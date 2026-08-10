@@ -78,10 +78,10 @@ export const HELMETS = {
 };
 
 export const EQUIPMENT_OVERLAY_OFFSETS = {
-    helmet: { offsetX: 0, offsetY: -0.25 },
+    helmet: { offsetX: 0, offsetY: 0 },
     armor: { offsetX: 0, offsetY: 0 },
-    weapon: { offsetX: -0.25, offsetY: 0 },
-    tool: { offsetX: 0.25, offsetY: 0 },
+    weapon: { offsetX: 0, offsetY: 0 },
+    tool: { offsetX: 0, offsetY: 0 },
 };
 
 export const TOOLS = {

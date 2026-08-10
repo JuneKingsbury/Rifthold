@@ -120,7 +120,7 @@ export const RESEARCH = {
     // Rifts
     warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards' },
     fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'stonework'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
-    void_summoning: { name: 'Void Summoning', cost: 550, requires: ['ley_channeling', 'warding', 'fortification'], tab: 'rifts', description: 'Open portals to summon waves of enemies', requiresBuildings: { arcane_sentinel: 1 }, requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
+    void_summoning: { name: 'Void Summoning', cost: 550, requires: ['ley_channeling', 'warding'], tab: 'rifts', description: 'Open portals to summon waves of enemies', requiresBuildings: { arcane_sentinel: 1 }, requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['void_summoning'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
     void_forging: { name: 'Void Forging', cost: 750, requires: ['void_architecture', 'runeforging'], tab: 'rifts', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
     planar_rift: { name: 'Planar Rift', cost: 800, requires: ['void_summoning', 'arcane_infusion'], tab: 'rifts', description: 'Open stable rifts for exploration expeditions', requiresMilestone: { stat: 'wavesCompleted', min: 1 } },
