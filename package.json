@@ -1,0 +1,16 @@
+{
+  "name": "convocation",
+  "version": "1.0.0",
+  "description": "Arcanum: Rifts & Ruins — a browser colony-sim. This package.json exists only for the dev/test tooling; the game itself runs as plain ES modules loaded by index.html and needs no build step.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "vitest": "^2.1.0"
+  }
+}
