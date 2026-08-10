@@ -564,7 +564,7 @@ class Game {
     }
 
     speedUp() {
-        this.speed = Math.min(5, this.speed + 1);
+        this.speed = Math.min(3, this.speed + 1);
     }
 
     speedDown() {
@@ -572,7 +572,7 @@ class Game {
     }
 
     setSpeed(val) {
-        this.speed = Math.max(1, Math.min(5, val));
+        this.speed = Math.max(1, Math.min(3, val));
         if (this.paused) this.togglePause();
     }
 
