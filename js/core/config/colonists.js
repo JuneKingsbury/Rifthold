@@ -188,3 +188,14 @@ export const TASK_SPEED_STATS = {
     build: 'buildSpeed',
     research: 'researchSpeed',
 };
+
+export const EASTER_EGG_COLONISTS = {
+    'Carson': {
+        nameColor: '#0be47b',
+        bodyVariant: 1,
+        hairVariant: 18,
+        shirtVariant: 2,
+        skills: { building: 2, farming: 2, crafting: 2, cooking: 4, animals: 4, research: 4 },
+        traits: ['pacifist', 'iron_stomach', 'tough']
+    }
+};

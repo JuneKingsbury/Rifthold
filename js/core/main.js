@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, ARTIFACTS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, COLONIST_NAMES } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, ARTIFACTS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, COLONIST_NAMES } from './config.js';
 import { generateMap, getTileChar, getTileColor, getTileBg } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -2438,19 +2438,6 @@ document.addEventListener('DOMContentLoaded', () => {
             spriteRow.appendChild(spriteCanvas);
             customView.appendChild(spriteRow);
 
-            // Appearance pickers (color + body/hair/shirt when a sprite pack is active)
-            const appearanceSection = document.createElement('div');
-            appearanceSection.style.cssText = 'margin-bottom:8px;';
-            const appearanceLabel = document.createElement('div');
-            appearanceLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
-            appearanceLabel.textContent = 'Appearance';
-            appearanceSection.appendChild(appearanceLabel);
-            const appearanceContainer = document.createElement('div');
-            appearanceContainer.dataset.slotAppearance = idx;
-            appearanceSection.appendChild(appearanceContainer);
-            rebuildAppearancePickers(appearanceContainer, spriteCanvas, nameDisplay);
-            customView.appendChild(appearanceSection);
-
             // Name
             const nameRow = document.createElement('div');
             nameRow.style.cssText = 'margin-bottom:8px;';
@@ -2464,12 +2451,35 @@ document.addEventListener('DOMContentLoaded', () => {
             nameInput.style.cssText = 'width:100%; box-sizing:border-box; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:3px; padding:3px 5px; font-family:inherit; font-size:11px;';
             nameInput.addEventListener('input', () => {
                 state.name = nameInput.value.trim() || `Colonist ${idx + 1}`;
+                if (EASTER_EGG_COLONISTS[state.name]) {
+                    const egg = EASTER_EGG_COLONISTS[state.name];
+                    state.nameColor = egg.nameColor;
+                    state.bodyVariant = egg.bodyVariant;
+                    state.hairVariant = egg.hairVariant;
+                    state.shirtVariant = egg.shirtVariant;
+                    state.skills = { ...egg.skills };
+                    state.traits = [...egg.traits];
+                    rebuildCustomView();
+                }
                 renderSlotName(nameDisplay, state, idx);
                 saveColonistSlots();
             });
             nameRow.appendChild(nameLabel);
             nameRow.appendChild(nameInput);
             customView.appendChild(nameRow);
+
+            // Appearance pickers (color + body/hair/shirt when a sprite pack is active)
+            const appearanceSection = document.createElement('div');
+            appearanceSection.style.cssText = 'margin-bottom:8px;';
+            const appearanceLabel = document.createElement('div');
+            appearanceLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
+            appearanceLabel.textContent = 'Appearance';
+            appearanceSection.appendChild(appearanceLabel);
+            const appearanceContainer = document.createElement('div');
+            appearanceContainer.dataset.slotAppearance = idx;
+            appearanceSection.appendChild(appearanceContainer);
+            rebuildAppearancePickers(appearanceContainer, spriteCanvas, nameDisplay);
+            customView.appendChild(appearanceSection);
 
             // Skills
             const skillsSection = document.createElement('div');
@@ -2607,44 +2617,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 pickerSelect.appendChild(placeholder);
 
                 const usedBudget = getSlotTraitValueSum(state);
-                for (const [key, def] of Object.entries(TRAITS)) {
-                    if (state.traits.includes(key)) continue;
-                    if (state.traits.length >= MAX_TRAITS) continue;
-                    // Check exclusions
-                    const excluded = TRAIT_EXCLUSIONS.some(pair => pair.includes(key) && state.traits.some(t => pair.includes(t)));
-                    if (excluded) continue;
-                    // Check if adding this would exceed budget (only block strictly positive cost traits)
-                    const newBudget = usedBudget + def.value;
-                    if (newBudget > TRAIT_VALUE_BUDGET) continue;
+                    for (const [key, def] of Object.entries(TRAITS)) {
+                        if (state.traits.includes(key)) continue;
+                        if (state.traits.length >= MAX_TRAITS) continue;
+                        // Check exclusions
+                        const excluded = TRAIT_EXCLUSIONS.some(pair => pair.includes(key) && state.traits.some(t => pair.includes(t)));
+                        if (excluded) continue;
+                        // Check if adding this would exceed budget (only block strictly positive cost traits)
+                        const newBudget = usedBudget + def.value;
+                        if (newBudget > TRAIT_VALUE_BUDGET) continue;
 
-                    const opt = document.createElement('option');
-                    opt.value = key;
-                    const sign = def.value > 0 ? `+${def.value}` : `${def.value}`;
-                    const valStr = def.value !== 0 ? ` (${sign})` : ' (0)';
-                    opt.textContent = `${def.name}${valStr}`;
-                    pickerSelect.appendChild(opt);
+                        const opt = document.createElement('option');
+                        opt.value = key;
+                        const sign = def.value > 0 ? `+${def.value}` : `${def.value}`;
+                        const valStr = def.value !== 0 ? ` (${sign})` : ' (0)';
+                        opt.textContent = `${def.name}${valStr}`;
+                        pickerSelect.appendChild(opt);
+                    }
                 }
-            }
-            rebuildTraitPicker();
-
-            pickerSelect.addEventListener('change', () => {
-                const key = pickerSelect.value;
-                if (!key) return;
-                const def = TRAITS[key];
-                if (!def) return;
-                const newBudget = getSlotTraitValueSum(state) + def.value;
-                if (newBudget > TRAIT_VALUE_BUDGET) return;
-                if (state.traits.length >= MAX_TRAITS) return;
-                state.traits.push(key);
-                pickerSelect.value = '';
-                rebuildSelectedTraits();
                 rebuildTraitPicker();
-                updateTraitBudgetDisplay();
-                saveColonistSlots();
-            });
-            traitsSection.appendChild(pickerSelect);
 
-            customView.appendChild(traitsSection);
+                pickerSelect.addEventListener('change', () => {
+                    const key = pickerSelect.value;
+                    if (!key) return;
+                    const def = TRAITS[key];
+                    if (!def) return;
+                    const newBudget = getSlotTraitValueSum(state) + def.value;
+                    if (newBudget > TRAIT_VALUE_BUDGET) return;
+                    if (state.traits.length >= MAX_TRAITS) return;
+                    state.traits.push(key);
+                    pickerSelect.value = '';
+                    rebuildSelectedTraits();
+                    rebuildTraitPicker();
+                    updateTraitBudgetDisplay();
+                    saveColonistSlots();
+                });
+                traitsSection.appendChild(pickerSelect);
+
+                customView.appendChild(traitsSection);
         }
 
         rebuildCustomView();
