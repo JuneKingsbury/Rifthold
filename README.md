@@ -1,9 +1,9 @@
-# Arcanum: Rifts & Ruins
+# Rifthold: Arcane Frontiers
 A Browser-Based Arcane Colony Management Sim
 
 ## About
 
-Arcanum is a colony management game inspired by Rimworld and Dwarf Fortress. Manage colonists, build defenses, research arcane technologies, and defend your settlement against waves of void creatures. The game comes with a classic ASCII renderer and supports custom pixel-art skins that can be created in the built-in Skin Editor.
+Rifthold is a colony management game inspired by Rimworld and Dwarf Fortress. Manage colonists, build defenses, research arcane technologies, and defend your settlement against waves of void creatures. The game comes with a classic ASCII renderer and supports custom pixel-art skins that can be created in the built-in Skin Editor.
 
 ---
 
@@ -209,7 +209,7 @@ Use "Auto-equip Best" to quickly gear up a colonist with the best available item
 
 ## Magic System
 
-Magic is at the heart of Arcanum. Colonists learn spells, channel mana, and reshape the world.
+Magic is at the heart of Rifthold. Colonists learn spells, channel mana, and reshape the world.
 
 ### Learning Spells
 Colonists learn spells by studying Spell Tomes at the research desk. Equip a tome, assign the colonist to research, and they'll make progress on it alongside generating study points. Progress persists if you unequip and re-equip the tome. Completing a tome consumes it and permanently grants that spell.
@@ -695,7 +695,7 @@ Accessible from Settings during gameplay or from the start screen. Features:
 
 ## Skins & Skin Editor
 
-Arcanum supports visual skins that replace ASCII characters with pixel-art sprites. Switch skins at any time from the start screen settings or the in-game settings panel.
+Rifthold supports visual skins that replace ASCII characters with pixel-art sprites. Switch skins at any time from the start screen settings or the in-game settings panel.
 
 ### How Skins Work
 A skin is a collection of PNG sprites organized by category (buildings, terrain, resources, entities, floors, effects). The game looks for skins as `.skin.zip` files in the `skins/` folder - any ZIP placed there is automatically detected and appears in the dropdown.

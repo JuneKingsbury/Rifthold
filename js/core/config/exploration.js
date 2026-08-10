@@ -600,7 +600,7 @@ export const WAVE_CONFIG = {
 
 // ============================================================================
 // STORY MILESTONES — SPOILER WARNING!
-// The text below contains narrative spoilers for Arcanum: Rifts & Ruins.
+// The text below contains narrative spoilers for Rifthold.
 // Do not read ahead if you want to experience the story organically in-game.
 // ============================================================================
 
