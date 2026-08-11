@@ -77,7 +77,7 @@ export function createColonist(x, y, skillBias, existingNames = []) {
     }
     const magicKeys = Object.keys(MAGIC_SKILLS);
     let magicBias = null;
-    if (traits.includes('magically_gifted') || Math.random() < COLONIST_CONFIG.magicBiasChance) {
+    if (traits.includes('magically_gifted')) {
         magicBias = magicKeys[Math.floor(Math.random() * magicKeys.length)];
         magicSkills[magicBias] = Math.min(10, magicSkills[magicBias] + (MAGIC_SKILLS[magicBias].biasBonus || 2));
     }
@@ -136,6 +136,35 @@ export function createColonist(x, y, skillBias, existingNames = []) {
         opinions: {},
         relationships: {},
     };
+}
+
+export function refreshCustomColonist(colonist) {
+    const magicSkills = {};
+    for (const [key, def] of Object.entries(MAGIC_SKILLS)) {
+        const [min, max] = def.baseLevel;
+        magicSkills[key] = min + Math.floor(Math.random() * (max - min + 1));
+    }
+    const magicKeys = Object.keys(MAGIC_SKILLS);
+    let magicBias = null;
+    if (colonist.traits.includes('magically_gifted')) {
+        magicBias = magicKeys[Math.floor(Math.random() * magicKeys.length)];
+        magicSkills[magicBias] = Math.min(10, magicSkills[magicBias] + (MAGIC_SKILLS[magicBias].biasBonus || 2));
+    }
+
+    // Magically Gifted colonists start knowing the level-0 spell for their magic school.
+    const starterSpell = (colonist.traits.includes('magically_gifted') && magicBias)
+        ? Object.entries(SPELLS).find(([, s]) => s.school === magicBias && s.minLevel === 0)?.[0] ?? null
+        : null;
+
+    const combinedMagicLevel = Object.values(magicSkills).reduce((sum, lvl) => sum + lvl, 0);
+    const maxMana = MANA_CONFIG.baseMana + combinedMagicLevel * MANA_CONFIG.manaPerMagicLevel;
+
+    // Ensure custom colonist starts with their spells and magic levels correctly.
+    colonist.magicSkills = magicSkills;
+    colonist.mana = maxMana;
+    colonist.maxMana = maxMana;
+    colonist.knownSpells = starterSpell ? [starterSpell] : [];
+    colonist.disabledSpells = [];
 }
 
 export function createGolem(type, x, y) {

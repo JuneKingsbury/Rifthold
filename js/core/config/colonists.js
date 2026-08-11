@@ -206,4 +206,12 @@ export const EASTER_EGG_COLONISTS = {
         skills: { building: 2, farming: 3, crafting: 5, cooking: 2, animals: 3, research: 3 },
         traits: ['socialite', 'optimist']
     },
+    'Robby': {
+        nameColor: '#125de8',
+        bodyVariant: 1,
+        hairVariant: 8,
+        shirtVariant: 3,
+        skills: { building: 3, farming: 2, crafting: 4, cooking: 2, animals: 2, research: 3 },
+        traits: ['magically_gifted', 'creative', 'early_bird']
+    },
 };

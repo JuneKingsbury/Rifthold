@@ -5,7 +5,7 @@ import { Camera } from '../ui/camera.js';
 import { Renderer } from '../ui/renderer.js';
 import { InputHandler } from '../ui/input.js';
 import { SkinManager } from '../ui/skin-manager.js';
-import { createColonist, createGolem, updateColonist, addThought, grantCastXp } from '../entities/colonist.js';
+import { createColonist, createGolem, refreshCustomColonist, updateColonist, addThought, grantCastXp } from '../entities/colonist.js';
 import { TaskQueue } from './tasks.js';
 import { ResourceManager } from '../systems/resources.js';
 import { detectRooms, calculateRoomQualities } from '../world/rooms.js';
@@ -209,6 +209,7 @@ class Game {
                 if (custom.nameColor) c.nameColor = custom.nameColor;
             }
             c.priorities[biases[i]] = 1;
+            refreshCustomColonist(c);
             this.addColonist(c);
         }
     }
@@ -2107,7 +2108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const TRAIT_VALUE_BUDGET = 3;
     const MAX_TRAITS = 3;
 
-    const COLONIST_SLOTS_KEY = 'convocation_colonist_slots';
+    const COLONIST_SLOTS_KEY = 'rifthold_colonist_slots';
 
     function saveColonistSlots() {
         try {
