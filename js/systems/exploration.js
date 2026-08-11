@@ -711,7 +711,7 @@ export class ExplorationSystem {
             }
         }
         for (const [res, amt] of Object.entries(exp.loot)) {
-            game.overlays.push({ type: 'floating_text', x: exp.gatePos.x, y: exp.gatePos.y, text: `+${amt} ${res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
+            game.overlays.push({ type: 'floating_text', x: exp.gatePos.x, y: exp.gatePos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
         }
         if (game.discoveredLoot) {
             for (const res of Object.keys(exp.loot)) {
@@ -724,12 +724,15 @@ export class ExplorationSystem {
                 game.discoveredLoot.add(`${exp.realm}:${itemKey}`);
             }
         }
-        const parts = Object.entries(exp.loot).map(([k, v]) => `${v} ${k}`);
+        const parts = [];// = Object.entries(exp.loot).map(([k, v]) => `${v} ${k}`);
         for (const artKey of artifacts) {
             parts.push(ARTIFACTS[artKey]?.name || artKey);
         }
         for (const itemKey of items) {
             parts.push(ALL_ITEMS[itemKey]?.name || itemKey);
+        }
+        for (const [res, amt] of Object.entries(exp.loot)) {
+            parts.push([`${amt}x ${ALL_ITEMS[res]?.name || res}`]);
         }
         const lootSummary = parts.join(', ');
         if (!allDefeated) {

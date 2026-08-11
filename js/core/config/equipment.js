@@ -1,6 +1,23 @@
 export const RECIPE_CATEGORIES = ['Materials', 'Weapons', 'Armor', 'Tools', 'Artifacts', 'Repair', 'Food & Potions', 'Tomes'];
 
 export const MATERIALS = {
+    wood: { name: 'Wood'},
+    stone: { name: 'Stone'},
+    food: { name: 'Food'},
+    meat: { name: 'Meat'},
+    wheat: { name: 'Wheat'},
+    berries: { name: 'Berries'},
+    corn: { name: 'Corn'},
+    potatoes: { name: 'Potatoes'},
+    moonbloom: { name: 'Moonbloom'},
+    hides: { name: 'Hides'},
+    iron_ore: { name: 'Iron Ore'},
+    runite: { name: 'Runite'},
+    eggs: { name: 'Eggs'},
+    milk: { name: 'Milk'},
+    wool: { name: 'Wool'},
+    void_essence: { name: 'Void Essence'},
+    gold: { name: 'Gold' },
     planks: { name: 'Planks', recipe: { input: { wood: 2 }, output: 3, ticks: 10, prefix: 'craft_' } },
     bricks: { name: 'Bricks', recipe: { input: { stone: 2 }, output: 3, ticks: 12, prefix: 'craft_' } },
     leather: { name: 'Leather', recipe: { input: { hides: 2 }, output: 2, ticks: 10, prefix: 'tan_' } },
