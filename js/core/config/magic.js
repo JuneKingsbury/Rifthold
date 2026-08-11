@@ -3,12 +3,12 @@ import { RECIPES } from './equipment.js';
 import { CROPS } from './world.js';
 
 export const MAGIC_SKILLS = {
-    evocation:     { name: 'Evocation', baseLevel: [0, 0], biasBonus: 2, color: '#ff6644', description: 'Ranged combat magic' },
-    enchantment:   { name: 'Enchantment', baseLevel: [0, 0], biasBonus: 2, color: '#88ffff', description: 'Support spells and golem animation' },
+    evocation:     { name: 'Evocation', baseLevel: [0, 0], biasBonus: 2, color: '#ff6644', description: 'Combat magic' },
+    enchantment:   { name: 'Enchantment', baseLevel: [0, 0], biasBonus: 2, color: '#88ffff', description: 'Supportive magic' },
     abjuration:    { name: 'Abjuration', baseLevel: [0, 0], biasBonus: 2, color: '#44ff44', description: 'Healing and protective magic' },
-    conjuration:   { name: 'Conjuration', baseLevel: [0, 0], biasBonus: 2, color: '#9966ff', description: 'Summoning and teleportation' },
+    conjuration:   { name: 'Conjuration', baseLevel: [0, 0], biasBonus: 2, color: '#9966ff', description: 'Summoning and teleportation magic' },
     transmutation: { name: 'Transmutation', baseLevel: [0, 0], biasBonus: 2, color: '#88ff88', description: 'Environmental and growth magic' },
-    divination:    { name: 'Divination', baseLevel: [0, 0], biasBonus: 2, color: '#ccaaff', description: 'Predicting and influencing fate' },
+    divination:    { name: 'Divination', baseLevel: [0, 0], biasBonus: 2, color: '#ccaaff', description: 'Influencing fate with magic' },
 };
 
 export const MANA_CONFIG = {
@@ -21,51 +21,77 @@ export const MANA_CONFIG = {
 };
 
 export const SPELLS = {
+    // Evocation
     spark: { name: 'Spark', school: 'evocation', minLevel: 0, manaCost: 4, cooldown: 25, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 6, range: 4, projectileColor: '#ffaa33', projectileChar: '.' },
+    magic_missile: { name: 'Magic Missile', school: 'evocation', minLevel: 2, manaCost: 8, cooldown: 30, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 15, range: 6, projectileColor: '#ff44ff', projectileChar: '*' },
+    smite: { name: 'Smite', school: 'evocation', minLevel: 2, manaCost: 6, cooldown: 20, castType: 'auto', trigger: 'inCombat', effect: 'melee_damage', damage: 12, range: 1, projectileColor: '#ffffaa', projectileChar: '✝' },
+    fireball: { name: 'Fireball', school: 'evocation', minLevel: 4, manaCost: 18, cooldown: 60, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_aoe', damage: 12, range: 7, radius: 2, projectileColor: '#ff6600', projectileChar: '●' },
+    
+    // Abjuration
     mend: { name: 'Mend', school: 'abjuration', minLevel: 0, manaCost: 5, cooldown: 60, castType: 'auto', trigger: 'lowHealth', effect: 'heal', healAmount: 8, targetSelf: true },
+    heal: { name: 'Heal', school: 'abjuration', minLevel: 2, manaCost: 10, cooldown: 60, castType: 'auto', trigger: 'lowHealth', hpThreshold: 0.5, effect: 'heal', healAmount: 30, targetSelf: true },
+    shield: { name: 'Shield', school: 'abjuration', minLevel: 4, manaCost: 15, cooldown: 150, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense', damageReduction: 0.3, duration: 60 },
+    
+    // Enchantment
     quicken: { name: 'Quicken', school: 'enchantment', minLevel: 0, manaCost: 6, cooldown: 80, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', moveSpeedBonus: 0, workSpeedBonus: 1.2, duration: 40 },
-    phase_step: { name: 'Phase Step', school: 'conjuration', minLevel: 0, manaCost: 6, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'buff_speed', moveSpeedBonus: 2, workSpeedBonus: 1.0, duration: 20 },
-    nurture: { name: 'Nurture', school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 200, castType: 'targeted', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },
-    magic_missile: { name: 'Magic Missile', school: 'evocation', minLevel: 1, manaCost: 8, cooldown: 30, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 15, range: 6, projectileColor: '#ff44ff', projectileChar: '*' },
-    smite: { name: 'Smite', school: 'evocation', minLevel: 1, manaCost: 6, cooldown: 20, castType: 'auto', trigger: 'inCombat', effect: 'melee_damage', damage: 12, range: 1, projectileColor: '#ffffaa', projectileChar: '✝' },
-    fireball: { name: 'Fireball', school: 'evocation', minLevel: 3, manaCost: 18, cooldown: 60, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_aoe', damage: 12, range: 7, radius: 2, projectileColor: '#ff6600', projectileChar: '●' },
     haste: { name: 'Haste', school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 200, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', moveSpeedBonus: 0.4, workSpeedBonus: 1.2, duration: 80, idleExclude: true },
-    heal: { name: 'Heal', school: 'abjuration', minLevel: 1, manaCost: 10, cooldown: 60, castType: 'auto', trigger: 'lowHealth', hpThreshold: 0.5, effect: 'heal', healAmount: 30, targetSelf: true },
-    shield: { name: 'Shield', school: 'abjuration', minLevel: 3, manaCost: 15, cooldown: 150, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense', damageReduction: 0.3, duration: 60 },
-    warp: { name: 'Warp', school: 'conjuration', minLevel: 2, manaCost: 15, cooldown: 100, castType: 'targeted', effect: 'teleport', range: 20 },
-    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 3, manaCost: 25, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
-    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 4, manaCost: 35, cooldown: 500, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
+    
+    // Conjuration
+    phase_step: { name: 'Phase Step', school: 'conjuration', minLevel: 0, manaCost: 6, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'teleport', range: 5 },
+    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 0, manaCost: 25, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
+    warp: { name: 'Warp', school: 'conjuration', minLevel: 2, manaCost: 15, cooldown: 100, castType: 'targeted', effect: 'teleport', range: 15 },
+    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 2, manaCost: 35, cooldown: 500, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
+    gate: { name: 'Gate', school: 'conjuration', minLevel: 4, manaCost: 25, cooldown: 200, castType: 'targeted', effect: 'teleport', range: 30 },
+    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 4, manaCost: 50, cooldown: 600, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
+
+    // Transmutation
+    nurture: { name: 'Nurture', school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 200, castType: 'targeted', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },
     circle_of_growth: { name: 'Circle of Growth', school: 'transmutation', minLevel: 2, manaCost: 20, cooldown: 400, castType: 'targeted', effect: 'boost_crops', range: 10, radius: 3, growthMult: 2.0, duration: 200 },
     level_field: { name: 'Level Field', school: 'transmutation', minLevel: 4, manaCost: 30, cooldown: 600, castType: 'targeted', effect: 'terraform', range: 8, radius: 3, targetTerrain: 'grass' },
+    
+    // Divination
     foresight: { name: 'Foresight', school: 'divination', minLevel: 0, manaCost: 6, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { raidDelay: 200 }, duration: 300 },
-    fair_winds: { name: 'Fair Winds', school: 'divination', minLevel: 1, manaCost: 10, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { weatherBias: 'clear' }, duration: 200 },
-    merchants_omen: { name: "Merchant's Omen", school: 'divination', minLevel: 2, manaCost: 15, cooldown: 600, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'caravan', eventMult: 3.0 }, duration: 400 },
-    ward_of_calamity: { name: 'Ward of Calamity', school: 'divination', minLevel: 3, manaCost: 20, cooldown: 800, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { suppressEvents: ['blight', 'cold_snap', 'fire'] }, duration: 500 },
-    fortunate_discovery: { name: 'Fortunate Discovery', school: 'divination', minLevel: 4, manaCost: 25, cooldown: 1000, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'meteorite', eventMult: 5.0 }, duration: 600 },
+    fair_winds: { name: 'Fair Winds', school: 'divination', minLevel: 2, manaCost: 10, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { weatherBias: 'clear' }, duration: 200 },
+    merchants_omen: { name: "Merchant's Omen", school: 'divination', minLevel: 3, manaCost: 15, cooldown: 600, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'caravan', eventMult: 3.0 }, duration: 400 },
+    ward_of_calamity: { name: 'Ward of Calamity', school: 'divination', minLevel: 4, manaCost: 20, cooldown: 800, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { suppressEvents: ['blight', 'cold_snap', 'fire'] }, duration: 500 },
+    fortunate_discovery: { name: 'Fortunate Discovery', school: 'divination', minLevel: 5, manaCost: 25, cooldown: 1000, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'meteorite', eventMult: 5.0 }, duration: 600 },
 };
 
 export const SPELL_TOMES = {
+    // Evocation
     tome_of_spark: { name: 'Tome of Spark', tradeValue: 12, spell: 'spark', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a basic bolt of fire at nearby foes.' },
+    tome_of_smite: { name: 'Tome of Smite', tradeValue: 22, spell: 'smite', learningWork: 120, minSchoolLevel: 2, description: 'Teaches a powerful melee strike of holy energy.' },
+    tome_of_magic_missile: { name: 'Tome of Magic Missile', tradeValue: 28, spell: 'magic_missile', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a potent ranged arcane bolt.' },
+    tome_of_fireball: { name: 'Tome of Fireball', tradeValue: 58, spell: 'fireball', learningWork: 350, minSchoolLevel: 4, description: 'Teaches an explosive fireball that damages an area.' },
+
+    // Abjuration
     tome_of_mend: { name: 'Tome of Mend', tradeValue: 12, spell: 'mend', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a minor self-healing incantation.' },
+    tome_of_heal: { name: 'Tome of Heal', tradeValue: 32, spell: 'heal', learningWork: 180, minSchoolLevel: 2, description: 'Teaches a strong healing spell.' },
+    tome_of_shield: { name: 'Tome of Shield', tradeValue: 52, spell: 'shield', learningWork: 320, minSchoolLevel: 4, description: 'Teaches a protective barrier that reduces damage.' },
+
+    // Enchantment
     tome_of_quicken: { name: 'Tome of Quicken', tradeValue: 12, spell: 'quicken', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a spell to hasten work speed.' },
-    tome_of_phase_step: { name: 'Tome of Phase Step', tradeValue: 12, spell: 'phase_step', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a burst of supernatural movement speed.' },
-    tome_of_nurture: { name: 'Tome of Nurture', tradeValue: 12, spell: 'nurture', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a spell to accelerate crop growth.' },
-    tome_of_smite: { name: 'Tome of Smite', tradeValue: 22, spell: 'smite', learningWork: 120, minSchoolLevel: 1, description: 'Teaches a powerful melee strike of holy energy.' },
-    tome_of_magic_missile: { name: 'Tome of Magic Missile', tradeValue: 28, spell: 'magic_missile', learningWork: 150, minSchoolLevel: 1, description: 'Teaches a potent ranged arcane bolt.' },
-    tome_of_fireball: { name: 'Tome of Fireball', tradeValue: 58, spell: 'fireball', learningWork: 350, minSchoolLevel: 3, description: 'Teaches an explosive fireball that damages an area.' },
     tome_of_haste: { name: 'Tome of Haste', tradeValue: 45, spell: 'haste', learningWork: 280, minSchoolLevel: 2, description: 'Teaches a powerful speed enhancement spell.' },
-    tome_of_heal: { name: 'Tome of Heal', tradeValue: 32, spell: 'heal', learningWork: 180, minSchoolLevel: 1, description: 'Teaches a strong healing spell.' },
-    tome_of_shield: { name: 'Tome of Shield', tradeValue: 52, spell: 'shield', learningWork: 320, minSchoolLevel: 3, description: 'Teaches a protective barrier that reduces damage.' },
+
+    // Conjuration
+    tome_of_phase_step: { name: 'Tome of Phase Step', tradeValue: 12, spell: 'phase_step', learningWork: 60, minSchoolLevel: 0, description: 'Teaches instant teleportation a short distance away.' },
+    tome_of_summon_familiar: { name: 'Tome of Summon Familiar', tradeValue: 24, spell: 'summon_familiar', learningWork: 120, minSchoolLevel: 0, description: 'Teaches summoning a familiar to fight alongside.' },
     tome_of_warp: { name: 'Tome of Warp', tradeValue: 38, spell: 'warp', learningWork: 230, minSchoolLevel: 2, description: 'Teaches instant teleportation to a target location.' },
-    tome_of_summon_familiar: { name: 'Tome of Summon Familiar', tradeValue: 62, spell: 'summon_familiar', learningWork: 380, minSchoolLevel: 3, description: 'Teaches summoning a familiar to fight alongside.' },
-    tome_of_summon_ghost: { name: 'Tome of Summon Ghost', tradeValue: 70, spell: 'summon_ghost', learningWork: 440, minSchoolLevel: 4, description: 'Teaches summoning a spectral warrior.' },
+    tome_of_summon_ghost: { name: 'Tome of Summon Ghost', tradeValue: 70, spell: 'summon_ghost', learningWork: 440, minSchoolLevel: 2, description: 'Teaches summoning a spectral warrior.' },
+    tome_of_gate: { name: 'Tome of Gate', tradeValue: 38, spell: 'gate', learningWork: 440, minSchoolLevel: 4, description: 'Teaches instant teleportation to a distant location.' },
+    tome_of_summon_monster: { name: 'Tome of Summon Monster', tradeValue: 70, spell: 'summon_monster', learningWork: 650, minSchoolLevel: 4, description: 'Teaches summoning a monster under your control.' },
+
+    // Transmuation
+    tome_of_nurture: { name: 'Tome of Nurture', tradeValue: 12, spell: 'nurture', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a spell to accelerate crop growth.' },
     tome_of_circle_of_growth: { name: 'Tome of Circle of Growth', tradeValue: 40, spell: 'circle_of_growth', learningWork: 240, minSchoolLevel: 2, description: 'Teaches a wide-area crop growth enhancement.' },
     tome_of_level_field: { name: 'Tome of Level Field', tradeValue: 70, spell: 'level_field', learningWork: 440, minSchoolLevel: 4, description: 'Teaches terrain-shaping transmutation magic.' },
+
+    // Divination
     tome_of_foresight: { name: 'Tome of Foresight', tradeValue: 12, spell: 'foresight', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a divination that delays enemy raids.' },
-    tome_of_fair_winds: { name: 'Tome of Fair Winds', tradeValue: 28, spell: 'fair_winds', learningWork: 150, minSchoolLevel: 1, description: 'Teaches a spell that biases weather toward clear skies.' },
-    tome_of_merchants_omen: { name: "Tome of Merchant's Omen", tradeValue: 40, spell: 'merchants_omen', learningWork: 240, minSchoolLevel: 2, description: 'Teaches a divination that attracts caravans.' },
-    tome_of_ward_of_calamity: { name: 'Tome of Ward of Calamity', tradeValue: 58, spell: 'ward_of_calamity', learningWork: 350, minSchoolLevel: 3, description: 'Teaches a ward that suppresses natural disasters.' },
-    tome_of_fortunate_discovery: { name: 'Tome of Fortunate Discovery', tradeValue: 70, spell: 'fortunate_discovery', learningWork: 440, minSchoolLevel: 4, description: 'Teaches a divination that attracts meteorites.' },
+    tome_of_fair_winds: { name: 'Tome of Fair Winds', tradeValue: 28, spell: 'fair_winds', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a spell that biases weather toward clear skies.' },
+    tome_of_merchants_omen: { name: "Tome of Merchant's Omen", tradeValue: 40, spell: 'merchants_omen', learningWork: 240, minSchoolLevel: 3, description: 'Teaches a divination that attracts caravans.' },
+    tome_of_ward_of_calamity: { name: 'Tome of Ward of Calamity', tradeValue: 58, spell: 'ward_of_calamity', learningWork: 350, minSchoolLevel: 4, description: 'Teaches a ward that suppresses natural disasters.' },
+    tome_of_fortunate_discovery: { name: 'Tome of Fortunate Discovery', tradeValue: 70, spell: 'fortunate_discovery', learningWork: 440, minSchoolLevel: 5, description: 'Teaches a divination that attracts meteorites.' },
 };
 
 export const RESEARCH_TABS = [
