@@ -587,6 +587,12 @@ class Game {
         c.priorities[skill] = (c.priorities[skill] + 1) % 6;
     }
 
+    cycleBackPriority(colonistId, skill) {
+        const c = this.getColonist(colonistId);
+        if (!c || c.golem) return;
+        c.priorities[skill] = (c.priorities[skill] - 1 + 6) % 6;
+    }
+
     toggleDraft(colonistId) {
         const c = this.getColonist(colonistId);
         if (!c || c.hp <= 0) return;

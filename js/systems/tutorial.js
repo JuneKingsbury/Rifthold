@@ -109,9 +109,37 @@ const TUTORIAL_STEPS = [
         },
     },
     {
+        id: 'tome',
+        title: 'Craft a Tome',
+        description: 'Open Craft [C], find the Tomes section, and craft any spell tome. Your colonists can learn a wide variety of spells that can help grow your colony.',
+        highlight: 'craft',
+        isComplete(game) {
+            if (game.resources.tomes.length > 0) return true;
+            return game.colonists.some(c => c.tome);
+        },
+        goTo(game) { game.ui.toggleCraftPanel(); },
+    },
+    {
+        id: 'equip_tome',
+        title: 'Equip a Tome',
+        description: 'Click a colonist to select them, then click an empty tome slot in their info panel to equip your crafted tome. The colonist will automatically study the tome as part of their regular research tasks.',
+        highlight: null,
+        isComplete(game) {
+            return game.colonists.some(c => c.tome);
+        },
+        goTo(game) {
+            const col = game.colonists.find(c => c.hp > 0);
+            if (col) {
+                game.selectedColonist = col.id;
+                game.selectedColonists = [col.id];
+                game.ui.update();
+            }
+        },
+    },
+    {
         id: 'bedroom',
         title: 'Build a Bedroom',
-        description: 'Build an enclosed room (walls on all sides + a door) with a Bed inside. Valid bedrooms give colonists an ongoing mood bonus when they sleep.',
+        description: 'Build an enclosed room (walls on all sides + a door) with a Bed inside. Valid bedrooms give colonists an ongoing mood bonus when they sleep. The same system can be used to make specialty buildings for each of your different workstations.',
         highlight: 'build',
         isComplete(game) {
             return Object.keys(game.roomQualities).length > 0;

@@ -303,6 +303,18 @@ export class UI {
             }
         });
 
+        this.elements.priorityPanel.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const cell = e.target.closest('[data-colonist-id][data-skill]');
+            if (cell) {
+                const colonistId = parseInt(cell.dataset.colonistId);
+                const skill = cell.dataset.skill;
+                this.game.cycleBackPriority(colonistId, skill);
+                this._lastPrioHtml = null;
+                this.updatePriorityPanel();
+            }
+        });
+
         this.elements.inventoryPanel.addEventListener('click', (e) => {
             const tabBtn = e.target.closest('[data-inv-tab]');
             if (tabBtn) {
@@ -1750,7 +1762,7 @@ export class UI {
     updatePriorityPanel() {
         const skills = Object.keys(SKILLS);
         let html = '<table><tr><th>Colonist</th>';
-        skills.forEach(s => { html += `<th>${s.substring(0, 5)}</th>`; });
+        skills.forEach(s => { html += `<th>${s.substring(0, 8)}</th>`; });
         html += '</tr>';
 
         for (const c of this.game.colonists) {
@@ -1760,8 +1772,10 @@ export class UI {
                 const val = c.priorities[s];
                 const display = val === 0 ? '-' : val;
                 const isGolem = c.golem;
+                const currentSkillLevel = c.skills[s];
+                const colorFromLevel = currentSkillLevel === 1 ? '#ff4444' : currentSkillLevel === 2 ? '#ff3c00' : currentSkillLevel === 3 ? '#ff7b00' : currentSkillLevel === 4 ? '#ffc800' : currentSkillLevel === 5 ? '#fff700' : currentSkillLevel === 6 ? '#ddff00' : currentSkillLevel === 7 ? '#ccff00' : currentSkillLevel === 8 ? '#80ff00' : currentSkillLevel === 9 ? '#91ff00' : currentSkillLevel === 10 ? '#80ff00' : '#666';
                 const cellClass = isGolem ? 'prio-cell golem-locked' : 'prio-cell';
-                const cellStyle = isGolem ? 'opacity: 0.6; cursor: not-allowed;' : '';
+                const cellStyle = isGolem ? 'opacity: 0.6; cursor: not-allowed;' : `background-color:${colorFromLevel};color:white;text-shadow:-1px -1px 0.5px #000, 1px -1px 0.5px #000, -1px  1px 0.5px #000, 1px  1px 0.5px #000;`;
                 html += `<td class="${cellClass}" data-colonist-id="${c.id}" data-skill="${s}" style="${cellStyle}">${display}</td>`;
             }
             html += '</tr>';
