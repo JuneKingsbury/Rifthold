@@ -53,7 +53,7 @@ function checkRelationshipChange(colonist, other, prevTierKey, game) {
         game.notifications.push({ text: `${colonist.name} and ${other.name} are now close friends!`, tick: game.tick, type: 'success' });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Close Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
         game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Close Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
-    } else if (newTierKey === 'lovers') {
+    } else if (newTierKey === 'lovers' && colonist.relationships.includes('lovers') === false && other.relationships.includes('lovers') === false) {
         addThought(colonist, THOUGHTS.fell_in_love.text, THOUGHTS.fell_in_love.moodEffect, THOUGHTS.fell_in_love.duration, game.tick);
         game.notifications.push({ text: `${colonist.name} has fallen in love with ${other.name}!`, tick: game.tick, type: 'success' });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Lovers!', color: '#ff88cc', fontSize: 11, ttl: 15, maxTtl: 15 });
