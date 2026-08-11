@@ -253,7 +253,7 @@ const arcaneMethods = {
         html += `<div id="exp-diff-desc" style="color:#888;font-size:0.8em;padding:2px 4px;"></div>`;
         html += `<div id="exp-strength-preview" style="margin-top:8px;padding:6px 8px;background:#1a1a2e;border-radius:4px;font-size:0.9em;color:#666;">Select colonists to see party strength</div>`;
         html += this._buildRealmDropsHtml(realmKey);
-        html += `<div class="info-actions" style="margin-top:16px;">`;
+        html += `<div class="info-actions" style="margin-top:8px;">`;
         html += `<button onclick="window.game.launchExpeditionFromPanel('${realmKey}')" style="background:#1a4466;color:#88ddff;padding:8px 16px;border:none;border-radius:4px;cursor:pointer;font-size:1em;">Launch Expedition</button>`;
         html += `<button onclick="window.game.ui._arcaneExpSetup=null;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#333;color:#aaa;padding:8px 12px;border:none;border-radius:4px;cursor:pointer;margin-left:8px;">Cancel</button>`;
         html += `</div></div>`;
@@ -265,7 +265,7 @@ const arcaneMethods = {
         if (!dim) return '';
         const discovered = this.game.discoveredLoot || new Set();
         let html = `<div style="margin-top:10px;color:#ccaa44;font-weight:bold;font-size:0.9em;">Possible Drops</div>`;
-        html += `<div style="max-height:120px;margin-top:4px;padding:4px;background:#1a1a2e;border-radius:4px;">`;
+        html += `<div style="margin-top:4px;padding:4px;background:#1a1a2e;border-radius:4px;">`;
 
         const totalWeight = dim.loot.reduce((s, l) => s + l.weight, 0);
         for (const entry of dim.loot) {
