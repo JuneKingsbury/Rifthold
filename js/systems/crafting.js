@@ -45,13 +45,33 @@ export function queueCraftingOrder(game, recipeKey) {
     return true;
 }
 
+export function queueEnchantingOrder(game, itemKey, itemQuality, itemType) {
+    const station = findAvailableStation(game, 'enchanting_table');
+    if (!station || !station.powered) return false;
+
+    let workAmount = 100; // Base work amount for enchanting, can be adjusted as needed.
+
+    game.taskQueue.add({
+        type: 'enchant',
+        skillRequired: 'crafting',
+        x: station.x,
+        y: station.y,
+        workAmount,
+        itemKey,
+        itemQuality,
+        itemType
+    });
+
+    return true;
+}
+
 function findAvailableStation(game, stationType) {
     let usePowered = stationType === 'workbench' && game.research.isResearched('arcane_infusion') && game.power.hasPower();
 
-    const pendingTasks = game.taskQueue.getAll().filter(t => t.type === 'craft' || t.type === 'cook');
+    const pendingTasks = game.taskQueue.getAll().filter(t => t.type === 'craft' || t.type === 'cook' || t.type === 'enchant');
     const taskCountAt = (x, y) => pendingTasks.filter(t => t.x === x && t.y === y).length;
 
-    if (usePowered) {
+    if (stationType === 'enchanting_table' || usePowered) {
         const stations = game.mapIndex.findAll('enchanting_table');
         let best = null, bestCount = Infinity;
         for (const { x, y } of stations) {

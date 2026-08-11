@@ -41,7 +41,7 @@ export class TaskQueue {
         for (const t of this.tasks) {
             this._byId.set(t.id, t);
             this._byPosition.set(this._posKey(t.x, t.y), t);
-            if ((t.type === 'craft' || t.type === 'cook') && t.status === 'in_progress') {
+            if ((t.type === 'craft' || t.type === 'cook' || t.type === 'enchant') && t.status === 'in_progress') {
                 this._busyStations.add(this._posKey(t.x, t.y));
             }
         }
@@ -81,7 +81,7 @@ export class TaskQueue {
             if (colonist.priorities[t.skillRequired] <= 0) continue;
             // Skip tasks this colonist recently failed to reach (30-tick cooldown)
             if (failedTasks && failedTasks[t.id] !== undefined && tick - failedTasks[t.id] < 30) continue;
-            if ((t.type === 'craft' || t.type === 'cook') && this._busyStations.has(this._posKey(t.x, t.y))) continue;
+            if ((t.type === 'craft' || t.type === 'cook' || t.type === 'enchant') && this._busyStations.has(this._posKey(t.x, t.y))) continue;
 
             // Lower priority number = higher preference; multiplied to dominate over distance
             const prio = colonist.priorities[t.skillRequired];
@@ -102,7 +102,7 @@ export class TaskQueue {
         if (task) {
             task.assignedTo = colonistId;
             task.status = 'in_progress';
-            if (task.type === 'craft' || task.type === 'cook') {
+            if (task.type === 'craft' || task.type === 'cook' || task.type === 'enchant') {
                 this._busyStations.add(this._posKey(task.x, task.y));
             }
             this._pendingDirty = true;
@@ -112,7 +112,7 @@ export class TaskQueue {
     release(taskId) {
         const task = this._byId.get(taskId);
         if (task) {
-            if (task.type === 'craft' || task.type === 'cook') {
+            if (task.type === 'craft' || task.type === 'cook' || task.type === 'enchant') {
                 this._busyStations.delete(this._posKey(task.x, task.y));
             }
             task.assignedTo = null;

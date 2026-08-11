@@ -30,4 +30,5 @@ export const TASK_TYPES = Object.freeze({
     TAME: 'tame',
     RESEARCH: 'research',
     EXTINGUISH: 'extinguish',
+    ENCHANT: 'enchant',
 });

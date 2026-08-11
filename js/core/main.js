@@ -10,7 +10,7 @@ import { TaskQueue } from './tasks.js';
 import { ResourceManager } from '../systems/resources.js';
 import { detectRooms, calculateRoomQualities } from '../world/rooms.js';
 import { updateFarming } from '../systems/farming.js';
-import { queueCraftingOrder, updateAutoCook, updateAutoCraft } from '../systems/crafting.js';
+import { queueCraftingOrder, queueEnchantingOrder, updateAutoCook, updateAutoCraft } from '../systems/crafting.js';
 import { Weather } from '../world/weather.js';
 import { updateWildlife, designateHunt } from '../entities/wildlife.js';
 import { CombatSystem } from '../entities/combat.js';
@@ -819,6 +819,17 @@ class Game {
         this.ui.updateInventoryPanel();
     }
 
+    _enchantItem(itemIndex, itemType) {
+        const itemKey = this.resources[itemType][itemIndex]?.key;
+        if (queueEnchantingOrder(this, itemKey, this.resources[itemType][itemIndex].quality, itemType)) {
+            this.notifications.push({ text: `Queued Enchantment on ${itemKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
+            // Discard original item if successfully queued for enchanting.
+            const list = this.resources[itemType];
+            const item = list.splice(itemIndex, 1)[0];
+            this.ui.updateInventoryPanel();
+        }
+    }
+
     equipWeapon(colonistId, index) { this._equipItem(colonistId, index, 'weapon', 'weapons', 'addWeapon'); }
     unequipWeapon(colonistId) { this._unequipItem(colonistId, 'weapon', 'addWeapon', 'weapon'); }
 
@@ -844,6 +855,12 @@ class Game {
         }
         if (queued > 0) {
             this.notifications.push({ text: `Queued ${queued}x: ${recipeKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
+        }
+    }
+
+    enchant(item) {
+        if (queueEnchantingOrder(this, item)) {
+            this.notifications.push({ text: `Queued Enchantment: ${item.name}`, tick: this.tick, type: 'success' });
         }
     }
 
@@ -1187,9 +1204,13 @@ class Game {
     discardWeapon(index) { this._discardItem(index, 'weapons'); }
     discardArmor(index) { this._discardItem(index, 'armors'); }
     discardHelmet(index) { this._discardItem(index, 'helmets'); }
+    discardTool(index) { this._discardItem(index, 'tools'); }
+    enchantWeapon(index) { this._enchantItem(index, 'weapons'); }
+    enchantArmor(index) { this._enchantItem(index, 'armors'); }
+    enchantHelmet(index) { this._enchantItem(index, 'helmets'); }
+    enchantTool(index) { this._enchantItem(index, 'tools'); }
     equipTool(colonistId, index) { this._equipItem(colonistId, index, 'tool', 'tools', 'addTool'); }
     unequipTool(colonistId) { this._unequipItem(colonistId, 'tool', 'addTool', 'tool'); }
-    discardTool(index) { this._discardItem(index, 'tools'); }
     equipArtifact(colonistId, index) { this._equipItem(colonistId, index, 'artifact', 'artifacts', 'addArtifact'); }
     unequipArtifact(colonistId) { this._unequipItem(colonistId, 'artifact', 'addArtifact', 'artifact'); }
 

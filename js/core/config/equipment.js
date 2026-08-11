@@ -189,6 +189,26 @@ export const ITEM_CHARS = {
     consumable: { char: '◆', color: '#aa44ff' },
 };
 
+export const WEAPON_ENCHANTMENT_EFFECTS = {
+    sharpness: { suffix: 'of Sharpness', description: 'Increases damage of attacks.', damageBonus: 3 },
+    //fire: { suffix: 'of Fire', description: 'Adds fire damage to attacks.', damageBonus: 5, effect: 'burn', burnDamage: 2, burnDuration: 5 },
+    //frost: { suffix: 'of Frost', description: 'Adds frost damage to attacks.', damageBonus: 3, effect: 'slow', slowAmount: 0.3, slowDuration: 4 },
+    //shock: { suffix: 'of Shock', description: 'Adds shock damage to attacks.', damageBonus: 4, effect: 'stun', stunDuration: 2 },
+    //poison: { suffix: 'of Poison', description: 'Adds poison damage to attacks.', damageBonus: 2, effect: 'poison', poisonDamage: 3, poisonDuration: 6 },
+};
+
+export const ARMOR_ENCHANTMENT_EFFECTS = {
+    protection: { suffix: 'of Protection', description: 'Increases defense of the wearer.', defenseBonus: 5 },
+};
+
+export const HELMET_ENCHANTMENT_EFFECTS = {
+    wisdom: { suffix: 'of Wisdom', description: 'Increases mana regeneration of the wearer.', manaRegenBonus: 2 },
+};
+
+export const TOOL_ENCHANTMENT_EFFECTS = {
+    efficiency: { suffix: 'of Efficiency', description: 'Reduces the time needed to complete tasks.', timeReduction: 0.2 },
+};
+
 const ARMOR_PAIRS = [
     ['wool_cap', HELMETS], ['wool_parka', ARMORS],
     ['leather_cap', HELMETS], ['leather_vest', ARMORS],

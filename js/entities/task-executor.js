@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, HELMET_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana } from './colonist.js';
@@ -32,6 +32,94 @@ function applyQuality(item, colonist, game, ...statKeys) {
     if (tier.key === 'superior' && window.game?.stats) {
         window.game.stats.superiorItemsCrafted++;
     }
+}
+
+function applyWeaponEnchantment(item, colonist, game) {
+    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
+    let skill = colonist.magicSkills.enchantment || 1;
+    if (game && game.workshopQualities) {
+        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
+        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
+            skill += game.workshopQualities[roomId].qualityBonus;
+        }
+    }
+    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
+    const total = chances.reduce((s, c) => s + c, 0);
+    let roll = Math.random() * total;
+    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
+    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
+        roll -= chances[i];
+        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
+    }*/
+    const enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS['sharpness']; // For now, always apply sharpness. TODO: Implement a random selection based on skill later.
+    item.enchantment = enchantmentEffect.key;
+    item.name = `${item.name} ${enchantmentEffect.suffix}`;
+}
+
+function applyArmorEnchantment(item, colonist, game) {
+    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
+    let skill = colonist.magicSkills.enchantment || 1;
+    if (game && game.workshopQualities) {
+        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
+        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
+            skill += game.workshopQualities[roomId].qualityBonus;
+        }
+    }
+    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
+    const total = chances.reduce((s, c) => s + c, 0);
+    let roll = Math.random() * total;
+    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
+    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
+        roll -= chances[i];
+        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
+    }*/
+    const enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS['protection']; // For now, always apply protection. TODO: Implement a random selection based on skill later.
+    item.enchantment = enchantmentEffect.key;
+    item.name = `${item.name} ${enchantmentEffect.suffix}`;
+}
+
+function applyHelmetEnchantment(item, colonist, game) {
+    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
+    let skill = colonist.magicSkills.enchantment || 1;
+    if (game && game.workshopQualities) {
+        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
+        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
+            skill += game.workshopQualities[roomId].qualityBonus;
+        }
+    }
+    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
+    const total = chances.reduce((s, c) => s + c, 0);
+    let roll = Math.random() * total;
+    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
+    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
+        roll -= chances[i];
+        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
+    }*/
+    const enchantmentEffect = HELMET_ENCHANTMENT_EFFECTS['wisdom']; // For now, always apply wisdom. TODO: Implement a random selection based on skill later.
+    item.enchantment = enchantmentEffect.key;
+    item.name = `${item.name} ${enchantmentEffect.suffix}`;
+}
+
+function applyToolEnchantment(item, colonist, game) {
+    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
+    let skill = colonist.magicSkills.enchantment || 1;
+    if (game && game.workshopQualities) {
+        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
+        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
+            skill += game.workshopQualities[roomId].qualityBonus;
+        }
+    }
+    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
+    const total = chances.reduce((s, c) => s + c, 0);
+    let roll = Math.random() * total;
+    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
+    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
+        roll -= chances[i];
+        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
+    }*/
+    const enchantmentEffect = TOOL_ENCHANTMENT_EFFECTS['efficiency']; // For now, always apply efficiency. TODO: Implement a random selection based on skill later.
+    item.enchantment = enchantmentEffect.key;
+    item.name = `${item.name} ${enchantmentEffect.suffix}`;
 }
 
 function applyThought(colonist, thoughtKey, tick) {
@@ -164,6 +252,33 @@ export function completeTask(colonist, task, game) {
                 applyThought(colonist, 'harvested', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.harvestChar, color: COMBAT_VISUALS.harvestColor, ttl: COMBAT_VISUALS.harvestTtl });
                 window.soundManager?.playSFX('harvest');
+            }
+            break;
+        }
+        case 'enchant': {
+            if (task.itemKey) {
+                const def = ALL_ITEMS[task.itemKey]
+                if (def) {
+                    const item = { ...def, key: task.itemKey };
+                    // Re-apply original item quality
+                    if (def.type === 'weapon') applyQuality(item, colonist, game, 'damage'); // TODO: Re-apply original item quality
+                    else if (def.type === 'armor' || def.type === 'helmet') applyQuality(item, colonist, game, 'damageReduction');
+                    else if (def.type === 'tool') applyQuality(item, colonist, game, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
+                    // Apply enchantment based on item type
+                    if (task.itemType === 'weapons') applyWeaponEnchantment(item, colonist, game);
+                    else if (task.itemType === 'armors') applyArmorEnchantment(item, colonist, game);
+                    else if (task.itemType === 'helmets') applyHelmetEnchantment(item, colonist, game);
+                    else if (task.itemType === 'tools') applyToolEnchantment(item, colonist, game);
+                    // Add item to inventory. TODO: Make sure we also remove the original item or replace it in-place.
+                    game.resources.addItem(item);
+                    applyThought(colonist, 'enchanted an item', game.tick);
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Enchanted ${item.name}`, color: '#ff00f7', fontSize: 10, ttl: 20, maxTtl: 20 });
+                    window.soundManager?.playSFX('enchant_complete');
+                }
+                const tile = game.map[colonist.y]?.[colonist.x];
+                if (tile?.structure === 'enchanting_table' && game.stats) {
+                    game.stats.itemsEnchanted++;
+                }
             }
             break;
         }
