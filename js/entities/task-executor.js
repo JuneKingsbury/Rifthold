@@ -55,47 +55,73 @@ function applyEnchantment(item, colonist, game, type) {
         }
     }
 
-    // Roll for a random enchantment of the given tier for the given item type.
-    let enchantmentEffect;
     let enchantmentTier = 1;
-    let enchantmentTierRomanNumerals = 'I';
-    if (enchantmentTier === 2) {
-        enchantmentTierRomanNumerals = 'II';
-    }
-    else if (enchantmentTier === 3) {
-        enchantmentTierRomanNumerals = 'III';
-    }
-    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
-    const total = chances.reduce((s, c) => s + c, 0);
-    let roll = Math.random() * total;
-    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
-    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
-        roll -= chances[i];
-        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
-    }*/
-    if (type === 'weapons') enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS['sharpness'];
-    else if (type === 'armors' || type === 'helmets') enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS['protection'];
-    else if (type === 'tools') enchantmentEffect = TOOL_ENCHANTMENT_EFFECTS['efficiency'];
-
-    // Apply the enchantment effect(s)
-    item.enchantment = enchantmentEffect.key;
-    item.description = `${item.description} ${enchantmentEffect.description}`;
-    item.name = `${item.name} ${enchantmentEffect.suffix} ${enchantmentTierRomanNumerals}`;
+    //skill
     
+    let enchantmentTierRomanNumerals = 'I';
+    switch (enchantmentTier) {
+        case 2:
+            enchantmentTierRomanNumerals = 'II';
+            break;
+        case 3:
+            enchantmentTierRomanNumerals = 'III';
+            break;
+        default:
+            break;
+    }
+
+    // Roll for and apply the enchantment effect
+    let enchantmentEffect;
+    let randomKey = 0;
     switch (type) {
         case 'weapons':
-            // Weapon Enchantments
+            // Roll for a random enchantment effect
+            randomKey = Object.keys(WEAPON_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(WEAPON_ENCHANTMENT_EFFECTS).length)];
+            enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS[randomKey];
+
             // sharpness:
             if (enchantmentEffect.damageMultiplier) item.damage = Math.round(item.damage * (enchantmentEffect.damageMultiplier * enchantmentTier) * 100) / 100;
+            // witchery:
+            else if (enchantmentEffect.spellDamageBonus) {
+                if (item.spellDamageBonus) {
+                    item.spellDamageBonus = item.spellDamageBonus + (enchantmentEffect.spellDamageBonus * enchantmentTier);
+                }
+                else {
+                    item.spellDamageBonus = enchantmentEffect.spellDamageBonus * enchantmentTier;
+                }
+            }
             // piercing:
-            if (enchantmentEffect.critChanceBonus) item.critChance += (enchantmentEffect.critChanceBonus * enchantmentTier);
+            else if (enchantmentEffect.critChanceBonus) {
+                if (item.critChance) {
+                    item.critChance = item.critChance + (enchantmentEffect.critChanceBonus * enchantmentTier);
+                }
+                else {
+                    item.critChance = enchantmentEffect.critChanceBonus * enchantmentTier;
+                }
+            } 
             // vampirism:
+            else if (enchantmentEffect.lifeStealBonus) {
+                if (item.lifeSteal) {
+                    item.lifeSteal = item.lifeSteal + (enchantmentEffect.lifeStealBonus * enchantmentTier);
+                }
+                else {
+                    item.lifeSteal = enchantmentEffect.lifeStealBonus * enchantmentTier;
+                }
+            }
+            
             // distance:
+
             // velocity:
+
             // greed:
+
             break;
         case 'armors':
         case 'helmets':
+            // Roll for a random enchantment effect
+            randomKey = Object.keys(ARMOR_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(ARMOR_ENCHANTMENT_EFFECTS).length)];
+            enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS[randomKey];
+
             // protection:
             if (enchantmentEffect.defenseMultiplier) item.defense = Math.round(item.defense * (enchantmentEffect.defenseMultiplier * enchantmentTier) * 100) / 100;
             // wisdom:
@@ -108,9 +134,15 @@ function applyEnchantment(item, colonist, game, type) {
             // barbs:
             else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage += (enchantmentEffect.thornsDamageBonus * enchantmentTier);
             // free_movement:
+
             // dodge_change:
+
             break;
         case 'tools':
+            // Roll for a random enchantment effect
+            randomKey = Object.keys(TOOL_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(TOOL_ENCHANTMENT_EFFECTS).length)];
+            enchantmentEffect = TOOL_ENCHANTMENT_EFFECTS[randomKey];
+
             // productivity:
             if (enchantmentEffect.workSpeedMultiplier) {
                 if (item.miningSpeed) item.miningSpeed = Math.round(item.miningSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
@@ -119,12 +151,18 @@ function applyEnchantment(item, colonist, game, type) {
                 if (item.craftingSpeed) item.craftingSpeed = Math.round(item.craftingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
             }
             // windfall
+
             // healthRegen
+
             // spellCostReduction
+
             break;
         default:
             break;
-    }    
+    }   
+    item.enchantment = enchantmentEffect.key;
+    item.description = `${item.description} ${enchantmentEffect.description}`;
+    item.name = `${item.name} ${enchantmentEffect.suffix} ${enchantmentTierRomanNumerals}`; 
 }
 
 function applyThought(colonist, thoughtKey, tick) {

@@ -191,8 +191,9 @@ export const ITEM_CHARS = {
 
 export const WEAPON_ENCHANTMENT_EFFECTS = {
     sharpness: { suffix: 'of Sharpness', description: 'Enchanted with sharpness, increasing attack damage by 15% per enchantment tier.', damageMultiplier: 1.15 },
-    // piercing: { suffix: 'of Piercing', description: 'Enchanted with piercing, increasing the chance of critical strikes by 15% per enchantment tier.', critChanceBonus: 0.15 },
-    // vampirism: { suffix: 'of Vampirism', description: 'Enchanted with vampirism, healing for 15% of damage dealt per enchantment tier.', lifeStealBonus: 0.15 },
+    witchery: { suffix: 'of Witchery', description: 'Enchanted with witchery, increasing spell damage by 15% per enchantment tier.', spellDamageBonus: 0.15 },
+    piercing: { suffix: 'of Piercing', description: 'Enchanted with piercing, increasing the chance of critical strikes by 15% per enchantment tier.', critChanceBonus: 0.15 },
+    vampirism: { suffix: 'of Vampirism', description: 'Enchanted with vampirism, healing for 15% of damage dealt per enchantment tier.', lifeStealBonus: 0.15 },
     // distance: { suffix: 'of Distance', description: 'Enchanted with distance, increasing attack range by 15% per enchantment tier, even for melee weapons.', attackRangeMultiplier: 1.15 },
     // velocity { suffix: 'of Velocity', description: 'Enchanted with velocity, increasing attack speed by 15% per enchantment tier.', attackSpeedMultiplier: 1.15 },
     // greed { suffix: 'of Greed', description: 'Enchanted with greed, increasing exploration loot rarity by 15% per enchantment tier.', lootRarityMultiplier: 1.15 },
@@ -201,7 +202,7 @@ export const WEAPON_ENCHANTMENT_EFFECTS = {
 export const ARMOR_ENCHANTMENT_EFFECTS = {
     protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 15% per enchantment tier.', defenseMultiplier: 1.15 },
     wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenMultiplier: 1.15 },
-    // barbs { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
+    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
     // free_movement { suffix: 'of Free Movement', description: 'Enchanted with free movement, increasing movement and exploration speed by 10% per enchantment tier.', speedMultiplier: 1.10 },
     // dodgeChance { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing dodge chance by 10% per enchantment tier.', dodgeChanceBonus: 0.10 },
 };
