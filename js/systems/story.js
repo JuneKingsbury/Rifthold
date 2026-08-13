@@ -7,6 +7,7 @@ export class StorySystem {
     }
 
     checkMilestone(triggerKey, game) {
+        let unlockedAny = false;
         for (const [key, milestone] of Object.entries(STORY_MILESTONES)) {
             if (milestone.trigger !== triggerKey) continue;
             if (this.unlocked.has(key)) continue;
@@ -16,9 +17,9 @@ export class StorySystem {
             });
             game.notifications.push({ text: 'New story entry unlocked!', tick: game.tick, type: 'event' });
             game.eventLog.add(game, `Story unlocked: ${milestone.title}`, 'event', null);
-            return true;
+            unlockedAny = true;
         }
-        return false;
+        return unlockedAny;
     }
 
     hasUnviewed() {

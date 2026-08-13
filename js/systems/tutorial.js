@@ -2,6 +2,14 @@ import { BUILDINGS } from '../core/config.js';
 
 const TUTORIAL_STEPS = [
     {
+        id: 'farm',
+        title: 'Plant a Farm',
+        description: "Your starting food won't last long. Press [F] to Farm, then drag on grass to plant wheat or berries. Colonists handle planting and harvesting automatically.",
+        highlight: 'zone',
+        isComplete(game) { return game.mapIndex.zones.size > 0; },
+        goTo(game) { game.input.setMode('zone'); },
+    },
+    {
         id: 'gather',
         title: 'Gather Resources',
         description: 'Designate trees or rocks for your colonists to harvest. Press [G] or click Gather in the mode bar, then drag over trees or rocks.',
@@ -31,17 +39,9 @@ const TUTORIAL_STEPS = [
         goTo(game) { game.ui.toggleCraftPanel(); },
     },
     {
-        id: 'farm',
-        title: 'Plant a Farm',
-        description: "Your starting food won't last long. Press [F] to Farm, then drag on grass to plant wheat or berries. Colonists handle planting and harvesting automatically.",
-        highlight: 'zone',
-        isComplete(game) { return game.mapIndex.zones.size > 0; },
-        goTo(game) { game.input.setMode('zone'); },
-    },
-    {
         id: 'cauldron',
         title: 'Build a Cauldron',
-        description: 'Raw crops must be cooked into meals. A Cauldron (3 stone, 1 wood) lets colonists cook food that is more filling and gives a mood bonus.',
+        description: `Now that you've had some time to grow your crops, it's time to turn them into cooked meals. A Cauldron (3 stone, 1 wood) lets colonists cook food that is more filling and gives a mood bonus.`,
         highlight: 'build',
         isComplete(game) { return game.mapIndex.getStructurePositions('cauldron').size > 0; },
         goTo(game) {
@@ -54,7 +54,7 @@ const TUTORIAL_STEPS = [
     {
         id: 'cook',
         title: 'Cook a Meal',
-        description: 'Open Craft [C] and queue "Cook Meal" (5 foodstuffs → 4 cooked food). Meals restore more hunger and give a mood bonus. Tip: set an auto-cook target in Settings.',
+        description: 'Open Craft [C] and queue "Cook Meal" (5 raw foodstuffs → 4 cooked food). Meals restore more hunger and give a mood bonus. Tip: set an auto-cook target in Settings.',
         highlight: 'craft',
         isComplete(game) { return !!game.tutorial.flags.cookedMeal; },
         goTo(game) { game.ui.toggleCraftPanel(); },
@@ -115,7 +115,6 @@ const TUTORIAL_STEPS = [
         highlight: 'craft',
         isComplete(game) {
             if (game.resources.tomes.length > 0) return true;
-            return game.colonists.some(c => c.tome);
         },
         goTo(game) { game.ui.toggleCraftPanel(); },
     },
@@ -125,7 +124,7 @@ const TUTORIAL_STEPS = [
         description: 'Click a colonist to select them, then click an empty tome slot in their info panel to equip your crafted tome. The colonist will automatically study the tome as part of their regular research tasks.',
         highlight: null,
         isComplete(game) {
-            return game.colonists.some(c => c.tome);
+            return game.colonists.some(c => c.equippedTome);
         },
         goTo(game) {
             const col = game.colonists.find(c => c.hp > 0);

@@ -672,7 +672,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Runecraft',
         trigger: 'research_runecraft',
-        text: `Runes are the main way to channel magical energies into equipment. Though a metal sword may be stronger than a stone, a stone with the right rune engraved into it might just turn the tide.\n
+        text: `Runes are the main way to channel magical energies into equipment. Though a metal sword may be stronger than a stone, a stone with the right rune engraved into it might just turn the tide.<br><br>
         You're certain that runes will be used in all sorts of equipment and workstations going forward, so giving your colonists a good understanding of the fundamentals is a must.`,
     },
     research_druidcraft: {
@@ -685,7 +685,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Beast Binding',
         trigger: 'research_beast_binding',
-        text: `Beast binding is an art perfected by the ancient Ferini, but now largely lost to you. Using the Binding Circle you are able to salvage a portion of that art and work alongside the wildlife around you.\n
+        text: `Beast binding is an art perfected by the ancient Ferini, but now largely lost to you. Using the Binding Circle you are able to salvage a portion of that art and work alongside the wildlife around you.<br><br>
         As you practice this art you wonder what else the Ferini knew that you'll have to rediscover.`,
     },
     research_ley_channeling: {
@@ -804,36 +804,36 @@ export const STORY_MILESTONES = {
         tab: 'world',
         title: 'The Humans',
         trigger: 'first_building_placed',
-        text: `The most common race in Rifthold. Humans tend to be very unique individuals with some of the widest variation in skills they excel at. These passions are what leads human colonists to greatness, especially after putting in the work.\n
+        text: `The most common race in Rifthold. Humans tend to be very unique individuals with some of the widest variation in skills they excel at. These passions are what leads human colonists to greatness, especially after putting in the work.<br><br>
         While often not gifted with magical abilities, humans tend to be great at cracking open old tomes and learning how to control the magic contained in them regardless of their innate magical talent. All schools of magic are equally appealing to humankind and powerful human magicians tend to dive into as many different schools as they can throughout their lives.`,
     },
     first_nymph_colonist: {
         tab: 'world',
         title: 'The Nympha',
         trigger: 'first_building_placed',
-        text: `Easily mistaken for humans with pointy ears, the Nympha are an inherently magical group that excel at mana control. They are often lacking in manual labor skills, using their magic spells to supplement when they can.\n
+        text: `Easily mistaken for humans with pointy ears, the Nympha are an inherently magical group that excel at mana control. They are often lacking in manual labor skills, using their magic spells to supplement when they can.<br><br>
         These folk are also known for their low requirements for sleep and their inherent skills as researchers.`,
     },
     first_kobalos_colonist: {
         tab: 'world',
         title: 'The Kobaloi',
         trigger: 'first_building_placed',
-        text: `A wide ranging people known for their large ears, distinct skin colors, and their mischievous behaviors. While not all Kobalos are tricksters, they tend to be known for their speed and their cunning.\n
+        text: `A wide ranging people known for their large ears, distinct skin colors, and their mischievous behaviors. While not all Kobalos are tricksters, they tend to be known for their speed and their cunning.<br><br>
         The Kobaloi are also known for their resilience, often able to live in worse conditions with little consequences. Some even believe that these folk are perfectly content with raw food and small bedrooms, though this may just be a myth.`,
     },
     first_ferin_colonist: {
         tab: 'world',
         title: 'The Ferini',
         trigger: 'first_building_placed',
-        text: `Another human-like group. Wildfolk always have some animal-like traits that separate them from humans, most commonly animalistic ears.\n
+        text: `Another human-like group. Wildfolk always have some animal-like traits that separate them from humans, most commonly animalistic ears.<br><br>
         Their connection to nature is best seen through their inherent skills as shepards and farmers.`,
     },
     first_bofos_colonist: {
         tab: 'world',
         title: 'The Bufoi',
         trigger: 'first_building_placed',
-        text: `A group of amphibious folk resembling frogs, salamanders, and rarely even fish. While these folk have a preference for living near water, they can easily survive life on dry land for extended periods of time.\n
-        The average bufos tends to excel at manual tasks like crafting and building. Despite their appearance, these folk are born with two right hands and an eye for detail that makes them a valuable asset for any colony.\n
+        text: `A group of amphibious folk resembling frogs, salamanders, and rarely even fish. While these folk have a preference for living near water, they can easily survive life on dry land for extended periods of time.<br><br>
+        The average bufos tends to excel at manual tasks like crafting and building. Despite their appearance, these folk are born with two right hands and an eye for detail that makes them a valuable asset for any colony.<br><br>
         These folks are also known for their heavy sleeping habits, some of which go as far as sleeping through entire winter seasons each year.`,
     },
     realm_crystal_caves: {
