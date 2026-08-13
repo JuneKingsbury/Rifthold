@@ -34,30 +34,19 @@ function applyQuality(item, colonist, game, ...statKeys) {
     }
 }
 
-function applyWeaponEnchantment(item, colonist, game) {
-    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
-    let skill = colonist.magicSkills.enchantment || 1;
-    if (game && game.workshopQualities) {
-        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
-        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
-            skill += game.workshopQualities[roomId].qualityBonus;
-        }
+function applySpecificQuality(item, qualityTier, ...statKeys) {
+    let tier = QUALITY_TIERS.find(t => t.key === qualityTier);
+    if (!tier) return;
+    if (tier.key === 'normal') return;
+    item.quality = tier.key;
+    item.name = `${tier.prefix} ${item.name}`;
+    for (const stat of statKeys) {
+        if (item[stat]) item[stat] = Math.round(item[stat] * tier.multiplier * 100) / 100;
     }
-    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
-    const total = chances.reduce((s, c) => s + c, 0);
-    let roll = Math.random() * total;
-    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
-    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
-        roll -= chances[i];
-        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
-    }*/
-    const enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS['sharpness']; // For now, always apply sharpness. TODO: Implement a random selection based on skill later.
-    item.enchantment = enchantmentEffect.key;
-    item.name = `${item.name} ${enchantmentEffect.suffix}`;
 }
 
-function applyArmorEnchantment(item, colonist, game) {
-    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
+function applyEnchantment(item, colonist, game, type) {
+    // Roll for enchantment tier based on colonist's enchantment skill and room quality.
     let skill = colonist.magicSkills.enchantment || 1;
     if (game && game.workshopQualities) {
         const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
@@ -65,28 +54,9 @@ function applyArmorEnchantment(item, colonist, game) {
             skill += game.workshopQualities[roomId].qualityBonus;
         }
     }
-    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
-    const total = chances.reduce((s, c) => s + c, 0);
-    let roll = Math.random() * total;
-    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
-    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
-        roll -= chances[i];
-        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
-    }*/
-    const enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS['protection']; // For now, always apply protection. TODO: Implement a random selection based on skill later.
-    item.enchantment = enchantmentEffect.key;
-    item.name = `${item.name} ${enchantmentEffect.suffix}`;
-}
 
-function applyHelmetEnchantment(item, colonist, game) {
-    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
-    let skill = colonist.magicSkills.enchantment || 1;
-    if (game && game.workshopQualities) {
-        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
-        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
-            skill += game.workshopQualities[roomId].qualityBonus;
-        }
-    }
+    // Roll for a random enchantment of the given tier for the given item type.
+    let enchantmentEffect;
     /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
     const total = chances.reduce((s, c) => s + c, 0);
     let roll = Math.random() * total;
@@ -95,31 +65,46 @@ function applyHelmetEnchantment(item, colonist, game) {
         roll -= chances[i];
         if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
     }*/
-    const enchantmentEffect = HELMET_ENCHANTMENT_EFFECTS['wisdom']; // For now, always apply wisdom. TODO: Implement a random selection based on skill later.
-    item.enchantment = enchantmentEffect.key;
-    item.name = `${item.name} ${enchantmentEffect.suffix}`;
-}
+    if (type === 'weapons') enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS['sharpness'];
+    else if (type === 'armors') enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS['protection'];
+    else if (type === 'helmets') enchantmentEffect = HELMET_ENCHANTMENT_EFFECTS['wisdom'];
+    else if (type === 'tools') enchantmentEffect = TOOL_ENCHANTMENT_EFFECTS['efficiency'];
 
-function applyToolEnchantment(item, colonist, game) {
-    // Roll for a random enchantment based on colonist's enchantment skill and room quality.
-    let skill = colonist.magicSkills.enchantment || 1;
-    if (game && game.workshopQualities) {
-        const roomId = game.map[colonist.y]?.[colonist.x]?.roomId;
-        if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
-            skill += game.workshopQualities[roomId].qualityBonus;
+    // Apply the enchantment
+    item.enchantment = enchantmentEffect.key;
+    item.description = `${item.description} ${enchantmentEffect.description}`;
+    item.name = `${item.name} ${enchantmentEffect.suffix}`;
+    if (enchantmentEffect.damageMultiplier) {
+        item.damage = Math.round(item.damage * enchantmentEffect.damageMultiplier * 100) / 100;
+    }
+    else if (enchantmentEffect.defenseMultiplier) {
+        item.defense = Math.round(item.defense * enchantmentEffect.defenseMultiplier * 100) / 100;
+    }
+    else if (enchantmentEffect.manaRegenMultiplier) {
+        if (item.manaRegenMultiplier === undefined) {
+            item.manaRegenMultiplier = 2;
+        }
+        else {
+            item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * enchantmentEffect.manaRegenMultiplier * 100) / 100;
         }
     }
-    /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
-    const total = chances.reduce((s, c) => s + c, 0);
-    let roll = Math.random() * total;
-    let enchantmentEffect = ENCHANTMENT_EFFECTS[1];
-    for (let i = 0; i < ENCHANTMENT_EFFECTS.length; i++) {
-        roll -= chances[i];
-        if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
-    }*/
-    const enchantmentEffect = TOOL_ENCHANTMENT_EFFECTS['efficiency']; // For now, always apply efficiency. TODO: Implement a random selection based on skill later.
-    item.enchantment = enchantmentEffect.key;
-    item.name = `${item.name} ${enchantmentEffect.suffix}`;
+    else if (enchantmentEffect.workSpeedMultiplier) {
+        if (item.workSpeed) {
+            item.workSpeed = Math.round(item.workSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
+        }
+        if (item.miningSpeed) {
+            item.miningSpeed = Math.round(item.miningSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
+        }
+        if (item.choppingSpeed) {
+            item.choppingSpeed = Math.round(item.choppingSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
+        }
+        if (item.farmingSpeed) {
+            item.farmingSpeed = Math.round(item.farmingSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
+        }
+        if (item.craftingSpeed) {
+            item.craftingSpeed = Math.round(item.craftingSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
+        }
+    }
 }
 
 function applyThought(colonist, thoughtKey, tick) {
@@ -261,14 +246,11 @@ export function completeTask(colonist, task, game) {
                 if (def) {
                     const item = { ...def, key: task.itemKey };
                     // Re-apply original item quality
-                    if (def.type === 'weapon') applyQuality(item, colonist, game, 'damage'); // TODO: Re-apply original item quality
-                    else if (def.type === 'armor' || def.type === 'helmet') applyQuality(item, colonist, game, 'damageReduction');
-                    else if (def.type === 'tool') applyQuality(item, colonist, game, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
+                    if (def.type === 'weapon') applySpecificQuality(item, task.itemQuality, 'damage'); // TODO: Re-apply original item quality
+                    else if (def.type === 'armor' || def.type === 'helmet') applySpecificQuality(item, task.itemQuality, 'damageReduction');
+                    else if (def.type === 'tool') applySpecificQuality(item, task.itemQuality, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
                     // Apply enchantment based on item type
-                    if (task.itemType === 'weapons') applyWeaponEnchantment(item, colonist, game);
-                    else if (task.itemType === 'armors') applyArmorEnchantment(item, colonist, game);
-                    else if (task.itemType === 'helmets') applyHelmetEnchantment(item, colonist, game);
-                    else if (task.itemType === 'tools') applyToolEnchantment(item, colonist, game);
+                    applyEnchantment(item, colonist, game, task.itemType);
                     // Add item to inventory. TODO: Make sure we also remove the original item or replace it in-place.
                     game.resources.addItem(item);
                     applyThought(colonist, 'enchanted an item', game.tick);

@@ -299,6 +299,7 @@ function updateMana(colonist) {
     const combinedLevel = Object.values(colonist.magicSkills).reduce((sum, lvl) => sum + lvl, 0);
     let regen = MANA_CONFIG.baseRegen + combinedLevel * MANA_CONFIG.regenPerMagicLevel;
     regen += getEquipmentStat(colonist, 'manaRegen');
+    regen *= getEquipmentStat(colonist, 'manaRegenMultiplier') || 1;
     if (colonist.state === 'sleeping') regen *= MANA_CONFIG.regenWhileSleeping;
     else if (colonist.state === 'idle') regen *= MANA_CONFIG.regenWhileIdle;
     colonist.mana = Math.min(colonist.maxMana, colonist.mana + regen);
