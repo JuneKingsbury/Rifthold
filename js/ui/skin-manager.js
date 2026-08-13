@@ -181,7 +181,7 @@ export class SkinManager {
             }
         }
 
-        return highlight && nameColor ? this._addOutline(canvas, nameColor) : canvas;
+        return highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
     }
 
     _tintSprite(sprite, color, w, h) {
@@ -250,7 +250,7 @@ export class SkinManager {
             ctx.drawImage(toolSprite, offX, offY, cw, ch);
         }
 
-        const result = highlight && nameColor ? this._addOutline(canvas, nameColor) : canvas;
+        const result = highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
         this._compositeCache.set(cacheKey, result);
         return result;
     }
