@@ -648,13 +648,13 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Kindred Spirits',
         trigger: 'first_animal_tamed',
-        text: 'TODO: Write story text for taming your first animal.',
+        text: `The Binding Circle was a huge success! Your colony's first animal companion has joined the flock and lives among us.`,
     },
     first_trade: {
         tab: 'colony',
         title: 'Commerce Begins',
         trigger: 'first_trade_completed',
-        text: 'TODO: Write story text for completing your first trade.',
+        text: `The trader was one of the first friendly faces your colonists had seen in some time. They were excited by all of the trader's goods, but we might not be able to afford those luxuries for some time.`,
     },
     first_spell: {
         tab: 'colony',
@@ -666,142 +666,200 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Void Triumphant',
         trigger: 'first_wave_completed',
-        text: 'TODO: Write story text for completing your first void wave.',
+        text: `Opening the rifts was a complete success! As monsters flowed out into your realm you were able to harvest the void itself from beyond the rifts. You suspect that opening the rifts again will put your realm in more danger, but it may be worthwhile if you find good uses for this void essence.`,
     },
-
-    // -----------------------------------------------------------------------
-    // World tab — lore and worldbuilding (research unlocks)
-    // -----------------------------------------------------------------------
     research_runecraft: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Runecraft',
         trigger: 'research_runecraft',
-        text: 'TODO: Write lore text for runecraft research.',
+        text: `Runes are the main way to channel magical energies into equipment. Though a metal sword may be stronger than a stone, a stone with the right rune engraved into it might just turn the tide.\n
+        You're certain that runes will be used in all sorts of equipment and workstations going forward, so giving your colonists a good understanding of the fundamentals is a must.`,
     },
     research_druidcraft: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Druidcraft',
         trigger: 'research_druidcraft',
-        text: 'TODO: Write lore text for druidcraft research.',
+        text: `Much like the Nympha, nature is inherently magical. By working with this magic you'll find your crops growing taller and the wildlife around you becoming less hostile.`,
     },
     research_beast_binding: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Beast Binding',
         trigger: 'research_beast_binding',
-        text: 'TODO: Write lore text for beast binding research.',
+        text: `Beast binding is an art perfected by the ancient Ferini, but now largely lost to you. Using the Binding Circle you are able to salvage a portion of that art and work alongside the wildlife around you.\n
+        As you practice this art you wonder what else the Ferini knew that you'll have to rediscover.`,
     },
     research_ley_channeling: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Ley Channeling',
         trigger: 'research_ley_channeling',
-        text: 'TODO: Write lore text for ley channeling research.',
+        text: `These lands are rich in untapped leylines full of magical energies. Tapping into that energy is a top priority. Using your knowledge of runes, you develop engraved crystals that will help spread magical energies throughout your colony.`,
     },
     research_arcane_studies: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Arcane Studies',
         trigger: 'research_arcane_studies',
-        text: 'TODO: Write lore text for arcane studies research.',
+        text: `You find that your colonists are quickly out growing the simple tomes they create in the workshop. Perhaps this knowledge will satisfy their desire to learn.`,
     },
     research_void_summoning: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Void Summoning',
         trigger: 'research_void_summoning',
-        text: 'TODO: Write lore text for void summoning research.',
+        text: `Progress in your colony has rapidly slowed. Perhaps it's time to seek something new to continue your growth. Using your knowledge of rifts, you think you may have found a way to tap into the void itself without ever having to leave your realm. The solution: summon it directly to you.`,
     },
     research_planar_rift: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Planar Rift',
         trigger: 'research_planar_rift',
-        text: 'TODO: Write lore text for planar rift research.',
+        text: `While you found great success opening rifts to your colony, you wonder what may lie beyond these portals. You quickly found a way to maintain a rift to other realms for your colonists to explore, though it'll take a toll on your mana reserves.`,
     },
     research_deep_delving: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Deep Delving',
         trigger: 'research_deep_delving',
-        text: 'TODO: Write lore text for deep delving research.',
+        text: `In spite of the dangers you find yourself sending colonists deeper into these hostile realms. The deeper they go the greater the rewards become, but how will we keep up with the dangers ahead?`,
     },
     research_golem_craft: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Golem Craft',
         trigger: 'research_golem_craft',
-        text: 'TODO: Write lore text for golem craft research.',
+        text: `With the creative use of runes and void essence, you find ways to automate the tasks your colonists have been stuck doing for all this time. These golems are great at each task you built them for, but after construction you find yourself unable to change their objectives.`,
     },
     research_herbalism: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Herbalism',
         trigger: 'research_herbalism',
-        text: 'TODO: Write lore text for herbalism research.',
+        text: `With some effort you find yourself not only able to work with the magic in nature, but strengthen it. Your crops are hardier and somehow grow even faster than they did before!`,
     },
     research_void_architecture: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Void Architecture',
         trigger: 'research_void_architecture',
         text: 'TODO: Write lore text for void architecture research.',
     },
     research_mana_reservoir: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Mana Reservoir',
         trigger: 'research_mana_reservoir',
         text: 'TODO: Write lore text for mana reservoir research.',
     },
     research_alchemy: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Alchemy',
         trigger: 'research_alchemy',
-        text: 'TODO: Write lore text for alchemy research.',
+        text: `Who would've guessed that your crops would have more uses than just cooking? You excitedly write up recipes for potions based on each plant's properties.`,
     },
     research_trade_routes: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Trade Routes',
         trigger: 'research_trade_routes',
         text: 'TODO: Write lore text for trade routes research.',
     },
     research_arcane_infusion: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Arcane Infusion',
         trigger: 'research_arcane_infusion',
         text: 'TODO: Write lore text for arcane infusion research.',
     },
     research_warding: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Warding',
         trigger: 'research_warding',
         text: 'TODO: Write lore text for warding research.',
     },
     research_void_forging: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Void Forging',
         trigger: 'research_void_forging',
         text: 'TODO: Write lore text for void forging research.',
     },
     research_masterwork: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Masterwork',
         trigger: 'research_masterwork',
         text: 'TODO: Write lore text for masterwork research.',
     },
     research_advanced_arcana: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Advanced Arcana',
         trigger: 'research_advanced_arcana',
         text: 'TODO: Write lore text for advanced arcana research.',
     },
     research_mana_weaving: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Mana Weaving',
         trigger: 'research_mana_weaving',
         text: 'TODO: Write lore text for mana weaving research.',
     },
     research_void_sorcery: {
-        tab: 'world',
+        tab: 'colony',
         title: 'Void Sorcery',
         trigger: 'research_void_sorcery',
         text: 'TODO: Write lore text for void sorcery research.',
     },
 
     // -----------------------------------------------------------------------
-    // World tab — lore and worldbuilding (realm exploration)
+    // World tab — lore and worldbuilding
     // -----------------------------------------------------------------------
+    first_human_colonist: {
+        tab: 'world',
+        title: 'The Humans',
+        trigger: 'first_building_placed',
+        text: `The most common race in Rifthold. Humans tend to be very unique individuals with some of the widest variation in skills they excel at. These passions are what leads human colonists to greatness, especially after putting in the work.\n
+        While often not gifted with magical abilities, humans tend to be great at cracking open old tomes and learning how to control the magic contained in them regardless of their innate magical talent. All schools of magic are equally appealing to humankind and powerful human magicians tend to dive into as many different schools as they can throughout their lives.`,
+    },
+    first_nymph_colonist: {
+        tab: 'world',
+        title: 'The Nympha',
+        trigger: 'first_building_placed',
+        text: `Easily mistaken for humans with pointy ears, the Nympha are an inherently magical group that excel at mana control. They are often lacking in manual labor skills, using their magic spells to supplement when they can.\n
+        These folk are also known for their low requirements for sleep and their inherent skills as researchers.`,
+    },
+    first_kobalos_colonist: {
+        tab: 'world',
+        title: 'The Kobaloi',
+        trigger: 'first_building_placed',
+        text: `A wide ranging people known for their large ears, distinct skin colors, and their mischievous behaviors. While not all Kobalos are tricksters, they tend to be known for their speed and their cunning.\n
+        The Kobaloi are also known for their resilience, often able to live in worse conditions with little consequences. Some even believe that these folk are perfectly content with raw food and small bedrooms, though this may just be a myth.`,
+    },
+    first_ferin_colonist: {
+        tab: 'world',
+        title: 'The Ferini',
+        trigger: 'first_building_placed',
+        text: `Another human-like group. Wildfolk always have some animal-like traits that separate them from humans, most commonly animalistic ears.\n
+        Their connection to nature is best seen through their inherent skills as shepards and farmers.`,
+    },
+    first_bofos_colonist: {
+        tab: 'world',
+        title: 'The Bufoi',
+        trigger: 'first_building_placed',
+        text: `A group of amphibious folk resembling frogs, salamanders, and rarely even fish. While these folk have a preference for living near water, they can easily survive life on dry land for extended periods of time.\n
+        The average bufos tends to excel at manual tasks like crafting and building. Despite their appearance, these folk are born with two right hands and an eye for detail that makes them a valuable asset for any colony.\n
+        These folks are also known for their heavy sleeping habits, some of which go as far as sleeping through entire winter seasons each year.`,
+    },
+    realm_crystal_caves: {
+        tab: 'world',
+        title: 'Crystal Caves',
+        trigger: 'first_building_placed',
+        text: 'TODO: Write lore text for exploring the Crystal Caves.',
+    },
+    realm_crystal_caves: {
+        tab: 'world',
+        title: 'Crystal Caves',
+        trigger: 'realm_crystal_caves',
+        text: 'TODO: Write lore text for exploring the Crystal Caves.',
+    },
+    realm_crystal_caves: {
+        tab: 'world',
+        title: 'Crystal Caves',
+        trigger: 'realm_crystal_caves',
+        text: 'TODO: Write lore text for exploring the Crystal Caves.',
+    },
+    realm_crystal_caves: {
+        tab: 'world',
+        title: 'Crystal Caves',
+        trigger: 'realm_crystal_caves',
+        text: 'TODO: Write lore text for exploring the Crystal Caves.',
+    },
     realm_crystal_caves: {
         tab: 'world',
         title: 'Crystal Caves',
