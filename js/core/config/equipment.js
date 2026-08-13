@@ -190,23 +190,27 @@ export const ITEM_CHARS = {
 };
 
 export const WEAPON_ENCHANTMENT_EFFECTS = {
-    sharpness: { suffix: 'of Sharpness', description: 'Enchanted with sharpness, increasing attack damage by 30%.', damageMultiplier: 1.3 },
-    //fire: { suffix: 'of Fire', description: 'Adds fire damage to attacks.', damageBonus: 5, effect: 'burn', burnDamage: 2, burnDuration: 5 },
-    //frost: { suffix: 'of Frost', description: 'Adds frost damage to attacks.', damageBonus: 3, effect: 'slow', slowAmount: 0.3, slowDuration: 4 },
-    //shock: { suffix: 'of Shock', description: 'Adds shock damage to attacks.', damageBonus: 4, effect: 'stun', stunDuration: 2 },
-    //poison: { suffix: 'of Poison', description: 'Adds poison damage to attacks.', damageBonus: 2, effect: 'poison', poisonDamage: 3, poisonDuration: 6 },
+    sharpness: { suffix: 'of Sharpness', description: 'Enchanted with sharpness, increasing attack damage by 15% per enchantment tier.', damageMultiplier: 1.15 },
+    // piercing: { suffix: 'of Piercing', description: 'Enchanted with piercing, increasing the chance of critical strikes by 15% per enchantment tier.', critChanceBonus: 0.15 },
+    // vampirism: { suffix: 'of Vampirism', description: 'Enchanted with vampirism, healing for 15% of damage dealt per enchantment tier.', lifeStealBonus: 0.15 },
+    // distance: { suffix: 'of Distance', description: 'Enchanted with distance, increasing attack range by 15% per enchantment tier, even for melee weapons.', attackRangeMultiplier: 1.15 },
+    // velocity { suffix: 'of Velocity', description: 'Enchanted with velocity, increasing attack speed by 15% per enchantment tier.', attackSpeedMultiplier: 1.15 },
+    // greed { suffix: 'of Greed', description: 'Enchanted with greed, increasing exploration loot rarity by 15% per enchantment tier.', lootRarityMultiplier: 1.15 },
 };
 
 export const ARMOR_ENCHANTMENT_EFFECTS = {
-    protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 30%.', defenseMultiplier: 1.3 },
-};
-
-export const HELMET_ENCHANTMENT_EFFECTS = {
-    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, doubling mana regeneration.', manaRegenMultiplier: 2 },
+    protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 15% per enchantment tier.', defenseMultiplier: 1.15 },
+    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenMultiplier: 1.15 },
+    // barbs { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
+    // free_movement { suffix: 'of Free Movement', description: 'Enchanted with free movement, increasing movement and exploration speed by 10% per enchantment tier.', speedMultiplier: 1.10 },
+    // dodgeChance { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing dodge chance by 10% per enchantment tier.', dodgeChanceBonus: 0.10 },
 };
 
 export const TOOL_ENCHANTMENT_EFFECTS = {
-    efficiency: { suffix: 'of Efficiency', description: 'Enchanted with efficiency, increasing work speed by 30%.', workSpeedMultiplier: 1.3 },
+    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedMultiplier: 1.15 },
+    // windfall: { suffix: 'of Windfall', description: 'Enchanted with windfall, increasing materials gained while gathering by 20% per enchantment tier.', gatheringMatMultiplier: 1.20 },
+    // healthRegen
+    // spellCostReduction
 };
 
 const ARMOR_PAIRS = [

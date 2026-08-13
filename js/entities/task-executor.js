@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, HELMET_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana } from './colonist.js';
@@ -57,6 +57,14 @@ function applyEnchantment(item, colonist, game, type) {
 
     // Roll for a random enchantment of the given tier for the given item type.
     let enchantmentEffect;
+    let enchantmentTier = 1;
+    let enchantmentTierRomanNumerals = 'I';
+    if (enchantmentTier === 2) {
+        enchantmentTierRomanNumerals = 'II';
+    }
+    else if (enchantmentTier === 3) {
+        enchantmentTierRomanNumerals = 'III';
+    }
     /*const chances = ENCHANTMENT_EFFECTS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
     const total = chances.reduce((s, c) => s + c, 0);
     let roll = Math.random() * total;
@@ -66,45 +74,57 @@ function applyEnchantment(item, colonist, game, type) {
         if (roll <= 0) { enchantmentEffect = ENCHANTMENT_EFFECTS[i]; break; }
     }*/
     if (type === 'weapons') enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS['sharpness'];
-    else if (type === 'armors') enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS['protection'];
-    else if (type === 'helmets') enchantmentEffect = HELMET_ENCHANTMENT_EFFECTS['wisdom'];
+    else if (type === 'armors' || type === 'helmets') enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS['protection'];
     else if (type === 'tools') enchantmentEffect = TOOL_ENCHANTMENT_EFFECTS['efficiency'];
 
-    // Apply the enchantment
+    // Apply the enchantment effect(s)
     item.enchantment = enchantmentEffect.key;
     item.description = `${item.description} ${enchantmentEffect.description}`;
-    item.name = `${item.name} ${enchantmentEffect.suffix}`;
-    if (enchantmentEffect.damageMultiplier) {
-        item.damage = Math.round(item.damage * enchantmentEffect.damageMultiplier * 100) / 100;
-    }
-    else if (enchantmentEffect.defenseMultiplier) {
-        item.defense = Math.round(item.defense * enchantmentEffect.defenseMultiplier * 100) / 100;
-    }
-    else if (enchantmentEffect.manaRegenMultiplier) {
-        if (item.manaRegenMultiplier === undefined) {
-            item.manaRegenMultiplier = 2;
-        }
-        else {
-            item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * enchantmentEffect.manaRegenMultiplier * 100) / 100;
-        }
-    }
-    else if (enchantmentEffect.workSpeedMultiplier) {
-        if (item.workSpeed) {
-            item.workSpeed = Math.round(item.workSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
-        }
-        if (item.miningSpeed) {
-            item.miningSpeed = Math.round(item.miningSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
-        }
-        if (item.choppingSpeed) {
-            item.choppingSpeed = Math.round(item.choppingSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
-        }
-        if (item.farmingSpeed) {
-            item.farmingSpeed = Math.round(item.farmingSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
-        }
-        if (item.craftingSpeed) {
-            item.craftingSpeed = Math.round(item.craftingSpeed * enchantmentEffect.workSpeedMultiplier * 100) / 100;
-        }
-    }
+    item.name = `${item.name} ${enchantmentEffect.suffix} ${enchantmentTierRomanNumerals}`;
+    
+    switch (type) {
+        case 'weapons':
+            // Weapon Enchantments
+            // sharpness:
+            if (enchantmentEffect.damageMultiplier) item.damage = Math.round(item.damage * (enchantmentEffect.damageMultiplier * enchantmentTier) * 100) / 100;
+            // piercing:
+            if (enchantmentEffect.critChanceBonus) item.critChance += (enchantmentEffect.critChanceBonus * enchantmentTier);
+            // vampirism:
+            // distance:
+            // velocity:
+            // greed:
+            break;
+        case 'armors':
+        case 'helmets':
+            // protection:
+            if (enchantmentEffect.defenseMultiplier) item.defense = Math.round(item.defense * (enchantmentEffect.defenseMultiplier * enchantmentTier) * 100) / 100;
+            // wisdom:
+            else if (enchantmentEffect.manaRegenMultiplier) {
+                if (item.manaRegenMultiplier === undefined) {
+                    item.manaRegenMultiplier = 1;
+                }
+                item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * enchantmentTier) * 100) / 100;
+            }
+            // barbs:
+            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage += (enchantmentEffect.thornsDamageBonus * enchantmentTier);
+            // free_movement:
+            // dodge_change:
+            break;
+        case 'tools':
+            // productivity:
+            if (enchantmentEffect.workSpeedMultiplier) {
+                if (item.miningSpeed) item.miningSpeed = Math.round(item.miningSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
+                if (item.choppingSpeed) item.choppingSpeed = Math.round(item.choppingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
+                if (item.farmingSpeed) item.farmingSpeed = Math.round(item.farmingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
+                if (item.craftingSpeed) item.craftingSpeed = Math.round(item.craftingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
+            }
+            // windfall
+            // healthRegen
+            // spellCostReduction
+            break;
+        default:
+            break;
+    }    
 }
 
 function applyThought(colonist, thoughtKey, tick) {

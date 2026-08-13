@@ -61,6 +61,8 @@ export class UI {
 
     initElements() {
         this.elements.statusBar = document.getElementById('status-bar');
+        document.getElementById('btn-cycle-back').addEventListener('click', () => this.game.cycleColonist(-1));
+        document.getElementById('btn-cycle-forward').addEventListener('click', () => this.game.cycleColonist(1));
         document.getElementById('btn-zoom-in').addEventListener('click', () => window.zoomIn());
         document.getElementById('btn-zoom-out').addEventListener('click', () => window.zoomOut());
         document.getElementById('btn-pause').addEventListener('click', () => { if (!this.game.paused) this.game.togglePause(); });
