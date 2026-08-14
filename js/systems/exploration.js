@@ -257,8 +257,9 @@ export class ExplorationSystem {
                 const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
                 return {
                     id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp,
+                    bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant,
                     golem: c.golem, golemType: c.golemType,
-                    weapon: c.weapon, armor: c.armor, helmet: c.helmet,
+                    weapon: c.weapon, armor: c.armor, helmet: c.helmet, tool: c.tool,
                     artifact: c.artifactBroken ? null : c.artifact,
                     knownSpells: c.knownSpells ? [...c.knownSpells] : [],
                     mana: c.mana || 0,

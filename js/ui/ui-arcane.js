@@ -566,7 +566,21 @@ const arcaneMethods = {
                 if (p.golem && p.golemType) {
                     sprite = skinMgr.getSprite('entities', p.golemType);
                 } else {
-                    sprite = skinMgr.getColonistSprite(p.id, false, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor);
+                    console.log(p);
+                    if (p.armor || p.helmet || p.weapon || p.tool) {
+                        let armorKey = '';
+                        let helmetKey = '';
+                        let weaponKey = '';
+                        let toolKey = '';
+                        if (p.armor) armorKey = p.armor.key;
+                        if (p.helmet) helmetKey = p.helmet.key;
+                        if (p.weapon) weaponKey = p.weapon.key;
+                        if (p.tool) toolKey = p.tool.key;
+                        sprite = skinMgr.getCompositedColonistSprite(p.id, false, armorKey, helmetKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, weaponKey, toolKey, false);
+                    }
+                    else {
+                        sprite = skinMgr.getColonistSprite(p.id, false, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, false);
+                    }
                 }
                 if (sprite) {
                     ctx.drawImage(sprite, px - 7, py - 7, 14, 14);
