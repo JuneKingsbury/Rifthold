@@ -408,7 +408,8 @@ export class ExplorationSystem {
             const dim = REALMS[exp.realm];
             const discPool = (dim.events && dim.events.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
-            this._addLog(exp, game, `${msg} (+${encounter.amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
+            //TODO: Fix .replace missing bug when calling _addLog here:
+            console.log(encounter.resource);//this._addLog(exp, game, `${msg} (+${encounter.amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
             return;
         }
 

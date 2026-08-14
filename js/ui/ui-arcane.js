@@ -566,7 +566,6 @@ const arcaneMethods = {
                 if (p.golem && p.golemType) {
                     sprite = skinMgr.getSprite('entities', p.golemType);
                 } else {
-                    console.log(p);
                     if (p.armor || p.helmet || p.weapon || p.tool) {
                         let armorKey = '';
                         let helmetKey = '';
