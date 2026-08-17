@@ -778,6 +778,7 @@ function updateIdle(colonist, game) {
         colonist.state = 'eating';
         return;
     }
+
     if (colonist.needs.rest < COLONIST_CONFIG.restMoodThreshold) {
         startSleeping(colonist, game);
         return;

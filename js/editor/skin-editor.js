@@ -21,6 +21,7 @@ const MATERIAL_ITEMS = [
     { key: 'moonbloom', char: '❀', color: '#aaccff', desc: 'Moonbloom (rare crop)' },
     { key: 'eggs', char: '○', color: '#ffffcc', desc: 'Eggs (from chickens)' },
     { key: 'milk', char: '○', color: '#ffffff', desc: 'Milk (from cows)' },
+    { key: 'gold', char: 'a', color: '#e2ff09', desc: 'Gold resource' },
 ];
 
 const CANVAS_SIZES = [8, 16, 32, 64, 128];

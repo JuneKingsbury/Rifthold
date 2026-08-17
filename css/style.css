@@ -2136,11 +2136,13 @@ body {
 .inv-name {
     color: #ccc;
     text-transform: capitalize;
+    padding-right: 6px;
 }
 
 .inv-amount {
     color: #88cc88;
     font-weight: bold;
+    padding-right: 6px;
 }
 
 .inv-delete {

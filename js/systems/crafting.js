@@ -48,6 +48,8 @@ export function queueCraftingOrder(game, recipeKey) {
 export function queueEnchantingOrder(game, itemKey, itemQuality, itemType) {
     const station = findAvailableStation(game, 'enchanting_table');
     if (!station || !station.powered) return false;
+    if (!game.resources.has({runite: 5})) return false;
+    game.resources.deduct({runite: 5});
 
     let workAmount = 100; // Base work amount for enchanting, can be adjusted as needed.
 
