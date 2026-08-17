@@ -2412,7 +2412,7 @@ document.addEventListener('DOMContentLoaded', () => {
             raceLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
             raceLabel.textContent = 'Race';
             raceRow.appendChild(raceLabel);
-            const races = ['Human', 'Ferin'];
+            const races = ['Human', 'Nymph', 'Ferin', 'Kobalos', 'Bufos'];
             const raceDropdown = document.createElement('select');
             races.forEach(raceName => {
                 const option = document.createElement('option');
@@ -2434,11 +2434,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }*/
 
             state.race = raceDropdown.value;
-            raceDropdown.addEventListener('change', (event) => {
-                state.race = event.target.value;
-                renderSlotSprite(previewCanvas, idx, state);
-                saveColonistSlots();
-            });
             raceRow.appendChild(raceDropdown);
             container.appendChild(raceRow);
 
@@ -2453,8 +2448,17 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyGrid.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px;';
             bodyRow.appendChild(bodyGrid);
             let bodyCount = 1;
-            if (state.race === 'ferin') {
+            if (state.race === 'nymph') {
+                bodyCount = sharedSkinManager.nymphBodyCount;
+            }
+            else if (state.race === 'ferin') {
                 bodyCount = sharedSkinManager.ferinBodyCount;
+            }
+            else if (state.race === 'kobalos') {
+                bodyCount = sharedSkinManager.kobalosBodyCount;
+            }
+            else if (state.race === 'bufos') {
+                bodyCount = sharedSkinManager.bufosBodyCount;
             }
             else {
                 bodyCount = sharedSkinManager.humanBodyCount;
@@ -2490,6 +2494,34 @@ document.addEventListener('DOMContentLoaded', () => {
             rebuildVariantRow(shirtGrid, previewCanvas, 'shirtVariant', sharedSkinManager.shirtCount,
                 v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, 1, 1, v, color));
             container.appendChild(shirtRow);
+
+            raceDropdown.addEventListener('change', (event) => {
+                state.race = event.target.value;
+                let newBodyCount = 1;
+                if (state.race === 'nymph') {
+                    newBodyCount = sharedSkinManager.nymphBodyCount;
+                }
+                else if (state.race === 'ferin') {
+                    newBodyCount = sharedSkinManager.ferinBodyCount;
+                }
+                else if (state.race === 'kobalos') {
+                    newBodyCount = sharedSkinManager.kobalosBodyCount;
+                }
+                else if (state.race === 'bufos') {
+                    newBodyCount = sharedSkinManager.bufosBodyCount;
+                }
+                else {
+                    newBodyCount = sharedSkinManager.humanBodyCount;
+                }
+                renderSlotSprite(previewCanvas, idx, state);
+                rebuildVariantRow(bodyGrid, previewCanvas, 'bodyVariant', newBodyCount,
+                    v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, v, 1, 1, color));
+                rebuildVariantRow(hairGrid, previewCanvas, 'hairVariant', sharedSkinManager.hairCount,
+                    v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, 1, v, 1, color));
+                rebuildVariantRow(shirtGrid, previewCanvas, 'shirtVariant', sharedSkinManager.shirtCount,
+                    v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, 1, 1, v, color));
+                saveColonistSlots();
+            });
         }
 
         function rebuildCustomView() {

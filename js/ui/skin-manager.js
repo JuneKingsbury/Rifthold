@@ -6,7 +6,10 @@ export class SkinManager {
         this._skinNames = ['ascii'];
         this._activeSkin = 'ascii';
         this._humanBodyCount = 0;
+        this._nymphBodyCount = 0;
         this._ferinBodyCount = 0;
+        this._kobalosBodyCount = 0;
+        this._bufosBodyCount = 0;
         this._hairCount = 0;
         this._shirtCount = 0;
         this._compositeCache = new Map();
@@ -21,7 +24,10 @@ export class SkinManager {
     }
 
     get humanBodyCount() { return this._humanBodyCount; }
+    get nymphBodyCount() { return this._nymphBodyCount; }
     get ferinBodyCount() { return this._ferinBodyCount; }
+    get kobalosBodyCount() { return this._kobalosBodyCount; }
+    get bufosBodyCount() { return this._bufosBodyCount; }
     get hairCount() { return this._hairCount; }
     get shirtCount() { return this._shirtCount; }
 
@@ -69,7 +75,10 @@ export class SkinManager {
             this._sprites.clear();
             this._activeSkin = 'ascii';
             this._humanBodyCount = 0;
+            this._nymphBodyCount = 0;
             this._ferinBodyCount = 0;
+            this._kobalosBodyCount = 0;
+            this._bufosBodyCount = 0;
             this._hairCount = 0;
             this._shirtCount = 0;
             this._itemDataURLCache = null;
@@ -155,8 +164,17 @@ export class SkinManager {
             if (s) return s;
         }
         let bodyCount = 0;
-        if (race === 'ferin') {
+        if (race === 'nymph') {
+            bodyCount = this._nymphBodyCount;
+        }
+        else if (race === 'ferin') {
             bodyCount = this._ferinBodyCount;
+        }
+        else if (race === 'kobalos') {
+            bodyCount = this._kobalosBodyCount;
+        }
+        else if (race === 'bufos') {
+            bodyCount = this._bufosBodyCount;
         }
         else {
             bodyCount = this._humanBodyCount;
@@ -276,19 +294,28 @@ export class SkinManager {
     async _loadSkin(skinName) {
         this._sprites.clear();
         this._humanBodyCount = 0;
+        this._nymphBodyCount = 0;
         this._ferinBodyCount = 0;
+        this._kobalosBodyCount = 0;
+        this._bufosBodyCount = 0;
         this._hairCount = 0;
         this._shirtCount = 0;
 
         const loaded = await this._tryLoadFromZip(skinName) || await this._tryLoadFromFolder(skinName);
         if (!loaded) return;
 
-        let b1 = 0; while (this._sprites.has('entities:colonist_human_body_' + (b1 + 1))) b1++;
-        let b2 = 0; while (this._sprites.has('entities:colonist_ferin_body_' + (b2 + 1))) b2++;
+        let bH = 0; while (this._sprites.has('entities:colonist_human_body_' + (bH + 1))) bH++;
+        let bN = 0; while (this._sprites.has('entities:colonist_nymph_body_' + (bN + 1))) bN++;
+        let bF = 0; while (this._sprites.has('entities:colonist_ferin_body_' + (bF + 1))) bF++;
+        let bK = 0; while (this._sprites.has('entities:colonist_kobalos_body_' + (bK + 1))) bK++;
+        let bB = 0; while (this._sprites.has('entities:colonist_bufos_body_' + (bB + 1))) bB++;
         let h = 0; while (this._sprites.has('entities:colonist_hair_' + (h + 1))) h++;
         let s = 0; while (this._sprites.has('entities:colonist_shirt_' + (s + 1))) s++;
-        this._humanBodyCount = b1;
-        this._ferinBodyCount = b2;
+        this._humanBodyCount = bH;
+        this._nymphBodyCount = bN;
+        this._ferinBodyCount = bF;
+        this._kobalosBodyCount = bK;
+        this._bufosBodyCount = bB;
         this._hairCount = h;
         this._shirtCount = s;
     }

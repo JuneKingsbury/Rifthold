@@ -147,7 +147,10 @@ class SkinEditor {
         this.categoryFilter = 'Buildings';
         this.bodyVariants = 3;
         this.humanBodyVariants = 3;
+        this.nymphBodyVariants = 3;
         this.ferinBodyVariants = 3;
+        this.kobalosBodyVariants = 3;
+        this.bufosBodyVariants = 3;
         this.hairVariants = 3;
         this.shirtVariants = 3;
         this.clipboard = null;
@@ -476,11 +479,26 @@ class SkinEditor {
                     items.push({ key: `colonist_human_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'humanBody' });
                 }
                 items.push({ key: '__add_human_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'humanBody' });
+                for (let i = 1; i <= this.nymphBodyVariants; i++) {
+                    const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
+                    items.push({ key: `colonist_nymph_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'nymphBody' });
+                }
+                items.push({ key: '__add_nymph_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'nymphBody' });
                 for (let i = 1; i <= this.ferinBodyVariants; i++) {
                     const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
                     items.push({ key: `colonist_ferin_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'ferinBody' });
                 }
                 items.push({ key: '__add_ferin_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'ferinBody' });
+                for (let i = 1; i <= this.kobalosBodyVariants; i++) {
+                    const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
+                    items.push({ key: `colonist_kobalos_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'kobalosBody' });
+                }
+                items.push({ key: '__add_kobalos_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'kobalosBody' });
+                for (let i = 1; i <= this.bufosBodyVariants; i++) {
+                    const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
+                    items.push({ key: `colonist_bufos_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'bufosBody' });
+                }
+                items.push({ key: '__add_bufos_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'bufosBody' });
                 for (let i = 1; i <= this.hairVariants; i++) {
                     const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
                     items.push({ key: `colonist_hair_${i}`, char: '@', color, desc: `Colonist hair style ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'hair' });
@@ -2596,7 +2614,10 @@ class SkinEditor {
     _addVariant(group) {
         if (group === 'body') this.bodyVariants++;
         else if (group === 'humanBody') this.humanBodyVariants++;
+        else if (group === 'nymphBody') this.nymphBodyVariants++;
         else if (group === 'ferinBody') this.ferinBodyVariants++;
+        else if (group === 'kobalosBody') this.kobalosBodyVariants++;
+        else if (group === 'bufosBody') this.bufosBodyVariants++;
         else if (group === 'hair') this.hairVariants++;
         else if (group === 'shirt') this.shirtVariants++;
         this._persistSkinData();
@@ -2687,7 +2708,7 @@ class SkinEditor {
             manifest[category].push(key);
         }
 
-        zip.file('manifest.json', JSON.stringify({ sprites: manifest, bodyVariants: this.bodyVariants, humanBodyVariants: this.humanBodyVariants, ferinBodyVariants: this.ferinBodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
+        zip.file('manifest.json', JSON.stringify({ sprites: manifest, bodyVariants: this.bodyVariants, humanBodyVariants: this.humanBodyVariants, nymphBodyVariants: this.nymphBodyVariants, ferinBodyVariants: this.ferinBodyVariants, kobalosBodyVariants: this.kobalosBodyVariants, bufosBodyVariants: this.bufosBodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
 
         const blob = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(blob);
@@ -2764,12 +2785,33 @@ class SkinEditor {
                 while (this.savedSprites[`entities:colonist_human_body_${v + 1}`]) v++;
                 this.humanBodyVariants = Math.max(v, this.humanBodyVariants);
             }
+            if (manifest.nymphBodyVariants != null) {
+                this.nymphBodyVariants = manifest.nymphBodyVariants;
+            } else {
+                let v = 0;
+                while (this.savedSprites[`entities:colonist_nymph_body_${v + 1}`]) v++;
+                this.nymphBodyVariants = Math.max(v, this.nymphBodyVariants);
+            }
             if (manifest.ferinBodyVariants != null) {
                 this.ferinBodyVariants = manifest.ferinBodyVariants;
             } else {
                 let v = 0;
                 while (this.savedSprites[`entities:colonist_ferin_body_${v + 1}`]) v++;
                 this.ferinBodyVariants = Math.max(v, this.ferinBodyVariants);
+            }
+            if (manifest.kobalosBodyVariants != null) {
+                this.kobalosBodyVariants = manifest.kobalosBodyVariants;
+            } else {
+                let v = 0;
+                while (this.savedSprites[`entities:colonist_kobalos_body_${v + 1}`]) v++;
+                this.kobalosBodyVariants = Math.max(v, this.kobalosBodyVariants);
+            }
+            if (manifest.bufosBodyVariants != null) {
+                this.bufosBodyVariants = manifest.bufosBodyVariants;
+            } else {
+                let v = 0;
+                while (this.savedSprites[`entities:colonist_bufos_body_${v + 1}`]) v++;
+                this.bufosBodyVariants = Math.max(v, this.bufosBodyVariants);
             }
             if (manifest.hairVariants != null) {
                 this.hairVariants = manifest.hairVariants;
