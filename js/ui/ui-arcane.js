@@ -575,10 +575,10 @@ const arcaneMethods = {
                         if (p.helmet) helmetKey = p.helmet.key;
                         if (p.weapon) weaponKey = p.weapon.key;
                         if (p.tool) toolKey = p.tool.key;
-                        sprite = skinMgr.getCompositedColonistSprite(p.id, false, armorKey, helmetKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, weaponKey, toolKey, false);
+                        sprite = skinMgr.getCompositedColonistSprite(p.id, false, p.raceKey, armorKey, helmetKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, weaponKey, toolKey, false);
                     }
                     else {
-                        sprite = skinMgr.getColonistSprite(p.id, false, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, false);
+                        sprite = skinMgr.getColonistSprite(p.id, false, p.raceKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, false);
                     }
                 }
                 if (sprite) {

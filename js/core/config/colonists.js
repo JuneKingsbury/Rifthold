@@ -53,6 +53,11 @@ export const TRAITS = {
     magically_gifted: { name: 'Magically Gifted', weight: 2, value:  3, description: 'Starts with 2 levels in a random magic school and knows its starter spell' },
 };
 
+export const RACES = {
+    human: {},
+    ferin: {},
+}
+
 export const COLONIST_CONFIG = {
     initialHunger: [80, 100],
     initialRest: [80, 100],
@@ -117,11 +122,11 @@ export const COLONIST_NAMES = [
     'Perry', 'Harper', 'Jules', 'Kris', 'Ash', 'Rowan', 'Ember', 'Lux',
 ];
 
-// Expected sprite layer counts — actual counts come from the active skin pack at runtime.
+// Sprite layer counts come from the active skin pack at runtime.
 export const COLONIST_APPEARANCE = {
-    bodyCount: 4,
-    hairCount: 6,
-    shirtCount: 4,
+    bodyCount: 1,
+    hairCount: 1,
+    shirtCount: 1,
 };
 
 export const NEED_DECAY = {
@@ -192,6 +197,7 @@ export const TASK_SPEED_STATS = {
 export const EASTER_EGG_COLONISTS = {
     'Carson': {
         nameColor: '#0be47b',
+        race: 'human',
         bodyVariant: 1,
         hairVariant: 18,
         shirtVariant: 2,
@@ -200,6 +206,7 @@ export const EASTER_EGG_COLONISTS = {
     },
     'Mars': {
         nameColor: '#e8da12',
+        race: 'ferin',
         bodyVariant: 2,
         hairVariant: 9,
         shirtVariant: 5,
@@ -208,6 +215,7 @@ export const EASTER_EGG_COLONISTS = {
     },
     'Robby': {
         nameColor: '#125de8',
+        race: 'human',
         bodyVariant: 1,
         hairVariant: 8,
         shirtVariant: 3,

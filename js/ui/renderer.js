@@ -89,10 +89,10 @@ export class Renderer {
                     if (s) return s;
                 }
                 if (entity.armorKey || entity.helmetKey || entity.weaponKey || entity.toolKey) {
-                    const comp = sm.getCompositedColonistSprite(entity.colonistId, entity.drafted, entity.armorKey, entity.helmetKey, entity.bodyVariant, entity.hairVariant, entity.shirtVariant, entity.nameColor, entity.weaponKey, entity.toolKey, highlight);
+                    const comp = sm.getCompositedColonistSprite(entity.colonistId, entity.drafted, entity.race, entity.armorKey, entity.helmetKey, entity.bodyVariant, entity.hairVariant, entity.shirtVariant, entity.nameColor, entity.weaponKey, entity.toolKey, highlight);
                     if (comp) return comp;
                 }
-                return sm.getColonistSprite(entity.colonistId, entity.drafted, entity.bodyVariant, entity.hairVariant, entity.shirtVariant, entity.nameColor, highlight);
+                return sm.getColonistSprite(entity.colonistId, entity.drafted, entity.race, entity.bodyVariant, entity.hairVariant, entity.shirtVariant, entity.nameColor, highlight);
             }
             if (entity.type === 'golem') {
                 if (entity.golemType) {
@@ -418,7 +418,7 @@ export class Renderer {
                 const showEq = game.settings.showEquipmentOverlays;
                 const isSleeping = c.state === 'sleeping';
                 const sleepingInBed = isSleeping && c.assignedBed && c.x === c.assignedBed.x && c.y === c.assignedBed.y;
-                const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
+                const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
                 if (isEntityMoving(c)) {
                     movingEntities.push({ entity: c, ...entData });
                 } else {

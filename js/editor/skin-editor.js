@@ -146,6 +146,8 @@ class SkinEditor {
         this.savedSprites = {};
         this.categoryFilter = 'Buildings';
         this.bodyVariants = 3;
+        this.humanBodyVariants = 3;
+        this.ferinBodyVariants = 3;
         this.hairVariants = 3;
         this.shirtVariants = 3;
         this.clipboard = null;
@@ -468,6 +470,14 @@ class SkinEditor {
                 for (let i = 1; i <= this.bodyVariants; i++) {
                     const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
                     items.push({ key: `colonist_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'body' });
+                }
+                for (let i = 1; i <= this.humanBodyVariants; i++) {
+                    const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
+                    items.push({ key: `colonist_human_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'humanBody' });
+                }
+                for (let i = 1; i <= this.ferinBodyVariants; i++) {
+                    const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
+                    items.push({ key: `colonist_ferin_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'ferinBody' });
                 }
                 items.push({ key: '__add_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'body' });
                 for (let i = 1; i <= this.hairVariants; i++) {
@@ -2584,6 +2594,8 @@ class SkinEditor {
     // --- Colonist Variants ---
     _addVariant(group) {
         if (group === 'body') this.bodyVariants++;
+        else if (group === 'humanBody') this.humanBodyVariants++;
+        else if (group === 'ferinBody') this.ferinBodyVariants++;
         else if (group === 'hair') this.hairVariants++;
         else if (group === 'shirt') this.shirtVariants++;
         this._persistSkinData();
@@ -2674,7 +2686,7 @@ class SkinEditor {
             manifest[category].push(key);
         }
 
-        zip.file('manifest.json', JSON.stringify({ sprites: manifest, bodyVariants: this.bodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
+        zip.file('manifest.json', JSON.stringify({ sprites: manifest, bodyVariants: this.bodyVariants, humanBodyVariants: this.humanBodyVariants, ferinBodyVariants: this.ferinBodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
 
         const blob = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(blob);
@@ -2743,6 +2755,20 @@ class SkinEditor {
                 let v = 0;
                 while (this.savedSprites[`entities:colonist_body_${v + 1}`]) v++;
                 this.bodyVariants = Math.max(v, this.bodyVariants);
+            }
+            if (manifest.humanBodyVariants != null) {
+                this.humanBodyVariants = manifest.humanBodyVariants;
+            } else {
+                let v = 0;
+                while (this.savedSprites[`entities:colonist_human_body_${v + 1}`]) v++;
+                this.humanBodyVariants = Math.max(v, this.humanBodyVariants);
+            }
+            if (manifest.ferinBodyVariants != null) {
+                this.ferinBodyVariants = manifest.ferinBodyVariants;
+            } else {
+                let v = 0;
+                while (this.savedSprites[`entities:colonist_ferin_body_${v + 1}`]) v++;
+                this.ferinBodyVariants = Math.max(v, this.ferinBodyVariants);
             }
             if (manifest.hairVariants != null) {
                 this.hairVariants = manifest.hairVariants;

@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_NAMES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
+import { CONFIG, COLONIST_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { isPassable, getMoveCost, hasLineOfSight } from '../world/map.js';
@@ -90,6 +90,10 @@ export function createColonist(x, y, skillBias, existingNames = []) {
     const combinedMagicLevel = Object.values(magicSkills).reduce((sum, lvl) => sum + lvl, 0);
     const maxMana = MANA_CONFIG.baseMana + combinedMagicLevel * MANA_CONFIG.manaPerMagicLevel;
 
+    // Randomly roll for colonist race.
+    const raceKeys = Object.keys(RACES);
+    const race = raceKeys[Math.floor(Math.random() * raceKeys.length)];
+
     // Use a large seed range so getColonistSprite's modulo wraps correctly into
     // however many sprites the active pack actually has at render time.
     const bodyVariant = Math.floor(Math.random() * 1000) + 1;
@@ -103,6 +107,7 @@ export function createColonist(x, y, skillBias, existingNames = []) {
     return {
         id, name, x, y, skills, skillXp: {}, magicSkills, magicBias, traits,
         nameColor,
+        race,
         bodyVariant,
         hairVariant,
         shirtVariant,

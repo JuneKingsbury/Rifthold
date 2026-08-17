@@ -256,7 +256,7 @@ export class ExplorationSystem {
                 const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
                 const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
                 return {
-                    id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp,
+                    id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp, raceKey: c.race,
                     bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant,
                     golem: c.golem, golemType: c.golemType,
                     weapon: c.weapon, armor: c.armor, helmet: c.helmet, tool: c.tool,

@@ -203,6 +203,7 @@ class Game {
                 if (custom.name) c.name = custom.name;
                 if (custom.skills) Object.assign(c.skills, custom.skills);
                 if (custom.traits) c.traits = [...custom.traits];
+                if (custom.race) c.race = custom.race;
                 if (custom.bodyVariant != null) c.bodyVariant = custom.bodyVariant;
                 if (custom.hairVariant != null) c.hairVariant = custom.hairVariant;
                 if (custom.shirtVariant != null) c.shirtVariant = custom.shirtVariant;
@@ -2152,6 +2153,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!s || typeof s !== 'object') continue;
                 colonistSlotStates[i].custom = !!s.custom;
                 colonistSlotStates[i].name = typeof s.name === 'string' ? s.name : '';
+                colonistSlotStates[i].race = typeof s.race === 'string' ? s.race : 'human';
                 colonistSlotStates[i].skills = (s.skills && typeof s.skills === 'object') ? { ...s.skills } : {};
                 colonistSlotStates[i].traits = Array.isArray(s.traits) ? s.traits.filter(t => TRAITS[t]) : [];
                 colonistSlotStates[i].bodyVariant = typeof s.bodyVariant === 'number' ? s.bodyVariant : null;
@@ -2166,9 +2168,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // appearance choices (null = random at spawn). nameColor is both the ASCII '@'
     // color and the shirt tint color.
     const colonistSlotStates = [
-        { custom: false, name: '', skills: {}, traits: [], bodyVariant: null, hairVariant: null, shirtVariant: null, nameColor: null },
-        { custom: false, name: '', skills: {}, traits: [], bodyVariant: null, hairVariant: null, shirtVariant: null, nameColor: null },
-        { custom: false, name: '', skills: {}, traits: [], bodyVariant: null, hairVariant: null, shirtVariant: null, nameColor: null },
+        { custom: false, name: '', skills: {}, traits: [], race: null, bodyVariant: null, hairVariant: null, shirtVariant: null, nameColor: null },
+        { custom: false, name: '', skills: {}, traits: [], race: null, bodyVariant: null, hairVariant: null, shirtVariant: null, nameColor: null },
+        { custom: false, name: '', skills: {}, traits: [], race: null, bodyVariant: null, hairVariant: null, shirtVariant: null, nameColor: null },
     ];
     loadColonistSlots();
 
@@ -2200,7 +2202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const color = (state && state.nameColor) || COLONIST_COLORS[slotIdx % COLONIST_COLORS.length];
         if (sharedSkinManager.isActive) {
             const sprite = sharedSkinManager.getColonistSprite(
-                slotIdx + 1, false,
+                slotIdx + 1, false, state.race,
                 state?.bodyVariant, state?.hairVariant, state?.shirtVariant, color
             );
             if (sprite) {
@@ -2403,6 +2405,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!usingSprites) return;
 
+            // Race picker
+            const raceRow = document.createElement('div');
+            raceRow.style.cssText = 'margin-bottom:6px;';
+            const raceLabel = document.createElement('div');
+            raceLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
+            raceLabel.textContent = 'Race';
+            raceRow.appendChild(raceLabel);
+            const races = ['Human', 'Ferin'];
+            const raceDropdown = document.createElement('select');
+            races.forEach(raceName => {
+                const option = document.createElement('option');
+                option.text = raceName;
+                option.value = raceName.toLowerCase();
+                raceDropdown.add(option);
+            });
+
+            /*if (EASTER_EGG_COLONISTS[state.name]) {
+                const egg = EASTER_EGG_COLONISTS[state.name];
+                state.nameColor = egg.nameColor;
+                state.race = egg.race;
+                state.bodyVariant = egg.bodyVariant;
+                state.hairVariant = egg.hairVariant;
+                state.shirtVariant = egg.shirtVariant;
+                state.skills = { ...egg.skills };
+                state.traits = [...egg.traits];
+                rebuildCustomView();
+            }*/
+
+            state.race = raceDropdown.value;
+            raceDropdown.addEventListener('change', (event) => {
+                state.race = event.target.value;
+                renderSlotSprite(previewCanvas, idx, state);
+                saveColonistSlots();
+            });
+            raceRow.appendChild(raceDropdown);
+            container.appendChild(raceRow);
+
             // Body picker
             const bodyRow = document.createElement('div');
             bodyRow.style.cssText = 'margin-bottom:6px;';
@@ -2413,8 +2452,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const bodyGrid = document.createElement('div');
             bodyGrid.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px;';
             bodyRow.appendChild(bodyGrid);
-            rebuildVariantRow(bodyGrid, previewCanvas, 'bodyVariant', sharedSkinManager.bodyCount,
-                v => sharedSkinManager.getColonistSprite(idx + 1, false, v, 1, 1, color));
+            let bodyCount = 1;
+            if (state.race === 'ferin') {
+                bodyCount = sharedSkinManager.ferinBodyCount;
+            }
+            else {
+                bodyCount = sharedSkinManager.humanBodyCount;
+            }
+            rebuildVariantRow(bodyGrid, previewCanvas, 'bodyVariant', bodyCount,
+                v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, v, 1, 1, color));
             container.appendChild(bodyRow);
 
             // Hair picker
@@ -2428,7 +2474,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hairGrid.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px;';
             hairRow.appendChild(hairGrid);
             rebuildVariantRow(hairGrid, previewCanvas, 'hairVariant', sharedSkinManager.hairCount,
-                v => sharedSkinManager.getColonistSprite(idx + 1, false, 1, v, 1, color));
+                v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, 1, v, 1, color));
             container.appendChild(hairRow);
 
             // Shirt picker — previews with current color tint
@@ -2442,7 +2488,7 @@ document.addEventListener('DOMContentLoaded', () => {
             shirtGrid.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px;';
             shirtRow.appendChild(shirtGrid);
             rebuildVariantRow(shirtGrid, previewCanvas, 'shirtVariant', sharedSkinManager.shirtCount,
-                v => sharedSkinManager.getColonistSprite(idx + 1, false, 1, 1, v, color));
+                v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, 1, 1, v, color));
             container.appendChild(shirtRow);
         }
 
@@ -2482,6 +2528,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (EASTER_EGG_COLONISTS[state.name]) {
                     const egg = EASTER_EGG_COLONISTS[state.name];
                     state.nameColor = egg.nameColor;
+                    state.race = egg.race;
                     state.bodyVariant = egg.bodyVariant;
                     state.hairVariant = egg.hairVariant;
                     state.shirtVariant = egg.shirtVariant;
@@ -2739,6 +2786,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     name: state.name,
                     skills: { ...state.skills },
                     traits: [...state.traits],
+                    race: state.race,
                     bodyVariant: state.bodyVariant,
                     hairVariant: state.hairVariant,
                     shirtVariant: state.shirtVariant,

@@ -5,7 +5,8 @@ export class SkinManager {
         this._sprites = new Map();
         this._skinNames = ['ascii'];
         this._activeSkin = 'ascii';
-        this._bodyCount = 0;
+        this._humanBodyCount = 0;
+        this._ferinBodyCount = 0;
         this._hairCount = 0;
         this._shirtCount = 0;
         this._compositeCache = new Map();
@@ -19,7 +20,8 @@ export class SkinManager {
         return this._activeSkin;
     }
 
-    get bodyCount() { return this._bodyCount; }
+    get humanBodyCount() { return this._humanBodyCount; }
+    get ferinBodyCount() { return this._ferinBodyCount; }
     get hairCount() { return this._hairCount; }
     get shirtCount() { return this._shirtCount; }
 
@@ -66,7 +68,8 @@ export class SkinManager {
         if (skinName === 'ascii') {
             this._sprites.clear();
             this._activeSkin = 'ascii';
-            this._bodyCount = 0;
+            this._humanBodyCount = 0;
+            this._ferinBodyCount = 0;
             this._hairCount = 0;
             this._shirtCount = 0;
             this._itemDataURLCache = null;
@@ -146,15 +149,22 @@ export class SkinManager {
         return out;
     }
 
-    getColonistSprite(colonistId, drafted, bodyVariant, hairVariant, shirtVariant, nameColor, highlight) {
+    getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight) {
         if (drafted) {
             const s = this._sprites.get('entities:colonist_drafted');
             if (s) return s;
         }
-        if (this._bodyCount <= 0) return null;
+        let bodyCount = 0;
+        if (race === 'ferin') {
+            bodyCount = this._ferinBodyCount;
+        }
+        else {
+            bodyCount = this._humanBodyCount;
+        }
+        if (bodyCount <= 0) return null;
 
-        const bIdx = (bodyVariant && bodyVariant > 0) ? ((bodyVariant - 1) % this._bodyCount) + 1 : 1;
-        const body = this._sprites.get('entities:colonist_body_' + bIdx);
+        const bIdx = (bodyVariant && bodyVariant > 0) ? ((bodyVariant - 1) % bodyCount) + 1 : 1;
+        const body = this._sprites.get(`entities:colonist_${race}_body_` + bIdx);
         if (!body) return null;
 
         const cw = body.width || body.naturalWidth || 16;
@@ -202,13 +212,13 @@ export class SkinManager {
         return this._sprites.get('entities:colonist_sleeping') || null;
     }
 
-    getCompositedColonistSprite(colonistId, drafted, armorKey, helmetKey, bodyVariant, hairVariant, shirtVariant, nameColor, weaponKey, toolKey, highlight) {
-        if (!armorKey && !helmetKey && !weaponKey && !toolKey) return this.getColonistSprite(colonistId, drafted, bodyVariant, hairVariant, shirtVariant, nameColor, highlight);
+    getCompositedColonistSprite(colonistId, drafted, race, armorKey, helmetKey, bodyVariant, hairVariant, shirtVariant, nameColor, weaponKey, toolKey, highlight) {
+        if (!armorKey && !helmetKey && !weaponKey && !toolKey) return this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight);
 
         const cacheKey = `${colonistId}:${drafted}:${bodyVariant || ''}:${hairVariant || ''}:${shirtVariant || ''}:${nameColor || ''}:${armorKey || ''}:${helmetKey || ''}:${weaponKey || ''}:${toolKey || ''}${highlight ? ':hl' : ''}`;
         if (this._compositeCache.has(cacheKey)) return this._compositeCache.get(cacheKey);
 
-        const base = this.getColonistSprite(colonistId, drafted, bodyVariant, hairVariant, shirtVariant, nameColor);
+        const base = this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor);
         if (!base) return null;
 
         const armorSprite = armorKey ? this._sprites.get('equipment_worn:' + armorKey) : null;
@@ -265,17 +275,20 @@ export class SkinManager {
 
     async _loadSkin(skinName) {
         this._sprites.clear();
-        this._bodyCount = 0;
+        this._humanBodyCount = 0;
+        this._ferinBodyCount = 0;
         this._hairCount = 0;
         this._shirtCount = 0;
 
         const loaded = await this._tryLoadFromZip(skinName) || await this._tryLoadFromFolder(skinName);
         if (!loaded) return;
 
-        let b = 0; while (this._sprites.has('entities:colonist_body_' + (b + 1))) b++;
+        let b1 = 0; while (this._sprites.has('entities:colonist_human_body_' + (b1 + 1))) b1++;
+        let b2 = 0; while (this._sprites.has('entities:colonist_ferin_body_' + (b2 + 1))) b2++;
         let h = 0; while (this._sprites.has('entities:colonist_hair_' + (h + 1))) h++;
         let s = 0; while (this._sprites.has('entities:colonist_shirt_' + (s + 1))) s++;
-        this._bodyCount = b;
+        this._humanBodyCount = b1;
+        this._ferinBodyCount = b2;
         this._hairCount = h;
         this._shirtCount = s;
     }
