@@ -2596,7 +2596,7 @@ body {
     }
 
     #game-footer {
-        height: 120px;
+        height: 200px;
     }
 
     #minimap-container canvas {
@@ -2607,7 +2607,7 @@ body {
 /* Landscape phone - maximize game area */
 @media (max-height: 500px) and (orientation: landscape) {
     #game-footer {
-        height: 100px;
+        height: 200px;
     }
 
     #game-footer.collapsed {
