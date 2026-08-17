@@ -475,11 +475,12 @@ class SkinEditor {
                     const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
                     items.push({ key: `colonist_human_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'humanBody' });
                 }
+                items.push({ key: '__add_human_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'humanBody' });
                 for (let i = 1; i <= this.ferinBodyVariants; i++) {
                     const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
                     items.push({ key: `colonist_ferin_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'ferinBody' });
                 }
-                items.push({ key: '__add_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'body' });
+                items.push({ key: '__add_ferin_body__', char: '+', color: '#888888', desc: 'Add another body variant', category: 'entities', isAction: true, variantGroup: 'ferinBody' });
                 for (let i = 1; i <= this.hairVariants; i++) {
                     const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
                     items.push({ key: `colonist_hair_${i}`, char: '@', color, desc: `Colonist hair style ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'hair' });
