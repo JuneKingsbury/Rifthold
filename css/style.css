@@ -143,6 +143,10 @@ body {
     align-items: center;
     gap: 2px;
     margin-left: auto;
+    flex-wrap: wrap;
+    flex: 1 1 0%;
+    min-width: 0px;
+    justify-content: flex-end;
 }
 .status-controls button {
     background: #333;
