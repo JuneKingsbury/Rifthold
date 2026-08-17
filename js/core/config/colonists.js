@@ -51,6 +51,12 @@ export const TRAITS = {
     pacifist:         { name: 'Pacifist',         weight: 1, value: -2, description: 'Refuses to attack enemies, only flees' },
     prodigy:          { name: 'Prodigy',          weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, description: 'Gains all XP 20% faster' },
     magically_gifted: { name: 'Magically Gifted', weight: 2, value:  3, description: 'Starts with 2 levels in a random magic school and knows its starter spell' },
+    // ── Race-specific ────────────────────────────────────────────────────────
+    human:   { name: 'Human',   weight: 0, value:  10, description: 'Related to the Humans' },
+    nymph:   { name: 'Nymph',   weight: 0, value:  10, description: 'Related to the Nympha' },
+    ferin:   { name: 'Ferin',   weight: 0, value:  10, description: 'Related to the Ferini' },
+    kobalos:   { name: 'Kobalos',   weight: 0, value:  10, description: 'Related to the Kobaloi' },
+    bufos:   { name: 'Bufos',   weight: 0, value:  10, description: 'Related to the Bufoi' },
 };
 
 export const RACES = {

@@ -202,7 +202,7 @@ class Game {
             if (custom) {
                 if (custom.name) c.name = custom.name;
                 if (custom.skills) Object.assign(c.skills, custom.skills);
-                if (custom.traits) c.traits = [...custom.traits];
+                if (custom.traits) c.traits = [custom.race, ...custom.traits];
                 if (custom.race) c.race = custom.race;
                 if (custom.bodyVariant != null) c.bodyVariant = custom.bodyVariant;
                 if (custom.hairVariant != null) c.hairVariant = custom.hairVariant;

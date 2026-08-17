@@ -25,6 +25,11 @@ export function createColonist(x, y, skillBias, existingNames = []) {
     let name = available.length > 0
         ? available[Math.floor(Math.random() * available.length)]
         : `Colonist ${id}`;
+
+    // Randomly roll for colonist race.
+    const raceKeys = Object.keys(RACES);
+    const race = raceKeys[Math.floor(Math.random() * raceKeys.length)];
+
     // Pick 1–3 traits via weighted random, respecting exclusion pairs.
     // Constraints: cumulative value never goes below 0, total value never exceeds 5.
     const TRAIT_BUDGET = 5;
@@ -51,6 +56,8 @@ export function createColonist(x, y, skillBias, existingNames = []) {
         }
         if (traits.length < i + 1) traits.push(pool[pool.length - 1][0]); // fallback
     }
+    // Add race-specific trait to colonist at the start of the array.
+    traits.unshift(race);
 
     // Allocate skill points randomly up to SKILL_POINT_TOTAL, respecting per-skill max.
     const SKILL_POINT_TOTAL = 22;
@@ -89,10 +96,6 @@ export function createColonist(x, y, skillBias, existingNames = []) {
 
     const combinedMagicLevel = Object.values(magicSkills).reduce((sum, lvl) => sum + lvl, 0);
     const maxMana = MANA_CONFIG.baseMana + combinedMagicLevel * MANA_CONFIG.manaPerMagicLevel;
-
-    // Randomly roll for colonist race.
-    const raceKeys = Object.keys(RACES);
-    const race = raceKeys[Math.floor(Math.random() * raceKeys.length)];
 
     // Use a large seed range so getColonistSprite's modulo wraps correctly into
     // however many sprites the active pack actually has at render time.
