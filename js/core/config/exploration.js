@@ -993,7 +993,7 @@ export const STORY_MILESTONES = {
         title: 'Humanity',
         trigger: 'first_human_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/humanity.png" alt="A drawing depicting Humanity">
-        The most common race in the world. Humans tend to be very unique individuals 
+        A dominating presence in the world. Humans tend to be very unique individuals 
         with some of the widest variation in skills they excel at. These passions are 
         what leads human colonists to greatness, especially after putting in the work.
         <br><br>
