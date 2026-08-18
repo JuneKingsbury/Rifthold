@@ -951,23 +951,34 @@ export const STORY_MILESTONES = {
         trigger: 'first_building_placed',//first_nymph_colonist_arrived',
         text: `<img class="pixel-art" src="nympha.png" alt="A drawing depicting the Nympha">
         A solitary people that could easily be mistaken for humans if it wasn't for their 
-        pointy ears. The Nympha are an inherently magical group that excel at mana control. 
-        They are often lacking in manual labor skills, using their magic spells to supplement 
-        when they can.
+        pointy ears and uncanny beauty. The Nympha are born with an inherent magic that allows 
+        them to excel at mana control. They make good use of their magical talents to supplement 
+        their less-than-impressive physical prowess.
         <br><br>
-        These folk are also known for their low requirements for sleep and their inherent 
-        skills as researchers.`,
+        The average nymph tends to find themselves in the role of a book keeper or similar 
+        work that requires a good memory and penmanship. They make especially efficient workers
+        due to their low requirements for rest, needing to sleep signifigantly less than their 
+        human peers.
+        <br><br>
+        The Nympha have become exceedingly rare among the human kingdoms in the recent years. 
+        Crusaders point to their innate magic and uncanny appearance as justification for their 
+        removal. The remaining people find themselves in hiding, spread out far and wide. The 
+        safest place for them today is out in the farthest parts of the frontier.`,
     },
     first_ferin_colonist: {
         tab: 'world',
         title: 'The Ferini',
         trigger: 'first_building_placed',//first_ferin_colonist_arrived',
         text: `<img class="pixel-art" src="ferini.png" alt="A drawing depicting the Ferini">
-        Another human-like group. Wildfolk always have some animal-like traits that 
-        separate them from humans, most commonly animalistic ears.
+        Also known as Wildfolk, the Ferini are a group of people with deep ties to nature. 
+        Each ferin is gifted with animal-like traits and an ability to communicate with animals 
+        and plants directly. These gifts are off putting to the humans of the larger kingdoms, 
+        with the Ferini often being excluded from their societies.
         <br><br>
-        Their connection to nature is best seen through their inherent skills as shepards 
-        and farmers.`,
+        The few Wildfolk who maintain ties to the human kingdoms find themselves working as 
+        shepherds and farmers, which they excel at. The majority of these people instead find 
+        themselves living in the wilderness among other Ferini in small communities that live 
+        off the gifts given to them by the land they roam.`,
     },
     first_kobalos_colonist: {
         tab: 'world',
