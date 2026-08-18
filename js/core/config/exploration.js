@@ -929,7 +929,7 @@ export const STORY_MILESTONES = {
         title: 'Humanity',
         trigger: 'first_building_placed',//first_human_colonist_arrived',
         text: `<img class="pixel-art" src="humanity.png" alt="A drawing depicting Humanity">
-        The most common race in Rifthold. Humans tend to be very unique individuals 
+        The most common race in the world. Humans tend to be very unique individuals 
         with some of the widest variation in skills they excel at. These passions are 
         what leads human colonists to greatness, especially after putting in the work.
         <br><br>
@@ -937,7 +937,13 @@ export const STORY_MILESTONES = {
         open old tomes and learning how to control the magic contained in them regardless 
         of their innate magical talent. All schools of magic are equally appealing to 
         humankind and powerful human magicians tend to dive into as many different schools 
-        as they can throughout their lives.`,
+        as they can throughout their lives.
+        <br><br>
+        What humans lack in magical prowess they make up for in sheer numbers. The largest 
+        kingdoms throughout the world are ruled by humans with strict laws on magic usage. 
+        Your old homeland is one of such kingdoms, recently starting their crusade against 
+        magic and magical beings. Humans in the frontier generally oppose these actions and 
+        have friendly relationships with innately magical folk.`,
     },
     first_nymph_colonist: {
         tab: 'world',
@@ -955,7 +961,7 @@ export const STORY_MILESTONES = {
         tab: 'world',
         title: 'The Ferini',
         trigger: 'first_building_placed',//first_ferin_colonist_arrived',
-        text: `<!--<img class="pixel-art" src="ferini.png" alt="A drawing depicting the Ferini">-->
+        text: `<img class="pixel-art" src="ferini.png" alt="A drawing depicting the Ferini">
         Another human-like group. Wildfolk always have some animal-like traits that 
         separate them from humans, most commonly animalistic ears.
         <br><br>
