@@ -204,6 +204,15 @@ body {
 #status-bar .info { color: #aaa; }
 #status-bar .peaceful { color: #66ddff; font-weight: bold; }
 
+img.pixel-art {
+  image-rendering: pixelated;
+  width: 200px; 
+  height: auto;
+  float: inline-end;
+  margin-left: 10px;
+  margin-bottom: 10px;
+}
+
 #game-area {
     grid-column: 1;
     grid-row: 2;

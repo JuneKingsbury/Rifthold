@@ -2255,8 +2255,8 @@ document.addEventListener('DOMContentLoaded', () => {
         randomView.id = `slot-random-${idx}`;
         randomView.style.cssText = 'text-align:center; padding:12px 0; display:' + (state.custom ? 'none' : 'block') + ';';
         const randomCanvas = document.createElement('canvas');
-        randomCanvas.width = 48;
-        randomCanvas.height = 48;
+        randomCanvas.width = 64;//48;
+        randomCanvas.height = 64;//48;
         randomCanvas.style.cssText = 'display:block; margin:0 auto; image-rendering:pixelated;';
         const randomHint = document.createElement('div');
         randomHint.style.cssText = 'font-size:11px; color:#666; margin-top:6px;';
@@ -2342,13 +2342,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tile = mkTile(selected);
                 tile.style.background = '#0d0d1a';
                 const cv = document.createElement('canvas');
-                cv.width = 22; cv.height = 22;
+                cv.width = 32; cv.height = 32;
                 cv.style.cssText = 'image-rendering:pixelated;';
                 const sprite = getSpriteForVariant(v);
                 if (sprite) {
                     const cctx = cv.getContext('2d');
                     cctx.imageSmoothingEnabled = false;
-                    cctx.drawImage(sprite, 0, 0, 22, 22);
+                    cctx.drawImage(sprite, 0, 0, 32, 32);
                 }
                 tile.appendChild(cv);
                 tile.addEventListener('click', () => {
@@ -2535,8 +2535,8 @@ document.addEventListener('DOMContentLoaded', () => {
             nameDisplay.style.cssText = 'font-size:12px; font-weight:bold; margin-bottom:4px; font-family:monospace; min-height:16px;';
             renderSlotName(nameDisplay, state, idx);
             const spriteCanvas = document.createElement('canvas');
-            spriteCanvas.width = 48;
-            spriteCanvas.height = 48;
+            spriteCanvas.width = 64;//48;
+            spriteCanvas.height = 64;//48;
             spriteCanvas.style.cssText = 'display:block; margin:0 auto; image-rendering:pixelated;';
             spriteCanvas.dataset.slotSprite = idx;
             renderSlotSprite(spriteCanvas, idx, state);

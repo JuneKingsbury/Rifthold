@@ -802,9 +802,11 @@ export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
     first_human_colonist: {
         tab: 'world',
-        title: 'The Humans',
+        title: 'Humanity',
         trigger: 'first_building_placed',//first_human_colonist_arrived',
-        text: `The most common race in Rifthold. Humans tend to be very unique individuals with some of the widest variation in skills they excel at. These passions are what leads human colonists to greatness, especially after putting in the work.<br><br>
+        text: `<img class="pixel-art" src="humanity.png" alt="A drawing depicting Humanity">
+        The most common race in Rifthold. Humans tend to be very unique individuals with some of the widest variation in skills they excel at. These passions are what leads human colonists to greatness, especially after putting in the work.
+        <br><br>
         While often not gifted with magical abilities, humans tend to be great at cracking open old tomes and learning how to control the magic contained in them regardless of their innate magical talent. All schools of magic are equally appealing to humankind and powerful human magicians tend to dive into as many different schools as they can throughout their lives.`,
     },
     first_nymph_colonist: {
