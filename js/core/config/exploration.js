@@ -950,9 +950,10 @@ export const STORY_MILESTONES = {
         title: 'The Nympha',
         trigger: 'first_building_placed',//first_nymph_colonist_arrived',
         text: `<img class="pixel-art" src="nympha.png" alt="A drawing depicting the Nympha">
-        Easily mistaken for humans with pointy ears, the Nympha are an inherently magical 
-        group that excel at mana control. They are often lacking in manual labor skills, 
-        using their magic spells to supplement when they can.
+        A solitary people that could easily be mistaken for humans if it wasn't for their 
+        pointy ears. The Nympha are an inherently magical group that excel at mana control. 
+        They are often lacking in manual labor skills, using their magic spells to supplement 
+        when they can.
         <br><br>
         These folk are also known for their low requirements for sleep and their inherent 
         skills as researchers.`,
@@ -972,7 +973,7 @@ export const STORY_MILESTONES = {
         tab: 'world',
         title: 'The Kobaloi',
         trigger: 'first_building_placed',//first_kobalos_colonist_arrived',
-        text: `<!--<img class="pixel-art" src="kobaloi.png" alt="A drawing depicting the Kobaloi">-->
+        text: `<img class="pixel-art" src="kobaloi.png" alt="A drawing depicting the Kobaloi">
         A wide ranging people known for their large ears, distinct skin colors, and their 
         mischievous behaviors. While not all Kobalos are tricksters, they tend to be known 
         for their speed and their cunning.
