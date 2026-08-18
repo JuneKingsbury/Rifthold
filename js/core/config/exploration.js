@@ -612,189 +612,313 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'First Foundation',
         trigger: 'first_building_placed',
-        text: 'TODO: Write story text for placing your first building.',
+        text: `
+        Your group has staked their claim in the wild frontier. Few others live in 
+        these parts, but you'll keep your doors open for traders and wanderers who 
+        stumble past.
+        <br><br>
+        With this seclusion you hope to build a thriving community while you wait out 
+        the growing crusade in your home lands. Here we will be able to practice magic 
+        freely and attempt to reclaim knowledge that's been lost to time.`,
     },
     colony_5: {
         tab: 'colony',
         title: 'A Settlement Forms',
         trigger: 'colonist_count_5',
-        text: 'TODO: Write story text for reaching 5 colonists.',
+        text: `
+        Your community is still small, but growth is steady. You anticipate more will
+        join as you advance your ability to harness magic. Until then, you do what you
+        can for those who've already made this colony their home.`,
     },
     colony_10: {
         tab: 'colony',
         title: 'A Thriving Community',
         trigger: 'colonist_count_10',
-        text: 'TODO: Write story text for reaching 10 colonists.',
+        text: `
+        You think back to how this community began. We were small and scared, nearly 
+        starving through our first winter. You've all grown much stronger, in body, 
+        mind, and spirit. Your efforts to lead this community are paying off in spades.`,
     },
     first_raid_survived: {
         tab: 'colony',
         title: 'Baptism of Steel',
         trigger: 'first_raid_survived',
-        text: 'TODO: Write story text for surviving your first raid.',
+        text: `
+        Not all people are friendly out in the frontier. For every group of traders is 
+        a gang of raiders ready to take what they need by force.
+        <br><br>
+        Your small group held off their attackers today, but you know there will be more 
+        in the future. Though no one wants to fight their fellow man, many colonists 
+        admit that better weapons and armor would go a long way to make them feel safer.`,
     },
     first_mental_break: {
         tab: 'colony',
         title: 'The Breaking Point',
         trigger: 'first_mental_break',
-        text: 'TODO: Write story text for first colonist mental break.',
+        text: `
+        Today a colonist has lost control of themselves. We all knew that life on the 
+        frontier would be difficult, but the constant toil is often too much to bare.
+        <br><br>
+        Perhaps we can find ways to keep everyone happy? Better sleeping quarters 
+        and consistent access to cooked food is a good starting point.`,
     },
     first_death: {
         tab: 'colony',
         title: 'The First Marker',
         trigger: 'first_colonist_death',
-        text: 'TODO: Write story text for first colonist death.',
+        text: `
+        Today a colonist has died. This will take a major toll on the friends they've 
+        made over their time here. Another may one day take their place in the colony, 
+        but this loss will be felt for a very long time.
+        <br><br>
+        We'll do what we can to keep the remaining colonists safe. Fight in groups, always 
+        wear armor, try out ranged weapons, and keep an abundant supply of healing potions.`,
     },
     first_tame: {
         tab: 'colony',
         title: 'Kindred Spirits',
         trigger: 'first_animal_tamed',
-        text: `The Binding Circle was a huge success! Your colony's first animal companion has joined the flock and lives among us.`,
+        text: `
+        The Binding Circle was a huge success! Your colony's first animal companion 
+        has joined the flock and lives among us.`,
     },
     first_trade: {
         tab: 'colony',
-        title: 'Commerce Begins',
+        title: 'Wandering Traders',
         trigger: 'first_trade_completed',
-        text: `The trader was one of the first friendly faces your colonists had seen in some time. They were excited by all of the trader's goods, but we might not be able to afford those luxuries for some time.`,
+        text: `
+        The trader was one of the first friendly faces your colonists had seen in some 
+        time. They were excited by all of the trader's goods, but we might not be able 
+        to afford those luxuries for some time.`,
     },
     first_spell: {
         tab: 'colony',
         title: 'The Spark of Magic',
         trigger: 'first_spell_cast',
-        text: 'TODO: Write story text for casting your first spell.',
+        text: `
+        One of your colonists cast their first spell. Whether innate or learned, you 
+        are excited by the results. You plan to write more tomes and help everyone 
+        get to the point where they can cast their very own spells for the first time.`,
     },
     first_wave_complete: {
         tab: 'colony',
         title: 'Void Triumphant',
         trigger: 'first_wave_completed',
-        text: `Opening the rifts was a complete success! As monsters flowed out into your realm you were able to harvest the void itself from beyond the rifts. You suspect that opening the rifts again will put your realm in more danger, but it may be worthwhile if you find good uses for this void essence.`,
+        text: `
+        Opening the rifts was a complete success! As monsters flowed out into your 
+        realm you were able to harvest the void itself from beyond the rifts. You suspect 
+        that opening the rifts again will put your realm in more danger, but it may be 
+        worthwhile if you find good uses for this void essence.`,
     },
     research_runecraft: {
         tab: 'colony',
         title: 'Runecraft',
         trigger: 'research_runecraft',
-        text: `Runes are the main way to channel magical energies into equipment. Though a metal sword may be stronger than a stone, a stone with the right rune engraved into it might just turn the tide.<br><br>
-        You're certain that runes will be used in all sorts of equipment and workstations going forward, so giving your colonists a good understanding of the fundamentals is a must.`,
+        text: `
+        Runes are the main way to channel magical energies into equipment. Though 
+        a metal sword may be stronger than a stone, a stone with the right rune engraved 
+        into it might just turn the tide.
+        <br><br>
+        You're certain that runes will be used in all sorts of equipment and workstations 
+        going forward, so giving your colonists a good understanding of the fundamentals 
+        is a must.`,
     },
     research_druidcraft: {
         tab: 'colony',
         title: 'Druidcraft',
         trigger: 'research_druidcraft',
-        text: `Much like the Nympha, nature is inherently magical. By working with this magic you'll find your crops growing taller and the wildlife around you becoming less hostile.`,
+        text: `
+        Much like the Nympha, nature is inherently magical. By working with this 
+        magic you'll find your crops growing taller and the wildlife around you becoming 
+        less hostile.`,
     },
     research_beast_binding: {
         tab: 'colony',
         title: 'Beast Binding',
         trigger: 'research_beast_binding',
-        text: `Beast binding is an art perfected by the ancient Ferini, but now largely lost to you. Using the Binding Circle you are able to salvage a portion of that art and work alongside the wildlife around you.<br><br>
-        As you practice this art you wonder what else the Ferini knew that you'll have to rediscover.`,
+        text: `
+        Beast binding is an art perfected by the ancient Ferini, but now largely 
+        lost to you. Using the Binding Circle you are able to salvage a portion of that 
+        art and work alongside the wildlife around you.
+        <br><br>
+        As you practice this art you wonder what else the Ferini knew that you'll have 
+        to rediscover.`,
     },
     research_ley_channeling: {
         tab: 'colony',
         title: 'Ley Channeling',
         trigger: 'research_ley_channeling',
-        text: `These lands are rich in untapped leylines full of magical energies. Tapping into that energy is a top priority. Using your knowledge of runes, you develop engraved crystals that will help spread magical energies throughout your colony.`,
+        text: `
+        These lands are rich in untapped leylines full of magical energies. 
+        Tapping into that energy is a top priority. Using your knowledge of runes, you 
+        develop engraved crystals that will help spread magical energies throughout 
+        your colony.`,
     },
     research_arcane_studies: {
         tab: 'colony',
         title: 'Arcane Studies',
         trigger: 'research_arcane_studies',
-        text: `You find that your colonists are quickly out growing the simple tomes they create in the workshop. Perhaps this knowledge will satisfy their desire to learn.`,
+        text: `
+        You find that your colonists are quickly out growing the simple tomes 
+        they create in the workshop. Perhaps this knowledge will satisfy their desire 
+        to learn.`,
     },
     research_void_summoning: {
         tab: 'colony',
         title: 'Void Summoning',
         trigger: 'research_void_summoning',
-        text: `Progress in your colony has rapidly slowed. Perhaps it's time to seek something new to continue your growth. Using your knowledge of rifts, you think you may have found a way to tap into the void itself without ever having to leave your realm. The solution: summon it directly to you.`,
+        text: `
+        Progress in your colony has rapidly slowed. Perhaps it's time to seek 
+        something new to continue your growth. Using your knowledge of rifts, you think 
+        you may have found a way to tap into the void itself without ever having to 
+        leave your realm. The solution: summon it directly to you.`,
     },
     research_planar_rift: {
         tab: 'colony',
         title: 'Planar Rift',
         trigger: 'research_planar_rift',
-        text: `While you found great success opening rifts to your colony, you wonder what may lie beyond these portals. You quickly found a way to maintain a rift to other realms for your colonists to explore, though it'll take a toll on your mana reserves.`,
+        text: `
+        While you found great success opening rifts to your colony, you wonder 
+        what may lie beyond these portals. You quickly found a way to maintain a rift 
+        to other realms for your colonists to explore, though it'll take a toll on your 
+        mana reserves.`,
     },
     research_deep_delving: {
         tab: 'colony',
         title: 'Deep Delving',
         trigger: 'research_deep_delving',
-        text: `In spite of the dangers you find yourself sending colonists deeper into these hostile realms. The deeper they go the greater the rewards become, but how will we keep up with the dangers ahead?`,
+        text: `
+        In spite of the dangers you find yourself sending colonists deeper into 
+        these hostile realms. The deeper they go the greater the rewards become, but 
+        how will we keep up with the dangers ahead?`,
     },
     research_golem_craft: {
         tab: 'colony',
         title: 'Golem Craft',
         trigger: 'research_golem_craft',
-        text: `With the creative use of runes and void essence, you find ways to automate the tasks your colonists have been stuck doing for all this time. These golems are great at each task you built them for, but after construction you find yourself unable to change their objectives.`,
+        text: `
+        With the creative use of runes and void essence, you find ways to 
+        automate the tasks your colonists have been stuck doing for all this time. 
+        These golems are great at each task you built them for, but after construction 
+        you find yourself unable to change their objectives.`,
     },
     research_herbalism: {
         tab: 'colony',
         title: 'Herbalism',
         trigger: 'research_herbalism',
-        text: `With some effort you find yourself not only able to work with the magic in nature, but strengthen it. Your crops are hardier and somehow grow even faster than they did before!`,
+        text: `
+        With some effort you find yourself not only able to work with the magic 
+        in nature, but strengthen it. Your crops are hardier and somehow grow even 
+        faster than they did before!`,
     },
     research_void_architecture: {
         tab: 'colony',
         title: 'Void Architecture',
         trigger: 'research_void_architecture',
-        text: 'TODO: Write lore text for void architecture research.',
+        text: `
+        You find more and more uses for void essence every day. Ignoring their 
+        magical potential, they make for an amazing building material, creating 
+        walls and doors that are much more difficult to break during battle.`,
     },
     research_mana_reservoir: {
         tab: 'colony',
         title: 'Mana Reservoir',
         trigger: 'research_mana_reservoir',
-        text: 'TODO: Write lore text for mana reservoir research.',
+        text: `
+        With new buildings that use up your colony's mana reserves, you find 
+        innovative ways to stretch the mana even further. You're now able to 
+        maintain more generating crystals and get more energy out of each one.`,
     },
     research_alchemy: {
         tab: 'colony',
         title: 'Alchemy',
         trigger: 'research_alchemy',
-        text: `Who would've guessed that your crops would have more uses than just cooking? You excitedly write up recipes for potions based on each plant's properties.`,
+        text: `
+        Who would've guessed that your crops would have more uses than just 
+        cooking? You excitedly write up recipes for potions based on each plant's 
+        properties.`,
     },
     research_trade_routes: {
         tab: 'colony',
         title: 'Trade Routes',
         trigger: 'research_trade_routes',
-        text: 'TODO: Write lore text for trade routes research.',
+        text: `
+        You've learned from your encounters with traders in the past. You know 
+        what they like, what they don't, and how to push them towards better deals. 
+        Beyond that your community has become better known and has been included 
+        as an important stop on the major trade routes in the frontier.`,
     },
     research_arcane_infusion: {
         tab: 'colony',
         title: 'Arcane Infusion',
         trigger: 'research_arcane_infusion',
-        text: 'TODO: Write lore text for arcane infusion research.',
+        text: `
+        You colony can now create their first Enchanting Table. You're excited 
+        about the possibilities this brings, letting you start enchanting your 
+        existing equipment to further boost your colonists.`,
     },
     research_warding: {
         tab: 'colony',
         title: 'Warding',
         trigger: 'research_warding',
-        text: 'TODO: Write lore text for warding research.',
+        text: `
+        Your first ward: The Arcane Sentinel.
+        <br><br>
+        For only a small amount of mana you can properly protect your colony 
+        from attacks. You feel that this will come in handy if your colony 
+        ever decides to open their gates to dangerous enemies.`,
     },
     research_void_forging: {
         tab: 'colony',
         title: 'Void Forging',
         trigger: 'research_void_forging',
-        text: 'TODO: Write lore text for void forging research.',
+        text: `
+        Harnessing void essence to its full potential, you can now create equipment 
+        to rival the weaponry of the far off crusaders. It'll be difficult to find 
+        enough of this material to supply your entire colony, but its not impossible.`,
     },
     research_masterwork: {
         tab: 'colony',
         title: 'Masterwork',
         trigger: 'research_masterwork',
-        text: 'TODO: Write lore text for masterwork research.',
+        text: `
+        Your colonists have become masters at their craft. Your equipment is of pristine 
+        quality and even distant traders struggle to offer you anything you couldn't 
+        simply make for yourself.`,
     },
     research_advanced_arcana: {
         tab: 'colony',
         title: 'Advanced Arcana',
         trigger: 'research_advanced_arcana',
-        text: 'TODO: Write lore text for advanced arcana research.',
+        text: `
+        Your community is learning quickly with the help of your tomes. You discover more 
+        magical spells and put them to paper for your colonists to grow even further.`,
     },
     research_mana_weaving: {
         tab: 'colony',
         title: 'Mana Weaving',
         trigger: 'research_mana_weaving',
-        text: 'TODO: Write lore text for mana weaving research.',
+        text: `
+        Many of your colonists complain about the weight of their metal armors and the 
+        toll they take on their ability to control their mana flow. You've come up with 
+        a clever solution by infusing lighter fabric with pure mana, increasing their 
+        protective capabilities tenfold.
+        <br><br>
+        While not quite as protective as runite plates, these robes get the job done. 
+        As a bonus they even help the wearer with their own mana control, boosting their 
+        magical abilities.`,
     },
     research_void_sorcery: {
         tab: 'colony',
         title: 'Void Sorcery',
         trigger: 'research_void_sorcery',
-        text: 'TODO: Write lore text for void sorcery research.',
+        text: `
+        While some focus on the brute strength of swords and clubs, 
+        you find yourself pondering more delicate options. By manipulating void essence 
+        in just the right way, you can use it to enhance a colonist's magical abilities.
+        <br><br>
+        Whether using a wand, stave, or dagger, you know these powerful casters will 
+        accomplish great things for their colony going forward.`,
     },
 
     // -----------------------------------------------------------------------

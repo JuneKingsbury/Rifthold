@@ -130,7 +130,7 @@ export const RESEARCH = {
 
     // Spells
     arcane_studies: { name: 'Arcane Studies', cost: 180, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
-    arcane_infusion: { name: 'Arcane Infusion', cost: 450, requires: ['ley_channeling', 'alchemy'], tab: 'magic', description: 'Faster enchanted crafting', requiresBuildings: { mana_crystal: 2 } },
+    arcane_infusion: { name: 'Arcane Infusion', cost: 450, requires: ['ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
     advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_studies', 'arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
     void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands, void staves, and void daggers', requiresTabCount: 3 },
     mana_weaving: { name: 'Mana Weaving', cost: 650, requires: ['arcane_infusion'], tab: 'magic', description: 'Weave mana into protective garb', requiresTabCount: 3 },
