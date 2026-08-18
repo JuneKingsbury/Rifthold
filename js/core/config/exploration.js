@@ -986,7 +986,7 @@ export const STORY_MILESTONES = {
         tab: 'world',
         title: 'The Bufoi',
         trigger: 'first_building_placed',//first_bofos_colonist_arrived',
-        text: `<!--<img class="pixel-art" src="bufoi.png" alt="A drawing depicting the Bufoi">-->
+        text: `<img class="pixel-art" src="bufoi.png" alt="A drawing depicting the Bufoi">
         A group of amphibious folk resembling frogs, salamanders, and rarely even fish. 
         While these folk have a preference for living near water, they can easily survive 
         life on dry land for extended periods of time.
