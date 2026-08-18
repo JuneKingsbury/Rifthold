@@ -924,32 +924,55 @@ export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
     // World tab — lore and worldbuilding
     // -----------------------------------------------------------------------
-    first_human_colonist: {
+    first_bofos_colonist: {
         tab: 'world',
-        title: 'Humanity',
-        trigger: 'first_building_placed',//first_human_colonist_arrived',
-        text: `<img class="pixel-art" src="humanity.png" alt="A drawing depicting Humanity">
-        The most common race in the world. Humans tend to be very unique individuals 
-        with some of the widest variation in skills they excel at. These passions are 
-        what leads human colonists to greatness, especially after putting in the work.
+        title: 'The Bufoi',
+        trigger: 'first_bufos_colonist_arrived',
+        text: `<img class="pixel-art" src="portraits/bufoi.png" alt="A drawing depicting the Bufoi">
+        A group of amphibious folk resembling frogs, salamanders, and rarely even fish. 
+        While these folk have a preference for living near water, they can easily survive 
+        life on dry land for extended periods of time.
         <br><br>
-        While often not gifted with magical abilities, humans tend to be great at cracking 
-        open old tomes and learning how to control the magic contained in them regardless 
-        of their innate magical talent. All schools of magic are equally appealing to 
-        humankind and powerful human magicians tend to dive into as many different schools 
-        as they can throughout their lives.
+        The average bufos tends to excel at manual tasks like crafting and building. 
+        Despite their appearance, these folk are born with two right hands and an eye for 
+        detail that makes them a valuable asset for any colony.
         <br><br>
-        What humans lack in magical prowess they make up for in sheer numbers. The largest 
-        kingdoms throughout the world are ruled by humans with strict laws on magic usage. 
-        Your old homeland is one of such kingdoms, recently starting their crusade against 
-        magic and magical beings. Humans in the frontier generally oppose these actions and 
-        have friendly relationships with innately magical folk.`,
+        These folks are also known for their heavy sleeping habits, some of which go as 
+        far as sleeping through entire winter seasons each year.`,
+    },
+    first_kobalos_colonist: {
+        tab: 'world',
+        title: 'The Kobaloi',
+        trigger: 'first_kobalos_colonist_arrived',
+        text: `<img class="pixel-art" src="portraits/kobaloi.png" alt="A drawing depicting the Kobaloi">
+        A wide ranging people known for their large ears, distinct skin colors, and their 
+        mischievous behaviors. While not all Kobalos are tricksters, they tend to be known 
+        for their speed and their cunning.
+        <br><br>
+        The Kobaloi are also known for their resilience, often able to live in worse 
+        conditions with little consequences. Some even believe that these folk are perfectly 
+        content with raw food and small bedrooms, though this may just be a myth.`,
+    },
+    first_ferin_colonist: {
+        tab: 'world',
+        title: 'The Ferini',
+        trigger: 'first_ferin_colonist_arrived',
+        text: `<img class="pixel-art" src="portraits/ferini.png" alt="A drawing depicting the Ferini">
+        Also known as Wildfolk, the Ferini are a group of people with deep ties to nature. 
+        Each ferin is gifted with animal-like traits and an ability to communicate with animals 
+        and plants directly. These gifts are off putting to the humans of the larger kingdoms, 
+        with the Ferini often being excluded from their societies.
+        <br><br>
+        The few Wildfolk who maintain ties to the human kingdoms find themselves working as 
+        shepherds and farmers, which they excel at. The majority of these people instead find 
+        themselves living in the wilderness among other Ferini in small communities that live 
+        off the gifts given to them by the land they roam.`,
     },
     first_nymph_colonist: {
         tab: 'world',
         title: 'The Nympha',
-        trigger: 'first_building_placed',//first_nymph_colonist_arrived',
-        text: `<img class="pixel-art" src="nympha.png" alt="A drawing depicting the Nympha">
+        trigger: 'first_nymph_colonist_arrived',
+        text: `<img class="pixel-art" src="portraits/nympha.png" alt="A drawing depicting the Nympha">
         A solitary people that could easily be mistaken for humans if it wasn't for their 
         pointy ears and uncanny beauty. The Nympha are born with an inherent magic that allows 
         them to excel at mana control. They make good use of their magical talents to supplement 
@@ -965,49 +988,26 @@ export const STORY_MILESTONES = {
         removal. The remaining people find themselves in hiding, spread out far and wide. The 
         safest place for them today is out in the farthest parts of the frontier.`,
     },
-    first_ferin_colonist: {
+    first_human_colonist: {
         tab: 'world',
-        title: 'The Ferini',
-        trigger: 'first_building_placed',//first_ferin_colonist_arrived',
-        text: `<img class="pixel-art" src="ferini.png" alt="A drawing depicting the Ferini">
-        Also known as Wildfolk, the Ferini are a group of people with deep ties to nature. 
-        Each ferin is gifted with animal-like traits and an ability to communicate with animals 
-        and plants directly. These gifts are off putting to the humans of the larger kingdoms, 
-        with the Ferini often being excluded from their societies.
+        title: 'Humanity',
+        trigger: 'first_human_colonist_arrived',
+        text: `<img class="pixel-art" src="portraits/humanity.png" alt="A drawing depicting Humanity">
+        The most common race in the world. Humans tend to be very unique individuals 
+        with some of the widest variation in skills they excel at. These passions are 
+        what leads human colonists to greatness, especially after putting in the work.
         <br><br>
-        The few Wildfolk who maintain ties to the human kingdoms find themselves working as 
-        shepherds and farmers, which they excel at. The majority of these people instead find 
-        themselves living in the wilderness among other Ferini in small communities that live 
-        off the gifts given to them by the land they roam.`,
-    },
-    first_kobalos_colonist: {
-        tab: 'world',
-        title: 'The Kobaloi',
-        trigger: 'first_building_placed',//first_kobalos_colonist_arrived',
-        text: `<img class="pixel-art" src="kobaloi.png" alt="A drawing depicting the Kobaloi">
-        A wide ranging people known for their large ears, distinct skin colors, and their 
-        mischievous behaviors. While not all Kobalos are tricksters, they tend to be known 
-        for their speed and their cunning.
+        While often not gifted with magical abilities, humans tend to be great at cracking 
+        open old tomes and learning how to control the magic contained in them regardless 
+        of their innate magical talent. All schools of magic are equally appealing to 
+        humankind and powerful human magicians tend to dive into as many different schools 
+        as they can throughout their lives.
         <br><br>
-        The Kobaloi are also known for their resilience, often able to live in worse 
-        conditions with little consequences. Some even believe that these folk are perfectly 
-        content with raw food and small bedrooms, though this may just be a myth.`,
-    },
-    first_bofos_colonist: {
-        tab: 'world',
-        title: 'The Bufoi',
-        trigger: 'first_building_placed',//first_bofos_colonist_arrived',
-        text: `<img class="pixel-art" src="bufoi.png" alt="A drawing depicting the Bufoi">
-        A group of amphibious folk resembling frogs, salamanders, and rarely even fish. 
-        While these folk have a preference for living near water, they can easily survive 
-        life on dry land for extended periods of time.
-        <br><br>
-        The average bufos tends to excel at manual tasks like crafting and building. 
-        Despite their appearance, these folk are born with two right hands and an eye for 
-        detail that makes them a valuable asset for any colony.
-        <br><br>
-        These folks are also known for their heavy sleeping habits, some of which go as 
-        far as sleeping through entire winter seasons each year.`,
+        What humans lack in magical prowess they make up for in sheer numbers. The largest 
+        kingdoms throughout the world are ruled by humans with strict laws on magic usage. 
+        Your old homeland is one of such kingdoms, recently starting their crusade against 
+        magic and magical beings. Humans in the frontier generally oppose these actions and 
+        have friendly relationships with innately magical folk.`,
     },
     realm_crystal_caves: {
         tab: 'world',

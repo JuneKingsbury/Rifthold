@@ -2,43 +2,50 @@
 
 ## Content
 
-### Story Milestones (41 entries need narrative text)
-All milestone triggers and tracking work — just need the actual story text written.
+### Story Milestones
+All milestone triggers and story left to flesh out.
 
 **Colony lore milestones:**
-- [ ] `first_building` — placing your first building
-- [ ] `colony_5` — reaching 5 colonists
-- [ ] `colony_10` — reaching 10 colonists
-- [ ] `first_raid_survived` — surviving your first raid
-- [ ] `first_mental_break` — first colonist mental break
-- [ ] `first_death` — first colonist death
-- [ ] `first_tame` — taming your first animal
-- [ ] `first_trade` — completing your first trade
-- [ ] `first_spell` — casting your first spell
-- [ ] `first_wave_complete` — completing your first void wave
+- [x] `first_building`
+- [x] `colony_5` — reaching 5 colonists
+- [x] `colony_10` — reaching 10 colonists
+- [x] `first_raid_survived`
+- [x] `first_mental_break`
+- [x] `first_death`
+- [x] `first_tame` — taming your first animal
+- [x] `first_trade`
+- [x] `first_spell` — casting your first spell
+- [x] `first_wave_complete` — completing your first void wave
+
+**Race lore milestones:**
+- [x] `bufoi`
+- [x] `kobaloi`
+- [x] `ferini`
+- [x] `nympha`
+- [x] `humanity`
 
 **Research lore milestones:**
-- [ ] `runecraft`
-- [ ] `druidcraft`
-- [ ] `beast_binding`
-- [ ] `ley_channeling`
-- [ ] `arcane_studies`
-- [ ] `void_summoning`
-- [ ] `planar_rift`
-- [ ] `deep_delving`
-- [ ] `golem_craft`
-- [ ] `herbalism`
-- [ ] `void_architecture`
-- [ ] `mana_reservoir`
-- [ ] `alchemy`
-- [ ] `trade_routes`
-- [ ] `arcane_infusion`
-- [ ] `warding`
-- [ ] `void_forging`
-- [ ] `masterwork`
-- [ ] `advanced_arcana`
-- [ ] `mana_weaving`
-- [ ] `void_sorcery`
+- [x] `runecraft`
+- [x] `druidcraft`
+- [x] `beast_binding`
+- [x] `ley_channeling`
+- [x] `arcane_studies`
+- [x] `void_summoning`
+- [x] `planar_rift`
+- [x] `deep_delving`
+- [x] `golem_craft`
+- [x] `herbalism`
+- [x] `void_architecture`
+- [x] `mana_reservoir`
+- [x] `alchemy`
+- [x] `trade_routes`
+- [x] `arcane_infusion`
+- [x] `warding`
+- [x] `void_forging`
+- [x] `masterwork`
+- [x] `advanced_arcana`
+- [x] `mana_weaving`
+- [x] `void_sorcery`
 
 **Realm exploration lore:**
 - [ ] `crystal_caves`

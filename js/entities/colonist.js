@@ -58,6 +58,7 @@ export function createColonist(x, y, skillBias, existingNames = []) {
     }
     // Add race-specific trait to colonist at the start of the array.
     traits.unshift(race);
+    game.story.checkMilestone(`first_${race}_colonist_arrived`, game);
 
     // Allocate skill points randomly up to SKILL_POINT_TOTAL, respecting per-skill max.
     const SKILL_POINT_TOTAL = 22;
@@ -99,8 +100,9 @@ export function createColonist(x, y, skillBias, existingNames = []) {
 
     // Use a large seed range so getColonistSprite's modulo wraps correctly into
     // however many sprites the active pack actually has at render time.
+    // Bufos can't use most hair styles, so default to bald for them.
     const bodyVariant = Math.floor(Math.random() * 1000) + 1;
-    const hairVariant = Math.floor(Math.random() * 1000) + 1;
+    const hairVariant = race === 'bufos' ? 1 : Math.floor(Math.random() * 1000) + 1;
     const shirtVariant = Math.floor(Math.random() * 1000) + 1;
 
     // Random vibrant color: full hue wheel, stored as hex for use in canvas/input[type=color].
