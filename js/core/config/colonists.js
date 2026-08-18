@@ -61,7 +61,10 @@ export const TRAITS = {
 
 export const RACES = {
     human: {},
+    nymph: {},
     ferin: {},
+    kobalos: {},
+    bufos: {},
 }
 
 export const COLONIST_CONFIG = {
