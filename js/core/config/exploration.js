@@ -612,7 +612,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'First Foundation',
         trigger: 'first_building_placed',
-        text: `
+        text: `<img class="pixel-art" src="portraits/first_building.png" alt="A drawing depicting a brand new colony">
         Your group has staked their claim in the wild frontier. Few others live in 
         these parts, but you'll keep your doors open for traders and wanderers who 
         stumble past.
