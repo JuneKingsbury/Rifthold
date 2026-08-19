@@ -506,7 +506,7 @@ function findPen(entity, game) {
     return game.mapIndex.findNearest('beast_circle', entity.x, entity.y);
 }
 
-function moveToward(entity, target, map, dur, game) {
+function moveTowardGreedy(entity, target, map, dur, game) {
     const dx = Math.sign(target.x - entity.x);
     const dy = Math.sign(target.y - entity.y);
     const passCheck = entity.hostile ? isPassableForEnemies : isPassable;
@@ -524,6 +524,119 @@ function moveToward(entity, target, map, dur, game) {
     }
     const pick = candidates[Math.floor(Math.random() * candidates.length)];
     moveEntity(entity, pick[0], pick[1], dur);
+}
+
+/*function moveToward(entity, target, map, dur, game) {
+    const passCheck = entity.hostile ? isPassableForEnemies : isPassable;
+    const path = findPath(map, entity.x, entity.y, target.x, target.y, passCheck);
+
+    // No path at all, entity stays put.
+    if (!path || path.length === 0) return;
+
+    // The next step is the first node in the path.
+    const [nx, ny] = path[0];
+
+    // Respect occupancy if game context is provided.
+    if (game && game.isTileOccupied(nx, ny)) {
+        // Try the second step if available (shuffle around an occupied tile).
+        if (path.length > 1 && !game.isTileOccupied(path[1][0], path[1][1])) {
+            // Only step forward two if the intermediate is also passable.
+            if (passCheck(map, path[1][0], path[1][1])) {
+                moveEntity(entity, path[1][0], path[1][1], dur);
+                return;
+            }
+        }
+        // Otherwise wait as the tile is blocked by another entity.
+        return;
+    }
+    moveEntity(entity, nx, ny, dur);
+}*/
+
+function moveToward(entity, target, map, dur, game) {
+    const passCheck = entity.hostile ? isPassableForEnemies : isPassable;
+
+    // Recompute path only when the target has moved or we have no path left.
+    const targetMoved =
+        !entity._pathTarget ||
+        entity._pathTarget.x !== target.x ||
+        entity._pathTarget.y !== target.y;
+
+    if (targetMoved || !entity._path || entity._path.length === 0) {
+        entity._path = findPath(map, entity.x, entity.y, target.x, target.y, passCheck) ?? [];
+        entity._pathTarget = { x: target.x, y: target.y };
+    }
+
+    if (entity._path.length === 0) return;
+
+    const [nx, ny] = entity._path[0];
+
+    if (game && game.isTileOccupied(nx, ny)) return;
+
+    entity._path.shift(); // consume the step.
+    moveEntity(entity, nx, ny, dur);
+}
+
+// A* path finding for the non-greedy movement option.
+function findPath(map, startX, startY, goalX, goalY, passCheck) {
+    const key = (x, y) => `${x},${y}`;
+    const heuristic = (x, y) => Math.abs(x - goalX) + Math.abs(y - goalY);
+
+    const open = new Map();
+    const closed = new Set();
+
+    const startNode = {
+        x: startX, y: startY,
+        g: 0,
+        f: heuristic(startX, startY),
+        parent: null,
+    };
+    open.set(key(startX, startY), startNode);
+
+    while (open.size > 0) {
+        // Pick the open node with the lowest score.
+        let current = null;
+        for (const node of open.values()) {
+            if (!current || node.f < current.f) current = node;
+        }
+
+        if (current.x === goalX && current.y === goalY) {
+            // Reconstruct path.
+            const path = [];
+            let node = current;
+            while (node.parent) {
+                path.unshift([node.x, node.y]);
+                node = node.parent;
+            }
+            return path;
+        }
+
+        open.delete(key(current.x, current.y));
+        closed.add(key(current.x, current.y));
+
+        // Cardinal neighbors only.
+        const neighbors = [
+            [current.x + 1, current.y],
+            [current.x - 1, current.y],
+            [current.x, current.y + 1],
+            [current.x, current.y - 1],
+        ];
+
+        for (const [nx, ny] of neighbors) {
+            if (closed.has(key(nx, ny))) continue;
+            // Allow the goal tile even if it would normally be impassable.
+            // (e.g. the player standing on it counts as the destination).
+            if (!passCheck(map, nx, ny) && !(nx === goalX && ny === goalY)) continue;
+
+            const g = current.g + 1;
+            const existing = open.get(key(nx, ny));
+            if (!existing || g < existing.g) {
+                const node = { x: nx, y: ny, g, f: g + heuristic(nx, ny), parent: current };
+                open.set(key(nx, ny), node);
+            }
+        }
+    }
+
+    return null; // No path found.
 }
 
 function moveTowardPassable(entity, target, map, dur, game) {
