@@ -160,6 +160,8 @@ export function renderCreditsHTML() {
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://glionox.itch.io/items16">16x16 Items</a> by Glionox</div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-effect-and-bullet-16x16">Free Effect and Bullet 16x16</a> by BDragon1727</div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-smoke-fx-pixel-2">Free Smoke Fx Pixel 2</a> by BDragon1727</div>
+    <div style="color:#ccc; margin-bottom:8px;"><b>Music & SFX</b></div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://rapidpunches.itch.io/game-of-the-unknown">GAME OF THE UNKNOWN</a> by RAPIDPUNCHES</div>
     <div style="color:#666; font-size:10px; margin-top:20px;">Version 0.2 — Aug 2026</div>
 </div>`;
 }

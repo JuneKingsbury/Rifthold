@@ -2881,6 +2881,10 @@ document.addEventListener('DOMContentLoaded', () => {
             s.showColonistNames = document.getElementById('start-names').value;
             s.uiFontSize = parseInt(document.getElementById('start-ui-font-size').value) || 12;
             localStorage.setItem('colony_settings', JSON.stringify(s));
+            if (SoundManager) {
+                SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
+                SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+            }
         } catch (e) {}
     }
 
@@ -2922,6 +2926,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.sfxVolume != null) { document.getElementById('start-sfx-vol').value = s.sfxVolume; document.getElementById('start-sfx-vol-val').textContent = s.sfxVolume; }
             if (s.showColonistNames) document.getElementById('start-names').value = s.showColonistNames;
             if (s.uiFontSize) { document.getElementById('start-ui-font-size').value = s.uiFontSize; document.getElementById('start-ui-font-val').textContent = s.uiFontSize + 'px'; }
+            if (SoundManager) {
+                SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
+                SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+            }
         } catch (e) {}
     }
 
@@ -2968,6 +2976,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-sfx-vol').value = 80;
         document.getElementById('start-sfx-vol-val').textContent = '80';
         saveStartSettings();
+        if (SoundManager) {
+            SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
+            SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+        }
     });
 
     // Shared transition from start screen into active game
@@ -2978,12 +2990,12 @@ document.addEventListener('DOMContentLoaded', () => {
         initPanelOverlay();
         initResizeHandles(fitGameFont);
         if (window.innerWidth <= 768) setFooterMode(true);
-        SoundManager.init();
-        window.soundManager = SoundManager;
         requestAnimationFrame(() => {
             fitGameFont();
             const game = new Game();
             setup(game);
+            window.soundManager.stopMusic();
+            window.soundManager.updateMusicState(this);
             SoundManager.setMusicVolume(game.settings.musicVolume);
             SoundManager.setSFXVolume(game.settings.sfxVolume);
             const tm = game.settings.toolbarMode || (game.settings.alwaysShowToolbar ? 'always' : 'auto');
@@ -3001,6 +3013,12 @@ document.addEventListener('DOMContentLoaded', () => {
             game.start();
         });
     }
+
+    SoundManager.init();
+    window.soundManager = SoundManager;
+    window.soundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
+    window.soundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+    window.soundManager.playMusic('menu_theme');
 
     document.getElementById('start-game').addEventListener('click', () => {
         CONFIG.PEACEFUL_MODE = document.getElementById('start-peaceful-check').checked;
