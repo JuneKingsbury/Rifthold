@@ -666,7 +666,7 @@ export const STORY_MILESTONES = {
     },
     first_raid_survived: {
         tab: 'colony',
-        title: 'Baptism of Steel',
+        title: 'Into the Fire',
         trigger: 'first_raid_survived',
         text: `
         Not all people are friendly out in the frontier. For every group of traders is 
@@ -675,6 +675,22 @@ export const STORY_MILESTONES = {
         Your small group held off their attackers today, but you know there will be more 
         in the future. Though no one wants to fight their fellow man, many colonists 
         admit that better weapons and armor would go a long way to make them feel safer.`,
+    },
+    first_crusader_raid_survived: {
+        tab: 'colony',
+        title: 'Closing In',
+        trigger: 'first_crusader_raid_survived',
+        text: `
+        You hadn't anticipated crusaders making it this deep into the frontier. 
+        Thankfully you were prepared, pushing back the invaders for the time being.
+        <br><br>
+        Their presence shakes the whole colony. Rumors spread that greater forces will 
+        be sent our way in the near future. We'll need to be prepared for anything.
+        <br><br>
+        It may even be time to use our progress to slow down the crusade. Perhaps we 
+        could open a rift right into the heart of the kingdom and cut off their supplies 
+        from there? The dangers will be colossal, but we'll do what we must to keep our 
+        frontier safe.`,
     },
     first_mental_break: {
         tab: 'colony',
@@ -1129,5 +1145,11 @@ export const STORY_MILESTONES = {
         title: 'Oblivion Rift',
         trigger: 'realm_oblivion_rift',
         text: 'TODO: Write lore text for exploring the Oblivion Rift.',
+    },
+    realm_kingdom_outskirts: {
+        tab: 'world',
+        title: 'Kingdom Outskirts',
+        trigger: 'realm_kingdom_outskirts',
+        text: 'TODO: Write lore text for exploring the Kingdom Outskirts.',
     },
 };
