@@ -122,13 +122,29 @@ export const COLONIST_CONFIG = {
     skillXpScalePerLevel: 4,
 };
 
-export const COLONIST_NAMES = [
+export const HUMAN_NAMES = [
     'Bob', 'Cal', 'Finn', 'Hank', 'Jake', 'Max', 'Otto',
     'Davis', 'Hugh', 'Matt', 'Paul', 'Jim', 'Rex', 'Liam', 'Noah', 'Owen',
     'Ada', 'Dee', 'Eve', 'Gail', 'Iris', 'Lena', 'Nora', 'Pia',
     'Mia', 'Tara', 'Uma', 'Xia', 'Wren', 'Faye', 'Opal', 'Ruth',
     'Kit', 'Quinn', 'Sage', 'Vex', 'Morgan', 'Sam',
     'Perry', 'Harper', 'Jules', 'Kris', 'Ash', 'Rowan', 'Ember', 'Lux',
+];
+
+export const NYMPH_NAMES = [
+    'Nymph Name 1', 'Nymph Name 2',
+];
+
+export const FERIN_NAMES = [
+    'Ferin Name 1', 'Ferin Name 2',
+];
+
+export const KOBALOS_NAMES = [
+    'Kobalos Name 1', 'Kobalos Name 2',
+];
+
+export const BUFOS_NAMES = [
+    'Froggy', 'Toad',
 ];
 
 // Sprite layer counts come from the active skin pack at runtime.

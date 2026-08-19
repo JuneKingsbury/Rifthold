@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
+import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { isPassable, getMoveCost, hasLineOfSight } from '../world/map.js';
@@ -21,14 +21,31 @@ function hslToHex(h, s, l) {
 export function createColonist(x, y, skillBias, existingNames = []) {
     const id = getNextId();
     const usedNames = new Set(existingNames);
-    const available = COLONIST_NAMES.filter(n => !usedNames.has(n));
-    let name = available.length > 0
-        ? available[Math.floor(Math.random() * available.length)]
-        : `Colonist ${id}`;
 
     // Randomly roll for colonist race.
     const raceKeys = Object.keys(RACES);
     const race = raceKeys[Math.floor(Math.random() * raceKeys.length)];
+
+    let available;
+    if (race === 'nymph') {
+        available = NYMPH_NAMES.filter(n => !usedNames.has(n));
+    }
+    else if (race === 'ferin') {
+        available = FERIN_NAMES.filter(n => !usedNames.has(n));
+    }
+    else if (race === 'kobalos') {
+        available = KOBALOS_NAMES.filter(n => !usedNames.has(n));
+    }
+    else if (race === 'bufos') {
+        available = BUFOS_NAMES.filter(n => !usedNames.has(n));
+    }
+    else {
+        available = HUMAN_NAMES.filter(n => !usedNames.has(n));
+    }
+
+    let name = available.length > 0
+        ? available[Math.floor(Math.random() * available.length)]
+        : `Colonist ${id}`;
 
     // Pick 1–3 traits via weighted random, respecting exclusion pairs.
     // Constraints: cumulative value never goes below 0, total value never exceeds 5.
