@@ -2995,7 +2995,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const game = new Game();
             setup(game);
             window.soundManager.stopMusic();
-            window.soundManager.updateMusicState(this);
+            window.soundManager.playMusic('ambient_day');
             SoundManager.setMusicVolume(game.settings.musicVolume);
             SoundManager.setSFXVolume(game.settings.sfxVolume);
             const tm = game.settings.toolbarMode || (game.settings.alwaysShowToolbar ? 'always' : 'auto');
