@@ -48,6 +48,7 @@ const ENTITY_SPECIALS = [
     { key: 'raider', char: 'R', color: '#ff3333', desc: 'Enemy raider (fallback)' },
     { key: 'raider_brute', char: 'R', color: '#ff3333', desc: 'Raider Brute' },
     { key: 'raider_archer', char: 'R', color: '#ff6633', desc: 'Raider Archer' },
+    { key: 'crusader', char: 'C', color: '#dec630', desc: 'Enemy raider (crusader)' },
     { key: 'wave_enemy', char: 'V', color: '#aa33ff', desc: 'Wave enemy (fallback)' },
     { key: 'void_walker', char: 'V', color: '#aa33ff', desc: 'Void Walker' },
     { key: 'void_brute', char: 'V', color: '#7722cc', desc: 'Void Brute' },
