@@ -525,6 +525,56 @@ export const REALMS = {
             ],
         },
     },
+    crusader_barracks: {
+        name: 'Crusader Barracks', difficulty: 7,
+        chain: 'kingdom', chainOrder: 2,
+        duration: [700, 1000], encounters: 8,
+        vis: { wall: 'stone_wall', floor: 'wood_floor' },
+        research: 'deep_delving',
+        loot: [
+            { artifact: 'map_fragment', weight: 3 },
+        ],
+        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4] },
+        events: {
+            ambient: [
+                'TODO: {name} marvels at crystalline formations pulsing with light.',
+            ],
+            discoveries: [
+                'TODO: {name} cracks open a geode — raw runite inside!',
+            ],
+            traps: [
+                'TODO: {name} slips on smooth crystal — hard landing!',
+            ],
+            rare: [
+                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { artifact: 'compass_of_greed' } },
+            ],
+        },
+    },
+    palace_fortress: {
+        name: 'Palace Fortress', difficulty: 9,
+        chain: 'kingdom', chainOrder: 3,
+        duration: [700, 1000], encounters: 8,
+        vis: { wall: 'stone_wall', floor: 'wood_floor' },
+        research: 'deep_delving',
+        loot: [
+            { artifact: 'map_fragment', weight: 3 },
+        ],
+        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4] },
+        events: {
+            ambient: [
+                'TODO: {name} marvels at crystalline formations pulsing with light.',
+            ],
+            discoveries: [
+                'TODO: {name} cracks open a geode — raw runite inside!',
+            ],
+            traps: [
+                'TODO: {name} slips on smooth crystal — hard landing!',
+            ],
+            rare: [
+                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { artifact: 'compass_of_greed' } },
+            ],
+        },
+    },
 };
 
 export const EXPLORATION_CONFIG = {
