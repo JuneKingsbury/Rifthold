@@ -124,27 +124,31 @@ export const COLONIST_CONFIG = {
 
 export const HUMAN_NAMES = [
     'Bob', 'Cal', 'Finn', 'Hank', 'Jake', 'Max', 'Otto',
-    'Davis', 'Hugh', 'Matt', 'Paul', 'Jim', 'Rex', 'Liam', 'Noah', 'Owen',
+    'Davis', 'Hugh', 'Matt', 'Paul', 'Jim', 'Rex', 'Liam',  
     'Ada', 'Dee', 'Eve', 'Gail', 'Iris', 'Lena', 'Nora', 'Pia',
     'Mia', 'Tara', 'Uma', 'Xia', 'Wren', 'Faye', 'Opal', 'Ruth',
-    'Kit', 'Quinn', 'Sage', 'Vex', 'Morgan', 'Sam',
-    'Perry', 'Harper', 'Jules', 'Kris', 'Ash', 'Rowan', 'Ember', 'Lux',
+    'Kit', 'Quinn', 'Sage', 'Morgan', 'Sam', 'Owen', 'Noah',
+    'Perry', 'Harper', 'Jules', 'Kris', 'Ash', 'Rowan', 'Ember',
 ];
 
 export const NYMPH_NAMES = [
-    'Nymph Name 1', 'Nymph Name 2',
+    'Syvis', 'Sanev', 'Aimer', 'Venali', 'Bellas', 'Leena',
+    'Belanor', 'Nym', 'Ryul', 'Slyvar', 'Dilya', 'Amra',
 ];
 
 export const FERIN_NAMES = [
-    'Ferin Name 1', 'Ferin Name 2',
+    'Puf', 'Pim', 'Rheh', 'Sam', 'Vrefa', 'Refe', 'Gemi',
+    'Kupi', 'Dhib', 'Stag', 'Kroh', 'Fif', 'Rhit', 'Gul',
 ];
 
 export const KOBALOS_NAMES = [
-    'Kobalos Name 1', 'Kobalos Name 2',
+    'Burm', 'Orm', 'Plio', 'Giox', 'Prigs', 'Gnert',
+    'Poshi', 'Tuil', 'Nols', 'Ong', 'Qunk', 'Greenie',
 ];
 
 export const BUFOS_NAMES = [
-    'Froggy', 'Toad',
+    'Gilly', 'Sprout', 'Hopper', 'Clover', 'Lily', 'Moss',
+    'Pickle', 'Brook', 'Groda', 'Kaeru', 'Kikker', 'Pogo',
 ];
 
 // Sprite layer counts come from the active skin pack at runtime.
