@@ -470,10 +470,6 @@ class SkinEditor {
                 }
                 break;
             case 'Entities':
-                for (let i = 1; i <= this.bodyVariants; i++) {
-                    const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
-                    items.push({ key: `colonist_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'body' });
-                }
                 for (let i = 1; i <= this.humanBodyVariants; i++) {
                     const color = VARIANT_COLORS[(i - 1) % VARIANT_COLORS.length];
                     items.push({ key: `colonist_human_body_${i}`, char: '@', color, desc: `Colonist body (skin tone) ${i}`, category: 'entities', isVariant: i > 1, variantGroup: 'humanBody' });
