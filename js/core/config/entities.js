@@ -23,9 +23,9 @@ export const ENTITIES = {
     combat_golem:    { name: 'Combat Golem', char: 'G', color: '#cc4444', hp: 250, speed: 0.35, category: 'golem', traits: ['tough'], damage: 20, roles: [{ type: 'worker', specialty: 'combat', skillLevel: 6 }], cost: { stone: 15, runite: 5, void_essence: 4 }, craftTicks: 110 },
 
     // === Enemies ===
-    raider_brute:    { name: 'Raider', char: 'R', color: '#ff3333', hp: 50, speed: 0.28, category: 'enemy', hostile: true, damage: 5, aggroRange: 10, roles: [{ type: 'melee_charger' }], loot: [] },
-    raider_archer:   { name: 'Raider Archer', char: 'R', color: '#ff6633', hp: 35, speed: 0.30, category: 'enemy', hostile: true, damage: 4, aggroRange: 12, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', loot: [] },
-    crusader:        { name: 'Crusader', char: 'C', color: '#d6d216', hp: 100, speed: 0.32, category: 'enemy', hostile: true, damage: 15, aggroRange: 20, roles: [{ type: 'melee_charger' }], loot: [] },
+    raider_brute:    { name: 'Raider', char: 'R', color: '#ff3333', hp: 50, speed: 0.28, category: 'enemy', hostile: true, damage: 5, aggroRange: 20, roles: [{ type: 'melee_charger' }], loot: [] },
+    raider_archer:   { name: 'Raider Archer', char: 'R', color: '#ff6633', hp: 35, speed: 0.30, category: 'enemy', hostile: true, damage: 4, aggroRange: 20, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', loot: [] },
+    crusader:        { name: 'Crusader', char: 'C', color: '#d6d216', hp: 100, speed: 0.32, category: 'enemy', hostile: true, damage: 15, aggroRange: 30, roles: [{ type: 'melee_charger' }], loot: [] },
     void_walker:     { name: 'Void Walker', char: 'V', color: '#aa33ff', hp: 30, speed: 0.21, category: 'enemy', hostile: true, damage: 4, roles: [{ type: 'nexus_target' }], loot: [] },
     void_brute:      { name: 'Void Brute', char: 'V', color: '#7722cc', hp: 80, speed: 0.14, category: 'enemy', hostile: true, damage: 10, roles: [{ type: 'nexus_target' }, { type: 'structure_breaker', breakSpeed: 2 }], loot: [] },
 };
