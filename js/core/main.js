@@ -377,6 +377,8 @@ class Game {
 
         if (this.tick % 30 === 0 && window.soundManager) {
             window.soundManager.updateMusicState(this);
+            window.soundManager.setMusicVolume(game.settings.musicVolume);
+            window.soundManager.setSFXVolume(game.settings.sfxVolume);
         }
 
         const hostileEntities = [];
@@ -2882,8 +2884,8 @@ document.addEventListener('DOMContentLoaded', () => {
             s.uiFontSize = parseInt(document.getElementById('start-ui-font-size').value) || 12;
             localStorage.setItem('colony_settings', JSON.stringify(s));
             if (SoundManager) {
-                SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
-                SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+                SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
+                SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
             }
         } catch (e) {}
     }
@@ -2927,8 +2929,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showColonistNames) document.getElementById('start-names').value = s.showColonistNames;
             if (s.uiFontSize) { document.getElementById('start-ui-font-size').value = s.uiFontSize; document.getElementById('start-ui-font-val').textContent = s.uiFontSize + 'px'; }
             if (SoundManager) {
-                SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
-                SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+                SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
+                SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
             }
         } catch (e) {}
     }
@@ -2977,8 +2979,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-sfx-vol-val').textContent = '80';
         saveStartSettings();
         if (SoundManager) {
-            SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
-            SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+            SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
+            SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
         }
     });
 
@@ -3016,8 +3018,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     SoundManager.init();
     window.soundManager = SoundManager;
-    window.soundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value) || 70);
-    window.soundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value) || 80);
+    window.soundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
+    window.soundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
     window.soundManager.playMusic('menu_theme');
 
     document.getElementById('start-game').addEventListener('click', () => {

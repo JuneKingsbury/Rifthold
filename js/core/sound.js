@@ -100,7 +100,7 @@ class SoundManagerClass {
             const trackGain = this.ctx.createGain();
             trackGain.connect(this.musicGain);
             trackGain.gain.setValueAtTime(0, now);
-            trackGain.gain.linearRampToValueAtTime(1, now + fadeTime);
+            trackGain.gain.linearRampToValueAtTime(this.musicVolume / 100, now + fadeTime);
 
             const source = this.ctx.createBufferSource();
             source.buffer = buffer;
