@@ -158,7 +158,7 @@ export class SkinManager {
         return out;
     }
 
-    getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight) {
+    getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight, outline = true) {
         if (drafted) {
             const s = this._sprites.get('entities:colonist_drafted');
             if (s) return s;
@@ -209,7 +209,12 @@ export class SkinManager {
             }
         }
 
-        return highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
+        if (outline) {
+            return highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
+        }
+        else {
+            return canvas;
+        }
     }
 
     _tintSprite(sprite, color, w, h) {
@@ -236,7 +241,7 @@ export class SkinManager {
         const cacheKey = `${colonistId}:${drafted}:${bodyVariant || ''}:${hairVariant || ''}:${shirtVariant || ''}:${nameColor || ''}:${armorKey || ''}:${helmetKey || ''}:${weaponKey || ''}:${toolKey || ''}${highlight ? ':hl' : ''}`;
         if (this._compositeCache.has(cacheKey)) return this._compositeCache.get(cacheKey);
 
-        const base = this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor);
+        const base = this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight, false);
         if (!base) return null;
 
         const armorSprite = armorKey ? this._sprites.get('equipment_worn:' + armorKey) : null;
