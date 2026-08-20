@@ -2138,6 +2138,10 @@ export class UI {
         return colors[item.quality] || '#cccccc';
     }
 
+    _enchantmentGlow(item) {
+        return item.enchantment ? ' enchanted-text' : '';
+    }
+
     _getBuildingSpriteURL(buildingKey) {
         if (!this._buildingSpriteCache) this._buildingSpriteCache = new Map();
         if (this._buildingSpriteCache.has(buildingKey)) return this._buildingSpriteCache.get(buildingKey);
@@ -2220,7 +2224,7 @@ export class UI {
                 let stats = `${w.damage}d (${(w.damage / cd).toFixed(1)} dps)`;
                 if (extras.length) stats += `, ${extras.join(', ')}`;
                 const tip = w.description || '';
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${w.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${tip}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${w.name}</span>
                         <span class="inv-amount">${stats}</span>
                         <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${w.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantWeapon(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${w.name.replace(/'/g, "\\\\'")}?')){window.game.discardWeapon(${i})}">♻</button></div>`;
@@ -2231,7 +2235,7 @@ export class UI {
             armors.forEach((a, i) => {
                 const stats = getItemStatLines(a).join(', ');
                 const tip = a.description || '';
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${a.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${tip}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${a.name}</span>
                         <span class="inv-amount">${stats}</span>
                         <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${a.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantArmor(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardArmor(${i})}">♻</button></div>`;
@@ -2242,7 +2246,7 @@ export class UI {
             helmets.forEach((h, i) => {
                 const stats = getItemStatLines(h).join(', ');
                 const tip = h.description || '';
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${h.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${tip}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${h.name}</span>
                         <span class="inv-amount">${stats}</span>
                         <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${h.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantHelmet(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\\\'")}?')){window.game.discardHelmet(${i})}">♻</button></div>`;
@@ -2253,7 +2257,7 @@ export class UI {
             tools.forEach((t, i) => {
                 const stats = getItemStatLines(t).join(', ');
                 const tip = t.description || '';
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${t.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(t)}" data-tip="${tip}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${t.name}</span>
                         <span class="inv-amount">${stats}</span>
                         <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${t.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantTool(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\\\'")}?')){window.game.discardTool(${i})}">♻</button></div>`;
@@ -2263,7 +2267,7 @@ export class UI {
             html += '<div class="info-row" style="color:#ccaa44;margin-top:8px;margin-bottom:4px;"><b>Artifacts:</b></div>';
             artifacts.forEach((a, i) => {
                 const tip = this._getArtifactTooltip(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}">${this._itemIcon(a.key, 'artifact')}${a.name}</span><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardArtifact(${i})}">♻</button></div>`;
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'artifact')}${a.name}</span><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardArtifact(${i})}">♻</button></div>`;
             });
         }
         if (!html) html = '<div class="info-row" style="color:#666;">No equipment in storage.</div>';

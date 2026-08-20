@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana } from './colonist.js';
@@ -54,20 +54,13 @@ function applyEnchantment(item, colonist, game, type) {
             skill += game.workshopQualities[roomId].qualityBonus;
         }
     }
-
-    let enchantmentTier = 1;
-    //skill
-    
-    let enchantmentTierRomanNumerals = 'I';
-    switch (enchantmentTier) {
-        case 2:
-            enchantmentTierRomanNumerals = 'II';
-            break;
-        case 3:
-            enchantmentTierRomanNumerals = 'III';
-            break;
-        default:
-            break;
+    const chances = ENCHANTMENT_TIERS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
+    const total = chances.reduce((s, c) => s + c, 0);
+    let roll = Math.random() * total;
+    let tier = ENCHANTMENT_TIERS[1];
+    for (let i = 0; i < ENCHANTMENT_TIERS.length; i++) {
+        roll -= chances[i];
+        if (roll <= 0) { tier = ENCHANTMENT_TIERS[i]; break; }
     }
 
     // Roll for and apply the enchantment effect
@@ -80,32 +73,32 @@ function applyEnchantment(item, colonist, game, type) {
             enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS[randomKey];
 
             // sharpness:
-            if (enchantmentEffect.damageMultiplier) item.damage = Math.round(item.damage * (enchantmentEffect.damageMultiplier * enchantmentTier) * 100) / 100;
+            if (enchantmentEffect.damageMultiplier) item.damage = Math.round(item.damage * (enchantmentEffect.damageMultiplier * tier.multiplier) * 100) / 100;
             // witchery:
             else if (enchantmentEffect.spellDamageBonus) {
                 if (item.spellDamageBonus) {
-                    item.spellDamageBonus = item.spellDamageBonus + (enchantmentEffect.spellDamageBonus * enchantmentTier);
+                    item.spellDamageBonus = item.spellDamageBonus + (enchantmentEffect.spellDamageBonus * tier.multiplier);
                 }
                 else {
-                    item.spellDamageBonus = enchantmentEffect.spellDamageBonus * enchantmentTier;
+                    item.spellDamageBonus = enchantmentEffect.spellDamageBonus * tier.multiplier;
                 }
             }
             // piercing:
             else if (enchantmentEffect.critChanceBonus) {
                 if (item.critChance) {
-                    item.critChance = item.critChance + (enchantmentEffect.critChanceBonus * enchantmentTier);
+                    item.critChance = item.critChance + (enchantmentEffect.critChanceBonus * tier.multiplier);
                 }
                 else {
-                    item.critChance = enchantmentEffect.critChanceBonus * enchantmentTier;
+                    item.critChance = enchantmentEffect.critChanceBonus * tier.multiplier;
                 }
             } 
             // vampirism:
             else if (enchantmentEffect.lifeStealBonus) {
                 if (item.lifeSteal) {
-                    item.lifeSteal = item.lifeSteal + (enchantmentEffect.lifeStealBonus * enchantmentTier);
+                    item.lifeSteal = item.lifeSteal + (enchantmentEffect.lifeStealBonus * tier.multiplier);
                 }
                 else {
-                    item.lifeSteal = enchantmentEffect.lifeStealBonus * enchantmentTier;
+                    item.lifeSteal = enchantmentEffect.lifeStealBonus * tier.multiplier;
                 }
             }
             
@@ -123,16 +116,16 @@ function applyEnchantment(item, colonist, game, type) {
             enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS[randomKey];
 
             // protection:
-            if (enchantmentEffect.defenseMultiplier) item.defense = Math.round(item.defense * (enchantmentEffect.defenseMultiplier * enchantmentTier) * 100) / 100;
+            if (enchantmentEffect.defenseMultiplier) item.defense = Math.round(item.defense * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
             // wisdom:
             else if (enchantmentEffect.manaRegenMultiplier) {
                 if (item.manaRegenMultiplier === undefined) {
                     item.manaRegenMultiplier = 1;
                 }
-                item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * enchantmentTier) * 100) / 100;
+                item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * tier.multiplier) * 100) / 100;
             }
             // barbs:
-            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage += (enchantmentEffect.thornsDamageBonus * enchantmentTier);
+            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage += (enchantmentEffect.thornsDamageBonus * tier.multiplier);
             // free_movement:
 
             // dodge_change:
@@ -145,17 +138,17 @@ function applyEnchantment(item, colonist, game, type) {
 
             // productivity:
             if (enchantmentEffect.workSpeedMultiplier) {
-                if (item.miningSpeed) item.miningSpeed = Math.round(item.miningSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
-                if (item.choppingSpeed) item.choppingSpeed = Math.round(item.choppingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
-                if (item.farmingSpeed) item.farmingSpeed = Math.round(item.farmingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
-                if (item.craftingSpeed) item.craftingSpeed = Math.round(item.craftingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
+                if (item.miningSpeed) item.miningSpeed = Math.round(item.miningSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
+                if (item.choppingSpeed) item.choppingSpeed = Math.round(item.choppingSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
+                if (item.farmingSpeed) item.farmingSpeed = Math.round(item.farmingSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
+                if (item.craftingSpeed) item.craftingSpeed = Math.round(item.craftingSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
             }
             // renewal:
             else if (enchantmentEffect.healthRegenMultiplier) {
                 if (item.healthRegenMultiplier === undefined) {
                     item.healthRegenMultiplier = 1;
                 }
-                item.healthRegenMultiplier = Math.round(item.healthRegenMultiplier * (enchantmentEffect.healthRegenMultiplier * enchantmentTier) * 100) / 100;
+                item.healthRegenMultiplier = Math.round(item.healthRegenMultiplier * (enchantmentEffect.healthRegenMultiplier * tier.multiplier) * 100) / 100;
             }
             // windfall:
 
@@ -165,9 +158,9 @@ function applyEnchantment(item, colonist, game, type) {
         default:
             break;
     }   
-    item.enchantment = enchantmentEffect.key;
+    item.enchantment = enchantmentEffect;
     item.description = `${item.description} ${enchantmentEffect.description}`;
-    item.name = `${item.name} ${enchantmentEffect.suffix} ${enchantmentTierRomanNumerals}`; 
+    item.name = `${item.name} ${enchantmentEffect.suffix} ${tier.key}`; 
 }
 
 function applyThought(colonist, thoughtKey, tick) {

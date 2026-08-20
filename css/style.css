@@ -2322,6 +2322,31 @@ img.pixel-art {
     font-size: 1em;
 }
 
+.enchanted-text {
+    font-weight: bold;
+
+    /* Use currentColor as the base, mixed with a white shifting gleam */
+    background: linear-gradient(
+    120deg,
+    currentColor 0%,
+    rgba(255, 150, 252, 0.7) 50%,
+    currentColor 100%
+    );
+
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent; /* Makes the background gradient visible through the text */
+
+    animation: enchant-gleam 3s linear infinite;
+}
+
+@keyframes enchant-gleam {
+    to {
+        background-position: -200% center;
+    }
+}
+
 /* ============================
    RESPONSIVE LAYOUT
    ============================ */
