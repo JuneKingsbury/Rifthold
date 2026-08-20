@@ -80,8 +80,8 @@ class Game {
             showPortalPath: true,
             craftTargets: {},
             layoutMode: 'auto',
-            musicVolume: 70,
-            sfxVolume: 80,
+            musicVolume: 50,
+            sfxVolume: 50,
             temperatureUnit: 'F',
             ditherDistance: 'light',
             ditherQuality: 'medium',
@@ -2878,8 +2878,8 @@ document.addEventListener('DOMContentLoaded', () => {
             s.notificationDuration = parseInt(document.getElementById('start-notif-dur').value) || 100;
             s.layoutMode = document.getElementById('start-layout-mode').value;
             s.temperatureUnit = document.getElementById('start-temp-unit').value;
-            s.musicVolume = parseInt(document.getElementById('start-music-vol').value) || 70;
-            s.sfxVolume = parseInt(document.getElementById('start-sfx-vol').value) || 80;
+            s.musicVolume = parseInt(document.getElementById('start-music-vol').value) || 50;
+            s.sfxVolume = parseInt(document.getElementById('start-sfx-vol').value) || 50;
             s.showColonistNames = document.getElementById('start-names').value;
             s.uiFontSize = parseInt(document.getElementById('start-ui-font-size').value) || 12;
             localStorage.setItem('colony_settings', JSON.stringify(s));
@@ -2973,10 +2973,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-notif-dur').value = '100';
         document.getElementById('start-layout-mode').value = 'auto';
         document.getElementById('start-temp-unit').value = 'F';
-        document.getElementById('start-music-vol').value = 70;
-        document.getElementById('start-music-vol-val').textContent = '70';
-        document.getElementById('start-sfx-vol').value = 80;
-        document.getElementById('start-sfx-vol-val').textContent = '80';
+        document.getElementById('start-music-vol').value = 50;
+        document.getElementById('start-music-vol-val').textContent = '50';
+        document.getElementById('start-sfx-vol').value = 50;
+        document.getElementById('start-sfx-vol-val').textContent = '50';
         saveStartSettings();
         if (SoundManager) {
             SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
@@ -3056,8 +3056,8 @@ document.addEventListener('DOMContentLoaded', () => {
             colorblindMode: document.getElementById('start-colorblind').value,
             notificationDuration: parseInt(document.getElementById('start-notif-dur').value) || 100,
             layoutMode: document.getElementById('start-layout-mode').value,
-            musicVolume: parseInt(document.getElementById('start-music-vol').value) || 70,
-            sfxVolume: parseInt(document.getElementById('start-sfx-vol').value) || 80,
+            musicVolume: parseInt(document.getElementById('start-music-vol').value),// || 50,
+            sfxVolume: parseInt(document.getElementById('start-sfx-vol').value),// || 50,
             temperatureUnit: document.getElementById('start-temp-unit').value || 'F',
         };
         setUIFontSize(startSettings.uiFontSize);
