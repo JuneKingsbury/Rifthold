@@ -150,11 +150,16 @@ function applyEnchantment(item, colonist, game, type) {
                 if (item.farmingSpeed) item.farmingSpeed = Math.round(item.farmingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
                 if (item.craftingSpeed) item.craftingSpeed = Math.round(item.craftingSpeed * (enchantmentEffect.workSpeedMultiplier * enchantmentTier) * 100) / 100;
             }
-            // windfall
+            // renewal:
+            else if (enchantmentEffect.healthRegenMultiplier) {
+                if (item.healthRegenMultiplier === undefined) {
+                    item.healthRegenMultiplier = 1;
+                }
+                item.healthRegenMultiplier = Math.round(item.healthRegenMultiplier * (enchantmentEffect.healthRegenMultiplier * enchantmentTier) * 100) / 100;
+            }
+            // windfall:
 
-            // healthRegen
-
-            // spellCostReduction
+            // spellCostReduction:
 
             break;
         default:

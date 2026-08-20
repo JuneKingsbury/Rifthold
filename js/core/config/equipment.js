@@ -209,8 +209,8 @@ export const ARMOR_ENCHANTMENT_EFFECTS = {
 
 export const TOOL_ENCHANTMENT_EFFECTS = {
     productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedMultiplier: 1.15 },
+    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenMultiplier: 1.15 },
     // windfall: { suffix: 'of Windfall', description: 'Enchanted with windfall, increasing materials gained while gathering by 20% per enchantment tier.', gatheringMatMultiplier: 1.20 },
-    // healthRegen
     // spellCostReduction
 };
 

@@ -316,6 +316,7 @@ function updateHealth(colonist) {
     if (colonist.hp >= colonist.maxHp) return;
     let regen = COLONIST_CONFIG.baseHealthRegen;
     regen += getEquipmentStat(colonist, 'healthRegen');
+    if (getEquipmentStat(colonist, 'healthRegenMultiplier')) regen *= getEquipmentStat(colonist, 'healthRegenMultiplier');
     if (colonist.state === 'sleeping') regen *= COLONIST_CONFIG.healthRegenWhileSleeping;
     else if (colonist.state === 'idle') regen *= COLONIST_CONFIG.healthRegenWhileIdle;
     colonist.hp = Math.min(colonist.maxHp, colonist.hp + regen);
@@ -326,7 +327,7 @@ function updateMana(colonist) {
     const combinedLevel = Object.values(colonist.magicSkills).reduce((sum, lvl) => sum + lvl, 0);
     let regen = MANA_CONFIG.baseRegen + combinedLevel * MANA_CONFIG.regenPerMagicLevel;
     regen += getEquipmentStat(colonist, 'manaRegen');
-    regen *= getEquipmentStat(colonist, 'manaRegenMultiplier') || 1;
+    if (getEquipmentStat(colonist, 'manaRegenMultiplier')) regen *= getEquipmentStat(colonist, 'manaRegenMultiplier');
     if (colonist.state === 'sleeping') regen *= MANA_CONFIG.regenWhileSleeping;
     else if (colonist.state === 'idle') regen *= MANA_CONFIG.regenWhileIdle;
     colonist.mana = Math.min(colonist.maxMana, colonist.mana + regen);
