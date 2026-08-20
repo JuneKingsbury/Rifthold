@@ -270,7 +270,7 @@ export function updateColonist(colonist, game) {
     }
 
     if (game.tick % 15 === 0) {
-        if (colonist.needs.hunger < 20) {
+        if (colonist.needs.hunger < COLONIST_CONFIG.hungerMoodThreshold ) {
             game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Starving!', color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
         }
         if (colonist.thoughts && colonist.thoughts.some(t => t.text === 'Freezing outside')) {
@@ -801,7 +801,8 @@ function updateIdle(colonist, game) {
         }
     }
 
-    if (colonist.needs.hunger < COLONIST_CONFIG.hungerMoodThreshold &&
+    // Start seeking food BEFORE the colonist encounters a mood debuff.
+    if (colonist.needs.hunger < COLONIST_CONFIG.hungerMoodThreshold + 10 &&
         (game.resources.stockpile.food > 0 || game.resources.getFoodstuffTotal() > 0)) {
         colonist.state = 'eating';
         return;
