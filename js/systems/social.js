@@ -66,6 +66,14 @@ function checkRelationshipChange(colonist, other, prevTierKey, game) {
         game.notifications.push({ text: `${colonist.name} and ${other.name} have become rivals!`, tick: game.tick, type: 'danger' });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Rivals!', color: '#ff4444', fontSize: 11, ttl: 15, maxTtl: 15 });
         game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Rivals!', color: '#ff4444', fontSize: 11, ttl: 15, maxTtl: 15 });
+    } else if (newTierKey === 'adversary') {
+        addThought(colonist, THOUGHTS.became_adversaries.text, THOUGHTS.became_adversaries.moodEffect, THOUGHTS.became_adversaries.duration, game.tick);
+        if (storedTier === 'friend' || storedTier === 'close_friend' || storedTier === 'lovers') {
+            addThought(colonist, THOUGHTS.friendship_ended.text, THOUGHTS.friendship_ended.moodEffect, THOUGHTS.friendship_ended.duration, game.tick);
+        }
+        game.notifications.push({ text: `${colonist.name} and ${other.name} have become adversaries!`, tick: game.tick, type: 'danger' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Adversaries!', color: '#ff9d34', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Adversaries!', color: '#ff9d34', fontSize: 11, ttl: 15, maxTtl: 15 });
     } else if (newTierKey === 'stranger' && (storedTier === 'friend' || storedTier === 'close_friend' || storedTier === 'lovers')) {
         addThought(colonist, THOUGHTS.friendship_ended.text, THOUGHTS.friendship_ended.moodEffect, THOUGHTS.friendship_ended.duration, game.tick);
     }

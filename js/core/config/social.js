@@ -19,7 +19,7 @@ export const THOUGHTS = {
     new_colonist:      { text: 'New colonist arrived', moodEffect: 5, duration: 200 },
     freezing:          { text: 'Freezing outside', moodEffect: -8, duration: 50 },
     fire_panic:        { text: 'Colony on fire!', moodEffect: -20, duration: 200 },
-    crops_died:        { text: 'Crops died', moodEffect: -15, duration: 300 },
+    crops_died:        { text: 'Crops died', moodEffect: -15, duration: 250 },
     cold_snap:         { text: 'Freezing cold snap', moodEffect: -12, duration: 300 },
     inspired:          { text: 'Feeling inspired!', moodEffect: 25, duration: 300 },
     food_spoiled:      { text: 'Food is rotting', moodEffect: -5, duration: 150 },
@@ -29,8 +29,9 @@ export const THOUGHTS = {
     wolf_retaliated:   { text: 'Wolf attacked during taming!', moodEffect: -12, duration: 200 },
     // Social thoughts
     made_friend:       { text: 'Made a new friend!', moodEffect: 12, duration: 300 },
+    became_adversaries:{ text: 'Made an adversary', moodEffect: -5, duration: 150 },
     became_rivals:     { text: 'Made an enemy', moodEffect: -10, duration: 250 },
-    good_conversation: { text: 'Had a nice chat', moodEffect: 4, duration: 80 },
+    good_conversation: { text: 'Had a nice chat', moodEffect: 4, duration: 120 },
     had_argument:      { text: 'Had an argument', moodEffect: -6, duration: 120 },
     fell_in_love:      { text: 'Found love!', moodEffect: 20, duration: 500 },
     friendship_ended:  { text: 'Lost a friend', moodEffect: -8, duration: 200 },
@@ -42,7 +43,8 @@ export const THOUGHTS = {
 };
 
 export const RELATIONSHIP_TIERS = [
-    { key: 'rival',        minOpinion: -100, name: 'Rival',        color: '#ff4444' },
+    { key: 'rival',        minOpinion: -75,  name: 'Rival',        color: '#ff4444' },
+    { key: 'adversary',    minOpinion: -50,  name: 'Adversary',    color: '#ff9d34' },
     { key: 'stranger',     minOpinion: -25,  name: 'Stranger',     color: '#888888' },
     { key: 'acquaintance', minOpinion: 15,   name: 'Acquaintance', color: '#aaaaaa' },
     { key: 'friend',       minOpinion: 40,   name: 'Friend',       color: '#44cc44' },
@@ -64,7 +66,7 @@ export const SOCIAL_INTERACTIONS = [
 
 export const SOCIAL_CONFIG = {
     checkInterval: 15,
-    interactionRange: 6,
+    interactionRange: 4,
     baseInteractionChance: 0.12,
     socialiteChanceMult: 1.8,
     lonerChanceMult: 0.3,
