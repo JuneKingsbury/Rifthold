@@ -19,17 +19,12 @@ export function getMaxCountBonus(def, buildType, game) {
 export function designateBuild(game, x, y, buildType) {
     const tile = game.map[y][x];
     if (tile.resource) return false;
-    if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock') return false;
+    if (tile.terrain === 'water' || tile.terrain === 'tall_rock') return false;
 
     const def = BUILDINGS[buildType];
     if (!def) return false;
 
-    if (def.structureType === 'floor') {
-        if (tile.floor) return false;
-    } else {
-        if (tile.structure) return false;
-    }
-    if (!tile.passable) return false;
+    if (!game.resources.has(def.cost)) return false;
 
     if (def.research && !game.research.isResearched(def.research)) return false;
 
@@ -45,7 +40,23 @@ export function designateBuild(game, x, y, buildType) {
         if (count >= def.maxCount + bonus) return false;
     }
 
-    if (!game.resources.has(def.cost)) return false;
+    if (def.structureType === 'floor') {
+        if (tile.floor) {
+            if (!(tile && (tile.type === 'deconstruct' || tile.type === 'deconstruct_floor'))) {
+                if (game.mapIndex) game.mapIndex.removeStructure(x, y, tile.floor);
+                tile.floor = null;
+            }
+        }
+    } else {
+        if (tile.structure) {
+            if (!(tile && tile.type === 'deconstruct')) {
+                if (game.mapIndex) game.mapIndex.removeStructure(x, y, tile.structure);
+                tile.structure = null;
+                tile.passable = true;
+            }
+        }
+    }
+    if (!tile.passable) return false;
 
     game.resources.deduct(def.cost);
     tile.designation = { type: 'build', buildType };

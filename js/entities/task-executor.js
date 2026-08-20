@@ -510,6 +510,40 @@ export function completeTask(colonist, task, game) {
             }
             break;
         }
+        case 'deconstruct_floor': {
+            const tile = game.map[task.y][task.x];
+            const target = tile.floor;
+            if (target) {
+                const def = BUILDINGS[target];
+                if (def) {
+                    const partial = {};
+                    for (const [res, amt] of Object.entries(def.cost)) {
+                        partial[res] = Math.ceil(amt * COLONIST_CONFIG.deconstructRecovery);
+                    }
+                    game.resources.add(partial);
+                }
+                if (tile.structure) {
+                    if (tile.structure === 'bed') {
+                        for (const c of game.colonists) {
+                            if (c.assignedBed && c.assignedBed.x === task.x && c.assignedBed.y === task.y) {
+                                c.assignedBed = null;
+                            }
+                        }
+                    }
+                    if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.structure);
+                    tile.structure = null;
+                    tile.passable = true;
+                } else {
+                    if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.floor);
+                    tile.floor = null;
+                }
+                tile.designation = null;
+                game.roomsDirty = true;
+                applyThought(colonist, 'deconstructed', game.tick);
+                game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+            }
+            break;
+        }
     }
 
     if (task.skillRequired && colonist.skills[task.skillRequired] !== undefined) {
