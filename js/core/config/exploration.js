@@ -828,9 +828,9 @@ export const STORY_MILESTONES = {
         title: 'Beast Binding',
         trigger: 'research_beast_binding',
         text: `
-        Beast binding is an art perfected by the ancient Ferini, but now largely 
-        lost to you. Using the Binding Circle you are able to salvage a portion of that 
-        art and work alongside the wildlife around you.
+        The ancient Ferini were known for their perfection of beast binding, but those
+        arts are largely lost to you. Using the Binding Circle you are able to salvage  
+        a portion of that art and work alongside the wildlife of the frontier.
         <br><br>
         As you practice this art you wonder what else the Ferini knew that you'll have 
         to rediscover.`,
@@ -1015,7 +1015,7 @@ export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
     // World tab — lore and worldbuilding
     // -----------------------------------------------------------------------
-    first_bofos_colonist: {
+    first_bufos_colonist: {
         tab: 'world',
         title: 'The Bufoi',
         trigger: 'first_bufos_colonist_arrived',
