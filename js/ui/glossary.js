@@ -38,8 +38,8 @@ export const GLOSSARY = [
             {
                 subtitle: 'Farming',
                 entries: [
-                    ['Farm Zone', 'Designate with Z mode. Select a crop type, drag an area on grass/dirt. Colonists auto-plant and harvest.'],
-                    ['Crops', 'Plant in Farm Zone mode (Z). Growth affected by season and weather.\n\n  Crop       Seasons              Time  Yield  Research\n  Wheat      Spring/Summer/Autumn  200   3      —\n  Berries    Spring/Summer/Autumn  150   2      —\n  Corn       Summer only           250   4      Druidcraft\n  Potatoes   Spring/Autumn/Winter  180   3      Druidcraft\n  Moonbloom  All seasons           220   2      Herbalism\n\nRain = 1.3x growth. Summer = 1.5x. No outdoor growth in winter (except potatoes and moonbloom). Irrigation research allows all crops at 0.5x in winter.'],
+                    ['Farm Zone', 'Designate with F mode. Select a crop type, drag an area on grass/dirt. Colonists auto-plant and harvest.'],
+                    ['Crops', 'Plant in Farm Zone mode (F). Growth affected by season and weather.\n\n  Crop       Seasons              Time  Yield  Research\n  Wheat      Spring/Summer/Autumn  200   3      —\n  Berries    Spring/Summer/Autumn  150   2      —\n  Corn       Summer only           250   4      Druidcraft\n  Potatoes   Spring/Autumn/Winter  180   3      Druidcraft\n  Moonbloom  All seasons           220   2      Herbalism\n\nRain = 1.3x growth. Summer = 1.5x. No outdoor growth in winter (except potatoes and moonbloom). Irrigation research allows all crops at 0.5x in winter.'],
                 ]
             },
             {
@@ -294,7 +294,7 @@ export const GLOSSARY = [
                     ['Space', 'Pause/Unpause.'],
                     ['< / >', 'Speed down/up (1x to 5x).'],
                     ['B', 'Toggle Build mode.'],
-                    ['Z', 'Toggle Farm Zone mode.'],
+                    ['F', 'Toggle Farm Zone mode.'],
                     ['G', 'Toggle Gather/Designate mode.'],
                     ['P', 'Toggle Priority panel.'],
                     ['C', 'Toggle Craft panel.'],
