@@ -1106,7 +1106,49 @@ export const STORY_MILESTONES = {
         tab: 'world',
         title: 'Crystal Caves',
         trigger: 'realm_crystal_caves',
-        text: 'TODO: Write lore text for exploring the Crystal Caves.',
+        text: `
+        You tore open a rift between your colony and a distant land. Without practice you 
+        had little control over just where this hole in space would open. Thankfully you 
+        were greeted by a large cavern lined with beautiful clear crystals.
+        <br><br>
+        After making sure the rift would stay open long enough to allow for exploration, 
+        you and a small team of colonists ventured into this unknown cave. The crystals 
+        provided ample light for navigation, their faint glow giving you a sense of safety 
+        in this unfamiliar place.
+        <br><br>
+        Despite this feeling you still found the quietness of the cavern offputting. You 
+        had hoped to hear a bat fly by or some insects scuttle to their hiding places, but
+        instead you're met with only the sound of your own footsteps echoing through the 
+        dimly lit cave.
+        <br><br>
+        In the silence you collected stray rocks and crystal samples to bring back to 
+        the colony. Sadly it seemed that this cave didn't have a lot to offer you, but 
+        you continue on your march regardless.
+        <br><br>
+        As you continued to walk you noticed the cave walls slowly closing in to a tight 
+        opening. It was easy enough to crawl through the opening as you entered into a deep 
+        hallway-like passage. Suddenly you hear something different coming from the end of 
+        the hallway. The sounds of quick footsteps making their way toward you, four feet 
+        moving effeciently through the tight corridor.
+        <br><br>
+        You stood ready to face the creature, not knowing what you expected to see. Your 
+        curiosity was answered when the monster stepped into your line of sight, glowing 
+        with the same dim light as the crystals throughout the cave system. The dim light 
+        made it hard to parse the being's exact features, looking almost like a wolf or a
+        wild cat. As it moved closer it became clear that its glow came from crystals of its 
+        own that seemed to be embedded into its body.
+        <br><br>
+        With some quick thinking you were able to drive the creature away by throwing loose 
+        stones and scraping your weapon against the cave walls. You pursued the creature in 
+        hopes of driving it further from the safe portion of the cavern you've already explored. 
+        While you ran as fast as you could, it was still able to out pace you, disappearing into 
+        the darkness of the cave tunnels.
+        <br><br>
+        As you caught your breath you took a moment to look around your new surroundings. A 
+        wooden plank held up against the tunnel wall caught your attention. Clearly someone 
+        was here before you. You noted down this finding as you walked back towards the open 
+        rift. Maybe there will be something useful to find deep within these caves after all?
+        `,
     },
     realm_crystal_mines: {
         tab: 'world',
