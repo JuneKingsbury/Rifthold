@@ -1051,15 +1051,29 @@ export const STORY_MILESTONES = {
         title: 'The Ferini',
         trigger: 'first_ferin_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/ferini.png" alt="A drawing depicting the Ferini">
-        Also known as Wildfolk, the Ferini are a group of people with deep ties to nature. 
-        Each ferin is gifted with animal-like traits and an ability to communicate with animals 
-        and plants directly. These gifts are off putting to the humans of the larger kingdoms, 
-        with the Ferini often being excluded from their societies.
+        A people with a strong connection to the wilderness. The ferini have always found 
+        themselves on the outskirts of society, living among themselves and the animals they 
+        befriend in far off lands. The Frontier is comfortable for the ferini, acting as many 
+        community's home for years already.
         <br><br>
-        The few Wildfolk who maintain ties to the human kingdoms find themselves working as 
-        shepherds and farmers, which they excel at. The majority of these people instead find 
-        themselves living in the wilderness among other Ferini in small communities that live 
-        off the gifts given to them by the land they roam.`,
+        The ferini largely live their lives unseen by other groups of people, content to 
+        live among their own and let the land provide for them all that they need. Ferini 
+        communities tend to differ a lot between one another, with some making their homes 
+        in steep mountains among the goats, others with deer in the woods, all sharing 
+        a reverence for nature.
+        <br><br>
+        This deep understanding of nature has manifested in the ferini through gifts from 
+        the world. They find themselves gifted with traits much like the animals they live 
+        among and the ability to communicate directly with the wild things around them. The 
+        few humans who are aware of the ferini outside of myths treat these gifts as curses, 
+        shunning the ferini from human society completely.
+        <br><br>
+        As The Crusade spreads, the ferini find their homes encroached upon by fearful humans. 
+        To keep themselves safe they've moved deeper into The Frontier, further from the 
+        homes they've grown alongside. They hope to one day return to these homes regardless 
+        of the damage the Crusaders continue to inflict upon the land. For the time 
+        being they find themselves joining new settlements, helping their small communities 
+        of strangers work alongside the unfamiliar nature that surrounds them.`,
     },
     first_nymph_colonist: {
         tab: 'world',
