@@ -1086,21 +1086,39 @@ export const STORY_MILESTONES = {
         title: 'Humanity',
         trigger: 'first_human_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/humanity.png" alt="A drawing depicting Humanity">
-        A dominating presence in the world. Humans tend to be very unique individuals 
-        with some of the widest variation in skills they excel at. These passions are 
-        what leads human colonists to greatness, especially after putting in the work.
+        A dominating presence in the world. Humanity makes up the largest portion of the 
+        known world, living in kingdoms that span huge swaths of land. Known for their 
+        strict rules and social boundaries, humans tend to have a skewed perception of 
+        the world outside of their borders that fails to conform to their requirements.
         <br><br>
-        While often not gifted with magical abilities, humans tend to be great at cracking 
-        open old tomes and learning how to control the magic contained in them regardless 
-        of their innate magical talent. All schools of magic are equally appealing to 
-        humankind and powerful human magicians tend to dive into as many different schools 
-        as they can throughout their lives.
+        With these codes of conduct came an air of superiority over the other. This arrogance 
+        has led the kingdoms to outlaw magic completely, along with those who are born 
+        with it. Their passion to enforce their rules has culminated in The Crusade, an 
+        attempt by humanity to rid their world of magic completely.
         <br><br>
-        What humans lack in magical prowess they make up for in sheer numbers. The largest 
-        kingdoms throughout the world are ruled by humans with strict laws on magic usage. 
-        Your old homeland is one of such kingdoms, recently starting their crusade against 
-        magic and magical beings. Humans in the frontier generally oppose these actions and 
-        have friendly relationships with innately magical folk.`,
+        Nearly all of the kingdoms throughout the realm have pushed aside their grudges 
+        to work together on this common goal. It has been rather easy to convince the 
+        people under these rulers to contribute to the cause, with many being taught from 
+        a young age to be fearful of the other. With the ever expanding Crusade on their 
+        heels, most magical races have gone into hiding deep within The Frontier, where 
+        no kingdom has claimed as its own.
+        <br><br>
+        While all Crusaders are human, not all humans are supportive of their actions. 
+        Some remember happier times where they had toiled alongside magical beings. Some 
+        simply remain unconvinced that further erradication is necesary now that these 
+        beings have fled into hiding. Speaking out against The Crusade is forbidden, with 
+        those accused of such actions often finding themselves among those they tried to 
+        defend in The Frontier. Thankfully these humans are welcomed into their new 
+        communities with open arms.
+        <br><br>
+        Humans tend to be very unique from one another, often being some of the first 
+        people to pick up a new skill if they have enough interest in it. With enough 
+        effort any human can become a valuable asset to their community. Interestingly 
+        humans have no issues learning how to control magic and cast spells despite 
+        their lack of innate magical gifts. Truly humans are capable of anything as long 
+        as they have the right support from those around them.
+        <br><br>
+        We can only hope that there will come a day when these kinder humans are able to prosper.`,
     },
     realm_crystal_caves: {
         tab: 'world',
