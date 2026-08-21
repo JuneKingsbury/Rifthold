@@ -1109,7 +1109,7 @@ export const STORY_MILESTONES = {
         text: `
         You tore open a rift between your colony and a distant land. Without practice you 
         had little control over just where this hole in space would open. Thankfully you 
-        were greeted by a large cavern lined with beautiful clear crystals.
+        were greeted by a large cavern lined with beautiful translucent crystals.
         <br><br>
         After making sure the rift would stay open long enough to allow for exploration, 
         you and a small team of colonists ventured into this unknown cave. The crystals 
