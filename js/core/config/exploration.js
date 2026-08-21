@@ -1022,18 +1022,34 @@ export const STORY_MILESTONES = {
         title: 'The Bufoi',
         trigger: 'first_bufos_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/bufoi.png" alt="A drawing depicting the Bufoi">
-        
-        
-        A group of amphibious folk resembling frogs, salamanders, and rarely even fish. 
-        While these folk have a preference for living near water, they can easily survive 
-        life on dry land for extended periods of time.
+        A foreign presence in the world. The Bufoi are a group of people that resemble 
+        frogs, salamanders, or even occasionally fish, but with a more human-like body plan.
+        They are by far the furthest removed group of people from the other races, with humans 
+        having little understanding of how the bufoi live their lives. Some even go as far 
+        as assuming the bufoi are not truly intellegent beings, though anyone who's lived among 
+        them knows that this is preposterous.
         <br><br>
-        The average bufos tends to excel at manual tasks like crafting and building. 
-        Despite their appearance, these folk are born with two right hands and an eye for 
-        detail that makes them a valuable asset for any colony.
+        Despite not being inherently magical beings themselves, the bufoi still found their 
+        communities targeted by the spreading Crusade. Flushed from their homes and forced to 
+        move downstream, into the far reaches of The Frontier. While the newly formed communities 
+        there are willing to take in these bufoi, their strange behaviors are quickly seen in full.
         <br><br>
-        These folks are also known for their heavy sleeping habits, some of which go as 
-        far as sleeping through entire winter seasons each year.`,
+        It is unclear if the bufoi are amphibious, like the animals they resemble. Regardless, 
+        it is well known that they tend to live near fresh water sources like rivers and 
+        lakes. Their society is often viewed as the most foreign part about them, even moreso 
+        than their physical appearance. For example, their courtship traditions are known to 
+        confuse and often frighten humans who find themselves in the wrong place at the wrong 
+        time. Despite these differences, the bufoi have had little trouble fitting in among 
+        communities in The Frontier. Some may find it odd when they spend their leisure time 
+        soaking in nearby rivers or fall asleep at odd hours of the day, but their friendly 
+        nature tends to make them seem normal among their community of outcasts. So friendly 
+        in fact that rumors have begun to spread of a bufos finding his true love among the 
+        ferini people.
+        <br><br>
+        It can often be difficult to guess know how a bufos is feeling, but overall, much like
+        the ferini, they always seem content living in the far off parts of The Frontier. They 
+        almost always enjoy life among their newly found community and seem to take great joy 
+        in teaching their interested neighbors about their people.`,
     },
     first_kobalos_colonist: {
         tab: 'world',
