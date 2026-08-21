@@ -1066,20 +1066,32 @@ export const STORY_MILESTONES = {
         title: 'The Nympha',
         trigger: 'first_nymph_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/nympha.png" alt="A drawing depicting the Nympha">
-        A solitary people that could easily be mistaken for humans if it wasn't for their 
-        pointy ears and uncanny beauty. The Nympha are born with an inherent magic that allows 
-        them to excel at mana control. They make good use of their magical talents to supplement 
-        their less-than-impressive physical prowess.
+        A secretive presence throughout recorded history. The nympha are a group of very 
+        few, with their hidden communities making them appear even smaller to those unfamiliar 
+        with their communities. Living among forest canopies, the nympha are truly one with 
+        the magic of the world they live in. Just as the world has become less magical, the 
+        nympha have dropped in number, being only a small fraction of what they used to be.
         <br><br>
-        The average nymph tends to find themselves in the role of a book keeper or similar 
-        work that requires a good memory and penmanship. They make especially efficient workers
-        due to their low requirements for rest, needing to sleep signifigantly less than their 
-        human peers.
+        Among modern humans the visage of the nympha brings to mind long standing fears 
+        of the unknown, seeing them as symbols of the wicked magic that they've been raised to 
+        distrust. One reason often cited for their fears is the nympha's uncanny appearance, 
+        with many sightings by humans describing their beauty being otherworldly. Some even 
+        fear that nympha may be able to live silently among their communities, acting as a 
+        curse upon their friends and family.
         <br><br>
-        The Nympha have become exceedingly rare among the human kingdoms in the recent years. 
-        Crusaders point to their innate magic and uncanny appearance as justification for their 
-        removal. The remaining people find themselves in hiding, spread out far and wide. The 
-        safest place for them today is out in the farthest parts of the frontier.`,
+        In the far past it was not uncommon to see a nymph working alongside humans. While not 
+        quite as physically capable as the average human farmhand, the nympha used their magic 
+        creatively to bridge the gap. Nympha were sought after by many among humanity's most 
+        powerful at that time, making use of the nympha's many talents. It was not uncommon to 
+        see a nympha employeed as book keepers, court magicians, or even concubines. 
+        Some especially long-lived nympha have fond memories of their time among humans. 
+        These nympha still hold out hope for humanity, taking in the exiles that wander 
+        into The Frontier.
+        <br><br>
+        The many humans that continue to fear the nympha continue to drive them further from 
+        their homes in the woods outside of the human kingdoms. The Frontier remains one of the 
+        only safe havens for these people, letting them rebuild their communities that were 
+        shaken by The Crusade.`,
     },
     first_human_colonist: {
         tab: 'world',
