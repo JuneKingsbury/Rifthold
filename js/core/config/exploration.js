@@ -1022,6 +1022,8 @@ export const STORY_MILESTONES = {
         title: 'The Bufoi',
         trigger: 'first_bufos_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/bufoi.png" alt="A drawing depicting the Bufoi">
+        
+        
         A group of amphibious folk resembling frogs, salamanders, and rarely even fish. 
         While these folk have a preference for living near water, they can easily survive 
         life on dry land for extended periods of time.
@@ -1038,6 +1040,8 @@ export const STORY_MILESTONES = {
         title: 'The Kobaloi',
         trigger: 'first_kobalos_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/kobaloi.png" alt="A drawing depicting the Kobaloi">
+        
+        
         A wide ranging people known for their large ears, distinct skin colors, and their 
         mischievous behaviors. While not all Kobalos are tricksters, they tend to be known 
         for their speed and their cunning.
@@ -1144,7 +1148,7 @@ export const STORY_MILESTONES = {
         their lack of innate magical gifts. Truly humans are capable of anything as long 
         as they have the right support from those around them.
         <br><br>
-        We can only hope that there will come a day when these kinder humans are able to prosper.`,
+        We can only hope that these kinder humans are able to prosper.`,
     },
     realm_crystal_caves: {
         tab: 'world',
