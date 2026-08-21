@@ -1164,19 +1164,84 @@ export const STORY_MILESTONES = {
         tab: 'world',
         title: 'Arcane Library',
         trigger: 'realm_arcane_library',
-        text: 'TODO: Write lore text for exploring the Arcane Library.',
+        text: `
+        The Arcane Library was once home to hundreds of prospective mages. 
+        With bans on magic the bustling halls quickly became silent. Its 
+        disappointing to see such a beautiful building slowly rot without 
+        its inhabitants.
+        <br><br>
+        Despite the lack of librarians, the shelves continue to be organized 
+        and re-stocked with books of all kinds. The deeper sections of the library 
+        carry fading magic energies that might be contributing to these remaining 
+        traces of order. We'll try to use this space while we can and keep it clear 
+        of those who'd like to see its knowledge stay forever trapped within these 
+        decaying walls.
+        <br><br>
+        Some sections of the library remain locked off with magical wards. You'd 
+        guess that these sections hide long lost magical lore that would greatly 
+        benefit your colony. Perhaps we can find a way in through the larger university 
+        grounds that the library sits on?`,
     },
     realm_ancient_university: {
         tab: 'world',
         title: 'Ancient University',
         trigger: 'realm_ancient_university',
-        text: 'TODO: Write lore text for exploring the Ancient University.',
+        text: `
+        Just as you anticipated, the university grounds contained the answer to 
+        the locked off library sections you hoped to explore.
+        <br><br>
+        Finding the key to these wards was not easy. The university has stood for 
+        hundreds of years, becoming a labyrinth of buildings and squares. The streets 
+        are also less empty than expected, with patrols of crusaders keeping wanderers 
+        from getting close to the library. You're glad you decided to open the initial 
+        rift directly into the library as they seem to be unwilling to enter.
+        <br><br>
+        By moving carefully right under their noses you're able to take your time with 
+        the cache of once-locked-away tomes.
+        <br><br>
+        You find among these hidden works a collection of notes. While its difficult to 
+        understand what exactly they mean, you gleam that there is a fundamental aspect 
+        of magic that the university was researching. The notes lead you to a building 
+        at the far end of the university grounds. This laboratory is clearly long 
+        abandonded, much like the rest of the buildings, but magical energy seems 
+        to still linger in the air from their experiments. Their findings may be just 
+        what we needed to uncover some lost art or a powerful spell!`,
     },
     realm_abandoned_laboratory: {
         tab: 'world',
         title: 'Abandoned Laboratory',
         trigger: 'realm_abandoned_laboratory',
-        text: 'TODO: Write lore text for exploring the Abandoned Laboratory.',
+        text: `
+        As you entered the laboratory the lingering magic grew rapidly in strength. 
+        After just a dozen steps into the main hallway the energy started to become 
+        overwhelming. You pushed through, walking quickly towards the source of this 
+        thick haze of magic.
+        <br><br>
+        As the haze grew in density the hallways became less and less cohesive. It was 
+        as if a fundamental chaos had intruded on this space, twisting the halls into 
+        impossible shapes. Stairs ran on for far too long and you found yourself questioning 
+        your ability to make your way back out of this maze.
+        <br><br>
+        Just as you started to grow frightened, you came to a proper antechamber free 
+        from the entropy effecting the rest of the building. Just past this laid a large 
+        room that appeared more pristine than even the untouched sections of the library. 
+        It was clear in an instant that this is where the experiments must have taken place.
+        <br><br>
+        The room isn't all that impressive at a glance. The walls are lined with bookshelves 
+        and alchemical equipment dotted the many worktables. Along with these beakers and vials 
+        sat piles and piles of parchment, all beautifully hand written and precisely sorted. 
+        Within these pages you found the secrets to the control of magic. If you understand it 
+        correctly, you believe that order and chaos are the underlying aspects of magic. With 
+        the right balance you could easily master a spell of enormous strength.
+        <br><br>
+        Frantically you began to write notes of your own. These notes easily turned to full 
+        spell tomes within the room, like the order had seeped into your own writings. As you 
+        step out of the room back into the chaos you find the knowledge you've learned slipping. 
+        However your tomes remain untouched, surviving the trek back to the rift.
+        <br><br>
+        You feel compelled to return to this place and continue your research, even if you can't 
+        bring it all home with you. You'll at least try to write up something useful for the 
+        colony whenever you visit.`,
     },
     realm_shadow_realm: {
         tab: 'world',
