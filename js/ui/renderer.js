@@ -154,6 +154,15 @@ export class Renderer {
         return sm.getSprite('terrain', tile.terrain);
     }
 
+    _resolveMaterialSprite(tile, season) {
+        const sm = this.skinManager;
+        if (tile.resource) {
+            const resourceSprite = sm.getSprite('resources', tile.resource.type + '_' + season);
+            return resourceSprite ? resourceSprite : sm.getSprite('resources', tile.resource.type);
+        }
+        return null;
+    }
+
     // Generates per-direction alpha masks for terrain edge dithering using ordered
     // (Bayer matrix) dithering. Each mask is a 1-tile canvas with white pixels where
     // the neighbor terrain should "bleed through". The 4x4 Bayer matrix provides a
@@ -466,6 +475,7 @@ export class Renderer {
         let lastColor = '';
         for (let sy = 0; sy < CONFIG.VIEWPORT_HEIGHT; sy++) {
             for (let sx = 0; sx < CONFIG.VIEWPORT_WIDTH; sx++) {
+                // Keep track of the x,y coordinate for the tile we are currently drawing on and its relation to the player camera.
                 const wx = camera.x + sx;
                 const wy = camera.y + sy;
                 const px = sx * cw;
@@ -475,21 +485,26 @@ export class Renderer {
                     continue;
                 }
 
+                // Get ASCII info for this tile.
                 const tile = map[wy][wx];
                 let char = getTileChar(tile, game.weather.season);
                 let color = getTileColor(tile, game.weather.season);
                 let bg = getTileBg(tile);
 
+                // Update tile color based on work task designation if one exists (e.g. marked for destruction).
                 if (tile.designation) {
                     color = TILE_COLORS[`designation_${tile.designation.type}`] || '#ffff00';
                 }
 
+                // Update tile color if this tile has a Rift Gate and it is actively being used.
                 if (tile.structure === 'rift_gate' && game.exploration && game.exploration.expeditions.length > 0) {
                     color = game.tick % RENDER_CONFIG.riftPulsePeriod < RENDER_CONFIG.riftPulseDuty ? '#33ccff' : '#1a6688';
                 }
 
+                // Get key for this tile to check against different maps (e.g. portalPathMap has a list of all tiles that Nexus Wave enemies plan to use for pathing).
                 const tileKey = wy * CONFIG.MAP_WIDTH + wx;
 
+                // Update tile color to indiciate Nexus Wave enemy paths if applicable.
                 if (portalMap.has(tileKey)) {
                     char = COMBAT_VISUALS.portalChar;
                     color = COMBAT_VISUALS.portalColor;
@@ -499,6 +514,7 @@ export class Renderer {
                     bg = COMBAT_VISUALS.portalPathBg;
                 }
 
+                // Check if this tile contains an entity. Update ASCII char and color to that entity if it exists as it should be placed on top of the previous changes.
                 const entity = entityMap.get(tileKey);
                 if (entity) {
                     char = entity.char;
@@ -507,6 +523,7 @@ export class Renderer {
                     color = COMBAT_VISUALS.dmgFlashColor;
                 }
 
+                // Check if an effect exists on this tile that needs to be drawn. This will take priority over entity char in ASCII mode.
                 const effect = effectMap.get(tileKey);
                 if (effect) {
                     char = effect.char;
@@ -517,6 +534,7 @@ export class Renderer {
                     bg = COMBAT_VISUALS.spellRangePreviewBg;
                 }
 
+                // Prep to draw drag selection and build preview.
                 const inSelection = selectionRect &&
                     wx >= selectionRect.x1 && wx <= selectionRect.x2 &&
                     wy >= selectionRect.y1 && wy <= selectionRect.y2;
@@ -538,158 +556,146 @@ export class Renderer {
                     bg = RENDER_CONFIG.cursorBg;
                 }
 
+                /* 
+                Each tile can contain several elements that may overlap. Most sprites will not take up the entire tile, so we
+                need to draw the other sprites underneath it to fill the space properly. We draw elements in the following order:
+                    1. Background color
+                    2. Terrain
+                    3. Floor
+                    4. Structure (Walls & Furniture)
+                    5. Entity
+                    6. Effects (e.g. Particles, arrows, turret shots)
+                */
+
+                // Draw background color if it was set.
                 if (bg) {
                     ctx.fillStyle = bg;
                     ctx.fillRect(px, py, cw, ch);
                     lastColor = '';
                 }
 
-                // Sprite rendering: overlays (effects, shots, portals) take priority over
-                // the base sprite. "Furniture" structures need ground drawn beneath them
-                // because their sprite doesn't fill the full tile.
+                // Draw anything that has a sprite (floors, structures, entities, & effects).
+                // If a sprite doesn't exist for that element we will instead draw using ASCII later.
                 let spriteDrawn = false;
                 if (this.skinManager.isActive) {
-                    let overlaySprite = null;
-                    if (effect) {
-                        overlaySprite = this._resolveEffectSprite(effect);
-                    } else if (portalMap.has(tileKey)) {
-                        overlaySprite = this._resolveEffectSprite('portal');
-                    }
-                    if (overlaySprite) {
+                    // Draw ground sprite (terrain, floor, or furniture) so it will appear underneath the colonist sprite.
+                    const needsGround = tile.structure && BUILDINGS[tile.structure] && BUILDINGS[tile.structure].structureType === 'furniture';
+                    if (needsGround || entity) {
                         const ground = this._resolveGroundSprite(tile, game.weather.season);
                         if (ground) ctx.drawImage(ground, px, py, cw, ch);
+                        const material = this._resolveMaterialSprite(tile, game.weather.season);
+                        if (material) ctx.drawImage(material, px, py, cw, ch);
+                    }
+                    const canDither = !tile.structure && !tile.resource && !tile.zone && !tile.floor;
+                    if (entity) {
+                        if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game);
                         if (tile.structure) {
                             const structSprite = this.skinManager.getSprite('buildings', tile.structure);
                             if (structSprite) ctx.drawImage(structSprite, px, py, cw, ch);
                         }
-                        if (entity) {
-                            const hl = !!(entity.type === 'colonist' && game.settings.showColonistHighlight);
-                            const entitySprite = this._resolveSprite(tile, entity, game.weather.season, hl);
-                            if (entitySprite) {
-                                const shakeActive = game.settings.showOverlays && game.settings.enableScreenShake && entity._atkShakeUntil > game.tick;
-                                const sPx = COMBAT_VISUALS.atkShakePx || 2;
-                                const shakeX = shakeActive ? ((game.tick * 7) % (sPx * 2 + 1)) - sPx : 0;
-                                const shakeY = shakeActive ? ((game.tick * 13) % (sPx + 1)) - Math.floor(sPx / 2) : 0;
-                                const hlOff = hl ? 1 : 0;
-                                ctx.drawImage(entitySprite, px + shakeX - hlOff, py + shakeY - hlOff, cw + hlOff * 2, ch + hlOff * 2);
-                                if (game.settings.showOverlays && game.settings.showDamageFlash && entity._dmgFlashUntil > game.tick) {
-                                    const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
-                                    if (flashSprite) {
-                                        ctx.drawImage(flashSprite, px + shakeX, py + shakeY, cw, ch);
-                                    } else {
-                                        ctx.globalAlpha = COMBAT_VISUALS.dmgFlashAlpha;
-                                        ctx.fillStyle = COMBAT_VISUALS.dmgFlashColor;
-                                        ctx.fillRect(px, py, cw, ch);
-                                        ctx.globalAlpha = 1.0;
-                                        lastColor = '';
-                                    }
-                                }
-                            }
-                        } else {
-                            const baseSprite = this._resolveSprite(tile, null, game.weather.season);
-                            if (baseSprite) ctx.drawImage(baseSprite, px, py, cw, ch);
+                    }
+
+                    // Determine if we have an entity sprite to draw on this tile.
+                    const hl = !!(entity && entity.type === 'colonist' && game.settings.showColonistHighlight);
+                    const sprite = this._resolveSprite(tile, entity, game.weather.season, hl);
+                    if (sprite) {
+                        // Determine any shake effects that need to be applied to the entity sprite before we draw it.
+                        const shakeActive = game.settings.showOverlays && game.settings.enableScreenShake && entity && entity._atkShakeUntil > game.tick;
+                        const shakePx = COMBAT_VISUALS.atkShakePx || 2;
+                        const shakeX = shakeActive ? ((game.tick * 7) % (shakePx * 2 + 1)) - shakePx : 0;
+                        const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
+                        const hlOff = hl ? 1 : 0;
+                        ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff, cw + hlOff * 2, ch + hlOff * 2);
+                        if (!entity && canDither) {
+                            this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game);
                         }
-                        ctx.drawImage(overlaySprite, px, py, cw, ch);
-                        spriteDrawn = true;
-                    } else {
-                        const hl = !!(entity && entity.type === 'colonist' && game.settings.showColonistHighlight);
-                        const sprite = this._resolveSprite(tile, entity, game.weather.season, hl);
-                        if (sprite) {
-                            const needsGround = tile.structure && BUILDINGS[tile.structure] &&
-                                BUILDINGS[tile.structure].structureType === 'furniture';
-                            if (needsGround || entity) {
-                                const ground = this._resolveGroundSprite(tile, game.weather.season);
-                                if (ground) ctx.drawImage(ground, px, py, cw, ch);
-                            }
-                            const canDither = !tile.structure && !tile.resource && !tile.zone && !tile.floor;
-                            if (entity) {
-                                if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game);
-                                if (tile.structure) {
-                                    const structSprite = this.skinManager.getSprite('buildings', tile.structure);
-                                    if (structSprite) ctx.drawImage(structSprite, px, py, cw, ch);
-                                }
-                            }
-                            const shakeActive = game.settings.showOverlays && game.settings.enableScreenShake && entity && entity._atkShakeUntil > game.tick;
-                            const shakePx = COMBAT_VISUALS.atkShakePx || 2;
-                            const shakeX = shakeActive ? ((game.tick * 7) % (shakePx * 2 + 1)) - shakePx : 0;
-                            const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
-                            const hlOff = hl ? 1 : 0;
-                            ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff, cw + hlOff * 2, ch + hlOff * 2);
-                            if (!entity && canDither) {
-                                this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game);
-                            }
-                            if (game.settings.showOverlays && game.settings.showDamageFlash && entity && entity._dmgFlashUntil > game.tick) {
-                                const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
-                                if (flashSprite) {
-                                    ctx.drawImage(flashSprite, px + shakeX, py + shakeY, cw, ch);
-                                } else {
-                                    ctx.globalAlpha = COMBAT_VISUALS.dmgFlashAlpha;
-                                    ctx.fillStyle = COMBAT_VISUALS.dmgFlashColor;
-                                    ctx.fillRect(px, py, cw, ch);
-                                    ctx.globalAlpha = 1.0;
-                                    lastColor = '';
-                                }
-                            }
-                            if (entity && shakeActive) {
-                                const swingSprite = this.skinManager.getSprite('effects', 'attack_swing');
-                                if (swingSprite) ctx.drawImage(swingSprite, px, py, cw, ch);
-                            }
-                            if (game.settings.showOverlays && game.settings.showDamageFlash && !entity && tile.structure && tile._dmgFlashUntil > game.tick) {
-                                const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
-                                if (flashSprite) {
-                                    ctx.drawImage(flashSprite, px, py, cw, ch);
-                                } else {
-                                    ctx.globalAlpha = COMBAT_VISUALS.dmgFlashAlpha;
-                                    ctx.fillStyle = COMBAT_VISUALS.dmgFlashColor;
-                                    ctx.fillRect(px, py, cw, ch);
-                                    ctx.globalAlpha = 1.0;
-                                    lastColor = '';
-                                }
-                            }
-                            if (tile.pedestalArtifact) {
-                                const itemSprite = this.skinManager.getSprite('items', tile.pedestalArtifact);
-                                if (itemSprite) {
-                                    const iSize = Math.floor(cw * 0.6);
-                                    const iOff = Math.floor((cw - iSize) / 2);
-                                    ctx.drawImage(itemSprite, px + iOff, py + iOff, iSize, iSize);
-                                }
-                            }
-                            if (effect) {
-                                ctx.fillStyle = effect.color;
-                                ctx.fillText(effect.char, px + this._textOffsetX, py);
-                                lastColor = '';
-                            }
-                            spriteDrawn = true;
-                        }
-                        if (tile.designation) {
-                            if (tile.designation.type === 'build' && tile.designation.buildType) {
-                                const ghostSprite = this.skinManager.getSprite('buildings', tile.designation.buildType)
-                                    || this.skinManager.getSprite('floors', tile.designation.buildType);
-                                if (ghostSprite) {
-                                    if (!spriteDrawn) {
-                                        const ground = this._resolveGroundSprite(tile, game.weather.season);
-                                        if (ground) {
-                                            ctx.drawImage(ground, px, py, cw, ch);
-                                            spriteDrawn = true;
-                                        }
-                                    }
-                                    ctx.globalAlpha = 0.4;
-                                    ctx.drawImage(ghostSprite, px, py, cw, ch);
-                                    ctx.globalAlpha = 1.0;
-                                    spriteDrawn = true;
-                                }
-                            } else if (spriteDrawn) {
-                                const tintColor = TILE_COLORS[`designation_${tile.designation.type}`] || '#ffff00';
-                                ctx.fillStyle = tintColor;
-                                ctx.globalAlpha = 0.35;
+                        if (game.settings.showOverlays && game.settings.showDamageFlash && entity && entity._dmgFlashUntil > game.tick) {
+                            const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
+                            if (flashSprite) {
+                                ctx.drawImage(flashSprite, px + shakeX, py + shakeY, cw, ch);
+                            } else {
+                                ctx.globalAlpha = COMBAT_VISUALS.dmgFlashAlpha;
+                                ctx.fillStyle = COMBAT_VISUALS.dmgFlashColor;
                                 ctx.fillRect(px, py, cw, ch);
                                 ctx.globalAlpha = 1.0;
                                 lastColor = '';
                             }
                         }
+                        // If we are actively shaking after an attack begins, draw the attack_swing overlay effect.
+                        if (entity && shakeActive) {
+                            const swingSprite = this.skinManager.getSprite('effects', 'attack_swing');
+                            if (swingSprite) ctx.drawImage(swingSprite, px, py, cw, ch);
+                        }
+                        // Draw any combat effects relevant for this entity sprite.
+                        if (game.settings.showOverlays && game.settings.showDamageFlash && !entity && tile.structure && tile._dmgFlashUntil > game.tick) {
+                            const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
+                            if (flashSprite) {
+                                ctx.drawImage(flashSprite, px, py, cw, ch);
+                            } else {
+                                ctx.globalAlpha = COMBAT_VISUALS.dmgFlashAlpha;
+                                ctx.fillStyle = COMBAT_VISUALS.dmgFlashColor;
+                                ctx.fillRect(px, py, cw, ch);
+                                ctx.globalAlpha = 1.0;
+                                lastColor = '';
+                            }
+                        }
+                        spriteDrawn = true;
+                    }
+
+                    // Draw the placed artifact image on top of its pedestal if applicable.
+                    if (tile.pedestalArtifact) {
+                        const itemSprite = this.skinManager.getSprite('items', tile.pedestalArtifact);
+                        if (itemSprite) {
+                            const iSize = Math.floor(cw * 0.6);
+                            const iOff = Math.floor((cw - iSize) / 2);
+                            ctx.drawImage(itemSprite, px + iOff, py + iOff, iSize, iSize);
+                        }
+                    }
+
+                    // Determine if an effect exists so it can be drawn on top of all other sprites.
+                    let effectSprite = null;
+                    if (effect) {
+                        effectSprite = this._resolveEffectSprite(effect);
+                    } else if (portalMap.has(tileKey)) {
+                        effectSprite = this._resolveEffectSprite('portal');
+                    }
+                    if (effectSprite) {
+                        // Finally draw the overlay effect on top of all other sprites.
+                        ctx.drawImage(effectSprite, px, py, cw, ch);
+                        spriteDrawn = true;
+                    }
+
+                    // Draw partially opaque color over tiles that are being actively selected or have some colonist
+                    // task designation (e.g. marked for destruction).
+                    if (tile.designation) {
+                        if (tile.designation.type === 'build' && tile.designation.buildType) {
+                            const ghostSprite = this.skinManager.getSprite('buildings', tile.designation.buildType)
+                                || this.skinManager.getSprite('floors', tile.designation.buildType);
+                            if (ghostSprite) {
+                                if (!spriteDrawn) {
+                                    const ground = this._resolveGroundSprite(tile, game.weather.season);
+                                    if (ground) {
+                                        ctx.drawImage(ground, px, py, cw, ch);
+                                        spriteDrawn = true;
+                                    }
+                                }
+                                ctx.globalAlpha = 0.4;
+                                ctx.drawImage(ghostSprite, px, py, cw, ch);
+                                ctx.globalAlpha = 1.0;
+                                spriteDrawn = true;
+                            }
+                        } else if (spriteDrawn) {
+                            const tintColor = TILE_COLORS[`designation_${tile.designation.type}`] || '#ffff00';
+                            ctx.fillStyle = tintColor;
+                            ctx.globalAlpha = 0.35;
+                            ctx.fillRect(px, py, cw, ch);
+                            ctx.globalAlpha = 1.0;
+                            lastColor = '';
+                        }
                     }
                 }
 
+                // If a sprite was not drawn because it either doesn't exist or we are in ASCII mode, draw the set ASCII character instead.
                 if (!spriteDrawn) {
                     const asciiShake = game.settings.showOverlays && game.settings.enableScreenShake && entity && entity._atkShakeUntil > game.tick;
                     const asciiShakePx = COMBAT_VISUALS.atkShakePx || 2;
@@ -712,8 +718,14 @@ export class Renderer {
                         }
                         ctx.fillText(char, px + this._textOffsetX + asx, py + asy);
                     }
+                    if (effect) {
+                        ctx.fillStyle = effect.color;
+                        ctx.fillText(effect.char, px + this._textOffsetX, py);
+                        lastColor = '';
+                    }
                 }
 
+                // If a sprite is underneath the Nexus Wave path then we should re-draw the background color at a lower opacity.
                 if (spriteDrawn && game.settings.showPortalPath && portalPathMap.has(tileKey)) {
                     ctx.fillStyle = COMBAT_VISUALS.portalPathColor;
                     ctx.globalAlpha = 0.35;
@@ -722,6 +734,7 @@ export class Renderer {
                     lastColor = '';
                 }
 
+                // Draw click and drag selection and build preview background colors with a lower opacity if a sprite was already drawn on that tile.
                 if (spriteDrawn && (inSelection || (cursor && cursor.x === wx && cursor.y === wy))) {
                     ctx.globalAlpha = 0.35;
                     if (inSelection && buildDragPreview) {
