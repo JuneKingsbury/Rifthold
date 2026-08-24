@@ -54,7 +54,8 @@ export function renderCreditsHTML() {
     <div style="color:#aaa; margin-bottom:20px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-smoke-fx-pixel-2">Free Smoke Fx Pixel 2</a> by BDragon1727</div>
     <div style="color:#ccc; margin-bottom:8px;"><b>Music & SFX</b></div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://rapidpunches.itch.io/game-of-the-unknown">GAME OF THE UNKNOWN</a> by RAPIDPUNCHES</div>
-    <div style="color:#aaa; margin-bottom:20px;"><a style="color:#aaa;" href="https://www.bfxr.net/">bfxr (custom SFX maker)</a> by increpare</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://www.bfxr.net/">bfxr (custom SFX maker)</a> by increpare</div>
+    <div style="color:#aaa; margin-bottom:20px;"><a style="color:#aaa;" href="https://dagurasusk.itch.io/retrosounds">Retro Sounds</a> by DASK</div>
     <div style="color:#666; font-size:10px; margin-top:20px;">Version 0.2 — Aug 2026</div>
     <img style="float:none" class="pixel-art" src="portraits/mars.png" alt="A drawing of game dev Mars">
     <div style="color:#aaa; font-size:10px; margin-top:0px;"><i>Thank you for playing my game!</i> -Mars</div>
