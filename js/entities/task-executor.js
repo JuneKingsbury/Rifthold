@@ -267,6 +267,9 @@ export function completeTask(colonist, task, game) {
                     game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
                     window.soundManager?.playSFX('mine_hit');
                 }
+                else {
+                    window.soundManager?.playSFX('chop_hit');
+                }
             }
             tile.designation = null;
             applyThought(colonist, 'good_work', game.tick);

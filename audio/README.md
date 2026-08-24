@@ -81,6 +81,7 @@ When the music changes, it crossfades over 2 seconds so you don't get a jarring 
 | `sfx/work/research_complete.ogg` | Research project completes |
 | `sfx/work/harvest.ogg` | Crop harvested |
 | `sfx/work/mine_hit.ogg` | Mining completes (rock removed) |
+| `sfx/work/chop_hit.ogg` | Chopping completes (tree removed) |
 
 ### SFX: Environment
 

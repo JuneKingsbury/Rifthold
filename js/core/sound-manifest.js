@@ -28,6 +28,7 @@ export const SOUND_MANIFEST = {
         research_complete: 'audio/sfx/work/research_complete.ogg',
         harvest: 'audio/sfx/work/harvest.ogg',
         mine_hit: 'audio/sfx/work/mine_hit.ogg',
+        chop_hit: 'audio/sfx/work/chop_hit.ogg',
 
         fire_ignite: 'audio/sfx/environment/fire_ignite.ogg',
         freezing: 'audio/sfx/environment/freezing.ogg',
