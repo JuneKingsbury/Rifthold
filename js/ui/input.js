@@ -58,10 +58,10 @@ export class InputHandler {
     measureCharSize() {
         const renderer = this.game.renderer;
         if (renderer && renderer.charWidth > 0) {
-            const canvas = renderer.canvas;
-            const rect = canvas.getBoundingClientRect();
-            this.charWidth = rect.width / CONFIG.VIEWPORT_WIDTH;
-            this.charHeight = rect.height / CONFIG.VIEWPORT_HEIGHT;
+            //const canvas = renderer.canvas;
+            //const rect = canvas.getBoundingClientRect();
+            this.charWidth = renderer.charWidth;//rect.width / CONFIG.VIEWPORT_WIDTH;
+            this.charHeight = renderer.charHeight;//rect.height / CONFIG.VIEWPORT_HEIGHT;
         } else {
             const gameEl = document.getElementById('game');
             const computedSize = gameEl

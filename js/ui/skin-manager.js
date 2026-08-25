@@ -1,4 +1,4 @@
-import { HELMETS, EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
+import { EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
 
 export class SkinManager {
     constructor() {
@@ -155,6 +155,7 @@ export class SkinManager {
         }
         ctx.putImageData(dst, 0, 0);
         ctx.drawImage(canvas, 1, 1);
+        //ctx.drawImage(this._sprites.get('effects:shadow'), 0, 0);
         return out;
     }
 

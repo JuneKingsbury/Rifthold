@@ -94,7 +94,7 @@ export class Renderer {
                     const comp = sm.getCompositedColonistSprite(entity.colonistId, entity.drafted, entity.race, entity.armorKey, entity.helmetKey, entity.bodyVariant, entity.hairVariant, entity.shirtVariant, entity.nameColor, entity.weaponKey, entity.toolKey, highlight);
                     if (comp) return comp;
                 }
-                return sm.getColonistSprite(entity.colonistId, entity.drafted, entity.race, entity.bodyVariant, entity.hairVariant, entity.shirtVariant, entity.nameColor, highlight);
+                return sm.getCompositedColonistSprite(entity.colonistId, entity.drafted, entity.race, null, null, entity.bodyVariant, entity.hairVariant, entity.shirtVariant, entity.nameColor, null, null, highlight);
             }
             if (entity.type === 'golem') {
                 if (entity.golemType) {
