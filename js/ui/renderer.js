@@ -345,7 +345,8 @@ export class Renderer {
         const showDamageFlash = settings.showDamageFlash;
         const enableScreenShake = settings.enableScreenShake;
         const showPortalPath = settings.showPortalPath;
-        const skinActive = this.skinManager.isActive;
+        const sm = this.skinManager;
+        const skinActive = sm.isActive;
         const atkShakePx = COMBAT_VISUALS.atkShakePx || 2;
 
         this.ctx.imageSmoothingEnabled = !skinActive;
@@ -606,7 +607,7 @@ export class Renderer {
                     if (entity) {
                         if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         if (tile.structure) {
-                            const structSprite = this.skinManager.getSprite('buildings', tile.structure);
+                            const structSprite = sm.getSprite('buildings', tile.structure);
                             if (structSprite) ctx.drawImage(structSprite, px, py, cw, ch);
                         }
                     }
@@ -615,6 +616,9 @@ export class Renderer {
                     const hl = !!(entity && entity.type === 'colonist' && game.settings.showColonistHighlight);
                     const sprite = this._resolveSprite(tile, entity, season, hl);
                     if (sprite) {
+                        // Draw entity shadow.
+                        const shadowSprite = sm.getSprite('effects', 'shadow');
+                        if (shadowSprite) ctx.drawImage(sm.getSprite('effects', 'shadow'), px, py, cw, ch);
                         // Determine any shake effects that need to be applied to the entity sprite before we draw it.
                         const shakeActive = showOverlays && enableScreenShake && entity && entity._atkShakeUntil > game.tick;
                         const shakePx = atkShakePx;
@@ -626,7 +630,7 @@ export class Renderer {
                             this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         }
                         if (showOverlays && showDamageFlash && entity && entity._dmgFlashUntil > game.tick) {
-                            const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
+                            const flashSprite = sm.getSprite('effects', 'damage_flash');
                             if (flashSprite) {
                                 ctx.drawImage(flashSprite, px + shakeX, py + shakeY, cw, ch);
                             } else {
@@ -639,12 +643,12 @@ export class Renderer {
                         }
                         // If we are actively shaking after an attack begins, draw the attack_swing overlay effect.
                         if (entity && shakeActive) {
-                            const swingSprite = this.skinManager.getSprite('effects', 'attack_swing');
+                            const swingSprite = sm.getSprite('effects', 'attack_swing');
                             if (swingSprite) ctx.drawImage(swingSprite, px, py, cw, ch);
                         }
                         // Draw any combat effects relevant for this entity sprite.
                         if (showOverlays && showDamageFlash && !entity && tile.structure && tile._dmgFlashUntil > game.tick) {
-                            const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
+                            const flashSprite = sm.getSprite('effects', 'damage_flash');
                             if (flashSprite) {
                                 ctx.drawImage(flashSprite, px, py, cw, ch);
                             } else {
@@ -660,7 +664,7 @@ export class Renderer {
 
                     // Draw the placed artifact image on top of its pedestal if applicable.
                     if (tile.pedestalArtifact) {
-                        const itemSprite = this.skinManager.getSprite('items', tile.pedestalArtifact);
+                        const itemSprite = sm.getSprite('items', tile.pedestalArtifact);
                         if (itemSprite) {
                             const iSize = Math.floor(cw * 0.6);
                             const iOff = Math.floor((cw - iSize) / 2);
@@ -685,8 +689,8 @@ export class Renderer {
                     // task designation (e.g. marked for destruction).
                     if (tile.designation) {
                         if (tile.designation.type === 'build' && tile.designation.buildType) {
-                            const ghostSprite = this.skinManager.getSprite('buildings', tile.designation.buildType)
-                                || this.skinManager.getSprite('floors', tile.designation.buildType);
+                            const ghostSprite = sm.getSprite('buildings', tile.designation.buildType)
+                                || sm.getSprite('floors', tile.designation.buildType);
                             if (ghostSprite) {
                                 if (!spriteDrawn) {
                                     const ground = this._resolveGroundSprite(tile, season);
@@ -795,6 +799,10 @@ export class Renderer {
                 const meHl = !!(me.type === 'colonist' && game.settings.showColonistHighlight);
                 const sprite = this._resolveSprite(destTile || {}, me, season, meHl);
                 if (sprite) {
+                    // Draw entity shadow.
+                    const shadowSprite = sm.getSprite('effects', 'shadow');
+                    if (shadowSprite) ctx.drawImage(sm.getSprite('effects', 'shadow'), rpx, rpy, cw, ch);
+                    // Draw entity.
                     const meHlOff = meHl ? 1 : 0;
                     ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff, cw + meHlOff * 2, ch + meHlOff * 2);
                 } else {
@@ -802,7 +810,7 @@ export class Renderer {
                     ctx.fillText(me.char, rpx + this._textOffsetX, rpy);
                 }
                 if (showOverlays && showDamageFlash && ent._dmgFlashUntil > game.tick) {
-                    const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
+                    const flashSprite = sm.getSprite('effects', 'damage_flash');
                     if (flashSprite) {
                         ctx.drawImage(flashSprite, rpx, rpy, cw, ch);
                     } else {
@@ -813,7 +821,7 @@ export class Renderer {
                     }
                 }
                 if (shakeActive) {
-                    const swingSprite = this.skinManager.getSprite('effects', 'attack_swing');
+                    const swingSprite = sm.getSprite('effects', 'attack_swing');
                     if (swingSprite) ctx.drawImage(swingSprite, rpx - shakeX, rpy - shakeY, cw, ch);
                 }
             } else {
@@ -832,7 +840,7 @@ export class Renderer {
                 const screenY = (py2 - camera.y) * ch;
                 if (screenX < -cw || screenX > this.canvas.width || screenY < -ch || screenY > this.canvas.height) continue;
                 if (skinActive) {
-                    const sprite = p.skinKey ? this.skinManager.getSprite('effects', p.skinKey) : null;
+                    const sprite = p.skinKey ? sm.getSprite('effects', p.skinKey) : null;
                     if (sprite) {
                         ctx.drawImage(sprite, Math.round(screenX), Math.round(screenY), cw, ch);
                     } else {

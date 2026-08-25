@@ -155,7 +155,6 @@ export class SkinManager {
         }
         ctx.putImageData(dst, 0, 0);
         ctx.drawImage(canvas, 1, 1);
-        //ctx.drawImage(this._sprites.get('effects:shadow'), 0, 0);
         return out;
     }
 
