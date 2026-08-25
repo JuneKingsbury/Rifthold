@@ -599,7 +599,7 @@ export class Renderer {
                     const needsGround = tile.structure && BUILDINGS[tile.structure] && BUILDINGS[tile.structure].structureType === 'furniture';
                     if (needsGround || entity) {
                         const ground = this._resolveGroundSprite(tile, season);
-                        if (ground) ctx.drawImage(ground, px, py, cw, ch);
+                        if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
                         const material = this._resolveMaterialSprite(tile, season);
                         if (material) ctx.drawImage(material, px, py, cw, ch);
                     }
@@ -625,7 +625,8 @@ export class Renderer {
                         const shakeX = shakeActive ? ((game.tick * 7) % (shakePx * 2 + 1)) - shakePx : 0;
                         const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
                         const hlOff = hl ? 1 : 0;
-                        ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff, cw + hlOff * 2, ch + hlOff * 2);
+                        const bleed = entity ? 0 : 1;
+                        ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff, cw + hlOff * 2 + bleed, ch + hlOff * 2 + bleed);
                         if (!entity && canDither) {
                             this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         }
@@ -695,7 +696,7 @@ export class Renderer {
                                 if (!spriteDrawn) {
                                     const ground = this._resolveGroundSprite(tile, season);
                                     if (ground) {
-                                        ctx.drawImage(ground, px, py, cw, ch);
+                                        ctx.drawImage(ground, px, py, cw + 1, ch + 1);
                                         spriteDrawn = true;
                                     }
                                 }
@@ -730,7 +731,7 @@ export class Renderer {
                     } else {
                         if (skinActive) {
                             const ground = this._resolveGroundSprite(tile, season);
-                            if (ground) ctx.drawImage(ground, px, py, cw, ch);
+                            if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
                         }
                         if (color !== lastColor) {
                             ctx.fillStyle = color;
