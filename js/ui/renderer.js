@@ -62,8 +62,8 @@ export class Renderer {
 
     _resizeCanvas() {
         const dpr = window.devicePixelRatio || 1;
-        const w = CONFIG.VIEWPORT_WIDTH * this.charWidth;
-        const h = CONFIG.VIEWPORT_HEIGHT * this.charHeight;
+        const w = (CONFIG.VIEWPORT_WIDTH + 1) * this.charWidth;
+        const h = (CONFIG.VIEWPORT_HEIGHT + 1) * this.charHeight;
         const bw = Math.round(w * dpr);
         const bh = Math.round(h * dpr);
         if (this.canvas.width !== bw || this.canvas.height !== bh) {
@@ -489,8 +489,8 @@ export class Renderer {
         //   ground → structure/entity → dither → artifact overlay → designation tint
         // Effects (combat hits, shots, portals) draw as overlays on top of the base.
         let lastColor = '';
-        for (let sy = 0; sy < vh; sy++) {
-            for (let sx = 0; sx < vw; sx++) {
+        for (let sy = 0; sy <= vh; sy++) {
+            for (let sx = 0; sx <= vw; sx++) {
                 // Keep track of the x,y coordinate for the tile we are currently drawing on and its relation to the player camera.
                 const wx = camera.x + sx;
                 const wy = camera.y + sy;
@@ -923,9 +923,9 @@ export class Renderer {
 
             // Draw the darkness overlay — skip fully-lit tiles (shade < 1)
             let lastDarkStyle = '';
-            for (let sy = 0; sy < vh; sy++) {
+            for (let sy = 0; sy <= vh; sy++) {
                 const rowOff = sy * vw;
-                for (let sx = 0; sx < vw; sx++) {
+                for (let sx = 0; sx <= vw; sx++) {
                     const shade = Math.round((1 - lightGrid[rowOff + sx]) * steps);
                     if (shade < 1) continue;
                     const style = darkStyles[shade - 1];
