@@ -67,8 +67,8 @@ class SoundManagerClass {
             const source = this.ctx.createBufferSource();
             source.buffer = buffer;
 
-            // Random offset between -500 and +500 cents (+/- 5 semitone)
-            const randomCents = (Math.random() * 2 - 1) * 500;
+            // Random offset between -300 and +300 cents (+/- 3 semitone)
+            const randomCents = (Math.random() * 2 - 1) * 300;
             source.detune.value = randomCents;
 
             source.connect(this.sfxGain);
