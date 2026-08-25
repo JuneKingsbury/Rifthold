@@ -1,5 +1,5 @@
 import { CONFIG, TILE_COLORS, BUILDINGS, ARTIFACTS, RENDER_CONFIG, COMBAT_VISUALS } from '../core/config.js';
-import { getTileChar, getTileColor, getTileBg } from '../world/map.js';
+import { getTileVisuals } from '../world/map.js';
 import { OverlayRenderer } from './overlay-renderer.js';
 import { SkinManager } from './skin-manager.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
@@ -504,9 +504,7 @@ export class Renderer {
 
                 // Get ASCII info for this tile.
                 const tile = map[wy][wx];
-                let char = getTileChar(tile, season);
-                let color = getTileColor(tile, season);
-                let bg = getTileBg(tile);
+                let {char, color, bg} = getTileVisuals(tile, season);
 
                 // Update tile color based on work task designation if one exists (e.g. marked for destruction).
                 if (tile.designation) {
@@ -557,12 +555,11 @@ export class Renderer {
                     wy >= selectionRect.y1 && wy <= selectionRect.y2;
 
                 if (inSelection && buildDragPreview) {
-                    const tKey = wy * mapW + wx;
-                    if (buildDragPreview.blocked && buildDragPreview.blocked.has(tKey)) {
+                    if (buildDragPreview.blocked && buildDragPreview.blocked.has(tileKey)) {
                         bg = '#3a1a1a';
-                    } else if (buildDragPreview.affordable.has(tKey)) {
+                    } else if (buildDragPreview.affordable.has(tileKey)) {
                         bg = '#1a3a1a';
-                    } else if (buildDragPreview.unaffordable.has(tKey)) {
+                    } else if (buildDragPreview.unaffordable.has(tileKey)) {
                         bg = '#3a1a1a';
                     } else {
                         bg = RENDER_CONFIG.selectionBgBuild;
@@ -759,12 +756,11 @@ export class Renderer {
                 if (spriteDrawn && (inSelection || (cursor && cursor.x === wx && cursor.y === wy))) {
                     ctx.globalAlpha = 0.35;
                     if (inSelection && buildDragPreview) {
-                        const tKey = wy * mapW + wx;
-                        if (buildDragPreview.blocked && buildDragPreview.blocked.has(tKey)) {
+                        if (buildDragPreview.blocked && buildDragPreview.blocked.has(tileKey)) {
                             ctx.fillStyle = '#cc2222';
-                        } else if (buildDragPreview.affordable.has(tKey)) {
+                        } else if (buildDragPreview.affordable.has(tileKey)) {
                             ctx.fillStyle = '#22cc22';
-                        } else if (buildDragPreview.unaffordable.has(tKey)) {
+                        } else if (buildDragPreview.unaffordable.has(tileKey)) {
                             ctx.fillStyle = '#cc2222';
                         } else {
                             ctx.fillStyle = RENDER_CONFIG.selectionBgBuild;

@@ -321,68 +321,64 @@ function clearStartingArea(map) {
 
 // --- Tile query functions ---
 
-export function getTileChar(tile, season) {
-    if (tile.onFire) return '^';
-    if (tile.structure) return TILE_CHARS[tile.structure] || '?';
-    if (tile.zone) {
+// Combined other get calls as we always needed to do them together. This saves us
+// from having to repeat these if-statements 3 times going through char, color, and bg.
+export function getTileVisuals(tile, season) {
+    let char = '';
+    let color = '';
+    let bg = '';
+    if (tile.onFire) {
+        char = '^';
+        color = '#ff4400';
+    }
+    else if (tile.structure) {
+        char = TILE_CHARS[tile.structure] || '?';
+        color = TILE_COLORS[tile.structure] || '#fff';
+        const bDef = BUILDINGS[tile.structure];
+        if (bDef && bDef.bg) bg = bDef.bg;
+    }
+    else if (tile.zone) {
         if (tile.zone.state === 'ready') {
             const cropDef = tile.zone.crop && CROPS[tile.zone.crop];
-            return (cropDef && cropDef.readyChar) || TILE_CHARS.farm_ready;
+            char = (cropDef && cropDef.readyChar) || TILE_CHARS.farm_ready;
+            cropDef ? color = cropDef.color : '#ffdd00';
         }
-        if (tile.zone.state === 'growing') {
+        else if (tile.zone.state === 'growing') {
             const cropDef = tile.zone.crop && CROPS[tile.zone.crop];
-            return (cropDef && cropDef.char) || TILE_CHARS.farm_growing;
+            char = (cropDef && cropDef.char) || TILE_CHARS.farm_growing;
+            color = TILE_COLORS.farm_growing;
         }
-        return TILE_CHARS.farm_empty;
-    }
-    if (tile.resource) {
-        const rDef = RESOURCES[tile.resource.type];
-        if (rDef) return rDef.char;
-    }
-    if (tile.floor) return TILE_CHARS[tile.floor] || '·';
-    if (tile.snowCovered && tile.terrain === 'grass') return TILE_CHARS.snow;
-    const tDef = TERRAIN[tile.terrain];
-    return tDef ? tDef.char : '?';
-}
-
-export function getTileColor(tile, season) {
-    if (tile.onFire) return '#ff4400';
-    if (tile.structure) return TILE_COLORS[tile.structure] || '#fff';
-    if (tile.zone) {
-        if (tile.zone.state === 'ready' || tile.zone.state === 'growing') {
-            const cropDef = tile.zone.crop && CROPS[tile.zone.crop];
-            if (cropDef) return cropDef.color;
+        else {
+            char = TILE_CHARS.farm_empty;
+            color = TILE_COLORS.farm_empty;
         }
-        if (tile.zone.state === 'ready') return '#ffdd00';
-        if (tile.zone.state === 'growing') return TILE_COLORS.farm_growing;
-        return TILE_COLORS.farm_empty;
     }
-    if (tile.resource) {
+    else if (tile.floor) {
+        char = TILE_CHARS[tile.floor] || '·';
+        color = TILE_COLORS[tile.floor] || '#888';
+        const fDef = BUILDINGS[tile.floor];
+        if (fDef && fDef.bg) bg = fDef.bg;
+    }
+    else if (tile.snowCovered && tile.terrain === 'grass') {
+        char = TILE_CHARS.snow;
+        color = TILE_COLORS.snow;
+        bg = TILE_COLORS.snowBg
+    }
+    else if (tile.resource) {
         const rDef = RESOURCES[tile.resource.type];
         if (rDef) {
+            char = rDef.char;
             const seasonColor = rDef[season + 'Color'];
-            if (seasonColor) return seasonColor;
-            return rDef.color;
+            if (seasonColor) color = seasonColor;
+            color = rDef.color;
         }
     }
-    if (tile.floor) return TILE_COLORS[tile.floor] || '#888';
-    if (tile.snowCovered) return TILE_COLORS.snow;
     const tDef = TERRAIN[tile.terrain];
-    return tDef ? tDef.color : '#fff';
-}
+    if (char === '') char = tDef ? tDef.char : '?';
+    if (color === '') color = tDef ? tDef.color : '#fff';
+    if (bg === '') bg = tDef ? tDef.bg : null;
 
-export function getTileBg(tile) {
-    if (tile.structure) {
-        const bDef = BUILDINGS[tile.structure];
-        if (bDef && bDef.bg) return bDef.bg;
-    }
-    if (tile.floor) {
-        const fDef = BUILDINGS[tile.floor];
-        if (fDef && fDef.bg) return fDef.bg;
-    }
-    if (tile.snowCovered && tile.terrain === 'grass') return TILE_COLORS.snowBg;
-    const tDef = TERRAIN[tile.terrain];
-    return tDef ? tDef.bg || null : null;
+    return {char, color, bg};
 }
 
 
