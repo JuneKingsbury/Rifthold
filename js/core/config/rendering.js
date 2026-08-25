@@ -1,7 +1,7 @@
 export const RENDER_CONFIG = {
     fontSize: 14,
     fontHeightMult: 1.15,
-    bgColor: '#111',
+    bgColor: '#85a643',
     cursorBg: '#444',
     selectionBgZone: '#2a3a2a',
     selectionBgBuild: '#3a2a2a',

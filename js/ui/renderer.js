@@ -12,6 +12,8 @@ const DITHER_DIRECTIONS = [
     { dir: 'west', dx: -1, dy: 0 },
     { dir: 'east', dx: 1, dy: 0 },
 ];
+const DITHER_DISTANCE_MAP = { none: 0, minimal: 0.12, light: 0.2, normal: 0.3, heavy: 0.45, extreme: 0.6 };
+const DITHER_QUALITY_MAP = { chunky: 4, low: 3, medium: 2, high: 1 };
 
 export class Renderer {
     constructor(container, skinManager) {
@@ -252,19 +254,9 @@ export class Renderer {
     // Draws dithered terrain transitions on edges where a tile borders a different
     // terrain type. For each cardinal neighbor with a different terrain, composites
     // the neighbor's sprite through the directional dither mask (from _generateDitherMasks).
-    _drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game) {
+    _drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, distSetting, depthFrac, qualSetting, blockSize) {
         if (!RENDER_CONFIG.terrainDithering) return;
-        const distanceMap = { none: 0, minimal: 0.12, light: 0.2, normal: 0.3, heavy: 0.45, extreme: 0.6 };
-        const qualityMap = { chunky: 4, low: 3, medium: 2, high: 1 };
-        const distSetting = (game && game.settings.ditherDistance) || 'normal';
         if (distSetting === 'none') return;
-        const depthFrac = distanceMap[distSetting] ?? 0.3;
-        const qualSetting = (game && game.settings.ditherQuality) || 'high';
-        const blockSize = qualityMap[qualSetting] ?? 1;
-        if (!this._ditherMasks || this._ditherTileSize !== cw || this._ditherDepthFraction !== depthFrac || this._ditherBlockSize !== blockSize) {
-            this._generateDitherMasks(depthFrac, blockSize);
-            this._ditherCache.clear();
-        }
 
         const baseTerrain = tile.terrain;
 
@@ -340,11 +332,23 @@ export class Renderer {
     }
 
     render(game) {
-        if (this._lastViewportW !== CONFIG.VIEWPORT_WIDTH || this._lastViewportH !== CONFIG.VIEWPORT_HEIGHT) {
+        const { settings, tick, weather } = game;
+        const vw = CONFIG.VIEWPORT_WIDTH;
+        const vh = CONFIG.VIEWPORT_HEIGHT;
+        if (this._lastViewportW !== vw || this._lastViewportH !== vh) {
             this._resizeCanvas();
         }
 
-        this.ctx.imageSmoothingEnabled = !this.skinManager.isActive;
+        const mapW = CONFIG.MAP_WIDTH;
+        const season = weather.season;
+        const showOverlays = settings.showOverlays;
+        const showDamageFlash = settings.showDamageFlash;
+        const enableScreenShake = settings.enableScreenShake;
+        const showPortalPath = settings.showPortalPath;
+        const skinActive = this.skinManager.isActive;
+        const atkShakePx = COMBAT_VISUALS.atkShakePx || 2;
+
+        this.ctx.imageSmoothingEnabled = !skinActive;
 
         const { map, camera, colonists, entities, raiders, cursor } = game;
         const ctx = this.ctx;
@@ -364,8 +368,8 @@ export class Renderer {
                         if (Math.abs(dx) + Math.abs(dy) > range) continue;
                         const tx = caster.x + dx;
                         const ty = caster.y + dy;
-                        if (tx >= 0 && ty >= 0 && tx < CONFIG.MAP_WIDTH && ty < CONFIG.MAP_HEIGHT) {
-                            spellRangeSet.add(ty * CONFIG.MAP_WIDTH + tx);
+                        if (tx >= 0 && ty >= 0 && tx < mapW && ty < CONFIG.MAP_HEIGHT) {
+                            spellRangeSet.add(ty * mapW + tx);
                         }
                     }
                 }
@@ -374,6 +378,18 @@ export class Renderer {
 
         ctx.fillStyle = RENDER_CONFIG.bgColor;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Dither settings are per-frame so we can do it once and re-use for all tiles.
+        const ditherOn = RENDER_CONFIG.terrainDithering && (game.settings.ditherDistance || 'normal') !== 'none';
+        const ditherDepthFrac = DITHER_DISTANCE_MAP[game.settings.ditherDistance || 'normal'] ?? 0.3; 
+        const ditherQualSetting = (game && game.settings.ditherQuality) || 'high';
+        const ditherBlockSize = DITHER_QUALITY_MAP[game.settings.ditherQuality] ?? 1;
+        // Regenerate masks here, once, if inputs changed — moved out of the per-tile call:
+        if (ditherOn && (!this._ditherMasks || this._ditherTileSize !== cw ||
+            this._ditherDepthFraction !== ditherDepthFrac || this._ditherBlockSize !== ditherBlockSize)) {
+            this._generateDitherMasks(ditherDepthFrac, ditherBlockSize);
+            this._ditherCache.clear();
+        }
 
         // --- Build entity/effect lookup maps (flat key = y*MAP_WIDTH + x) ---
         // These let the tile loop do O(1) lookups instead of scanning arrays per tile.
@@ -387,7 +403,7 @@ export class Renderer {
             if (isEntityMoving(e)) {
                 movingEntities.push({ entity: e, char: e.char, color: e.color, type: e.type });
             } else {
-                entityMap.set(e.y * CONFIG.MAP_WIDTH + e.x, { char: e.char, color: e.color, type: e.type, _dmgFlashUntil: e._dmgFlashUntil });
+                entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: e.type, _dmgFlashUntil: e._dmgFlashUntil });
             }
         }
         if (game.waves) {
@@ -396,7 +412,7 @@ export class Renderer {
                 if (isEntityMoving(e)) {
                     movingEntities.push({ entity: e, char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type });
                 } else {
-                    entityMap.set(e.y * CONFIG.MAP_WIDTH + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, _dmgFlashUntil: e._dmgFlashUntil });
+                    entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, _dmgFlashUntil: e._dmgFlashUntil });
                 }
             }
         }
@@ -407,7 +423,7 @@ export class Renderer {
             if (isEntityMoving(r)) {
                 movingEntities.push({ entity: r, char: rChar, color: rColor, type: 'raider', entityType: r.type });
             } else {
-                entityMap.set(r.y * CONFIG.MAP_WIDTH + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, _dmgFlashUntil: r._dmgFlashUntil });
+                entityMap.set(r.y * mapW + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, _dmgFlashUntil: r._dmgFlashUntil });
             }
         }
         const rallySet = this._rallySet;
@@ -431,10 +447,10 @@ export class Renderer {
                 if (isEntityMoving(c)) {
                     movingEntities.push({ entity: c, ...entData });
                 } else {
-                    entityMap.set(c.y * CONFIG.MAP_WIDTH + c.x, entData);
+                    entityMap.set(c.y * mapW + c.x, entData);
                 }
                 if (drafted && c.draftTarget) {
-                    rallySet.set(c.draftTarget.y * CONFIG.MAP_WIDTH + c.draftTarget.x, true);
+                    rallySet.set(c.draftTarget.y * mapW + c.draftTarget.x, true);
                 }
             }
         }
@@ -450,20 +466,20 @@ export class Renderer {
         portalPathMap.clear();
         if (game.waves && game.waves.active && game.waves.portals.length > 0) {
             for (const p of game.waves.portals) {
-                portalMap.set(p.y * CONFIG.MAP_WIDTH + p.x, true);
+                portalMap.set(p.y * mapW + p.x, true);
             }
             const pathPoints = game.waves.getPathPreview(game);
             for (const pt of pathPoints) {
-                const key = pt.y * CONFIG.MAP_WIDTH + pt.x;
+                const key = pt.y * mapW + pt.x;
                 if (!portalMap.has(key)) portalPathMap.set(key, true);
             }
         }
 
         const effectMap = this._effectMap;
         effectMap.clear();
-        if (game.combatEffects && game.settings.showOverlays && game.settings.showCombatParticles) {
+        if (game.combatEffects && showOverlays && game.settings.showCombatParticles) {
             for (const e of game.combatEffects) {
-                effectMap.set(e.y * CONFIG.MAP_WIDTH + e.x, e);
+                effectMap.set(e.y * mapW + e.x, e);
             }
         }
 
@@ -473,22 +489,22 @@ export class Renderer {
         //   ground → structure/entity → dither → artifact overlay → designation tint
         // Effects (combat hits, shots, portals) draw as overlays on top of the base.
         let lastColor = '';
-        for (let sy = 0; sy < CONFIG.VIEWPORT_HEIGHT; sy++) {
-            for (let sx = 0; sx < CONFIG.VIEWPORT_WIDTH; sx++) {
+        for (let sy = 0; sy < vh; sy++) {
+            for (let sx = 0; sx < vw; sx++) {
                 // Keep track of the x,y coordinate for the tile we are currently drawing on and its relation to the player camera.
                 const wx = camera.x + sx;
                 const wy = camera.y + sy;
                 const px = sx * cw;
                 const py = sy * ch;
 
-                if (wx < 0 || wx >= CONFIG.MAP_WIDTH || wy < 0 || wy >= CONFIG.MAP_HEIGHT) {
+                if (wx < 0 || wx >= mapW || wy < 0 || wy >= CONFIG.MAP_HEIGHT) {
                     continue;
                 }
 
                 // Get ASCII info for this tile.
                 const tile = map[wy][wx];
-                let char = getTileChar(tile, game.weather.season);
-                let color = getTileColor(tile, game.weather.season);
+                let char = getTileChar(tile, season);
+                let color = getTileColor(tile, season);
                 let bg = getTileBg(tile);
 
                 // Update tile color based on work task designation if one exists (e.g. marked for destruction).
@@ -502,14 +518,14 @@ export class Renderer {
                 }
 
                 // Get key for this tile to check against different maps (e.g. portalPathMap has a list of all tiles that Nexus Wave enemies plan to use for pathing).
-                const tileKey = wy * CONFIG.MAP_WIDTH + wx;
+                const tileKey = wy * mapW + wx;
 
                 // Update tile color to indiciate Nexus Wave enemy paths if applicable.
                 if (portalMap.has(tileKey)) {
                     char = COMBAT_VISUALS.portalChar;
                     color = COMBAT_VISUALS.portalColor;
                     bg = COMBAT_VISUALS.portalBg;
-                } else if (game.settings.showPortalPath && portalPathMap.has(tileKey)) {
+                } else if (showPortalPath && portalPathMap.has(tileKey)) {
                     color = COMBAT_VISUALS.portalPathColor;
                     bg = COMBAT_VISUALS.portalPathBg;
                 }
@@ -518,8 +534,8 @@ export class Renderer {
                 const entity = entityMap.get(tileKey);
                 if (entity) {
                     char = entity.char;
-                    color = (game.settings.showOverlays && game.settings.showDamageFlash && entity._dmgFlashUntil > game.tick) ? COMBAT_VISUALS.dmgFlashColor : entity.color;
-                } else if (tile.structure && game.settings.showOverlays && game.settings.showDamageFlash && tile._dmgFlashUntil > game.tick) {
+                    color = (showOverlays && showDamageFlash && entity._dmgFlashUntil > game.tick) ? COMBAT_VISUALS.dmgFlashColor : entity.color;
+                } else if (tile.structure && showOverlays && showDamageFlash && tile._dmgFlashUntil > game.tick) {
                     color = COMBAT_VISUALS.dmgFlashColor;
                 }
 
@@ -540,7 +556,7 @@ export class Renderer {
                     wy >= selectionRect.y1 && wy <= selectionRect.y2;
 
                 if (inSelection && buildDragPreview) {
-                    const tKey = wy * CONFIG.MAP_WIDTH + wx;
+                    const tKey = wy * mapW + wx;
                     if (buildDragPreview.blocked && buildDragPreview.blocked.has(tKey)) {
                         bg = '#3a1a1a';
                     } else if (buildDragPreview.affordable.has(tKey)) {
@@ -577,18 +593,18 @@ export class Renderer {
                 // Draw anything that has a sprite (floors, structures, entities, & effects).
                 // If a sprite doesn't exist for that element we will instead draw using ASCII later.
                 let spriteDrawn = false;
-                if (this.skinManager.isActive) {
+                if (skinActive) {
                     // Draw ground sprite (terrain, floor, or furniture) so it will appear underneath the colonist sprite.
                     const needsGround = tile.structure && BUILDINGS[tile.structure] && BUILDINGS[tile.structure].structureType === 'furniture';
                     if (needsGround || entity) {
-                        const ground = this._resolveGroundSprite(tile, game.weather.season);
+                        const ground = this._resolveGroundSprite(tile, season);
                         if (ground) ctx.drawImage(ground, px, py, cw, ch);
-                        const material = this._resolveMaterialSprite(tile, game.weather.season);
+                        const material = this._resolveMaterialSprite(tile, season);
                         if (material) ctx.drawImage(material, px, py, cw, ch);
                     }
                     const canDither = !tile.structure && !tile.resource && !tile.zone && !tile.floor;
                     if (entity) {
-                        if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game);
+                        if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         if (tile.structure) {
                             const structSprite = this.skinManager.getSprite('buildings', tile.structure);
                             if (structSprite) ctx.drawImage(structSprite, px, py, cw, ch);
@@ -597,19 +613,19 @@ export class Renderer {
 
                     // Determine if we have an entity sprite to draw on this tile.
                     const hl = !!(entity && entity.type === 'colonist' && game.settings.showColonistHighlight);
-                    const sprite = this._resolveSprite(tile, entity, game.weather.season, hl);
+                    const sprite = this._resolveSprite(tile, entity, season, hl);
                     if (sprite) {
                         // Determine any shake effects that need to be applied to the entity sprite before we draw it.
-                        const shakeActive = game.settings.showOverlays && game.settings.enableScreenShake && entity && entity._atkShakeUntil > game.tick;
-                        const shakePx = COMBAT_VISUALS.atkShakePx || 2;
+                        const shakeActive = showOverlays && enableScreenShake && entity && entity._atkShakeUntil > game.tick;
+                        const shakePx = atkShakePx;
                         const shakeX = shakeActive ? ((game.tick * 7) % (shakePx * 2 + 1)) - shakePx : 0;
                         const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
                         const hlOff = hl ? 1 : 0;
                         ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff, cw + hlOff * 2, ch + hlOff * 2);
                         if (!entity && canDither) {
-                            this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game);
+                            this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         }
-                        if (game.settings.showOverlays && game.settings.showDamageFlash && entity && entity._dmgFlashUntil > game.tick) {
+                        if (showOverlays && showDamageFlash && entity && entity._dmgFlashUntil > game.tick) {
                             const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
                             if (flashSprite) {
                                 ctx.drawImage(flashSprite, px + shakeX, py + shakeY, cw, ch);
@@ -627,7 +643,7 @@ export class Renderer {
                             if (swingSprite) ctx.drawImage(swingSprite, px, py, cw, ch);
                         }
                         // Draw any combat effects relevant for this entity sprite.
-                        if (game.settings.showOverlays && game.settings.showDamageFlash && !entity && tile.structure && tile._dmgFlashUntil > game.tick) {
+                        if (showOverlays && showDamageFlash && !entity && tile.structure && tile._dmgFlashUntil > game.tick) {
                             const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
                             if (flashSprite) {
                                 ctx.drawImage(flashSprite, px, py, cw, ch);
@@ -673,7 +689,7 @@ export class Renderer {
                                 || this.skinManager.getSprite('floors', tile.designation.buildType);
                             if (ghostSprite) {
                                 if (!spriteDrawn) {
-                                    const ground = this._resolveGroundSprite(tile, game.weather.season);
+                                    const ground = this._resolveGroundSprite(tile, season);
                                     if (ground) {
                                         ctx.drawImage(ground, px, py, cw, ch);
                                         spriteDrawn = true;
@@ -697,8 +713,8 @@ export class Renderer {
 
                 // If a sprite was not drawn because it either doesn't exist or we are in ASCII mode, draw the set ASCII character instead.
                 if (!spriteDrawn) {
-                    const asciiShake = game.settings.showOverlays && game.settings.enableScreenShake && entity && entity._atkShakeUntil > game.tick;
-                    const asciiShakePx = COMBAT_VISUALS.atkShakePx || 2;
+                    const asciiShake = showOverlays && enableScreenShake && entity && entity._atkShakeUntil > game.tick;
+                    const asciiShakePx = atkShakePx;
                     const asx = asciiShake ? ((game.tick * 7) % (asciiShakePx * 2 + 1)) - asciiShakePx : 0;
                     const asy = asciiShake ? ((game.tick * 13) % (asciiShakePx + 1)) - Math.floor(asciiShakePx / 2) : 0;
                     if (char === '█' || char === '▓' || char === '▒') {
@@ -708,8 +724,8 @@ export class Renderer {
                         }
                         ctx.fillRect(px + asx, py + asy, cw, ch);
                     } else {
-                        if (this.skinManager.isActive) {
-                            const ground = this._resolveGroundSprite(tile, game.weather.season);
+                        if (skinActive) {
+                            const ground = this._resolveGroundSprite(tile, season);
                             if (ground) ctx.drawImage(ground, px, py, cw, ch);
                         }
                         if (color !== lastColor) {
@@ -726,7 +742,7 @@ export class Renderer {
                 }
 
                 // If a sprite is underneath the Nexus Wave path then we should re-draw the background color at a lower opacity.
-                if (spriteDrawn && game.settings.showPortalPath && portalPathMap.has(tileKey)) {
+                if (spriteDrawn && showPortalPath && portalPathMap.has(tileKey)) {
                     ctx.fillStyle = COMBAT_VISUALS.portalPathColor;
                     ctx.globalAlpha = 0.35;
                     ctx.fillRect(px, py, cw, ch);
@@ -738,7 +754,7 @@ export class Renderer {
                 if (spriteDrawn && (inSelection || (cursor && cursor.x === wx && cursor.y === wy))) {
                     ctx.globalAlpha = 0.35;
                     if (inSelection && buildDragPreview) {
-                        const tKey = wy * CONFIG.MAP_WIDTH + wx;
+                        const tKey = wy * mapW + wx;
                         if (buildDragPreview.blocked && buildDragPreview.blocked.has(tKey)) {
                             ctx.fillStyle = '#cc2222';
                         } else if (buildDragPreview.affordable.has(tKey)) {
@@ -766,18 +782,18 @@ export class Renderer {
             const pos = getEntityRenderPos(me.entity, now);
             const sx = pos.x - camera.x;
             const sy = pos.y - camera.y;
-            if (sx < -1 || sx >= CONFIG.VIEWPORT_WIDTH + 1 || sy < -1 || sy >= CONFIG.VIEWPORT_HEIGHT + 1) continue;
+            if (sx < -1 || sx >= vw + 1 || sy < -1 || sy >= vh + 1) continue;
             const ent = me.entity;
-            const shakeActive = game.settings.showOverlays && game.settings.enableScreenShake && ent._atkShakeUntil > game.tick;
-            const sPxE = COMBAT_VISUALS.atkShakePx || 2;
+            const shakeActive = showOverlays && enableScreenShake && ent._atkShakeUntil > game.tick;
+            const sPxE = atkShakePx;
             const shakeX = shakeActive ? ((game.tick * 7) % (sPxE * 2 + 1)) - sPxE : 0;
             const shakeY = shakeActive ? ((game.tick * 13) % (sPxE + 1)) - Math.floor(sPxE / 2) : 0;
             const rpx = Math.round(sx * cw) + shakeX;
             const rpy = Math.round(sy * ch) + shakeY;
-            if (this.skinManager.isActive) {
+            if (skinActive) {
                 const destTile = map[ent.y]?.[ent.x];
                 const meHl = !!(me.type === 'colonist' && game.settings.showColonistHighlight);
-                const sprite = this._resolveSprite(destTile || {}, me, game.weather.season, meHl);
+                const sprite = this._resolveSprite(destTile || {}, me, season, meHl);
                 if (sprite) {
                     const meHlOff = meHl ? 1 : 0;
                     ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff, cw + meHlOff * 2, ch + meHlOff * 2);
@@ -785,7 +801,7 @@ export class Renderer {
                     ctx.fillStyle = me.color;
                     ctx.fillText(me.char, rpx + this._textOffsetX, rpy);
                 }
-                if (game.settings.showOverlays && game.settings.showDamageFlash && ent._dmgFlashUntil > game.tick) {
+                if (showOverlays && showDamageFlash && ent._dmgFlashUntil > game.tick) {
                     const flashSprite = this.skinManager.getSprite('effects', 'damage_flash');
                     if (flashSprite) {
                         ctx.drawImage(flashSprite, rpx, rpy, cw, ch);
@@ -801,13 +817,13 @@ export class Renderer {
                     if (swingSprite) ctx.drawImage(swingSprite, rpx - shakeX, rpy - shakeY, cw, ch);
                 }
             } else {
-                ctx.fillStyle = (game.settings.showOverlays && game.settings.showDamageFlash && ent._dmgFlashUntil > game.tick) ? COMBAT_VISUALS.dmgFlashColor : me.color;
+                ctx.fillStyle = (showOverlays && showDamageFlash && ent._dmgFlashUntil > game.tick) ? COMBAT_VISUALS.dmgFlashColor : me.color;
                 ctx.fillText(me.char, rpx + this._textOffsetX, rpy);
             }
         }
 
         // --- Draw projectiles at interpolated positions ---
-        if (game.projectiles && game.settings.showOverlays && game.settings.showProjectiles) {
+        if (game.projectiles && showOverlays && game.settings.showProjectiles) {
             for (const p of game.projectiles) {
                 const t = Math.min(1, (now - p._startTime) / p._duration);
                 const px2 = p.fromX + (p.toX - p.fromX) * t;
@@ -815,7 +831,7 @@ export class Renderer {
                 const screenX = (px2 - camera.x) * cw;
                 const screenY = (py2 - camera.y) * ch;
                 if (screenX < -cw || screenX > this.canvas.width || screenY < -ch || screenY > this.canvas.height) continue;
-                if (this.skinManager.isActive) {
+                if (skinActive) {
                     const sprite = p.skinKey ? this.skinManager.getSprite('effects', p.skinKey) : null;
                     if (sprite) {
                         ctx.drawImage(sprite, Math.round(screenX), Math.round(screenY), cw, ch);
@@ -842,7 +858,7 @@ export class Renderer {
                 const pos = getEntityRenderPos(c, now);
                 const sx = pos.x - camera.x;
                 const sy = pos.y - camera.y;
-                if (sx < 0 || sx >= CONFIG.VIEWPORT_WIDTH || sy < 0 || sy >= CONFIG.VIEWPORT_HEIGHT) continue;
+                if (sx < 0 || sx >= vw || sy < 0 || sy >= vh) continue;
                 const nx = Math.round(sx * cw);
                 const ny = Math.round(sy * ch) - 1;
                 ctx.fillStyle = '#000000';
@@ -861,7 +877,7 @@ export class Renderer {
         // (Float32Array) so cost is O(viewport + sources*radius²) instead of
         // O(viewport * sources). Darkness is quantized into discrete alpha steps
         // (nightGradientSteps) to minimize fillStyle changes on the canvas context.
-        const darkness = game.settings.showNightLighting ? this.getNightDarkness(game.timeOfDay, game.weather.season) : 0;
+        const darkness = game.settings.showNightLighting ? this.getNightDarkness(game.timeOfDay, season) : 0;
         if (darkness > 0) {
             const lightSources = this._getLightSources(game, camera);
             const steps = RENDER_CONFIG.nightGradientSteps;
@@ -871,9 +887,6 @@ export class Renderer {
             for (let i = 1; i <= steps; i++) {
                 darkStyles.push(`rgba(${nr},${ng},${nb},${(darkness * i / steps).toFixed(3)})`);
             }
-
-            const vw = CONFIG.VIEWPORT_WIDTH;
-            const vh = CONFIG.VIEWPORT_HEIGHT;
 
             // Light grid: each cell holds the max illumination (0..1) from any source.
             // Sources stamp their radius using Manhattan distance (matches the game's
