@@ -705,7 +705,11 @@ export const STORY_MILESTONES = {
         text: `
         Your community is still small, but growth is steady. You anticipate more will
         join as you advance your ability to harness magic. Until then, you do what you
-        can for those who've already made this colony their home.`,
+        can for those who've already made this colony their home.
+        <br><br>
+        Despite the progress, you still find yourself thinking back to The Crusade each 
+        night. One day you hope to bring your new friends back to the homes that were 
+        taken from them.`,
     },
     colony_10: {
         tab: 'colony',
@@ -714,7 +718,10 @@ export const STORY_MILESTONES = {
         text: `
         You think back to how this community began. We were small and scared, nearly 
         starving through our first winter. You've all grown much stronger, in body, 
-        mind, and spirit. Your efforts to lead this community are paying off in spades.`,
+        mind, and spirit. Your efforts to lead this community are paying off in spades.
+        <br><br>
+        You still have to keep pushing. The Crusade is looming on the horizon and your
+        community needs to be ready to face them when the time comes.`,
     },
     first_raid_survived: {
         tab: 'colony',
@@ -793,15 +800,40 @@ export const STORY_MILESTONES = {
         are excited by the results. You plan to write more tomes and help everyone 
         get to the point where they can cast their very own spells for the first time.`,
     },
+    first_friend: {
+        tab: 'colony',
+        title: 'Friendly Neighbors',
+        trigger: 'first_friend_made',
+        text: `
+        Some of your colonists have become fast friends. You see these two chatting 
+        often, keeping each other sane during these unstable times.`,
+    },
+    first_love: {
+        tab: 'colony',
+        title: 'Love in the Frontier',
+        trigger: 'first_lover_made',
+        text: `
+        You overheard some talks of romance among the colonists. It's beautiful to 
+        think that they're able to find love so far from home. You can only hope that 
+        this relationship helps these two weather the tribulations of The Frontier.`,
+    },
     first_wave_complete: {
         tab: 'colony',
         title: 'Void Triumphant',
         trigger: 'first_wave_completed',
         text: `
-        Opening the rifts was a complete success! As monsters flowed out into your 
-        realm you were able to harvest the void itself from beyond the rifts. You suspect 
-        that opening the rifts again will put your realm in more danger, but it may be 
-        worthwhile if you find good uses for this void essence.`,
+        It was horrifying, but opening these rifts may just be a worthwhile endevour. 
+        Your colonists held fast against the horde of fleshy monsters that poured from 
+        the portals, finding time to harvest a shadowy material from beyond the rift.
+        <br><br>
+        Some of the colonists have turned to calling this material <i>Void Essence</i> 
+        which was only fitting for something taken from such unnatural creatures. Your 
+        initial tests show that this essence will be of great use to the colony, but it 
+        seems that the only way to get it is to re-open the rifts to this terrifying place.
+        <br><br>
+        You ponder the dangers, afraid that the only way forward is to once again invite 
+        these monsters into your home. Perhaps with enough study the essence will give 
+        your colonists what they need to face these beasts with confidence.`,
     },
     research_runecraft: {
         tab: 'colony',

@@ -9,6 +9,7 @@ import { SOCIAL_INTERACTIONS, SOCIAL_CONFIG, THOUGHTS } from '../core/config.js'
 import { getRelationshipTier } from './social-utils.js';
 import { addThought } from '../entities/colonist.js';
 import { manhattanDist } from '../world/pathfinding.js';
+import { StorySystem } from '../systems/story.js';
 
 export { getRelationshipTier };
 
@@ -43,12 +44,15 @@ function checkRelationshipChange(colonist, other, prevTierKey, game) {
 
     colonist.relationships[other.id] = newTierKey;
 
+    if (!this.story) this.story = new StorySystem();
+
     // Milestone thoughts and notifications
     if (newTierKey === 'friend' && (storedTier === 'stranger' || storedTier === 'acquaintance')) {
         addThought(colonist, THOUGHTS.made_friend.text, THOUGHTS.made_friend.moodEffect, THOUGHTS.made_friend.duration, game.tick);
         game.notifications.push({ text: `${colonist.name} and ${other.name} became friends!`, tick: game.tick, type: 'success' });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
         game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
+        this.story.checkMilestone('first_friend_made', this);
     } else if (newTierKey === 'close_friend' && storedTier !== 'lovers') {
         game.notifications.push({ text: `${colonist.name} and ${other.name} are now close friends!`, tick: game.tick, type: 'success' });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Close Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
@@ -58,6 +62,7 @@ function checkRelationshipChange(colonist, other, prevTierKey, game) {
         game.notifications.push({ text: `${colonist.name} has fallen in love with ${other.name}!`, tick: game.tick, type: 'success' });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Lovers!', color: '#ff88cc', fontSize: 11, ttl: 15, maxTtl: 15 });
         game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Lovers!', color: '#ff88cc', fontSize: 11, ttl: 15, maxTtl: 15 });
+        this.story.checkMilestone('first_lover_made', this);
     } else if (newTierKey === 'rival') {
         addThought(colonist, THOUGHTS.became_rivals.text, THOUGHTS.became_rivals.moodEffect, THOUGHTS.became_rivals.duration, game.tick);
         if (storedTier === 'friend' || storedTier === 'close_friend' || storedTier === 'lovers') {
