@@ -1056,7 +1056,8 @@ export const STORY_MILESTONES = {
         title: 'The Kobaloi',
         trigger: 'first_kobalos_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/kobaloi.png" alt="A drawing depicting the Kobaloi">
-        
+        A roguish people known for their bright chromatic skin tones and ears as wide as 
+        their own heads. The kobaloi 
         
         A wide ranging people known for their large ears, distinct skin colors, and their 
         mischievous behaviors. While not all Kobalos are tricksters, they tend to be known 

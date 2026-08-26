@@ -131,6 +131,7 @@ export const COMBAT_VISUALS = {
     xpGainChar: '·',
     xpGainColor: '#88ff88',
     xpGainTtl: 1,
+    smiteChar: '✝',
 };
 
 export const LOG_COLORS = {
