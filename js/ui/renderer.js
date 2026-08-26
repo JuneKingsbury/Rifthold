@@ -353,7 +353,7 @@ export class Renderer {
         this.ctx.imageSmoothingEnabled = !skinActive;
 
         const { map, camera, colonists, entities, raiders, cursor } = game;
-        const camKey = `${camera.x},${camera.y},${game.tick}`;
+        const camKey = `${camera.x},${camera.y},${game.tick},${CONFIG.VIEWPORT_WIDTH},${CONFIG.VIEWPORT_HEIGHT},${this.charWidth}`;
         const settingsKey = `${showOverlays},${game.settings.showCombatParticles},${game.settings.showEquipmentOverlays}`;
         const ctx = this.ctx;
         const cw = this.charWidth;
@@ -924,7 +924,7 @@ export class Renderer {
             const lightGrid = this._lightGrid;
 
             // Cache static light grid
-            const srcHash = sources.reduce((h, s) => h ^ (s.x * 7919 + s.y * 104729 + s.radius * 31), 0) ^ (camera.x * 48611 + camera.y * 96293) ^ (sources.length * 104723);
+            const srcHash = sources.reduce((h, s) => h ^ (s.x * 7919 + s.y * 104729 + s.radius * 31), 0) ^ (camera.x * 48611 + camera.y * 96293) ^ (sources.length * 104723) ^ (vw * 40503 + vh * 27691);
             if (srcHash !== this._lastLightHash) {
                 this._lastLightHash = srcHash;
                 this._staticLightGrid.fill(0);
@@ -1013,7 +1013,7 @@ export class Renderer {
         const y0 = camera.y - margin;
         const x1 = camera.x + CONFIG.VIEWPORT_WIDTH + margin;
         const y1 = camera.y + CONFIG.VIEWPORT_HEIGHT + margin;
-        const structureCamKey = `${camera.x},${camera.y},${game.tick}`;
+        const structureCamKey = `${camera.x},${camera.y},${game.tick},${CONFIG.VIEWPORT_WIDTH},${CONFIG.VIEWPORT_HEIGHT},${this.charWidth}`;
         
         if (this._lastStructureCamKey === structureCamKey) {
             // allStructures is still valid, skip rebuilding them.
