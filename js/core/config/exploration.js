@@ -780,7 +780,8 @@ export const STORY_MILESTONES = {
         trigger: 'first_animal_tamed',
         text: `
         The Binding Circle was a huge success! Your colony's first animal companion 
-        has joined the flock and lives among us.`,
+        has joined the flock and now lives among us. This animal will provide a lot 
+        to our community as long as we care for it properly.`,
     },
     first_trade: {
         tab: 'colony',
@@ -810,7 +811,7 @@ export const STORY_MILESTONES = {
     },
     first_love: {
         tab: 'colony',
-        title: 'Love in the Frontier',
+        title: 'Love on the Frontier',
         trigger: 'first_lover_made',
         text: `
         You overheard some talks of romance among the colonists. It's beautiful to 
@@ -819,7 +820,7 @@ export const STORY_MILESTONES = {
     },
     first_wave_complete: {
         tab: 'colony',
-        title: 'Void Triumphant',
+        title: 'Horrors from the Void',
         trigger: 'first_wave_completed',
         text: `
         It was horrifying, but opening these rifts may just be a worthwhile endeavour. 
