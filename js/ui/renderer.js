@@ -40,6 +40,7 @@ export class Renderer {
         this._portalPathMap = new Map();
         this._effectMap = new Map();
         this._movingEntities = [];
+        this._structureMap = new Map();
 
         // Terrain dithering
         this._ditherMasks = null;
@@ -352,6 +353,8 @@ export class Renderer {
         this.ctx.imageSmoothingEnabled = !skinActive;
 
         const { map, camera, colonists, entities, raiders, cursor } = game;
+        const camKey = `${camera.x},${camera.y},${game.tick}`;
+        const settingsKey = `${showOverlays},${game.settings.showCombatParticles},${game.settings.showEquipmentOverlays}`;
         const ctx = this.ctx;
         const cw = this.charWidth;
         const ch = this.charHeight;
@@ -395,95 +398,111 @@ export class Renderer {
         // --- Build entity/effect lookup maps (flat key = y*MAP_WIDTH + x) ---
         // These let the tile loop do O(1) lookups instead of scanning arrays per tile.
         // Moving entities (mid-lerp) are collected separately for fractional-position rendering.
+        
         const entityMap = this._entityMap;
-        entityMap.clear();
         const movingEntities = this._movingEntities;
-        movingEntities.length = 0;
-        for (const e of entities) {
-            if (e.hp <= 0) continue;
-            if (isEntityMoving(e)) {
-                movingEntities.push({ entity: e, char: e.char, color: e.color, type: e.type });
-            } else {
-                entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: e.type, _dmgFlashUntil: e._dmgFlashUntil });
-            }
-        }
-        if (game.waves) {
-            for (const e of game.waves.enemies) {
-                if (e.hp <= 0) continue;
-                if (isEntityMoving(e)) {
-                    movingEntities.push({ entity: e, char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type });
-                } else {
-                    entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, _dmgFlashUntil: e._dmgFlashUntil });
-                }
-            }
-        }
-        for (const r of raiders) {
-            if (r.hp <= 0) continue;
-            const rChar = r.char || 'R';
-            const rColor = r.color || TILE_COLORS.raider;
-            if (isEntityMoving(r)) {
-                movingEntities.push({ entity: r, char: rChar, color: rColor, type: 'raider', entityType: r.type });
-            } else {
-                entityMap.set(r.y * mapW + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, _dmgFlashUntil: r._dmgFlashUntil });
-            }
-        }
         const rallySet = this._rallySet;
-        rallySet.clear();
-        for (const c of colonists) {
-            if (c.hp > 0 && !c.onExpedition) {
-                const drafted = c.drafted;
-                const pulse = drafted && (game.tick % RENDER_CONFIG.draftedPulsePeriod < RENDER_CONFIG.draftedPulseDuty);
-                let color;
-                if (drafted) {
-                    color = pulse ? '#ff4444' : '#ff8888';
-                } else if (c.activeEffects && c.activeEffects.some(e => e.source === 'spell') && game.tick % RENDER_CONFIG.spellGlowPeriod < RENDER_CONFIG.spellGlowDuty) {
-                    color = COMBAT_VISUALS.spellBuffColor;
-                } else {
-                    color = c.nameColor || TILE_COLORS.colonist;
-                }
-                const showEq = game.settings.showEquipmentOverlays;
-                const isSleeping = c.state === 'sleeping';
-                const sleepingInBed = isSleeping && c.assignedBed && c.x === c.assignedBed.x && c.y === c.assignedBed.y;
-                const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
-                if (isEntityMoving(c)) {
-                    movingEntities.push({ entity: c, ...entData });
-                } else {
-                    entityMap.set(c.y * mapW + c.x, entData);
-                }
-                if (drafted && c.draftTarget) {
-                    rallySet.set(c.draftTarget.y * mapW + c.draftTarget.x, true);
-                }
-            }
-        }
-        for (const [key] of rallySet) {
-            if (!entityMap.has(key)) {
-                entityMap.set(key, { char: '⚑', color: '#ff4444', type: 'rally' });
-            }
-        }
-
         const portalMap = this._portalMap;
         const portalPathMap = this._portalPathMap;
-        portalMap.clear();
-        portalPathMap.clear();
-        if (game.waves && game.waves.active && game.waves.portals.length > 0) {
-            for (const p of game.waves.portals) {
-                portalMap.set(p.y * mapW + p.x, true);
+
+        if (this._lastEntityMapKey === camKey) {
+            // entityMap, rallySet, portalMap, etc. are still valid, skip all the rebuild loops.
+        } else {
+            this._lastEntityMapKey = camKey;
+
+            entityMap.clear();
+            
+            movingEntities.length = 0;
+            for (const e of entities) {
+                if (e.hp <= 0) continue;
+                if (isEntityMoving(e)) {
+                    movingEntities.push({ entity: e, char: e.char, color: e.color, type: e.type });
+                } else {
+                    entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: e.type, _dmgFlashUntil: e._dmgFlashUntil });
+                }
             }
-            const pathPoints = game.waves.getPathPreview(game);
-            for (const pt of pathPoints) {
-                const key = pt.y * mapW + pt.x;
-                if (!portalMap.has(key)) portalPathMap.set(key, true);
+            if (game.waves) {
+                for (const e of game.waves.enemies) {
+                    if (e.hp <= 0) continue;
+                    if (isEntityMoving(e)) {
+                        movingEntities.push({ entity: e, char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type });
+                    } else {
+                        entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, _dmgFlashUntil: e._dmgFlashUntil });
+                    }
+                }
+            }
+            for (const r of raiders) {
+                if (r.hp <= 0) continue;
+                const rChar = r.char || 'R';
+                const rColor = r.color || TILE_COLORS.raider;
+                if (isEntityMoving(r)) {
+                    movingEntities.push({ entity: r, char: rChar, color: rColor, type: 'raider', entityType: r.type });
+                } else {
+                    entityMap.set(r.y * mapW + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, _dmgFlashUntil: r._dmgFlashUntil });
+                }
+            }
+            
+            rallySet.clear();
+            for (const c of colonists) {
+                if (c.hp > 0 && !c.onExpedition) {
+                    const drafted = c.drafted;
+                    const pulse = drafted && (game.tick % RENDER_CONFIG.draftedPulsePeriod < RENDER_CONFIG.draftedPulseDuty);
+                    let color;
+                    if (drafted) {
+                        color = pulse ? '#ff4444' : '#ff8888';
+                    } else if (c.activeEffects && c.activeEffects.some(e => e.source === 'spell') && game.tick % RENDER_CONFIG.spellGlowPeriod < RENDER_CONFIG.spellGlowDuty) {
+                        color = COMBAT_VISUALS.spellBuffColor;
+                    } else {
+                        color = c.nameColor || TILE_COLORS.colonist;
+                    }
+                    const showEq = game.settings.showEquipmentOverlays;
+                    const isSleeping = c.state === 'sleeping';
+                    const sleepingInBed = isSleeping && c.assignedBed && c.x === c.assignedBed.x && c.y === c.assignedBed.y;
+                    const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
+                    if (isEntityMoving(c)) {
+                        movingEntities.push({ entity: c, ...entData });
+                    } else {
+                        entityMap.set(c.y * mapW + c.x, entData);
+                    }
+                    if (drafted && c.draftTarget) {
+                        rallySet.set(c.draftTarget.y * mapW + c.draftTarget.x, true);
+                    }
+                }
+            }
+            for (const [key] of rallySet) {
+                if (!entityMap.has(key)) {
+                    entityMap.set(key, { char: '⚑', color: '#ff4444', type: 'rally' });
+                }
+            }
+
+            portalMap.clear();
+            portalPathMap.clear();
+            if (game.waves && game.waves.active && game.waves.portals.length > 0) {
+                for (const p of game.waves.portals) {
+                    portalMap.set(p.y * mapW + p.x, true);
+                }
+                const pathPoints = game.waves.getPathPreview(game);
+                for (const pt of pathPoints) {
+                    const key = pt.y * mapW + pt.x;
+                    if (!portalMap.has(key)) portalPathMap.set(key, true);
+                }
             }
         }
 
         const effectMap = this._effectMap;
-        effectMap.clear();
-        if (game.combatEffects && showOverlays && game.settings.showCombatParticles) {
-            for (const e of game.combatEffects) {
-                effectMap.set(e.y * mapW + e.x, e);
+
+        if (this._lastSettingsKey === settingsKey && this._lastEntityMapKey === camKey) {
+            // effectMap still valid, skip that loop.
+        } else {
+            this._lastSettingsKey = settingsKey;
+            effectMap.clear();
+            if (game.combatEffects && showOverlays && game.settings.showCombatParticles) {
+                for (const e of game.combatEffects) {
+                    effectMap.set(e.y * mapW + e.x, e);
+                }
             }
         }
-
+        
         // --- Tile rendering loop ---
         // Iterates over the visible viewport, drawing each tile as either a sprite
         // (skin active) or an ASCII character. Layering order for sprites:
@@ -884,7 +903,7 @@ export class Renderer {
         // (nightGradientSteps) to minimize fillStyle changes on the canvas context.
         const darkness = game.settings.showNightLighting ? this.getNightDarkness(game.timeOfDay, season) : 0;
         if (darkness > 0) {
-            const lightSources = this._getLightSources(game, camera);
+            const { sources, mobileSources } = this._getLightSources(game, camera);
             const steps = RENDER_CONFIG.nightGradientSteps;
             const [nr, ng, nb] = RENDER_CONFIG.nightOverlayColor;
             // Pre-build the style strings for each quantized darkness level
@@ -899,10 +918,42 @@ export class Renderer {
             if (!this._lightGrid || this._lightGrid.length < vw * vh) {
                 this._lightGrid = new Float32Array(vw * vh);
             }
+            if (!this._staticLightGrid || this._staticLightGrid.length < vw * vh) {
+                this._staticLightGrid = new Float32Array(vw * vh);
+            }
             const lightGrid = this._lightGrid;
-            lightGrid.fill(0);
 
-            for (const src of lightSources) {
+            // Cache static light grid
+            const srcHash = sources.reduce((h, s) => h ^ (s.x * 7919 + s.y * 104729 + s.radius * 31), 0) ^ (camera.x * 48611 + camera.y * 96293) ^ (sources.length * 104723);
+            if (srcHash !== this._lastLightHash) {
+                this._lastLightHash = srcHash;
+                this._staticLightGrid.fill(0);
+                for (const src of sources) {
+                    const localX = src.x - camera.x;
+                    const localY = src.y - camera.y;
+                    const r = src.radius;
+                    const yStart = Math.max(0, localY - r);
+                    const yEnd = Math.min(vh - 1, localY + r);
+                    const xStart = Math.max(0, localX - r);
+                    const xEnd = Math.min(vw - 1, localX + r);
+                    for (let sy = yStart; sy <= yEnd; sy++) {
+                        const rowOff = sy * vw;
+                        const dy = Math.abs(sy - localY);
+                        for (let sx = xStart; sx <= xEnd; sx++) {
+                            const dist = dy + Math.abs(sx - localX);
+                            if (dist > r) continue;
+                            const falloff = 1 - (dist / (r + 1));
+                            const idx = rowOff + sx;
+                            if (falloff > this._staticLightGrid[idx]) 
+                            this._staticLightGrid[idx] = falloff;
+                        }
+                    }
+                }
+            }
+
+            // Each frame: copy static grid, then stamp mobile sources on top
+            lightGrid.set(this._staticLightGrid);
+            for (const src of mobileSources) {
                 const localX = src.x - camera.x;
                 const localY = src.y - camera.y;
                 const r = src.radius;
@@ -916,9 +967,6 @@ export class Renderer {
                     for (let sx = xStart; sx <= xEnd; sx++) {
                         const dist = dy + Math.abs(sx - localX);
                         if (dist > r) continue;
-                        // Linear falloff: 1.0 at source, 0.0 at radius edge.
-                        // The "+1" avoids falloff=0 exactly at dist==r (would leave a
-                        // hard dark ring at the light boundary).
                         const falloff = 1 - (dist / (r + 1));
                         const idx = rowOff + sx;
                         if (falloff > lightGrid[idx]) lightGrid[idx] = falloff;
@@ -959,13 +1007,22 @@ export class Renderer {
 
     _getLightSources(game, camera) {
         const sources = [];
+        const mobileSources = [];
         const margin = RENDER_CONFIG.lightSourceMargin;
         const x0 = camera.x - margin;
         const y0 = camera.y - margin;
         const x1 = camera.x + CONFIG.VIEWPORT_WIDTH + margin;
         const y1 = camera.y + CONFIG.VIEWPORT_HEIGHT + margin;
+        const structureCamKey = `${camera.x},${camera.y},${game.tick}`;
+        
+        if (this._lastStructureCamKey === structureCamKey) {
+            // allStructures is still valid, skip rebuilding them.
+        } else {
+            this._lastStructureCamKey = structureCamKey;
+            this._structureMap = game.mapIndex ? game.mapIndex.getAllStructurePositions() : [];
+        }
 
-        const allStructures = game.mapIndex ? game.mapIndex.getAllStructurePositions() : [];
+        const allStructures = this._structureMap;
         const noPower = game.power && !game.power.powered;
 
         for (const { x, y, type } of allStructures) {
@@ -998,7 +1055,7 @@ export class Renderer {
                 radius = Math.max(radius, c.tool.lightRadius);
             }
             if (radius > 0) {
-                sources.push({ x: c.x, y: c.y, radius });
+                mobileSources.push({ x: c.x, y: c.y, radius });
             }
         }
 
@@ -1010,6 +1067,6 @@ export class Renderer {
             }
         }
 
-        return sources;
+        return { sources, mobileSources };
     }
 }
