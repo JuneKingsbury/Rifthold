@@ -411,32 +411,36 @@ class Game {
             checkComplexStructures(this);
             const qualities = calculateRoomQualities(this.map, roomCount);
 
-            // Track room completions and quality changes for visual feedback
+            // Build room center index in a single pass over the map.
+            // We only need the center point per room, so accumulate sums + count.
+            const roomSumX = new Float64Array(roomCount);
+            const roomSumY = new Float64Array(roomCount);
+            const roomTileCount = new Uint32Array(roomCount);
+            for (let y = 0; y < this.map.length; y++) {
+                const row = this.map[y];
+                for (let x = 0; x < row.length; x++) {
+                    const rid = row[x].roomId;
+                    if (rid >= 0 && rid < roomCount) {
+                        roomSumX[rid] += x;
+                        roomSumY[rid] += y;
+                        roomTileCount[rid]++;
+                    }
+                }
+            }
+
             for (let roomId = 0; roomId < roomCount; roomId++) {
                 const prevQuality = this.roomQualities[roomId];
                 const newQuality = qualities.roomQualities[roomId];
                 if (newQuality && !prevQuality) {
-                    // Room newly completed
-                    const roomTiles = Array.from({ length: this.map.length }, (_, y) =>
-                        Array.from({ length: this.map[y].length }, (_, x) =>
-                            this.map[y][x].roomId === roomId ? { x, y } : null
-                        ).filter(Boolean)
-                    ).flat();
-                    if (roomTiles.length > 0) {
-                        const centerX = Math.floor(roomTiles.reduce((sum, t) => sum + t.x, 0) / roomTiles.length);
-                        const centerY = Math.floor(roomTiles.reduce((sum, t) => sum + t.y, 0) / roomTiles.length);
+                    if (roomTileCount[roomId] > 0) {
+                        const centerX = Math.floor(roomSumX[roomId] / roomTileCount[roomId]);
+                        const centerY = Math.floor(roomSumY[roomId] / roomTileCount[roomId]);
                         this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: 'Room complete', color: '#ffcc00', fontSize: 11, ttl: 25, maxTtl: 25 });
                     }
                 } else if (newQuality && prevQuality && newQuality.tier > prevQuality.tier) {
-                    // Room quality improved
-                    const roomTiles = Array.from({ length: this.map.length }, (_, y) =>
-                        Array.from({ length: this.map[y].length }, (_, x) =>
-                            this.map[y][x].roomId === roomId ? { x, y } : null
-                        ).filter(Boolean)
-                    ).flat();
-                    if (roomTiles.length > 0) {
-                        const centerX = Math.floor(roomTiles.reduce((sum, t) => sum + t.x, 0) / roomTiles.length);
-                        const centerY = Math.floor(roomTiles.reduce((sum, t) => sum + t.y, 0) / roomTiles.length);
+                    if (roomTileCount[roomId] > 0) {
+                        const centerX = Math.floor(roomSumX[roomId] / roomTileCount[roomId]);
+                        const centerY = Math.floor(roomSumY[roomId] / roomTileCount[roomId]);
                         this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: `Room: ${newQuality.tier}`, color: '#44ff44', fontSize: 11, ttl: 25, maxTtl: 25 });
                     }
                 }
@@ -446,6 +450,7 @@ class Game {
             this.workshopQualities = qualities.workshopQualities;
             this.roomsDirty = false;
         }
+
         if (prof) prof.mark('weather+decay+rooms');
 
         if (this.tick % 5 === 0) {
