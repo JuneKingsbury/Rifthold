@@ -757,7 +757,7 @@ export const STORY_MILESTONES = {
         trigger: 'first_mental_break',
         text: `
         Today a colonist has lost control of themselves. We all knew that life on the 
-        frontier would be difficult, but the constant toil is often too much to bare.
+        frontier would be difficult, but the constant toil is often too much to bear.
         <br><br>
         Perhaps we can find ways to keep everyone happy? Better sleeping quarters 
         and consistent access to cooked food is a good starting point.`,
@@ -822,7 +822,7 @@ export const STORY_MILESTONES = {
         title: 'Void Triumphant',
         trigger: 'first_wave_completed',
         text: `
-        It was horrifying, but opening these rifts may just be a worthwhile endevour. 
+        It was horrifying, but opening these rifts may just be a worthwhile endeavour. 
         Your colonists held fast against the horde of fleshy monsters that poured from 
         the portals, finding time to harvest a shadowy material from beyond the rift.
         <br><br>
@@ -1058,7 +1058,7 @@ export const STORY_MILESTONES = {
         frogs, salamanders, or even occasionally fish, but with a more human-like body plan.
         They are by far the furthest removed group of people from the other races, with humans 
         having little understanding of how the bufoi live their lives. Some even go as far 
-        as assuming the bufoi are not truly intellegent beings, though anyone who's lived among 
+        as assuming the bufoi are not truly intelligent beings, though anyone who's lived among 
         them knows that this is preposterous.
         <br><br>
         Despite not being inherently magical beings themselves, the bufoi still found their 
@@ -1078,7 +1078,7 @@ export const STORY_MILESTONES = {
         in fact that rumors have begun to spread of a bufos finding his true love among the 
         ferini people.
         <br><br>
-        It can often be difficult to guess know how a bufos is feeling, but overall, much like
+        It can often be difficult to guess how a bufos is feeling, but overall, much like
         the ferini, they always seem content living in the far off parts of The Frontier. They 
         almost always enjoy life among their newly found community and seem to take great joy 
         in teaching their interested neighbors about their people.`,
@@ -1090,18 +1090,18 @@ export const STORY_MILESTONES = {
         text: `<img class="pixel-art" src="portraits/kobaloi.png" alt="A drawing depicting the Kobaloi">
         A roguish people known for their bright chromatic skin tones and ears as wide as 
         their own heads. For most humans, the kobaloi are best known for their depictions 
-        in myths and stories. For them, a kobalos is a mischevious figure that's as likely 
+        in myths and stories. For them, a kobalos is a mischievous figure that's as likely 
         to pull a prank on you as they are to eat you whole, especially if you're a child 
         exploring the woods all alone.
         <br><br>
         In spite of these stories, the kobaloi are a rather peaceful people. Embodying the idea 
-        that it takes a village to raise a child, they take any opporotunity to help their community.
+        that it takes a village to raise a child, they take any opportunity to help their community.
         It is clear that they take great pride in their large families and friendly neighbors.
         <br><br>
         The human kingdoms refused to see this reality and it was only a matter of time before The 
-        Crusade made its way to the kobaloi's doors. They defended their communities fiercly, with 
+        Crusade made its way to the kobaloi's doors. They defended their communities fiercely, with
         several groups of kobaloi continuing to fight back against the Crusaders today. While lacking 
-        in numbers compared to their attackers, they make great use of their nack for tricks by leading 
+        in numbers compared to their attackers, they make great use of their knack for tricks by leading
         groups of Crusaders into traps and winning battles through ambush tactics.
         <br><br>
         The many kobaloi who were unable to continue fighting found themselves pushed deep into The 
@@ -1161,7 +1161,7 @@ export const STORY_MILESTONES = {
         quite as physically capable as the average human farmhand, the nympha used their magic 
         creatively to bridge the gap. Nympha were sought after by many among humanity's most 
         powerful at that time, making use of the nympha's many talents. It was not uncommon to 
-        see a nympha employeed as book keepers, court magicians, or even concubines. 
+        see a nympha employed as bookkeepers, court magicians, or even concubines. 
         Some especially long-lived nympha have fond memories of their time among humans. 
         These nympha still hold out hope for humanity, taking in the exiles that wander 
         into The Frontier.
@@ -1195,7 +1195,7 @@ export const STORY_MILESTONES = {
         <br><br>
         While all Crusaders are human, not all humans are supportive of their actions. 
         Some remember happier times where they had toiled alongside magical beings. Some 
-        simply remain unconvinced that further erradication is necesary now that these 
+        simply remain unconvinced that further eradication is necessary now that these 
         beings have fled into hiding. Speaking out against The Crusade is forbidden, with 
         those accused of such actions often finding themselves among those they tried to 
         defend in The Frontier. Thankfully these humans are welcomed into their new 
@@ -1224,7 +1224,7 @@ export const STORY_MILESTONES = {
         provided ample light for navigation, their faint glow giving you a sense of safety 
         in this unfamiliar place.
         <br><br>
-        Despite this feeling you still found the quietness of the cavern offputting. You 
+        Despite this feeling you still found the quietness of the cavern off-putting. You 
         had hoped to hear a bat fly by or some insects scuttle to their hiding places, but
         instead you're met with only the sound of your own footsteps echoing through the 
         dimly lit cave.
@@ -1237,7 +1237,7 @@ export const STORY_MILESTONES = {
         opening. It was easy enough to crawl through the opening as you entered into a deep 
         hallway-like passage. Suddenly you hear something different coming from the end of 
         the hallway. The sounds of quick footsteps making their way toward you, four feet 
-        moving effeciently through the tight corridor.
+        moving efficiently through the tight corridor.
         <br><br>
         You stood ready to face the creature, not knowing what you expected to see. Your 
         curiosity was answered when the monster stepped into your line of sight, glowing 
@@ -1294,8 +1294,8 @@ export const STORY_MILESTONES = {
         trigger: 'realm_arcane_library',
         text: `
         The Arcane Library was once home to hundreds of prospective mages. 
-        With bans on magic the bustling halls quickly became silent. Its 
-        disappointing to see such a beautiful building slowly rot without 
+        With bans on magic the bustling halls quickly became silent. It's
+        disappointing to see such a beautiful building slowly rot without
         its inhabitants.
         <br><br>
         Despite the lack of librarians, the shelves continue to be organized 
@@ -1327,11 +1327,11 @@ export const STORY_MILESTONES = {
         By moving carefully right under their noses you're able to take your time with 
         the cache of once-locked-away tomes.
         <br><br>
-        You find among these hidden works a collection of notes. While its difficult to 
-        understand what exactly they mean, you gleam that there is a fundamental aspect 
+        You find among these hidden works a collection of notes. While it's difficult to
+        understand what exactly they mean, you glean that there is a fundamental aspect
         of magic that the university was researching. The notes lead you to a building 
         at the far end of the university grounds. This laboratory is clearly long 
-        abandonded, much like the rest of the buildings, but magical energy seems 
+        abandoned, much like the rest of the buildings, but magical energy seems 
         to still linger in the air from their experiments. Their findings may be just 
         what we needed to uncover some lost art or a powerful spell!`,
     },
@@ -1351,7 +1351,7 @@ export const STORY_MILESTONES = {
         your ability to make your way back out of this maze.
         <br><br>
         Just as you started to grow frightened, you came to a proper antechamber free 
-        from the entropy effecting the rest of the building. Just past this laid a large 
+        from the entropy affecting the rest of the building. Just past this lay a large
         room that appeared more pristine than even the untouched sections of the library. 
         It was clear in an instant that this is where the experiments must have taken place.
         <br><br>
