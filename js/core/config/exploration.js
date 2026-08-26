@@ -731,7 +731,7 @@ export const STORY_MILESTONES = {
         Not all people are friendly out in the frontier. For every group of traders is 
         a gang of raiders ready to take what they need by force.
         <br><br>
-        Your small group held off their attackers today, but you know there will be more 
+        Your small group has held off their attackers today, but you know there will be more
         in the future. Though no one wants to fight their fellow man, many colonists 
         admit that better weapons and armor would go a long way to make them feel safer.`,
     },
@@ -787,9 +787,9 @@ export const STORY_MILESTONES = {
         title: 'Wandering Traders',
         trigger: 'first_trade_completed',
         text: `
-        The trader was one of the first friendly faces your colonists had seen in some 
-        time. They were excited by all of the trader's goods, but we might not be able 
-        to afford those luxuries for some time.`,
+        The trader was one of the first friendly faces your colonists had seen in some
+        time. They were excited by all of the trader's goods, but such luxuries would
+        remain out of reach for some time.`,
     },
     first_spell: {
         tab: 'colony',
@@ -903,9 +903,9 @@ export const STORY_MILESTONES = {
         title: 'Planar Rift',
         trigger: 'research_planar_rift',
         text: `
-        While you found great success opening rifts to your colony, you wonder 
-        what may lie beyond these portals. You quickly found a way to maintain a rift 
-        to other realms for your colonists to explore, though it'll take a toll on your 
+        While you find great success opening rifts to your colony, you wonder
+        what may lie beyond these portals. You quickly find a way to maintain a rift
+        to other realms for your colonists to explore, though it'll take a toll on your
         mana reserves.`,
     },
     research_deep_delving: {
@@ -1226,16 +1226,16 @@ export const STORY_MILESTONES = {
         <br><br>
         Despite this feeling you still found the quietness of the cavern off-putting. You 
         had hoped to hear a bat fly by or some insects scuttle to their hiding places, but
-        instead you're met with only the sound of your own footsteps echoing through the 
+        instead you were met with only the sound of your own footsteps echoing through the
         dimly lit cave.
         <br><br>
         In the silence you collected stray rocks and crystal samples to bring back to 
-        the colony. Sadly it seemed that this cave didn't have a lot to offer you, but 
-        you continue on your march regardless.
+        the colony. Sadly it seemed that this cave didn't have a lot to offer you, but
+        you continued on your march regardless.
         <br><br>
         As you continued to walk you noticed the cave walls slowly closing in to a tight 
         opening. It was easy enough to crawl through the opening as you entered into a deep 
-        hallway-like passage. Suddenly you hear something different coming from the end of 
+        hallway-like passage. Suddenly you heard something different coming from the end of
         the hallway. The sounds of quick footsteps making their way toward you, four feet 
         moving efficiently through the tight corridor.
         <br><br>
@@ -1320,19 +1320,19 @@ export const STORY_MILESTONES = {
         <br><br>
         Finding the key to these wards was not easy. The university has stood for 
         hundreds of years, becoming a labyrinth of buildings and squares. The streets 
-        are also less empty than expected, with patrols of crusaders keeping wanderers 
-        from getting close to the library. You're glad you decided to open the initial 
-        rift directly into the library as they seem to be unwilling to enter.
+        were also less empty than expected, with patrols of crusaders keeping wanderers
+        from getting close to the library. You were glad you decided to open the initial
+        rift directly into the library as they seemed to be unwilling to enter.
         <br><br>
-        By moving carefully right under their noses you're able to take your time with 
+        By moving carefully right under their noses you were able to take your time with
         the cache of once-locked-away tomes.
         <br><br>
-        You find among these hidden works a collection of notes. While it's difficult to
-        understand what exactly they mean, you glean that there is a fundamental aspect
-        of magic that the university was researching. The notes lead you to a building 
-        at the far end of the university grounds. This laboratory is clearly long 
-        abandoned, much like the rest of the buildings, but magical energy seems 
-        to still linger in the air from their experiments. Their findings may be just 
+        You found among these hidden works a collection of notes. While it was difficult to
+        understand what exactly they meant, you gleaned that there was a fundamental aspect
+        of magic that the university was researching. The notes led you to a building
+        at the far end of the university grounds. This laboratory was clearly long
+        abandoned, much like the rest of the buildings, but magical energy seemed
+        to still linger in the air from their experiments. Their findings may be just
         what we needed to uncover some lost art or a powerful spell!`,
     },
     realm_abandoned_laboratory: {
@@ -1355,17 +1355,17 @@ export const STORY_MILESTONES = {
         room that appeared more pristine than even the untouched sections of the library. 
         It was clear in an instant that this is where the experiments must have taken place.
         <br><br>
-        The room isn't all that impressive at a glance. The walls are lined with bookshelves 
-        and alchemical equipment dotted the many worktables. Along with these beakers and vials 
-        sat piles and piles of parchment, all beautifully hand written and precisely sorted. 
-        Within these pages you found the secrets to the control of magic. If you understand it 
-        correctly, you believe that order and chaos are the underlying aspects of magic. With 
+        The room wasn't all that impressive at a glance. The walls were lined with bookshelves
+        and alchemical equipment dotted the many worktables. Along with these beakers and vials
+        sat piles and piles of parchment, all beautifully hand written and precisely sorted.
+        Within these pages you found the secrets to the control of magic. If you understood it
+        correctly, you believed that order and chaos were the underlying aspects of magic. With
         the right balance you could easily master a spell of enormous strength.
         <br><br>
         Frantically you began to write notes of your own. These notes easily turned to full 
         spell tomes within the room, like the order had seeped into your own writings. As you 
-        step out of the room back into the chaos you find the knowledge you've learned slipping. 
-        However your tomes remain untouched, surviving the trek back to the rift.
+        step out of the room back into the chaos you found the knowledge you'd learned slipping.
+        However your tomes remained untouched, surviving the trek back to the rift.
         <br><br>
         You feel compelled to return to this place and continue your research, even if you can't 
         bring it all home with you. You'll at least try to write up something useful for the 
