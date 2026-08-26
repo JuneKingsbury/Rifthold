@@ -1057,15 +1057,26 @@ export const STORY_MILESTONES = {
         trigger: 'first_kobalos_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/kobaloi.png" alt="A drawing depicting the Kobaloi">
         A roguish people known for their bright chromatic skin tones and ears as wide as 
-        their own heads. The kobaloi 
-        
-        A wide ranging people known for their large ears, distinct skin colors, and their 
-        mischievous behaviors. While not all Kobalos are tricksters, they tend to be known 
-        for their speed and their cunning.
+        their own heads. For most humans, the kobaloi are best known for their depictions 
+        in myths and stories. For them, a kobalos is a mischevious figure that's as likely 
+        to pull a prank on you as they are to eat you whole, especially if you're a child 
+        exploring the woods all alone.
         <br><br>
-        The Kobaloi are also known for their resilience, often able to live in worse 
-        conditions with little consequences. Some even believe that these folk are perfectly 
-        content with raw food and small bedrooms, though this may just be a myth.`,
+        In spite of these stories, the kobaloi are a rather peaceful people. Embodying the idea 
+        that it takes a village to raise a child, they take any opporotunity to help their community.
+        It is clear that they take great pride in their large families and friendly neighbors.
+        <br><br>
+        The human kingdoms refused to see this reality and it was only a matter of time before The 
+        Crusade made its way to the kobaloi's doors. They defended their communities fiercly, with 
+        several groups of kobaloi continuing to fight back against the Crusaders today. While lacking 
+        in numbers compared to their attackers, they make great use of their nack for tricks by leading 
+        groups of Crusaders into traps and winning battles through ambush tactics.
+        <br><br>
+        The many kobaloi who were unable to continue fighting found themselves pushed deep into The 
+        Frontier. Their once thriving communities were shattered and each individual is left to pick 
+        up the pieces. It wasn't long before many new communities were established, often consisting 
+        of complete strangers. These kobaloi continue to be protective of their community, regardless 
+        of how different their new neighbors might be.`,
     },
     first_ferin_colonist: {
         tab: 'world',
