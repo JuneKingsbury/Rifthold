@@ -3,7 +3,7 @@
  * crop growth/blight. updateFarming is called from simulationTick every 5th
  * tick; ready crops become harvest tasks for colonists.
  */
-import { CROPS, TERRAIN, WORK_CONFIG } from '../core/config.js';
+import { CONFIG, CROPS, TERRAIN, WORK_CONFIG } from '../core/config.js';
 
 // Derived from the 'research' field on each crop entry
 export const CROP_RESEARCH_REQS = Object.fromEntries(
@@ -17,8 +17,11 @@ export function designateFarmZone(game, x1, y1, x2, y2, cropType) {
     const req = CROP_RESEARCH_REQS[cropType];
     if (req && !game.research.isResearched(req)) return false;
 
-    const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
-    const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+    // Clamp to map bounds: getMouseTile only clamps the lower bound and screenToWorld adds the
+    // camera offset with no upper clamp, so a drag released past the right/bottom edge yields
+    // coords >= MAP_WIDTH/HEIGHT and game.map[y][x] would throw (as buildArea already guards).
+    const minX = Math.max(0, Math.min(x1, x2)), maxX = Math.min(CONFIG.MAP_WIDTH - 1, Math.max(x1, x2));
+    const minY = Math.max(0, Math.min(y1, y2)), maxY = Math.min(CONFIG.MAP_HEIGHT - 1, Math.max(y1, y2));
 
     let count = 0;
     for (let y = minY; y <= maxY; y++) {

@@ -31,7 +31,10 @@ export function saveGame(game) {
             potions: game.resources.potions,
             tomes: game.resources.tomes,
             consumables: game.resources.consumables,
-            _decayAccumulators: game.resources._decayAccumulators,
+            // Serialized without a leading underscore: the JSON replacer below strips every
+            // _-prefixed key (transient render/state caches), which silently dropped the decay
+            // progress so slow-spoiling items reset their fractional timer on every load.
+            decayAccumulators: game.resources._decayAccumulators,
             reservedFoodstuffs: game.resources.reservedFoodstuffs,
         },
 
@@ -144,7 +147,7 @@ export function loadGame(game) {
         game.resources.potions = data.resources.potions || [];
         game.resources.tomes = data.resources.tomes || [];
         game.resources.consumables = data.resources.consumables || [];
-        game.resources._decayAccumulators = data.resources._decayAccumulators || {};
+        game.resources._decayAccumulators = data.resources.decayAccumulators || {};
         game.resources.reservedFoodstuffs = data.resources.reservedFoodstuffs || {};
 
         game.weather.season = data.weather.season;

@@ -91,14 +91,12 @@ export class CombatSystem {
 
     updateRaid(game) {
         const aliveRaiders = game.raiders.filter(r => r.hp > 0);
-        if (aliveRaiders.length === 0) {
-            this.raidActive = false;
-            game.notifications.push({ text: 'Raid defeated!', tick: game.tick, type: 'success' });
-            game.eventLog.add(game, 'Raid defeated!', 'success', null);
-            game.story.checkMilestone('first_raid_survived', game);
-            if (game.stats) game.stats.raidsDefeated++;
-            return;
-        }
+        // Whether every raider was already dead at the start of this tick. Raiders are never
+        // killed inside updateRaid (colonist attacks kill them elsewhere), so if any were alive
+        // here the list can only empty via the flee/OOB cull below -> "Raiders fled!". We must
+        // still fall through to the processing loop so the final batch of corpses gets its death
+        // effects/loot and is spliced out; returning early here leaked them permanently.
+        const allDead = aliveRaiders.length === 0;
 
         // Individual flee: each raider flees when critically wounded
         for (const raider of aliveRaiders) {
@@ -141,16 +139,24 @@ export class CombatSystem {
                 continue;
             }
             updateRaider(raider, game);
+            // Cull raiders that have left the map, and fleeing raiders that have reached a
+            // border tile. moveToEdge parks a fleer on the edge (dx/dy become 0 there), so it
+            // never crosses the < 0 bound — without this an escaped fleer lingers forever and
+            // keeps raidActive true, permanently blocking all future raids.
+            const atBorder = raider.x <= 0 || raider.x >= CONFIG.MAP_WIDTH - 1 ||
+                raider.y <= 0 || raider.y >= CONFIG.MAP_HEIGHT - 1;
             if (raider.x < 0 || raider.x >= CONFIG.MAP_WIDTH ||
-                raider.y < 0 || raider.y >= CONFIG.MAP_HEIGHT) {
+                raider.y < 0 || raider.y >= CONFIG.MAP_HEIGHT ||
+                (raider.fleeing && atBorder)) {
                 game.raiders.splice(i, 1);
             }
         }
 
         if (game.raiders.length === 0) {
             this.raidActive = false;
-            game.notifications.push({ text: 'Raiders fled!', tick: game.tick, type: 'success' });
-            game.eventLog.add(game, 'Raiders fled!', 'success', null);
+            const text = allDead ? 'Raid defeated!' : 'Raiders fled!';
+            game.notifications.push({ text, tick: game.tick, type: 'success' });
+            game.eventLog.add(game, text, 'success', null);
             game.story.checkMilestone('first_raid_survived', game);
             if (game.stats) game.stats.raidsDefeated++;
         }

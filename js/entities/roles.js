@@ -143,7 +143,14 @@ export const ROLE_HANDLERS = {
 
             if (dist <= range && dist >= 2) {
                 if (canAttack(entity, game)) {
-                    target.hp -= entity.damage;
+                    // A hostile entity's targets are colonists (see getTargets); they must take
+                    // damage through colonistTakeDamage so armor/dodge/shield and the death path
+                    // apply. Only non-colonist targets (hostiles) use raw hp subtraction.
+                    if (entity.hostile) {
+                        colonistTakeDamage(target, entity.damage, game, entity);
+                    } else {
+                        target.hp -= entity.damage;
+                    }
                     target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
                     const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
                     game.projectiles.push({
@@ -197,12 +204,15 @@ export const ROLE_HANDLERS = {
                     const bonus = !rs.charged ? (role.chargeBonus || 5) : 0;
                     rs.charged = true;
                     const dmg = entity.damage + bonus;
-                    if (target.hp !== undefined) {
-                        target.hp -= dmg;
-                        game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
-                    } else {
+                    // Hostile entities target colonists (see getTargets) and must route through
+                    // colonistTakeDamage for armor/dodge/shield and the death path. Non-colonist
+                    // targets (hostiles) use raw hp subtraction.
+                    if (entity.hostile) {
                         colonistTakeDamage(target, dmg, game, entity);
+                    } else {
+                        target.hp -= dmg;
                     }
+                    game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
                 }
             } else {
                 moveToward(entity, target, game.map, dur, game);

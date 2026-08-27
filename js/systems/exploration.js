@@ -403,13 +403,24 @@ export class ExplorationSystem {
         if (!encounter) return;
 
         if (encounter.type === 'loot') {
-            exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + encounter.amount;
             const member = exp.partySnapshot.find(p => p.hp > 0) || exp.partySnapshot[0];
             const dim = REALMS[exp.realm];
             const discPool = (dim.events && dim.events.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
-            //TODO: Fix .replace missing bug when calling _addLog here:
-            console.log(encounter.resource);//this._addLog(exp, game, `${msg} (+${encounter.amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
+            // A loot roll can be an artifact ({ artifact }) with no resource/amount. Artifacts
+            // accumulate in exp.loot._artifacts (matched to _completeExpedition); treating them
+            // as a resource wrote stockpile['undefined'] = NaN and permanently poisoned wealth.
+            // The previous .replace(encounter.resource) also threw on the artifact case, which is
+            // why the log line was commented out.
+            if (encounter.artifact) {
+                if (!exp.loot._artifacts) exp.loot._artifacts = [];
+                exp.loot._artifacts.push(encounter.artifact);
+                const artName = ARTIFACTS[encounter.artifact]?.name || encounter.artifact;
+                this._addLog(exp, game, `${msg} (found ${artName}!)`, 'loot');
+            } else {
+                exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + encounter.amount;
+                this._addLog(exp, game, `${msg} (+${encounter.amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
+            }
             return;
         }
 

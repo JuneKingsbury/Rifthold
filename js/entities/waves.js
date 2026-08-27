@@ -121,6 +121,17 @@ export class WaveSystem {
                 continue;
             }
             this.updateEnemy(enemy, game);
+            // Cull a fleeing enemy that has reached (or left) the map border. A flee_on_damage
+            // enemy runs to the nearest edge and then idles there forever; since the wave only
+            // ends when enemies.length === 0, a stranded fleer would soft-lock the wave.
+            if (enemy.fleeing) {
+                const atBorder = enemy.x <= 0 || enemy.x >= CONFIG.MAP_WIDTH - 1 ||
+                    enemy.y <= 0 || enemy.y >= CONFIG.MAP_HEIGHT - 1;
+                if (atBorder) {
+                    this.enemies.splice(i, 1);
+                    continue;
+                }
+            }
         }
 
         if (this.nexusHp <= 0) {

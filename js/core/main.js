@@ -298,7 +298,10 @@ class Game {
     }
 
     gameLoop(timestamp) {
-        const dt = timestamp - this.lastTime;
+        // Clamp dt so a backgrounded tab or a long stall can't queue hundreds of
+        // catch-up ticks in one frame (the "spiral of death"). We drop simulation
+        // time beyond the cap rather than trying to replay it.
+        const dt = Math.min(timestamp - this.lastTime, CONFIG.MAX_FRAME_DELTA);
         this.lastTime = timestamp;
 
         if (!this.paused) {
@@ -1724,7 +1727,6 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
 }
 
 const CHAR_RATIO = 0.6;
-const LINE_HEIGHT = 1.15;
 const MIN_FONT = 5;
 const MAX_FONT = 48;
 const ZOOM_STEP = 2;
@@ -1747,7 +1749,11 @@ function fitGameFont() {
     const fontSize = Math.max(MIN_FONT, Math.min(MAX_FONT, currentZoomFont));
     currentZoomFont = fontSize;
 
-    const cellSize = fontSize * LINE_HEIGHT;
+    // Must match renderer.measureFont: charWidth/charHeight are ceil(fontSize * fontHeightMult).
+    // Deriving the viewport tile count from a different (float) cell size desyncs VIEWPORT_WIDTH
+    // from the tiles actually painted, which makes camera.centerOn miscenter (worse on narrow
+    // viewports and after a zoom changes fontSize).
+    const cellSize = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
     CONFIG.VIEWPORT_WIDTH = Math.max(20, Math.floor(availWidth / cellSize));
     CONFIG.VIEWPORT_HEIGHT = Math.max(10, Math.floor(availHeight / cellSize));
 

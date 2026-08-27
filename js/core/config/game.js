@@ -6,6 +6,9 @@ export const CONFIG = {
     VIEWPORT_WIDTH: 80,
     VIEWPORT_HEIGHT: 40,
     TICK_RATE: 200,
+    // Upper bound on per-frame simulation time (ms). Caps catch-up ticks after a
+    // stall/backgrounded tab so the loop can't enter a spiral of death.
+    MAX_FRAME_DELTA: 250,
     TICKS_PER_SEASON: 2400,
     TICKS_PER_DAY: 480,
     START_RESOURCES: { wood: 25, stone: 15, planks: 5, food: 20, meat: 0, wheat: 0, berries: 0, corn: 0, potatoes: 0, moonbloom: 0, bricks: 0, hides: 0, leather: 0, iron_ore: 0, iron: 0, runite: 0, eggs: 0, milk: 0, wool: 0, void_essence: 0, gold: 0 },
