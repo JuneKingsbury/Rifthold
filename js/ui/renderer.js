@@ -663,6 +663,11 @@ export class Renderer {
                         // Seeded by entity id so phase is continuous across stationary/moving transitions.
                         const grow = (entity && showBreathing) ? this._breatheGrow(now, entity.entityId || 0) : 0;
                         ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff - grow, cw + hlOff * 2 + bleed, ch + hlOff * 2 + bleed + grow);
+                        // Draw the "in water" overlay on top of the entity when it's standing in a water tile.
+                        if (entity && tile.terrain === 'water') {
+                            const waterSprite = sm.getSprite('effects', 'in_water');
+                            if (waterSprite) ctx.drawImage(waterSprite, px, py, cw, ch);
+                        }
                         if (!entity && canDither) {
                             this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         }
@@ -842,6 +847,16 @@ export class Renderer {
                     // Breathing: stretch height, anchor feet by nudging y up by the same amount.
                     const grow = showBreathing ? this._breatheGrow(now, ent.id || 0) : 0;
                     ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
+                    // Draw the "in water" overlay when stepping between two water tiles (both the
+                    // source and destination tiles are water). If _prevX is null the entity is
+                    // effectively standing, so fall back to just the destination tile.
+                    const destWater = destTile && destTile.terrain === 'water';
+                    const prevTile = (ent._prevX != null) ? map[ent._prevY]?.[ent._prevX] : null;
+                    const inWater = destWater && (ent._prevX == null || (prevTile && prevTile.terrain === 'water'));
+                    if (inWater) {
+                        const waterSprite = sm.getSprite('effects', 'in_water');
+                        if (waterSprite) ctx.drawImage(waterSprite, rpx, rpy, cw, ch);
+                    }
                 } else {
                     ctx.fillStyle = me.color;
                     ctx.fillText(me.char, rpx + this._textOffsetX, rpy);
