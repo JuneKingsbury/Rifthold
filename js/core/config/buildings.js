@@ -83,6 +83,9 @@ export const BREAKABLE_STRUCTURES = new Set(
 export const WALL_STRUCTURES = new Set(
     Object.entries(BUILDINGS).filter(([, b]) => b.structureType === 'wall').map(([k]) => k)
 );
+export const FURNITURE_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.structureType === 'furniture').map(([k]) => k)
+);
 export const DOOR_STRUCTURES = new Set(
     Object.entries(BUILDINGS).filter(([, b]) => b.structureType === 'door').map(([k]) => k)
 );

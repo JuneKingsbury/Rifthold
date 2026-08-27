@@ -103,4 +103,11 @@ export const PATHFINDING_CONFIG = {
     // occupied tile only as a last resort. Tuned so a detour of a few tiles is
     // preferred over overlapping, while a long detour still yields to walking through.
     occupiedCostPenalty: 8,
+    // Soft penalty added to the move-cost of a tile holding walkable furniture (a
+    // bed, chair, workbench, etc.). Entities stay able to walk through furniture so
+    // a path is always found, but this biases A* toward routing around it whenever a
+    // comparable-length open-tile alternative exists, cutting through furniture only
+    // when it's the shortest option by a wide margin. The path's own endpoint is
+    // exempt so a colonist can still target the furniture tile itself (sleep, craft).
+    furnitureCostPenalty: 6,
 };

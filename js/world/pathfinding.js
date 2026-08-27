@@ -1,4 +1,4 @@
-import { isPassable, getMoveCost, isPassableForEnemies, isBreakableByEnemies } from './map.js';
+import { isPassable, getMoveCost, isPassableForEnemies, isBreakableByEnemies, isWalkableFurniture } from './map.js';
 import { CONFIG, PATHFINDING_CONFIG } from '../core/config.js';
 
 const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];//, [-1, -1], [1, 1], [1, -1], [-1, 1]];
@@ -131,9 +131,20 @@ function findPathGeneric(map, startX, startY, endX, endY, passabilityFn) {
     return null;
 }
 
-function colonistPassability(map, x, y) {
+// Soft penalty for walking through (walkable) furniture, so routes prefer open
+// tiles and only cut through furniture when it's clearly the shortest option. The
+// path's own endpoint is exempt: a colonist must still be able to target the
+// furniture tile itself (e.g. a bed to sleep in, a workbench to craft at).
+function furniturePenalty(map, x, y, endX, endY) {
+    if ((x !== endX || y !== endY) && isWalkableFurniture(map, x, y)) {
+        return PATHFINDING_CONFIG.furnitureCostPenalty;
+    }
+    return 0;
+}
+
+function colonistPassability(map, x, y, endX, endY) {
     if (!isPassable(map, x, y)) return false;
-    return getMoveCost(map, x, y);
+    return getMoveCost(map, x, y) + furniturePenalty(map, x, y, endX, endY);
 }
 
 // Builds a colonist passability callback that adds a soft cost penalty to tiles
@@ -146,19 +157,19 @@ function makeColonistPassability(occupied) {
     if (!occupied) return colonistPassability;
     return function (map, x, y, endX, endY) {
         if (!isPassable(map, x, y)) return false;
-        const cost = getMoveCost(map, x, y);
+        let cost = getMoveCost(map, x, y) + furniturePenalty(map, x, y, endX, endY);
         if ((x !== endX || y !== endY) && occupied.has(tileKey(x, y))) {
-            return cost + PATHFINDING_CONFIG.occupiedCostPenalty;
+            cost += PATHFINDING_CONFIG.occupiedCostPenalty;
         }
         return cost;
     };
 }
 
-function enemyPassability(map, x, y) {
+function enemyPassability(map, x, y, endX, endY) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     if (isBreakableByEnemies(map, x, y)) return getMoveCost(map, x, y) + PATHFINDING_CONFIG.breakableCostPenalty;
     if (!isPassableForEnemies(map, x, y)) return false;
-    return getMoveCost(map, x, y);
+    return getMoveCost(map, x, y) + furniturePenalty(map, x, y, endX, endY);
 }
 
 // `occupied` (optional): Set of packed tile keys (see tileKey) currently held by

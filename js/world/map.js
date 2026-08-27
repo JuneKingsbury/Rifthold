@@ -1,4 +1,4 @@
-import { CONFIG, WALL_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, MAP_GENERATORS, CROPS } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, CROPS } from '../core/config.js';
 
 export function createTile(terrain) {
     return {
@@ -422,6 +422,15 @@ export function isPassableForEnemies(map, x, y) {
 export function isBreakableByEnemies(map, x, y) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     return BREAKABLE_STRUCTURES.has(map[y][x].structure);
+}
+
+// True when the tile holds a furniture structure entities can walk through (beds,
+// chairs, workbenches, etc.). Impassable furniture is excluded by isPassable
+// before this is consulted, so callers use it only to add a soft routing penalty
+// that biases movement around walkable furniture. Not a passability check.
+export function isWalkableFurniture(map, x, y) {
+    if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
+    return FURNITURE_STRUCTURES.has(map[y][x].structure);
 }
 
 export function hasLineOfSight(map, x0, y0, x1, y1) {

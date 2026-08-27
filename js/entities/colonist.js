@@ -1,7 +1,7 @@
 import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
-import { isPassable, getMoveCost, hasLineOfSight } from '../world/map.js';
+import { isPassable, getMoveCost, hasLineOfSight, isWalkableFurniture } from '../world/map.js';
 import { moveEntity, computeMoveDuration, computeMoveCooldown } from '../systems/movement-lerp.js';
 import { FOODSTUFFS } from '../systems/resources.js';
 import { spawnSummon } from './summons.js';
@@ -887,12 +887,22 @@ function updateIdle(colonist, game) {
 
 function wander(colonist, game) {
     const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-    const dir = dirs[Math.floor(Math.random() * 4)];
-    const nx = colonist.x + dir[0];
-    const ny = colonist.y + dir[1];
-    if (isPassable(game.map, nx, ny) && !game.isTileOccupied(nx, ny)) {
-        moveEntity(colonist, nx, ny, CONFIG.TICK_RATE / game.speed);
+    // Gather every passable, unoccupied neighbor, then prefer open ground over
+    // furniture. A wandering colonist only steps onto a furniture tile when no
+    // clear tile is available. This mirrors the pathfinding furniture penalty so
+    // idle movement doesn't shuffle through beds, workbenches, etc.
+    const open = [];
+    const furniture = [];
+    for (const [dx, dy] of dirs) {
+        const nx = colonist.x + dx;
+        const ny = colonist.y + dy;
+        if (!isPassable(game.map, nx, ny) || game.isTileOccupied(nx, ny)) continue;
+        (isWalkableFurniture(game.map, nx, ny) ? furniture : open).push([nx, ny]);
     }
+    const choices = open.length > 0 ? open : furniture;
+    if (choices.length === 0) return;
+    const [nx, ny] = choices[Math.floor(Math.random() * choices.length)];
+    moveEntity(colonist, nx, ny, CONFIG.TICK_RATE / game.speed);
 }
 
 function updateGuarding(colonist, game) {
@@ -919,10 +929,20 @@ function updateGuarding(colonist, game) {
         moveTowardPoint(colonist, post.x, post.y, game.map, CONFIG.TICK_RATE / game.speed, game);
     } else if (Math.random() < 0.15) {
         const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-        const dir = dirs[Math.floor(Math.random() * 4)];
-        const nx = colonist.x + dir[0];
-        const ny = colonist.y + dir[1];
-        if (isPassable(game.map, nx, ny) && manhattanDist(nx, ny, post.x, post.y) <= WORK_CONFIG.guardPatrolRadius && !game.isTileOccupied(nx, ny)) {
+        // Same open-ground-over-furniture preference as wander(), constrained to
+        // tiles within the patrol radius so guards don't loiter on the furniture.
+        const open = [];
+        const furniture = [];
+        for (const [dx, dy] of dirs) {
+            const nx = colonist.x + dx;
+            const ny = colonist.y + dy;
+            if (!isPassable(game.map, nx, ny) || game.isTileOccupied(nx, ny)) continue;
+            if (manhattanDist(nx, ny, post.x, post.y) > WORK_CONFIG.guardPatrolRadius) continue;
+            (isWalkableFurniture(game.map, nx, ny) ? furniture : open).push([nx, ny]);
+        }
+        const choices = open.length > 0 ? open : furniture;
+        if (choices.length > 0) {
+            const [nx, ny] = choices[Math.floor(Math.random() * choices.length)];
             moveEntity(colonist, nx, ny, CONFIG.TICK_RATE / game.speed);
         }
     }
