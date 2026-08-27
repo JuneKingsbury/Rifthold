@@ -822,7 +822,7 @@ function updateIdle(colonist, game) {
     if (task) {
         game.taskQueue.claim(task.id, colonist.id);
         colonist.currentTaskId = task.id;
-        const path = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y);
+        const path = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y, game._occupiedTiles);
         if (path && path.length > 0) {
             colonist.path = path;
             colonist.state = 'moving';
@@ -868,7 +868,7 @@ function updateIdle(colonist, game) {
                 return (!best || d < best.dist) ? { c, dist: d } : best;
             }, null);
             if (target) {
-                const path = findPathAdjacent(game.map, colonist.x, colonist.y, target.c.x, target.c.y);
+                const path = findPathAdjacent(game.map, colonist.x, colonist.y, target.c.x, target.c.y, game._occupiedTiles);
                 if (path && path.length > 0) {
                     colonist.path = path;
                     colonist.state = 'moving';
@@ -1020,7 +1020,7 @@ function updateMoving(colonist, game) {
     } else {
         const task = game.taskQueue.getById(colonist.currentTaskId);
         if (task) {
-            const newPath = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y);
+            const newPath = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y, game._occupiedTiles);
             if (newPath) {
                 colonist.path = newPath;
             } else {
@@ -1132,7 +1132,7 @@ function eatRawFoodstuff(game) {
 
 function startSleeping(colonist, game) {
     if (colonist.assignedBed) {
-        const path = findPath(game.map, colonist.x, colonist.y, colonist.assignedBed.x, colonist.assignedBed.y);
+        const path = findPath(game.map, colonist.x, colonist.y, colonist.assignedBed.x, colonist.assignedBed.y, game._occupiedTiles);
         if (path && path.length > 0) {
             colonist.path = path;
             colonist.state = 'moving';
@@ -1383,7 +1383,7 @@ function updateDrafted(colonist, game) {
     }
     if (colonist.draftTarget) {
         if (colonist.path.length === 0) {
-            const path = findPath(game.map, colonist.x, colonist.y, colonist.draftTarget.x, colonist.draftTarget.y);
+            const path = findPath(game.map, colonist.x, colonist.y, colonist.draftTarget.x, colonist.draftTarget.y, game._occupiedTiles);
             if (path) colonist.path = path;
         }
         if (colonist.path.length > 0) {

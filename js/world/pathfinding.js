@@ -75,6 +75,10 @@ export function manhattanDist(x1, y1, x2, y2) {
 // passabilityFn(map, x, y) => number|false:
 //   - returns false if tile is impassable
 //   - returns movement cost (>= 0) if passable
+// The endpoint is exempt from any soft occupancy penalty inside the callback
+// (see colonistPassability): we always want to reach the requested goal even
+// if it happens to be occupied, and the penalty is only meant to bias the
+// intermediate route around other entities.
 function findPathGeneric(map, startX, startY, endX, endY, passabilityFn) {
     if (startX === endX && startY === endY) return [];
 
@@ -111,7 +115,7 @@ function findPathGeneric(map, startX, startY, endX, endY, passabilityFn) {
 
             if (closed.has(nKey)) continue;
 
-            const cost = passabilityFn(map, nx, ny);
+            const cost = passabilityFn(map, nx, ny, endX, endY);
             if (cost === false) continue;
 
             const tentativeG = gScore.get(currentKey) + cost;
@@ -132,6 +136,24 @@ function colonistPassability(map, x, y) {
     return getMoveCost(map, x, y);
 }
 
+// Builds a colonist passability callback that adds a soft cost penalty to tiles
+// currently occupied by another entity, so A* prefers routing around others but
+// still walks through occupancy when no better route exists. The path's own
+// endpoint is exempt — a colonist must still be able to reach a goal tile even
+// if it is momentarily occupied. `occupied` is a Set of packed tile keys
+// (see tileKey); when absent, behavior is identical to colonistPassability.
+function makeColonistPassability(occupied) {
+    if (!occupied) return colonistPassability;
+    return function (map, x, y, endX, endY) {
+        if (!isPassable(map, x, y)) return false;
+        const cost = getMoveCost(map, x, y);
+        if ((x !== endX || y !== endY) && occupied.has(tileKey(x, y))) {
+            return cost + PATHFINDING_CONFIG.occupiedCostPenalty;
+        }
+        return cost;
+    };
+}
+
 function enemyPassability(map, x, y) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     if (isBreakableByEnemies(map, x, y)) return getMoveCost(map, x, y) + PATHFINDING_CONFIG.breakableCostPenalty;
@@ -139,19 +161,34 @@ function enemyPassability(map, x, y) {
     return getMoveCost(map, x, y);
 }
 
-export function findPath(map, startX, startY, endX, endY) {
+// `occupied` (optional): Set of packed tile keys (see tileKey) currently held by
+// other entities. When supplied, occupied tiles get a soft cost penalty so the
+// route avoids them where possible, stepping through only as a last resort.
+export function findPath(map, startX, startY, endX, endY, occupied) {
     if (!isPassable(map, endX, endY)) return null;
-    return findPathGeneric(map, startX, startY, endX, endY, colonistPassability);
+    return findPathGeneric(map, startX, startY, endX, endY, makeColonistPassability(occupied));
 }
 
-export function findPathAdjacent(map, startX, startY, targetX, targetY) {
+// `occupied` (optional): see findPath. Applied both when scoring candidate
+// adjacent tiles (an occupied standing tile is a worse goal) and when routing to
+// them, so colonists spread across distinct adjacent tiles rather than stacking.
+export function findPathAdjacent(map, startX, startY, targetX, targetY, occupied) {
     let bestPath = null;
+    let bestCost = Infinity;
     for (const [dx, dy] of DIRS) {
         const ax = targetX + dx;
         const ay = targetY + dy;
         if (!isPassable(map, ax, ay)) continue;
-        const path = findPath(map, startX, startY, ax, ay);
-        if (path && (bestPath === null || path.length < bestPath.length)) {
+        const path = findPath(map, startX, startY, ax, ay, occupied);
+        if (!path) continue;
+        // Bias the choice of standing tile away from occupied ones so multiple
+        // colonists working the same target don't all pick the same neighbor.
+        const occupiedPenalty = occupied && occupied.has(tileKey(ax, ay))
+            ? PATHFINDING_CONFIG.occupiedCostPenalty
+            : 0;
+        const cost = path.length + occupiedPenalty;
+        if (cost < bestCost) {
+            bestCost = cost;
             bestPath = path;
         }
     }

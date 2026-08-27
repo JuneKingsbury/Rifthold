@@ -70,7 +70,7 @@ export class ExplorationSystem {
                 game.taskQueue.release(c.currentTaskId);
                 c.currentTaskId = null;
             }
-            const path = findPathAdjacent(game.map, c.x, c.y, gatePos.x, gatePos.y);
+            const path = findPathAdjacent(game.map, c.x, c.y, gatePos.x, gatePos.y, game._occupiedTiles);
             if (path && path.length > 0) {
                 c.path = path;
                 c.state = 'moving';
@@ -236,7 +236,7 @@ export class ExplorationSystem {
             } else {
                 allArrived = false;
                 if (c.state === 'idle' || (c.state === 'moving' && (!c.path || c.path.length === 0))) {
-                    const path = findPathAdjacent(game.map, c.x, c.y, gx, gy);
+                    const path = findPathAdjacent(game.map, c.x, c.y, gx, gy, game._occupiedTiles);
                     if (path && path.length > 0) {
                         c.path = path;
                         c.state = 'moving';
