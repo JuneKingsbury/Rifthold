@@ -984,6 +984,7 @@ img.pixel-art {
     text-align: center;
     flex-shrink: 0;
     white-space: nowrap;
+    width: 80px;
 }
 
 #touch-toolbar button.active {
