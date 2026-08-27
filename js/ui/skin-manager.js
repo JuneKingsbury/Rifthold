@@ -1,4 +1,4 @@
-import { EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
+import { EQUIPMENT_OVERLAY_OFFSETS, RENDER_CONFIG } from '../core/config.js';
 
 export class SkinManager {
     constructor() {
@@ -158,11 +158,16 @@ export class SkinManager {
         return out;
     }
 
+    // Applies the standard colonist outline (nameColor when highlighted, else black),
+    // plus an additional purple ring around the whole sprite when the colonist is
+    // drafted — so drafted colonists read as combat-ready without a separate sprite.
+    _finishColonistOutline(canvas, drafted, nameColor, highlight) {
+        const inner = highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
+        if (!drafted) return inner;
+        return this._addOutline(inner, RENDER_CONFIG.draftedOutlineColor);
+    }
+
     getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight, outline = true) {
-        if (drafted) {
-            const s = this._sprites.get('entities:colonist_drafted');
-            if (s) return s;
-        }
         let bodyCount = 0;
         if (race === 'nymph') {
             bodyCount = this._nymphBodyCount;
@@ -210,7 +215,7 @@ export class SkinManager {
         }
 
         if (outline) {
-            return highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
+            return this._finishColonistOutline(canvas, drafted, nameColor, highlight);
         }
         else {
             return canvas;
@@ -283,7 +288,7 @@ export class SkinManager {
             ctx.drawImage(toolSprite, offX, offY, cw, ch);
         }
 
-        const result = highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
+        const result = this._finishColonistOutline(canvas, drafted, nameColor, highlight);
         this._compositeCache.set(cacheKey, result);
         return result;
     }

@@ -22,10 +22,18 @@ export const RENDER_CONFIG = {
     ditherDepth: 0.3,
     draftedPulsePeriod: 20,
     draftedPulseDuty: 10,
+    draftedOutlineColor: '#aa33ff',
     spellGlowPeriod: 16,
     spellGlowDuty: 8,
     riftPulsePeriod: 20,
     riftPulseDuty: 10,
+    // Entity "breathing": subtle continuous vertical stretch, driven by
+    // performance.now() (NOT game.tick) so it stays smooth at 60fps and
+    // continues while paused. Period in ms, amplitude in CSS px.
+    entityBreathing: true,
+    breathePeriodMs: 3200,
+    breatheAmplitudePx: 1.4,
+    breathePhaseSpread: 6.28,
     healthBarGreenThreshold: 0.5,
     healthBarYellowThreshold: 0.25,
     healthBarColors: { green: '#00ff00', yellow: '#ffaa00', red: '#ff3333' },

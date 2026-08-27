@@ -318,6 +318,18 @@ export class Renderer {
         return null;
     }
 
+    // Continuous sine "breath": returns px of extra sprite height this frame
+    // (0..breatheAmplitudePx). Driven by `now` (performance.now()) so it stays
+    // smooth at 60fps and continues while paused. `seed` decorrelates each
+    // entity's phase so the colony doesn't pulse in unison. Sub-pixel (no rounding).
+    _breatheGrow(now, seed) {
+        if (!RENDER_CONFIG.entityBreathing) return 0;
+        const phase = (now / RENDER_CONFIG.breathePeriodMs) * Math.PI * 2
+            + (seed % 1000) / 1000 * RENDER_CONFIG.breathePhaseSpread;
+        // 0.5 - 0.5*cos → smooth 0→1→0, peaks mid-cycle.
+        return (0.5 - 0.5 * Math.cos(phase)) * RENDER_CONFIG.breatheAmplitudePx;
+    }
+
     getNightDarkness(timeOfDay, season) {
         const t = timeOfDay / CONFIG.TICKS_PER_DAY;
         const daylight = RENDER_CONFIG.seasonDaylight[season] || RENDER_CONFIG.seasonDaylight.default;
@@ -358,6 +370,10 @@ export class Renderer {
         const ctx = this.ctx;
         const cw = this.charWidth;
         const ch = this.charHeight;
+        // Wall-clock time for this frame. Used for smooth sub-tick motion
+        // (movement interpolation, entity breathing) that must stay smooth at
+        // 60fps and keep animating while the simulation is paused.
+        const now = performance.now();
         const selectionRect = game.input.getSelectionRect();
         const buildDragPreview = game.input.getBuildDragPreview();
         const spellTargeting = game.input.spellTargeting;
@@ -418,7 +434,7 @@ export class Renderer {
                 if (isEntityMoving(e)) {
                     movingEntities.push({ entity: e, char: e.char, color: e.color, type: e.type });
                 } else {
-                    entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: e.type, _dmgFlashUntil: e._dmgFlashUntil });
+                    entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: e.type, entityId: e.id, _dmgFlashUntil: e._dmgFlashUntil });
                 }
             }
             if (game.waves) {
@@ -427,7 +443,7 @@ export class Renderer {
                     if (isEntityMoving(e)) {
                         movingEntities.push({ entity: e, char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type });
                     } else {
-                        entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, _dmgFlashUntil: e._dmgFlashUntil });
+                        entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, entityId: e.id, _dmgFlashUntil: e._dmgFlashUntil });
                     }
                 }
             }
@@ -438,7 +454,7 @@ export class Renderer {
                 if (isEntityMoving(r)) {
                     movingEntities.push({ entity: r, char: rChar, color: rColor, type: 'raider', entityType: r.type });
                 } else {
-                    entityMap.set(r.y * mapW + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, _dmgFlashUntil: r._dmgFlashUntil });
+                    entityMap.set(r.y * mapW + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, entityId: r.id, _dmgFlashUntil: r._dmgFlashUntil });
                 }
             }
             
@@ -458,7 +474,7 @@ export class Renderer {
                     const showEq = game.settings.showEquipmentOverlays;
                     const isSleeping = c.state === 'sleeping';
                     const sleepingInBed = isSleeping && c.assignedBed && c.x === c.assignedBed.x && c.y === c.assignedBed.y;
-                    const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
+                    const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, entityId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
                     if (isEntityMoving(c)) {
                         movingEntities.push({ entity: c, ...entData });
                     } else {
@@ -642,7 +658,10 @@ export class Renderer {
                         const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
                         const hlOff = hl ? 1 : 0;
                         const bleed = entity ? 0 : 1;
-                        ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff, cw + hlOff * 2 + bleed, ch + hlOff * 2 + bleed);
+                        // Breathing: stretch height, anchor feet by nudging y up by the same amount.
+                        // Seeded by entity id so phase is continuous across stationary/moving transitions.
+                        const grow = entity ? this._breatheGrow(now, entity.entityId || 0) : 0;
+                        ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff - grow, cw + hlOff * 2 + bleed, ch + hlOff * 2 + bleed + grow);
                         if (!entity && canDither) {
                             this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         }
@@ -797,7 +816,6 @@ export class Renderer {
         }
 
         // --- Draw moving entities at interpolated positions ---
-        const now = performance.now();
         for (const me of movingEntities) {
             const pos = getEntityRenderPos(me.entity, now);
             const sx = pos.x - camera.x;
@@ -820,7 +838,9 @@ export class Renderer {
                     if (shadowSprite) ctx.drawImage(sm.getSprite('effects', 'shadow'), rpx, rpy, cw, ch);
                     // Draw entity.
                     const meHlOff = meHl ? 1 : 0;
-                    ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff, cw + meHlOff * 2, ch + meHlOff * 2);
+                    // Breathing: stretch height, anchor feet by nudging y up by the same amount.
+                    const grow = this._breatheGrow(now, ent.id || 0);
+                    ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
                 } else {
                     ctx.fillStyle = me.color;
                     ctx.fillText(me.char, rpx + this._textOffsetX, rpy);
