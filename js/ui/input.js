@@ -164,7 +164,10 @@ export class InputHandler {
                 if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) continue;
                 const tile = this.game.map[y][x];
                 const key = y * CONFIG.MAP_WIDTH + x;
-                if ((tile.terrain !== 'grass' && tile.terrain !== 'dirt') || tile.structure || tile.resource || tile.zone) {
+                if (this._rightDrag) {
+                    // Right-drag removes farm zones: flag existing zones as the removal target.
+                    if (tile.zone) blocked.add(key);
+                } else if ((tile.terrain !== 'grass' && tile.terrain !== 'dirt') || tile.structure || tile.resource || tile.zone) {
                     blocked.add(key);
                 } else {
                     affordable.add(key);
@@ -398,7 +401,7 @@ export class InputHandler {
         }
 
         if (e.button === 2) {
-            if (this.mode === 'build') {
+            if (this.mode === 'build' || this.mode === 'zone') {
                 this.dragStart = pos;
                 this.dragEnd = pos;
                 this.dragging = true;
@@ -485,6 +488,8 @@ export class InputHandler {
                 }
             } else if (this._rightDrag && this.mode === 'build') {
                 this.deconstructArea(this.dragStart, pos);
+            } else if (this._rightDrag && this.mode === 'zone') {
+                this.removeFarmZoneArea(this.dragStart, pos);
             } else if (this.mode === 'build' && this.dragBuildTypes.has(this.buildType)) {
                 this.buildArea(this.dragStart, pos);
             } else if (this.mode === 'zone') {
@@ -707,6 +712,18 @@ export class InputHandler {
             for (let x = minX; x <= maxX; x++) {
                 if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) continue;
                 cancelDesignation(this.game, x, y);
+            }
+        }
+    }
+
+    removeFarmZoneArea(start, end) {
+        const minX = Math.min(start.x, end.x), maxX = Math.max(start.x, end.x);
+        const minY = Math.min(start.y, end.y), maxY = Math.max(start.y, end.y);
+
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) continue;
+                if (this.game.map[y][x].zone) removeFarmZone(this.game, x, y);
             }
         }
     }
