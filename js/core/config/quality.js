@@ -28,6 +28,13 @@ export const ROOM_QUALITY_TIERS = [
     { key: 'opulent', name: 'Opulent quarters', minScore: 80, moodEffect: 26, duration: 500 },
 ];
 
+export const TOWN_HALL_QUALITY_TIERS = [
+    { key: 'plain',     name: 'Plain hall',     minScore: 0,  moodEffect: 8,  duration: 250 },
+    { key: 'welcoming', name: 'Welcoming hall', minScore: 25, moodEffect: 11, duration: 300 },
+    { key: 'grand',     name: 'Grand hall',     minScore: 50, moodEffect: 15, duration: 350 },
+    { key: 'majestic',  name: 'Majestic hall',  minScore: 75, moodEffect: 19, duration: 400 },
+];
+
 export const WORKSHOP_QUALITY_TIERS = [
     { key: 'makeshift', name: 'Makeshift', minScore: 0, speedMult: 1.0, qualityBonus: 0 },
     { key: 'functional', name: 'Functional', minScore: 25, speedMult: 1.1, qualityBonus: 0 },

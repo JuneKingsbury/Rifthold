@@ -1,6 +1,7 @@
 import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS } from '../core/config.js';
 import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
+import { getRelaxActivityLabel } from '../entities/colonist.js';
 
 export function installArcanePanel(UI) {
     Object.assign(UI.prototype, arcaneMethods);
@@ -786,6 +787,8 @@ const arcaneMethods = {
     },
 
     getColonistTaskDescription(colonist) {
+        const relaxLabel = getRelaxActivityLabel(colonist);
+        if (relaxLabel) return `<span style="color:#88cc88;cursor:pointer" onclick="window.game.camera.centerOn(${colonist.x},${colonist.y})">${relaxLabel}</span>`;
         if (!colonist.currentTaskId) return `<span style="color:#666;cursor:pointer" onclick="window.game.camera.centerOn(${colonist.x},${colonist.y})">None</span>`;
         const task = this.game.taskQueue.getAll().find(t => t.id === colonist.currentTaskId);
         if (!task) return `<span style="color:#666;cursor:pointer" onclick="window.game.camera.centerOn(${colonist.x},${colonist.y})">None</span>`;

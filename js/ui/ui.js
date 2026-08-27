@@ -1263,9 +1263,20 @@ export class UI {
         let html = '';
         const rq = this.game.roomQualities[roomId];
         const wq = this.game.workshopQualities[roomId];
-        if (!rq && !wq) {
+        const th = this.game.townHallQualities[roomId];
+        if (!rq && !wq && !th) {
             html += `<div class="info-row">Room #${roomId}</div>`;
             return html;
+        }
+        if (th) {
+            html += `<div class="info-row" style="color:#ffdd66;font-weight:bold;">Town Hall — ${th.tierName} (${th.total}/100)</div>`;
+            html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → Mood +${th.moodEffect} for ${th.duration} ticks when relaxing here</div>`;
+            const b = th.breakdown;
+            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size}</div>`;
+            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor}</div>`;
+            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light}</div>`;
+            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} (${th.decorList.map(d => d.replace(/_/g, ' ')).join(', ')})</div>`;
+            if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence}</div>`;
         }
         if (rq) {
             html += `<div class="info-row" style="color:#aaccff;font-weight:bold;">${rq.tierName} (${rq.total}/100)</div>`;
@@ -1686,7 +1697,7 @@ export class UI {
             html += `<div style="border-top:1px solid #333;margin-top:4px;padding-top:4px;">`;
             html += `<span class="info-header" style="font-size:12px;cursor:pointer;color:${c.nameColor || '#ffff00'}" onclick="window.game.selectColonistById(${c.id})">${c.name}</span>`;
             html += ` <span class="mood-${moodLevel}">${c.mood.toFixed(0)}</span>`;
-            html += ` <span style="color:#888">${c.state}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${c.golem ? ' [Golem]' : ''}</span>`;
+            html += ` <span style="color:#888">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${c.golem ? ' [Golem]' : ''}</span>`;
             html += `<div class="info-row">HP:${Math.round(c.hp)} H:${c.needs.hunger.toFixed(0)} R:${c.needs.rest.toFixed(0)}</div>`;
             html += `<div class="info-actions">`;
             html += `<button onclick="window.game.selectColonistById(${c.id})">Focus</button>`;
@@ -1962,7 +1973,7 @@ export class UI {
             const weapon = c.weapon?.name || 'Fists';
             html += `<div class="hud-colonist" data-colonist-id="${c.id}">`;
             const needsDots = `<span class="hud-dots"><span style="color:${moodColor}">●</span><span style="color:${hungerColor}">●</span><span style="color:${restColor}">●</span><span style="color:${hpColor}">●</span></span>`;
-            html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> ${needsDots} <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}</span>`;
+            html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> ${needsDots} <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}</span>`;
             html += `<div class="hud-bars">Mood: <span style="color:${moodColor}">${c.mood.toFixed(0)} (${moodLevel})</span> | Hunger: <span style="color:${hungerColor}">${c.needs.hunger.toFixed(0)}</span> | Rest: <span style="color:${restColor}">${c.needs.rest.toFixed(0)}</span> | HP: <span style="color:${hpColor}">${Math.round(c.hp)}/${c.maxHp}</span></div>`;
             html += `</div>`;
         }

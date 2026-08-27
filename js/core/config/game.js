@@ -80,6 +80,27 @@ export const EVENTS = {
         notification: '{name} is feeling inspired!',
         logMessage: '{name} is feeling inspired!', logType: 'success',
     },
+    pleasant_weather: {
+        weight: 9, minTick: 320, cooldown: 640, seasons: ['spring', 'summer'],
+        effect: 'mood',
+        thought: 'Enjoyed the weather', moodChange: 6, moodDuration: 400,
+        notification: '{name} is enjoying the weather.',
+        logMessage: '{name} enjoyed the pleasant weather', logType: 'success',
+    },
+    shooting_star: {
+        weight: 5, minTick: 480, cooldown: 1280,
+        effect: 'mood',
+        thought: 'Saw a shooting star', moodChange: 8, moodDuration: 400,
+        notification: '{name} saw a shooting star!',
+        logMessage: '{name} saw a shooting star', logType: 'success',
+    },
+    found_trinket: {
+        weight: 6, minTick: 320, cooldown: 960,
+        effect: 'mood',
+        thought: 'Found a lucky trinket', moodChange: 5, moodDuration: 350,
+        notification: '{name} found a lucky trinket.',
+        logMessage: '{name} found a lucky trinket', logType: 'success',
+    },
 };
 
 export const FIRE_CONFIG = {

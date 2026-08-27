@@ -855,6 +855,25 @@ function updateIdle(colonist, game) {
         return;
     }
 
+    // --- Relaxation ---
+    // Only reached when there is no pending work task, so a relaxing colonist
+    // stays fully work-available: it re-runs this whole priority chain (including
+    // findBestTask above) every tick, and only continues relaxing when no work
+    // was found. Pre-emption by work/threats/needs is therefore automatic.
+    if (colonist._relaxActivity) {
+        updateRelaxTick(colonist, game);
+        return;
+    }
+    // Note: _relaxCooldown is undefined until a colonist has relaxed at least
+    // once. Coalesce to 0 so a fresh colonist is immediately eligible — comparing
+    // undefined against a number is always false, which would gate relaxation off
+    // forever otherwise.
+    if (colonist._relaxCooldown > 0) {
+        colonist._relaxCooldown--;
+    } else if (Math.random() < COLONIST_CONFIG.relaxChance) {
+        if (tryStartRelaxing(colonist, game)) return;
+    }
+
     if (colonist.traits.includes('socialite')) {
         const socialRange = SOCIAL_CONFIG.interactionRange;
         const alreadyNear = game.colonists.some(c =>
@@ -903,6 +922,152 @@ function wander(colonist, game) {
     if (choices.length === 0) return;
     const [nx, ny] = choices[Math.floor(Math.random() * choices.length)];
     moveEntity(colonist, nx, ny, CONFIG.TICK_RATE / game.speed);
+}
+
+// Relaxation activity metadata: the mood thought awarded on completion and the
+// floating-text glyph/color shown while relaxing. 'hang_out' uses the Town Hall's
+// quality tier for its thought when available (see finishRelaxing).
+const RELAX_ACTIVITIES = {
+    hang_out:       { label: 'Hanging out',       thought: 'hung_out',        glyph: '♪', color: '#ffdd66' },
+    warm_by_fire:   { label: 'Warming by the fire', thought: 'warmed_by_fire', glyph: '≈', color: '#ff8844' },
+    people_watch:   { label: 'People watching',   thought: 'people_watched',  glyph: '☺', color: '#88ccff' },
+    stargaze:       { label: 'Stargazing',        thought: 'stargazed',       glyph: '✦', color: '#aaccff' },
+    cloud_watch:    { label: 'Cloud watching',    thought: 'cloud_watched',   glyph: '☁', color: '#cccccc' },
+    skip_stones:    { label: 'Skipping stones',   thought: 'skipped_stones',  glyph: '○', color: '#88bbcc' },
+    smell_flowers:  { label: 'Smelling the flowers', thought: 'smelled_flowers', glyph: '❀', color: '#ff99cc' },
+    stroll:         { label: 'Strolling',         thought: 'strolled',        glyph: '♫', color: '#aaddaa' },
+};
+
+// Friendly label for a colonist's current relaxation activity, or null if not
+// relaxing. Used by the info panel to show the activity as the current "task".
+export function getRelaxActivityLabel(colonist) {
+    if (!colonist._relaxActivity) return null;
+    const info = RELAX_ACTIVITIES[colonist._relaxActivity];
+    return info ? info.label : 'Relaxing';
+}
+
+const WARMTH_SOURCES = ['torch', 'hearth_shrine', 'ember_ward', 'inferno_ward'];
+
+function randRange(range) {
+    return range[0] + Math.floor(Math.random() * (range[1] - range[0]));
+}
+
+// True if any tile within `radius` (manhattan) of the colonist matches `pred`.
+function nearTile(colonist, game, radius, pred) {
+    for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+            const nx = colonist.x + dx, ny = colonist.y + dy;
+            const row = game.map[ny];
+            if (!row || !row[nx]) continue;
+            if (pred(row[nx])) return true;
+        }
+    }
+    return false;
+}
+
+// Randomly begin a relaxation activity. Returns true if one was started this tick.
+// The chosen activity is weighted; only activities whose context gate passes are
+// eligible. Hang Out (a reachable Town Hall) is the heaviest weight so it dominates
+// whenever a Town Hall exists.
+function tryStartRelaxing(colonist, game) {
+    const t = game.timeOfDay / CONFIG.TICKS_PER_DAY;
+    const isNight = t > DAY_NIGHT.nightStart || t < DAY_NIGHT.dayStart;
+    const indoors = isIndoors(colonist, game.map);
+
+    const candidates = [];
+
+    // Hang Out — nearest Town Hall banner within range and reachable.
+    let hangOutTarget = null;
+    const banner = game.mapIndex.findNearest('town_hall_banner', colonist.x, colonist.y);
+    if (banner && manhattanDist(colonist.x, colonist.y, banner.x, banner.y) <= COLONIST_CONFIG.hangOutSearchRadius) {
+        hangOutTarget = banner;
+        candidates.push({ key: 'hang_out', weight: 40 });
+    }
+
+    if (nearTile(colonist, game, 5, tile => WARMTH_SOURCES.includes(tile.structure))) {
+        candidates.push({ key: 'warm_by_fire', weight: 15 });
+    }
+    const socialRange = SOCIAL_CONFIG.interactionRange;
+    const otherNear = game.colonists.some(c =>
+        c.id !== colonist.id && c.hp > 0 && !c.onExpedition &&
+        manhattanDist(colonist.x, colonist.y, c.x, c.y) <= socialRange
+    );
+    if (otherNear) candidates.push({ key: 'people_watch', weight: 12 });
+
+    if (!indoors && isNight) candidates.push({ key: 'stargaze', weight: 12 });
+    if (!indoors && !isNight) candidates.push({ key: 'cloud_watch', weight: 12 });
+
+    if (nearTile(colonist, game, 2, tile => tile.terrain === 'water')) {
+        candidates.push({ key: 'skip_stones', weight: 10 });
+    }
+    if (nearTile(colonist, game, 2, tile => tile.zone)) {
+        candidates.push({ key: 'smell_flowers', weight: 10 });
+    }
+
+    // Stroll is always eligible as a fallback.
+    candidates.push({ key: 'stroll', weight: 8 });
+
+    // Weighted random pick.
+    let total = 0;
+    for (const c of candidates) total += c.weight;
+    let roll = Math.random() * total;
+    let chosen = candidates[candidates.length - 1].key;
+    for (const c of candidates) {
+        roll -= c.weight;
+        if (roll < 0) { chosen = c.key; break; }
+    }
+
+    // Hang Out walks to the Town Hall first; everything else relaxes in place.
+    if (chosen === 'hang_out' && hangOutTarget) {
+        const path = findPathAdjacent(game.map, colonist.x, colonist.y, hangOutTarget.x, hangOutTarget.y, game._occupiedTiles);
+        if (path && path.length > 0) {
+            colonist.path = path;
+            colonist.state = 'moving';
+            colonist._relaxAfterMove = true;
+        } else {
+            // Town Hall is unreachable — fall back to a stroll rather than
+            // hanging out in place with no hall to gather in.
+            chosen = 'stroll';
+        }
+    }
+
+    colonist._relaxActivity = chosen;
+    colonist._relaxTimer = randRange(COLONIST_CONFIG.relaxDuration);
+    colonist._relaxCooldown = randRange(COLONIST_CONFIG.relaxCooldown);
+    return true;
+}
+
+function updateRelaxTick(colonist, game) {
+    colonist._relaxTimer--;
+    const info = RELAX_ACTIVITIES[colonist._relaxActivity];
+    if (info && game.tick % 12 === 0) {
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: info.glyph, color: info.color, fontSize: 10, ttl: 11, maxTtl: 11 });
+    }
+    // Strolling colonists amble about; other activities stand in place.
+    if (colonist._relaxActivity === 'stroll' && Math.random() < COLONIST_CONFIG.wanderChance) {
+        wander(colonist, game);
+    }
+    if (colonist._relaxTimer <= 0) {
+        finishRelaxing(colonist, game);
+    }
+}
+
+function finishRelaxing(colonist, game) {
+    const activity = colonist._relaxActivity;
+    const info = RELAX_ACTIVITIES[activity];
+    const roomId = game.map[colonist.y] && game.map[colonist.y][colonist.x]
+        ? game.map[colonist.y][colonist.x].roomId : null;
+    if (activity === 'hang_out' && roomId !== null && game.townHallQualities[roomId]) {
+        const q = game.townHallQualities[roomId];
+        addThought(colonist, q.tierName, q.moodEffect, q.duration, game.tick);
+    } else if (info) {
+        const th = THOUGHTS[info.thought];
+        addThought(colonist, th.text, th.moodEffect, th.duration, game.tick);
+    }
+    delete colonist._relaxActivity;
+    delete colonist._relaxTimer;
+    delete colonist._relaxAfterMove;
 }
 
 function updateGuarding(colonist, game) {
@@ -1015,6 +1180,13 @@ function updateMoving(colonist, game) {
             delete colonist._sleepAfterMove;
             colonist.state = 'sleeping';
             colonist.stateTimer = COLONIST_CONFIG.sleepAfterMoveDuration;
+            return;
+        }
+        if (colonist._relaxAfterMove) {
+            delete colonist._relaxAfterMove;
+            // Back to idle so next tick re-checks for work first, then resumes
+            // relaxing in place via the _relaxActivity branch in updateIdle.
+            colonist.state = 'idle';
             return;
         }
         colonist.state = 'working';

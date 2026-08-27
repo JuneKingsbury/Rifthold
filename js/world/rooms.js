@@ -1,4 +1,4 @@
-import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, BUILDINGS, ROOM_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS, STATION_GROUPS, FLOOR_QUALITY_VALUES } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, BUILDINGS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS, STATION_GROUPS, FLOOR_QUALITY_VALUES } from '../core/config.js';
 
 export function detectRooms(map) {
     for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
@@ -87,6 +87,15 @@ function isWall(tile) {
     return WALL_STRUCTURES.has(tile.structure);
 }
 
+// Whether a decor structure's roomQuality bonus applies to the given room type.
+// A building may declare `decorRooms` to restrict which room types it decorates
+// (e.g. a podium only benefits a town hall). Absent that list, the bonus is
+// treated as universal so existing furniture keeps benefiting every room type.
+function decorBenefits(bDef, roomType) {
+    if (!bDef.decorRooms) return true;
+    return bDef.decorRooms.includes(roomType);
+}
+
 export function getRoomContents(map, roomId) {
     const contents = { beds: [], stations: [], size: 0 };
     for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
@@ -109,6 +118,7 @@ export function getRoomContents(map, roomId) {
 export function calculateRoomQualities(map, roomCount) {
     const roomQualities = {};
     const workshopQualities = {};
+    const townHallQualities = {};
 
     // Single pass over the grid: bucket tiles by room and collect light sources
     // at the same time, instead of rescanning the whole map once per room.
@@ -140,13 +150,17 @@ export function calculateRoomQualities(map, roomCount) {
         if (analysis.stationTypes.size > 0) {
             workshopQualities[id] = computeWorkshopQuality(analysis);
         }
+        if (analysis.townHallCount > 0) {
+            townHallQualities[id] = computeTownHallQuality(analysis);
+        }
     }
 
-    return { roomQualities, workshopQualities };
+    return { roomQualities, workshopQualities, townHallQualities };
 }
 
 function analyzeRoom(map, tiles, lightSources) {
     let bedCount = 0;
+    let townHallCount = 0;
     let stationCount = 0;
     let flooredTiles = 0;
     let litTiles = 0;
@@ -159,6 +173,7 @@ function analyzeRoom(map, tiles, lightSources) {
 
     for (const { x, y, tile } of tiles) {
         if (tile.structure === 'bed') bedCount++;
+        if (tile.structure === 'town_hall_banner') townHallCount++;
 
         if (tile.floor) {
             if (FLOOR_QUALITY_VALUES[tile.floor]) {
@@ -214,7 +229,7 @@ function analyzeRoom(map, tiles, lightSources) {
     const uniformFloor = floorTypeNames.length === 1;
 
     return {
-        size, bedCount, stationCount, flooredTiles, floorCoverage, litTiles, litRatio,
+        size, bedCount, townHallCount, stationCount, flooredTiles, floorCoverage, litTiles, litRatio,
         floorTypes, decorations, workshopSupport, stationTypes,
         wallTypes, allWallsSturdy, uniformFloor, floorTypeNames,
     };
@@ -257,9 +272,10 @@ function computeBedroomQuality(a) {
     for (const [type, count] of Object.entries(a.decorations)) {
         const bDef = BUILDINGS[type];
         if (!bDef || !bDef.roomQuality) continue;
+        if (!decorBenefits(bDef, 'bedroom')) continue;
         const firstValue = bDef.roomQuality;
         decorScore += firstValue;
-        decorList.push(bDef.description ? type : type);
+        decorList.push(type);
         if (count > 1) {
             decorScore += Math.floor(firstValue * 0.5) * (count - 1);
         }
@@ -275,6 +291,68 @@ function computeBedroomQuality(a) {
     let tier = ROOM_QUALITY_TIERS[0];
     for (let i = ROOM_QUALITY_TIERS.length - 1; i >= 0; i--) {
         if (total >= ROOM_QUALITY_TIERS[i].minScore) { tier = ROOM_QUALITY_TIERS[i]; break; }
+    }
+
+    return {
+        total, tier: tier.key, tierName: tier.name,
+        moodEffect: tier.moodEffect, duration: tier.duration,
+        breakdown: { size: sizeScore, floor: floorScore, light: lightScore, decor: decorScore, coherence: coherenceScore },
+        decorList: Object.keys(a.decorations),
+    };
+}
+
+function computeTownHallQuality(a) {
+    // A community hall wants to be roomy: score by raw tile count rather than
+    // tiles-per-object (there's no per-occupant target like beds/stations).
+    let sizeScore = 0;
+    if (a.size < 6) sizeScore = 0;
+    else if (a.size <= 12) sizeScore = 8;
+    else if (a.size <= 30) sizeScore = 20;
+    else if (a.size <= 60) sizeScore = 15;
+    else sizeScore = 10;
+
+    let floorScore = 0;
+    if (a.floorCoverage > 0) {
+        const floorEntries = Object.entries(a.floorTypes);
+        let totalValue = 0;
+        let totalTiles = 0;
+        for (const [type, count] of floorEntries) {
+            const value = type === 'rug' ? 20 : (FLOOR_QUALITY_VALUES[type] || 0);
+            totalValue += value * count;
+            totalTiles += count;
+        }
+        const avgValue = totalTiles > 0 ? totalValue / totalTiles : 0;
+        floorScore = Math.min(25, Math.round(a.floorCoverage * avgValue));
+    }
+
+    let lightScore = 0;
+    if (a.litRatio >= 0.8) lightScore = 20;
+    else if (a.litRatio >= 0.5) lightScore = 15;
+    else if (a.litRatio >= 0.3) lightScore = 10;
+    else if (a.litRatio > 0) lightScore = 5;
+
+    let decorScore = 0;
+    for (const [type, count] of Object.entries(a.decorations)) {
+        const bDef = BUILDINGS[type];
+        if (!bDef || !bDef.roomQuality) continue;
+        if (!decorBenefits(bDef, 'townhall')) continue;
+        const firstValue = bDef.roomQuality;
+        decorScore += firstValue;
+        if (count > 1) {
+            decorScore += Math.floor(firstValue * 0.5) * (count - 1);
+        }
+    }
+    decorScore = Math.min(25, decorScore);
+
+    let coherenceScore = 0;
+    if (a.uniformFloor && a.floorCoverage >= 0.8) coherenceScore += 5;
+    if (a.allWallsSturdy && a.wallTypes.size > 0) coherenceScore += 5;
+
+    const total = Math.min(100, sizeScore + floorScore + lightScore + decorScore + coherenceScore);
+
+    let tier = TOWN_HALL_QUALITY_TIERS[0];
+    for (let i = TOWN_HALL_QUALITY_TIERS.length - 1; i >= 0; i--) {
+        if (total >= TOWN_HALL_QUALITY_TIERS[i].minScore) { tier = TOWN_HALL_QUALITY_TIERS[i]; break; }
     }
 
     return {

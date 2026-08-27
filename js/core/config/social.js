@@ -27,6 +27,20 @@ export const THOUGHTS = {
     cast_spell:        { text: 'Cast a spell', moodEffect: 3, duration: 80 },
     tame_failed:       { text: 'Failed taming attempt!', moodEffect: -8, duration: 150 },
     wolf_retaliated:   { text: 'Wolf attacked during taming!', moodEffect: -12, duration: 200 },
+    // Relaxation thoughts
+    relaxed:           { text: 'Relaxed a while',          moodEffect: 4, duration: 200 },
+    hung_out:          { text: 'Hung out in the hall',     moodEffect: 8, duration: 250 },
+    stargazed:         { text: 'Watched the stars',        moodEffect: 6, duration: 220 },
+    cloud_watched:     { text: 'Watched the clouds',       moodEffect: 5, duration: 200 },
+    strolled:          { text: 'Took a nice stroll',       moodEffect: 3, duration: 150 },
+    warmed_by_fire:    { text: 'Warmed by the fire',       moodEffect: 6, duration: 200 },
+    people_watched:    { text: 'Did some people-watching', moodEffect: 5, duration: 200 },
+    skipped_stones:    { text: 'Skipped stones',           moodEffect: 5, duration: 200 },
+    smelled_flowers:   { text: 'Smelled the flowers',      moodEffect: 5, duration: 200 },
+    // Ambient mood events
+    enjoyed_weather:   { text: 'Enjoyed the weather',      moodEffect: 6, duration: 400 },
+    saw_shooting_star: { text: 'Saw a shooting star',      moodEffect: 8, duration: 400 },
+    found_trinket:     { text: 'Found a lucky trinket',    moodEffect: 5, duration: 350 },
     // Social thoughts
     made_friend:       { text: 'Made a new friend!', moodEffect: 12, duration: 300 },
     became_adversaries:{ text: 'Made an adversary', moodEffect: -5, duration: 150 },

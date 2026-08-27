@@ -136,6 +136,7 @@ class Game {
         this.roomsDirty = true;
         this.roomQualities = {};
         this.workshopQualities = {};
+        this.townHallQualities = {};
         this._recipeCacheVersion = 0;
 
         this.spatial = {
@@ -454,6 +455,7 @@ class Game {
 
             this.roomQualities = qualities.roomQualities;
             this.workshopQualities = qualities.workshopQualities;
+            this.townHallQualities = qualities.townHallQualities;
             this.roomsDirty = false;
         }
 

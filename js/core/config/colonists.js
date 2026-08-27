@@ -84,6 +84,12 @@ export const COLONIST_CONFIG = {
     breakingWanderDuration: [30, 50],
     wanderCooldown: [5, 15],
     wanderChance: 0.3,
+    relaxChance: 0.04,          // per-eligible-tick roll to start relaxing while idle
+    relaxCooldown: [200, 500],  // ticks before a colonist may roll to relax again
+    relaxDuration: [40, 90],    // ticks a relaxation activity lasts
+    relaxMoodBonus: 4,          // generic fallback mood on completing a relax
+    relaxMoodDuration: 200,
+    hangOutSearchRadius: 40,    // max manhattan dist to seek a Town Hall for Hang Out
     fightEngageDistance: 8,
     fleeHpThreshold: 20,
     fleeDisengageDistance: 8,
