@@ -358,6 +358,7 @@ export class Renderer {
         const showDamageFlash = settings.showDamageFlash;
         const enableScreenShake = settings.enableScreenShake;
         const showPortalPath = settings.showPortalPath;
+        const showBreathing = settings.showBreathing;
         const sm = this.skinManager;
         const skinActive = sm.isActive;
         const atkShakePx = COMBAT_VISUALS.atkShakePx || 2;
@@ -660,7 +661,7 @@ export class Renderer {
                         const bleed = entity ? 0 : 1;
                         // Breathing: stretch height, anchor feet by nudging y up by the same amount.
                         // Seeded by entity id so phase is continuous across stationary/moving transitions.
-                        const grow = entity ? this._breatheGrow(now, entity.entityId || 0) : 0;
+                        const grow = (entity && showBreathing) ? this._breatheGrow(now, entity.entityId || 0) : 0;
                         ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff - grow, cw + hlOff * 2 + bleed, ch + hlOff * 2 + bleed + grow);
                         if (!entity && canDither) {
                             this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
@@ -839,7 +840,7 @@ export class Renderer {
                     // Draw entity.
                     const meHlOff = meHl ? 1 : 0;
                     // Breathing: stretch height, anchor feet by nudging y up by the same amount.
-                    const grow = this._breatheGrow(now, ent.id || 0);
+                    const grow = showBreathing ? this._breatheGrow(now, ent.id || 0) : 0;
                     ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
                 } else {
                     ctx.fillStyle = me.color;

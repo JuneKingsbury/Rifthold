@@ -2481,6 +2481,7 @@ export class UI {
         graphics += this._settingsCheck('set-equip-overlays', s.showEquipmentOverlays, 'window.game.settings.showEquipmentOverlays=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show equipped armor/helmets on colonists (sprite mode)');
         graphics += this._settingsCheck('set-progress-bars', s.showProgressBars, 'window.game.settings.showProgressBars=this.checked', 'Progress & health bars');
         graphics += this._settingsCheck('set-portal-path', s.showPortalPath, 'window.game.settings.showPortalPath=this.checked', 'Portal path highlighting');
+        graphics += this._settingsCheck('set-breathing', s.showBreathing, 'window.game.settings.showBreathing=this.checked', 'Entity breathing animation');
         graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
         graphics += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', 'Show FPS counter (top-right of game grid)');
         graphics += `</div>`;
@@ -2617,11 +2618,12 @@ export class UI {
         s.showEquipmentOverlays = on;
         s.showProgressBars = on;
         s.showPortalPath = on;
+        s.showBreathing = on;
         s.showMinimap = on;
         window.RENDER_CONFIG.terrainDithering = on;
         document.getElementById('minimap-container').style.display = on ? '' : 'none';
         if (!on) this.game.renderer?.skinManager?._compositeCache.clear();
-        const ids = ['set-night','set-weather','set-damage-flash','set-screen-shake','set-combat-particles','set-projectiles','set-equip-overlays','set-progress-bars','set-portal-path','set-minimap'];
+        const ids = ['set-night','set-weather','set-damage-flash','set-screen-shake','set-combat-particles','set-projectiles','set-equip-overlays','set-progress-bars','set-portal-path','set-breathing','set-minimap'];
         for (const id of ids) {
             const el = document.getElementById(id);
             if (el) el.checked = on;
