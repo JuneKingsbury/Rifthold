@@ -1,4 +1,4 @@
-import { CONFIG, CROPS, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ARTIFACTS } from '../core/config.js';
+import { CONFIG, CROPS, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ARTIFACTS, DEFAULT_KEYMAP } from '../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { isPassable } from '../world/map.js';
@@ -28,6 +28,10 @@ export class InputHandler {
         this.rallyMode = false;
         this.spellTargeting = null;
         this.guardPointTargeting = null;
+
+        this.actions = this.buildActions();
+        this.keyToAction = {};
+        this.applyKeyBindings();
 
         this.charWidth = 0;
         this.charHeight = 0;
@@ -170,81 +174,114 @@ export class InputHandler {
         return { affordable, unaffordable: new Set(), blocked };
     }
 
-    onKeyDown(e) {
-        this.keysDown.add(e.key.toLowerCase());
+    // Named action handlers, keyed by the action names in DEFAULT_KEYMAP.
+    // Each receives the KeyboardEvent so it can preventDefault where needed.
+    // Rebinding maps keys onto these action names; the handlers never change.
+    buildActions() {
+        return {
+            panUp: () => this.game.camera.pan(0, -3),
+            panDown: () => this.game.camera.pan(0, 3),
+            panLeft: () => this.game.camera.pan(-3, 0),
+            panRight: () => this.game.camera.pan(3, 0),
 
-        switch (e.key.toLowerCase()) {
-            case 'w': case 'arrowup': this.game.camera.pan(0, -3); break;
-            case 's': case 'arrowdown': this.game.camera.pan(0, 3); break;
-            case 'a': case 'arrowleft': this.game.camera.pan(-3, 0); break;
-            case 'd': case 'arrowright': this.game.camera.pan(3, 0); break;
-            case 'b': this.setMode(this.mode === 'build' ? 'normal' : 'build'); break;
-            case 'f': this.setMode(this.mode === 'zone' ? 'normal' : 'zone'); break;
-            case 'g': this.setMode(this.mode === 'designate' ? 'normal' : 'designate'); break;
-            case 'escape': {
-                if (this.spellTargeting) {
-                    this.cancelSpellTargeting();
-                    break;
-                }
-                if (this.guardPointTargeting) {
-                    this.cancelGuardPointTargeting();
-                    break;
-                }
-                const ui = this.game.ui;
-                const hadPanel = ui.priorityPanelVisible || ui.craftPanelVisible ||
-                    ui.researchPanelVisible || ui.inventoryVisible ||
-                    ui.settingsPanelVisible ||
-                    ui.arcanePanelVisible || ui.storyPanelVisible;
-                if (hadPanel) {
-                    if (ui.priorityPanelVisible) ui.togglePriorityPanel();
-                    if (ui.craftPanelVisible) ui.toggleCraftPanel();
-                    if (ui.researchPanelVisible) ui.toggleResearchPanel();
-                    if (ui.inventoryVisible) ui.toggleInventoryPanel();
-                    if (ui.settingsPanelVisible) ui.toggleSettingsPanel();
-                    if (ui.arcanePanelVisible) ui.toggleArcanePanel();
-                    if (ui.storyPanelVisible) ui.toggleStoryPanel();
-                } else if (this.mode !== 'normal') {
-                    this.setMode('normal');
-                } else {
-                    ui.toggleSettingsPanel();
-                }
-                break;
+            toggleBuild: () => this.setMode(this.mode === 'build' ? 'normal' : 'build'),
+            toggleZone: () => this.setMode(this.mode === 'zone' ? 'normal' : 'zone'),
+            toggleDesignate: () => this.setMode(this.mode === 'designate' ? 'normal' : 'designate'),
+            deconstruct: () => { if (this.mode === 'build') this.toggleDeconstructMode(); },
+
+            togglePriority: () => this.game.ui.togglePriorityPanel(),
+            toggleCraft: () => this.game.ui.toggleCraftPanel(),
+            toggleResearch: () => { if (this.mode === 'normal') this.game.ui.toggleResearchPanel(); },
+            toggleInventory: () => this.game.ui.toggleInventoryPanel(),
+            toggleArcane: () => this.game.ui.toggleArcanePanel(),
+            toggleStory: () => this.game.ui.toggleStoryPanel(),
+
+            pause: (e) => { e.preventDefault(); this.game.togglePause(); },
+            speedUp: () => this.game.speedUp(),
+            speedDown: () => this.game.speedDown(),
+            zoomIn: () => window.zoomIn?.(),
+            zoomOut: () => window.zoomOut?.(),
+            resetMinimap: () => window.resetMinimapSize?.(),
+
+            cyclePrev: () => this.game.cycleColonist(-1),
+            cycleNext: () => this.game.cycleColonist(1),
+            draftToggle: () => this.toggleDraftSelected(),
+            selectAll: () => this.selectAllColonists(),
+            nextIdle: () => this.game.cycleIdleColonist(),
+            centerSelection: () => this.centerOnSelection(),
+        };
+    }
+
+    // Rebuild the key->action lookup from DEFAULT_KEYMAP merged with any
+    // per-user overrides stored in game.settings.keyBindings. Called on
+    // construction and whenever the player changes a binding.
+    applyKeyBindings() {
+        const overrides = (this.game.settings && this.game.settings.keyBindings) || {};
+        const map = { ...DEFAULT_KEYMAP, ...overrides };
+        this.keyToAction = {};
+        for (const [action, keys] of Object.entries(map)) {
+            if (!this.actions[action]) continue; // ignore stale/unknown actions
+            for (const key of keys) {
+                this.keyToAction[key] = action;
             }
-            case 'p': this.game.ui.togglePriorityPanel(); break;
-            case 'c': this.game.ui.toggleCraftPanel(); break;
-            case 'r':
-                if (this.mode === 'normal') this.game.ui.toggleResearchPanel();
-                break;
-            case 'i': this.game.ui.toggleInventoryPanel(); break;
-            case 'v': this.game.ui.toggleArcanePanel(); break;
-            case 'j': this.game.ui.toggleStoryPanel(); break;
-            case ',': this.game.ui.toggleSettingsPanel(); break;
-            case ' ':
-                e.preventDefault();
-                this.game.togglePause();
-                break;
-            case '=': case '+': window.zoomIn?.(); break;
-            case '-': window.zoomOut?.(); break;
-            case '>': this.game.speedUp(); break;
-            case '<': this.game.speedDown(); break;
-            case '/': window.resetMinimapSize?.(); break;
-            case '[': this.game.cycleColonist(-1); break;
-            case ']': this.game.cycleColonist(1); break;
-            case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
-                this.handleNumberKey(e.key === '0' ? 10 : parseInt(e.key));
-                break;
-            case 'x':
-                if (this.mode === 'build') this.toggleDeconstructMode();
-                break;
-            case 'tab':
-                e.preventDefault();
-                if (this.mode === 'build') {
-                    this.cycleBuildCategory(e.shiftKey ? -1 : 1);
-                } else if (this.mode === 'designate') {
-                    this.designateMode = this.designateMode === 'chop' ? 'mine' : 'chop';
-                    this.game.ui.updateModeDisplay(this);
-                }
-                break;
+        }
+    }
+
+    // True when the user is typing into a text field, so gameplay hotkeys
+    // should not fire (e.g. naming a colony, editor text inputs).
+    _isTypingTarget() {
+        const el = document.activeElement;
+        return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    }
+
+    onKeyDown(e) {
+        if (this._isTypingTarget()) return;
+
+        const key = e.key.toLowerCase();
+        this.keysDown.add(key);
+
+        // Structural keys handled outside the rebindable keymap.
+        if (key === 'escape') { this.handleEscape(); return; }
+        if (key === 'tab') { this.handleTab(e); return; }
+        if (key.length === 1 && key >= '0' && key <= '9') {
+            this.handleNumberKey(key === '0' ? 10 : parseInt(key));
+            return;
+        }
+
+        const action = this.keyToAction[key];
+        if (action) this.actions[action](e);
+    }
+
+    handleEscape() {
+        if (this.spellTargeting) { this.cancelSpellTargeting(); return; }
+        if (this.guardPointTargeting) { this.cancelGuardPointTargeting(); return; }
+        const ui = this.game.ui;
+        const hadPanel = ui.priorityPanelVisible || ui.craftPanelVisible ||
+            ui.researchPanelVisible || ui.inventoryVisible ||
+            ui.settingsPanelVisible ||
+            ui.arcanePanelVisible || ui.storyPanelVisible;
+        if (hadPanel) {
+            if (ui.priorityPanelVisible) ui.togglePriorityPanel();
+            if (ui.craftPanelVisible) ui.toggleCraftPanel();
+            if (ui.researchPanelVisible) ui.toggleResearchPanel();
+            if (ui.inventoryVisible) ui.toggleInventoryPanel();
+            if (ui.settingsPanelVisible) ui.toggleSettingsPanel();
+            if (ui.arcanePanelVisible) ui.toggleArcanePanel();
+            if (ui.storyPanelVisible) ui.toggleStoryPanel();
+        } else if (this.mode !== 'normal') {
+            this.setMode('normal');
+        } else {
+            ui.toggleSettingsPanel();
+        }
+    }
+
+    handleTab(e) {
+        e.preventDefault();
+        if (this.mode === 'build') {
+            this.cycleBuildCategory(e.shiftKey ? -1 : 1);
+        } else if (this.mode === 'designate') {
+            this.designateMode = this.designateMode === 'chop' ? 'mine' : 'chop';
+            this.game.ui.updateModeDisplay(this);
         }
     }
 
@@ -252,7 +289,37 @@ export class InputHandler {
         this.keysDown.delete(e.key.toLowerCase());
     }
 
+    toggleDraftSelected() {
+        const selected = this.game.selectedColonists || [];
+        if (selected.length === 0) return;
+        const anyUndrafted = selected.some(c => c.hp > 0 && !c.drafted);
+        if (anyUndrafted) this.game.draftAllSelected();
+        else this.game.undraftAllSelected();
+    }
+
+    selectAllColonists() {
+        const alive = this.game.colonists.filter(c => c.hp > 0);
+        if (alive.length === 0) return;
+        this.game.selectedColonist = alive[0];
+        this.game.selectedColonists = alive;
+        if (alive.length > 1) {
+            this.game.ui.showMultiColonistInfo(alive);
+        } else {
+            this.game.ui.showColonistInfo(alive[0]);
+        }
+        this.game.notifications.push({ text: `Selected ${alive.length} colonist${alive.length > 1 ? 's' : ''}`, tick: this.game.tick, type: 'success' });
+    }
+
+    centerOnSelection() {
+        const c = this.game.selectedColonist;
+        if (c && c.hp > 0) this.game.camera.centerOn(c.x, c.y);
+    }
+
     handleNumberKey(num) {
+        if (this.mode === 'normal') {
+            this.castSelectedColonistSpell(num);
+            return;
+        }
         if (this.mode === 'build') {
             const idx = num - 1;
             if (idx < this.buildOptions.length) {
@@ -698,6 +765,31 @@ export class InputHandler {
                 }
                 break;
         }
+    }
+
+    // Number-key spell casting in normal mode: 1-9 map to the selected
+    // colonist's known spells (in listed order). Only targeted spells enter
+    // targeting; auto spells are passive toggles and are skipped.
+    castSelectedColonistSpell(num) {
+        const colonist = this.game.selectedColonist;
+        if (!colonist || colonist.hp <= 0) return;
+        const known = colonist.knownSpells;
+        if (!known || known.length === 0) return;
+        const spellKey = known[num - 1];
+        if (!spellKey) return;
+        const spell = SPELLS[spellKey];
+        if (!spell || spell.castType !== 'targeted') return;
+
+        if (colonist.mana < spell.manaCost) {
+            this.game.notifications.push({ text: `${colonist.name} doesn't have enough mana for ${spell.name}`, tick: this.game.tick, type: 'danger' });
+            return;
+        }
+        if (colonist._spellCooldowns && colonist._spellCooldowns[spellKey] &&
+            this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown) {
+            this.game.notifications.push({ text: `${spell.name} is on cooldown`, tick: this.game.tick, type: 'danger' });
+            return;
+        }
+        this.startSpellTargeting(colonist.id, spellKey);
     }
 
     startSpellTargeting(colonistId, spellKey) {

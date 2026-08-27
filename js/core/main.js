@@ -40,6 +40,7 @@ import { StorySystem } from '../systems/story.js';
 import { TutorialSystem } from '../systems/tutorial.js';
 import { SoundManager } from './sound.js';
 import { TickProfiler } from './perf-probe.js';
+import { keybindingRowsHtml, beginRebindCapture, clearStoredBindings, resetStoredBinding, formatKeyLabel } from '../ui/keybindings-ui.js';
 
 class Game {
     constructor() {
@@ -87,6 +88,7 @@ class Game {
             ditherQuality: 'medium',
             showColonistHighlight: false,
             showTutorial: true,
+            keyBindings: {},
         };
         try {
             const saved = JSON.parse(localStorage.getItem('colony_settings'));
@@ -1355,6 +1357,24 @@ class Game {
         this.selectColonistById(alive[next].id);
     }
 
+    // Select and center the next idle (undrafted, unassigned) colonist after
+    // the current selection, wrapping around. Used by the "next idle" hotkey.
+    cycleIdleColonist() {
+        const alive = this.colonists.filter(c => c.hp > 0);
+        const isIdle = (c) => !c.drafted && !c.currentTaskId && c.state !== 'working';
+        const idle = alive.filter(isIdle);
+        if (idle.length === 0) {
+            this.notifications.push({ text: 'No idle colonists', tick: this.tick, type: 'event' });
+            return;
+        }
+        const startIdx = this.selectedColonist ? alive.indexOf(this.selectedColonist) : -1;
+        // Scan forward from the current selection for the next idle colonist.
+        for (let i = 1; i <= alive.length; i++) {
+            const c = alive[(startIdx + i + alive.length) % alive.length];
+            if (isIdle(c)) { this.selectColonistById(c.id); return; }
+        }
+    }
+
     draftAll() {
         for (const c of this.colonists) {
             if (c.hp > 0 && !c.drafted) this.toggleDraft(c.id);
@@ -1463,6 +1483,66 @@ class Game {
 
     saveSettingsToStorage() {
         try { localStorage.setItem('colony_settings', JSON.stringify(this.settings)); } catch (e) {}
+    }
+
+    // Rebind a single action to a new key. Overrides are stored per-action in
+    // settings.keyBindings (full key list), persisted, and re-applied live.
+    setKeyBinding(action, key) {
+        if (!this.settings.keyBindings) this.settings.keyBindings = {};
+        this.settings.keyBindings[action] = [key.toLowerCase()];
+        this.saveSettingsToStorage();
+        this.input.applyKeyBindings();
+        this.ui.updateSettingsPanel();
+    }
+
+    // Reset all non-keybinding settings to their defaults, re-apply the live DOM
+    // effects, and re-render the panel. Keybindings have their own reset button
+    // on the Controls tab, so they are intentionally preserved here.
+    resetAllSettings() {
+        const keep = this.settings.keyBindings || {};
+        const craftTargets = this.settings.craftTargets || {};
+        Object.assign(this.settings, {
+            autoPauseHostile: true, autoPauseEvent: true, pauseOnDeath: false, pauseOnResearch: true,
+            uiFontSize: 12, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
+            showWeatherParticles: true, showColonistNames: 'selected', showMinimap: true, showFps: false,
+            autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
+            largeClickTargets: false, pauseOnFocusLoss: true, enableScreenShake: true, colorblindMode: 'none',
+            notificationDuration: 100, showDamageFlash: true, showCombatParticles: true, showProjectiles: true,
+            showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, layoutMode: 'auto',
+            musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
+            ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true,
+        });
+        this.settings.keyBindings = keep;
+        this.settings.craftTargets = craftTargets;
+        this.saveSettingsToStorage();
+        // Re-apply live effects that have side effects beyond the settings object.
+        window.setUIFontSize?.(12);
+        if (window.soundManager) { window.soundManager.setMusicVolume(50); window.soundManager.setSFXVolume(50); }
+        document.getElementById('game')?.classList.toggle('paused', this.paused && this.settings.darkenOnPause);
+        document.getElementById('game-container')?.classList.toggle('large-targets', false);
+        document.getElementById('game-container')?.setAttribute('data-colorblind', 'none');
+        const mm = document.getElementById('minimap-container'); if (mm) mm.style.display = '';
+        const tb = document.getElementById('touch-toolbar'); if (tb) tb.style.display = '';
+        this.renderer?.skinManager?._compositeCache.clear();
+        this.setLayoutMode('auto');
+        this.ui.updateTutorialNote(this);
+        this.ui.updateSettingsPanel();
+    }
+
+    // Revert a single action to its DEFAULT_KEYMAP value.
+    resetKeyBinding(action) {
+        if (this.settings.keyBindings) delete this.settings.keyBindings[action];
+        this.saveSettingsToStorage();
+        this.input.applyKeyBindings();
+        this.ui.updateSettingsPanel();
+    }
+
+    // Clear all custom bindings, reverting to DEFAULT_KEYMAP.
+    resetKeyBindings() {
+        this.settings.keyBindings = {};
+        this.saveSettingsToStorage();
+        this.input.applyKeyBindings();
+        this.ui.updateSettingsPanel();
     }
 
     save() {
@@ -2941,6 +3021,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('start-settings-panel').addEventListener('change', saveStartSettings);
     document.getElementById('start-settings-panel').addEventListener('input', saveStartSettings);
+
+    // Start-screen settings tabs (General / Graphics / Controls). Sections are
+    // tagged with data-start-tab; we toggle visibility rather than re-render.
+    function setStartSettingsTab(tab) {
+        document.querySelectorAll('#start-settings-panel [data-start-tab]').forEach(el => {
+            el.style.display = el.getAttribute('data-start-tab') === tab ? '' : 'none';
+        });
+        document.querySelectorAll('#start-settings-panel [data-start-tab-btn]').forEach(btn => {
+            const active = btn.getAttribute('data-start-tab-btn') === tab;
+            btn.classList.toggle('active', active);
+            btn.style.background = active ? '#2a2a4e' : '#16162a';
+            btn.style.color = active ? '#ffcc00' : '#999';
+        });
+        if (tab === 'controls') renderStartKeybindings();
+    }
+    document.querySelectorAll('#start-settings-panel [data-start-tab-btn]').forEach(btn => {
+        btn.addEventListener('click', () => setStartSettingsTab(btn.getAttribute('data-start-tab-btn')));
+    });
+
+    // Render the rebindable-key rows into the start-screen Controls tab. There is
+    // no Game instance yet, so binding capture works directly against localStorage
+    // via the shared keybindings-ui helper (window.startRebindKey below).
+    function renderStartKeybindings() {
+        const host = document.getElementById('start-keybindings');
+        if (host) host.innerHTML = keybindingRowsHtml('window.startRebindKey', 'window.startResetKey');
+    }
+    window.startRebindKey = (action, btn) => {
+        beginRebindCapture(
+            action, btn,
+            () => renderStartKeybindings(),
+            (key) => { btn.title = `"${formatKeyLabel(key)}" is reserved and cannot be rebound`; }
+        );
+    };
+    window.startResetKey = (action) => {
+        resetStoredBinding(action);
+        renderStartKeybindings();
+    };
+
+    document.getElementById('start-reset-keybinds').addEventListener('click', () => {
+        clearStoredBindings();
+        renderStartKeybindings();
+    });
 
     document.getElementById('start-reset-defaults').addEventListener('click', () => {
         document.getElementById('start-skin').value = 'ascii';

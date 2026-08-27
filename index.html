@@ -51,19 +51,26 @@
             <b><u>Controls</u></b><br>
             [WASD]/[Arrows]=Pan | [B]=Build | [F]=Farm | [G]=Gather<br>
             [P]=Priorities | [C]=Craft | [R]=Research | [I]=Inventory<br>
-            [V]=Arcane | [J]=Story | [Esc]/[,]=Settings | [Tab]=Toggle Chop/Mine<br>
-            [Space]=Pause | [&lt;]/[&gt;]=Speed | [+]/[-]=Zoom | [/]=Cycle Colonist<br>
-            [Click]=Select/Place | [Click+Drag]=Area select<br>
-            [Right-click]=Cancel/Mark for Destruction | [Esc]=Close/Cancel
+            [V]=Arcane | [J]=Story | [Esc]=Settings | [Tab]=Toggle Chop/Mine<br>
+            [Space]=Pause | [&lt;]/[&gt;]/[.]=Speed | [+]/[-]/[Wheel]=Zoom | [/]=Reset Minimap<br>
+            [Q]=Draft/Undraft | [E]=Select All | [N]=Next Idle | [ [ ]/[ ] ]=Cycle Colonist<br>
+            [Click]=Select/Place | [Click+Drag]=Area select | [Middle-drag]=Pan<br>
+            [Right-click]=Cancel/Mark for Destruction | [Esc]=Close/Cancel<br>
+            Keys can be remapped in Settings &rarr; Controls / Keybindings.
         </p>
         <div id="version-label" style="color:#999;""></div>
         <input type="file" id="import-file" accept=".json" style="display:none">
-        <div id="start-settings-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:360px; max-width:90vw; max-height:80vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
+        <div id="start-settings-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(600px, 92vw); max-width:92vw; max-height:80vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
             <button onclick="document.getElementById('start-settings-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="position:absolute; top:8px; right:12px; background:none; border:none; color:#aaa; font-size:18px; cursor:pointer; z-index:1;">&times;</button>
             <div style="margin-bottom:12px; padding-right:24px;">
                 <div style="color:#ffcc00; font-weight:bold;">Game Settings</div>
             </div>
-            <div class="settings-section">
+            <div class="settings-tabs" style="display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid #444;">
+                <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">General</button>
+                <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Graphics</button>
+                <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Controls</button>
+            </div>
+            <div class="settings-section" data-start-tab="graphics" style="display:none;">
                 <div class="settings-section-title">Visual</div>
                 <div class="settings-row">
                     <label for="start-skin">Tile Skin:</label>
@@ -91,7 +98,7 @@
                     </select>
                 </div>
             </div>
-            <div class="settings-section">
+            <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Audio</div>
                 <div class="settings-row">
                     <label for="start-music-vol">Music Volume: <span id="start-music-vol-val">70</span></label>
@@ -102,7 +109,7 @@
                     <input type="range" id="start-sfx-vol" min="0" max="100" value="80" style="width:80px" oninput="document.getElementById('start-sfx-vol-val').textContent=this.value">
                 </div>
             </div>
-            <div class="settings-section">
+            <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Gameplay</div>
                 <div class="settings-row"><input type="checkbox" id="start-autopause-hostile" checked><label for="start-autopause-hostile">Auto-pause on hostile event (raids)</label></div>
                 <div class="settings-row"><input type="checkbox" id="start-autopause-event" checked><label for="start-autopause-event">Auto-pause on choice events (wanderers, caravans)</label></div>
@@ -130,7 +137,7 @@
                     </select>
                 </div>
             </div>
-            <div class="settings-section">
+            <div class="settings-section" data-start-tab="graphics" style="display:none;">
                 <div class="settings-section-title">Effects & Performance</div>
                 <div class="settings-row"><input type="checkbox" id="start-overlays" checked onchange="document.querySelectorAll('#start-night,#start-weather,#start-damage-flash,#start-screen-shake,#start-combat-particles,#start-projectiles,#start-equip-overlays,#start-progress-bars,#start-portal-path,#start-minimap').forEach(el=>el.checked=this.checked)"><label for="start-overlays">Master toggle: all combat/overlay effects</label></div>
                 <div class="settings-row"><input type="checkbox" id="start-night" checked><label for="start-night">Show night lighting/darkness (High Performance Impact)</label></div>
@@ -165,7 +172,7 @@
                 </div>
                 <div class="settings-row"><input type="checkbox" id="start-fps"><label for="start-fps">Show FPS counter</label></div>
             </div>
-            <div class="settings-section">
+            <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Accessibility</div>
                 <div class="settings-row"><input type="checkbox" id="start-darken-pause" checked><label for="start-darken-pause">Darken screen when paused</label></div>
                 <div class="settings-row">
@@ -206,15 +213,22 @@
                 </div>
                 <div class="settings-row"><input type="checkbox" id="start-colonist-highlight"><label for="start-colonist-highlight">Show colonist color outline (sprite mode)</label></div>
             </div>
-            <div class="settings-section">
+            <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Save Data</div>
                 <div class="settings-row" style="gap:8px;">
                     <button id="export-game" disabled style="flex:1;padding:4px 8px;font-size:11px;">Export Save</button>
                     <button id="import-game" style="flex:1;padding:4px 8px;font-size:11px;">Import Save</button>
                 </div>
             </div>
-            <div style="margin-top:12px; text-align:center;">
-                <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset to Defaults</button>
+            <div class="settings-section" data-start-tab="general" style="border-bottom:none; text-align:center;">
+                <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset all settings to Default</button>
+            </div>
+            <div class="settings-section" data-start-tab="controls" style="display:none;">
+                <div class="settings-section-title">Controls / Keybindings</div>
+                <div id="start-keybindings"></div>
+                <div class="settings-row" style="margin-top:6px;">
+                    <button id="start-reset-keybinds" style="padding:4px 10px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset all keybinds to Default</button>
+                </div>
             </div>
         </div>
     </div>
@@ -357,9 +371,12 @@
             <div id="mode-bar"></div>
         </div>
         <div id="touch-toolbar">
-            <button id="touch-pan-btn" onclick="window.game?.input.toggleTouchPanMode()">Pan</button>
             <button id="touch-destroy-btn" onclick="window.game?.input.toggleDestroyMode()">Destroy</button>
+            <button id="touch-pan-btn" onclick="window.game?.input.toggleTouchPanMode()">Pan</button>
             <button id="touch-rally-btn" onclick="window.game?.input.toggleRallyMode()">Rally</button>
+            <button id="touch-selectall-btn" onclick="window.game?.input.selectAllColonists()">Select All</button>
+            <button id="touch-idle-btn" onclick="window.game?.cycleIdleColonist()">Next Idle</button>
+            <button id="touch-draft-btn" onclick="window.game?.input.toggleDraftSelected()">Draft</button>
             <button onclick="window.game?.togglePause()">Pause</button>
         </div>
         <div id="panel-overlay" class="panel-overlay"></div>

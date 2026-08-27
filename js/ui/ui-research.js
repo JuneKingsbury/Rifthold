@@ -184,6 +184,8 @@ const researchMethods = {
         this._removeResearchKeyboard();
         this._researchKeydownHandler = (e) => {
             if (!this.researchPanelVisible) return;
+            const el = document.activeElement;
+            if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
             if (e.key === 'Escape') {
                 this.toggleResearchPanel();
             } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {

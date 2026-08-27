@@ -984,7 +984,6 @@ img.pixel-art {
     text-align: center;
     flex-shrink: 0;
     white-space: nowrap;
-    width: 80px;
 }
 
 #touch-toolbar button.active {
@@ -2275,6 +2274,18 @@ img.pixel-art {
 }
 
 .settings-debug .settings-section-title {
+    color: #ff6666;
+}
+
+/* Debug section is a collapsible <details>; style its <summary> as a toggle. */
+details.settings-debug > summary {
+    user-select: none;
+    padding: 2px 0;
+}
+details.settings-debug > summary:hover {
+    color: #ff8888;
+}
+details.settings-debug > summary::marker {
     color: #ff6666;
 }
 

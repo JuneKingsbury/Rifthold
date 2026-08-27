@@ -10,6 +10,7 @@ import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
 import { getRoleInfoHtml, getEffectInfoHtml } from '../entities/roles.js';
+import { keybindingRowsHtml, beginRebindCapture, formatKeyLabel } from './keybindings-ui.js';
 import { installArcanePanel } from './ui-arcane.js';
 import { installResearchPanel } from './ui-research.js';
 import { installTutorialPanel } from './ui-tutorial.js';
@@ -2350,201 +2351,253 @@ export class UI {
 
     updateSettingsPanel() {
         const s = this.game.settings;
+        if (!this._settingsTab) this._settingsTab = 'general';
+        const tab = this._settingsTab;
         let html = '<div class="panel-close" data-panel-close="settings">&times;</div><h3>Settings</h3>';
 
-        html += `<div class="settings-section"><div class="settings-section-title">Save / Load</div>`;
-        html += `<div class="settings-row" style="gap:8px;">`;
-        html += `<button onclick="window.game.save()" class="settings-btn settings-btn-green">Save Game</button>`;
-        html += `<button onclick="window.game.exportSave()" class="settings-btn settings-btn-blue">Export Save</button>`;
-        html += `</div></div>`;
+        // Tab bar (General / Graphics / Controls)
+        const tabs = [['general', 'General'], ['graphics', 'Graphics'], ['controls', 'Controls']];
+        html += `<div class="settings-tabs" style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #444;">`;
+        for (const [key, label] of tabs) {
+            const active = tab === key;
+            html += `<button onclick="window.game.ui._setSettingsTab('${key}')" class="settings-tab-btn${active ? ' active' : ''}" style="flex:1;padding:5px 8px;background:${active ? '#2a2a4e' : '#16162a'};color:${active ? '#ffcc00' : '#999'};border:1px solid #444;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-family:inherit;font-size:12px;">${label}</button>`;
+        }
+        html += `</div>`;
 
-        html += `<div class="settings-section"><div class="settings-section-title">Visual</div>`;
-        html += `<div class="settings-row">`;
-        html += `<label for="set-skin">Tile Skin:</label>`;
-        html += `<select id="set-skin" onchange="window.game.switchSkin(this.value)" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
+        // ===== GENERAL TAB =====
+        let general = '';
+        general += `<div class="settings-section"><div class="settings-section-title">Save / Load</div>`;
+        general += `<div class="settings-row" style="gap:8px;">`;
+        general += `<button onclick="window.game.save()" class="settings-btn settings-btn-green">Save Game</button>`;
+        general += `<button onclick="window.game.exportSave()" class="settings-btn settings-btn-blue">Export Save</button>`;
+        general += `</div></div>`;
+
+        // ===== GRAPHICS TAB =====
+        let graphics = '';
+        graphics += `<div class="settings-section"><div class="settings-section-title">Visual</div>`;
+        graphics += `<div class="settings-row">`;
+        graphics += `<label for="set-skin">Tile Skin:</label>`;
+        graphics += `<select id="set-skin" onchange="window.game.switchSkin(this.value)" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
         const skinNames = this.game.skinManager.getSkinNames();
         for (const name of skinNames) {
             const display = name === 'ascii' ? 'ASCII' : name.charAt(0).toUpperCase() + name.slice(1);
-            html += `<option value="${name}" ${s.activeSkin === name ? 'selected' : ''}>${display}</option>`;
+            graphics += `<option value="${name}" ${s.activeSkin === name ? 'selected' : ''}>${display}</option>`;
         }
-        html += `</select></div>`;
-        html += `<div class="settings-row">`;
-        html += `<label for="set-names">Colonist names:</label>`;
-        html += `<select id="set-names" onchange="window.game.settings.showColonistNames=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
+        graphics += `</select></div>`;
+        graphics += `<div class="settings-row">`;
+        graphics += `<label for="set-names">Colonist names:</label>`;
+        graphics += `<select id="set-names" onchange="window.game.settings.showColonistNames=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
         for (const val of ['off', 'selected', 'always']) {
-            html += `<option value="${val}" ${s.showColonistNames === val ? 'selected' : ''}>${val.charAt(0).toUpperCase() + val.slice(1)}</option>`;
+            graphics += `<option value="${val}" ${s.showColonistNames === val ? 'selected' : ''}>${val.charAt(0).toUpperCase() + val.slice(1)}</option>`;
         }
-        html += `</select></div>`;
+        graphics += `</select></div>`;
         const uiSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-size')) || 12;
-        html += `<div class="settings-row">`;
-        html += `<label for="set-ui-font-size">UI Font Size: <span id="ui-font-size-val">${uiSize}px</span></label>`;
-        html += `<input type="range" id="set-ui-font-size" min="8" max="20" value="${uiSize}" style="width:80px" oninput="document.getElementById('ui-font-size-val').textContent=this.value+'px';window.setUIFontSize(this.value)">`;
-        html += `</div>`;
-        html += `<div class="settings-row"><label for="set-temp-unit">Temperature unit:</label><select id="set-temp-unit" onchange="window.game.settings.temperatureUnit=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        graphics += `<div class="settings-row">`;
+        graphics += `<label for="set-ui-font-size">UI Font Size: <span id="ui-font-size-val">${uiSize}px</span></label>`;
+        graphics += `<input type="range" id="set-ui-font-size" min="8" max="20" value="${uiSize}" style="width:80px" oninput="document.getElementById('ui-font-size-val').textContent=this.value+'px';window.setUIFontSize(this.value)">`;
+        graphics += `</div>`;
+        graphics += `<div class="settings-row"><label for="set-temp-unit">Temperature unit:</label><select id="set-temp-unit" onchange="window.game.settings.temperatureUnit=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['F','Fahrenheit (°F)'],['C','Celsius (°C)']]) {
-            html += `<option value="${val}"${s.temperatureUnit === val ? ' selected' : ''}>${label}</option>`;
+            graphics += `<option value="${val}"${s.temperatureUnit === val ? ' selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += `<div class="settings-row"><label for="set-dither-dist">Dithering Distance:</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        graphics += `</select></div>`;
+        graphics += `<div class="settings-row"><label for="set-dither-dist">Dithering Distance:</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['none','Off'],['minimal','Minimal'],['light','Light (default)'],['normal','Normal'],['heavy','Heavy'],['extreme','Extreme']]) {
-            html += `<option value="${val}"${(s.ditherDistance || 'light') === val ? ' selected' : ''}>${label}</option>`;
+            graphics += `<option value="${val}"${(s.ditherDistance || 'light') === val ? ' selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += `<div class="settings-row"><label for="set-dither-qual">Dithering Quality:</label><select id="set-dither-qual" onchange="window.game.settings.ditherQuality=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        graphics += `</select></div>`;
+        graphics += `<div class="settings-row"><label for="set-dither-qual">Dithering Quality:</label><select id="set-dither-qual" onchange="window.game.settings.ditherQuality=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['chunky','Chunky (4x4 blocks)'],['low','Low (3x3 blocks)'],['medium','Medium (2x2 blocks, default)'],['high','High (single pixels)']]) {
-            html += `<option value="${val}"${(s.ditherQuality || 'medium') === val ? ' selected' : ''}>${label}</option>`;
+            graphics += `<option value="${val}"${(s.ditherQuality || 'medium') === val ? ' selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += `</div>`;
+        graphics += `</select></div>`;
+        graphics += `</div>`;
 
-        html += `<div class="settings-section"><div class="settings-section-title">Audio</div>`;
-        html += `<div class="settings-row">`;
-        html += `<label for="set-music-vol">Music Volume: <span id="music-vol-val">${s.musicVolume}</span></label>`;
-        html += `<input type="range" id="set-music-vol" min="0" max="100" value="${s.musicVolume}" style="width:80px" oninput="document.getElementById('music-vol-val').textContent=this.value;window.game.settings.musicVolume=parseInt(this.value);if(window.soundManager)window.soundManager.setMusicVolume(parseInt(this.value))">`;
-        html += `</div>`;
-        html += `<div class="settings-row">`;
-        html += `<label for="set-sfx-vol">SFX Volume: <span id="sfx-vol-val">${s.sfxVolume}</span></label>`;
-        html += `<input type="range" id="set-sfx-vol" min="0" max="100" value="${s.sfxVolume}" style="width:80px" oninput="document.getElementById('sfx-vol-val').textContent=this.value;window.game.settings.sfxVolume=parseInt(this.value);if(window.soundManager)window.soundManager.setSFXVolume(parseInt(this.value))">`;
-        html += `</div></div>`;
+        general += `<div class="settings-section"><div class="settings-section-title">Audio</div>`;
+        general += `<div class="settings-row">`;
+        general += `<label for="set-music-vol">Music Volume: <span id="music-vol-val">${s.musicVolume}</span></label>`;
+        general += `<input type="range" id="set-music-vol" min="0" max="100" value="${s.musicVolume}" style="width:80px" oninput="document.getElementById('music-vol-val').textContent=this.value;window.game.settings.musicVolume=parseInt(this.value);if(window.soundManager)window.soundManager.setMusicVolume(parseInt(this.value))">`;
+        general += `</div>`;
+        general += `<div class="settings-row">`;
+        general += `<label for="set-sfx-vol">SFX Volume: <span id="sfx-vol-val">${s.sfxVolume}</span></label>`;
+        general += `<input type="range" id="set-sfx-vol" min="0" max="100" value="${s.sfxVolume}" style="width:80px" oninput="document.getElementById('sfx-vol-val').textContent=this.value;window.game.settings.sfxVolume=parseInt(this.value);if(window.soundManager)window.soundManager.setSFXVolume(parseInt(this.value))">`;
+        general += `</div></div>`;
 
-        html += `<div class="settings-section"><div class="settings-section-title">Gameplay</div>`;
-        html += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', 'Auto-pause on hostile event (raids)');
-        html += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, caravans)');
-        html += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', 'Auto-pause on colonist death');
-        html += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
-        html += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', 'Peaceful mode (no raids/hostile animals)');
-        html += `<div class="settings-row" style="gap:4px;">`;
-        html += `<label>Auto-cook target:</label>`;
-        html += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)-10)" style="padding:1px 5px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;">-10</button>`;
-        html += `<input type="number" min="0" max="200" value="${s.autoCookTarget||0}" onchange="window.game.setAutoCookTarget(parseInt(this.value)||0)" style="width:42px;text-align:center;background:#1a1a2e;color:#88cc88;border:1px solid #555;border-radius:3px;padding:1px;">`;
-        html += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)+10)" style="padding:1px 5px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;">+10</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row">`;
-        html += `<label for="set-autosave">Auto-save interval:</label>`;
-        html += `<select id="set-autosave" onchange="window.game.settings.autoSaveInterval=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
+        general += `<div class="settings-section"><div class="settings-section-title">Gameplay</div>`;
+        general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', 'Auto-pause on hostile event (raids)');
+        general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, caravans)');
+        general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', 'Auto-pause on colonist death');
+        general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
+        general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', 'Peaceful mode (no raids/hostile animals)');
+        general += `<div class="settings-row" style="gap:4px;">`;
+        general += `<label>Auto-cook target:</label>`;
+        general += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)-10)" style="padding:1px 5px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;">-10</button>`;
+        general += `<input type="number" min="0" max="200" value="${s.autoCookTarget||0}" onchange="window.game.setAutoCookTarget(parseInt(this.value)||0)" style="width:42px;text-align:center;background:#1a1a2e;color:#88cc88;border:1px solid #555;border-radius:3px;padding:1px;">`;
+        general += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)+10)" style="padding:1px 5px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;">+10</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row">`;
+        general += `<label for="set-autosave">Auto-save interval:</label>`;
+        general += `<select id="set-autosave" onchange="window.game.settings.autoSaveInterval=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
         for (const [val, label] of [[0, 'Off'], [12, 'Every 12 hours'], [24, 'Every 24 hours'], [48, 'Every 48 hours']]) {
-            html += `<option value="${val}" ${s.autoSaveInterval === val ? 'selected' : ''}>${label}</option>`;
+            general += `<option value="${val}" ${s.autoSaveInterval === val ? 'selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', 'Show tutorial hints');
-        html += `</div>`;
+        general += `</select></div>`;
+        general += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', 'Show tutorial hints');
+        general += `</div>`;
 
-        html += `<div class="settings-section"><div class="settings-section-title">Accessibility</div>`;
-        html += this._settingsCheck('set-darken-pause', s.darkenOnPause, 'window.game.settings.darkenOnPause=this.checked;if(window.game.paused)document.getElementById("game").classList.toggle("paused",this.checked)', 'Darken screen when paused');
-        html += `<div class="settings-row"><label for="set-toolbar-mode">Button bar:</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        general += `<div class="settings-section"><div class="settings-section-title">Accessibility</div>`;
+        general += this._settingsCheck('set-darken-pause', s.darkenOnPause, 'window.game.settings.darkenOnPause=this.checked;if(window.game.paused)document.getElementById("game").classList.toggle("paused",this.checked)', 'Darken screen when paused');
+        general += `<div class="settings-row"><label for="set-toolbar-mode">Button bar:</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['auto','Auto'],['always','Always'],['never','Never']]) {
-            html += `<option value="${val}"${(s.toolbarMode || 'auto') === val ? ' selected' : ''}>${label}</option>`;
+            general += `<option value="${val}"${(s.toolbarMode || 'auto') === val ? ' selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += this._settingsCheck('set-large-clicks', s.largeClickTargets, 'window.game.settings.largeClickTargets=this.checked;document.getElementById("game-container").classList.toggle("large-targets",this.checked)', 'Larger click targets (buttons & checkboxes)');
-        html += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', 'Pause when window loses focus');
-        html += `<div class="settings-row"><label for="set-colorblind">Colorblind mode:</label><select id="set-colorblind" onchange="window.game.settings.colorblindMode=this.value;document.getElementById('game-container').setAttribute('data-colorblind',this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        general += `</select></div>`;
+        general += this._settingsCheck('set-large-clicks', s.largeClickTargets, 'window.game.settings.largeClickTargets=this.checked;document.getElementById("game-container").classList.toggle("large-targets",this.checked)', 'Larger click targets (buttons & checkboxes)');
+        general += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', 'Pause when window loses focus');
+        general += `<div class="settings-row"><label for="set-colorblind">Colorblind mode:</label><select id="set-colorblind" onchange="window.game.settings.colorblindMode=this.value;document.getElementById('game-container').setAttribute('data-colorblind',this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['none','None'],['protanopia','Protanopia (red-blind)'],['deuteranopia','Deuteranopia (green-blind)'],['tritanopia','Tritanopia (blue-blind)']]) {
-            html += `<option value="${val}"${s.colorblindMode === val ? ' selected' : ''}>${label}</option>`;
+            general += `<option value="${val}"${s.colorblindMode === val ? ' selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += `<div class="settings-row"><label for="set-notif-dur">Notification duration:</label><select id="set-notif-dur" onchange="window.game.settings.notificationDuration=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        general += `</select></div>`;
+        general += `<div class="settings-row"><label for="set-notif-dur">Notification duration:</label><select id="set-notif-dur" onchange="window.game.settings.notificationDuration=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['50','Short (50 ticks)'],['100','Normal (100 ticks)'],['200','Long (200 ticks)'],['500','Persistent (500 ticks)']]) {
-            html += `<option value="${val}"${s.notificationDuration === parseInt(val) ? ' selected' : ''}>${label}</option>`;
+            general += `<option value="${val}"${s.notificationDuration === parseInt(val) ? ' selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += `<div class="settings-row"><label for="set-layout-mode">Layout mode:</label><select id="set-layout-mode" onchange="window.game.setLayoutMode(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        general += `</select></div>`;
+        general += `<div class="settings-row"><label for="set-layout-mode">Layout mode:</label><select id="set-layout-mode" onchange="window.game.setLayoutMode(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['auto','Auto (detect screen size)'],['separate','Separate'],['tabbed','Tabbed']]) {
-            html += `<option value="${val}"${s.layoutMode === val ? ' selected' : ''}>${label}</option>`;
+            general += `<option value="${val}"${s.layoutMode === val ? ' selected' : ''}>${label}</option>`;
         }
-        html += `</select></div>`;
-        html += this._settingsCheck('set-colonist-highlight', s.showColonistHighlight, 'window.game.settings.showColonistHighlight=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show colonist color outline (sprite mode)');
-        html += `</div>`;
+        general += `</select></div>`;
+        graphics += `<div class="settings-section"><div class="settings-section-title">Effects & Performance</div>`;
+        graphics += this._settingsCheck('set-colonist-highlight', s.showColonistHighlight, 'window.game.settings.showColonistHighlight=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show colonist color outline (sprite mode)');
+        graphics += this._settingsCheck('set-overlays', s.showOverlays, 'window.game.ui._toggleAllEffects(this.checked)', 'Master toggle: all combat/overlay effects');
+        graphics += this._settingsCheck('set-night', s.showNightLighting, 'window.game.settings.showNightLighting=this.checked', 'Show night lighting/darkness (High Performance Impact)');
+        graphics += this._settingsCheck('set-weather', s.showWeatherParticles, 'window.game.settings.showWeatherParticles=this.checked', 'Show weather particles');
+        graphics += this._settingsCheck('set-damage-flash', s.showDamageFlash, 'window.game.settings.showDamageFlash=this.checked', 'Damage flash on hit');
+        graphics += this._settingsCheck('set-screen-shake', s.enableScreenShake, 'window.game.settings.enableScreenShake=this.checked', 'Enable screen shake');
+        graphics += this._settingsCheck('set-combat-particles', s.showCombatParticles, 'window.game.settings.showCombatParticles=this.checked', 'Combat/action particles (sparks, skulls)');
+        graphics += this._settingsCheck('set-projectiles', s.showProjectiles, 'window.game.settings.showProjectiles=this.checked', 'Projectile trails (arrows, bolts)');
+        graphics += this._settingsCheck('set-equip-overlays', s.showEquipmentOverlays, 'window.game.settings.showEquipmentOverlays=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show equipped armor/helmets on colonists (sprite mode)');
+        graphics += this._settingsCheck('set-progress-bars', s.showProgressBars, 'window.game.settings.showProgressBars=this.checked', 'Progress & health bars');
+        graphics += this._settingsCheck('set-portal-path', s.showPortalPath, 'window.game.settings.showPortalPath=this.checked', 'Portal path highlighting');
+        graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
+        graphics += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', 'Show FPS counter (top-right of game grid)');
+        graphics += `</div>`;
 
-        html += `<div class="settings-section"><div class="settings-section-title">Effects & Performance</div>`;
-        html += this._settingsCheck('set-overlays', s.showOverlays, 'window.game.ui._toggleAllEffects(this.checked)', 'Master toggle: all combat/overlay effects');
-        html += this._settingsCheck('set-night', s.showNightLighting, 'window.game.settings.showNightLighting=this.checked', 'Show night lighting/darkness (High Performance Impact)');
-        html += this._settingsCheck('set-weather', s.showWeatherParticles, 'window.game.settings.showWeatherParticles=this.checked', 'Show weather particles');
-        html += this._settingsCheck('set-damage-flash', s.showDamageFlash, 'window.game.settings.showDamageFlash=this.checked', 'Damage flash on hit');
-        html += this._settingsCheck('set-screen-shake', s.enableScreenShake, 'window.game.settings.enableScreenShake=this.checked', 'Enable screen shake');
-        html += this._settingsCheck('set-combat-particles', s.showCombatParticles, 'window.game.settings.showCombatParticles=this.checked', 'Combat/action particles (sparks, skulls)');
-        html += this._settingsCheck('set-projectiles', s.showProjectiles, 'window.game.settings.showProjectiles=this.checked', 'Projectile trails (arrows, bolts)');
-        html += this._settingsCheck('set-equip-overlays', s.showEquipmentOverlays, 'window.game.settings.showEquipmentOverlays=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show equipped armor/helmets on colonists (sprite mode)');
-        html += this._settingsCheck('set-progress-bars', s.showProgressBars, 'window.game.settings.showProgressBars=this.checked', 'Progress & health bars');
-        html += this._settingsCheck('set-portal-path', s.showPortalPath, 'window.game.settings.showPortalPath=this.checked', 'Portal path highlighting');
-        html += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
-        html += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', 'Show FPS counter (top-right of game grid)');
-        html += `</div>`;
+        // ===== CONTROLS TAB =====
+        let controls = this._keybindingsSectionHtml();
 
-        html += `<div class="settings-section">`;
-        html += `<button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">View Glossary</button>`;
-        html += `</div>`;
+        general += `<div class="settings-section">`;
+        general += `<button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">View Glossary</button>`;
+        general += `</div>`;
 
-        html += `<div class="settings-section settings-debug"><div class="settings-section-title" style="color:#ff6666;">Debug / Testing</div>`;
-        html += `<button onclick="if(confirm('Grant 999 of all resources?'))window.game.cheatResources()" class="settings-btn settings-btn-danger">Grant 999 Resources</button>`;
-        html += `<button onclick="if(confirm('Complete all research?'))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">Grant All Research</button>`;
-        html += `<button onclick="if(confirm('Grant all starter spells (level 0) to every colonist and set magic skills to 1?'))window.game.cheatGrantStarterSpells()" class="settings-btn settings-btn-danger">Grant All Starter Spells + Magic Lvl 1</button>`;
-        html += `<button onclick="window.game.cheatSpawnColonist()" class="settings-btn settings-btn-danger">Grant New Colonist</button>`;
-        html += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
-        html += `<select id="debug-artifact-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        general += `<details class="settings-section settings-debug"><summary class="settings-section-title" style="color:#ff6666;cursor:pointer;list-style:revert;">Debug / Testing</summary>`;
+        general += `<button onclick="if(confirm('Grant 999 of all resources?'))window.game.cheatResources()" class="settings-btn settings-btn-danger" style="margin-top:8px;">Grant 999 Resources</button>`;
+        general += `<button onclick="if(confirm('Complete all research?'))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">Grant All Research</button>`;
+        general += `<button onclick="if(confirm('Grant all starter spells (level 0) to every colonist and set magic skills to 1?'))window.game.cheatGrantStarterSpells()" class="settings-btn settings-btn-danger">Grant All Starter Spells + Magic Lvl 1</button>`;
+        general += `<button onclick="window.game.cheatSpawnColonist()" class="settings-btn settings-btn-danger">Grant New Colonist</button>`;
+        general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-artifact-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(ARTIFACTS)) {
-            html += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${key}">${def.name}</option>`;
         }
-        html += `</select>`;
-        html += `<button onclick="window.game.cheatSpawnItem('artifact',document.getElementById('debug-artifact-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Artifact</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
-        html += `<select id="debug-weapon-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatSpawnItem('artifact',document.getElementById('debug-artifact-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Artifact</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-weapon-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(WEAPONS)) {
             if (key === 'fists') continue;
-            html += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${key}">${def.name}</option>`;
         }
-        html += `</select>`;
-        html += `<button onclick="window.game.cheatSpawnItem('weapon',document.getElementById('debug-weapon-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Weapon</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
-        html += `<select id="debug-armor-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatSpawnItem('weapon',document.getElementById('debug-weapon-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Weapon</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-armor-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(ARMORS)) {
-            html += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${key}">${def.name}</option>`;
         }
-        html += `</select>`;
-        html += `<button onclick="window.game.cheatSpawnItem('armor',document.getElementById('debug-armor-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Armor</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
-        html += `<select id="debug-tool-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatSpawnItem('armor',document.getElementById('debug-armor-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Armor</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-tool-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(TOOLS)) {
-            html += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${key}">${def.name}</option>`;
         }
-        html += `</select>`;
-        html += `<button onclick="window.game.cheatSpawnItem('tool',document.getElementById('debug-tool-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Tool</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
-        html += `<select id="debug-helmet-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatSpawnItem('tool',document.getElementById('debug-tool-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Tool</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-helmet-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(HELMETS)) {
-            html += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${key}">${def.name}</option>`;
         }
-        html += `</select>`;
-        html += `<button onclick="window.game.cheatSpawnItem('helmet',document.getElementById('debug-helmet-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Helmet</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
-        html += `<select id="debug-resource-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:80px;">`;
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatSpawnItem('helmet',document.getElementById('debug-helmet-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Helmet</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-resource-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:80px;">`;
         for (const key of Object.keys(this.game.resources.stockpile)) {
-            html += `<option value="${key}">${key.replace(/_/g, ' ')}</option>`;
+            general += `<option value="${key}">${key.replace(/_/g, ' ')}</option>`;
         }
-        html += `</select>`;
-        html += `<input id="debug-resource-amount" type="number" value="50" min="1" max="999" style="width:50px;background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
-        html += `<button onclick="window.game.cheatAddResource(document.getElementById('debug-resource-select').value, parseInt(document.getElementById('debug-resource-amount').value)||50)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Resource</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
-        html += `<select id="debug-event-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        general += `</select>`;
+        general += `<input id="debug-resource-amount" type="number" value="50" min="1" max="999" style="width:50px;background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
+        general += `<button onclick="window.game.cheatAddResource(document.getElementById('debug-resource-select').value, parseInt(document.getElementById('debug-resource-amount').value)||50)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Resource</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-event-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const key of Object.keys(EVENTS)) {
-            html += `<option value="${key}">${key.replace(/_/g, ' ')}</option>`;
+            general += `<option value="${key}">${key.replace(/_/g, ' ')}</option>`;
         }
-        html += `</select>`;
-        html += `<button onclick="window.game.cheatTriggerEvent(document.getElementById('debug-event-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Trigger Event</button>`;
-        html += `</div>`;
-        html += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
-        html += `<input id="debug-time-amount" type="number" value="300" min="1" max="9999" style="width:60px;background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
-        html += `<button onclick="window.game.cheatAdvanceTime(parseInt(document.getElementById('debug-time-amount').value)||300)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Advance Ticks</button>`;
-        html += `<span style="color:#666;font-size:10px;">(300=1 day)</span>`;
-        html += `</div>`;
-        html += `</div>`;
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatTriggerEvent(document.getElementById('debug-event-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Trigger Event</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
+        general += `<input id="debug-time-amount" type="number" value="300" min="1" max="9999" style="width:60px;background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
+        general += `<button onclick="window.game.cheatAdvanceTime(parseInt(document.getElementById('debug-time-amount').value)||300)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Advance Ticks</button>`;
+        general += `<span style="color:#666;font-size:10px;">(300=1 day)</span>`;
+        general += `</div>`;
+        general += `</details>`;
+
+        general += `<div class="settings-section" style="text-align:center;"><button onclick="if(confirm('Reset all settings to their default values? (Keybindings are reset separately on the Controls tab.)'))window.game.resetAllSettings()" class="settings-btn settings-btn-danger">Reset all settings to Default</button></div>`;
+
+        html += tab === 'graphics' ? graphics : tab === 'controls' ? controls : general;
         this.elements.settingsPanel.innerHTML = html;
+    }
+
+    // Switch the active settings tab and re-render the panel.
+    _setSettingsTab(tab) {
+        this._settingsTab = tab;
+        this.updateSettingsPanel();
+    }
+
+    // Controls tab body: grouped rebindable keys + reset button. Delegates row
+    // rendering to the shared keybindings-ui helper (also used by the start screen).
+    _keybindingsSectionHtml() {
+        let html = `<div class="settings-section"><div class="settings-section-title">Controls / Keybindings</div>`;
+        html += keybindingRowsHtml('window.game.ui._startRebind', 'window.game.ui._resetRebind');
+        html += `<div class="settings-row" style="margin-top:6px;"><button onclick="window.game.resetKeyBindings()" class="settings-btn settings-btn-danger">Reset all keybinds to Default</button></div>`;
+        html += `</div>`;
+        return html;
+    }
+
+    // Capture the next keypress and assign it to the given action, then re-apply
+    // to the live InputHandler and re-render. A second click cancels a pending
+    // capture; reserved structural keys are rejected with a notification.
+    _startRebind(action, btn) {
+        beginRebindCapture(
+            action, btn,
+            (_action, key) => { this.game.setKeyBinding(action, key); },
+            (key) => { this.game.notifications.push({ text: `"${formatKeyLabel(key)}" is reserved and cannot be rebound`, tick: this.game.tick, type: 'danger' }); }
+        );
+    }
+
+    // Revert a single action to its default key and re-apply live + re-render.
+    _resetRebind(action) {
+        this.game.resetKeyBinding(action);
     }
 
     _settingsCheck(id, checked, onchange, label) {
