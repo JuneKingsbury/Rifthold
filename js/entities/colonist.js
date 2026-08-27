@@ -947,17 +947,40 @@ function moveTowardPoint(colonist, tx, ty, map, dur, game) {
     moveEntity(colonist, pick[0], pick[1], dur);
 }
 
-function updateMoving(colonist, game) {
-    if (game.waves && game.waves.active && game.waves.enemies.length > 0) {
-        const threat = findNearestHostile(colonist, game);
-        if (threat && colonist.currentTaskId) {
-            game.taskQueue.release(colonist.currentTaskId);
-            colonist.currentTaskId = null;
-            colonist.path = [];
-            colonist.state = 'fighting';
-            return;
-        }
+// Interrupt an in-progress task to engage a threat, then return true if combat was joined.
+// During an active wave any detected hostile triggers engagement regardless of distance
+// (unchanged legacy behavior). During a raid (or when hostile wildlife is about) the threat
+// must be within the colonist's auto-engage range, mirroring updateIdle so busy colonists
+// react to approaching raiders the same way idle ones do. The task is released back to the
+// queue rather than discarded, so an idle colonist — often this same one once the fight
+// ends — can reclaim it via findBestTask. (release() resets workDone, so partial progress is
+// lost, consistent with the wave path.)
+function tryCombatInterrupt(colonist, game) {
+    const waveActive = game.waves && game.waves.active && game.waves.enemies.length > 0;
+    const raidersPresent = game.raiders && game.raiders.length > 0;
+    if (!waveActive && !raidersPresent) return false;
+    if (!colonist.currentTaskId) return false;
+
+    const threat = findNearestHostile(colonist, game);
+    if (!threat) return false;
+
+    if (!waveActive) {
+        if (colonist.traits.includes('pacifist')) return false;
+        const dist = manhattanDist(colonist.x, colonist.y, threat.x, threat.y);
+        const wpnRange = colonist.weapon && colonist.weapon.ranged ? colonist.weapon.range : 0;
+        const autoEngageDist = Math.max(COLONIST_CONFIG.fightEngageDistance, wpnRange);
+        if (dist > autoEngageDist) return false;
     }
+
+    game.taskQueue.release(colonist.currentTaskId);
+    colonist.currentTaskId = null;
+    colonist.path = [];
+    colonist.state = 'fighting';
+    return true;
+}
+
+function updateMoving(colonist, game) {
+    if (tryCombatInterrupt(colonist, game)) return;
 
     if (colonist.moveCooldown > 0) {
         colonist.moveCooldown--;
@@ -1013,15 +1036,7 @@ function updateMoving(colonist, game) {
 }
 
 function updateWorking(colonist, game) {
-    if (game.waves && game.waves.active && game.waves.enemies.length > 0) {
-        const threat = findNearestHostile(colonist, game);
-        if (threat && colonist.currentTaskId) {
-            game.taskQueue.release(colonist.currentTaskId);
-            colonist.currentTaskId = null;
-            colonist.state = 'fighting';
-            return;
-        }
-    }
+    if (tryCombatInterrupt(colonist, game)) return;
 
     const task = game.taskQueue.getById(colonist.currentTaskId);
     if (!task) {
