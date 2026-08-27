@@ -36,6 +36,26 @@ export class ResourceManager {
         return total;
     }
 
+    // How many of `key` the colony currently holds in its store. Bulk resources
+    // and materials live in the stockpile; non-stackable gear/potions/tomes live
+    // in their own typed arrays (addItem routes them there, never to stockpile),
+    // so a plain stockpile[key] lookup would always read 0 for those. Callers
+    // that need the true on-hand quantity (e.g. auto-craft stock targets) must
+    // use this rather than indexing stockpile directly.
+    countItem(key) {
+        switch (ALL_ITEMS[key]?.type) {
+            case 'weapon':     return this.weapons.filter(i => i.key === key).length;
+            case 'armor':      return this.armors.filter(i => i.key === key).length;
+            case 'helmet':     return this.helmets.filter(i => i.key === key).length;
+            case 'tool':       return this.tools.filter(i => i.key === key).length;
+            case 'artifact':   return this.artifacts.filter(i => i.key === key).length;
+            case 'potion':     return this.potions.filter(i => (i.key ?? i.type) === key).length;
+            case 'tome':       return this.tomes.filter(i => i.key === key).length;
+            case 'consumable': return this.consumables.filter(i => i.key === key).length;
+            default:           return this.stockpile[key] || 0;
+        }
+    }
+
     has(costs) {
         for (const [resource, amount] of Object.entries(costs)) {
             if (resource === 'foodstuffs') {

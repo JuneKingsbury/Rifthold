@@ -5,6 +5,7 @@
  * simulationTick every 10th tick; queueCraftingOrder is player-driven.
  */
 import { RECIPES, WORK_CONFIG } from '../core/config.js';
+import { getEquippedItems } from '../entities/colonist.js';
 
 // Cached recipe availability — invalidated when resources, research, structures,
 // or the task queue change. Uses a version counter on game to detect staleness.
@@ -125,6 +126,22 @@ export function updateAutoCook(game) {
     }
 }
 
+// Count items matching `outputKey` currently equipped by colonists, so the
+// auto-craft stock target isn't refilled just because gear moved from the store
+// onto a colonist. Equipped weapon/armor/helmet/tool/artifact are the same
+// objects taken from the store arrays, so they keep their `.key`; tomes are
+// tracked separately as the `equippedTome` key string.
+function countEquipped(game, outputKey) {
+    let count = 0;
+    for (const c of game.colonists) {
+        for (const item of getEquippedItems(c)) {
+            if (item.key === outputKey) count++;
+        }
+        if (c.equippedTome === outputKey) count++;
+    }
+    return count;
+}
+
 export function updateAutoCraft(game) {
     const targets = game.settings.craftTargets;
     if (!targets) return;
@@ -147,7 +164,13 @@ export function updateAutoCraft(game) {
 
         let shouldQueue = false;
         if (config.target > 0) {
-            const current = game.resources.stockpile[outputKey] || 0;
+            // Count everything the colony holds toward the target, not just the
+            // stockpile: crafted gear/potions/tomes are stored in typed arrays
+            // (never in stockpile), and gear a colonist has equipped has left the
+            // store arrays entirely. Omitting either made `current` read 0 for
+            // those recipes, so the target was never satisfied and we crafted
+            // forever past it.
+            const current = game.resources.countItem(outputKey) + countEquipped(game, outputKey);
             const expected = current + pendingForRecipe * (recipe.output[outputKey] || 1);
             shouldQueue = expected < config.target;
         } else if (config.repeat) {
