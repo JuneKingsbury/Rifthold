@@ -491,6 +491,13 @@ function getEquipmentWorkBonus(colonist, task) {
     return mult;
 }
 
+function getRangedWeaponRange(colonist, game) {
+    if (!colonist.weapon || !colonist.weapon.ranged) return 0;
+    let range = colonist.weapon.range;
+    if (game && game.research.isResearched('marksmanship')) range += 1;
+    return range;
+}
+
 function getEquipmentDamageReduction(colonist) {
     let mult = 1;
     for (const item of getEquippedItems(colonist)) {
@@ -793,7 +800,7 @@ function updateIdle(colonist, game) {
     const threat = findNearestHostile(colonist, game);
     if (threat && !colonist.traits.includes('pacifist')) {
         const dist = manhattanDist(colonist.x, colonist.y, threat.x, threat.y);
-        const wpnRange = colonist.weapon && colonist.weapon.ranged ? colonist.weapon.range : 0;
+        const wpnRange = getRangedWeaponRange(colonist, game);
         const autoEngageDist = Math.max(COLONIST_CONFIG.fightEngageDistance, wpnRange);
         if (waveActive || dist <= autoEngageDist) {
             colonist.state = 'fighting';
@@ -1152,7 +1159,7 @@ function tryCombatInterrupt(colonist, game) {
     if (!waveActive) {
         if (colonist.traits.includes('pacifist')) return false;
         const dist = manhattanDist(colonist.x, colonist.y, threat.x, threat.y);
-        const wpnRange = colonist.weapon && colonist.weapon.ranged ? colonist.weapon.range : 0;
+        const wpnRange = getRangedWeaponRange(colonist, game);
         const autoEngageDist = Math.max(COLONIST_CONFIG.fightEngageDistance, wpnRange);
         if (dist > autoEngageDist) return false;
     }
@@ -1248,6 +1255,9 @@ function updateWorking(colonist, game) {
     const skill = colonist.skills[task.skillRequired] || 1;
     speed *= (1 + skill * COLONIST_CONFIG.skillWorkBonus);
 
+    if (task.type === 'mine' && game.research.isResearched('stonework')) {
+        speed *= WORK_CONFIG.stoneworkMiningMult;
+    }
     if (task.skillRequired === 'farming' && colonist.traits.includes('green_thumb')) {
         speed *= TRAITS.green_thumb.farmingSpeedMult;
     }
@@ -1375,7 +1385,7 @@ function updateFighting(colonist, game) {
 
     const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
     const waveActive = game.waves && game.waves.active && game.waves.enemies.length > 0;
-    const weaponReach = colonist.weapon && colonist.weapon.ranged ? colonist.weapon.range : 0;
+    const weaponReach = getRangedWeaponRange(colonist, game);
     const engageDist = Math.max(COLONIST_CONFIG.fightEngageDistance, weaponReach);
     if (dist > engageDist && !waveActive) {
         colonist.state = 'idle';
@@ -1392,7 +1402,7 @@ function updateFighting(colonist, game) {
 
     const weapon = colonist.weapon;
     const isRanged = weapon && weapon.ranged;
-    const weaponRange = isRanged ? weapon.range : 1;
+    const weaponRange = isRanged ? getRangedWeaponRange(colonist, game) : 1;
 
     const baseCooldown = (weapon && weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
     let atkSpeed = 1 + getEquipmentStat(colonist, 'attackSpeed');
@@ -1484,7 +1494,7 @@ function updateHunting(colonist, game) {
     const dist = manhattanDist(colonist.x, colonist.y, animal.x, animal.y);
     const weapon = colonist.weapon;
     const isRanged = weapon && weapon.ranged;
-    const attackRange = isRanged ? weapon.range : 1;
+    const attackRange = isRanged ? getRangedWeaponRange(colonist, game) : 1;
 
     if (dist > attackRange) {
         const dx = Math.sign(animal.x - colonist.x);
@@ -1562,7 +1572,7 @@ function updateDrafted(colonist, game) {
     const threat = findNearestHostile(colonist, game);
     if (threat) {
         const dist = manhattanDist(colonist.x, colonist.y, threat.x, threat.y);
-        const wpnRange = colonist.weapon && colonist.weapon.ranged ? colonist.weapon.range : 0;
+        const wpnRange = getRangedWeaponRange(colonist, game);
         const autoEngageDist = Math.max(COLONIST_CONFIG.fightEngageDistance, wpnRange);
         if (dist <= autoEngageDist) {
             colonist.state = 'fighting';

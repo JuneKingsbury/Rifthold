@@ -108,6 +108,9 @@ function updateFarmTile(game, x, y, season, growthMult) {
             if (game.research.isResearched('irrigation') && isAdjacentToWater(game, x, y)) {
                 effectiveMult *= 1.2;
             }
+            if (tile.zone.crop === 'moonbloom' && game.research.isResearched('verdant_growth')) {
+                effectiveMult *= 1.3;
+            }
             tile.zone.growth += effectiveMult;
             if (tile.zone.growth >= crop.growthTicks) {
                 tile.zone.state = 'ready';

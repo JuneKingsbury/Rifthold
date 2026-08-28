@@ -15,6 +15,7 @@ function applyQuality(item, colonist, game, ...statKeys) {
     }
     if (colonist.traits.includes('creative')) skill += TRAITS.creative.qualityBonus;
     if (colonist.traits.includes('lucky')) skill += TRAITS.lucky.qualityBonus;
+    if (game && game.research.isResearched('artisans_touch')) skill += WORK_CONFIG.artisanQualityBonus;
     const chances = QUALITY_TIERS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
     const total = chances.reduce((s, c) => s + c, 0);
     let roll = Math.random() * total;

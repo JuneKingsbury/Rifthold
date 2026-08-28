@@ -1,4 +1,4 @@
-import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG } from '../core/config.js';
+import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG } from '../core/config.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { isPassable, isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
@@ -26,7 +26,10 @@ export const ROLE_HANDLERS = {
             const rs = entity.roleState.guard;
             const dur = CONFIG.TICK_RATE / (entity.speed * game.speed);
             const radius = role.guardRadius || 8;
-            const damage = role.guardDamage || entity.damage || 8;
+            let damage = role.guardDamage || entity.damage || 8;
+            if (entity.tamed && entity.type === 'wolf' && game.research.isResearched('wolf_mastery')) {
+                damage += 4;
+            }
 
             if (rs.state === 'retreating') {
                 const anchor = findAnchor(entity, game);
@@ -97,7 +100,11 @@ export const ROLE_HANDLERS = {
             rs.cooldown--;
             if (rs.cooldown <= 0) {
                 const output = {};
-                output[role.produces] = role.produceAmount || 1;
+                let amount = role.produceAmount || 1;
+                if (game.research.isResearched('husbandry')) {
+                    amount = Math.ceil(amount * WORK_CONFIG.husbandryProductionMult);
+                }
+                output[role.produces] = amount;
                 game.resources.add(output);
                 rs.cooldown = role.produceRate || 80;
             }

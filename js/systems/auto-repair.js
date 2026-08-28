@@ -8,9 +8,12 @@
  * mapIndex.getAllStructurePositions() — an array of { x, y, type }. It defaults
  * to a fresh scan when called standalone (e.g. from tests).
  */
-import { BUILDINGS } from '../core/config.js';
+import { BUILDINGS, WORK_CONFIG } from '../core/config.js';
 
 export function updateAutoRepair(game, structurePositions = game.mapIndex.getAllStructurePositions()) {
+    const repairWork = game.research.isResearched('fortification')
+        ? Math.round(15 / WORK_CONFIG.fortificationRepairMult)
+        : 15;
     for (const { x, y } of structurePositions) {
         const tile = game.map[y][x];
         if (tile.structureHp === undefined) continue;
@@ -22,7 +25,7 @@ export function updateAutoRepair(game, structurePositions = game.mapIndex.getAll
             type: 'repair',
             skillRequired: 'building',
             x, y,
-            workAmount: 15,
+            workAmount: repairWork,
         });
     }
     const anvils = structurePositions.filter(s => s.type === 'anvil');
