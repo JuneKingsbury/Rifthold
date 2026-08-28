@@ -11,7 +11,7 @@ export const REALMS = {
             { resource: 'void_essence', weight: 10, amount: [1, 3] },
             { artifact: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4] },
+        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} marvels at crystalline formations pulsing with light.',
@@ -49,7 +49,7 @@ export const REALMS = {
             { resource: 'void_essence', weight: 15, amount: [2, 5] },
             { artifact: 'drum_of_rallying', weight: 3 },
         ],
-        enemies: { hp: [70, 110], damage: [7, 12], count: [3, 5] },
+        enemies: { hp: [70, 110], damage: [7, 12], count: [3, 5], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} hears the echoing clink of ancient pickaxes.',
@@ -90,7 +90,7 @@ export const REALMS = {
             { resource: 'stone', weight: 15, amount: [8, 18] },
             { artifact: 'ward_of_the_sentinel', weight: 3 },
         ],
-        enemies: { hp: [100, 160], damage: [11, 17], count: [4, 7] },
+        enemies: { hp: [100, 160], damage: [11, 17], count: [4, 7], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} feels immense pressure from the rock above.',
@@ -130,7 +130,7 @@ export const REALMS = {
             { resource: 'berries', weight: 20, amount: [4, 8] },
             { artifact: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [30, 50], damage: [4, 6], count: [1, 3] },
+        enemies: { hp: [30, 50], damage: [4, 6], count: [1, 3], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} pushes through thick vine curtains.',
@@ -168,7 +168,7 @@ export const REALMS = {
             { resource: 'potatoes', weight: 20, amount: [5, 10] },
             { artifact: 'cornucopia_charm', weight: 3 },
         ],
-        enemies: { hp: [55, 85], damage: [6, 10], count: [2, 5] },
+        enemies: { hp: [55, 85], damage: [6, 10], count: [2, 5], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} ducks under a canopy of phosphorescent mushroom caps.',
@@ -210,7 +210,7 @@ export const REALMS = {
             { resource: 'void_essence', weight: 10, amount: [2, 5] },
             { artifact: 'staff_of_regrowth', weight: 3 },
         ],
-        enemies: { hp: [80, 130], damage: [9, 14], count: [3, 6] },
+        enemies: { hp: [80, 130], damage: [9, 14], count: [3, 6], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} climbs through roots thicker than castle walls.',
@@ -253,7 +253,7 @@ export const REALMS = {
             { resource: 'runite', weight: 20, amount: [2, 4] },
             { artifact: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [30, 50], damage: [4, 7], count: [1, 3] },
+        enemies: { hp: [30, 50], damage: [4, 7], count: [1, 3], sprite: 'ghost' },
         research: 'arcane_studies',
         events: {
             ambient: [
@@ -298,7 +298,7 @@ export const REALMS = {
             { resource: 'runite', weight: 25, amount: [3, 7] },
             { artifact: 'tome_of_shared_wisdom', weight: 3 },
         ],
-        enemies: { hp: [60, 100], damage: [7, 12], count: [2, 5] },
+        enemies: { hp: [60, 100], damage: [7, 12], count: [2, 5], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} passes through a grand lecture hall where spectral students still sit.',
@@ -344,7 +344,7 @@ export const REALMS = {
             { resource: 'void_essence', weight: 15, amount: [2, 6] },
             { artifact: 'scholars_spectacles', weight: 2 },
         ],
-        enemies: { hp: [90, 150], damage: [10, 16], count: [3, 6] },
+        enemies: { hp: [90, 150], damage: [10, 16], count: [3, 6], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} passes containment chambers — most are cracked and empty.',
@@ -384,7 +384,7 @@ export const REALMS = {
             { resource: 'runite', weight: 25, amount: [3, 6] },
             { artifact: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [80, 120], damage: [8, 14], count: [3, 6] },
+        enemies: { hp: [80, 120], damage: [8, 14], count: [3, 6], sprite: 'ghost' },
         research: 'deep_delving',
         events: {
             ambient: [
@@ -427,7 +427,7 @@ export const REALMS = {
             { resource: 'runite', weight: 20, amount: [4, 8] },
             { artifact: 'voidwalkers_lantern', weight: 3 },
         ],
-        enemies: { hp: [120, 180], damage: [12, 18], count: [4, 7] },
+        enemies: { hp: [120, 180], damage: [12, 18], count: [4, 7], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} cannot tell if they are walking on ground or floating.',
@@ -469,7 +469,7 @@ export const REALMS = {
             { resource: 'runite', weight: 20, amount: [5, 10] },
             { artifact: 'cloak_of_shadows', weight: 3 },
         ],
-        enemies: { hp: [160, 240], damage: [15, 22], count: [4, 8] },
+        enemies: { hp: [160, 240], damage: [15, 22], count: [4, 8], sprite: 'ghost' },
         events: {
             ambient: [
                 '{name} walks on platforms of solidified nothingness.',
@@ -509,7 +509,7 @@ export const REALMS = {
         loot: [
             { artifact: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4] },
+        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
             ambient: [
                 'TODO: {name} marvels at crystalline formations pulsing with light.',
@@ -535,7 +535,7 @@ export const REALMS = {
         loot: [
             { artifact: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4] },
+        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
             ambient: [
                 'TODO: {name} marvels at crystalline formations pulsing with light.',
@@ -561,7 +561,7 @@ export const REALMS = {
         loot: [
             { artifact: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4] },
+        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
             ambient: [
                 'TODO: {name} marvels at crystalline formations pulsing with light.',

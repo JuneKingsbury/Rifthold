@@ -1226,7 +1226,7 @@ img.pixel-art {
 
 /* Arcane Portal Panel */
 #arcane-panel {
-    min-width: min(620px, 92vw);
+    min-width: min(780px, 92vw);
 }
 
 .arcane-tabs {

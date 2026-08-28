@@ -1,4 +1,4 @@
-import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, ARTIFACTS, ALL_ITEMS, COLONIST_CONFIG } from '../core/config.js';
+import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, ARTIFACTS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES } from '../core/config.js';
 import { getEquipmentStat } from '../entities/colonist.js';
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
@@ -119,6 +119,7 @@ export class ExplorationSystem {
                 ? [{ tick: 0, text: `Party heading to Rift Gate (${packAnimals.length} pack animal${packAnimals.length > 1 ? 's' : ''})`, type: 'info' }]
                 : [{ tick: 0, text: `Party heading to Rift Gate`, type: 'info' }],
             combat: null,
+            summons: [],
             lastMicroEventTick: 0,
             difficulty,
             diffSettings,
@@ -157,6 +158,16 @@ export class ExplorationSystem {
 
                 this._regenMana(exp, game);
                 this._tryHealSpells(exp, game);
+
+                if (exp.summons && exp.summons.length > 0) {
+                    for (let si = exp.summons.length - 1; si >= 0; si--) {
+                        exp.summons[si].ticksRemaining--;
+                        if (exp.summons[si].ticksRemaining <= 0) {
+                            this._addLog(exp, game, `The ${exp.summons[si].name} fades away.`, 'info');
+                            exp.summons.splice(si, 1);
+                        }
+                    }
+                }
 
                 if (game.tick >= exp.nextEncounterTick && exp.currentEncounter < exp.encounters.length) {
                     this._startEncounter(exp, game);
@@ -261,7 +272,7 @@ export class ExplorationSystem {
                     golem: c.golem, golemType: c.golemType,
                     weapon: c.weapon, armor: c.armor, helmet: c.helmet, tool: c.tool,
                     artifact: c.artifactBroken ? null : c.artifact,
-                    knownSpells: c.knownSpells ? [...c.knownSpells] : [],
+                    knownSpells: c.knownSpells ? c.knownSpells.filter(s => !c.disabledSpells || !c.disabledSpells.includes(s)) : [],
                     mana: c.mana || 0,
                     maxMana: c.maxMana || 0,
                     spellCooldowns: {},
@@ -495,11 +506,50 @@ export class ExplorationSystem {
 
         this._tryCombatSpells(exp, game, alive, combat);
 
+        if (exp.summons && exp.summons.length > 0) {
+            for (let si = exp.summons.length - 1; si >= 0; si--) {
+                const summon = exp.summons[si];
+                summon.ticksRemaining -= EXPLORATION_CONFIG.combatRoundTicks;
+                if (summon.ticksRemaining <= 0 || summon.hp <= 0) {
+                    this._addLog(exp, game, `The ${summon.name} fades away.`, 'info');
+                    exp.summons.splice(si, 1);
+                    continue;
+                }
+                const summonTarget = combat.enemies.find(e => e.hp > 0);
+                if (summonTarget) {
+                    const sDmg = summon.damage + randInt(0, 2);
+                    if (Math.random() < 0.1) {
+                        this._addLog(exp, game, `The ${summon.name} misses!`, 'combat');
+                    } else {
+                        summonTarget.hp -= sDmg;
+                        this._addLog(exp, game, `The ${summon.name} attacks for ${sDmg}!`, 'combat');
+                        if (summonTarget.hp <= 0) this._addLog(exp, game, `The ${summon.name} slays a foe!`, 'success');
+                    }
+                }
+            }
+        }
+
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             const enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
             for (let hit = 0; hit < enemyHits; hit++) {
+                const aliveSummons = exp.summons ? exp.summons.filter(s => s.hp > 0) : [];
+                if (aliveSummons.length > 0 && Math.random() < 0.5) {
+                    const targetSummon = aliveSummons[randInt(0, aliveSummons.length - 1)];
+                    let dmg = enemy.damage + randInt(0, 2);
+                    if (Math.random() < 0.15) {
+                        this._addLog(exp, game, `An enemy misses the ${targetSummon.name}!`, 'combat');
+                    } else {
+                        targetSummon.hp -= dmg;
+                        this._addLog(exp, game, `An enemy strikes the ${targetSummon.name} for ${dmg}!`, 'combat');
+                        if (targetSummon.hp <= 0) {
+                            this._addLog(exp, game, `The ${targetSummon.name} is slain!`, 'danger');
+                            exp.summons.splice(exp.summons.indexOf(targetSummon), 1);
+                        }
+                    }
+                    continue;
+                }
                 let target = null;
                 let bestScore = Infinity;
                 for (const p of alive) {
@@ -580,6 +630,7 @@ export class ExplorationSystem {
                             t.hp -= dmg;
                         }
                         this._addLog(exp, game, `${member.name} casts ${spell.name}! Hits ${targets.length} foes for ${dmg} each.`, 'combat');
+                        game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                         for (const t of targets) {
                             if (t.hp <= 0) this._addLog(exp, game, `An enemy is destroyed by the blast!`, 'success');
                         }
@@ -588,6 +639,7 @@ export class ExplorationSystem {
                         if (target) {
                             target.hp -= dmg;
                             this._addLog(exp, game, `${member.name} casts ${spell.name} at an enemy for ${dmg} damage!`, 'combat');
+                            game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                             if (target.hp <= 0) this._addLog(exp, game, `${member.name}'s spell slays a foe!`, 'success');
                         }
                     }
@@ -596,15 +648,27 @@ export class ExplorationSystem {
                     member.shieldActive = true;
                     member.shieldReduction = spell.damageReduction;
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — shielded!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     break;
                 } else if (spell.effect === 'summon') {
-                    const summonDmg = spell.summonDamage || 8;
-                    const target = combat.enemies.find(e => e.hp > 0);
-                    if (target) {
-                        target.hp -= summonDmg;
-                        this._addLog(exp, game, `${member.name} summons a familiar that attacks for ${summonDmg}!`, 'combat');
-                        if (target.hp <= 0) this._addLog(exp, game, `The familiar finishes off a foe!`, 'success');
-                    }
+                    if (!exp.summons) exp.summons = [];
+                    if (exp.summons.some(s => s.ownerId === member.id && s.hp > 0)) continue;
+                    const summonDef = SUMMON_TYPES[spell.summonType];
+                    if (!summonDef) break;
+                    exp.summons.push({
+                        type: spell.summonType,
+                        name: summonDef.name,
+                        hp: summonDef.hp,
+                        maxHp: summonDef.hp,
+                        damage: summonDef.damage,
+                        char: summonDef.char,
+                        color: summonDef.color,
+                        ownerId: member.id,
+                        ticksRemaining: summonDef.duration,
+                        maxDuration: summonDef.duration,
+                    });
+                    this._addLog(exp, game, `${member.name} summons a ${summonDef.name}!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     break;
                 }
             }
@@ -629,6 +693,7 @@ export class ExplorationSystem {
                 const healed = Math.min(spell.healAmount, member.maxHp - member.hp);
                 member.hp += healed;
                 this._addLog(exp, game, `${member.name} casts ${spell.name} and heals for ${healed} HP.`, 'success');
+                game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                 break;
             }
         }
@@ -805,6 +870,8 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
     const diff = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
 
     let totalDmg = 0, totalHp = 0, drProduct = 1, size = 0;
+    const members = [];
+    const spellRoster = [];
 
     for (const id of colonistIds) {
         const c = game.getColonist(id);
@@ -819,7 +886,8 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
         const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
         const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
         const hitsPerRound = Math.max(1, Math.round(baseCd / effCd));
-        totalDmg += dmg * hitsPerRound;
+        const memberDmg = dmg * hitsPerRound;
+        totalDmg += memberDmg;
         totalHp += c.maxHp;
         let dr = 1;
         for (const item of items) {
@@ -827,10 +895,62 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
             if (item.expedition && item.expedition.damageReduction) dr *= (1 - item.expedition.damageReduction);
         }
         drProduct *= dr;
+
+        const combatTraits = [];
+        for (const traitKey of (c.traits || [])) {
+            const t = TRAITS[traitKey];
+            if (t && t.damageTakenMult) combatTraits.push({ name: t.name, description: t.description });
+        }
+
+        const memberSpells = [];
+        for (const spellKey of (c.knownSpells || [])) {
+            if (c.disabledSpells && c.disabledSpells.includes(spellKey)) continue;
+            const spell = SPELLS[spellKey];
+            if (!spell) continue;
+            const isExpeditionRelevant = spell.trigger === 'inCombat' || spell.trigger === 'lowHealth';
+            if (!isExpeditionRelevant) continue;
+            memberSpells.push(spellKey);
+            const existing = spellRoster.find(s => s.spellKey === spellKey);
+            if (existing) {
+                existing.casters.push(c.name);
+            } else {
+                let effectDesc;
+                if (spell.effect === 'ranged_damage') effectDesc = `${spell.damage} dmg`;
+                else if (spell.effect === 'ranged_damage_aoe') effectDesc = `${spell.damage} AOE dmg`;
+                else if (spell.effect === 'melee_damage') effectDesc = `${spell.damage} melee dmg`;
+                else if (spell.effect === 'heal') effectDesc = `heals ${spell.healAmount} HP`;
+                else if (spell.effect === 'buff_defense') effectDesc = `${Math.round(spell.damageReduction * 100)}% DR shield`;
+                else if (spell.effect === 'summon') {
+                    const st = SUMMON_TYPES[spell.summonType];
+                    effectDesc = st ? `summons ${st.name} (${st.hp} HP, ${st.damage} dmg)` : 'summons ally';
+                } else effectDesc = spell.effect;
+                let triggerDesc = spell.trigger === 'inCombat' ? 'in combat' : `HP < ${Math.round((spell.hpThreshold || 0.5) * 100)}%`;
+                spellRoster.push({ spellKey, name: spell.name, school: spell.school, casters: [c.name], manaCost: spell.manaCost, triggerDesc, effectDesc });
+            }
+        }
+
+        members.push({
+            name: c.name, dmgPerRound: memberDmg, hitsPerRound, hp: c.maxHp,
+            dr: Math.round((1 - dr) * 100), maxMana: c.maxMana || 0,
+            traits: combatTraits, spells: memberSpells,
+            artifactName: c.artifact?.name || null,
+        });
     }
 
     if (size === 0) return null;
     const avgDR = 1 - Math.pow(drProduct, 1 / size);
+
+    const partyEffects = {};
+    const effectKeys = ['partyDamageMult', 'trapDamageMult', 'lootMult', 'rareEncounterMult', 'autoReviveHp', 'healthRegen', 'durationMult'];
+    const mockSnapshot = colonistIds.map(id => {
+        const c = game.getColonist(id);
+        return c ? { hp: c.hp, artifact: c.artifact } : null;
+    }).filter(Boolean);
+    for (const key of effectKeys) {
+        const val = getPartyExpeditionEffect(mockSnapshot, key);
+        if (key.includes('Mult') && val !== 1.0) partyEffects[key] = val;
+        else if (!key.includes('Mult') && val !== 0) partyEffects[key] = val;
+    }
 
     const enemyCount = Math.round(((realm.enemies.count[0] + realm.enemies.count[1]) / 2) * diff.enemyCountMult);
     const enemyHp = ((realm.enemies.hp[0] + realm.enemies.hp[1]) / 2) * diff.enemyHpMult;
@@ -849,5 +969,5 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
     else if (ratio > 0.4) { rating = 'Dangerous'; color = '#ff8844'; }
     else { rating = 'Suicidal'; color = '#ff4444'; }
 
-    return { rating, color, totalDmg, totalHp, avgDR: Math.round(avgDR * 100), size };
+    return { rating, color, totalDmg, totalHp, avgDR: Math.round(avgDR * 100), size, members, partyEffects, spellRoster };
 }

@@ -38,11 +38,11 @@ export const SPELLS = {
     
     // Conjuration
     phase_step: { name: 'Phase Step', school: 'conjuration', minLevel: 0, manaCost: 6, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'teleport', range: 5 },
-    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 0, manaCost: 25, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
+    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 0, manaCost: 15, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
     warp: { name: 'Warp', school: 'conjuration', minLevel: 2, manaCost: 15, cooldown: 100, castType: 'targeted', effect: 'teleport', range: 15 },
-    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 2, manaCost: 35, cooldown: 500, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
+    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 2, manaCost: 25, cooldown: 300, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
     gate: { name: 'Gate', school: 'conjuration', minLevel: 4, manaCost: 25, cooldown: 200, castType: 'targeted', effect: 'teleport', range: 30 },
-    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 4, manaCost: 50, cooldown: 600, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
+    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 4, manaCost: 40, cooldown: 600, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
 
     // Transmutation
     nurture: { name: 'Nurture', school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 200, castType: 'targeted', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },

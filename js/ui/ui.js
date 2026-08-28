@@ -50,7 +50,7 @@ export class UI {
         this._arcaneTab = 'defense';
         this._arcaneExpSetup = null;
         this._lastArcaneHtml = '';
-        this._expVisState = { lastLogLen: 0, effects: [], partyX: 0 };
+        this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0 };
         this.storyPanelVisible = false;
         this._storyTab = 'colony';
         this._lastStoryHtml = '';

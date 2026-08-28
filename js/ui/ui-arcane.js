@@ -1,4 +1,4 @@
-import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS } from '../core/config.js';
+import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS } from '../core/config.js';
 import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
@@ -38,9 +38,25 @@ const arcaneMethods = {
         }
 
         if (html !== this._lastArcaneHtml) {
+            let savedChecks = null;
+            let savedPacks = null;
+            if (tab === 'expeditions' && this._arcaneExpSetup) {
+                savedChecks = [...this.elements.arcanePanel.querySelectorAll('.exp-check:checked')].map(cb => cb.value);
+                savedPacks = [...this.elements.arcanePanel.querySelectorAll('.exp-pack-check:checked')].map(cb => cb.value);
+            }
             this._lastArcaneHtml = html;
             this.elements.arcanePanel.innerHTML = html;
             if (tab === 'expeditions') {
+                if (savedChecks && savedChecks.length > 0) {
+                    for (const val of savedChecks) {
+                        const cb = this.elements.arcanePanel.querySelector(`.exp-check[value="${val}"]`);
+                        if (cb) cb.checked = true;
+                    }
+                    for (const val of savedPacks) {
+                        const cb = this.elements.arcanePanel.querySelector(`.exp-pack-check[value="${val}"]`);
+                        if (cb) cb.checked = true;
+                    }
+                }
                 const logEl = this.elements.arcanePanel.querySelector('.exp-log-container');
                 if (logEl) logEl.scrollTop = logEl.scrollHeight;
                 this._setupExpCheckboxLimits();
@@ -143,11 +159,12 @@ const arcaneMethods = {
                     html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — ${exp.status}${exp.combat ? ' [COMBAT]' : ''}</div>`;
                     html += `<div class="info-row">Progress: <span style="color:#88ddff">${pct}%</span></div>`;
 
-                    html += `<canvas class="exp-vis-canvas" width="560" height="120"></canvas>`;
+                    html += `<canvas class="exp-vis-canvas" width="720" height="140"></canvas>`;
 
-                    const aliveParty = exp.partySnapshot.filter(p => p.hp > 0);
-                    html += `<div class="info-row" style="color:#888;">Party (${aliveParty.length}/${exp.partySnapshot.length} alive):</div>`;
-                    for (const p of exp.partySnapshot) {
+                    const snapshot = exp.partySnapshot || [];
+                    const aliveParty = snapshot.filter(p => p.hp > 0);
+                    html += `<div class="info-row" style="color:#888;">Party (${aliveParty.length}/${snapshot.length} alive):</div>`;
+                    for (const p of snapshot) {
                         const hpPct = Math.max(0, Math.round((p.hp / p.maxHp) * 100));
                         const color = p.hp <= 0 ? '#664444' : hpPct < 30 ? '#ff4444' : hpPct < 60 ? '#ffaa44' : '#88cc88';
                         const status = p.hp <= 0 ? ' [DOWN]' : '';
@@ -368,8 +385,44 @@ const arcaneMethods = {
         }
         const result = estimatePartyStrength(this.game, ids, realmKey, diff);
         if (!result) { el.innerHTML = ''; return; }
-        el.innerHTML = `<div style="color:${result.color};font-weight:bold;">${result.rating}</div>`
-            + `<div style="color:#aaa;font-size:0.85em;margin-top:2px;">Dmg/round: ${result.totalDmg} | HP: ${result.totalHp} | DR: ${result.avgDR}%</div>`;
+
+        let html = `<div style="color:${result.color};font-weight:bold;font-size:1.1em;">${result.rating}</div>`;
+        html += `<div style="color:#aaa;font-size:0.85em;margin-top:2px;">Dmg/round: ${result.totalDmg} | HP: ${result.totalHp} | DR: ${result.avgDR}%</div>`;
+
+        html += '<div style="margin-top:6px;border-top:1px solid #333;padding-top:4px;">';
+        for (const m of result.members) {
+            const traitStr = m.traits.length > 0 ? ` <span style="color:#88cc88;">[${m.traits.map(t => t.name).join(', ')}]</span>` : '';
+            const manaStr = m.maxMana > 0 ? ` | <span style="color:#6688ff;">${m.maxMana} MP</span>` : '';
+            html += `<div style="font-size:0.8em;color:#ccc;margin:1px 0;">`
+                + `<span style="color:#eee;">${m.name}</span>: ${m.dmgPerRound} dmg x${m.hitsPerRound}/rnd | ${m.hp} HP | ${m.dr}% DR${manaStr}${traitStr}</div>`;
+        }
+        html += '</div>';
+
+        const fx = result.partyEffects;
+        if (Object.keys(fx).length > 0) {
+            html += '<div style="margin-top:4px;border-top:1px solid #333;padding-top:3px;font-size:0.8em;color:#cc88ff;">';
+            if (fx.partyDamageMult) html += `<div>Party Dmg: x${fx.partyDamageMult.toFixed(2)}</div>`;
+            if (fx.trapDamageMult) html += `<div>Trap Dmg: x${fx.trapDamageMult.toFixed(2)}</div>`;
+            if (fx.lootMult) html += `<div>Loot: +${Math.round((fx.lootMult - 1) * 100)}%</div>`;
+            if (fx.rareEncounterMult) html += `<div>Rare Finds: x${fx.rareEncounterMult.toFixed(1)}</div>`;
+            if (fx.autoReviveHp) html += `<div>Auto-Revive: ${Math.round(fx.autoReviveHp * 100)}% HP</div>`;
+            if (fx.healthRegen) html += `<div>Regen: +${Math.round(fx.healthRegen * 100)}% HP/tick</div>`;
+            if (fx.durationMult) html += `<div>Duration: x${fx.durationMult.toFixed(2)}</div>`;
+            html += '</div>';
+        }
+
+        if (result.spellRoster.length > 0) {
+            html += '<div style="margin-top:4px;border-top:1px solid #333;padding-top:3px;font-size:0.8em;">';
+            html += '<div style="color:#aa88ff;margin-bottom:2px;">Party Spells:</div>';
+            for (const s of result.spellRoster) {
+                const schoolColor = { evocation: '#ff8844', abjuration: '#44ff88', conjuration: '#aa66ff', enchantment: '#44aaff' }[s.school] || '#aaa';
+                html += `<div style="color:#bbb;margin:1px 0;"><span style="color:${schoolColor};">${s.name}</span> `
+                    + `<span style="color:#888;">(${s.casters.join(', ')})</span> — ${s.effectDesc}, ${s.manaCost} MP, ${s.triggerDesc}</div>`;
+            }
+            html += '</div>';
+        }
+
+        el.innerHTML = html;
     },
 
     _renderExpeditionVis() {
@@ -402,7 +455,7 @@ const arcaneMethods = {
         }
 
         const activeExp = exp || this._expVisState.finishExp;
-        if (!activeExp) { ctx.clearRect(0, 0, W, H); return; }
+        if (!activeExp || !activeExp.partySnapshot) { ctx.clearRect(0, 0, W, H); return; }
 
         const elapsed = this.game.tick - activeExp.startTick;
         const totalDur = Math.floor(activeExp.duration * 1.2);
@@ -449,6 +502,17 @@ const arcaneMethods = {
 
         ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, W, H);
+
+        let shakeApplied = false;
+        if (!this._expVisState.shakeFrames) this._expVisState.shakeFrames = 0;
+        if (!this._expVisState.flashFrames) this._expVisState.flashFrames = 0;
+        if (this._expVisState.shakeFrames > 0) {
+            const intensity = this._expVisState.shakeFrames * 0.8;
+            ctx.save();
+            ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
+            shakeApplied = true;
+            this._expVisState.shakeFrames--;
+        }
 
         const fullBlockChars = new Set(['█', '▓', '▒']);
         for (let tx = 0; tx < W; tx += tileSize) {
@@ -525,6 +589,56 @@ const arcaneMethods = {
         }
         ctx.restore();
 
+        const ambientCfg = {
+            crystal_caves: { shape: 'diamond', color: '#4488ff', dx: 0, dy: 0.3 },
+            crystal_mines: { shape: 'diamond', color: '#3366dd', dx: 0, dy: 0.3 },
+            crystal_depths: { shape: 'diamond', color: '#2244aa', dx: 0, dy: 0.4 },
+            verdant_depths: { shape: 'circle', color: '#44cc44', dx: 0.1, dy: -0.2 },
+            fungal_hollows: { shape: 'circle', color: '#88aa44', dx: 0.05, dy: -0.25 },
+            primeval_canopy: { shape: 'circle', color: '#22aa66', dx: 0.1, dy: -0.15 },
+            arcane_library: { shape: 'rune', color: '#ffcc44', dx: 0, dy: 0 },
+            ancient_university: { shape: 'rune', color: '#ddaa22', dx: 0, dy: 0 },
+            abandoned_laboratory: { shape: 'rune', color: '#ff8844', dx: 0, dy: 0 },
+            shadow_realm: { shape: 'wisp', color: '#aa44ff', dx: 0.2, dy: 0 },
+            void_abyss: { shape: 'wisp', color: '#7722cc', dx: 0.15, dy: 0 },
+            oblivion_rift: { shape: 'wisp', color: '#440088', dx: 0.2, dy: 0 },
+            kingdom_outskirts: { shape: 'dust', color: '#aa8866', dx: 0.1, dy: 0.1 },
+            crusader_barracks: { shape: 'dust', color: '#887755', dx: 0.1, dy: 0.15 },
+            palace_fortress: { shape: 'dust', color: '#998866', dx: 0.05, dy: 0.1 },
+        };
+        const ambCfg = ambientCfg[activeExp.realm] || ambientCfg.crystal_caves;
+        if (!this._expVisState.ambientParticles) this._expVisState.ambientParticles = [];
+        const particles = this._expVisState.ambientParticles;
+        if (particles.length < 30 && Math.random() < 0.15) {
+            particles.push({ x: Math.random() * W, y: ambCfg.dy <= 0 ? H - 20 : 5, life: 0, maxLife: 60 + Math.random() * 40, phase: Math.random() * Math.PI * 2 });
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const pt = particles[i];
+            pt.life++;
+            if (pt.life >= pt.maxLife) { particles.splice(i, 1); continue; }
+            pt.x += ambCfg.dx + (ambCfg.shape === 'wisp' ? Math.sin(pt.life * 0.08 + pt.phase) * 0.5 : 0);
+            pt.y += ambCfg.dy || (ambCfg.shape === 'rune' ? 0 : 0.1);
+            const ptAlpha = Math.sin((pt.life / pt.maxLife) * Math.PI) * 0.4;
+            ctx.globalAlpha = ptAlpha;
+            ctx.fillStyle = ambCfg.color;
+            if (ambCfg.shape === 'diamond') {
+                ctx.beginPath();
+                ctx.moveTo(pt.x, pt.y - 3); ctx.lineTo(pt.x - 2, pt.y); ctx.lineTo(pt.x, pt.y + 3); ctx.lineTo(pt.x + 2, pt.y);
+                ctx.closePath(); ctx.fill();
+            } else if (ambCfg.shape === 'circle') {
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2); ctx.fill();
+            } else if (ambCfg.shape === 'rune') {
+                ctx.font = '8px monospace';
+                const runes = '⊕⊗⊘⊙◈◇';
+                ctx.fillText(runes[Math.floor(pt.phase * 3) % runes.length], pt.x, pt.y);
+            } else if (ambCfg.shape === 'wisp') {
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, 2 + Math.sin(pt.life * 0.1) * 1, 0, Math.PI * 2); ctx.fill();
+            } else {
+                ctx.fillRect(pt.x, pt.y, 2, 2);
+            }
+            ctx.globalAlpha = 1;
+        }
+
         ctx.fillStyle = '#222';
         ctx.fillRect(0, H - 14, W, 14);
         ctx.fillStyle = isRetreating ? '#ff4444' : colors.accent;
@@ -551,7 +665,7 @@ const arcaneMethods = {
         this._expVisState.partyX += (targetX - this._expVisState.partyX) * walkSpeed;
         const partyX = this._expVisState.partyX;
 
-        const party = activeExp.partySnapshot;
+        const party = activeExp.partySnapshot || [];
         const skinMgr = this.game.skinManager;
         const useSkins = skinMgr && skinMgr.isActive;
         for (let i = 0; i < party.length; i++) {
@@ -605,6 +719,22 @@ const arcaneMethods = {
                 ctx.fillText(p.golem ? 'G' : '@', px, py);
             }
             ctx.globalAlpha = 1;
+            if (p.hp > 0) {
+                const barW = 12, barH = 2;
+                const barX = px - barW / 2;
+                const barY = py - 11;
+                ctx.fillStyle = '#222';
+                ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = hpPct > 0.6 ? '#44ff44' : hpPct > 0.3 ? '#ffaa44' : '#ff4444';
+                ctx.fillRect(barX, barY, barW * hpPct, barH);
+                if (p.maxMana > 0) {
+                    const manaPct = p.mana / p.maxMana;
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(barX, barY + 3, barW, barH);
+                    ctx.fillStyle = '#4466ff';
+                    ctx.fillRect(barX, barY + 3, barW * manaPct, barH);
+                }
+            }
         }
 
         if (activeExp.packAnimals && activeExp.packAnimals.length > 0) {
@@ -634,14 +764,63 @@ const arcaneMethods = {
             }
         }
 
+        const activeSummons = (activeExp.summons || []).filter(s => s.hp > 0);
+        for (let si = 0; si < activeSummons.length; si++) {
+            const summon = activeSummons[si];
+            const ownerIdx = party.findIndex(p => p.id === summon.ownerId);
+            const oy = ownerIdx >= 0 ? H / 2 + (ownerIdx - party.length / 2) * 16 + 6 : H / 2 + si * 14;
+            const sy = oy;
+            const sx = partyX + 22 + (sy - H / 2) * diagSlope;
+            ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.005 + si) * 0.15;
+            ctx.strokeStyle = summon.color;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            if (useSkins) {
+                const sumSprite = skinMgr.getSprite('entities', summon.type);
+                if (sumSprite) {
+                    ctx.drawImage(sumSprite, sx - 5, sy - 5, 10, 10);
+                } else {
+                    ctx.font = 'bold 10px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = summon.color;
+                    ctx.fillText(summon.char, sx, sy);
+                }
+            } else {
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = summon.color;
+                ctx.fillText(summon.char, sx, sy);
+            }
+            const sHpPct = summon.hp / summon.maxHp;
+            const sBarW = 8, sBarH = 2;
+            ctx.fillStyle = '#222';
+            ctx.fillRect(sx - sBarW / 2, sy - 9, sBarW, sBarH);
+            ctx.fillStyle = sHpPct > 0.6 ? '#44ff44' : sHpPct > 0.3 ? '#ffaa44' : '#ff4444';
+            ctx.fillRect(sx - sBarW / 2, sy - 9, sBarW * sHpPct, sBarH);
+            if (summon.maxDuration) {
+                const dPct = summon.ticksRemaining / summon.maxDuration;
+                ctx.fillStyle = '#222';
+                ctx.fillRect(sx - sBarW / 2, sy - 6, sBarW, sBarH);
+                ctx.fillStyle = '#ddcc44';
+                ctx.fillRect(sx - sBarW / 2, sy - 6, sBarW * dPct, sBarH);
+            }
+        }
+
         if (activeExp.combat) {
             const enemies = activeExp.combat.enemies.filter(e => e.hp > 0);
-            const raiderSprite = useSkins ? skinMgr.getSprite('entities', 'raider') : null;
+            const enemySpriteKey = realmDef?.enemies?.sprite;
+            const enemySprite = useSkins && enemySpriteKey ? skinMgr.getSprite('entities', enemySpriteKey) : null;
             for (let i = 0; i < enemies.length; i++) {
+                const enemy = enemies[i];
                 const ey = H / 2 + (i - enemies.length / 2) * 16;
                 const ex = partyX + 60 + (ey - H / 2) * diagSlope;
-                if (raiderSprite) {
-                    ctx.drawImage(raiderSprite, ex - 7, ey - 7, 14, 14);
+                if (enemySprite) {
+                    ctx.drawImage(enemySprite, ex - 7, ey - 7, 14, 14);
                 } else {
                     ctx.beginPath();
                     ctx.moveTo(ex, ey - 7);
@@ -653,6 +832,14 @@ const arcaneMethods = {
                     ctx.strokeStyle = '#aa0000';
                     ctx.lineWidth = 1;
                     ctx.stroke();
+                }
+                if (enemy.maxHp) {
+                    const eHpPct = enemy.hp / enemy.maxHp;
+                    const eBarW = 10, eBarH = 2;
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(ex - eBarW / 2, ey - 11, eBarW, eBarH);
+                    ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
+                    ctx.fillRect(ex - eBarW / 2, ey - 11, eBarW * eHpPct, eBarH);
                 }
             }
 
@@ -674,19 +861,43 @@ const arcaneMethods = {
                 const isCast = text.includes('casts');
                 if (isCast && text.includes('heals')) {
                     this._expVisState.effects.push({ type: 'spell_heal', x: partyX + Math.random() * 20, y: H / 2 - 5 + Math.random() * 10, frame: 0, maxFrames: 30 });
+                    const healMatch = text.match(/(\d+) HP/);
+                    if (healMatch) this._expVisState.effects.push({ type: 'damage_number', text: healMatch[1], color: '#44ff44', x: partyX + Math.random() * 20, y: H / 2 - 5, frame: 0, maxFrames: 25 });
                 } else if (isCast && text.includes('shielded')) {
                     this._expVisState.effects.push({ type: 'spell_shield', x: partyX + Math.random() * 20, y: H / 2, frame: 0, maxFrames: 35 });
                 } else if (isCast && (text.includes('damage') || text.includes('Hits'))) {
-                    this._expVisState.effects.push({ type: 'spell_attack', x: partyX + 20, y: H / 2 - 10 + Math.random() * 20, frame: 0, maxFrames: 20 });
-                } else if (isCast && text.includes('summon')) {
-                    this._expVisState.effects.push({ type: 'spell_summon', x: partyX + 10 + Math.random() * 15, y: H / 2 - 10 + Math.random() * 20, frame: 0, maxFrames: 30 });
+                    const school = this._detectSpellSchool(text);
+                    this._expVisState.effects.push({ type: 'spell_attack', school, x: partyX + 20, y: H / 2 - 10 + Math.random() * 20, frame: 0, maxFrames: 25 });
+                    const dmgMatch = text.match(/for (\d+)/);
+                    if (dmgMatch) this._expVisState.effects.push({ type: 'damage_number', text: dmgMatch[1], color: '#ffff44', x: partyX + 50 + Math.random() * 20, y: H / 2 - 10 + Math.random() * 15, frame: 0, maxFrames: 25 });
+                } else if (text.includes('summons a')) {
+                    this._expVisState.effects.push({ type: 'spell_summon', x: partyX + 25, y: H / 2, frame: 0, maxFrames: 40 });
                 } else if (entry.type === 'loot' || entry.type === 'success') {
                     this._expVisState.effects.push({ type: 'loot', x: partyX + Math.random() * 20, y: H / 2 - 20 + Math.random() * 10, frame: 0, maxFrames: 40 });
                 } else if (entry.type === 'danger') {
                     this._expVisState.effects.push({ type: 'danger', x: partyX - 5 + Math.random() * 30, y: H / 2, frame: 0, maxFrames: 20 });
+                    this._expVisState.shakeFrames = 6;
+                    this._expVisState.flashFrames = 3;
+                } else if (entry.type === 'combat' && text.includes('for ')) {
+                    const dmgMatch = text.match(/for (\d+)/);
+                    if (dmgMatch) {
+                        const isEnemyAttacking = text.startsWith('An enemy');
+                        const numColor = isEnemyAttacking ? '#ff6644' : '#ffff44';
+                        const numX = isEnemyAttacking ? (partyX + Math.random() * 20) : (partyX + 45 + Math.random() * 25);
+                        this._expVisState.effects.push({ type: 'damage_number', text: dmgMatch[1], color: numColor, x: numX, y: H / 2 - 5 + Math.random() * 15, frame: 0, maxFrames: 25 });
+                        if (isEnemyAttacking) this._expVisState.shakeFrames = Math.max(this._expVisState.shakeFrames, 3);
+                    }
                 }
             }
             this._expVisState.lastLogLen = logLen;
+        }
+
+        if (this._expVisState.flashFrames > 0) {
+            ctx.fillStyle = '#ff0000';
+            ctx.globalAlpha = 0.12;
+            ctx.fillRect(0, 0, W, H);
+            ctx.globalAlpha = 1;
+            this._expVisState.flashFrames--;
         }
 
         for (let i = this._expVisState.effects.length - 1; i >= 0; i--) {
@@ -727,6 +938,10 @@ const arcaneMethods = {
                 ctx.fillStyle = '#44ff44';
                 ctx.font = 'bold 14px monospace';
                 ctx.fillText('+', eff.x, eff.y - eff.frame * 0.8);
+                for (let s = 0; s < 3; s++) {
+                    ctx.globalAlpha = alpha * 0.5;
+                    ctx.fillRect(eff.x - 4 + Math.sin(eff.frame * 0.3 + s * 2) * 6, eff.y - eff.frame * 0.6 - s * 3, 2, 2);
+                }
             } else if (eff.type === 'spell_shield') {
                 ctx.strokeStyle = '#4488ff';
                 ctx.lineWidth = 2;
@@ -734,30 +949,87 @@ const arcaneMethods = {
                 ctx.beginPath();
                 ctx.arc(eff.x, eff.y, r, 0, Math.PI * 2);
                 ctx.stroke();
-            } else if (eff.type === 'spell_attack') {
-                ctx.fillStyle = '#aa44ff';
-                const bx = eff.x + eff.frame * 2.5;
                 ctx.beginPath();
-                ctx.moveTo(bx, eff.y);
-                ctx.lineTo(bx - 5, eff.y - 3);
-                ctx.lineTo(bx - 5, eff.y + 3);
-                ctx.closePath();
-                ctx.fill();
-                ctx.fillStyle = '#dd88ff';
-                ctx.globalAlpha = alpha * 0.5;
-                ctx.fillRect(eff.x, eff.y - 1, eff.frame * 2.5, 2);
-            } else if (eff.type === 'spell_summon') {
-                ctx.fillStyle = '#ffaa22';
-                const pulse = Math.sin(eff.frame * 0.4) * 3;
-                ctx.beginPath();
-                ctx.arc(eff.x, eff.y, 5 + pulse, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = '#ff8800';
-                ctx.lineWidth = 1;
+                ctx.arc(eff.x, eff.y, r * 0.7, Math.PI * 0.2, Math.PI * 0.8);
                 ctx.stroke();
+            } else if (eff.type === 'spell_attack') {
+                if (eff.school === 'evocation') {
+                    const bx = eff.x + eff.frame * 3;
+                    ctx.fillStyle = '#ff6600';
+                    for (let s = 0; s < 3; s++) {
+                        const sx = bx - s * 5;
+                        const sr = 3 - s * 0.5;
+                        ctx.globalAlpha = alpha * (1 - s * 0.25);
+                        ctx.beginPath();
+                        ctx.arc(sx, eff.y + Math.sin(eff.frame + s) * 2, sr, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = alpha * 0.3;
+                    ctx.fillStyle = '#ffaa33';
+                    ctx.fillRect(eff.x, eff.y - 1, eff.frame * 3, 2);
+                } else if (eff.school === 'conjuration') {
+                    ctx.strokeStyle = '#aa44ff';
+                    ctx.lineWidth = 1;
+                    const progress = eff.frame / eff.maxFrames;
+                    for (let s = 0; s < 4; s++) {
+                        const angle = (s / 4) * Math.PI * 2 + eff.frame * 0.15;
+                        const dist = 12 * (1 - progress);
+                        const px = eff.x + Math.cos(angle) * dist;
+                        const py = eff.y + Math.sin(angle) * dist;
+                        ctx.globalAlpha = alpha * 0.8;
+                        ctx.beginPath();
+                        ctx.arc(px, py, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    ctx.fillStyle = '#aa44ff';
+                    const bx = eff.x + eff.frame * 2.5;
+                    ctx.beginPath();
+                    ctx.moveTo(bx, eff.y);
+                    ctx.lineTo(bx - 5, eff.y - 3);
+                    ctx.lineTo(bx - 5, eff.y + 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#dd88ff';
+                    ctx.globalAlpha = alpha * 0.5;
+                    ctx.fillRect(eff.x, eff.y - 1, eff.frame * 2.5, 2);
+                }
+            } else if (eff.type === 'spell_summon') {
+                const progress = eff.frame / eff.maxFrames;
+                ctx.strokeStyle = '#aa44ff';
+                ctx.lineWidth = 1.5;
+                const r = 10 * (1 - progress * 0.5);
+                ctx.beginPath();
+                ctx.arc(eff.x, eff.y, r, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(eff.x, eff.y, r * 0.6, 0, Math.PI * 2 * progress);
+                ctx.stroke();
+                if (progress > 0.5) {
+                    ctx.globalAlpha = (progress - 0.5) * 2 * alpha;
+                    ctx.fillStyle = '#ffaa22';
+                    ctx.font = 'bold 10px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('★', eff.x, eff.y);
+                }
+            } else if (eff.type === 'damage_number') {
+                ctx.font = 'bold 10px monospace';
+                ctx.fillStyle = eff.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(eff.text, eff.x, eff.y - eff.frame * 0.7);
             }
             ctx.globalAlpha = 1;
         }
+
+        if (shakeApplied) ctx.restore();
+    },
+
+    _detectSpellSchool(text) {
+        for (const spell of Object.values(SPELLS)) {
+            if (text.includes(spell.name)) return spell.school;
+        }
+        return 'evocation';
     },
 
     _itemIcon(itemKey, categoryHint) {
