@@ -1,4 +1,4 @@
-import { CONFIG, ENTITIES } from './config.js';
+import { CONFIG, ENTITIES, ALL_ITEMS } from './config.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
 
@@ -28,7 +28,8 @@ export function saveGame(game) {
             helmets: game.resources.helmets,
             clothes: game.resources.clothes,
             tools: game.resources.tools,
-            artifacts: game.resources.artifacts,
+            trinkets: game.resources.trinkets,
+            boots: game.resources.boots,
             potions: game.resources.potions,
             tomes: game.resources.tomes,
             consumables: game.resources.consumables,
@@ -139,13 +140,60 @@ export function loadGame(game) {
         game.entities = data.entities || [];
         game.raiders = data.raiders || [];
 
+        // Migration: rename artifacts -> trinkets, route re-categorized items, add boots
+        if (data.resources.artifacts && !data.resources.trinkets) {
+            data.resources.trinkets = [];
+            data.resources.boots = data.resources.boots || [];
+            for (const item of data.resources.artifacts) {
+                const def = ALL_ITEMS[item.key];
+                if (!def) { data.resources.trinkets.push(item); continue; }
+                switch (def.type) {
+                    case 'boots': data.resources.boots.push(item); break;
+                    case 'tool': (data.resources.tools = data.resources.tools || []).push(item); break;
+                    case 'armor': (data.resources.armors = data.resources.armors || []).push(item); break;
+                    case 'helmet': (data.resources.helmets = data.resources.helmets || []).push(item); break;
+                    case 'clothes': (data.resources.clothes = data.resources.clothes || []).push(item); break;
+                    default: data.resources.trinkets.push(item); break;
+                }
+            }
+            delete data.resources.artifacts;
+        }
+        data.resources.boots = data.resources.boots || [];
+
+        // Migration: colonist artifact -> trinket (route re-categorized equipped items), add boots
+        for (const c of (data.colonists || [])) {
+            if (c.artifact !== undefined && c.trinket === undefined) {
+                const equipped = c.artifact;
+                if (equipped) {
+                    const def = ALL_ITEMS[equipped.key];
+                    const newType = def?.type || 'trinket';
+                    if (newType === 'trinket') {
+                        c.trinket = equipped;
+                    } else {
+                        c.trinket = null;
+                        const listMap = { boots: 'boots', tool: 'tools', armor: 'armors', helmet: 'helmets', clothes: 'clothes' };
+                        const listName = listMap[newType] || 'trinkets';
+                        data.resources[listName] = data.resources[listName] || [];
+                        data.resources[listName].push(equipped);
+                    }
+                } else {
+                    c.trinket = null;
+                }
+                delete c.artifact;
+                c.trinketBroken = c.artifactBroken || false;
+                delete c.artifactBroken;
+            }
+            c.boots = c.boots || null;
+        }
+
         game.resources.stockpile = data.resources.stockpile;
         game.resources.weapons = data.resources.weapons;
         game.resources.armors = data.resources.armors || [];
         game.resources.helmets = data.resources.helmets || [];
         game.resources.clothes = data.resources.clothes || [];
         game.resources.tools = data.resources.tools || [];
-        game.resources.artifacts = data.resources.artifacts || [];
+        game.resources.trinkets = data.resources.trinkets || [];
+        game.resources.boots = data.resources.boots || [];
         game.resources.potions = data.resources.potions || [];
         game.resources.tomes = data.resources.tomes || [];
         game.resources.consumables = data.resources.consumables || [];

@@ -1,4 +1,4 @@
-import { CONFIG, CROPS, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ARTIFACTS, DEFAULT_KEYMAP } from '../core/config.js';
+import { CONFIG, CROPS, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP } from '../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { isPassable } from '../world/map.js';
@@ -987,15 +987,15 @@ export class InputHandler {
 
     _getRadiusHighlight(pos, tile, colonistsHere) {
         if (tile.structure === 'artifact_pedestal' && tile.pedestalArtifact) {
-            const def = ARTIFACTS[tile.pedestalArtifact];
+            const def = ALL_ITEMS[tile.pedestalArtifact];
             if (def?.pedestal?.radius && def.pedestal.radius !== 'global') {
                 return { x: pos.x, y: pos.y, radius: def.pedestal.radius, color: '#ccaa4466' };
             }
         }
         if (colonistsHere.length > 0) {
             const c = colonistsHere[0];
-            if (c.artifact && !c.artifactBroken && c.artifact.pedestal?.radius && c.artifact.pedestal.radius !== 'global') {
-                return { x: pos.x, y: pos.y, radius: c.artifact.pedestal.radius, color: '#ccaa4466' };
+            if (c.trinket && !c.trinketBroken && c.trinket.pedestal?.radius && c.trinket.pedestal.radius !== 'global') {
+                return { x: pos.x, y: pos.y, radius: c.trinket.pedestal.radius, color: '#ccaa4466' };
             }
         }
         const bDef = BUILDINGS[tile.structure];

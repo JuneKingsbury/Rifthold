@@ -1,4 +1,4 @@
-import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, ARTIFACTS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES } from '../core/config.js';
+import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES } from '../core/config.js';
 import { getEquipmentStat } from '../entities/colonist.js';
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
@@ -85,15 +85,16 @@ export class ExplorationSystem {
         }
         let durationMult = 1.0;
         for (const c of party) {
-            if (c.artifact && !c.artifactBroken) {
-                const art = c.artifact;
-                if (art.expedition?.durationMult) durationMult *= art.expedition.durationMult;
-                if (art.consumable) {
-                    game.resources.removeArtifact(art.key);
-                    c.artifact = null;
-                    game.eventLog.add(game, `${c.name}'s ${art.name} crumbles to dust as the expedition begins`, 'event', null);
+            if (c.trinket && !c.trinketBroken) {
+                const trinketItem = c.trinket;
+                if (trinketItem.expedition?.durationMult) durationMult *= trinketItem.expedition.durationMult;
+                if (trinketItem.consumable) {
+                    game.resources.removeTrinket(trinketItem.key);
+                    c.trinket = null;
+                    game.eventLog.add(game, `${c.name}'s ${trinketItem.name} crumbles to dust as the expedition begins`, 'event', null);
                 }
             }
+            if (c.boots?.expedition?.durationMult) durationMult *= c.boots.expedition.durationMult;
         }
         if (durationMult !== 1.0) duration = Math.floor(duration * durationMult);
         const diffSettings = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
@@ -210,14 +211,14 @@ export class ExplorationSystem {
     }
 
     _checkExpeditionRevive(exp, member, game) {
-        const art = member.artifact;
-        if (art?.expedition?.autoReviveHp && !member._reviveUsed) {
-            member.hp = Math.floor(member.maxHp * art.expedition.autoReviveHp);
+        const trinketItem = member.trinket;
+        if (trinketItem?.expedition?.autoReviveHp && !member._reviveUsed) {
+            member.hp = Math.floor(member.maxHp * trinketItem.expedition.autoReviveHp);
             member._reviveUsed = true;
-            member.artifact = null;
-            this._addLog(exp, game, `${member.name}'s ${art.name} shatters, bringing them back!`, 'success');
+            member.trinket = null;
+            this._addLog(exp, game, `${member.name}'s ${trinketItem.name} shatters, bringing them back!`, 'success');
             const colonist = game.getColonist(member.id);
-            if (colonist) colonist.artifactBroken = true;
+            if (colonist) colonist.trinketBroken = true;
         } else {
             exp.defeated.push(member.id);
             this._addLog(exp, game, pickRandom(EXPLORATION_EVENTS.combatDefeat).replace('{name}', member.name), 'danger');
@@ -271,12 +272,13 @@ export class ExplorationSystem {
                     bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant,
                     golem: c.golem, golemType: c.golemType,
                     weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
-                    artifact: c.artifactBroken ? null : c.artifact,
+                    boots: c.boots,
+                    trinket: c.trinketBroken ? null : c.trinket,
                     knownSpells: c.knownSpells ? c.knownSpells.filter(s => !c.disabledSpells || !c.disabledSpells.includes(s)) : [],
                     mana: c.mana || 0,
                     maxMana: c.maxMana || 0,
                     spellCooldowns: {},
-                    spellDamageBonus: (c.weapon?.spellDamageBonus || 0) + (c.armor?.spellDamageBonus || 0) + (c.helmet?.spellDamageBonus || 0) + (c.clothes?.spellDamageBonus || 0) + (c.tool?.spellDamageBonus || 0) + ((!c.artifactBroken && c.artifact?.spellDamageBonus) || 0),
+                    spellDamageBonus: (c.weapon?.spellDamageBonus || 0) + (c.armor?.spellDamageBonus || 0) + (c.helmet?.spellDamageBonus || 0) + (c.clothes?.spellDamageBonus || 0) + (c.tool?.spellDamageBonus || 0) + (c.boots?.spellDamageBonus || 0) + ((!c.trinketBroken && c.trinket?.spellDamageBonus) || 0),
                     attackCooldown: baseCd,
                     effectiveCooldown: effCd,
                     shieldActive: false,
@@ -324,12 +326,12 @@ export class ExplorationSystem {
         for (const entry of dim.loot) {
             roll -= entry.weight;
             if (roll <= 0) {
-                if (entry.artifact) return { artifact: entry.artifact };
+                if (entry.item) return { item: entry.item };
                 return { resource: entry.resource, amount: Math.round(randInt(entry.amount[0], entry.amount[1]) * lootMult) };
             }
         }
         const fallback = dim.loot[0];
-        if (fallback.artifact) return { artifact: fallback.artifact };
+        if (fallback.item) return { item: fallback.item };
         return { resource: fallback.resource, amount: Math.round(randInt(fallback.amount[0], fallback.amount[1]) * lootMult) };
     }
 
@@ -351,12 +353,7 @@ export class ExplorationSystem {
             for (const rare of dimEvents.rare) {
                 if (Math.random() < rare.chance * rareEncounterMult * ds.rareLootMult) {
                     const msg = rare.text.replace('{name}', member.name);
-                    if (rare.loot.artifact) {
-                        if (!exp.loot._artifacts) exp.loot._artifacts = [];
-                        exp.loot._artifacts.push(rare.loot.artifact);
-                        const artName = ARTIFACTS[rare.loot.artifact]?.name || rare.loot.artifact;
-                        this._addLog(exp, game, `${msg} (found ${artName}!)`, 'loot');
-                    } else if (rare.loot.item) {
+                    if (rare.loot.item) {
                         if (!exp.loot._items) exp.loot._items = [];
                         exp.loot._items.push(rare.loot.item);
                         const itemName = ALL_ITEMS[rare.loot.item]?.name || rare.loot.item;
@@ -389,11 +386,11 @@ export class ExplorationSystem {
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult');
             const discPool = (dimEvents && dimEvents.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
-            if (lootEntry.artifact) {
-                if (!exp.loot._artifacts) exp.loot._artifacts = [];
-                exp.loot._artifacts.push(lootEntry.artifact);
-                const artName = ARTIFACTS[lootEntry.artifact]?.name || lootEntry.artifact;
-                this._addLog(exp, game, `${msg} (found ${artName}!)`, 'loot');
+            if (lootEntry.item) {
+                if (!exp.loot._items) exp.loot._items = [];
+                exp.loot._items.push(lootEntry.item);
+                const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
+                this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
             } else {
                 const boostedAmount = Math.floor(lootEntry.amount * lootMult);
                 exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + boostedAmount;
@@ -418,16 +415,16 @@ export class ExplorationSystem {
             const dim = REALMS[exp.realm];
             const discPool = (dim.events && dim.events.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
-            // A loot roll can be an artifact ({ artifact }) with no resource/amount. Artifacts
-            // accumulate in exp.loot._artifacts (matched to _completeExpedition); treating them
+            // A loot roll can be an item ({ item }) with no resource/amount. Items
+            // accumulate in exp.loot._items (matched to _completeExpedition); treating them
             // as a resource wrote stockpile['undefined'] = NaN and permanently poisoned wealth.
-            // The previous .replace(encounter.resource) also threw on the artifact case, which is
+            // The previous .replace(encounter.resource) also threw on the item case, which is
             // why the log line was commented out.
-            if (encounter.artifact) {
-                if (!exp.loot._artifacts) exp.loot._artifacts = [];
-                exp.loot._artifacts.push(encounter.artifact);
-                const artName = ARTIFACTS[encounter.artifact]?.name || encounter.artifact;
-                this._addLog(exp, game, `${msg} (found ${artName}!)`, 'loot');
+            if (encounter.item) {
+                if (!exp.loot._items) exp.loot._items = [];
+                exp.loot._items.push(encounter.item);
+                const itemName = ALL_ITEMS[encounter.item]?.name || encounter.item;
+                this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
             } else {
                 exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + encounter.amount;
                 this._addLog(exp, game, `${msg} (+${encounter.amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
@@ -451,7 +448,7 @@ export class ExplorationSystem {
     // Each round: party attacks (multi-hit from low cooldown), party spell phase,
     // then enemies attack. Damage = base weapon + rand(0,3), modified by
     // equipment stats and difficulty multipliers. 15% flat miss chance on both sides.
-    // Enemy targeting uses artifact targetPriority (taunt mechanic).
+    // Enemy targeting uses equipment targetPriority (taunt mechanic).
     _updateCombat(exp, game) {
         const combat = exp.combat;
         if (game.tick < combat.roundTick) return;
@@ -471,7 +468,7 @@ export class ExplorationSystem {
         for (const member of alive) {
             if (member.hp <= 0) continue;
             let weaponDmg = member.weapon ? member.weapon.damage : EXPLORATION_CONFIG.baseFistDamage;
-            const memberItems = [member.weapon, member.armor, member.helmet, member.artifact].filter(Boolean);
+            const memberItems = [member.weapon, member.armor, member.helmet, member.clothes, member.boots, member.tool, member.trinket].filter(Boolean);
             for (const item of memberItems) { if (item !== member.weapon && item.damage) weaponDmg += item.damage; }
             const critChance = memberItems.reduce((sum, it) => sum + (it.critChance || 0), 0);
             const hitsPerRound = Math.max(1, Math.round(member.attackCooldown / member.effectiveCooldown));
@@ -559,7 +556,7 @@ export class ExplorationSystem {
                     if (score < bestScore) { bestScore = score; target = p; }
                 }
                 if (!target) break;
-                const targetItems = [target.weapon, target.armor, target.helmet, target.artifact].filter(Boolean);
+                const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
                 const dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
                     this._addLog(exp, game, `${target.name} dodges an attack!`, 'combat');
@@ -716,11 +713,11 @@ export class ExplorationSystem {
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult');
             const dsCombat = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
             const lootEntry = this._rollLoot(dim, dsCombat);
-            if (lootEntry.artifact) {
-                if (!exp.loot._artifacts) exp.loot._artifacts = [];
-                exp.loot._artifacts.push(lootEntry.artifact);
-                const artName = ARTIFACTS[lootEntry.artifact]?.name || lootEntry.artifact;
-                this._addLog(exp, game, `Victory! Found ${artName}!`, 'success');
+            if (lootEntry.item) {
+                if (!exp.loot._items) exp.loot._items = [];
+                exp.loot._items.push(lootEntry.item);
+                const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
+                this._addLog(exp, game, `Victory! Found ${itemName}!`, 'success');
             } else {
                 const amount = Math.floor(lootEntry.amount * lootMult);
                 exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
@@ -772,21 +769,11 @@ export class ExplorationSystem {
             }
         }
 
-        const artifacts = exp.loot._artifacts || [];
-        delete exp.loot._artifacts;
         const items = exp.loot._items || [];
         delete exp.loot._items;
         game.resources.add(exp.loot);
-        for (const artKey of artifacts) {
-            game.resources.addArtifact({ ...ARTIFACTS[artKey], key: artKey });
-        }
         for (const itemKey of items) {
-            const def = ALL_ITEMS[itemKey];
-            if (def) {
-                game.resources.addItem({ ...def, key: itemKey });
-            } else {
-                game.resources.addConsumable({ key: itemKey, name: itemKey });
-            }
+            game.resources.addItem({ ...ALL_ITEMS[itemKey], key: itemKey });
         }
         for (const [res, amt] of Object.entries(exp.loot)) {
             game.overlays.push({ type: 'floating_text', x: exp.gatePos.x, y: exp.gatePos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
@@ -795,17 +782,11 @@ export class ExplorationSystem {
             for (const res of Object.keys(exp.loot)) {
                 game.discoveredLoot.add(`${exp.realm}:${res}`);
             }
-            for (const artKey of artifacts) {
-                game.discoveredLoot.add(`${exp.realm}:${artKey}`);
-            }
             for (const itemKey of items) {
                 game.discoveredLoot.add(`${exp.realm}:${itemKey}`);
             }
         }
         const parts = [];// = Object.entries(exp.loot).map(([k, v]) => `${v} ${k}`);
-        for (const artKey of artifacts) {
-            parts.push(ARTIFACTS[artKey]?.name || artKey);
-        }
         for (const itemKey of items) {
             parts.push(ALL_ITEMS[itemKey]?.name || itemKey);
         }
@@ -838,18 +819,20 @@ const PEDESTAL_TO_EXPEDITION = {
 function getPartyExpeditionEffect(partySnapshot, effectKey) {
     let value = effectKey.includes('Mult') ? 1.0 : 0;
     for (const member of partySnapshot) {
-        if (member.hp <= 0 || !member.artifact) continue;
-        const art = member.artifact;
-        if (art.expedition?.[effectKey]) {
-            if (effectKey.includes('Mult')) value *= art.expedition[effectKey];
-            else value += art.expedition[effectKey];
-        }
-        if (art.pedestal && typeof art.pedestal.radius === 'number') {
-            for (const [pedestalKey, mappedKey] of Object.entries(PEDESTAL_TO_EXPEDITION)) {
-                if (mappedKey !== effectKey) continue;
-                if (!art.pedestal[pedestalKey]) continue;
-                if (effectKey.includes('Mult')) value *= art.pedestal[pedestalKey];
-                else value += art.pedestal[pedestalKey];
+        if (member.hp <= 0) continue;
+        const items = [member.weapon, member.armor, member.helmet, member.clothes, member.boots, member.tool, member.trinket].filter(Boolean);
+        for (const item of items) {
+            if (item.expedition?.[effectKey]) {
+                if (effectKey.includes('Mult')) value *= item.expedition[effectKey];
+                else value += item.expedition[effectKey];
+            }
+            if (item.pedestal && typeof item.pedestal.radius === 'number') {
+                for (const [pedestalKey, mappedKey] of Object.entries(PEDESTAL_TO_EXPEDITION)) {
+                    if (mappedKey !== effectKey) continue;
+                    if (!item.pedestal[pedestalKey]) continue;
+                    if (effectKey.includes('Mult')) value *= item.pedestal[pedestalKey];
+                    else value += item.pedestal[pedestalKey];
+                }
             }
         }
     }
@@ -878,7 +861,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
         if (!c || c.hp <= 0) continue;
         size++;
         let dmg = c.weapon ? c.weapon.damage : EXPLORATION_CONFIG.baseFistDamage;
-        const items = [c.weapon, c.armor, c.helmet, c.artifact].filter(Boolean);
+        const items = [c.weapon, c.armor, c.helmet, c.clothes, c.boots, c.tool, c.trinket].filter(Boolean);
         for (const item of items) {
             if (item !== c.weapon && item.damage) dmg += item.damage;
         }
@@ -933,7 +916,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
             name: c.name, dmgPerRound: memberDmg, hitsPerRound, hp: c.maxHp,
             dr: Math.round((1 - dr) * 100), maxMana: c.maxMana || 0,
             traits: combatTraits, spells: memberSpells,
-            artifactName: c.artifact?.name || null,
+            trinketName: c.trinket?.name || null,
         });
     }
 
@@ -944,7 +927,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
     const effectKeys = ['partyDamageMult', 'trapDamageMult', 'lootMult', 'rareEncounterMult', 'autoReviveHp', 'healthRegen', 'durationMult'];
     const mockSnapshot = colonistIds.map(id => {
         const c = game.getColonist(id);
-        return c ? { hp: c.hp, artifact: c.artifact } : null;
+        return c ? { hp: c.hp, trinket: c.trinket } : null;
     }).filter(Boolean);
     for (const key of effectKeys) {
         const val = getPartyExpeditionEffect(mockSnapshot, key);

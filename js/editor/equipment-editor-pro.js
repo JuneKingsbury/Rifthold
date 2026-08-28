@@ -1,4 +1,4 @@
-import { WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, POTIONS, ITEM_CHARS, RECIPES, MATERIALS, RECIPE_CATEGORIES } from '../core/config.js';
+import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, ITEM_CHARS, RECIPES, MATERIALS, RECIPE_CATEGORIES } from '../core/config.js';
 import { RESEARCH } from '../core/config/magic.js';
 import { STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines } from '../core/config/effects.js';
 
@@ -8,8 +8,10 @@ const CATEGORIES = {
     weapon: { label: 'Weapons', config: WEAPONS, headerColor: '#cc8888' },
     armor: { label: 'Armor', config: ARMORS, headerColor: '#9966cc' },
     helmet: { label: 'Helmets', config: HELMETS, headerColor: '#7799cc' },
+    clothes: { label: 'Clothes', config: CLOTHES, headerColor: '#77aa77' },
+    boots: { label: 'Boots', config: BOOTS, headerColor: '#aa8855' },
     tool: { label: 'Tools', config: TOOLS, headerColor: '#88aacc' },
-    artifact: { label: 'Artifacts', config: ARTIFACTS, headerColor: '#ccaa44' },
+    trinket: { label: 'Trinkets', config: TRINKETS, headerColor: '#ccaa44' },
 };
 
 const STATIONS = ['workbench', 'anvil', 'cauldron', 'enchanting_table'];
@@ -17,7 +19,7 @@ const RESOURCES = ['wood', 'stone', 'planks', 'bricks', 'iron_ore', 'iron', 'lea
 const TIER_COLORS = ['#666', '#88cc88', '#4488ff', '#cc88ff', '#ffaa33'];
 const QUALITY_MAP = { 0: null, 1: null, 2: 'fine', 3: 'superior', 4: 'superior' };
 
-const ARTIFACT_EQUIP_STATS = ['moveSpeedBonus', 'workSpeedBonus', 'damageReduction', 'healthRegen', 'spellDamageBonus'];
+const TRINKET_EQUIP_STATS = ['moveSpeedBonus', 'workSpeedBonus', 'damageReduction', 'healthRegen', 'spellDamageBonus'];
 const PEDESTAL_STATS = ['workSpeedBonus', 'skillGrowthBonus', 'wandererChanceMult', 'blightImmunity', 'cookingBonusFood', 'tradeMarkupMult', 'damageBonusMult', 'lightRadius'];
 const EXPEDITION_STATS = ['lootMult', 'trapDamageMult', 'durationMult', 'rareEncounterMult', 'partyDamageMult', 'targetPriority', 'autoReviveHp', 'damageReduction', 'healthRegen'];
 const COMBAT_STATS = ['targetPriority', 'damageReduction', 'autoReviveHp', 'healthRegen'];
@@ -192,7 +194,7 @@ class EquipmentEditorPro {
     }
 
     _showNewItemDialog() {
-        const cat = prompt('Category? (weapon, armor, helmet, tool, artifact)', 'weapon');
+        const cat = prompt('Category? (weapon, armor, helmet, clothes, boots, tool, trinket)', 'weapon');
         if (!cat || !CATEGORIES[cat]) return;
         let base = `new_${cat}`;
         let key = base;
@@ -280,10 +282,10 @@ class EquipmentEditorPro {
             html += `<div class="fe-field"><label>Cooking</label><input type="number" id="eqp-cookingSpeed" step="0.05" value="${item.cookingSpeed || ''}"></div>`;
             html += `<div class="fe-field"><label>Building</label><input type="number" id="eqp-buildSpeed" step="0.05" value="${item.buildSpeed || ''}"></div>`;
             html += `</div>`;
-        } else if (cat === 'artifact') {
+        } else if (cat === 'trinket') {
             html += `<div class="fe-section-title">Equipped Stats</div>`;
             html += `<div class="fe-row">`;
-            for (const stat of ARTIFACT_EQUIP_STATS) {
+            for (const stat of TRINKET_EQUIP_STATS) {
                 const meta = STAT_META[stat];
                 html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="number" id="eqp-${stat}" step="0.05" value="${item[stat] || ''}"></div>`;
             }
@@ -462,8 +464,8 @@ class EquipmentEditorPro {
             for (const stat of ['miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed', 'cookingSpeed', 'buildSpeed']) {
                 this._collectNumericStat(item, stat);
             }
-        } else if (cat === 'artifact') {
-            for (const stat of ARTIFACT_EQUIP_STATS) this._collectNumericStat(item, stat);
+        } else if (cat === 'trinket') {
+            for (const stat of TRINKET_EQUIP_STATS) this._collectNumericStat(item, stat);
             if (document.getElementById('eqp-consumable')?.checked) item.consumable = true;
 
             if (document.getElementById('eqp-pedestal-toggle')?.checked) {
@@ -556,8 +558,8 @@ class EquipmentEditorPro {
         }
         html += `</div>`;
 
-        if (item.category === 'artifact') {
-            html += `<div class="fe-preview-section-title">Artifact Details</div>`;
+        if (item.category === 'trinket') {
+            html += `<div class="fe-preview-section-title">Trinket Details</div>`;
             html += `<div class="fe-preview-ingame" style="font-size:11px;">`;
             const equipped = getItemStatLines(item);
             if (equipped.length) html += `<div style="color:#ccc;margin-bottom:4px;">${equipped.join(', ')}</div>`;
@@ -599,7 +601,7 @@ class EquipmentEditorPro {
             stats = `Dmg: ${item.damage || 0}`;
             const extras = getItemStatLines({ ...item, damage: undefined, ranged: undefined, range: undefined });
             if (extras.length) stats += `, ${extras.join(', ')}`;
-        } else if (cat === 'artifact') {
+        } else if (cat === 'trinket') {
             stats = item.description || '';
         } else {
             stats = getItemStatLines(item).join(', ');
@@ -732,8 +734,8 @@ class EquipmentEditorPro {
         }
         out += `};\n\n`;
 
-        const cats = ['weapon', 'armor', 'helmet', 'tool', 'artifact'];
-        const exports = { weapon: 'WEAPONS', armor: 'ARMORS', helmet: 'HELMETS', tool: 'TOOLS', artifact: 'ARTIFACTS' };
+        const cats = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+        const exports = { weapon: 'WEAPONS', armor: 'ARMORS', helmet: 'HELMETS', clothes: 'CLOTHES', boots: 'BOOTS', tool: 'TOOLS', trinket: 'TRINKETS' };
 
         for (const cat of cats) {
             const exportName = exports[cat];
@@ -789,7 +791,7 @@ class EquipmentEditorPro {
         out += `    { items: WEAPONS, category: 'Weapons', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
         out += `    { items: ARMOR_PAIRS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' }, paired: true },\n`;
         out += `    { items: TOOLS, category: 'Tools', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: ARTIFACTS, category: 'Artifacts', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
+        out += `    { items: TRINKETS, category: 'Trinkets', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
         out += `    { items: POTIONS, category: 'Food & Potions', prefix: 'brew_', defaults: { skill: 'cooking', station: 'cauldron' } },\n`;
         out += `];\n\n`;
 

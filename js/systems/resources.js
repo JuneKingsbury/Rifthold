@@ -1,6 +1,6 @@
 /**
  * The colony's central store: the resource stockpile plus item inventories
- * (weapons, armor, tomes, artifacts, consumables). Owns add/deduct/has resource
+ * (weapons, armor, tomes, trinkets, boots, consumables). Owns add/deduct/has resource
  * math and food spoilage. decayFood is called from simulationTick on the
  * FOOD_DECAY_CONFIG.decayInterval cadence; the rest is invoked on demand by
  * building, crafting, trading, and equipment code.
@@ -21,7 +21,8 @@ export class ResourceManager {
         this.helmets = [];
         this.clothes = [];
         this.tools = [];
-        this.artifacts = [];
+        this.trinkets = [];
+        this.boots = [];
         this.potions = [];
         this.tomes = [];
         this.consumables = [];
@@ -50,7 +51,8 @@ export class ResourceManager {
             case 'helmet':     return this.helmets.filter(i => i.key === key).length;
             case 'clothes':    return this.clothes.filter(i => i.key === key).length;
             case 'tool':       return this.tools.filter(i => i.key === key).length;
-            case 'artifact':   return this.artifacts.filter(i => i.key === key).length;
+            case 'trinket':    return this.trinkets.filter(i => i.key === key).length;
+            case 'boots':      return this.boots.filter(i => i.key === key).length;
             case 'potion':     return this.potions.filter(i => (i.key ?? i.type) === key).length;
             case 'tome':       return this.tomes.filter(i => i.key === key).length;
             case 'consumable': return this.consumables.filter(i => i.key === key).length;
@@ -119,12 +121,23 @@ export class ResourceManager {
             case 'helmet':     return this.addHelmet(item);
             case 'clothes':    return this.addClothes(item);
             case 'tool':       return this.addTool(item);
-            case 'artifact':   return this.addArtifact(item);
+            case 'trinket':    return this.addTrinket(item);
+            case 'boots':      return this.addBoots(item);
             case 'potion':     return this.addPotion(item);
             case 'tome':       return this.addTome(item);
             case 'consumable': return this.addConsumable(item);
             default:           return this.addConsumable(item);
         }
+    }
+
+    removeItem(key) {
+        const def = ALL_ITEMS[key];
+        if (!def) return;
+        const listMap = { weapon: 'weapons', armor: 'armors', helmet: 'helmets', clothes: 'clothes', tool: 'tools', trinket: 'trinkets', boots: 'boots', potion: 'potions', tome: 'tomes', consumable: 'consumables' };
+        const list = this[listMap[def.type]];
+        if (!list) return;
+        const idx = list.findIndex(i => i.key === key);
+        if (idx !== -1) list.splice(idx, 1);
     }
 
     addWeapon(weaponType) {
@@ -176,18 +189,28 @@ export class ResourceManager {
         return this.tools.shift();
     }
 
-    addArtifact(artifact) {
-        this.artifacts.push(artifact);
+    addTrinket(trinket) {
+        this.trinkets.push(trinket);
     }
 
-    removeArtifact(key) {
-        const idx = this.artifacts.findIndex(a => a.key === key);
-        if (idx !== -1) this.artifacts.splice(idx, 1);
+    removeTrinket(key) {
+        const idx = this.trinkets.findIndex(a => a.key === key);
+        if (idx !== -1) this.trinkets.splice(idx, 1);
     }
 
-    takeArtifact() {
-        if (this.artifacts.length === 0) return null;
-        return this.artifacts.shift();
+    takeTrinket() {
+        if (this.trinkets.length === 0) return null;
+        return this.trinkets.shift();
+    }
+
+    addBoots(boots) {
+        this.boots.push(boots);
+    }
+
+    takeBoots() {
+        if (this.boots.length === 0) return null;
+        this.boots.sort((a, b) => (b.moveSpeedBonus || 0) - (a.moveSpeedBonus || 0));
+        return this.boots.shift();
     }
 
     addTome(tome) {

@@ -41,7 +41,7 @@ export const GLOSSARY = [
                     ['Skills', 'Six work skills (Building, Farming, Crafting, Cooking, Animals, Research) plus six magic schools. Higher skill levels mean faster task completion and better outcomes.'],
                     ['Skill Leveling', 'Skills improve through use, with completing related tasks granting experience. Each level requires progressively more experience than the last.'],
                     ['Health', 'Colonists have hit points that regenerate slowly when idle and faster when sleeping. If a colonist dies, surviving colonists suffer severe mood penalties based on their relationship.'],
-                    ['Equipment Slots', 'Each colonist has Weapon, Armor, Helmet, Tool, and Artifact slots. Use Auto-equip to quickly assign the best available gear, or manually equip from the inventory.'],
+                    ['Equipment Slots', 'Each colonist has Weapon, Armor, Helmet, Boots, Tool, and Trinket slots. Use Auto-equip to quickly assign the best available gear, or manually equip from the inventory.'],
                     ['Active Effects', 'Temporary buffs from potions and spells appear in the colonist info panel with remaining duration. Effects include speed boosts, damage shields, and healing. Buffed colonists pulse on the map.'],
                 ]
             },
@@ -71,7 +71,7 @@ export const GLOSSARY = [
                 entries: [
                     ['How Tasks Work', 'When you designate work (building, gathering, farming, etc.), tasks enter a queue. Colonists pick tasks based on their priority settings for the relevant skill.'],
                     ['Priorities', 'Set each skill from 1 (highest priority) to 5 (lowest), or disable it entirely. Colonists always attempt the lowest-numbered available task they have skill for.'],
-                    ['Work Speed', 'How fast a colonist completes tasks is determined by their skill level, mood, traits, equipped tool, active spell or artifact effects, and workshop quality. All bonuses multiply together.'],
+                    ['Work Speed', 'How fast a colonist completes tasks is determined by their skill level, mood, traits, equipped tool, active spell or trinket effects, and workshop quality. All bonuses multiply together.'],
                     ['Tool Bonuses', 'Equipping the right tool type (Pickaxe, Axe, Sickle, Hammer, Mattock) speeds up matching tasks. Higher-tier tools provide bigger bonuses. Mattocks cover multiple tasks but are weaker than specialists.'],
                     ['Mood & Work Speed', 'Inspired colonists work noticeably faster. Stressed colonists work significantly slower. Breaking colonists stop working entirely until their mood recovers.'],
                     ['Idle Behavior', 'Colonists with no tasks may wander, stargaze, skip stones, or socialize. If a Town Hall exists, idle colonists will gather there for mood-boosting relaxation activities.'],
@@ -121,7 +121,7 @@ export const GLOSSARY = [
                     ['Crafting Stations', 'Different items require different stations: A Workbench for basic goods, an Anvil for metalwork, a Cauldron for cooking, an Alchemy Table for potions, an Enchanting Table for enchantments. Build the right station, then queue recipes. Building multiple of the same workstation will allow more colonists to take on crafting tasks at the unoccupied stations.'],
                     ['How Crafting Works', 'Open the Craft panel (C) and queue recipes. Colonists with Crafting or Cooking skill will work queued recipes at the appropriate station. Mana-powered stations (Enchanting Tables) work faster than their unpowered counterparts (Workbenches).'],
                     ['Quality Tiers', 'Crafted equipment rolls a quality level from Crude to Superior. Higher Crafting skill gives that colonist better odds of higher quality crafts. Quality multiplies the item\'s effectiveness signifigantly, with high-quality equipment from lower tiers outpacing low-quality equipment from higher tiers.'],
-                    ['Enchantment Effects', 'Similar to equipment Quality, you can choose to enchant any non-artifact equipment from the inventory for a small cost. This will queue an enchantment task that is prioritized as a crafting task but distinctly uses the Enchantment skill level from the working colonist. These enchantments vary widely, applying some new effect to the equipment with a power level based on the enchantment\'s tier (I, II, III, or IV). The higher the Enchantment skill, the better odds of higher enchantment tiers. Additionally, enchanted equipment can be queued for enchantment multiple times, replacing the previous effect with a newly rolled one, allowing you to re-enchant your best equipment until you find an effect that you\'re satisfied with.'],
+                    ['Enchantment Effects', 'Similar to equipment Quality, you can choose to enchant any non-trinket equipment from the inventory for a small cost. This will queue an enchantment task that is prioritized as a crafting task but distinctly uses the Enchantment skill level from the working colonist. These enchantments vary widely, applying some new effect to the equipment with a power level based on the enchantment\'s tier (I, II, III, or IV). The higher the Enchantment skill, the better odds of higher enchantment tiers. Additionally, enchanted equipment can be queued for enchantment multiple times, replacing the previous effect with a newly rolled one, allowing you to re-enchant your best equipment until you find an effect that you\'re satisfied with.'],
                     ['Auto-Craft & Auto-Cook', 'Set stock targets on recipes to automatically queue them when supplies run low. Toggle repeat mode to keep a recipe permanently queued. Great for maintaining food and potion supplies as well as keeping materials stocked.'],
                     ['Salvage', 'Recycle unwanted equipment from the inventory to recover a portion of its crafting materials. Useful for clearing out low-quality gear after upgrades.'],
                 ]
@@ -242,13 +242,13 @@ export const GLOSSARY = [
                 ]
             },
             {
-                subtitle: 'Artifacts',
+                subtitle: 'Trinkets',
                 entries: [
-                    ['What Are Artifacts', 'Powerful unique items with special effects. Some are equipped directly on colonists for personal bonuses while others are placed on Artifact Pedestals to project area or colony-wide effects.'],
-                    ['Artifact Pedestals', 'Build after researching Arcane Infusion. Place an artifact on a pedestal to project its effect in a radius around it. Some artifacts have global effects that benefit the entire colony. Pedestals consume mana based on the placed artifact.'],
-                    ['Equipped Artifacts', 'When worn by a colonist, these provide passive bonuses: increased move speed, work speed, combat power, or emergency auto-revival. Some have special expedition-only effects.'],
-                    ['Durability & Repair', 'Certain powerful artifacts break after activating their effect. Broken artifacts provide no bonuses. Repair tasks take place at an Anvil using runite and are queued automatically.'],
-                    ['Finding Artifacts', 'Found as expedition loot (each realm chain has signature drops), purchased from rare trader inventories, or occasionally crafted with end-game research and materials.'],
+                    ['What Are Trinkets', 'Powerful unique items with special effects. Some are equipped directly on colonists for personal bonuses while others are placed on Trinket Pedestals to project area or colony-wide effects.'],
+                    ['Trinket Pedestals', 'Build after researching Arcane Infusion. Place a trinket on a pedestal to project its effect in a radius around it. Some trinkets have global effects that benefit the entire colony. Pedestals consume mana based on the placed trinket.'],
+                    ['Equipped Trinkets', 'When worn by a colonist, these provide passive bonuses: increased move speed, work speed, combat power, or emergency auto-revival. Some have special expedition-only effects.'],
+                    ['Durability & Repair', 'Certain powerful trinkets break after activating their effect. Broken trinkets provide no bonuses. Repair tasks take place at an Anvil using runite and are queued automatically.'],
+                    ['Finding Trinkets', 'Found as expedition loot (each realm chain has signature drops), purchased from rare trader inventories, or occasionally crafted with end-game research and materials.'],
                 ]
             },
         ]
@@ -273,7 +273,7 @@ export const GLOSSARY = [
                     ['Farm Zones', 'Press F to enter Farm Zone mode. Select a crop type, then drag an area on grass or dirt. Colonists with Farming skill will automatically plant and harvest crops in the zone.'],
                     ['Crop Growth', 'Growth speed is affected by the current season, weather conditions, and magic spells. By default most crops do not grow during the winter season.'],
                     ['Available Crops', 'Crops range from basic (available immediately) to advanced (requiring research). Each has different season compatibility, growth speed, and yield. Some crops, like the magical Moonbloom, grow in all seasons.'],
-                    ['Crop Blight', 'A random event that destroys a portion of growing crops. More common in summer and autumn. Certain artifacts and Divination spells can reduce or outright prevent blights.'],
+                    ['Crop Blight', 'A random event that destroys a portion of growing crops. More common in summer and autumn. Certain trinkets and Divination spells can reduce or outright prevent blights.'],
                 ]
             },
             {
@@ -326,7 +326,7 @@ export const GLOSSARY = [
                     ['Ğ', 'Golem Forge', '#cc8833'],
                     ['⚒', 'Forge Core', '#ff8844'],
                     ['◎', 'Ritual Core', '#aa44ff'],
-                    ['◆', 'Artifact Pedestal', '#ccaa44'],
+                    ['◆', 'Trinket Pedestal', '#ccaa44'],
                     ['⌂', 'Anvil', '#999999'],
                     ['Ħ', 'Inferno Ward', '#ff4400'],
                     ['⊛', 'Mana Relay', '#aa88ff'],

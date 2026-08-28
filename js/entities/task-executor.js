@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS, BOOTS_ENCHANTMENT_EFFECTS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana } from './colonist.js';
@@ -169,9 +169,20 @@ function applyEnchantment(item, colonist, game, type) {
             // spellCostReduction:
 
             break;
+        case 'boots':
+            randomKey = Object.keys(BOOTS_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(BOOTS_ENCHANTMENT_EFFECTS).length)];
+            enchantmentEffect = BOOTS_ENCHANTMENT_EFFECTS[randomKey];
+
+            if (enchantmentEffect.speedMultiplier) {
+                item.moveSpeedBonus = Math.round((item.moveSpeedBonus || 0) * (enchantmentEffect.speedMultiplier * tier.multiplier) * 100) / 100;
+            }
+            else if (enchantmentEffect.defenseMultiplier) {
+                item.damageReduction = Math.round((item.damageReduction || 0) * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
+            }
+            break;
         default:
             break;
-    }   
+    }
     item.enchantment = enchantmentEffect;
     item.description = `${item.description} ${enchantmentEffect.description}`;
     item.name = `${item.name} ${enchantmentEffect.suffix} ${tier.key}`; 
@@ -475,13 +486,13 @@ export function completeTask(colonist, task, game) {
             }
             break;
         }
-        case 'repair_artifact': {
+        case 'repair_trinket': {
             if (task.colonistId) {
                 const target = game.getColonist(task.colonistId);
-                if (target && target.artifactBroken) {
-                    target.artifactBroken = false;
+                if (target && target.trinketBroken) {
+                    target.trinketBroken = false;
                     target._repairQueued = false;
-                    const artName = target.artifact?.name || 'artifact';
+                    const artName = target.trinket?.name || 'trinket';
                     game.eventLog.add(game, `${artName} repaired at the anvil`, 'success', null);
                 }
             }

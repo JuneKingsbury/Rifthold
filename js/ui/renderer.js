@@ -1,4 +1,4 @@
-import { CONFIG, TILE_COLORS, BUILDINGS, ARTIFACTS, RENDER_CONFIG, COMBAT_VISUALS } from '../core/config.js';
+import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS } from '../core/config.js';
 import { getTileVisuals } from '../world/map.js';
 import { OverlayRenderer } from './overlay-renderer.js';
 import { SkinManager } from './skin-manager.js';
@@ -523,7 +523,7 @@ export class Renderer {
         // --- Tile rendering loop ---
         // Iterates over the visible viewport, drawing each tile as either a sprite
         // (skin active) or an ASCII character. Layering order for sprites:
-        //   ground → structure/entity → dither → artifact overlay → designation tint
+        //   ground → structure/entity → dither → pedestal item overlay → designation tint
         // Effects (combat hits, shots, portals) draw as overlays on top of the base.
         let lastColor = '';
         for (let sy = 0; sy <= vh; sy++) {
@@ -704,7 +704,7 @@ export class Renderer {
                         spriteDrawn = true;
                     }
 
-                    // Draw the placed artifact image on top of its pedestal if applicable.
+                    // Draw the placed item image on top of its pedestal if applicable.
                     if (tile.pedestalArtifact) {
                         const itemSprite = sm.getSprite('items', tile.pedestalArtifact);
                         if (itemSprite) {
@@ -1074,7 +1074,7 @@ export class Renderer {
             if (x < x0 || x > x1 || y < y0 || y > y1) continue;
             const tile = game.map[y][x];
             if (!tile.pedestalArtifact || tile.pedestalInactive) continue;
-            const artDef = ARTIFACTS[tile.pedestalArtifact];
+            const artDef = ALL_ITEMS[tile.pedestalArtifact];
             if (artDef?.pedestal?.lightRadius) {
                 sources.push({ x, y, radius: artDef.pedestal.lightRadius });
             }
@@ -1084,8 +1084,8 @@ export class Renderer {
             if (c.hp <= 0 || c.onExpedition) continue;
             if (c.x < x0 || c.x > x1 || c.y < y0 || c.y > y1) continue;
             let radius = 0;
-            if (c.artifact && !c.artifactBroken && c.artifact.pedestal?.lightRadius) {
-                radius = Math.max(radius, c.artifact.pedestal.lightRadius);
+            if (c.trinket && !c.trinketBroken && c.trinket.pedestal?.lightRadius) {
+                radius = Math.max(radius, c.trinket.pedestal.lightRadius);
             }
             if (c.tool?.lightRadius) {
                 radius = Math.max(radius, c.tool.lightRadius);

@@ -5,7 +5,7 @@ import { getPedestalEffect } from './artifacts.js';
 
 /**
  * Computes effective trade rates for the current game state.
- * Rates are affected by: Trade Routes research, pedestal artifacts (Haggler's Coin, Merchant's Ring).
+ * Rates are affected by: Trade Routes research, pedestal items (Haggler's Coin, Merchant's Ring).
  *
  * @param {object} game - Game instance (needs game.research, pedestal effects)
  * @returns {{ markup: number, discount: number }}

@@ -1,4 +1,4 @@
-import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, ARTIFACTS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
+import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
 
 const MATERIAL_ITEMS = [
     { key: 'wood', char: '≡', color: '#8b6b3a', desc: 'Wood resource' },
@@ -534,8 +534,11 @@ class SkinEditor {
                 for (const [key, def] of Object.entries(TOOLS)) {
                     items.push({ key, char: def.char || ITEM_CHARS.tool.char, color: def.charColor || ITEM_CHARS.tool.color, desc: `Tool: ${def.name}`, category: 'items' });
                 }
-                for (const [key, def] of Object.entries(ARTIFACTS)) {
-                    items.push({ key, char: def.char || ITEM_CHARS.artifact.char, color: def.charColor || ITEM_CHARS.artifact.color, desc: `Artifact: ${def.name}`, category: 'items' });
+                for (const [key, def] of Object.entries(TRINKETS)) {
+                    items.push({ key, char: def.char || ITEM_CHARS.trinket.char, color: def.charColor || ITEM_CHARS.trinket.color, desc: `Trinket: ${def.name}`, category: 'items' });
+                }
+                for (const [key, def] of Object.entries(BOOTS)) {
+                    items.push({ key, char: def.char || ITEM_CHARS.boots.char, color: def.charColor || ITEM_CHARS.boots.color, desc: `Boots: ${def.name}`, category: 'items' });
                 }
                 for (const [key, def] of Object.entries(POTIONS)) {
                     items.push({ key, char: def.char || ITEM_CHARS.potion.char, color: def.charColor || ITEM_CHARS.potion.color, desc: `Potion: ${def.name}`, category: 'items' });

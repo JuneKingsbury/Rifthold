@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, ARTIFACTS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -709,24 +709,24 @@ class Game {
         }
     }
 
-    placePedestalArtifact(x, y, artifactKey) {
+    placePedestalItem(x, y, itemKey) {
         const tile = this.map[y][x];
         if (tile.structure !== 'artifact_pedestal' || tile.pedestalArtifact) return;
-        if (!ARTIFACTS[artifactKey]?.pedestal) return;
-        this.resources.removeArtifact(artifactKey);
-        tile.pedestalArtifact = artifactKey;
-        this.notifications.push({ text: `Placed ${ARTIFACTS[artifactKey].name} on pedestal`, tick: this.tick, type: 'success' });
+        if (!ALL_ITEMS[itemKey]?.pedestal) return;
+        this.resources.removeItem(itemKey);
+        tile.pedestalArtifact = itemKey;
+        this.notifications.push({ text: `Placed ${ALL_ITEMS[itemKey].name} on pedestal`, tick: this.tick, type: 'success' });
         this.ui.showTileInfo(tile, x, y);
     }
 
-    retrievePedestalArtifact(x, y) {
+    retrievePedestalItem(x, y) {
         const tile = this.map[y][x];
         if (tile.structure !== 'artifact_pedestal' || !tile.pedestalArtifact) return;
         const key = tile.pedestalArtifact;
         tile.pedestalArtifact = null;
         tile.pedestalInactive = false;
-        this.resources.addArtifact({ ...ARTIFACTS[key], key });
-        this.notifications.push({ text: `Retrieved ${ARTIFACTS[key]?.name || key} from pedestal`, tick: this.tick, type: 'success' });
+        this.resources.addItem({ ...ALL_ITEMS[key], key });
+        this.notifications.push({ text: `Retrieved ${ALL_ITEMS[key]?.name || key} from pedestal`, tick: this.tick, type: 'success' });
         this.ui.showTileInfo(tile, x, y);
     }
 
@@ -776,9 +776,9 @@ class Game {
         if (c[slot]) this.resources[addMethod](c[slot]);
         c[slot] = item;
         this._recalcEquipmentStats(c);
-        if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool') this.renderer?.skinManager?.invalidateComposite(colonistId);
+        if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool' || slot === 'boots') this.renderer?.skinManager?.invalidateComposite(colonistId);
         this.notifications.push({ text: `${c.name} equipped ${item.name}`, tick: this.tick, type: 'success' });
-        if (slot === 'artifact') this._updateColonistRadiusHighlight(c);
+        if (slot === 'trinket') this._updateColonistRadiusHighlight(c);
         this.ui.showColonistInfo(c);
     }
 
@@ -789,16 +789,16 @@ class Game {
         this.resources[addMethod](c[slot]);
         c[slot] = null;
         this._recalcEquipmentStats(c);
-        if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool') this.renderer?.skinManager?.invalidateComposite(colonistId);
+        if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool' || slot === 'boots') this.renderer?.skinManager?.invalidateComposite(colonistId);
         this.notifications.push({ text: `${c.name} unequipped ${label}`, tick: this.tick, type: 'success' });
-        if (slot === 'artifact') this._updateColonistRadiusHighlight(c);
+        if (slot === 'trinket') this._updateColonistRadiusHighlight(c);
         this.ui.showColonistInfo(c);
     }
 
     _recalcEquipmentStats(c) {
         const baseHp = c.golem ? (GOLEM_TYPES[c.golem]?.hp || c.maxHp) : COLONIST_CONFIG.maxHp;
         let bonus = 0;
-        for (const item of [c.weapon, c.armor, c.helmet, c.clothes, c.tool, c.artifact].filter(Boolean)) {
+        for (const item of [c.weapon, c.armor, c.helmet, c.clothes, c.boots, c.tool, c.trinket].filter(Boolean)) {
             if (item.maxHpBonus) bonus += item.maxHpBonus;
         }
         c.maxHp = baseHp + bonus;
@@ -806,8 +806,8 @@ class Game {
     }
 
     _updateColonistRadiusHighlight(c) {
-        if (c.artifact && !c.artifactBroken && c.artifact.pedestal?.radius && c.artifact.pedestal.radius !== 'global') {
-            this.radiusHighlight = { x: c.x, y: c.y, radius: c.artifact.pedestal.radius, color: '#ccaa4466' };
+        if (c.trinket && !c.trinketBroken && c.trinket.pedestal?.radius && c.trinket.pedestal.radius !== 'global') {
+            this.radiusHighlight = { x: c.x, y: c.y, radius: c.trinket.pedestal.radius, color: '#ccaa4466' };
         } else {
             this.radiusHighlight = null;
         }
@@ -1232,8 +1232,10 @@ class Game {
     discardClothes(index) { this._discardItem(index, 'clothes'); }
     equipTool(colonistId, index) { this._equipItem(colonistId, index, 'tool', 'tools', 'addTool'); }
     unequipTool(colonistId) { this._unequipItem(colonistId, 'tool', 'addTool', 'tool'); }
-    equipArtifact(colonistId, index) { this._equipItem(colonistId, index, 'artifact', 'artifacts', 'addArtifact'); }
-    unequipArtifact(colonistId) { this._unequipItem(colonistId, 'artifact', 'addArtifact', 'artifact'); }
+    equipTrinket(colonistId, index) { this._equipItem(colonistId, index, 'trinket', 'trinkets', 'addTrinket'); }
+    unequipTrinket(colonistId) { this._unequipItem(colonistId, 'trinket', 'addTrinket', 'trinket'); }
+    equipBoots(colonistId, index) { this._equipItem(colonistId, index, 'boots', 'boots', 'addBoots'); }
+    unequipBoots(colonistId) { this._unequipItem(colonistId, 'boots', 'addBoots', 'boots'); }
 
     equipTome(colonistId, index) {
         const c = this.getColonist(colonistId);
@@ -1358,7 +1360,9 @@ class Game {
         this.story.checkMilestone('first_spell_cast', this);
     }
 
-    discardArtifact(index) { this._discardItem(index, 'artifacts'); }
+    discardTrinket(index) { this._discardItem(index, 'trinkets'); }
+    discardBoots(index) { this._discardItem(index, 'boots'); }
+    enchantBoots(index) { this._enchantItem(index, 'boots'); }
 
     cycleColonist(dir) {
         const alive = this.colonists.filter(c => c.hp > 0);
@@ -1447,8 +1451,14 @@ class Game {
         if (this.resources.tools.length > 0 && !c.tool) {
             this.equipTool(colonistId, 0);
         }
-        if (this.resources.artifacts.length > 0 && !c.artifact) {
-            this.equipArtifact(colonistId, 0);
+        if (this.resources.boots.length > 0) {
+            this.resources.boots.sort((a, b) => (b.moveSpeedBonus || 0) - (a.moveSpeedBonus || 0));
+            if (!c.boots || (this.resources.boots[0].moveSpeedBonus || 0) > (c.boots.moveSpeedBonus || 0)) {
+                this.equipBoots(colonistId, 0);
+            }
+        }
+        if (this.resources.trinkets.length > 0 && !c.trinket) {
+            this.equipTrinket(colonistId, 0);
         }
         this.ui.showColonistInfo(c);
     }
@@ -1708,7 +1718,7 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
     });
     for (const { x, y } of pedestals) {
         const tile = game.map[y][x];
-        const def = ARTIFACTS[tile.pedestalArtifact];
+        const def = ALL_ITEMS[tile.pedestalArtifact];
         if (!def?.pedestal) continue;
         const mana = def.pedestal.manaCost || 0;
         if (mana > 0 && !game.power.hasPower()) {
@@ -1729,8 +1739,8 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
     }
 
     for (const carrier of game.colonists) {
-        if (carrier.hp <= 0 || carrier.artifactBroken || carrier.onExpedition) continue;
-        const art = carrier.artifact;
+        if (carrier.hp <= 0 || carrier.trinketBroken || carrier.onExpedition) continue;
+        const art = carrier.trinket;
         if (!art?.pedestal) continue;
         if (art.pedestal.radius === 'global' || typeof art.pedestal.radius !== 'number') continue;
         const radius = art.pedestal.radius;

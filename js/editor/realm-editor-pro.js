@@ -1,6 +1,6 @@
 import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, WAVE_CONFIG, STORY_MILESTONES } from '../core/config/exploration.js';
 import { RESEARCH } from '../core/config/magic.js';
-import { ARTIFACTS } from '../core/config/equipment.js';
+import { TRINKETS } from '../core/config/equipment.js';
 
 const STORAGE_KEY = 'convocation_realm_pro';
 const CHAIN_COLORS = { crystal: '#88ccff', verdant: '#66cc66', arcane: '#cc88ff', shadow: '#aa66cc' };
@@ -291,13 +291,13 @@ class RealmEditorPro {
     }
 
     _lootRowHtml(loot, i) {
-        const type = loot.resource ? 'resource' : (loot.artifact ? 'artifact' : 'item');
+        const type = loot.resource ? 'resource' : 'item';
         const key = loot.resource || loot.artifact || loot.item || '';
         const weight = loot.weight || 10;
         const amtMin = loot.amount ? loot.amount[0] : 1;
         const amtMax = loot.amount ? loot.amount[1] : 1;
         return `<div class="fe-list-row" style="margin-bottom:4px;align-items:center;">
-            <select class="rlm-loot-type" style="width:70px;"><option value="resource"${type === 'resource' ? ' selected' : ''}>Resource</option><option value="artifact"${type === 'artifact' ? ' selected' : ''}>Artifact</option><option value="item"${type === 'item' ? ' selected' : ''}>Item</option></select>
+            <select class="rlm-loot-type" style="width:70px;"><option value="resource"${type === 'resource' ? ' selected' : ''}>Resource</option><option value="item"${type === 'item' ? ' selected' : ''}>Item</option></select>
             <input type="text" class="rlm-loot-key" value="${key}" placeholder="key" style="flex:1;">
             <input type="number" class="rlm-loot-weight" value="${weight}" title="Weight" style="width:45px;">
             <input type="number" class="rlm-loot-min" value="${amtMin}" title="Min" style="width:40px;">
@@ -307,14 +307,14 @@ class RealmEditorPro {
     }
 
     _rareRowHtml(r, i) {
-        const type = r.loot?.resource ? 'resource' : (r.loot?.artifact ? 'artifact' : 'item');
+        const type = r.loot?.resource ? 'resource' : 'item';
         const key = r.loot?.resource || r.loot?.artifact || r.loot?.item || '';
         const amtMin = r.loot?.amount ? r.loot.amount[0] : 1;
         const amtMax = r.loot?.amount ? r.loot.amount[1] : 1;
         return `<div class="fe-list-row" style="margin-bottom:6px;flex-wrap:wrap;">
             <input type="number" class="rlm-rare-chance" value="${r.chance || 0.05}" step="0.005" title="Chance" style="width:55px;">
             <input type="text" class="rlm-rare-text" value="${(r.text || '').replace(/"/g, '&quot;')}" placeholder="Event text..." style="flex:1;min-width:200px;">
-            <select class="rlm-rare-type" style="width:70px;"><option value="resource"${type === 'resource' ? ' selected' : ''}>Resource</option><option value="artifact"${type === 'artifact' ? ' selected' : ''}>Artifact</option><option value="item"${type === 'item' ? ' selected' : ''}>Item</option></select>
+            <select class="rlm-rare-type" style="width:70px;"><option value="resource"${type === 'resource' ? ' selected' : ''}>Resource</option><option value="item"${type === 'item' ? ' selected' : ''}>Item</option></select>
             <input type="text" class="rlm-rare-key" value="${key}" placeholder="key" style="width:100px;">
             <input type="number" class="rlm-rare-min" value="${amtMin}" style="width:35px;">
             <input type="number" class="rlm-rare-max" value="${amtMax}" style="width:35px;">
@@ -508,10 +508,10 @@ class RealmEditorPro {
         html += `<div class="fe-drops-preview">`;
         const totalWeight = (realm.loot || []).reduce((s, l) => s + (l.weight || 0), 0);
         for (const loot of (realm.loot || [])) {
-            const type = loot.resource ? 'resource' : (loot.artifact ? 'artifact' : 'item');
+            const type = loot.resource ? 'resource' : 'item';
             const lootKey = loot.resource || loot.artifact || loot.item || '?';
             const pct = totalWeight > 0 ? ((loot.weight / totalWeight) * 100).toFixed(1) : '0';
-            const color = type === 'artifact' ? '#ccaa44' : type === 'item' ? '#88ccff' : '#ccc';
+            const color = type === 'item' ? '#88ccff' : '#ccc';
             const amt = loot.amount ? `(${loot.amount[0]}-${loot.amount[1]})` : '';
             html += `<div style="display:flex;justify-content:space-between;padding:2px 0;">`;
             html += `<span style="color:${color};">${lootKey} ${amt}</span>`;
@@ -521,7 +521,7 @@ class RealmEditorPro {
         if (realm.events?.rare?.length) {
             html += `<div style="margin-top:8px;color:#aa66cc;font-size:10px;font-weight:bold;">Rare Encounters:</div>`;
             for (const r of realm.events.rare) {
-                const rKey = r.loot?.resource || r.loot?.artifact || r.loot?.item || '';
+                const rKey = r.loot?.resource || r.loot?.item || '';
                 html += `<div style="color:#886;font-size:10px;padding:1px 0;">`;
                 html += `<span style="color:#aa66cc;">${(r.chance * 100).toFixed(1)}%</span> `;
                 html += `${rKey}`;
@@ -549,7 +549,7 @@ class RealmEditorPro {
         if (realm.loot?.length) {
             lines.push(`    loot: [`);
             for (const l of realm.loot) {
-                const type = l.resource ? 'resource' : (l.artifact ? 'artifact' : 'item');
+                const type = l.resource ? 'resource' : 'item';
                 const lk = l.resource || l.artifact || l.item || '';
                 let entry = `        { ${type}: '${lk}', weight: ${l.weight || 10}`;
                 if (l.amount) entry += `, amount: [${l.amount[0]}, ${l.amount[1]}]`;
@@ -579,8 +579,8 @@ class RealmEditorPro {
         if (events.rare?.length) {
             lines.push(`        rare: [`);
             for (const r of events.rare) {
-                const type = r.loot?.resource ? 'resource' : (r.loot?.artifact ? 'artifact' : 'item');
-                const rk = r.loot?.resource || r.loot?.artifact || r.loot?.item || '';
+                const type = r.loot?.resource ? 'resource' : 'item';
+                const rk = r.loot?.resource || r.loot?.item || '';
                 let entry = `            { chance: ${r.chance}, text: '${(r.text || '').replace(/'/g, "\\'")}', loot: { ${type}: '${rk}'`;
                 if (r.loot?.amount) entry += `, amount: [${r.loot.amount[0]}, ${r.loot.amount[1]}]`;
                 entry += ` } },`;

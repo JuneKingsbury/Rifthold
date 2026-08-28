@@ -153,7 +153,8 @@ export function createColonist(x, y, skillBias, existingNames = []) {
         helmet: null,
         clothes: null,
         tool: null,
-        artifact: null,
+        trinket: null,
+        boots: null,
         drafted: false,
         draftTarget: null,
         guardMode: false,
@@ -218,7 +219,7 @@ export function createGolem(type, x, y) {
         state: 'idle',
         currentTaskId: null, path: [], workProgress: 0,
         assignedBed: null,
-        weapon: null, armor: null, helmet: null, clothes: null, tool: null, artifact: null,
+        weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null,
         drafted: false, draftTarget: null,
         guardMode: false, guardPost: null,
         stateTimer: 0, wanderCooldown: 0, moveCooldown: 0,
@@ -480,7 +481,8 @@ export function getEquippedItems(colonist) {
     if (colonist.helmet) items.push(colonist.helmet);
     if (colonist.clothes) items.push(colonist.clothes);
     if (colonist.tool) items.push(colonist.tool);
-    if (colonist.artifact && !colonist.artifactBroken) items.push(colonist.artifact);
+    if (colonist.boots) items.push(colonist.boots);
+    if (colonist.trinket && !colonist.trinketBroken) items.push(colonist.trinket);
     return items;
 }
 
@@ -1709,10 +1711,10 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
     }
 
     if (colonist.hp <= 0) {
-        const art = colonist.artifact;
-        if (art?.combat?.autoReviveHp && !colonist.artifactBroken) {
+        const art = colonist.trinket;
+        if (art?.combat?.autoReviveHp && !colonist.trinketBroken) {
             colonist.hp = Math.floor(colonist.maxHp * art.combat.autoReviveHp);
-            colonist.artifactBroken = true;
+            colonist.trinketBroken = true;
             game.eventLog.add(game, `${colonist.name}'s ${art.name} shatters, reviving them!`, 'success', { type: 'colonist', id: colonist.id });
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '✦', color: '#ffdd44', ttl: 8 });
         } else {

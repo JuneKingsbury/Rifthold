@@ -128,7 +128,7 @@ export function updateAutoCook(game) {
 
 // Count items matching `outputKey` currently equipped by colonists, so the
 // auto-craft stock target isn't refilled just because gear moved from the store
-// onto a colonist. Equipped weapon/armor/helmet/tool/artifact are the same
+// onto a colonist. Equipped weapon/armor/helmet/tool/trinket/boots are the same
 // objects taken from the store arrays, so they keep their `.key`; tomes are
 // tracked separately as the `equippedTome` key string.
 function countEquipped(game, outputKey) {

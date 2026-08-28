@@ -1,4 +1,4 @@
-import { WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS } from '../core/config.js';
+import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS } from '../core/config.js';
 import { EffectPicker, formatEffectsCode, STAT_KEYS } from './effect-picker.js';
 
 const STORAGE_KEY = 'convocation_equipment_drafts';
@@ -7,16 +7,20 @@ const CATEGORIES = {
     weapon: { label: 'Weapon', config: 'WEAPONS' },
     armor: { label: 'Armor', config: 'ARMORS' },
     helmet: { label: 'Helmet', config: 'HELMETS' },
+    clothes: { label: 'Clothes', config: 'CLOTHES' },
+    boots: { label: 'Boots', config: 'BOOTS' },
     tool: { label: 'Tool', config: 'TOOLS' },
-    artifact: { label: 'Artifact', config: 'ARTIFACTS' },
+    trinket: { label: 'Trinket', config: 'TRINKETS' },
 };
 
 const CONFIG_EQUIPMENT = {
     weapon: WEAPONS,
     armor: ARMORS,
     helmet: HELMETS,
+    clothes: CLOTHES,
+    boots: BOOTS,
     tool: TOOLS,
-    artifact: ARTIFACTS,
+    trinket: TRINKETS,
 };
 
 let editorInstance = null;
@@ -277,7 +281,7 @@ class EquipmentEditor {
     }
 
     _getDefaultChar() {
-        const chars = { weapon: '/', armor: '[', helmet: '^', tool: '\\', artifact: '*' };
+        const chars = { weapon: '/', armor: '[', helmet: '^', clothes: '~', boots: '∟', tool: '\\', trinket: '*' };
         return chars[this.category] || '?';
     }
 
@@ -563,14 +567,14 @@ class EquipmentEditor {
         document.getElementById('eq-key').value = item.key;
         document.getElementById('eq-name').value = item.name;
 
-        if (item.category === 'artifact') {
-            ARTIFACT_EQUIPPED_STATS.forEach(f => {
+        if (item.category === 'trinket') {
+            TRINKET_EQUIPPED_STATS.forEach(f => {
                 document.getElementById(`eq-arteq-${f.key}`).value = item[f.key] || '';
             });
             document.getElementById('eq-art-consumable').checked = !!item.consumable;
             if (item.pedestal) {
                 document.getElementById('eq-art-pedestal-toggle').checked = true;
-                ARTIFACT_PEDESTAL_FIELDS.forEach(f => {
+                TRINKET_PEDESTAL_FIELDS.forEach(f => {
                     const el = document.getElementById(`eq-ped-${f.key}`);
                     if (f.type === 'checkbox') el.checked = !!item.pedestal[f.key];
                     else el.value = item.pedestal[f.key] || '';
@@ -578,13 +582,13 @@ class EquipmentEditor {
             }
             if (item.expedition) {
                 document.getElementById('eq-art-expedition-toggle').checked = true;
-                ARTIFACT_EXPEDITION_FIELDS.forEach(f => {
+                TRINKET_EXPEDITION_FIELDS.forEach(f => {
                     document.getElementById(`eq-exp-${f.key}`).value = item.expedition[f.key] || '';
                 });
             }
             if (item.combat) {
                 document.getElementById('eq-art-combat-toggle').checked = true;
-                ARTIFACT_COMBAT_FIELDS.forEach(f => {
+                TRINKET_COMBAT_FIELDS.forEach(f => {
                     document.getElementById(`eq-com-${f.key}`).value = item.combat[f.key] || '';
                 });
             }

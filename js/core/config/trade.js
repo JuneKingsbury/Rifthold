@@ -39,7 +39,7 @@ export const MERCHANTS = [
         exclusiveItems: ['aegis_of_the_vanguard', 'iron_sword', 'runic_blade', 'iron_crossbow', 'runic_plate', 'runic_helm'],
         extraItemChances: [0.6, 0.3],   // 1 guaranteed + up to 2 extras (60%, then 30%)
         goldRange: [30, 60],
-        buyCategories: ['artifact', 'tome', 'consumable'],
+        buyCategories: ['trinket', 'tome', 'consumable'],
     },
     {
         name: 'Tome Peddler',
@@ -47,7 +47,7 @@ export const MERCHANTS = [
         exclusiveItems: ['tome_of_spark', 'tome_of_mend', 'tome_of_smite', 'tome_of_magic_missile', 'tome_of_heal'],
         extraItemChances: [0.6, 0.3],   // 1 guaranteed + up to 2 extras (60%, then 30%)
         goldRange: [15, 35],
-        buyCategories: ['weapon', 'armor', 'helmet', 'artifact', 'consumable'],
+        buyCategories: ['weapon', 'armor', 'helmet', 'trinket', 'consumable'],
     },
     {
         name: 'Wandering Alchemist',
@@ -73,6 +73,6 @@ export const TRADE_VALUES = {
 // TRADER_MARKUP: multiplier on base value when buying FROM the trader (higher = more expensive).
 // TRADER_DISCOUNT: multiplier on base value when selling TO the trader (lower = less value).
 // Effective ratio = MARKUP / DISCOUNT (currently 1.5:1). Must always be > 1 to prevent arbitrage.
-// Modified at runtime by: Trade Routes research (see getTradeRates), pedestal artifacts (tradeMarkupMult).
+// Modified at runtime by: Trade Routes research (see getTradeRates), pedestal items (tradeMarkupMult).
 export const TRADER_MARKUP = 1.2;
 export const TRADER_DISCOUNT = 0.8;

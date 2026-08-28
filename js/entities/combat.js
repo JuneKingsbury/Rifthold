@@ -227,8 +227,12 @@ function updateRaider(raider, game) {
 }
 
 function getColonistTargetPriority(colonist) {
-    if (!colonist.artifact || colonist.artifactBroken) return 0;
-    return colonist.artifact.combat?.targetPriority || 0;
+    let priority = 0;
+    for (const item of [colonist.weapon, colonist.armor, colonist.helmet, colonist.clothes, colonist.boots, colonist.tool, colonist.trinket].filter(Boolean)) {
+        if (item === colonist.trinket && colonist.trinketBroken) continue;
+        priority += item.combat?.targetPriority || 0;
+    }
+    return priority;
 }
 
 function findNearestColonist(raider, game) {

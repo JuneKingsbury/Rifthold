@@ -1,10 +1,10 @@
-import { WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, REALMS, RESEARCH, CONFIG } from '../core/config.js';
+import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, ALL_ITEMS, REALMS, RESEARCH, CONFIG } from '../core/config.js';
 
 const STORAGE_KEY = 'convocation_realm_drafts';
 
 const REFERENCE_DATA = [
     { title: 'Resource IDs', ids: Object.keys(CONFIG.START_RESOURCES) },
-    { title: 'Artifact IDs', ids: Object.keys(ARTIFACTS) },
+    { title: 'Trinket IDs', ids: Object.keys(TRINKETS) },
     { title: 'Weapon IDs', ids: Object.keys(WEAPONS) },
     { title: 'Armor IDs', ids: Object.keys(ARMORS) },
     { title: 'Helmet IDs', ids: Object.keys(HELMETS) },
@@ -332,7 +332,7 @@ class RealmEditor {
             <div class="fe-list-row">
                 <select data-loot-type="${i}" style="width:90px;">
                     <option value="resource" ${row.type === 'resource' ? 'selected' : ''}>Resource</option>
-                    <option value="artifact" ${row.type === 'artifact' ? 'selected' : ''}>Artifact</option>
+                    <option value="item" ${row.type === 'item' ? 'selected' : ''}>Item</option>
                 </select>
                 <input type="text" data-loot-key="${i}" value="${row.key}" placeholder="key" style="flex:1;">
                 <input type="number" data-loot-weight="${i}" value="${row.weight}" placeholder="wt" style="width:50px;" min="1">
@@ -384,7 +384,7 @@ class RealmEditor {
                 <div style="width:100%;display:flex;gap:6px;margin-top:4px;">
                     <select data-rare-loottype="${i}" style="width:80px;">
                         <option value="resource" ${row.lootType === 'resource' ? 'selected' : ''}>resource</option>
-                        <option value="artifact" ${row.lootType === 'artifact' ? 'selected' : ''}>artifact</option>
+                        <option value="item" ${row.lootType === 'item' ? 'selected' : ''}>item</option>
                     </select>
                     <input type="text" data-rare-lootkey="${i}" value="${row.lootKey}" placeholder="loot key" style="flex:1;">
                     <input type="number" data-rare-lootmin="${i}" value="${row.lootMin || ''}" placeholder="min" style="width:50px;">
@@ -714,7 +714,7 @@ class RealmEditor {
         data.loot.forEach(l => {
             const parts = [];
             if (l.resource) parts.push(`resource: '${l.resource}'`);
-            if (l.artifact) parts.push(`artifact: '${l.artifact}'`);
+            if (l.item) parts.push(`item: '${l.item}'`);
             parts.push(`weight: ${l.weight}`);
             if (l.amount) parts.push(`amount: [${l.amount[0]}, ${l.amount[1]}]`);
             out += `        { ${parts.join(', ')} },\n`;
@@ -739,7 +739,7 @@ class RealmEditor {
             if (r.loot) {
                 const lootParts = [];
                 if (r.loot.resource) lootParts.push(`resource: '${r.loot.resource}'`);
-                if (r.loot.artifact) lootParts.push(`artifact: '${r.loot.artifact}'`);
+                if (r.loot.item) lootParts.push(`item: '${r.loot.item}'`);
                 if (r.loot.amount) lootParts.push(`amount: [${r.loot.amount[0]}, ${r.loot.amount[1]}]`);
                 lootStr = `, loot: { ${lootParts.join(', ')} }`;
             }
@@ -860,8 +860,8 @@ class RealmEditor {
         }
         if (def.loot) {
             this.lootRows = def.loot.map(l => ({
-                type: l.artifact ? 'artifact' : 'resource',
-                key: l.resource || l.artifact || '',
+                type: l.item ? 'item' : 'resource',
+                key: l.resource || l.item || '',
                 weight: l.weight || 10,
                 amountMin: l.amount ? l.amount[0] : 1,
                 amountMax: l.amount ? l.amount[1] : 1,
@@ -875,8 +875,8 @@ class RealmEditor {
                 this.rareEvents = def.events.rare.map(r => ({
                     chance: r.chance || 0.05,
                     text: r.text || '',
-                    lootType: r.loot ? (r.loot.artifact ? 'artifact' : 'resource') : 'resource',
-                    lootKey: r.loot ? (r.loot.resource || r.loot.artifact || '') : '',
+                    lootType: r.loot ? (r.loot.item ? 'item' : 'resource') : 'resource',
+                    lootKey: r.loot ? (r.loot.resource || r.loot.item || '') : '',
                     lootMin: r.loot && r.loot.amount ? r.loot.amount[0] : 1,
                     lootMax: r.loot && r.loot.amount ? r.loot.amount[1] : 3,
                 }));

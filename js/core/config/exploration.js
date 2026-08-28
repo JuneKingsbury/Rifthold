@@ -9,7 +9,7 @@ export const REALMS = {
             { resource: 'stone', weight: 40, amount: [5, 12] },
             { resource: 'runite', weight: 30, amount: [2, 5] },
             { resource: 'void_essence', weight: 10, amount: [1, 3] },
-            { artifact: 'map_fragment', weight: 3 },
+            { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
@@ -33,7 +33,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} discovers a resonating crystal chamber — bonus runite!', loot: { resource: 'runite', amount: [3, 6] } },
                 { chance: 0.03, text: '{name} finds an ancient dwarven cache!', loot: { resource: 'stone', amount: [8, 15] } },
-                { chance: 0.02, text: '{name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { artifact: 'compass_of_greed' } },
+                { chance: 0.02, text: '{name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { item: 'compass_of_greed' } },
             ],
         },
     },
@@ -47,7 +47,7 @@ export const REALMS = {
             { resource: 'runite', weight: 35, amount: [4, 9] },
             { resource: 'stone', weight: 25, amount: [6, 14] },
             { resource: 'void_essence', weight: 15, amount: [2, 5] },
-            { artifact: 'drum_of_rallying', weight: 3 },
+            { item: 'drum_of_rallying', weight: 3 },
         ],
         enemies: { hp: [70, 110], damage: [7, 12], count: [3, 5], sprite: 'ghost' },
         events: {
@@ -73,8 +73,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} finds a deep runite motherload!', loot: { resource: 'runite', amount: [6, 12] } },
                 { chance: 0.03, text: '{name} discovers a crystallized void pocket deep underground!', loot: { resource: 'void_essence', amount: [4, 8] } },
-                { chance: 0.015, text: '{name} unearths an ancient mining golem core — still humming with power!', loot: { artifact: 'boots_of_haste' } },
-                { chance: 0.015, text: '{name} pries a ward stone from a sealed vault door!', loot: { artifact: 'ward_of_the_sentinel' } },
+                { chance: 0.015, text: '{name} unearths an ancient mining golem core — still humming with power!', loot: { item: 'boots_of_haste' } },
+                { chance: 0.015, text: '{name} pries a ward stone from a sealed vault door!', loot: { item: 'ward_of_the_sentinel' } },
             ],
         },
     },
@@ -88,7 +88,7 @@ export const REALMS = {
             { resource: 'runite', weight: 40, amount: [6, 14] },
             { resource: 'void_essence', weight: 25, amount: [3, 7] },
             { resource: 'stone', weight: 15, amount: [8, 18] },
-            { artifact: 'ward_of_the_sentinel', weight: 3 },
+            { item: 'ward_of_the_sentinel', weight: 3 },
         ],
         enemies: { hp: [100, 160], damage: [11, 17], count: [4, 7], sprite: 'ghost' },
         events: {
@@ -114,8 +114,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} discovers the legendary Crystal Heart — a massive runite formation!', loot: { resource: 'runite', amount: [10, 18] } },
                 { chance: 0.03, text: '{name} finds a sealed primordial chamber full of void-infused crystal!', loot: { resource: 'void_essence', amount: [6, 12] } },
-                { chance: 0.015, text: '{name} pries a shimmering gem from the deepest wall — it pulses with protective energy!', loot: { artifact: 'crystal_aegis' } },
-                { chance: 0.01, text: '{name} uncovers an ancient crystalline forge still burning with arcane fire!', loot: { artifact: 'runite_hammer' } },
+                { chance: 0.015, text: '{name} pries a shimmering gem from the deepest wall — it pulses with protective energy!', loot: { item: 'crystal_aegis' } },
+                { chance: 0.01, text: '{name} uncovers an ancient crystalline forge still burning with arcane fire!', loot: { item: 'runite_hammer' } },
             ],
         },
     },
@@ -128,7 +128,7 @@ export const REALMS = {
             { resource: 'wood', weight: 50, amount: [8, 15] },
             { resource: 'wheat', weight: 20, amount: [5, 10] },
             { resource: 'berries', weight: 20, amount: [4, 8] },
-            { artifact: 'map_fragment', weight: 3 },
+            { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [30, 50], damage: [4, 6], count: [1, 3], sprite: 'ghost' },
         events: {
@@ -152,7 +152,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.06, text: '{name} discovers a fertile seed cache — rare crops!', loot: { resource: 'potatoes', amount: [6, 10] } },
                 { chance: 0.04, text: '{name} finds a druid\'s abandoned herb stash!', loot: { resource: 'berries', amount: [8, 12] } },
-                { chance: 0.02, text: '{name} finds a golden charm shaped like a cornucopia!', loot: { artifact: 'cornucopia_charm' } },
+                { chance: 0.02, text: '{name} finds a golden charm shaped like a cornucopia!', loot: { item: 'cornucopia_charm' } },
             ],
         },
     },
@@ -166,7 +166,7 @@ export const REALMS = {
             { resource: 'wood', weight: 35, amount: [10, 20] },
             { resource: 'berries', weight: 25, amount: [6, 12] },
             { resource: 'potatoes', weight: 20, amount: [5, 10] },
-            { artifact: 'cornucopia_charm', weight: 3 },
+            { item: 'cornucopia_charm', weight: 3 },
         ],
         enemies: { hp: [55, 85], damage: [6, 10], count: [2, 5], sprite: 'ghost' },
         events: {
@@ -192,8 +192,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} discovers a grove of giant truffles — incredibly valuable!', loot: { resource: 'potatoes', amount: [8, 14] } },
                 { chance: 0.04, text: '{name} finds a cache of preserved seeds in a hollow tree!', loot: { resource: 'wheat', amount: [10, 16] } },
-                { chance: 0.02, text: '{name} finds a living staff of intertwined roots that still grows!', loot: { artifact: 'staff_of_regrowth' } },
-                { chance: 0.015, text: '{name} discovers a symbiotic fungal crown that enhances the mind!', loot: { artifact: 'mycelium_crown' } },
+                { chance: 0.02, text: '{name} finds a living staff of intertwined roots that still grows!', loot: { item: 'staff_of_regrowth' } },
+                { chance: 0.015, text: '{name} discovers a symbiotic fungal crown that enhances the mind!', loot: { item: 'mycelium_crown' } },
             ],
         },
     },
@@ -208,7 +208,7 @@ export const REALMS = {
             { resource: 'berries', weight: 20, amount: [8, 16] },
             { resource: 'potatoes', weight: 15, amount: [6, 12] },
             { resource: 'void_essence', weight: 10, amount: [2, 5] },
-            { artifact: 'staff_of_regrowth', weight: 3 },
+            { item: 'staff_of_regrowth', weight: 3 },
         ],
         enemies: { hp: [80, 130], damage: [9, 14], count: [3, 6], sprite: 'ghost' },
         events: {
@@ -234,8 +234,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} discovers the World-Root — a nexus of primal nature energy!', loot: { resource: 'void_essence', amount: [5, 9] } },
                 { chance: 0.03, text: '{name} harvests from the legendary Ever-Fruit tree!', loot: { resource: 'berries', amount: [12, 20] } },
-                { chance: 0.015, text: '{name} bonds with a seed of the World-Tree — it grows into living armor!', loot: { artifact: 'living_bark_armor' } },
-                { chance: 0.01, text: '{name} discovers an ancient druid\'s heartwood staff, still thrumming with life magic!', loot: { artifact: 'heartwood_staff' } },
+                { chance: 0.015, text: '{name} bonds with a seed of the World-Tree — it grows into living armor!', loot: { item: 'living_bark_armor' } },
+                { chance: 0.01, text: '{name} discovers an ancient druid\'s heartwood staff, still thrumming with life magic!', loot: { item: 'heartwood_staff' } },
             ],
         },
     },
@@ -251,7 +251,7 @@ export const REALMS = {
             { resource: 'tome_of_warp', weight: 15, amount: [1, 1] },
             { resource: 'tome_of_circle_of_growth', weight: 10, amount: [1, 1] },
             { resource: 'runite', weight: 20, amount: [2, 4] },
-            { artifact: 'map_fragment', weight: 3 },
+            { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [30, 50], damage: [4, 7], count: [1, 3], sprite: 'ghost' },
         research: 'arcane_studies',
@@ -277,7 +277,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} discovers a sealed headmaster\'s vault — rare tome inside!', loot: { resource: 'tome_of_magic_missile', amount: [1, 1] } },
                 { chance: 0.04, text: '{name} finds a cache of enchanting runite!', loot: { resource: 'runite', amount: [3, 5] } },
-                { chance: 0.015, text: '{name} finds a glowing codex that shares its knowledge with all who stand near!', loot: { artifact: 'tome_of_shared_wisdom' } },
+                { chance: 0.015, text: '{name} finds a glowing codex that shares its knowledge with all who stand near!', loot: { item: 'tome_of_shared_wisdom' } },
                 { chance: 0.02, text: '{name} discovers a crystalline apparatus in a forgotten research alcove — it amplifies mana storage!', loot: { item: 'crystal_capacitor' } },
             ],
         },
@@ -296,7 +296,7 @@ export const REALMS = {
             { resource: 'tome_of_warp', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_circle_of_growth', weight: 10, amount: [1, 1] },
             { resource: 'runite', weight: 25, amount: [3, 7] },
-            { artifact: 'tome_of_shared_wisdom', weight: 3 },
+            { item: 'tome_of_shared_wisdom', weight: 3 },
         ],
         enemies: { hp: [60, 100], damage: [7, 12], count: [2, 5], sprite: 'ghost' },
         events: {
@@ -322,7 +322,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} discovers the Dean\'s private vault — advanced tome inside!', loot: { resource: 'tome_of_haste', amount: [1, 1] } },
                 { chance: 0.03, text: '{name} finds an enchanted runite cache in the alchemy wing!', loot: { resource: 'runite', amount: [5, 9] } },
-                { chance: 0.02, text: '{name} finds a set of spectacles that reveal hidden truths!', loot: { artifact: 'scholars_spectacles' } },
+                { chance: 0.02, text: '{name} finds a set of spectacles that reveal hidden truths!', loot: { item: 'scholars_spectacles' } },
                 { chance: 0.015, text: '{name} discovers a thesis on mana crystallization with a working prototype!', loot: { item: 'crystal_capacitor' } },
             ],
         },
@@ -342,7 +342,7 @@ export const REALMS = {
             { resource: 'tome_of_circle_of_growth', weight: 12, amount: [1, 1] },
             { resource: 'runite', weight: 20, amount: [4, 9] },
             { resource: 'void_essence', weight: 15, amount: [2, 6] },
-            { artifact: 'scholars_spectacles', weight: 2 },
+            { item: 'scholars_spectacles', weight: 2 },
         ],
         enemies: { hp: [90, 150], damage: [10, 16], count: [3, 6], sprite: 'ghost' },
         events: {
@@ -369,8 +369,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} accesses the head researcher\'s personal vault — forbidden knowledge!', loot: { resource: 'tome_of_circle_of_growth', amount: [1, 1] } },
                 { chance: 0.03, text: '{name} finds concentrated void essence in a sealed containment jar!', loot: { resource: 'void_essence', amount: [6, 10] } },
-                { chance: 0.015, text: '{name} recovers an experimental amplification gauntlet — still functional!', loot: { artifact: 'arcane_amplifier' } },
-                { chance: 0.01, text: '{name} discovers the masterwork of a mad researcher — a staff that bends reality!', loot: { artifact: 'staff_of_distortion' } },
+                { chance: 0.015, text: '{name} recovers an experimental amplification gauntlet — still functional!', loot: { item: 'arcane_amplifier' } },
+                { chance: 0.01, text: '{name} discovers the masterwork of a mad researcher — a staff that bends reality!', loot: { item: 'staff_of_distortion' } },
             ],
         },
     },
@@ -382,7 +382,7 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 40, amount: [3, 7] },
             { resource: 'runite', weight: 25, amount: [3, 6] },
-            { artifact: 'map_fragment', weight: 3 },
+            { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [80, 120], damage: [8, 14], count: [3, 6], sprite: 'ghost' },
         research: 'deep_delving',
@@ -409,8 +409,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} absorbs a collapsing void crystal — pure essence!', loot: { resource: 'void_essence', amount: [4, 8] } },
                 { chance: 0.02, text: '{name} finds a sealed void reliquary!', loot: { resource: 'void_essence', amount: [6, 10] } },
-                { chance: 0.015, text: '{name} pulls a glowing lantern from the void — it never goes dark!', loot: { artifact: 'voidwalkers_lantern' } },
-                { chance: 0.015, text: '{name} wraps themselves in living shadow — a cloak of concealment!', loot: { artifact: 'cloak_of_shadows' } },
+                { chance: 0.015, text: '{name} pulls a glowing lantern from the void — it never goes dark!', loot: { item: 'voidwalkers_lantern' } },
+                { chance: 0.015, text: '{name} wraps themselves in living shadow — a cloak of concealment!', loot: { item: 'cloak_of_shadows' } },
                 { chance: 0.02, text: '{name} finds a pulsing crystal device that hums with containment magic!', loot: { item: 'crystal_capacitor' } },
             ],
         },
@@ -425,7 +425,7 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 45, amount: [5, 10] },
             { resource: 'runite', weight: 20, amount: [4, 8] },
-            { artifact: 'voidwalkers_lantern', weight: 3 },
+            { item: 'voidwalkers_lantern', weight: 3 },
         ],
         enemies: { hp: [120, 180], damage: [12, 18], count: [4, 7], sprite: 'ghost' },
         events: {
@@ -452,8 +452,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} finds a concentrated void crystal — pure primordial essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
                 { chance: 0.03, text: '{name} collects runite that has been void-tempered for aeons!', loot: { resource: 'runite', amount: [6, 12] } },
-                { chance: 0.015, text: '{name} wrests a blade from the void itself — it cuts through reality!', loot: { artifact: 'void_blade' } },
-                { chance: 0.01, text: '{name} discovers an orb containing a trapped dimension — incredible power!', loot: { artifact: 'dimensional_orb' } },
+                { chance: 0.015, text: '{name} wrests a blade from the void itself — it cuts through reality!', loot: { item: 'void_blade' } },
+                { chance: 0.01, text: '{name} discovers an orb containing a trapped dimension — incredible power!', loot: { item: 'dimensional_orb' } },
             ],
         },
     },
@@ -467,7 +467,7 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 50, amount: [7, 14] },
             { resource: 'runite', weight: 20, amount: [5, 10] },
-            { artifact: 'cloak_of_shadows', weight: 3 },
+            { item: 'cloak_of_shadows', weight: 3 },
         ],
         enemies: { hp: [160, 240], damage: [15, 22], count: [4, 8], sprite: 'ghost' },
         events: {
@@ -494,9 +494,9 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.04, text: '{name} finds a tear in reality leading to a void essence wellspring!', loot: { resource: 'void_essence', amount: [10, 18] } },
-                { chance: 0.02, text: '{name} claims a fragment of pure oblivion — it annihilates anything it touches!', loot: { artifact: 'shard_of_oblivion' } },
-                { chance: 0.01, text: '{name} binds a fraction of the void\'s power into their very soul!', loot: { artifact: 'voidheart' } },
-                { chance: 0.01, text: '{name} finds armor forged from the boundary between existence and nothing!', loot: { artifact: 'armor_of_the_abyss' } },
+                { chance: 0.02, text: '{name} claims a fragment of pure oblivion — it annihilates anything it touches!', loot: { item: 'shard_of_oblivion' } },
+                { chance: 0.01, text: '{name} binds a fraction of the void\'s power into their very soul!', loot: { item: 'voidheart' } },
+                { chance: 0.01, text: '{name} finds armor forged from the boundary between existence and nothing!', loot: { item: 'armor_of_the_abyss' } },
             ],
         },
     },
@@ -507,7 +507,7 @@ export const REALMS = {
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         research: 'deep_delving',
         loot: [
-            { artifact: 'map_fragment', weight: 3 },
+            { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
@@ -521,7 +521,7 @@ export const REALMS = {
                 'TODO: {name} slips on smooth crystal — hard landing!',
             ],
             rare: [
-                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { artifact: 'compass_of_greed' } },
+                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { item: 'compass_of_greed' } },
             ],
         },
     },
@@ -533,7 +533,7 @@ export const REALMS = {
         research: 'deep_delving',
         requiresRealm: 'kingdom_outskirts',
         loot: [
-            { artifact: 'map_fragment', weight: 3 },
+            { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
@@ -547,7 +547,7 @@ export const REALMS = {
                 'TODO: {name} slips on smooth crystal — hard landing!',
             ],
             rare: [
-                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { artifact: 'compass_of_greed' } },
+                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { item: 'compass_of_greed' } },
             ],
         },
     },
@@ -559,7 +559,7 @@ export const REALMS = {
         research: 'deep_delving',
         requiresRealm: 'crusader_barracks',
         loot: [
-            { artifact: 'map_fragment', weight: 3 },
+            { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
         events: {
@@ -573,7 +573,7 @@ export const REALMS = {
                 'TODO: {name} slips on smooth crystal — hard landing!',
             ],
             rare: [
-                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { artifact: 'compass_of_greed' } },
+                { chance: 0.02, text: 'TODO: {name} finds a strange compass embedded in crystal — it pulses with greed!', loot: { item: 'compass_of_greed' } },
             ],
         },
     },

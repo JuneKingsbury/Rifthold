@@ -43,7 +43,7 @@ export class OverlayRenderer {
 
         if (game.radiusHighlight && game.selectedColonist) {
             const c = game.selectedColonist;
-            if (c.artifact && !c.artifactBroken && c.artifact.pedestal?.radius && c.artifact.pedestal.radius !== 'global') {
+            if (c.trinket && !c.trinketBroken && c.trinket.pedestal?.radius && c.trinket.pedestal.radius !== 'global') {
                 game.radiusHighlight.x = c.x;
                 game.radiusHighlight.y = c.y;
             }

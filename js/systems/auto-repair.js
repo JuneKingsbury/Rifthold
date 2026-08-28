@@ -1,6 +1,6 @@
 /**
  * Auto-repair: on a periodic tick, queue repair tasks for damaged structures
- * and repair_artifact tasks for colonists carrying a broken artifact (which
+ * and repair_trinket tasks for colonists carrying a broken trinket (which
  * need an anvil). Extracted from the main loop so the queueing logic can be
  * unit-tested without booting the DOM-coupled engine.
  *
@@ -31,18 +31,18 @@ export function updateAutoRepair(game, structurePositions = game.mapIndex.getAll
     const anvils = structurePositions.filter(s => s.type === 'anvil');
     if (anvils.length === 0) return;
     for (const c of game.colonists) {
-        if (c.hp <= 0 || !c.artifactBroken || !c.artifact) continue;
+        if (c.hp <= 0 || !c.trinketBroken || !c.trinket) continue;
         if (c._repairQueued) continue;
         const anvil = anvils[0];
-        const existing = game.taskQueue.getAll().find(t => t.type === 'repair_artifact' && t.colonistId === c.id);
+        const existing = game.taskQueue.getAll().find(t => t.type === 'repair_trinket' && t.colonistId === c.id);
         if (existing) continue;
         game.taskQueue.add({
-            type: 'repair_artifact',
+            type: 'repair_trinket',
             skillRequired: 'crafting',
             x: anvil.x, y: anvil.y,
             workAmount: 40,
             colonistId: c.id,
-            artifactKey: c.artifact,
+            trinketKey: c.trinket,
         });
         c._repairQueued = true;
     }

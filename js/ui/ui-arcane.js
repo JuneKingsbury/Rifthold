@@ -1,4 +1,4 @@
-import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, ARTIFACTS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS } from '../core/config.js';
+import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, TRINKETS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS } from '../core/config.js';
 import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
@@ -131,7 +131,7 @@ const arcaneMethods = {
             html += `<div class="arcane-section" style="color:#888;padding:20px 0;text-align:center;">`;
             html += `<div style="font-size:1.2em;color:#33ccff;margin-bottom:8px;">Rift Gate Required</div>`;
             html += `<div>Build a Rift Gate to send expeditions to other realms.</div>`;
-            html += `<div style="margin-top:6px;color:#666;">Explore for treasure, artifacts, and rare materials. Requires mana to operate.</div>`;
+            html += `<div style="margin-top:6px;color:#666;">Explore for treasure, rare items, and rare materials. Requires mana to operate.</div>`;
             html += `</div>`;
             return html;
         }
@@ -288,10 +288,10 @@ const arcaneMethods = {
         const totalWeight = dim.loot.reduce((s, l) => s + l.weight, 0);
         for (const entry of dim.loot) {
             const pct = Math.round(entry.weight / totalWeight * 100);
-            const key = entry.artifact || entry.resource;
+            const key = entry.item || entry.resource;
             const isFound = discovered.has(`${realmKey}:${key}`);
-            const name = isFound ? (entry.artifact ? (ARTIFACTS[entry.artifact]?.name || entry.artifact) : entry.resource.replace(/_/g, ' ')) : '??????';
-            const icon = isFound ? this._itemIcon(key, entry.artifact ? 'artifact' : null) : '';
+            const name = isFound ? (entry.item ? (ALL_ITEMS[entry.item]?.name || entry.item) : entry.resource.replace(/_/g, ' ')) : '??????';
+            const icon = isFound ? this._itemIcon(key, entry.item ? (ALL_ITEMS[entry.item]?.type || 'trinket') : null) : '';
             const nameColor = isFound ? '#ccc' : '#555';
             html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px;font-size:0.8em;">`;
             html += `<span style="color:${nameColor};">${icon}${name}</span>`;
@@ -304,11 +304,7 @@ const arcaneMethods = {
             for (const rare of dim.events.rare) {
                 const pct = (rare.chance * 100).toFixed(1);
                 let key, name, isFound;
-                if (rare.loot.artifact) {
-                    key = rare.loot.artifact;
-                    isFound = discovered.has(`${realmKey}:${key}`);
-                    name = isFound ? (ARTIFACTS[key]?.name || key) : '??????';
-                } else if (rare.loot.item) {
+                if (rare.loot.item) {
                     key = rare.loot.item;
                     isFound = discovered.has(`${realmKey}:${key}`);
                     name = isFound ? (ALL_ITEMS[key]?.name || key) : '??????';
@@ -317,7 +313,7 @@ const arcaneMethods = {
                     isFound = discovered.has(`${realmKey}:${key}`);
                     name = isFound ? key.replace(/_/g, ' ') : '??????';
                 }
-                const icon = isFound ? this._itemIcon(key, rare.loot.artifact ? 'artifact' : null) : '';
+                const icon = isFound ? this._itemIcon(key, rare.loot.item ? (ALL_ITEMS[key]?.type || 'trinket') : null) : '';
                 const nameColor = isFound ? '#ccc' : '#555';
                 html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px;font-size:0.8em;">`;
                 html += `<span style="color:${nameColor};">${icon}${name}</span>`;
@@ -327,7 +323,7 @@ const arcaneMethods = {
         }
 
         const totalDrops = dim.loot.length + (dim.events?.rare?.length || 0);
-        const foundCount = [...dim.loot.map(e => e.artifact || e.resource), ...(dim.events?.rare || []).map(r => r.loot.artifact || r.loot.item || r.loot.resource)].filter(k => discovered.has(`${realmKey}:${k}`)).length;
+        const foundCount = [...dim.loot.map(e => e.item || e.resource), ...(dim.events?.rare || []).map(r => r.loot.item || r.loot.resource)].filter(k => discovered.has(`${realmKey}:${k}`)).length;
         html += `<div style="color:#666;font-size:0.7em;text-align:right;margin-top:4px;">${foundCount}/${totalDrops} discovered</div>`;
         html += `</div>`;
         return html;
@@ -1040,7 +1036,7 @@ const arcaneMethods = {
         }
         const cat = categoryHint || this._getItemCategory(itemKey);
         if (!cat) return '';
-        const itemDef = (WEAPONS[itemKey] || ARMORS[itemKey] || HELMETS[itemKey] || CLOTHES[itemKey] || TOOLS[itemKey] || ARTIFACTS[itemKey] || POTIONS[itemKey] || SPELL_TOMES[itemKey] || ALL_ITEMS[itemKey]);
+        const itemDef = (WEAPONS[itemKey] || ARMORS[itemKey] || HELMETS[itemKey] || CLOTHES[itemKey] || TOOLS[itemKey] || TRINKETS[itemKey] || POTIONS[itemKey] || SPELL_TOMES[itemKey] || ALL_ITEMS[itemKey]);
         const ch = itemDef?.char || ITEM_CHARS[cat]?.char;
         if (!ch) return '';
         const color = itemDef?.charColor || ITEM_CHARS[cat]?.color || '#aaa';
@@ -1053,7 +1049,7 @@ const arcaneMethods = {
         if (HELMETS[itemKey]) return 'helmet';
         if (CLOTHES[itemKey]) return 'clothes';
         if (TOOLS[itemKey]) return 'tool';
-        if (ARTIFACTS[itemKey]) return 'artifact';
+        if (TRINKETS[itemKey]) return 'trinket';
         if (POTIONS[itemKey]) return 'potion';
         if (SPELL_TOMES[itemKey]) return 'tome';
         return ALL_ITEMS[itemKey]?.type || null;

@@ -4,7 +4,7 @@
  * pedestals, for systems that need the colony-wide modifier on demand. The
  * radius-based aura application to colonists lives in main.js (updatePedestals).
  */
-import { ARTIFACTS } from '../core/config.js';
+import { ALL_ITEMS } from '../core/config.js';
 
 export function getPedestalEffect(game, effectKey) {
     let value = effectKey.includes('Mult') ? 1.0 : 0;
@@ -13,7 +13,7 @@ export function getPedestalEffect(game, effectKey) {
         if (type !== 'artifact_pedestal') continue;
         const tile = game.map[y][x];
         if (!tile.pedestalArtifact || tile.pedestalInactive) continue;
-        const def = ARTIFACTS[tile.pedestalArtifact];
+        const def = ALL_ITEMS[tile.pedestalArtifact];
         if (!def?.pedestal) continue;
         if (def.pedestal.radius !== 'global') continue;
         if (def.pedestal[effectKey] !== undefined) {

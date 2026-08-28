@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, ARTIFACTS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getComplexStructureAt } from '../systems/complexBuildings.js';
@@ -963,7 +963,7 @@ export class UI {
         return sections.join('<br>');
     }
 
-    _getArtifactTooltip(art) {
+    _getTrinketTooltip(art) {
         const lines = [];
         if (art.description) lines.push(art.description);
         const equipped = getItemStatLines(art);
@@ -1022,7 +1022,8 @@ export class UI {
         const helmetTip = colonist.helmet ? `${colonist.helmet.description || ''} ${getItemStatLines(colonist.helmet).join(', ')}`.trim() : 'No helmet equipped';
         const clothesTip = colonist.clothes ? `${colonist.clothes.description || ''} ${getItemStatLines(colonist.clothes).join(', ')}`.trim() : 'No clothes equipped';
         const toolTip = colonist.tool ? `${colonist.tool.description || ''} ${getItemStatLines(colonist.tool).join(', ')}`.trim() : 'No tool equipped';
-        const artifactTip = colonist.artifact ? this._getArtifactTooltip(colonist.artifact) : 'No artifact equipped';
+        const bootsTip = colonist.boots ? `${colonist.boots.description || ''} ${getItemStatLines(colonist.boots).join(', ')}`.trim() : 'No boots equipped';
+        const trinketTip = colonist.trinket ? this._getTrinketTooltip(colonist.trinket) : 'No trinket equipped';
 
         const nc = colonist.nameColor || '#ffff00';
         const sectionHdr = 'color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333;margin-top:8px;padding-bottom:2px;margin-bottom:3px';
@@ -1060,8 +1061,8 @@ export class UI {
         const tomeName = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : null;
         const tomeTip = tomeName ? (() => { const p = (colonist.tomeProgress?.[colonist.equippedTome] || 0); return `${tomeName} (${Math.floor(p / SPELL_TOMES[colonist.equippedTome].learningWork * 100)}%)`; })() : 'No tome equipped';
         const slotStyle = 'position:relative;border:1px solid #444;border-radius:4px;padding:4px 2px;background:#1a1a2e;cursor:pointer;min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;';
-        html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin:4px 0 0 0;text-align:center;">`;
-        // Row 1: Tome | Helmet | Artifact
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:4px 0 0 0;text-align:center;">`;
+        // Row 1: Tome | Helmet | Armor | Trinket
         html += `<div class="skill-tip" data-tip="${tomeTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Tome</div>`;
         html += colonist.equippedTome ? `${this._itemIcon(colonist.equippedTome, 'tome')}` : `<span style="color:#333;font-size:14px">~</span>`;
@@ -1072,23 +1073,28 @@ export class UI {
         html += colonist.helmet ? `${this._itemIcon(colonist.helmet.key, 'helmet')}` : `<span style="color:#333;font-size:14px">^</span>`;
         html += this._buildSlotSelect(colonist, 'helmet');
         html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${artifactTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Artifact</div>`;
-        html += colonist.artifact ? `${this._itemIcon(colonist.artifact.key, 'artifact')}` : `<span style="color:#333;font-size:14px">*</span>`;
-        html += this._buildSlotSelect(colonist, 'artifact');
+        html += `<div class="skill-tip" data-tip="${armorTip}" style="${slotStyle}">`;
+        html += `<div style="color:#666;font-size:10px">Armor</div>`;
+        html += colonist.armor ? `${this._itemIcon(colonist.armor.key, 'armor')}` : `<span style="color:#333;font-size:14px">[]</span>`;
+        html += this._buildSlotSelect(colonist, 'armor');
+        html += `</div>`;
+        html += `<div class="skill-tip" data-tip="${trinketTip}" style="${slotStyle}">`;
+        html += `<div style="color:#666;font-size:10px">Trinket</div>`;
+        html += colonist.trinket ? `${this._itemIcon(colonist.trinket.key, 'trinket')}` : `<span style="color:#333;font-size:14px">*</span>`;
+        html += this._buildSlotSelect(colonist, 'trinket');
         html += `</div>`;
         html += `</div>`;
         html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:0 0 4px 0;text-align:center;">`;
-        // Row 2: Weapon | Armor | Clothes | Tool
+        // Row 2: Weapon | Boots | Clothes | Offhand
         html += `<div class="skill-tip" data-tip="${weaponTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Weapon</div>`;
         html += colonist.weapon ? `${this._itemIcon(colonist.weapon.key, 'weapon')}` : `<span style="color:#333;font-size:14px">/</span>`;
         html += this._buildSlotSelect(colonist, 'weapon');
         html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${armorTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Armor</div>`;
-        html += colonist.armor ? `${this._itemIcon(colonist.armor.key, 'armor')}` : `<span style="color:#333;font-size:14px">[]</span>`;
-        html += this._buildSlotSelect(colonist, 'armor');
+        html += `<div class="skill-tip" data-tip="${bootsTip}" style="${slotStyle}">`;
+        html += `<div style="color:#666;font-size:10px">Boots</div>`;
+        html += colonist.boots ? `${this._itemIcon(colonist.boots.key, 'boots')}` : `<span style="color:#333;font-size:14px">∟</span>`;
+        html += this._buildSlotSelect(colonist, 'boots');
         html += `</div>`;
         html += `<div class="skill-tip" data-tip="${clothesTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Clothes</div>`;
@@ -1096,7 +1102,7 @@ export class UI {
         html += this._buildSlotSelect(colonist, 'clothes');
         html += `</div>`;
         html += `<div class="skill-tip" data-tip="${toolTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Tool</div>`;
+        html += `<div style="color:#666;font-size:10px">Offhand</div>`;
         html += colonist.tool ? `${this._itemIcon(colonist.tool.key, 'tool')}` : `<span style="color:#333;font-size:14px">\\</span>`;
         html += this._buildSlotSelect(colonist, 'tool');
         html += `</div>`;
@@ -1151,8 +1157,8 @@ export class UI {
             }
             if (colonist.activeAuras && colonist.activeAuras.length > 0) {
                 const auraSpans = colonist.activeAuras.map(a => {
-                    const def = ARTIFACTS[a.key];
-                    const tip = def ? this._getArtifactTooltip(def) : a.name;
+                    const def = ALL_ITEMS[a.key];
+                    const tip = def ? this._getTrinketTooltip(def) : a.name;
                     const clickAction = a.sourceType === 'pedestal'
                         ? `window.game.camera.centerOn(${a.x},${a.y})`
                         : `window.game.selectColonistById(${a.colonistId})`;
@@ -1226,11 +1232,21 @@ export class UI {
             armor: { listName: 'armors', label: 'Armor', fallback: 'None', equipFn: 'equipArmor', unequipFn: 'unequipArmor', statRenderer: a => getItemStatLines(a).join(', ') },
             helmet: { listName: 'helmets', label: 'Helmet', fallback: 'None', equipFn: 'equipHelmet', unequipFn: 'unequipHelmet', statRenderer: h => getItemStatLines(h).join(', ') },
             clothes: { listName: 'clothes', label: 'Clothes', fallback: 'None', equipFn: 'equipClothes', unequipFn: 'unequipClothes', statRenderer: c => getItemStatLines(c).join(', ') },
-            tool: { listName: 'tools', label: 'Tool', fallback: 'None', equipFn: 'equipTool', unequipFn: 'unequipTool', statRenderer: t => getItemStatLines(t).join(', ') },
-            artifact: { listName: 'artifacts', label: 'Artifact', fallback: 'None', equipFn: 'equipArtifact', unequipFn: 'unequipArtifact', statRenderer: a => {
+            tool: { listName: 'tools', label: 'Offhand', fallback: 'None', equipFn: 'equipTool', unequipFn: 'unequipTool', statRenderer: t => {
+                const lines = getItemStatLines(t);
+                if (t.expedition) { const el = getNestedEffectLines(t.expedition); if (el.length) lines.push(...el); }
+                if (t.combat) { const cl = getNestedEffectLines(t.combat); if (cl.length) lines.push(...cl); }
+                return lines.join(', ');
+            } },
+            trinket: { listName: 'trinkets', label: 'Trinket', fallback: 'None', equipFn: 'equipTrinket', unequipFn: 'unequipTrinket', statRenderer: a => {
                 const lines = getItemStatLines(a);
                 if (a.expedition) { const el = getNestedEffectLines(a.expedition); if (el.length) lines.push(...el); }
                 if (a.combat) { const cl = getNestedEffectLines(a.combat); if (cl.length) lines.push(...cl); }
+                return lines.join(', ');
+            } },
+            boots: { listName: 'boots', label: 'Boots', fallback: 'None', equipFn: 'equipBoots', unequipFn: 'unequipBoots', statRenderer: b => {
+                const lines = getItemStatLines(b);
+                if (b.expedition) { const el = getNestedEffectLines(b.expedition); if (el.length) lines.push(...el); }
                 return lines.join(', ');
             } },
         };
@@ -1355,28 +1371,34 @@ export class UI {
     _buildPedestalInfoHtml(tile, x, y) {
         let html = '';
         if (tile.pedestalArtifact) {
-            const artDef = ARTIFACTS[tile.pedestalArtifact];
+            const artDef = ALL_ITEMS[tile.pedestalArtifact];
             const broken = tile.pedestalInactive ? ' <span style="color:#ff4444;">(No Power)</span>' : '';
-            html += `<div class="info-row" style="color:#ccaa44;">Artifact: ${this._itemIcon(tile.pedestalArtifact, 'artifact')}${artDef?.name || tile.pedestalArtifact}${broken}</div>`;
+            html += `<div class="info-row" style="color:#ccaa44;">Placed: ${this._itemIcon(tile.pedestalArtifact, artDef?.type || 'trinket')}${artDef?.name || tile.pedestalArtifact}${broken}</div>`;
             html += this.getPedestalEffectDescription(artDef);
             if (artDef?.pedestal?.radius && artDef.pedestal.radius !== 'global') {
                 html += `<div class="info-row">Radius: ${artDef.pedestal.radius} | Mana: -${artDef.pedestal.manaCost || 0}</div>`;
             } else if (artDef?.pedestal?.radius === 'global') {
                 html += `<div class="info-row">Effect: Colony-wide | Mana: -${artDef.pedestal.manaCost || 0}</div>`;
             }
-            html += `<div class="info-actions"><button onclick="window.game.retrievePedestalArtifact(${x},${y})">Retrieve Artifact</button></div>`;
+            html += `<div class="info-actions"><button onclick="window.game.retrievePedestalItem(${x},${y})">Retrieve Item</button></div>`;
         } else {
-            html += `<div class="info-row" style="color:#888;">Empty — place an artifact</div>`;
-            const available = this.game.resources.artifacts.filter(a => a.pedestal);
+            html += `<div class="info-row" style="color:#888;">Empty — place an item</div>`;
+            const available = [
+                ...this.game.resources.trinkets,
+                ...this.game.resources.tools,
+                ...this.game.resources.helmets,
+                ...this.game.resources.armors,
+                ...this.game.resources.boots,
+            ].filter(a => a.pedestal);
             if (available.length > 0) {
                 html += `<div class="info-actions"><select id="pedestal-select">`;
                 for (const art of available) {
                     html += `<option value="${art.key}">${art.name}</option>`;
                 }
                 html += `</select>`;
-                html += `<button onclick="window.game.placePedestalArtifact(${x},${y},document.getElementById('pedestal-select').value)">Place</button></div>`;
+                html += `<button onclick="window.game.placePedestalItem(${x},${y},document.getElementById('pedestal-select').value)">Place</button></div>`;
             } else {
-                html += `<div class="info-row" style="color:#666;">No artifacts with pedestal effects in inventory</div>`;
+                html += `<div class="info-row" style="color:#666;">No items with pedestal effects in inventory</div>`;
             }
         }
         return html;
@@ -1434,8 +1456,8 @@ export class UI {
             tip += getItemStatLines(t).join(', ');
             return tip;
         }
-        if (ARTIFACTS[outputKey]) {
-            return this._getArtifactTooltip(ARTIFACTS[outputKey]);
+        if (ALL_ITEMS[outputKey]?.type === 'trinket') {
+            return this._getTrinketTooltip(ALL_ITEMS[outputKey]);
         }
         if (POTIONS[outputKey]) {
             const p = POTIONS[outputKey];
@@ -2068,7 +2090,7 @@ export class UI {
         const weapons = this.game.resources.weapons;
         const armors = this.game.resources.armors;
         const tools = this.game.resources.tools;
-        const artifacts = this.game.resources.artifacts;
+        const trinkets = this.game.resources.trinkets;
         const potions = this.game.resources.potions;
         const tomes = this.game.resources.tomes;
         const consumables = this.game.resources.consumables;
@@ -2076,7 +2098,8 @@ export class UI {
 
         const helmets = this.game.resources.helmets;
         const clothes = this.game.resources.clothes;
-        const equipCount = weapons.length + armors.length + helmets.length + clothes.length + tools.length + artifacts.length;
+        const boots = this.game.resources.boots;
+        const equipCount = weapons.length + armors.length + helmets.length + clothes.length + tools.length + boots.length + trinkets.length;
         const consumeCount = potions.length + tomes.length;
 
         let html = '<div class="panel-close" data-panel-close="inventory">&times;</div><h3>Inventory</h3>';
@@ -2092,7 +2115,7 @@ export class UI {
         if (activeTab === 'resources') {
             html += this._buildInvResources(r);
         } else if (activeTab === 'equipment') {
-            html += this._buildInvEquipment(weapons, armors, helmets, clothes, tools, artifacts);
+            html += this._buildInvEquipment(weapons, armors, helmets, clothes, tools, boots, trinkets);
         } else if (activeTab === 'consumables') {
             html += this._buildInvConsumables(potions, tomes, consumables);
         } else if (activeTab === 'animals') {
@@ -2242,7 +2265,7 @@ export class UI {
         tt.style.top = Math.max(y, 4) + 'px';
     }
 
-    _buildInvEquipment(weapons, armors, helmets, clothes, tools, artifacts) {
+    _buildInvEquipment(weapons, armors, helmets, clothes, tools, boots, trinkets) {
         let html = '';
         if (weapons.length > 0) {
             html += '<div class="info-row" style="color:#cc8888;margin-bottom:4px;"><b>Weapons:</b></div>';
@@ -2280,6 +2303,17 @@ export class UI {
                         <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\\\'")}?')){window.game.discardHelmet(${i})}">♻</button></div>`;
             });
         }
+        if (boots.length > 0) {
+            html += '<div class="info-row" style="color:#aa8855;margin-top:8px;margin-bottom:4px;"><b>Boots:</b></div>';
+            boots.forEach((b, i) => {
+                const stats = getItemStatLines(b).join(', ');
+                const tip = b.description || '';
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${tip}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${b.name}</span>
+                        <span class="inv-amount">${stats}</span>
+                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${b.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantBoots(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${b.name.replace(/'/g, "\\\\'")}?')){window.game.discardBoots(${i})}">♻</button></div>`;
+            });
+        }
         if (clothes.length > 0) {
             html += '<div class="info-row" style="color:#cc8866;margin-top:8px;margin-bottom:4px;"><b>Clothes:</b></div>';
             clothes.forEach((c, i) => {
@@ -2302,11 +2336,11 @@ export class UI {
                         <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\\\'")}?')){window.game.discardTool(${i})}">♻</button></div>`;
             });
         }
-        if (artifacts.length > 0) {
-            html += '<div class="info-row" style="color:#ccaa44;margin-top:8px;margin-bottom:4px;"><b>Artifacts:</b></div>';
-            artifacts.forEach((a, i) => {
-                const tip = this._getArtifactTooltip(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'artifact')}${a.name}</span><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardArtifact(${i})}">♻</button></div>`;
+        if (trinkets.length > 0) {
+            html += '<div class="info-row" style="color:#ccaa44;margin-top:8px;margin-bottom:4px;"><b>Trinkets:</b></div>';
+            trinkets.forEach((a, i) => {
+                const tip = this._getTrinketTooltip(a);
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'trinket')}${a.name}</span><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardTrinket(${i})}">♻</button></div>`;
             });
         }
         if (!html) html = '<div class="info-row" style="color:#666;">No equipment in storage.</div>';
@@ -2537,12 +2571,20 @@ export class UI {
         general += `<button onclick="if(confirm('Grant all starter spells (level 0) to every colonist and set magic skills to 1?'))window.game.cheatGrantStarterSpells()" class="settings-btn settings-btn-danger">Grant All Starter Spells + Magic Lvl 1</button>`;
         general += `<button onclick="window.game.cheatSpawnColonist()" class="settings-btn settings-btn-danger">Grant New Colonist</button>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
-        general += `<select id="debug-artifact-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
-        for (const [key, def] of Object.entries(ARTIFACTS)) {
+        general += `<select id="debug-trinket-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        for (const [key, def] of Object.entries(TRINKETS)) {
             general += `<option value="${key}">${def.name}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('artifact',document.getElementById('debug-artifact-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Artifact</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('trinket',document.getElementById('debug-trinket-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Trinket</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-boots-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        for (const [key, def] of Object.entries(BOOTS)) {
+            general += `<option value="${key}">${def.name}</option>`;
+        }
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatSpawnItem('boots',document.getElementById('debug-boots-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Boots</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-weapon-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -2791,7 +2833,7 @@ export class UI {
     _getExclusiveItemTooltip(key) {
         const item = ALL_ITEMS[key];
         if (!item) return '';
-        if (item.type === 'artifact') return this._getArtifactTooltip(item);
+        if (item.type === 'trinket') return this._getTrinketTooltip(item);
         const lines = [];
         if (item.description) lines.push(item.description);
         const stats = getItemStatLines(item);
@@ -2831,7 +2873,7 @@ export class UI {
         const bonuses = [];
         if (this.game.research.isResearched('trade_routes')) bonuses.push('Trade Routes');
         const artMult = getPedestalEffect(this.game, 'tradeMarkupMult');
-        if (artMult < 1) bonuses.push(`Artifact: ${Math.round((1 - artMult) * 100)}% off`);
+        if (artMult < 1) bonuses.push(`Trinket: ${Math.round((1 - artMult) * 100)}% off`);
         if (bonuses.length > 0) {
             html += `<div class="trade-bonuses">${bonuses.join(' | ')}</div>`;
         }
@@ -2892,7 +2934,7 @@ export class UI {
 
         // Equipment items the merchant will buy, filtered by buyCategories
         const buyCategories = data.buyCategories ? new Set(data.buyCategories) : null;
-        const EQUIP_ARRAYS = ['weapon', 'armor', 'helmet', 'tool', 'artifact', 'tome', 'consumable'];
+        const EQUIP_ARRAYS = ['weapon', 'armor', 'helmet', 'tool', 'trinket', 'boots', 'tome', 'consumable'];
         const offerableEquip = [];
         for (const type of EQUIP_ARRAYS) {
             if (buyCategories && !buyCategories.has(type)) continue;

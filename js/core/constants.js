@@ -19,7 +19,7 @@ export const TASK_TYPES = Object.freeze({
     MINE: 'mine',
     GATHER: 'gather',
     REPAIR: 'repair',
-    REPAIR_ARTIFACT: 'repair_artifact',
+    REPAIR_TRINKET: 'repair_trinket',
     COOK: 'cook',
     CRAFT: 'craft',
     HARVEST: 'harvest',

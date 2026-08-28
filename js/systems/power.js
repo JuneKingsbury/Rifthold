@@ -4,7 +4,7 @@
  * PowerSystem.update runs every 10th simulation tick; updateTurrets runs every
  * tick while powered so defenses react quickly.
  */
-import { BUILDINGS, COMBAT_VISUALS, ARTIFACTS } from '../core/config.js';
+import { BUILDINGS, COMBAT_VISUALS, ALL_ITEMS } from '../core/config.js';
 import { manhattanDist } from '../world/pathfinding.js';
 
 export class PowerSystem {
@@ -80,7 +80,7 @@ export class PowerSystem {
             if (type === 'artifact_pedestal') {
                 const tile = game.map[y][x];
                 if (tile.pedestalArtifact) {
-                    const artDef = ARTIFACTS[tile.pedestalArtifact];
+                    const artDef = ALL_ITEMS[tile.pedestalArtifact];
                     if (artDef?.pedestal?.manaCost) {
                         this.totalConsumed += artDef.pedestal.manaCost;
                     }
