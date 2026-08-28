@@ -776,7 +776,7 @@ class Game {
         if (c[slot]) this.resources[addMethod](c[slot]);
         c[slot] = item;
         this._recalcEquipmentStats(c);
-        if (slot === 'armor' || slot === 'helmet' || slot === 'weapon' || slot === 'tool') this.renderer?.skinManager?.invalidateComposite(colonistId);
+        if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool') this.renderer?.skinManager?.invalidateComposite(colonistId);
         this.notifications.push({ text: `${c.name} equipped ${item.name}`, tick: this.tick, type: 'success' });
         if (slot === 'artifact') this._updateColonistRadiusHighlight(c);
         this.ui.showColonistInfo(c);
@@ -789,7 +789,7 @@ class Game {
         this.resources[addMethod](c[slot]);
         c[slot] = null;
         this._recalcEquipmentStats(c);
-        if (slot === 'armor' || slot === 'helmet' || slot === 'weapon' || slot === 'tool') this.renderer?.skinManager?.invalidateComposite(colonistId);
+        if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool') this.renderer?.skinManager?.invalidateComposite(colonistId);
         this.notifications.push({ text: `${c.name} unequipped ${label}`, tick: this.tick, type: 'success' });
         if (slot === 'artifact') this._updateColonistRadiusHighlight(c);
         this.ui.showColonistInfo(c);
@@ -798,7 +798,7 @@ class Game {
     _recalcEquipmentStats(c) {
         const baseHp = c.golem ? (GOLEM_TYPES[c.golem]?.hp || c.maxHp) : COLONIST_CONFIG.maxHp;
         let bonus = 0;
-        for (const item of [c.weapon, c.armor, c.helmet, c.tool, c.artifact].filter(Boolean)) {
+        for (const item of [c.weapon, c.armor, c.helmet, c.clothes, c.tool, c.artifact].filter(Boolean)) {
             if (item.maxHpBonus) bonus += item.maxHpBonus;
         }
         c.maxHp = baseHp + bonus;
@@ -1225,7 +1225,11 @@ class Game {
     enchantWeapon(index) { this._enchantItem(index, 'weapons'); }
     enchantArmor(index) { this._enchantItem(index, 'armors'); }
     enchantHelmet(index) { this._enchantItem(index, 'helmets'); }
+    enchantClothes(index) { this._enchantItem(index, 'clothes'); }
     enchantTool(index) { this._enchantItem(index, 'tools'); }
+    equipClothes(colonistId, index) { this._equipItem(colonistId, index, 'clothes', 'clothes', 'addClothes'); }
+    unequipClothes(colonistId) { this._unequipItem(colonistId, 'clothes', 'addClothes', 'clothes'); }
+    discardClothes(index) { this._discardItem(index, 'clothes'); }
     equipTool(colonistId, index) { this._equipItem(colonistId, index, 'tool', 'tools', 'addTool'); }
     unequipTool(colonistId) { this._unequipItem(colonistId, 'tool', 'addTool', 'tool'); }
     equipArtifact(colonistId, index) { this._equipItem(colonistId, index, 'artifact', 'artifacts', 'addArtifact'); }
@@ -1432,6 +1436,12 @@ class Game {
             this.resources.helmets.sort((a, b) => b.damageReduction - a.damageReduction);
             if (!c.helmet || this.resources.helmets[0].damageReduction > c.helmet.damageReduction) {
                 this.equipHelmet(colonistId, 0);
+            }
+        }
+        if (this.resources.clothes.length > 0) {
+            this.resources.clothes.sort((a, b) => (b.tier || 0) - (a.tier || 0));
+            if (!c.clothes || (this.resources.clothes[0].tier || 0) > (c.clothes.tier || 0)) {
+                this.equipClothes(colonistId, 0);
             }
         }
         if (this.resources.tools.length > 0 && !c.tool) {

@@ -240,21 +240,22 @@ export class SkinManager {
         return this._sprites.get('entities:colonist_sleeping') || null;
     }
 
-    getCompositedColonistSprite(colonistId, drafted, race, armorKey, helmetKey, bodyVariant, hairVariant, shirtVariant, nameColor, weaponKey, toolKey, highlight) {
-        if (!armorKey && !helmetKey && !weaponKey && !toolKey) return this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight);
+    getCompositedColonistSprite(colonistId, drafted, race, armorKey, helmetKey, bodyVariant, hairVariant, shirtVariant, nameColor, weaponKey, toolKey, clothesKey, highlight) {
+        if (!armorKey && !helmetKey && !weaponKey && !toolKey && !clothesKey) return this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight);
 
-        const cacheKey = `${colonistId}:${drafted}:${bodyVariant || ''}:${hairVariant || ''}:${shirtVariant || ''}:${nameColor || ''}:${armorKey || ''}:${helmetKey || ''}:${weaponKey || ''}:${toolKey || ''}${highlight ? ':hl' : ''}`;
+        const cacheKey = `${colonistId}:${drafted}:${bodyVariant || ''}:${hairVariant || ''}:${shirtVariant || ''}:${nameColor || ''}:${armorKey || ''}:${helmetKey || ''}:${clothesKey || ''}:${weaponKey || ''}:${toolKey || ''}${highlight ? ':hl' : ''}`;
         if (this._compositeCache.has(cacheKey)) return this._compositeCache.get(cacheKey);
 
         const base = this.getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight, false);
         if (!base) return null;
 
+        const clothesSprite = clothesKey ? this._sprites.get('equipment_worn:' + clothesKey) : null;
         const armorSprite = armorKey ? this._sprites.get('equipment_worn:' + armorKey) : null;
         const helmetSprite = helmetKey ? this._sprites.get('equipment_worn:' + helmetKey) : null;
         const weaponSprite = weaponKey ? this._sprites.get('equipment_worn:' + weaponKey) : null;
         const toolSprite = toolKey ? this._sprites.get('equipment_worn:' + toolKey) : null;
 
-        if (!armorSprite && !helmetSprite && !weaponSprite && !toolSprite) {
+        if (!armorSprite && !helmetSprite && !weaponSprite && !toolSprite && !clothesSprite) {
             this._compositeCache.set(cacheKey, base);
             return base;
         }
@@ -267,6 +268,11 @@ export class SkinManager {
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(base, 0, 0, cw, ch);
+        if (clothesSprite) {
+            const offX = Math.floor(cw * (EQUIPMENT_OVERLAY_OFFSETS.clothes.offsetX || 0));
+            const offY = Math.floor(ch * (EQUIPMENT_OVERLAY_OFFSETS.clothes.offsetY || 0));
+            ctx.drawImage(clothesSprite, offX, offY, cw, ch);
+        }
         if (armorSprite) {
             const offX = Math.floor(cw * (EQUIPMENT_OVERLAY_OFFSETS.armor.offsetX || 0));
             const offY = Math.floor(ch * (EQUIPMENT_OVERLAY_OFFSETS.armor.offsetY || 0));

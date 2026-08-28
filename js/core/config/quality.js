@@ -51,6 +51,7 @@ export const STATION_GROUPS = {
     enchanting_table: 'Workshop',
     scriptorium: 'Scriptorium',
     research_desk: 'Laboratory',
+    loom: 'Clothier',
 };
 
 export const FLOOR_QUALITY_VALUES = {

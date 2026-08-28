@@ -109,6 +109,7 @@ export function getRoomContents(map, roomId) {
             if (map[y][x].structure === 'alchemy_table') contents.stations.push({ x, y, type: 'alchemy_table' });
             if (map[y][x].structure === 'scriptorium') contents.stations.push({ x, y, type: 'scriptorium' });
             if (map[y][x].structure === 'enchanting_table') contents.stations.push({ x, y, type: 'enchanting_table' });
+            if (map[y][x].structure === 'loom') contents.stations.push({ x, y, type: 'loom' });
             if (map[y][x].structure === 'research_desk') contents.stations.push({ x, y, type: 'research_desk' });
         }
     }

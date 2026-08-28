@@ -1,4 +1,4 @@
-import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
+import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, ARTIFACTS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
 
 const MATERIAL_ITEMS = [
     { key: 'wood', char: '≡', color: '#8b6b3a', desc: 'Wood resource' },
@@ -11,6 +11,8 @@ const MATERIAL_ITEMS = [
     { key: 'leather', char: '~', color: '#8b5e3c', desc: 'Leather (tanned from hides)' },
     { key: 'hides', char: '~', color: '#6b4e2c', desc: 'Raw animal hides' },
     { key: 'wool', char: '○', color: '#eeeecc', desc: 'Wool (from sheep)' },
+    { key: 'cotton', char: '○', color: '#eeeeee', desc: 'Cotton (farm crop)' },
+    { key: 'cloth', char: '≋', color: '#ddaa66', desc: 'Cloth (woven from cotton)' },
     { key: 'void_essence', char: '✦', color: '#9933ff', desc: 'Void essence (from nexus waves)' },
     { key: 'food', char: '♦', color: '#88cc44', desc: 'Cooked food' },
     { key: 'meat', char: '♦', color: '#cc5544', desc: 'Raw meat' },
@@ -526,6 +528,9 @@ class SkinEditor {
                 for (const [key, def] of Object.entries(HELMETS)) {
                     items.push({ key, char: def.char || ITEM_CHARS.helmet.char, color: def.charColor || ITEM_CHARS.helmet.color, desc: `Helmet: ${def.name}`, category: 'items' });
                 }
+                for (const [key, def] of Object.entries(CLOTHES)) {
+                    items.push({ key, char: def.char || ITEM_CHARS.clothes.char, color: def.charColor || ITEM_CHARS.clothes.color, desc: `Clothes: ${def.name}`, category: 'items' });
+                }
                 for (const [key, def] of Object.entries(TOOLS)) {
                     items.push({ key, char: def.char || ITEM_CHARS.tool.char, color: def.charColor || ITEM_CHARS.tool.color, desc: `Tool: ${def.name}`, category: 'items' });
                 }
@@ -583,6 +588,9 @@ class SkinEditor {
                 }
                 for (const [key, def] of Object.entries(HELMETS)) {
                     items.push({ key, char: def.char || ITEM_CHARS.helmet.char, color: def.charColor || ITEM_CHARS.helmet.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
+                }
+                for (const [key, def] of Object.entries(CLOTHES)) {
+                    items.push({ key, char: def.char || ITEM_CHARS.clothes.char, color: def.charColor || ITEM_CHARS.clothes.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
                 }
                 for (const [key, def] of Object.entries(WEAPONS)) {
                     if (key === 'fists') continue;

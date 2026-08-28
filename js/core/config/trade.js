@@ -67,6 +67,7 @@ export const TRADE_VALUES = {
     hides: 1.5, leather: 3, iron_ore: 2, iron: 4,
     runite: 6, void_essence: 10, meat: 1, wheat: 0.7, berries: 0.6,
     corn: 0.8, potatoes: 0.7, moonbloom: 3, eggs: 1.5, milk: 2, wool: 2.5,
+    cotton: 1, cloth: 2.5,
 };
 
 // TRADER_MARKUP: multiplier on base value when buying FROM the trader (higher = more expensive).

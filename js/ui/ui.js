@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, ARTIFACTS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getComplexStructureAt } from '../systems/complexBuildings.js';
@@ -1020,6 +1020,7 @@ export class UI {
         const weaponTip = colonist.weapon ? getWeaponTooltip(colonist) : 'No weapon equipped';
         const armorTip = colonist.armor ? `${colonist.armor.description || ''} ${getItemStatLines(colonist.armor).join(', ')}`.trim() : 'No armor equipped';
         const helmetTip = colonist.helmet ? `${colonist.helmet.description || ''} ${getItemStatLines(colonist.helmet).join(', ')}`.trim() : 'No helmet equipped';
+        const clothesTip = colonist.clothes ? `${colonist.clothes.description || ''} ${getItemStatLines(colonist.clothes).join(', ')}`.trim() : 'No clothes equipped';
         const toolTip = colonist.tool ? `${colonist.tool.description || ''} ${getItemStatLines(colonist.tool).join(', ')}`.trim() : 'No tool equipped';
         const artifactTip = colonist.artifact ? this._getArtifactTooltip(colonist.artifact) : 'No artifact equipped';
 
@@ -1059,7 +1060,7 @@ export class UI {
         const tomeName = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : null;
         const tomeTip = tomeName ? (() => { const p = (colonist.tomeProgress?.[colonist.equippedTome] || 0); return `${tomeName} (${Math.floor(p / SPELL_TOMES[colonist.equippedTome].learningWork * 100)}%)`; })() : 'No tome equipped';
         const slotStyle = 'position:relative;border:1px solid #444;border-radius:4px;padding:4px 2px;background:#1a1a2e;cursor:pointer;min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;';
-        html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin:4px 0;text-align:center;">`;
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin:4px 0 0 0;text-align:center;">`;
         // Row 1: Tome | Helmet | Artifact
         html += `<div class="skill-tip" data-tip="${tomeTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Tome</div>`;
@@ -1076,7 +1077,9 @@ export class UI {
         html += colonist.artifact ? `${this._itemIcon(colonist.artifact.key, 'artifact')}` : `<span style="color:#333;font-size:14px">*</span>`;
         html += this._buildSlotSelect(colonist, 'artifact');
         html += `</div>`;
-        // Row 2: Weapon | Armor | Tool
+        html += `</div>`;
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:0 0 4px 0;text-align:center;">`;
+        // Row 2: Weapon | Armor | Clothes | Tool
         html += `<div class="skill-tip" data-tip="${weaponTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Weapon</div>`;
         html += colonist.weapon ? `${this._itemIcon(colonist.weapon.key, 'weapon')}` : `<span style="color:#333;font-size:14px">/</span>`;
@@ -1086,6 +1089,11 @@ export class UI {
         html += `<div style="color:#666;font-size:10px">Armor</div>`;
         html += colonist.armor ? `${this._itemIcon(colonist.armor.key, 'armor')}` : `<span style="color:#333;font-size:14px">[]</span>`;
         html += this._buildSlotSelect(colonist, 'armor');
+        html += `</div>`;
+        html += `<div class="skill-tip" data-tip="${clothesTip}" style="${slotStyle}">`;
+        html += `<div style="color:#666;font-size:10px">Clothes</div>`;
+        html += colonist.clothes ? `${this._itemIcon(colonist.clothes.key, 'clothes')}` : `<span style="color:#333;font-size:14px">♦</span>`;
+        html += this._buildSlotSelect(colonist, 'clothes');
         html += `</div>`;
         html += `<div class="skill-tip" data-tip="${toolTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Tool</div>`;
@@ -1217,6 +1225,7 @@ export class UI {
             weapon: { listName: 'weapons', label: 'Weapon', fallback: 'Fists', equipFn: 'equipWeapon', unequipFn: 'unequipWeapon', statRenderer: w => { const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown; return `${w.damage}d (${(w.damage / cd).toFixed(1)} dps)`; } },
             armor: { listName: 'armors', label: 'Armor', fallback: 'None', equipFn: 'equipArmor', unequipFn: 'unequipArmor', statRenderer: a => getItemStatLines(a).join(', ') },
             helmet: { listName: 'helmets', label: 'Helmet', fallback: 'None', equipFn: 'equipHelmet', unequipFn: 'unequipHelmet', statRenderer: h => getItemStatLines(h).join(', ') },
+            clothes: { listName: 'clothes', label: 'Clothes', fallback: 'None', equipFn: 'equipClothes', unequipFn: 'unequipClothes', statRenderer: c => getItemStatLines(c).join(', ') },
             tool: { listName: 'tools', label: 'Tool', fallback: 'None', equipFn: 'equipTool', unequipFn: 'unequipTool', statRenderer: t => getItemStatLines(t).join(', ') },
             artifact: { listName: 'artifacts', label: 'Artifact', fallback: 'None', equipFn: 'equipArtifact', unequipFn: 'unequipArtifact', statRenderer: a => {
                 const lines = getItemStatLines(a);
@@ -1411,6 +1420,12 @@ export class UI {
             const h = HELMETS[outputKey];
             let tip = h.description ? `${h.description} ` : '';
             tip += getItemStatLines(h).join(', ');
+            return tip;
+        }
+        if (CLOTHES[outputKey]) {
+            const c = CLOTHES[outputKey];
+            let tip = c.description ? `${c.description} ` : '';
+            tip += getItemStatLines(c).join(', ');
             return tip;
         }
         if (TOOLS[outputKey]) {
@@ -1824,7 +1839,7 @@ export class UI {
             html += `<button class="craft-tab${active}" data-craft-tab="${cat}">${cat}</button>`;
         }
         html += '</div>';
-        const hasEquipTiers = ['Weapons', 'Armor', 'Tools'].includes(this._craftTab);
+        const hasEquipTiers = ['Weapons', 'Armor', 'Clothing', 'Tools'].includes(this._craftTab);
         const hasTomeFilter = this._craftTab === 'Tomes';
         if (hasEquipTiers) {
             if (this._craftHiddenTiers === undefined) this._craftHiddenTiers = new Set();
@@ -1861,7 +1876,7 @@ export class UI {
         if (hasEquipTiers && this._craftHiddenTiers && this._craftHiddenTiers.size > 0) {
             filtered = filtered.filter(r => {
                 const outputKey = Object.keys(r.recipe.output)[0];
-                const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || TOOLS[outputKey];
+                const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || TOOLS[outputKey];
                 if (!def || def.tier === undefined) return true;
                 return !this._craftHiddenTiers.has(def.tier);
             });
@@ -1889,8 +1904,8 @@ export class UI {
             filtered.sort((a, b) => {
                 const aKey = Object.keys(a.recipe.output)[0];
                 const bKey = Object.keys(b.recipe.output)[0];
-                const aDef = WEAPONS[aKey] || ARMORS[aKey] || HELMETS[aKey] || TOOLS[aKey];
-                const bDef = WEAPONS[bKey] || ARMORS[bKey] || HELMETS[bKey] || TOOLS[bKey];
+                const aDef = WEAPONS[aKey] || ARMORS[aKey] || HELMETS[aKey] || CLOTHES[aKey] || TOOLS[aKey];
+                const bDef = WEAPONS[bKey] || ARMORS[bKey] || HELMETS[bKey] || CLOTHES[bKey] || TOOLS[bKey];
                 return (aDef?.tier || 0) - (bDef?.tier || 0);
             });
         }
@@ -2060,7 +2075,8 @@ export class UI {
         const tamed = this.game.entities.filter(e => e.tamed);
 
         const helmets = this.game.resources.helmets;
-        const equipCount = weapons.length + armors.length + helmets.length + tools.length + artifacts.length;
+        const clothes = this.game.resources.clothes;
+        const equipCount = weapons.length + armors.length + helmets.length + clothes.length + tools.length + artifacts.length;
         const consumeCount = potions.length + tomes.length;
 
         let html = '<div class="panel-close" data-panel-close="inventory">&times;</div><h3>Inventory</h3>';
@@ -2076,7 +2092,7 @@ export class UI {
         if (activeTab === 'resources') {
             html += this._buildInvResources(r);
         } else if (activeTab === 'equipment') {
-            html += this._buildInvEquipment(weapons, armors, helmets, tools, artifacts);
+            html += this._buildInvEquipment(weapons, armors, helmets, clothes, tools, artifacts);
         } else if (activeTab === 'consumables') {
             html += this._buildInvConsumables(potions, tomes, consumables);
         } else if (activeTab === 'animals') {
@@ -2104,7 +2120,7 @@ export class UI {
             html += `<div class="info-row" style="color:#aa8844;font-size:0.9em;">Food preservation: -${pct}% spoilage${seasonLabel}</div>`;
         }
 
-        const buildingMats = ['wood', 'stone', 'planks', 'bricks', 'hides', 'leather', 'iron_ore', 'iron', 'runite', 'wool', 'void_essence'];
+        const buildingMats = ['wood', 'stone', 'planks', 'bricks', 'hides', 'leather', 'iron_ore', 'iron', 'runite', 'wool', 'cotton', 'cloth', 'void_essence'];
         const foodKeys = [...FOODSTUFFS, 'food'];
         const reserved = this.game.resources.reservedFoodstuffs;
 
@@ -2226,7 +2242,7 @@ export class UI {
         tt.style.top = Math.max(y, 4) + 'px';
     }
 
-    _buildInvEquipment(weapons, armors, helmets, tools, artifacts) {
+    _buildInvEquipment(weapons, armors, helmets, clothes, tools, artifacts) {
         let html = '';
         if (weapons.length > 0) {
             html += '<div class="info-row" style="color:#cc8888;margin-bottom:4px;"><b>Weapons:</b></div>';
@@ -2262,6 +2278,17 @@ export class UI {
                         <span class="inv-amount">${stats}</span>
                         <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${h.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantHelmet(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\\\'")}?')){window.game.discardHelmet(${i})}">♻</button></div>`;
+            });
+        }
+        if (clothes.length > 0) {
+            html += '<div class="info-row" style="color:#cc8866;margin-top:8px;margin-bottom:4px;"><b>Clothes:</b></div>';
+            clothes.forEach((c, i) => {
+                const stats = getItemStatLines(c).join(', ');
+                const tip = c.description || '';
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${tip}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${c.name}</span>
+                        <span class="inv-amount">${stats}</span>
+                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${c.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantClothes(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${c.name.replace(/'/g, "\\\\'")}?')){window.game.discardClothes(${i})}">♻</button></div>`;
             });
         }
         if (tools.length > 0) {
@@ -2549,6 +2576,14 @@ export class UI {
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('helmet',document.getElementById('debug-helmet-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Helmet</button>`;
+        general += `</div>`;
+        general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
+        general += `<select id="debug-clothes-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
+        for (const [key, def] of Object.entries(CLOTHES)) {
+            general += `<option value="${key}">${def.name}</option>`;
+        }
+        general += `</select>`;
+        general += `<button onclick="window.game.cheatSpawnItem('clothes',document.getElementById('debug-clothes-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Clothes</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-resource-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:80px;">`;

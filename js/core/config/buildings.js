@@ -39,6 +39,7 @@ export const BUILDINGS = {
     beast_circle:      { char: 'A', color: '#9cf642', cost: { wood: 6 }, work: 28, structureType: 'furniture', category: 'Production', research: 'beast_binding', description: 'Required for binding creatures. Bound animals produce resources.' },
     enchanting_table:  { char: 'P', color: '#bb88ff', cost: { planks: 4, stone: 3 }, work: 35, structureType: 'furniture', category: 'Production', research: 'arcane_infusion', power: { consumes: 4, speedMult: 1.5 }, description: '1.5x crafting speed. Consumes 4 mana.' },
     scriptorium:       { char: '𝕊', color: '#4488cc', cost: { planks: 6, stone: 3, leather: 2 }, work: 40, structureType: 'furniture', category: 'Production', research: 'arcane_studies', description: 'Required for crafting spell tomes.' },
+    loom:              { char: 'Ł', color: '#ddaa66', cost: { planks: 4, wood: 3 }, work: 30, structureType: 'furniture', category: 'Production', research: 'textiles', description: 'Required for weaving cloth and crafting clothing.' },
     golem_forge:       { char: 'Ğ', color: '#cc8833', cost: { stone: 8, runite: 4, planks: 4 }, work: 50, structureType: 'furniture', category: 'Production', research: 'golem_craft', description: 'Animate stone golems. Click to craft.' },
 
     // === Defense (ordered by progression) ===

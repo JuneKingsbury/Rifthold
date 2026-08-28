@@ -11,7 +11,7 @@ export const CONFIG = {
     MAX_FRAME_DELTA: 250,
     TICKS_PER_SEASON: 2400,
     TICKS_PER_DAY: 480,
-    START_RESOURCES: { wood: 25, stone: 15, planks: 5, food: 20, meat: 0, wheat: 0, berries: 0, corn: 0, potatoes: 0, moonbloom: 0, bricks: 0, hides: 0, leather: 0, iron_ore: 0, iron: 0, runite: 0, eggs: 0, milk: 0, wool: 0, void_essence: 0, gold: 0 },
+    START_RESOURCES: { wood: 25, stone: 15, planks: 5, food: 20, meat: 0, wheat: 0, berries: 0, corn: 0, potatoes: 0, moonbloom: 0, cotton: 0, bricks: 0, hides: 0, leather: 0, iron_ore: 0, iron: 0, runite: 0, cloth: 0, eggs: 0, milk: 0, wool: 0, void_essence: 0, gold: 0 },
     PEACEFUL_MODE: false,
     GAME_SPEED: 1,
     STOCKPILE_ALERTS: { wood: 5, stone: 5, food: 5 },

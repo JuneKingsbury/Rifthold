@@ -1,4 +1,4 @@
-import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, TOOLS, ARTIFACTS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS } from '../core/config.js';
+import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, ARTIFACTS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS } from '../core/config.js';
 import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
@@ -1040,7 +1040,7 @@ const arcaneMethods = {
         }
         const cat = categoryHint || this._getItemCategory(itemKey);
         if (!cat) return '';
-        const itemDef = (WEAPONS[itemKey] || ARMORS[itemKey] || HELMETS[itemKey] || TOOLS[itemKey] || ARTIFACTS[itemKey] || POTIONS[itemKey] || SPELL_TOMES[itemKey] || ALL_ITEMS[itemKey]);
+        const itemDef = (WEAPONS[itemKey] || ARMORS[itemKey] || HELMETS[itemKey] || CLOTHES[itemKey] || TOOLS[itemKey] || ARTIFACTS[itemKey] || POTIONS[itemKey] || SPELL_TOMES[itemKey] || ALL_ITEMS[itemKey]);
         const ch = itemDef?.char || ITEM_CHARS[cat]?.char;
         if (!ch) return '';
         const color = itemDef?.charColor || ITEM_CHARS[cat]?.color || '#aaa';
@@ -1051,6 +1051,7 @@ const arcaneMethods = {
         if (WEAPONS[itemKey]) return 'weapon';
         if (ARMORS[itemKey]) return 'armor';
         if (HELMETS[itemKey]) return 'helmet';
+        if (CLOTHES[itemKey]) return 'clothes';
         if (TOOLS[itemKey]) return 'tool';
         if (ARTIFACTS[itemKey]) return 'artifact';
         if (POTIONS[itemKey]) return 'potion';

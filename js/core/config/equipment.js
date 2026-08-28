@@ -1,4 +1,4 @@
-export const RECIPE_CATEGORIES = ['Materials', 'Weapons', 'Armor', 'Tools', 'Artifacts', 'Repair', 'Food & Potions', 'Tomes'];
+export const RECIPE_CATEGORIES = ['Materials', 'Weapons', 'Armor', 'Clothing', 'Tools', 'Artifacts', 'Repair', 'Food & Potions', 'Tomes'];
 
 export const MATERIALS = {
     wood: { name: 'Wood'},
@@ -16,8 +16,10 @@ export const MATERIALS = {
     eggs: { name: 'Eggs'},
     milk: { name: 'Milk'},
     wool: { name: 'Wool'},
+    cotton: { name: 'Cotton'},
     void_essence: { name: 'Void Essence'},
     gold: { name: 'Gold' },
+    cloth: { name: 'Cloth', recipe: { input: { cotton: 2 }, output: 3, ticks: 10, prefix: 'weave_', station: 'loom' } },
     planks: { name: 'Planks', recipe: { input: { wood: 2 }, output: 3, ticks: 10, prefix: 'craft_' } },
     bricks: { name: 'Bricks', recipe: { input: { stone: 2 }, output: 3, ticks: 12, prefix: 'craft_' } },
     leather: { name: 'Leather', recipe: { input: { hides: 2 }, output: 2, ticks: 10, prefix: 'tan_' } },
@@ -108,9 +110,16 @@ export const HELMETS = {
     void_crown: { name: 'Void Crown', damageReduction: 0.18, tier: 4, spellDamageBonus: 0.15, description: 'A crown of void energy. Boosts spells and protection.', recipe: { input: { void_essence: 4, runite: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
 };
 
+export const CLOTHES = {
+    cotton_shirt: { name: 'Cotton Shirt', tier: 1, coldResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.05, description: 'A light cotton shirt. Comfortable for work.', recipe: { input: { cloth: 3 }, ticks: 14, station: 'loom' } },
+    wool_tunic: { name: 'Wool Tunic', tier: 1, coldResistance: 0.5, moodBonus: 3, description: 'A warm wool tunic. Good protection from the cold.', recipe: { input: { wool: 4, cloth: 1 }, ticks: 18, station: 'loom' } },
+    leather_jacket: { name: 'Leather Jacket', tier: 2, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, description: 'A rugged leather jacket. Versatile in all seasons.', recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, station: 'loom' } },
+};
+
 export const EQUIPMENT_OVERLAY_OFFSETS = {
     helmet: { offsetX: 0, offsetY: 0 },
     armor: { offsetX: 0, offsetY: 0 },
+    clothes: { offsetX: 0, offsetY: 0 },
     weapon: { offsetX: 0, offsetY: 0 },
     tool: { offsetX: 0, offsetY: 0 },
 };
@@ -190,6 +199,7 @@ export const ITEM_CHARS = {
     weapon: { char: '/', color: '#cccccc' },
     armor: { char: '[', color: '#6688cc' },
     helmet: { char: '^', color: '#7799cc' },
+    clothes: { char: '♦', color: '#cc8866' },
     tool: { char: '\\', color: '#bb8844' },
     artifact: { char: '*', color: '#cc44ff' },
     potion: { char: '!', color: '#44cc44' },
@@ -213,6 +223,12 @@ export const ARMOR_ENCHANTMENT_EFFECTS = {
     barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
     // free_movement { suffix: 'of Free Movement', description: 'Enchanted with free movement, increasing movement and exploration speed by 10% per enchantment tier.', speedMultiplier: 1.10 },
     // dodgeChance { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing dodge chance by 10% per enchantment tier.', dodgeChanceBonus: 0.10 },
+};
+
+export const CLOTHES_ENCHANTMENT_EFFECTS = {
+    protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 15% per enchantment tier.', defenseMultiplier: 1.15 },
+    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenMultiplier: 1.15 },
+    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
 };
 
 export const TOOL_ENCHANTMENT_EFFECTS = {
@@ -240,6 +256,7 @@ const _ITEM_SOURCES = [
     ['weapon',     WEAPONS],
     ['armor',      ARMORS],
     ['helmet',     HELMETS],
+    ['clothes',    CLOTHES],
     ['tool',       TOOLS],
     ['artifact',   ARTIFACTS],
     ['potion',     POTIONS],
@@ -257,6 +274,7 @@ for (const [type, dict] of _ITEM_SOURCES) {
 const EQUIPMENT_RECIPE_SOURCES = [
     { items: WEAPONS, category: 'Weapons', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
     { items: ARMOR_PAIRS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' }, paired: true },
+    { items: CLOTHES, category: 'Clothing', prefix: 'craft_', defaults: { skill: 'crafting', station: 'loom' } },
     { items: TOOLS, category: 'Tools', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
     { items: ARTIFACTS, category: 'Artifacts', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
     { items: POTIONS, category: 'Food & Potions', prefix: 'brew_', defaults: { skill: 'cooking', station: 'alchemy_table' } },

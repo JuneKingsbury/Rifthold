@@ -19,6 +19,7 @@ export class ResourceManager {
         this.weapons = [];
         this.armors = [];
         this.helmets = [];
+        this.clothes = [];
         this.tools = [];
         this.artifacts = [];
         this.potions = [];
@@ -47,6 +48,7 @@ export class ResourceManager {
             case 'weapon':     return this.weapons.filter(i => i.key === key).length;
             case 'armor':      return this.armors.filter(i => i.key === key).length;
             case 'helmet':     return this.helmets.filter(i => i.key === key).length;
+            case 'clothes':    return this.clothes.filter(i => i.key === key).length;
             case 'tool':       return this.tools.filter(i => i.key === key).length;
             case 'artifact':   return this.artifacts.filter(i => i.key === key).length;
             case 'potion':     return this.potions.filter(i => (i.key ?? i.type) === key).length;
@@ -115,6 +117,7 @@ export class ResourceManager {
             case 'weapon':     return this.addWeapon(item);
             case 'armor':      return this.addArmor(item);
             case 'helmet':     return this.addHelmet(item);
+            case 'clothes':    return this.addClothes(item);
             case 'tool':       return this.addTool(item);
             case 'artifact':   return this.addArtifact(item);
             case 'potion':     return this.addPotion(item);
@@ -152,6 +155,16 @@ export class ResourceManager {
         if (this.helmets.length === 0) return null;
         this.helmets.sort((a, b) => b.damageReduction - a.damageReduction);
         return this.helmets.shift();
+    }
+
+    addClothes(clothes) {
+        this.clothes.push(clothes);
+    }
+
+    takeClothes() {
+        if (this.clothes.length === 0) return null;
+        this.clothes.sort((a, b) => (b.tier || 0) - (a.tier || 0));
+        return this.clothes.shift();
     }
 
     addTool(tool) {

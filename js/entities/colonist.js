@@ -151,6 +151,7 @@ export function createColonist(x, y, skillBias, existingNames = []) {
         weapon: null,
         armor: null,
         helmet: null,
+        clothes: null,
         tool: null,
         artifact: null,
         drafted: false,
@@ -217,7 +218,7 @@ export function createGolem(type, x, y) {
         state: 'idle',
         currentTaskId: null, path: [], workProgress: 0,
         assignedBed: null,
-        weapon: null, armor: null, helmet: null, tool: null, artifact: null,
+        weapon: null, armor: null, helmet: null, clothes: null, tool: null, artifact: null,
         drafted: false, draftTarget: null,
         guardMode: false, guardPost: null,
         stateTimer: 0, wanderCooldown: 0, moveCooldown: 0,
@@ -310,6 +311,13 @@ function updateNeeds(colonist, game) {
             }
         }
     }
+
+    if (game.weather.currentWeather === 'heatwave' && !isIndoors(colonist, game.map)) {
+        const heatRes = getEquipmentStat(colonist, 'heatResistance');
+        if (heatRes <= 0 || Math.random() >= heatRes) {
+            applyThought(colonist, 'overheating', game.tick);
+        }
+    }
 }
 
 function updateHealth(colonist) {
@@ -395,6 +403,15 @@ function checkCriticalAlerts(colonist, game) {
     } else if (!freezing) {
         flags.freezing = false;
     }
+
+    const overheating = colonist.thoughts.some(t => t.text === 'Overheating outside');
+    if (overheating && !flags.overheating) {
+        flags.overheating = true;
+        game.notifications.push({ text: `${colonist.name} is overheating!`, tick: game.tick, type: 'warning' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Overheating!', color: '#ff8844', fontSize: 11, ttl: 12, maxTtl: 12 });
+    } else if (!overheating) {
+        flags.overheating = false;
+    }
 }
 
 export function addThought(colonist, text, moodEffect, duration, tick) {
@@ -461,6 +478,7 @@ export function getEquippedItems(colonist) {
     if (colonist.weapon) items.push(colonist.weapon);
     if (colonist.armor) items.push(colonist.armor);
     if (colonist.helmet) items.push(colonist.helmet);
+    if (colonist.clothes) items.push(colonist.clothes);
     if (colonist.tool) items.push(colonist.tool);
     if (colonist.artifact && !colonist.artifactBroken) items.push(colonist.artifact);
     return items;

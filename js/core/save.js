@@ -26,6 +26,7 @@ export function saveGame(game) {
             weapons: game.resources.weapons,
             armors: game.resources.armors,
             helmets: game.resources.helmets,
+            clothes: game.resources.clothes,
             tools: game.resources.tools,
             artifacts: game.resources.artifacts,
             potions: game.resources.potions,
@@ -142,6 +143,7 @@ export function loadGame(game) {
         game.resources.weapons = data.resources.weapons;
         game.resources.armors = data.resources.armors || [];
         game.resources.helmets = data.resources.helmets || [];
+        game.resources.clothes = data.resources.clothes || [];
         game.resources.tools = data.resources.tools || [];
         game.resources.artifacts = data.resources.artifacts || [];
         game.resources.potions = data.resources.potions || [];

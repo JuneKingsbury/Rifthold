@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana } from './colonist.js';
@@ -131,6 +131,19 @@ function applyEnchantment(item, colonist, game, type) {
 
             // dodge_change:
 
+            break;
+        case 'clothes':
+            randomKey = Object.keys(CLOTHES_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(CLOTHES_ENCHANTMENT_EFFECTS).length)];
+            enchantmentEffect = CLOTHES_ENCHANTMENT_EFFECTS[randomKey];
+
+            if (enchantmentEffect.defenseMultiplier) item.defense = Math.round((item.defense || 0) * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
+            else if (enchantmentEffect.manaRegenMultiplier) {
+                if (item.manaRegenMultiplier === undefined) {
+                    item.manaRegenMultiplier = 1;
+                }
+                item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * tier.multiplier) * 100) / 100;
+            }
+            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage = (item.thornsDamage || 0) + (enchantmentEffect.thornsDamageBonus * tier.multiplier);
             break;
         case 'tools':
             // Roll for a random enchantment effect

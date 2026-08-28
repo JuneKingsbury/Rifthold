@@ -16,6 +16,7 @@ export const STAT_META = {
     moodBonus:          { label: 'Mood',             format: 'plus_flat' },
     hungerReduction:    { label: 'Hunger',           format: 'minus_percent' },
     coldResistance:     { label: 'Cold Res',         format: 'percent' },
+    heatResistance:     { label: 'Heat Res',         format: 'percent' },
     moveSpeedBonus:     { label: 'Move Speed',       format: 'plus_percent' },
     workSpeedBonus:     { label: 'Work Speed',       format: 'plus_percent' },
     miningSpeed:        { label: 'Mining',           format: 'mult_as_percent' },
