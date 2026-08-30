@@ -193,8 +193,8 @@ export const GLOSSARY = [
                 subtitle: 'Complex Structures',
                 entries: [
                     ['Pattern Activation', 'Certain multi-tile building patterns activate powerful colony-wide bonuses when completed. Build the core piece, then surround it with the required layout. Destroying any part of the pattern deactivates the bonus.'],
-                    ['Great Forge', 'A walled room around a Forge Core that greatly increases all crafting speed and quality. Requires Masterwork research.'],
-                    ['Ritual Circle', 'A diamond pattern of walls around a Ritual Core that reduces spell cooldowns for all colonists. Requires Advanced Arcana research.'],
+                    ['Great Forge', 'A walled room around a Forge Core that greatly increases all crafting speed and quality. Requires Masterwork research.<img src="glossary_images/great_forge.png">'],
+                    ['Ritual Circle', 'A diamond pattern of walls around a Ritual Core that reduces spell cooldowns for all colonists. Requires Advanced Arcana research.<img src="glossary_images/ritual_circle.png">'],
                 ]
             },
         ]
