@@ -117,7 +117,7 @@ export const HELMETS = {
 export const CLOTHES = {
     cotton_shirt: { name: 'Cotton Shirt', tier: 1, coldResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.05, description: 'A light cotton shirt. Comfortable for work.', recipe: { input: { cloth: 3 }, ticks: 14, station: 'loom' } },
     wool_tunic: { name: 'Wool Tunic', tier: 1, coldResistance: 0.5, moodBonus: 3, description: 'A warm wool tunic. Good protection from the cold.', recipe: { input: { wool: 4, cloth: 1 }, ticks: 18, station: 'loom' } },
-    leather_jacket: { name: 'Leather Jacket', tier: 2, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, description: 'A rugged leather jacket. Versatile in all seasons.', recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, station: 'loom' } },
+    leather_jerkin: { name: 'Leather Jerkin', tier: 2, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, description: 'A rugged leather jerkin. Versatile in all seasons.', recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, station: 'loom' } },
     cloak_of_shadows: { name: 'Cloak of Shadows', textColor: '#4488ff', tradeValue: 45, tier: 3, description: 'A cloak that makes the wearer harder to target.', combat: { targetPriority: -10 }, expedition: { targetPriority: -10 } },
 };
 
@@ -157,7 +157,7 @@ export const TOOLS = {
     runic_mattock: { name: 'Runic Mattock', miningSpeed: 1.5, choppingSpeed: 1.5, tier: 3, description: 'A runic mattock. Excellent at mining and chopping.', recipe: { input: { runite: 3, planks: 2 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
     lantern: { name: 'Lantern', lightRadius: 4, tier: 1, description: 'A handheld lantern. Illuminates the area around the carrier.', recipe: { input: { iron: 1, planks: 2 }, ticks: 12, station: 'anvil' } },
     aegis_of_the_vanguard: { name: 'Aegis of the Vanguard', textColor: '#f944ff', tradeValue: 60, description: 'A heavy shield that draws attacks and absorbs blows.', combat: { targetPriority: 10, damageReduction: 0.3 }, expedition: { targetPriority: 10, damageReduction: 0.3 } },
-    crystal_aegis: { name: 'Crystal Aegis', textColor: '#4488ff', tradeValue: 45, description: 'A crystalline shield that absorbs damage.', damageReduction: 0.2, combat: { damageReduction: 0.15 }, expedition: { damageReduction: 0.2 } },
+    crystal_aegis: { name: 'Crystal Aegis', textColor: '#4488ff', tradeValue: 45, description: 'A crystalline shield that reflects damage.', damageReduction: 0.2, thornsDamage: 2, combat: { damageReduction: 0.15 }, expedition: { damageReduction: 0.2 } },
     drum_of_rallying: { name: 'Drum of Rallying', textColor: '#4488ff', tradeValue: 50, description: 'War drums that inspire nearby fighters.', attackSpeed: 0.15, pedestal: { radius: 8, manaCost: 3, damageBonusMult: 1.15 }, expedition: { partyDamageMult: 1.15 }, recipe: { input: { wood: 6, runite: 2, planks: 3 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
     runite_hammer: { name: 'Runite Hammer', textColor: '#4488ff', tradeValue: 50, description: 'A hammer pulsing with runic energy. Greatly speeds work.', workSpeedBonus: 0.35, pedestal: { radius: 5, manaCost: 2, workSpeedBonus: 0.2 } },
     heartwood_staff: { name: 'Heartwood Staff', textColor: '#4488ff', tradeValue: 55, description: 'A staff carved from ancient heartwood. Strong magic focus.', spellDamageBonus: 0.3, pedestal: { radius: 7, manaCost: 3, skillGrowthBonus: 0.1 } },
@@ -236,9 +236,10 @@ export const ARMOR_ENCHANTMENT_EFFECTS = {
 };
 
 export const CLOTHES_ENCHANTMENT_EFFECTS = {
-    protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 15% per enchantment tier.', defenseMultiplier: 1.15 },
     wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenMultiplier: 1.15 },
     barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
+    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedMultiplier: 1.15 },
+    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenMultiplier: 1.15 },
 };
 
 export const TOOL_ENCHANTMENT_EFFECTS = {
@@ -250,7 +251,7 @@ export const TOOL_ENCHANTMENT_EFFECTS = {
 
 export const BOOTS_ENCHANTMENT_EFFECTS = {
     swiftness: { suffix: 'of Swiftness', description: 'Enchanted with swiftness, increasing movement speed by 10% per enchantment tier.', speedMultiplier: 1.10 },
-    protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 15% per enchantment tier.', defenseMultiplier: 1.15 },
+    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedMultiplier: 1.15 },
 };
 
 const ARMOR_PAIRS = [
