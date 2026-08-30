@@ -32,7 +32,16 @@ function maybeSpawnAnimal(game) {
     const wildCount = game.entities.filter(e => e.category === 'animal' && !e.tamed).length;
     if (wildCount >= WILDLIFE_CONFIG.maxCount) return;
 
-    const edge = getRandomEdge();
+    let edge;
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = getRandomEdge();
+        if (isPassableForAnimals(game.map, candidate.x, candidate.y)) {
+            edge = candidate;
+            break;
+        }
+    }
+    if (!edge) return;
+
     const type = pickAnimalType(game);
     if (!type) return;
     if (ANIMALS[type].hostile && CONFIG.PEACEFUL_MODE) return;
@@ -72,6 +81,11 @@ function getRandomEdge() {
         case 2: return { x: Math.floor(Math.random() * CONFIG.MAP_WIDTH), y: CONFIG.MAP_HEIGHT - 1 };
         case 3: return { x: 0, y: Math.floor(Math.random() * CONFIG.MAP_HEIGHT) };
     }
+}
+
+function isEdgeExit(fromX, fromY, toX, toY) {
+    if (toX >= 0 && toX < CONFIG.MAP_WIDTH && toY >= 0 && toY < CONFIG.MAP_HEIGHT) return false;
+    return fromX === 0 || fromX === CONFIG.MAP_WIDTH - 1 || fromY === 0 || fromY === CONFIG.MAP_HEIGHT - 1;
 }
 
 function updateAnimal(animal, game) {
@@ -171,9 +185,7 @@ function fleeFrom(animal, threat, game, dur) {
     const dy = Math.sign(animal.y - threat.y);
     const nx = animal.x + dx;
     const ny = animal.y + dy;
-    if (isPassableForAnimals(game.map, nx, ny) && !game.isTileOccupied(nx, ny)) {
-        moveEntity(animal, nx, ny, dur);
-    } else if (isPassableForAnimals(game.map, nx, ny)) {
+    if (isPassableForAnimals(game.map, nx, ny) || isEdgeExit(animal.x, animal.y, nx, ny)) {
         moveEntity(animal, nx, ny, dur);
     } else {
         randomMove(animal, game, dur);
@@ -199,13 +211,21 @@ function moveToward(animal, target, game, dur) {
 
 function randomMove(animal, game, dur) {
     const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-    const shuffled = dirs.filter(([ddx, ddy]) => {
+    const passable = dirs.filter(([ddx, ddy]) => {
         const nx = animal.x + ddx, ny = animal.y + ddy;
         return isPassableForAnimals(game.map, nx, ny);
     });
-    if (shuffled.length === 0) return;
-    const unoccupied = shuffled.filter(([ddx, ddy]) => !game.isTileOccupied(animal.x + ddx, animal.y + ddy));
-    const pool = unoccupied.length > 0 ? unoccupied : shuffled;
+    const exits = dirs.filter(([ddx, ddy]) => {
+        return isEdgeExit(animal.x, animal.y, animal.x + ddx, animal.y + ddy);
+    });
+    const candidates = [...passable, ...exits];
+    if (candidates.length === 0) return;
+    const unoccupied = candidates.filter(([ddx, ddy]) => {
+        const nx = animal.x + ddx, ny = animal.y + ddy;
+        if (nx < 0 || nx >= CONFIG.MAP_WIDTH || ny < 0 || ny >= CONFIG.MAP_HEIGHT) return true;
+        return !game.isTileOccupied(nx, ny);
+    });
+    const pool = unoccupied.length > 0 ? unoccupied : candidates;
     const dir = pool[Math.floor(Math.random() * pool.length)];
     moveEntity(animal, animal.x + dir[0], animal.y + dir[1], dur);
 }

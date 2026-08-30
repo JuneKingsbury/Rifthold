@@ -92,7 +92,7 @@ export const WAVE_TYPES = {
 };
 
 export const WILDLIFE_CONFIG = {
-    maxCount: 15,
+    maxCount: 30,
     passiveMoveChance: 0.3,
     hostileIdleMoveChance: 0.2,
     animalSearchRadius: 20,

@@ -4,7 +4,7 @@ export const SEASON_EFFECTS = {
     spring: { cropGrowthMult: 1.0, animalSpawnRate: 0.04, tempRange: [10, 20] },
     summer: { cropGrowthMult: 1.5, animalSpawnRate: 0.035, tempRange: [20, 35] },
     autumn: { cropGrowthMult: 0.8, animalSpawnRate: 0.015, tempRange: [5, 15] },
-    winter: { cropGrowthMult: 0, animalSpawnRate: 0.004, tempRange: [-10, 5] },
+    winter: { cropGrowthMult: 0, animalSpawnRate: 0.01, tempRange: [-10, 5] },
 };
 
 export const TERRAIN = {

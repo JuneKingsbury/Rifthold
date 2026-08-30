@@ -222,11 +222,14 @@ class Game {
     spawnStartingWildlife() {
         const types = ['deer', 'deer', 'rabbit', 'rabbit', 'rabbit', 'chicken', 'chicken', 'cow', 'sheep'];
         for (const type of types) {
-            const x = Math.floor(Math.random() * CONFIG.MAP_WIDTH);
-            const y = Math.floor(Math.random() * CONFIG.MAP_HEIGHT);
-            const tile = this.map[y][x];
-            if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock' || tile.resource) continue;
-            this.entities.push(createWildAnimal(type, x, y));
+            for (let attempt = 0; attempt < 20; attempt++) {
+                const x = Math.floor(Math.random() * CONFIG.MAP_WIDTH);
+                const y = Math.floor(Math.random() * CONFIG.MAP_HEIGHT);
+                const tile = this.map[y][x];
+                if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock' || tile.resource) continue;
+                this.entities.push(createWildAnimal(type, x, y));
+                break;
+            }
         }
     }
 
