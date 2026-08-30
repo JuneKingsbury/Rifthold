@@ -106,9 +106,9 @@ export const RESEARCH_TABS = [
 export const RESEARCH = {
     // Foundations
     runecraft: { name: 'Runecraft', cost: 80, requires: [], tab: 'foundations', description: 'Etch runes into stone weapons'},
-    stonework: { name: 'Stonework', cost: 100, requires: [], tab: 'foundations', description: 'Brick construction and faster mining' },
-    ley_channeling: { name: 'Ley Channeling', cost: 300, requires: ['runecraft', 'stonework'], tab: 'foundations', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
-    alchemy: { name: 'Alchemy', cost: 150, requires: ['stonework'], tab: 'foundations', description: 'Cooking produces +2 bonus food per meal' },
+    metalworking: { name: 'Metalworking', cost: 100, requires: [], tab: 'foundations', description: 'Smelting metal and crafting gear at anvils' },
+    ley_channeling: { name: 'Ley Channeling', cost: 300, requires: ['runecraft', 'metalworking'], tab: 'foundations', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
+    alchemy: { name: 'Alchemy', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Cooking produces +2 bonus food per meal' },
     trade_routes: { name: 'Trade Routes', cost: 300, requires: ['alchemy'], tab: 'foundations', description: 'Caravans arrive more often and offer better prices' },
 
     // Wildlife
@@ -146,7 +146,7 @@ export const RESEARCH = {
 
     // Rifts
     warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards' },
-    fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'stonework'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
+    fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
     void_summoning: { name: 'Void Summoning', cost: 550, requires: ['ley_channeling', 'warding'], tab: 'rifts', description: 'Open portals to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['void_summoning'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
     void_forging: { name: 'Void Forging', cost: 750, requires: ['void_architecture', 'runeforging'], tab: 'rifts', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },

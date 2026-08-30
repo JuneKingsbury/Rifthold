@@ -1450,6 +1450,12 @@ export class UI {
             tip += getItemStatLines(c).join(', ');
             return tip;
         }
+        if (BOOTS[outputKey]) {
+            const b = BOOTS[outputKey];
+            let tip = b.description ? `${b.description} ` : '';
+            tip += getItemStatLines(b).join(', ');
+            return tip;
+        }
         if (TOOLS[outputKey]) {
             const t = TOOLS[outputKey];
             let tip = t.description ? `${t.description} ` : '';
@@ -1898,7 +1904,7 @@ export class UI {
         if (hasEquipTiers && this._craftHiddenTiers && this._craftHiddenTiers.size > 0) {
             filtered = filtered.filter(r => {
                 const outputKey = Object.keys(r.recipe.output)[0];
-                const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || TOOLS[outputKey];
+                const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || BOOTS[outputKey] || TOOLS[outputKey];
                 if (!def || def.tier === undefined) return true;
                 return !this._craftHiddenTiers.has(def.tier);
             });
@@ -1926,8 +1932,8 @@ export class UI {
             filtered.sort((a, b) => {
                 const aKey = Object.keys(a.recipe.output)[0];
                 const bKey = Object.keys(b.recipe.output)[0];
-                const aDef = WEAPONS[aKey] || ARMORS[aKey] || HELMETS[aKey] || CLOTHES[aKey] || TOOLS[aKey];
-                const bDef = WEAPONS[bKey] || ARMORS[bKey] || HELMETS[bKey] || CLOTHES[bKey] || TOOLS[bKey];
+                const aDef = WEAPONS[aKey] || ARMORS[aKey] || HELMETS[aKey] || CLOTHES[aKey] || BOOTS[aKey] || TOOLS[aKey];
+                const bDef = WEAPONS[bKey] || ARMORS[bKey] || HELMETS[bKey] || CLOTHES[bKey] || BOOTS[bKey] || TOOLS[bKey];
                 return (aDef?.tier || 0) - (bDef?.tier || 0);
             });
         }

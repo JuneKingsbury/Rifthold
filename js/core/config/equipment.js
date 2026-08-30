@@ -23,7 +23,7 @@ export const MATERIALS = {
     planks: { name: 'Planks', recipe: { input: { wood: 2 }, output: 3, ticks: 10, prefix: 'craft_' } },
     bricks: { name: 'Bricks', recipe: { input: { stone: 2 }, output: 3, ticks: 12, prefix: 'craft_' } },
     leather: { name: 'Leather', recipe: { input: { hides: 2 }, output: 2, ticks: 10, prefix: 'tan_' } },
-    iron: { name: 'Iron', recipe: { input: { iron_ore: 2 }, output: 2, ticks: 12, prefix: 'smelt_', station: 'anvil' } },
+    iron: { name: 'Iron', recipe: { input: { iron_ore: 2 }, output: 2, ticks: 12, prefix: 'smelt_', research: 'metalworking', station: 'anvil' } },
 };
 
 const BASE_RECIPES = {
@@ -70,7 +70,7 @@ export const WEAPONS = {
     fists: { name: 'Fists', damage: 5, tier: 0, description: 'Bare fists.' },
     stone_spear: { name: 'Stone Spear', damage: 8, tier: 1, description: 'A sharpened stone lashed to a stick.', recipe: { input: { stone: 2, wood: 1 }, ticks: 12 } },
     wooden_club: { name: 'Wooden Club', damage: 10, tier: 1, description: 'A heavy wooden bludgeon.', recipe: { input: { wood: 2, planks: 1 }, ticks: 15 } },
-    iron_sword: { name: 'Iron Sword', tradeValue: 28, damage: 14, tier: 2, description: 'A reliable iron blade.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, station: 'anvil' } },
+    iron_sword: { name: 'Iron Sword', tradeValue: 28, damage: 14, tier: 2, description: 'A reliable iron blade.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
     etched_axe: { name: 'Etched Axe', damage: 15, tier: 2, description: 'An axe inscribed with runes of sharpness.', recipe: { input: { iron: 2, planks: 1, stone: 1 }, ticks: 22, research: 'runecraft', station: 'anvil' } },
     etched_mace: { name: 'Etched Mace', damage: 17, tier: 2, description: 'A heavy mace with runes that make it heavier.', recipe: { input: { iron: 3, planks: 1 }, ticks: 24, research: 'runecraft', station: 'anvil' } },
     enchanted_glaive: { name: 'Enchanted Glaive', damage: 18, tier: 3, spellDamageBonus: 0.25, description: 'A long blade humming with arcane energy.', recipe: { input: { iron: 2, runite: 1, planks: 2 }, ticks: 38, research: 'mana_weaving', station: 'enchanting_table' } },
@@ -82,7 +82,7 @@ export const WEAPONS = {
     runic_wand: { name: 'Runic Wand', damage: 7, tier: 3, attackCooldown: 2, spellDamageBonus: 0.5, ranged: true, range: 7, projectileChar: '·', projectileColor: '#dd88ff', skinKey: 'projectile_spell', description: 'A wand inscribed with potent spell-amplifying runes. Attacks quickly.', recipe: { input: { runite: 2, planks: 2 }, ticks: 35, research: 'void_sorcery', station: 'enchanting_table' } },
     void_staff: { name: 'Void Staff', damage: 12, tier: 4, spellDamageBonus: 0.65, ranged: true, range: 8, projectileChar: '✦', projectileColor: '#cc00ff', skinKey: 'projectile_spell', description: 'A staff channeling raw void energy.', recipe: { input: { void_essence: 5, runite: 2, planks: 2 }, ticks: 55, research: 'void_sorcery', station: 'enchanting_table' } },
     short_bow: { name: 'Short Bow', damage: 7, tier: 1, ranged: true, range: 5, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', description: 'A simple short-range bow.', recipe: { input: { wood: 3, leather: 1 }, ticks: 14 } },
-    hunting_bow: { name: 'Hunting Bow', damage: 10, tier: 2, ranged: true, range: 6, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', description: 'A sturdy bow made for hunting.', recipe: { input: { planks: 2, leather: 2, iron: 1 }, ticks: 22, station: 'anvil' } },
+    hunting_bow: { name: 'Hunting Bow', damage: 10, tier: 2, ranged: true, range: 6, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', description: 'A sturdy bow made for hunting.', recipe: { input: { planks: 2, leather: 2, iron: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
     iron_crossbow: { name: 'Iron Crossbow', tradeValue: 38, damage: 22, tier: 2, attackCooldown: 5, ranged: true, range: 7, projectileChar: '→', projectileColor: '#aaddff', skinKey: 'projectile_bolt', description: 'A mechanical crossbow with iron bolts. Slow but powerful.', recipe: { input: { iron: 3, planks: 2, leather: 1 }, ticks: 30, research: 'marksmanship', station: 'anvil' } },
     runic_crossbow: { name: 'Runic Crossbow', damage: 30, tier: 3, attackCooldown: 5, ranged: true, range: 8, projectileChar: '→', projectileColor: '#bb99ff', skinKey: 'projectile_bolt', description: 'A crossbow enhanced with runic power. Slow but devastating.', recipe: { input: { runite: 3, iron: 2, planks: 2 }, ticks: 42, research: 'runeforging', station: 'enchanting_table' } },
     void_longbow: { name: 'Void Longbow', damage: 24, tier: 4, ranged: true, range: 10, projectileChar: '⟶', projectileColor: '#cc00ff', skinKey: 'projectile_void', description: 'A longbow that fires arrows of pure void.', recipe: { input: { void_essence: 4, runite: 2, planks: 3 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
@@ -91,11 +91,11 @@ export const WEAPONS = {
 
 export const ARMORS = {
     wool_parka: { name: 'Wool Parka', damageReduction: 0.04, tier: 1, coldResistance: 0.7, hungerReduction: 0.1, description: 'Warm wool parka. Resists cold and reduces hunger.', recipe: { input: { wool: 4, leather: 1 }, ticks: 16 } },
-    iron_brigandine: { name: 'Iron Brigandine', damageReduction: 0.08, tier: 1, description: 'Light iron armor offering basic protection.', recipe: { input: { iron: 2 }, ticks: 14, station: 'anvil' } },
+    iron_brigandine: { name: 'Iron Brigandine', damageReduction: 0.08, tier: 1, description: 'Light iron armor offering basic protection.', recipe: { input: { iron: 2 }, ticks: 14, research: 'metalworking', station: 'anvil' } },
     leather_vest: { name: 'Leather Vest', damageReduction: 0.10, tier: 1, description: 'A sturdy leather vest.', recipe: { input: { leather: 3 }, ticks: 18 } },
     enchanted_tunic: { name: 'Enchanted Tunic', damageReduction: 0.12, tier: 2, spellDamageBonus: 0.10, description: 'A leather tunic woven with mana threads. Light protection with arcane attunement.', recipe: { input: { leather: 2, planks: 2, iron: 1 }, ticks: 24, research: 'mana_weaving', station: 'enchanting_table' } },
     mana_weave_robe: { name: 'Mana-Weave Robe', damageReduction: 0.18, tier: 3, spellDamageBonus: 0.20, description: 'A robe woven with mana threads. Boosts spell damage.', recipe: { input: { runite: 2, leather: 2, iron: 1 }, ticks: 40, research: 'mana_weaving', station: 'enchanting_table' } },
-    iron_chainmail: { name: 'Iron Chainmail', damageReduction: 0.16, tier: 2, description: 'Interlocking iron rings for solid protection.', recipe: { input: { iron: 4, leather: 2 }, ticks: 30, station: 'anvil' } },
+    iron_chainmail: { name: 'Iron Chainmail', damageReduction: 0.16, tier: 2, description: 'Interlocking iron rings for solid protection.', recipe: { input: { iron: 4, leather: 2 }, ticks: 30, research: 'metalworking', station: 'anvil' } },
     runic_plate: { name: 'Runic Plate', tradeValue: 48, damageReduction: 0.24, tier: 3, description: 'Heavy plate armor inscribed with protective runes.', recipe: { input: { runite: 3, iron: 2, leather: 1 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
     void_armor: { name: 'Void Armor', damageReduction: 0.3, tier: 4, description: 'Armor forged from void essence. Maximum protection.', recipe: { input: { void_essence: 5, runite: 2, iron: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
     living_bark_armor: { name: 'Living Bark Armor', textColor: '#4488ff', tradeValue: 55, damageReduction: 0.25, tier: 3, description: 'Armor grown from a living tree. Regenerates the wearer.', healthRegen: 0.07, combat: { damageReduction: 0.2, healthRegen: 0.05 }, expedition: { damageReduction: 0.25, healthRegen: 0.07 } },
@@ -105,7 +105,7 @@ export const ARMORS = {
 export const HELMETS = {
     wool_cap: { name: 'Wool Cap', damageReduction: 0.02, tier: 1, coldResistance: 0.4, moodBonus: 3, description: 'A cozy wool cap. Keeps spirits and warmth up.', recipe: { input: { wool: 3 }, ticks: 10 } },
     leather_cap: { name: 'Leather Cap', damageReduction: 0.05, tier: 1, description: 'A simple leather skullcap.', recipe: { input: { leather: 2 }, ticks: 12 } },
-    iron_helmet: { name: 'Iron Helmet', damageReduction: 0.08, tier: 2, description: 'A solid iron helmet.', recipe: { input: { iron: 3 }, ticks: 18, station: 'anvil' } },
+    iron_helmet: { name: 'Iron Helmet', damageReduction: 0.08, tier: 2, description: 'A solid iron helmet.', recipe: { input: { iron: 3 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
     mages_circlet: { name: "Mage's Circlet", damageReduction: 0.06, tier: 2, spellDamageBonus: 0.08, description: 'A circlet of woven iron and crystal. Focuses magical energy.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'arcane_implements', station: 'anvil' } },
     runic_helm: { name: 'Runic Helm', tradeValue: 38, damageReduction: 0.14, tier: 3, description: 'A helm etched with protective runes.', recipe: { input: { runite: 2, iron: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
     runic_hood: { name: 'Runic Hood', damageReduction: 0.10, tier: 3, spellDamageBonus: 0.12, description: 'A hood inscribed with runes of clarity. Amplifies spellcraft.', recipe: { input: { runite: 2, leather: 1 }, ticks: 32, research: 'mana_weaving', station: 'enchanting_table' } },
@@ -123,7 +123,7 @@ export const CLOTHES = {
 
 export const BOOTS = {
     leather_boots: { name: 'Leather Boots', moveSpeedBonus: 0.1, tier: 1, description: 'Sturdy leather boots for travel.', recipe: { input: { leather: 2, planks: 1 }, ticks: 14 } },
-    iron_greaves: { name: 'Iron Greaves', moveSpeedBonus: 0.05, damageReduction: 0.04, tier: 2, description: 'Heavy iron greaves. Solid protection for the legs.', recipe: { input: { iron: 2, leather: 1 }, ticks: 20, station: 'anvil' } },
+    iron_greaves: { name: 'Iron Greaves', moveSpeedBonus: 0.05, damageReduction: 0.04, tier: 2, description: 'Heavy iron greaves. Solid protection for the legs.', recipe: { input: { iron: 2, leather: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
     runic_striders: { name: 'Runic Striders', moveSpeedBonus: 0.2, tier: 3, description: 'Boots inscribed with runes of swiftness.', recipe: { input: { runite: 2, leather: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
     boots_of_haste: { name: 'Boots of Haste', textColor: '#4488ff', tradeValue: 55, moveSpeedBonus: 0.5, tier: 4, description: 'Enchanted boots that quicken the wearer.', expedition: { durationMult: 0.85 }, recipe: { input: { void_essence: 3, planks: 2, runite: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
     void_treads: { name: 'Void Treads', moveSpeedBonus: 0.35, damageReduction: 0.06, tier: 4, description: 'Boots forged from void essence. Swift and protective.', recipe: { input: { void_essence: 3, runite: 1, leather: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
@@ -141,21 +141,21 @@ export const EQUIPMENT_OVERLAY_OFFSETS = {
 // Tool items can also include Offhand items that appear in the colonist's hand on their sprite.
 export const TOOLS = {
     stone_pickaxe: { name: 'Stone Pickaxe', miningSpeed: 1.25, tier: 1, description: 'A basic stone pickaxe for mining.', recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
-    iron_pickaxe: { name: 'Iron Pickaxe', miningSpeed: 1.45, tier: 2, description: 'An iron pickaxe. Mines faster.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, station: 'anvil' } },
+    iron_pickaxe: { name: 'Iron Pickaxe', miningSpeed: 1.45, tier: 2, description: 'An iron pickaxe. Mines faster.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
     runic_pickaxe: { name: 'Runic Pickaxe', miningSpeed: 1.7, tier: 3, description: 'A pickaxe enhanced with runes. Superior mining.', recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
     stone_axe: { name: 'Stone Axe', choppingSpeed: 1.25, tier: 1, description: 'A basic stone axe for chopping.', recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
-    iron_axe: { name: 'Iron Axe', choppingSpeed: 1.45, tier: 2, description: 'An iron axe. Chops faster.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, station: 'anvil' } },
+    iron_axe: { name: 'Iron Axe', choppingSpeed: 1.45, tier: 2, description: 'An iron axe. Chops faster.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
     runic_axe: { name: 'Runic Axe', choppingSpeed: 1.7, tier: 3, description: 'A runic axe. Superior chopping.', recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
     stone_sickle: { name: 'Stone Sickle', farmingSpeed: 1.25, tier: 1, description: 'A basic stone sickle for farming.', recipe: { input: { stone: 1, planks: 1 }, ticks: 12 } },
-    iron_sickle: { name: 'Iron Sickle', farmingSpeed: 1.45, tier: 2, description: 'An iron sickle. Farms faster.', recipe: { input: { iron: 1, planks: 1 }, ticks: 18, station: 'anvil' } },
+    iron_sickle: { name: 'Iron Sickle', farmingSpeed: 1.45, tier: 2, description: 'An iron sickle. Farms faster.', recipe: { input: { iron: 1, planks: 1 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
     runic_sickle: { name: 'Runic Sickle', farmingSpeed: 1.7, tier: 3, description: 'A runic sickle. Superior farming.', recipe: { input: { runite: 1, planks: 1 }, ticks: 30, research: 'runeforging', station: 'enchanting_table' } },
     stone_hammer: { name: 'Stone Hammer', craftingSpeed: 1.25, tier: 1, description: 'A basic stone hammer for crafting.', recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
-    iron_hammer: { name: 'Iron Hammer', craftingSpeed: 1.45, tier: 2, description: 'An iron hammer. Crafts faster.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, station: 'anvil' } },
+    iron_hammer: { name: 'Iron Hammer', craftingSpeed: 1.45, tier: 2, description: 'An iron hammer. Crafts faster.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
     runic_hammer: { name: 'Runic Hammer', craftingSpeed: 1.7, tier: 3, description: 'A runic hammer. Superior crafting.', recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
     stone_mattock: { name: 'Stone Mattock', miningSpeed: 1.15, choppingSpeed: 1.15, tier: 1, description: 'A versatile tool for mining and chopping.', recipe: { input: { stone: 3, planks: 2 }, ticks: 18 } },
-    iron_mattock: { name: 'Iron Mattock', miningSpeed: 1.3, choppingSpeed: 1.3, tier: 2, description: 'An iron mattock. Good at both mining and chopping.', recipe: { input: { iron: 3, planks: 2 }, ticks: 26, station: 'anvil' } },
+    iron_mattock: { name: 'Iron Mattock', miningSpeed: 1.3, choppingSpeed: 1.3, tier: 2, description: 'An iron mattock. Good at both mining and chopping.', recipe: { input: { iron: 3, planks: 2 }, ticks: 26, research: 'metalworking', station: 'anvil' } },
     runic_mattock: { name: 'Runic Mattock', miningSpeed: 1.5, choppingSpeed: 1.5, tier: 3, description: 'A runic mattock. Excellent at mining and chopping.', recipe: { input: { runite: 3, planks: 2 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
-    lantern: { name: 'Lantern', lightRadius: 4, tier: 1, description: 'A handheld lantern. Illuminates the area around the carrier.', recipe: { input: { iron: 1, planks: 2 }, ticks: 12, station: 'anvil' } },
+    lantern: { name: 'Lantern', lightRadius: 4, tier: 1, description: 'A handheld lantern. Illuminates the area around the carrier.', recipe: { input: { iron: 1, planks: 2 }, ticks: 12, research: 'metalworking', station: 'anvil' } },
     aegis_of_the_vanguard: { name: 'Aegis of the Vanguard', textColor: '#f944ff', tradeValue: 60, description: 'A heavy shield that draws attacks and absorbs blows.', combat: { targetPriority: 10, damageReduction: 0.3 }, expedition: { targetPriority: 10, damageReduction: 0.3 } },
     crystal_aegis: { name: 'Crystal Aegis', textColor: '#4488ff', tradeValue: 45, description: 'A crystalline shield that reflects damage.', damageReduction: 0.2, thornsDamage: 2, combat: { damageReduction: 0.15 }, expedition: { damageReduction: 0.2 } },
     drum_of_rallying: { name: 'Drum of Rallying', textColor: '#4488ff', tradeValue: 50, description: 'War drums that inspire nearby fighters.', attackSpeed: 0.15, pedestal: { radius: 8, manaCost: 3, damageBonusMult: 1.15 }, expedition: { partyDamageMult: 1.15 }, recipe: { input: { wood: 6, runite: 2, planks: 3 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
