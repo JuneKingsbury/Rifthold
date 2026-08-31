@@ -226,11 +226,11 @@ function updateRaider(raider, game) {
     }
 }
 
-function getColonistTargetPriority(colonist) {
+export function getColonistTargetPriority(colonist) {
     let priority = 0;
     for (const item of [colonist.weapon, colonist.armor, colonist.helmet, colonist.clothes, colonist.boots, colonist.tool, colonist.trinket].filter(Boolean)) {
         if (item === colonist.trinket && colonist.trinketBroken) continue;
-        priority += item.combat?.targetPriority || 0;
+        priority += item.targetPriority || 0;
     }
     return priority;
 }

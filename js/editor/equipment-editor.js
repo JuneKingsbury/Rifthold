@@ -586,12 +586,6 @@ class EquipmentEditor {
                     document.getElementById(`eq-exp-${f.key}`).value = item.expedition[f.key] || '';
                 });
             }
-            if (item.combat) {
-                document.getElementById('eq-art-combat-toggle').checked = true;
-                TRINKET_COMBAT_FIELDS.forEach(f => {
-                    document.getElementById(`eq-com-${f.key}`).value = item.combat[f.key] || '';
-                });
-            }
             if (item.durability) {
                 document.getElementById('eq-art-durability-toggle').checked = true;
                 document.getElementById('eq-dur-max').value = item.durability.max || '';

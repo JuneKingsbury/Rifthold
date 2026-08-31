@@ -1,14 +1,10 @@
 // Small presentation helpers shared across the UI modules (ui.js, ui-arcane.js)
 // and the exploration system. Kept dependency-free so any layer can import them.
 
-// A held trinket's "target priority" (aka threat): positive draws enemy aggro,
-// negative sheds it. Prefer the expedition-specific value, falling back to the
-// combat value so a trinket that only declares combat threat still behaves
-// consistently in expeditions.
 export function getTargetPriority(x) {
     let priority = 0;
     for (const item of [x.weapon, x.armor, x.helmet, x.clothes, x.boots, x.tool, x.trinket].filter(Boolean)) {
-        priority += item.expedition?.targetPriority || item.combat?.targetPriority || 0;
+        priority += item.targetPriority || 0;
     }
     return priority;
 }

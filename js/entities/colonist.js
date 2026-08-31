@@ -522,7 +522,6 @@ function getEquipmentDamageReduction(colonist) {
     let mult = 1;
     for (const item of getEquippedItems(colonist)) {
         if (item.damageReduction) mult *= (1 - item.damageReduction);
-        if (item.combat?.damageReduction) mult *= (1 - item.combat.damageReduction);
     }
     return mult;
 }
@@ -1711,13 +1710,24 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
     }
 
     if (colonist.hp <= 0) {
-        const art = colonist.trinket;
-        if (art?.combat?.autoReviveHp && !colonist.trinketBroken) {
-            colonist.hp = Math.floor(colonist.maxHp * art.combat.autoReviveHp);
-            colonist.trinketBroken = true;
-            game.eventLog.add(game, `${colonist.name}'s ${art.name} shatters, reviving them!`, 'success', { type: 'colonist', id: colonist.id });
+        let revived = false;
+        const reviveSlots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+        for (const slot of reviveSlots) {
+            const item = colonist[slot];
+            if (!item?.autoReviveHp) continue;
+            if (slot === 'trinket' && colonist.trinketBroken) continue;
+            colonist.hp = Math.floor(colonist.maxHp * item.autoReviveHp);
+            if (slot === 'trinket') {
+                colonist.trinketBroken = true;
+            } else {
+                colonist[slot] = null;
+            }
+            game.eventLog.add(game, `${colonist.name}'s ${item.name} shatters, reviving them!`, 'success', { type: 'colonist', id: colonist.id });
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '✦', color: '#ffdd44', ttl: 8 });
-        } else {
+            revived = true;
+            break;
+        }
+        if (!revived) {
             colonist.hp = 0;
             colonist.state = 'dead';
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.deathChar, color: COMBAT_VISUALS.deathColor, ttl: COMBAT_VISUALS.deathTtl });

@@ -186,6 +186,28 @@ export function loadGame(game) {
             c.boots = c.boots || null;
         }
 
+        // Migration: flatten item.combat stats to top-level
+        const _flattenCombat = (item) => {
+            if (!item || !item.combat) return;
+            for (const [k, v] of Object.entries(item.combat)) {
+                if (v && item[k] === undefined) item[k] = v;
+            }
+            delete item.combat;
+        };
+        const _itemLists = ['weapons', 'armors', 'helmets', 'clothes', 'tools', 'trinkets', 'boots'];
+        for (const list of _itemLists) {
+            for (const item of (data.resources[list] || [])) _flattenCombat(item);
+        }
+        const _equipSlots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+        for (const c of (data.colonists || [])) {
+            for (const slot of _equipSlots) _flattenCombat(c[slot]);
+        }
+        for (const exp of (data.exploration?.expeditions || [])) {
+            for (const member of (exp.partySnapshot || [])) {
+                for (const slot of _equipSlots) _flattenCombat(member[slot]);
+            }
+        }
+
         game.resources.stockpile = data.resources.stockpile;
         game.resources.weapons = data.resources.weapons;
         game.resources.armors = data.resources.armors || [];

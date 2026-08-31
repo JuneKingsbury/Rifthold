@@ -1451,17 +1451,24 @@ class Game {
                 this.equipClothes(colonistId, 0);
             }
         }
-        if (this.resources.tools.length > 0 && !c.tool) {
-            this.equipTool(colonistId, 0);
+        if (this.resources.tools.length > 0) {
+            this.resources.tools.sort((a, b) => (b.tier || 0) - (a.tier || 0));
+            if (!c.tool || (this.resources.tools[0].tier || 0) > (c.tool.tier || 0)) {
+                this.equipTool(colonistId, 0);
+            }
         }
         if (this.resources.boots.length > 0) {
-            this.resources.boots.sort((a, b) => (b.moveSpeedBonus || 0) - (a.moveSpeedBonus || 0));
-            if (!c.boots || (this.resources.boots[0].moveSpeedBonus || 0) > (c.boots.moveSpeedBonus || 0)) {
+            const bootScore = b => (b.moveSpeedBonus || 0) * 2 + (b.damageReduction || 0) * 10 + (b.tier || 0) * 0.1;
+            this.resources.boots.sort((a, b) => bootScore(b) - bootScore(a));
+            if (!c.boots || bootScore(this.resources.boots[0]) > bootScore(c.boots)) {
                 this.equipBoots(colonistId, 0);
             }
         }
-        if (this.resources.trinkets.length > 0 && !c.trinket) {
-            this.equipTrinket(colonistId, 0);
+        if (this.resources.trinkets.length > 0) {
+            this.resources.trinkets.sort((a, b) => (b.tradeValue || 0) - (a.tradeValue || 0));
+            if (!c.trinket || (this.resources.trinkets[0].tradeValue || 0) > (c.trinket.tradeValue || 0)) {
+                this.equipTrinket(colonistId, 0);
+            }
         }
         this.ui.showColonistInfo(c);
     }

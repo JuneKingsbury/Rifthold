@@ -1,5 +1,5 @@
 import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES } from '../core/config.js';
-import { getEquipmentStat } from '../entities/colonist.js';
+import { getEquipmentStat, getEquippedItems } from '../entities/colonist.js';
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
 
@@ -85,16 +85,14 @@ export class ExplorationSystem {
         }
         let durationMult = 1.0;
         for (const c of party) {
-            if (c.trinket && !c.trinketBroken) {
-                const trinketItem = c.trinket;
-                if (trinketItem.expedition?.durationMult) durationMult *= trinketItem.expedition.durationMult;
-                if (trinketItem.consumable) {
-                    game.resources.removeTrinket(trinketItem.key);
+            for (const item of getEquippedItems(c)) {
+                if (item.expedition?.durationMult) durationMult *= item.expedition.durationMult;
+                if (item.consumable) {
+                    game.resources.removeTrinket(item.key);
                     c.trinket = null;
-                    game.eventLog.add(game, `${c.name}'s ${trinketItem.name} crumbles to dust as the expedition begins`, 'event', null);
+                    game.eventLog.add(game, `${c.name}'s ${item.name} crumbles to dust as the expedition begins`, 'event', null);
                 }
             }
-            if (c.boots?.expedition?.durationMult) durationMult *= c.boots.expedition.durationMult;
         }
         if (durationMult !== 1.0) duration = Math.floor(duration * durationMult);
         const diffSettings = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
@@ -211,18 +209,27 @@ export class ExplorationSystem {
     }
 
     _checkExpeditionRevive(exp, member, game) {
-        const trinketItem = member.trinket;
-        if (trinketItem?.expedition?.autoReviveHp && !member._reviveUsed) {
-            member.hp = Math.floor(member.maxHp * trinketItem.expedition.autoReviveHp);
-            member._reviveUsed = true;
-            member.trinket = null;
-            this._addLog(exp, game, `${member.name}'s ${trinketItem.name} shatters, bringing them back!`, 'success');
-            const colonist = game.getColonist(member.id);
-            if (colonist) colonist.trinketBroken = true;
-        } else {
-            exp.defeated.push(member.id);
-            this._addLog(exp, game, pickRandom(EXPLORATION_EVENTS.combatDefeat).replace('{name}', member.name), 'danger');
+        const slots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+        for (const slot of slots) {
+            const item = member[slot];
+            if (item?.autoReviveHp && !member._reviveUsed) {
+                member.hp = Math.floor(member.maxHp * item.autoReviveHp);
+                member._reviveUsed = true;
+                member[slot] = null;
+                this._addLog(exp, game, `${member.name}'s ${item.name} shatters, bringing them back!`, 'success');
+                const colonist = game.getColonist(member.id);
+                if (colonist) {
+                    if (slot === 'trinket') {
+                        colonist.trinketBroken = true;
+                    } else {
+                        colonist[slot] = null;
+                    }
+                }
+                return;
+            }
         }
+        exp.defeated.push(member.id);
+        this._addLog(exp, game, pickRandom(EXPLORATION_EVENTS.combatDefeat).replace('{name}', member.name), 'danger');
     }
 
     _updateGathering(exp, game) {
@@ -278,7 +285,7 @@ export class ExplorationSystem {
                     mana: c.mana || 0,
                     maxMana: c.maxMana || 0,
                     spellCooldowns: {},
-                    spellDamageBonus: (c.weapon?.spellDamageBonus || 0) + (c.armor?.spellDamageBonus || 0) + (c.helmet?.spellDamageBonus || 0) + (c.clothes?.spellDamageBonus || 0) + (c.tool?.spellDamageBonus || 0) + (c.boots?.spellDamageBonus || 0) + ((!c.trinketBroken && c.trinket?.spellDamageBonus) || 0),
+                    spellDamageBonus: getEquipmentStat(c, 'spellDamageBonus'),
                     attackCooldown: baseCd,
                     effectiveCooldown: effCd,
                     shieldActive: false,
@@ -492,6 +499,11 @@ export class ExplorationSystem {
                         .replace('{target}', 'an enemy')
                         .replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
+                    const lifeSteal = memberItems.reduce((sum, it) => sum + (it.lifeSteal || 0), 0);
+                    if (lifeSteal > 0) {
+                        const healed = Math.floor(dmg * lifeSteal);
+                        if (healed > 0) member.hp = Math.min(member.maxHp, member.hp + healed);
+                    }
                     if (target.hp <= 0) {
                         this._addLog(exp, game, `${member.name} slays a foe!`, 'success');
                         const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0);
@@ -565,7 +577,6 @@ export class ExplorationSystem {
                 let dmg = enemy.damage + randInt(0, 2);
                 for (const item of targetItems) {
                     if (item.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - item.damageReduction)));
-                    if (item.expedition?.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - item.expedition.damageReduction)));
                 }
                 if (target.shieldActive) {
                     dmg = Math.max(1, Math.floor(dmg * (1 - target.shieldReduction)));
@@ -583,6 +594,12 @@ export class ExplorationSystem {
                         .replace('{target}', target.name)
                         .replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
+                    const thorns = targetItems.reduce((sum, it) => sum + (it.thornsDamage || 0), 0);
+                    if (thorns > 0 && enemy.hp > 0) {
+                        enemy.hp -= thorns;
+                        this._addLog(exp, game, `Thorns deal ${thorns} damage back!`, 'combat');
+                        if (enemy.hp <= 0) this._addLog(exp, game, `An enemy is slain by thorns!`, 'success');
+                    }
                     if (target.hp <= 0) {
                         this._checkExpeditionRevive(exp, target, game);
                     }
@@ -875,7 +892,6 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
         let dr = 1;
         for (const item of items) {
             if (item.damageReduction) dr *= (1 - item.damageReduction);
-            if (item.expedition && item.expedition.damageReduction) dr *= (1 - item.expedition.damageReduction);
         }
         drProduct *= dr;
 
@@ -924,15 +940,25 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
     const avgDR = 1 - Math.pow(drProduct, 1 / size);
 
     const partyEffects = {};
-    const effectKeys = ['partyDamageMult', 'trapDamageMult', 'lootMult', 'rareEncounterMult', 'autoReviveHp', 'healthRegen', 'durationMult'];
+    const effectKeys = ['partyDamageMult', 'trapDamageMult', 'lootMult', 'rareEncounterMult', 'durationMult'];
     const mockSnapshot = colonistIds.map(id => {
         const c = game.getColonist(id);
-        return c ? { hp: c.hp, trinket: c.trinket } : null;
+        return c ? { hp: c.hp, weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, boots: c.boots, tool: c.tool, trinket: c.trinketBroken ? null : c.trinket } : null;
     }).filter(Boolean);
     for (const key of effectKeys) {
         const val = getPartyExpeditionEffect(mockSnapshot, key);
         if (key.includes('Mult') && val !== 1.0) partyEffects[key] = val;
         else if (!key.includes('Mult') && val !== 0) partyEffects[key] = val;
+    }
+    const topLevelStats = ['autoReviveHp', 'healthRegen', 'lifeSteal', 'thornsDamage'];
+    for (const key of topLevelStats) {
+        let total = 0;
+        for (const m of mockSnapshot) {
+            if (m.hp <= 0) continue;
+            const items = [m.weapon, m.armor, m.helmet, m.clothes, m.boots, m.tool, m.trinket].filter(Boolean);
+            for (const item of items) { if (item[key]) total += item[key]; }
+        }
+        if (total > 0) partyEffects[key] = total;
     }
 
     const enemyCount = Math.round(((realm.enemies.count[0] + realm.enemies.count[1]) / 2) * diff.enemyCountMult);

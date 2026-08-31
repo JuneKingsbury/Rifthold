@@ -117,7 +117,7 @@ function applyEnchantment(item, colonist, game, type) {
             enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS[randomKey];
 
             // protection:
-            if (enchantmentEffect.defenseMultiplier) item.defense = Math.round(item.defense * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
+            if (enchantmentEffect.defenseMultiplier) item.damageReduction = Math.round((item.damageReduction || 0) * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
             // wisdom:
             else if (enchantmentEffect.manaRegenMultiplier) {
                 if (item.manaRegenMultiplier === undefined) {
@@ -126,7 +126,7 @@ function applyEnchantment(item, colonist, game, type) {
                 item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * tier.multiplier) * 100) / 100;
             }
             // barbs:
-            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage += (enchantmentEffect.thornsDamageBonus * tier.multiplier);
+            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage = (item.thornsDamage || 0) + (enchantmentEffect.thornsDamageBonus * tier.multiplier);
             // free_movement:
 
             // dodge_change:
@@ -136,14 +136,22 @@ function applyEnchantment(item, colonist, game, type) {
             randomKey = Object.keys(CLOTHES_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(CLOTHES_ENCHANTMENT_EFFECTS).length)];
             enchantmentEffect = CLOTHES_ENCHANTMENT_EFFECTS[randomKey];
 
-            if (enchantmentEffect.defenseMultiplier) item.defense = Math.round((item.defense || 0) * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
-            else if (enchantmentEffect.manaRegenMultiplier) {
+            if (enchantmentEffect.manaRegenMultiplier) {
                 if (item.manaRegenMultiplier === undefined) {
                     item.manaRegenMultiplier = 1;
                 }
                 item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * tier.multiplier) * 100) / 100;
             }
             else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage = (item.thornsDamage || 0) + (enchantmentEffect.thornsDamageBonus * tier.multiplier);
+            else if (enchantmentEffect.workSpeedMultiplier) {
+                if (item.workSpeedBonus) item.workSpeedBonus = Math.round(item.workSpeedBonus * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
+            }
+            else if (enchantmentEffect.healthRegenMultiplier) {
+                if (item.healthRegenMultiplier === undefined) {
+                    item.healthRegenMultiplier = 1;
+                }
+                item.healthRegenMultiplier = Math.round(item.healthRegenMultiplier * (enchantmentEffect.healthRegenMultiplier * tier.multiplier) * 100) / 100;
+            }
             break;
         case 'tools':
             // Roll for a random enchantment effect
@@ -175,9 +183,6 @@ function applyEnchantment(item, colonist, game, type) {
 
             if (enchantmentEffect.speedMultiplier) {
                 item.moveSpeedBonus = Math.round((item.moveSpeedBonus || 0) * (enchantmentEffect.speedMultiplier * tier.multiplier) * 100) / 100;
-            }
-            else if (enchantmentEffect.defenseMultiplier) {
-                item.damageReduction = Math.round((item.damageReduction || 0) * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
             }
             break;
         default:
@@ -359,6 +364,8 @@ export function completeTask(colonist, task, game) {
                         if (def.type === 'weapon') applyQuality(item, colonist, game, 'damage');
                         else if (def.type === 'armor' || def.type === 'helmet') applyQuality(item, colonist, game, 'damageReduction');
                         else if (def.type === 'tool') applyQuality(item, colonist, game, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
+                        else if (def.type === 'clothes') applyQuality(item, colonist, game, 'workSpeedBonus', 'moodBonus', 'coldResistance', 'heatResistance');
+                        else if (def.type === 'boots') applyQuality(item, colonist, game, 'moveSpeedBonus', 'damageReduction');
                         game.resources.addItem(item);
                         handled = true;
                     }

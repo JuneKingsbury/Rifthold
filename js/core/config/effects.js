@@ -45,10 +45,10 @@ export const STAT_META = {
 const ITEM_META_KEYS = new Set([
     'name', 'key', 'description', 'tier', 'ranged', 'range',
     'projectileChar', 'projectileColor', 'skinKey', 'attackCooldown',
-    'pedestal', 'combat', 'expedition', 'durability', 'consumable',
+    'pedestal', 'expedition', 'durability', 'consumable',
     'trigger', 'hpThreshold', 'effect', 'healAmount', 'duration', 'cooldown',
     'manaThreshold', 'manaAmount', 'moveSpeedBonus_potion', 'workSpeedBonus_potion',
-    'recipe',
+    'recipe', 'type', 'tradeValue', 'textColor', 'quality', 'enchantment',
 ]);
 
 export function formatStatValue(statKey, value) {

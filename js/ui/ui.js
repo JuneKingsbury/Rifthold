@@ -914,23 +914,14 @@ export class UI {
         const items = getEquippedItems(colonist);
         if (items.length === 0) return '';
         const totals = {};
-        const combatTotals = {};
         const expeditionTotals = {};
         let drMult = 1;
-        let combatDrMult = 1;
         let expDrMult = 1;
         for (const item of items) {
             for (const stat of Object.keys(STAT_META)) {
                 if (!item[stat]) continue;
                 if (STAT_META[stat].aggregation === 'multiplicative') { drMult *= (1 - item[stat]); }
                 else { totals[stat] = (totals[stat] || 0) + item[stat]; }
-            }
-            if (item.combat) {
-                for (const [stat, value] of Object.entries(item.combat)) {
-                    if (!STAT_META[stat] || !value) continue;
-                    if (STAT_META[stat].aggregation === 'multiplicative') { combatDrMult *= (1 - value); }
-                    else { combatTotals[stat] = (combatTotals[stat] || 0) + value; }
-                }
             }
             if (item.expedition) {
                 for (const [stat, value] of Object.entries(item.expedition)) {
@@ -941,7 +932,6 @@ export class UI {
             }
         }
         if (drMult < 1) totals.damageReduction = 1 - drMult;
-        if (combatDrMult < 1) combatTotals.damageReduction = 1 - combatDrMult;
         if (expDrMult < 1) expeditionTotals.damageReduction = 1 - expDrMult;
         const sep = ' <span style="color:#333">|</span> ';
         const sections = [];
@@ -950,11 +940,6 @@ export class UI {
             if (totals[stat]) parts.push(`<span style="color:#ccc">${meta.label}:</span> ${formatStatValue(stat, totals[stat])}`);
         }
         if (parts.length) sections.push(parts.join(sep));
-        const combatParts = [];
-        for (const [stat, meta] of Object.entries(STAT_META)) {
-            if (combatTotals[stat]) combatParts.push(`<span style="color:#ccc">${meta.label}:</span> ${formatStatValue(stat, combatTotals[stat])}`);
-        }
-        if (combatParts.length) sections.push(`<span style="color:#ff8866">Combat:</span> ${combatParts.join(sep)}`);
         const expParts = [];
         for (const [stat, meta] of Object.entries(STAT_META)) {
             if (expeditionTotals[stat]) expParts.push(`<span style="color:#ccc">${meta.label}:</span> ${formatStatValue(stat, expeditionTotals[stat])}`);
@@ -973,10 +958,6 @@ export class UI {
             const parts = getNestedEffectLines(art.pedestal);
             if (parts.length) lines.push(`Aura (${r}): ${parts.join(', ')}`);
             if (art.pedestal.manaCost) lines.push(`Pedestal mana: -${art.pedestal.manaCost}`);
-        }
-        if (art.combat) {
-            const parts = getNestedEffectLines(art.combat);
-            if (parts.length) lines.push(`Combat: ${parts.join(', ')}`);
         }
         if (art.expedition) {
             const parts = getNestedEffectLines(art.expedition);
@@ -1235,13 +1216,11 @@ export class UI {
             tool: { listName: 'tools', label: 'Offhand', fallback: 'None', equipFn: 'equipTool', unequipFn: 'unequipTool', statRenderer: t => {
                 const lines = getItemStatLines(t);
                 if (t.expedition) { const el = getNestedEffectLines(t.expedition); if (el.length) lines.push(...el); }
-                if (t.combat) { const cl = getNestedEffectLines(t.combat); if (cl.length) lines.push(...cl); }
                 return lines.join(', ');
             } },
             trinket: { listName: 'trinkets', label: 'Trinket', fallback: 'None', equipFn: 'equipTrinket', unequipFn: 'unequipTrinket', statRenderer: a => {
                 const lines = getItemStatLines(a);
                 if (a.expedition) { const el = getNestedEffectLines(a.expedition); if (el.length) lines.push(...el); }
-                if (a.combat) { const cl = getNestedEffectLines(a.combat); if (cl.length) lines.push(...cl); }
                 return lines.join(', ');
             } },
             boots: { listName: 'boots', label: 'Boots', fallback: 'None', equipFn: 'equipBoots', unequipFn: 'unequipBoots', statRenderer: b => {

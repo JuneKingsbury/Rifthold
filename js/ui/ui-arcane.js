@@ -401,8 +401,10 @@ const arcaneMethods = {
             if (fx.trapDamageMult) html += `<div>Trap Dmg: x${fx.trapDamageMult.toFixed(2)}</div>`;
             if (fx.lootMult) html += `<div>Loot: +${Math.round((fx.lootMult - 1) * 100)}%</div>`;
             if (fx.rareEncounterMult) html += `<div>Rare Finds: x${fx.rareEncounterMult.toFixed(1)}</div>`;
+            if (fx.lifeSteal) html += `<div>Life Steal: ${Math.round(fx.lifeSteal * 100)}%</div>`;
+            if (fx.thornsDamage) html += `<div>Thorns: ${fx.thornsDamage} dmg</div>`;
             if (fx.autoReviveHp) html += `<div>Auto-Revive: ${Math.round(fx.autoReviveHp * 100)}% HP</div>`;
-            if (fx.healthRegen) html += `<div>Regen: +${Math.round(fx.healthRegen * 100)}% HP/tick</div>`;
+            if (fx.healthRegen) html += `<div>Regen: +${fx.healthRegen}/tick</div>`;
             if (fx.durationMult) html += `<div>Duration: x${fx.durationMult.toFixed(2)}</div>`;
             html += '</div>';
         }

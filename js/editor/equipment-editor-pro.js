@@ -21,8 +21,7 @@ const QUALITY_MAP = { 0: null, 1: null, 2: 'fine', 3: 'superior', 4: 'superior' 
 
 const TRINKET_EQUIP_STATS = ['moveSpeedBonus', 'workSpeedBonus', 'damageReduction', 'healthRegen', 'spellDamageBonus'];
 const PEDESTAL_STATS = ['workSpeedBonus', 'skillGrowthBonus', 'wandererChanceMult', 'blightImmunity', 'cookingBonusFood', 'tradeMarkupMult', 'damageBonusMult', 'lightRadius'];
-const EXPEDITION_STATS = ['lootMult', 'trapDamageMult', 'durationMult', 'rareEncounterMult', 'partyDamageMult', 'targetPriority', 'autoReviveHp', 'damageReduction', 'healthRegen'];
-const COMBAT_STATS = ['targetPriority', 'damageReduction', 'autoReviveHp', 'healthRegen'];
+const EXPEDITION_STATS = ['lootMult', 'trapDamageMult', 'durationMult', 'rareEncounterMult', 'partyDamageMult'];
 
 let editorInstance = null;
 
@@ -312,14 +311,6 @@ class EquipmentEditorPro {
             }
             html += `</div></div>`;
 
-            html += `<div class="fe-section-title">Combat <input type="checkbox" id="eqp-combat-toggle" style="width:auto;vertical-align:middle;" ${item.combat ? 'checked' : ''}></div>`;
-            html += `<div id="eqp-combat-fields" style="display:${item.combat ? 'block' : 'none'};"><div class="fe-row">`;
-            for (const stat of COMBAT_STATS) {
-                const meta = STAT_META[stat];
-                html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="number" id="eqp-com-${stat}" step="0.05" value="${item.combat?.[stat] || ''}"></div>`;
-            }
-            html += `</div></div>`;
-
             html += `<div class="fe-section-title">Durability <input type="checkbox" id="eqp-durability-toggle" style="width:auto;vertical-align:middle;" ${item.durability ? 'checked' : ''}></div>`;
             html += `<div id="eqp-durability-fields" style="display:${item.durability ? 'block' : 'none'};"><div class="fe-row">`;
             html += `<div class="fe-field"><label>Max</label><input type="number" id="eqp-dur-max" value="${item.durability?.max || 1}"></div>`;
@@ -492,14 +483,6 @@ class EquipmentEditorPro {
                 }
                 if (Object.keys(exp).length) item.expedition = exp;
             }
-            if (document.getElementById('eqp-combat-toggle')?.checked) {
-                const com = {};
-                for (const stat of COMBAT_STATS) {
-                    const v = parseFloat(document.getElementById(`eqp-com-${stat}`)?.value);
-                    if (v) com[stat] = v;
-                }
-                if (Object.keys(com).length) item.combat = com;
-            }
             if (document.getElementById('eqp-durability-toggle')?.checked) {
                 item.durability = { max: parseInt(document.getElementById('eqp-dur-max')?.value) || 1 };
                 if (document.getElementById('eqp-dur-breakOnUse')?.checked) item.durability.breakOnUse = true;
@@ -574,11 +557,6 @@ class EquipmentEditorPro {
                 html += `<div style="color:#ffaa33;margin-top:4px;">Expedition:</div>`;
                 html += `<div style="color:#aaa;padding-left:8px;">${expLines.join(', ')}</div>`;
             }
-            if (item.combat) {
-                const comLines = getNestedEffectLines(item.combat);
-                html += `<div style="color:#ff8844;margin-top:4px;">Combat:</div>`;
-                html += `<div style="color:#aaa;padding-left:8px;">${comLines.join(', ')}</div>`;
-            }
             if (item.durability) html += `<div style="color:#cc6666;margin-top:4px;">Durability: ${item.durability.max}${item.durability.breakOnUse ? ' (breaks on use)' : ''}</div>`;
             if (item.consumable) html += `<div style="color:#aa44ff;margin-top:4px;">Consumable (single use)</div>`;
             html += `</div>`;
@@ -652,10 +630,6 @@ class EquipmentEditorPro {
         if (item.expedition) {
             const pp = Object.entries(item.expedition).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`);
             lines.push(`    expedition: { ${pp.join(', ')} },`);
-        }
-        if (item.combat) {
-            const pp = Object.entries(item.combat).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`);
-            lines.push(`    combat: { ${pp.join(', ')} },`);
         }
         if (item.durability) {
             const pp = [`max: ${item.durability.max}`];
