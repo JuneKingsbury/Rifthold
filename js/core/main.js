@@ -3067,8 +3067,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function syncDemoBanner() {
-        document.getElementById('demo-banner-start').style.display =
-            document.getElementById('start-demo-mode').checked ? '' : 'none';
+        const demo = document.getElementById('start-demo-mode').checked;
+        document.getElementById('demo-banner-start').style.display = demo ? '' : 'none';
+        const devTab = document.querySelector('[data-start-tab-btn="devtools"]');
+        if (devTab) devTab.style.display = demo ? 'none' : '';
     }
     document.getElementById('start-demo-mode').addEventListener('change', syncDemoBanner);
 

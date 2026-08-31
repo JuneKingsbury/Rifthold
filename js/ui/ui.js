@@ -2469,6 +2469,8 @@ export class UI {
         general += `<button onclick="window.game.exportSave()" class="settings-btn settings-btn-blue">Export Save</button>`;
         general += `</div></div>`;
 
+        general += `<div class="settings-section"><button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">View Glossary</button></div>`;
+
         // ===== GRAPHICS TAB =====
         let graphics = '';
         graphics += `<div class="settings-section"><div class="settings-section-title">Visual</div>`;
@@ -2498,16 +2500,6 @@ export class UI {
             graphics += `<option value="${val}"${s.temperatureUnit === val ? ' selected' : ''}>${label}</option>`;
         }
         graphics += `</select></div>`;
-        graphics += `<div class="settings-row"><label for="set-dither-dist">Dithering Distance:</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['none','Off'],['minimal','Minimal'],['light','Light (default)'],['normal','Normal'],['heavy','Heavy'],['extreme','Extreme']]) {
-            graphics += `<option value="${val}"${(s.ditherDistance || 'light') === val ? ' selected' : ''}>${label}</option>`;
-        }
-        graphics += `</select></div>`;
-        graphics += `<div class="settings-row"><label for="set-dither-qual">Dithering Quality:</label><select id="set-dither-qual" onchange="window.game.settings.ditherQuality=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['chunky','Chunky (4x4 blocks)'],['low','Low (3x3 blocks)'],['medium','Medium (2x2 blocks, default)'],['high','High (single pixels)']]) {
-            graphics += `<option value="${val}"${(s.ditherQuality || 'medium') === val ? ' selected' : ''}>${label}</option>`;
-        }
-        graphics += `</select></div>`;
         graphics += `</div>`;
 
         general += `<div class="settings-section"><div class="settings-section-title">Audio</div>`;
@@ -2521,11 +2513,6 @@ export class UI {
         general += `</div></div>`;
 
         general += `<div class="settings-section"><div class="settings-section-title">Gameplay</div>`;
-        general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', 'Auto-pause on hostile event (raids)');
-        general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, caravans)');
-        general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', 'Auto-pause on colonist death');
-        general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
-        general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', 'Peaceful mode (no raids/hostile animals)');
         general += `<div class="settings-row" style="gap:4px;">`;
         general += `<label>Auto-cook target:</label>`;
         general += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)-10)" style="padding:1px 5px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;">-10</button>`;
@@ -2539,26 +2526,20 @@ export class UI {
             general += `<option value="${val}" ${s.autoSaveInterval === val ? 'selected' : ''}>${label}</option>`;
         }
         general += `</select></div>`;
+        general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', 'Auto-pause on hostile event (raids)');
+        general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, caravans)');
+        general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', 'Auto-pause on colonist death');
+        general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
+        general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', 'Peaceful mode (no raids/hostile animals)');
         general += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', 'Show tutorial hints');
         general += `</div>`;
 
         general += `<div class="settings-section"><div class="settings-section-title">Accessibility</div>`;
         general += this._settingsCheck('set-darken-pause', s.darkenOnPause, 'window.game.settings.darkenOnPause=this.checked;if(window.game.paused)document.getElementById("game").classList.toggle("paused",this.checked)', 'Darken screen when paused');
-        general += `<div class="settings-row"><label for="set-toolbar-mode">Button bar:</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        general += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', 'Pause when window loses focus');
+        general += `<div class="settings-row"><label for="set-toolbar-mode">Mobile button bar:</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['auto','Auto'],['always','Always'],['never','Never']]) {
             general += `<option value="${val}"${(s.toolbarMode || 'auto') === val ? ' selected' : ''}>${label}</option>`;
-        }
-        general += `</select></div>`;
-        general += this._settingsCheck('set-large-clicks', s.largeClickTargets, 'window.game.settings.largeClickTargets=this.checked;document.getElementById("game-container").classList.toggle("large-targets",this.checked)', 'Larger click targets (buttons & checkboxes)');
-        general += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', 'Pause when window loses focus');
-        general += `<div class="settings-row"><label for="set-colorblind">Colorblind mode:</label><select id="set-colorblind" onchange="window.game.settings.colorblindMode=this.value;document.getElementById('game-container').setAttribute('data-colorblind',this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['none','None'],['protanopia','Protanopia (red-blind)'],['deuteranopia','Deuteranopia (green-blind)'],['tritanopia','Tritanopia (blue-blind)']]) {
-            general += `<option value="${val}"${s.colorblindMode === val ? ' selected' : ''}>${label}</option>`;
-        }
-        general += `</select></div>`;
-        general += `<div class="settings-row"><label for="set-notif-dur">Notification duration:</label><select id="set-notif-dur" onchange="window.game.settings.notificationDuration=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['50','Short (50 ticks)'],['100','Normal (100 ticks)'],['200','Long (200 ticks)'],['500','Persistent (500 ticks)']]) {
-            general += `<option value="${val}"${s.notificationDuration === parseInt(val) ? ' selected' : ''}>${label}</option>`;
         }
         general += `</select></div>`;
         general += `<div class="settings-row"><label for="set-layout-mode">Layout mode:</label><select id="set-layout-mode" onchange="window.game.setLayoutMode(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
@@ -2566,8 +2547,19 @@ export class UI {
             general += `<option value="${val}"${s.layoutMode === val ? ' selected' : ''}>${label}</option>`;
         }
         general += `</select></div>`;
+        general += `<div class="settings-row"><label for="set-notif-dur">Notification duration:</label><select id="set-notif-dur" onchange="window.game.settings.notificationDuration=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['50','Short (50 ticks)'],['100','Normal (100 ticks)'],['200','Long (200 ticks)'],['500','Persistent (500 ticks)']]) {
+            general += `<option value="${val}"${s.notificationDuration === parseInt(val) ? ' selected' : ''}>${label}</option>`;
+        }
+        general += `</select></div>`;
+        general += `<div class="settings-row"><label for="set-colorblind">Colorblind mode:</label><select id="set-colorblind" onchange="window.game.settings.colorblindMode=this.value;document.getElementById('game-container').setAttribute('data-colorblind',this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['none','None'],['protanopia','Protanopia (red-blind)'],['deuteranopia','Deuteranopia (green-blind)'],['tritanopia','Tritanopia (blue-blind)']]) {
+            general += `<option value="${val}"${s.colorblindMode === val ? ' selected' : ''}>${label}</option>`;
+        }
+        general += `</select></div>`;
+        general += this._settingsCheck('set-colonist-highlight', s.showColonistHighlight, 'window.game.settings.showColonistHighlight=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show colonist color outline (sprite mode)');
+        general += this._settingsCheck('set-large-clicks', s.largeClickTargets, 'window.game.settings.largeClickTargets=this.checked;document.getElementById("game-container").classList.toggle("large-targets",this.checked)', 'Larger click targets (buttons & checkboxes)');
         graphics += `<div class="settings-section"><div class="settings-section-title">Effects & Performance</div>`;
-        graphics += this._settingsCheck('set-colonist-highlight', s.showColonistHighlight, 'window.game.settings.showColonistHighlight=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show colonist color outline (sprite mode)');
         graphics += this._settingsCheck('set-overlays', s.showOverlays, 'window.game.ui._toggleAllEffects(this.checked)', 'Master toggle: all combat/overlay effects');
         graphics += this._settingsCheck('set-night', s.showNightLighting, 'window.game.settings.showNightLighting=this.checked', 'Show night lighting/darkness (High Performance Impact)');
         graphics += this._settingsCheck('set-weather', s.showWeatherParticles, 'window.game.settings.showWeatherParticles=this.checked', 'Show weather particles');
@@ -2580,6 +2572,16 @@ export class UI {
         graphics += this._settingsCheck('set-portal-path', s.showPortalPath, 'window.game.settings.showPortalPath=this.checked', 'Portal path highlighting');
         graphics += this._settingsCheck('set-breathing', s.showBreathing, 'window.game.settings.showBreathing=this.checked', 'Entity breathing animation');
         graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
+        graphics += `<div class="settings-row"><label for="set-dither-dist">Dithering Distance:</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['none','Off'],['minimal','Minimal'],['light','Light (default)'],['normal','Normal'],['heavy','Heavy'],['extreme','Extreme']]) {
+            graphics += `<option value="${val}"${(s.ditherDistance || 'light') === val ? ' selected' : ''}>${label}</option>`;
+        }
+        graphics += `</select></div>`;
+        graphics += `<div class="settings-row"><label for="set-dither-qual">Dithering Quality:</label><select id="set-dither-qual" onchange="window.game.settings.ditherQuality=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['chunky','Chunky (4x4 blocks)'],['low','Low (3x3 blocks)'],['medium','Medium (2x2 blocks, default)'],['high','High (single pixels)']]) {
+            graphics += `<option value="${val}"${(s.ditherQuality || 'medium') === val ? ' selected' : ''}>${label}</option>`;
+        }
+        graphics += `</select></div>`;
         graphics += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', 'Show FPS counter (top-right of game grid)');
         graphics += this._settingsCheck('set-fps-cap', s.fpsCap === 30, 'window.game.settings.fpsCap=this.checked?30:60', 'Cap framerate to 30 FPS (reduces CPU/GPU usage)');
         graphics += `</div>`;
@@ -2587,10 +2589,7 @@ export class UI {
         // ===== CONTROLS TAB =====
         let controls = this._keybindingsSectionHtml();
 
-        general += `<div class="settings-section">`;
-        general += `<button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">View Glossary</button>`;
-        general += `</div>`;
-
+        if (!this.game.settings.demoMode) {
         general += `<details class="settings-section settings-debug"><summary class="settings-section-title" style="color:#ff6666;cursor:pointer;list-style:revert;">Debug / Testing</summary>`;
         general += `<button onclick="if(confirm('Grant 999 of all resources?'))window.game.cheatResources()" class="settings-btn settings-btn-danger" style="margin-top:8px;">Grant 999 Resources</button>`;
         general += `<button onclick="if(confirm('Complete all research?'))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">Grant All Research</button>`;
@@ -2685,6 +2684,7 @@ export class UI {
         general += `</div>`;
         general += `<button onclick="window.game.cheatUnlockAllStory()" class="settings-btn settings-btn-danger">Unlock All Story Milestones</button>`;
         general += `</details>`;
+        }
 
         general += `<div class="settings-section" style="text-align:center;"><button onclick="if(confirm('Reset all settings to their default values? (Keybindings are reset separately on the Controls tab.)'))window.game.resetAllSettings()" class="settings-btn settings-btn-danger">Reset all settings to Default</button></div>`;
 
