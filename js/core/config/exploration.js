@@ -1407,6 +1407,11 @@ export const STORY_MILESTONES = {
         tab: 'world',
         title: 'Palace Fortress',
         trigger: 'realm_palace_fortress',
-        text: 'TODO: Write lore text for exploring the Kingdom.',
+        text: `
+        TODO: Write lore text for exploring the Kingdom.
+        <br><br>
+        <div style="text-align:center;margin-top:12px;">
+            <button onclick="window.game.startOutro()" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">Go Home</button>
+        </div>`,
     },
 };

@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -611,6 +611,17 @@ class Game {
         this.paused = !this.paused;
         document.getElementById('game').classList.toggle('paused', this.paused && this.settings.darkenOnPause);
         document.getElementById('pause-overlay').style.display = this.paused ? 'block' : 'none';
+    }
+
+    startOutro() {
+        if (!confirm('This will end the current game and play the credits.\nYou can continue playing by re-loading your save.\n\nAre you sure?')) return;
+        this.paused = true;
+        this._gameOver = true;
+        const overlay = document.getElementById('outro-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            window.soundManager?.stopMusic();
+        }
     }
 
     speedUp() {
@@ -1713,6 +1724,15 @@ class Game {
     cheatAdvanceTime(ticks) {
         this.tick += ticks;
         this.notifications.push({ text: `[DEBUG] Advanced ${ticks} ticks`, tick: this.tick, type: 'success' });
+    }
+
+    cheatUnlockAllStory() {
+        for (const key of Object.keys(STORY_MILESTONES)) {
+            if (!this.story.unlocked.has(key)) {
+                this.story.unlocked.set(key, { year: this.weather.year, season: this.weather.season });
+            }
+        }
+        this.notifications.push({ text: '[DEBUG] All story milestones unlocked', tick: this.tick, type: 'success' });
     }
 
     // Phase 6 perf investigation: attach an opt-in profiler and auto-report every
@@ -3337,6 +3357,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('start-realm-editor-pro').addEventListener('click', () => {
         import('../editor/realm-editor-pro.js').then(m => m.launchRealmEditorPro());
+    });
+
+    document.getElementById('outro-return-btn').addEventListener('click', () => {
+        document.getElementById('outro-overlay').style.display = 'none';
+        gameContainer.style.display = 'none';
+        startScreen.style.display = '';
+        window.game = null;
+        window.soundManager?.playMusic('menu_theme');
     });
 
     const importFileInput = document.getElementById('import-file');

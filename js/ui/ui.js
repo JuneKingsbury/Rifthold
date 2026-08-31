@@ -2669,6 +2669,7 @@ export class UI {
         general += `<button onclick="window.game.cheatAdvanceTime(parseInt(document.getElementById('debug-time-amount').value)||300)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Advance Ticks</button>`;
         general += `<span style="color:#666;font-size:10px;">(300=1 day)</span>`;
         general += `</div>`;
+        general += `<button onclick="window.game.cheatUnlockAllStory()" class="settings-btn settings-btn-danger">Unlock All Story Milestones</button>`;
         general += `</details>`;
 
         general += `<div class="settings-section" style="text-align:center;"><button onclick="if(confirm('Reset all settings to their default values? (Keybindings are reset separately on the Controls tab.)'))window.game.resetAllSettings()" class="settings-btn settings-btn-danger">Reset all settings to Default</button></div>`;
