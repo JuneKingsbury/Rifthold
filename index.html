@@ -35,15 +35,12 @@
                 <button id="load-game" disabled>Load Game</button>
             </div>
             <div class="start-btn-row">
-                <button id="start-colonists">Colonists</button>
+                <button id="start-colonists">Party Setup</button>
                 <button id="start-settings">Settings</button>
             </div>
             <div class="start-btn-row">
                 <button id="start-glossary">Glossary</button>
                 <button id="start-credits">Credits</button>
-            </div>
-            <div class="start-btn-row">
-                <button id="start-devtools">Dev Tools</button>
             </div>
         </div>
         <p style="font-size:12px; color:#999;">
@@ -62,6 +59,7 @@
                 <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">General</button>
                 <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Graphics</button>
                 <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Controls</button>
+                <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Dev Tools</button>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">
                 <div class="settings-section-title">Visual</div>
@@ -225,6 +223,43 @@
                     <button id="start-reset-keybinds" style="padding:4px 10px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset all keybinds to Default</button>
                 </div>
             </div>
+            <div class="settings-section" data-start-tab="devtools" style="display:none;">
+                <div class="settings-section-title">Dev Tools</div>
+                <table style="width:100%; border-collapse:collapse;">
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-blueprint" style="width:100%;padding:6px 10px;">Blueprint</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Design building layouts visually on a grid</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-skin-editor" style="width:100%;padding:6px 10px;">Skin</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Pixel art editor for custom game sprites</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor" style="width:100%;padding:6px 10px;">Realm</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Create expedition realms with loot, enemies, and events</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-entity-editor" style="width:100%;padding:6px 10px;">Entity</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Define animals and creatures with roles and behaviors</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor" style="width:100%;padding:6px 10px;">Equipment</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Create weapons, armor, tools, and artifacts</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-spell-editor" style="width:100%;padding:6px 10px;">Spell</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Design spells and their associated tome recipes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor-pro" style="width:100%;padding:6px 10px;">Equipment Pro</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Full equipment file editor with in-game preview</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor-pro" style="width:100%;padding:6px 10px;">Realm Pro</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Full exploration file editor with in-game preview</td>
+                    </tr>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -253,46 +288,6 @@
         <div id="changelog-body"></div>
     </div>
 
-    <div id="devtools-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:360px; max-width:90vw; max-height:80vh; overflow-y:auto; font-size:12px; line-height:1.6; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Dev Tools</div>
-            <button onclick="document.getElementById('devtools-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
-        </div>
-        <table style="width:100%; border-collapse:collapse;">
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-blueprint" style="width:100%;padding:6px 10px;">Blueprint</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Design building layouts visually on a grid</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-skin-editor" style="width:100%;padding:6px 10px;">Skin</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Pixel art editor for custom game sprites</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor" style="width:100%;padding:6px 10px;">Realm</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Create expedition realms with loot, enemies, and events</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-entity-editor" style="width:100%;padding:6px 10px;">Entity</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Define animals and creatures with roles and behaviors</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor" style="width:100%;padding:6px 10px;">Equipment</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Create weapons, armor, tools, and artifacts</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-spell-editor" style="width:100%;padding:6px 10px;">Spell</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Design spells and their associated tome recipes</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor-pro" style="width:100%;padding:6px 10px;">Equipment Pro</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Full equipment file editor with in-game preview</td>
-            </tr>
-            <tr>
-                <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor-pro" style="width:100%;padding:6px 10px;">Realm Pro</button></td>
-                <td style="padding:4px 0; color:#aaa; font-size:11px;">Full exploration file editor with in-game preview</td>
-            </tr>
-        </table>
-    </div>
 
     <div id="colonists-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:700px; max-width:95vw; max-height:85vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
