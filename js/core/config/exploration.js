@@ -837,8 +837,11 @@ export const STORY_MILESTONES = {
         these monsters into your home. Perhaps with enough study the essence will give 
         your colonists what they need to face these beasts with confidence.`,
     },
+    // -----------------------------------------------------------------------
+    // Research tab — knowledge and technology discoveries
+    // -----------------------------------------------------------------------
     research_runecraft: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Runecraft',
         trigger: 'research_runecraft',
         text: `
@@ -851,7 +854,7 @@ export const STORY_MILESTONES = {
         is a must.`,
     },
     research_druidcraft: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Druidcraft',
         trigger: 'research_druidcraft',
         text: `
@@ -860,7 +863,7 @@ export const STORY_MILESTONES = {
         less hostile.`,
     },
     research_beast_binding: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Beast Binding',
         trigger: 'research_beast_binding',
         text: `
@@ -872,7 +875,7 @@ export const STORY_MILESTONES = {
         to rediscover.`,
     },
     research_ley_channeling: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Ley Channeling',
         trigger: 'research_ley_channeling',
         text: `
@@ -882,7 +885,7 @@ export const STORY_MILESTONES = {
         your colony.`,
     },
     research_arcane_studies: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Arcane Studies',
         trigger: 'research_arcane_studies',
         text: `
@@ -891,7 +894,7 @@ export const STORY_MILESTONES = {
         to learn.`,
     },
     research_void_summoning: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Void Summoning',
         trigger: 'research_void_summoning',
         text: `
@@ -901,7 +904,7 @@ export const STORY_MILESTONES = {
         leave your realm. The solution: summon it directly to you.`,
     },
     research_planar_rift: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Planar Rift',
         trigger: 'research_planar_rift',
         text: `
@@ -911,7 +914,7 @@ export const STORY_MILESTONES = {
         mana reserves.`,
     },
     research_deep_delving: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Deep Delving',
         trigger: 'research_deep_delving',
         text: `
@@ -920,7 +923,7 @@ export const STORY_MILESTONES = {
         how will we keep up with the dangers ahead?`,
     },
     research_golem_craft: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Golem Craft',
         trigger: 'research_golem_craft',
         text: `
@@ -930,7 +933,7 @@ export const STORY_MILESTONES = {
         you find yourself unable to change their objectives.`,
     },
     research_herbalism: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Herbalism',
         trigger: 'research_herbalism',
         text: `
@@ -939,7 +942,7 @@ export const STORY_MILESTONES = {
         faster than they did before!`,
     },
     research_void_architecture: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Void Architecture',
         trigger: 'research_void_architecture',
         text: `
@@ -948,7 +951,7 @@ export const STORY_MILESTONES = {
         walls and doors that are much more difficult to break during battle.`,
     },
     research_mana_reservoir: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Mana Reservoir',
         trigger: 'research_mana_reservoir',
         text: `
@@ -957,7 +960,7 @@ export const STORY_MILESTONES = {
         maintain more generating crystals and get more energy out of each one.`,
     },
     research_alchemy: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Alchemy',
         trigger: 'research_alchemy',
         text: `
@@ -966,7 +969,7 @@ export const STORY_MILESTONES = {
         properties.`,
     },
     research_trade_routes: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Trade Routes',
         trigger: 'research_trade_routes',
         text: `
@@ -976,7 +979,7 @@ export const STORY_MILESTONES = {
         as an important stop on the major trade routes in the frontier.`,
     },
     research_arcane_infusion: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Arcane Infusion',
         trigger: 'research_arcane_infusion',
         text: `
@@ -985,7 +988,7 @@ export const STORY_MILESTONES = {
         existing equipment to further boost your colonists.`,
     },
     research_warding: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Warding',
         trigger: 'research_warding',
         text: `
@@ -996,7 +999,7 @@ export const STORY_MILESTONES = {
         ever decides to open their gates to dangerous enemies.`,
     },
     research_void_forging: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Void Forging',
         trigger: 'research_void_forging',
         text: `
@@ -1005,7 +1008,7 @@ export const STORY_MILESTONES = {
         enough of this material to supply your entire colony, but its not impossible.`,
     },
     research_masterwork: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Masterwork',
         trigger: 'research_masterwork',
         text: `
@@ -1014,7 +1017,7 @@ export const STORY_MILESTONES = {
         simply make for yourself.`,
     },
     research_advanced_arcana: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Advanced Arcana',
         trigger: 'research_advanced_arcana',
         text: `
@@ -1022,7 +1025,7 @@ export const STORY_MILESTONES = {
         magical spells and put them to paper for your colonists to grow even further.`,
     },
     research_mana_weaving: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Mana Weaving',
         trigger: 'research_mana_weaving',
         text: `
@@ -1036,7 +1039,7 @@ export const STORY_MILESTONES = {
         magical abilities.`,
     },
     research_void_sorcery: {
-        tab: 'colony',
+        tab: 'research',
         title: 'Void Sorcery',
         trigger: 'research_void_sorcery',
         text: `
@@ -1049,10 +1052,10 @@ export const STORY_MILESTONES = {
     },
 
     // -----------------------------------------------------------------------
-    // World tab — lore and worldbuilding
+    // Races tab — lore about the peoples of the world
     // -----------------------------------------------------------------------
     first_bufos_colonist: {
-        tab: 'world',
+        tab: 'races',
         title: 'The Bufoi',
         trigger: 'first_bufos_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/bufoi.png" alt="A drawing depicting the Bufoi">
@@ -1086,7 +1089,7 @@ export const STORY_MILESTONES = {
         in teaching their interested neighbors about their people.`,
     },
     first_kobalos_colonist: {
-        tab: 'world',
+        tab: 'races',
         title: 'The Kobaloi',
         trigger: 'first_kobalos_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/kobaloi.png" alt="A drawing depicting the Kobaloi">
@@ -1113,7 +1116,7 @@ export const STORY_MILESTONES = {
         of how different their new neighbors might be.`,
     },
     first_ferin_colonist: {
-        tab: 'world',
+        tab: 'races',
         title: 'The Ferini',
         trigger: 'first_ferin_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/ferini.png" alt="A drawing depicting the Ferini">
@@ -1142,7 +1145,7 @@ export const STORY_MILESTONES = {
         of strangers work alongside the unfamiliar nature that surrounds them.`,
     },
     first_nymph_colonist: {
-        tab: 'world',
+        tab: 'races',
         title: 'The Nympha',
         trigger: 'first_nymph_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/nympha.png" alt="A drawing depicting the Nympha">
@@ -1174,7 +1177,7 @@ export const STORY_MILESTONES = {
         shaken by The Crusade.`,
     },
     first_human_colonist: {
-        tab: 'world',
+        tab: 'races',
         title: 'Humanity',
         trigger: 'first_human_colonist_arrived',
         text: `<img class="pixel-art" src="portraits/humanity.png" alt="A drawing depicting Humanity">
@@ -1212,8 +1215,11 @@ export const STORY_MILESTONES = {
         <br><br>
         We can only hope that these kinder humans are able to prosper.`,
     },
+    // -----------------------------------------------------------------------
+    // Realms tab — exploration journals from other worlds
+    // -----------------------------------------------------------------------
     realm_crystal_caves: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Crystal Caves',
         trigger: 'realm_crystal_caves',
         text: `
@@ -1261,37 +1267,37 @@ export const STORY_MILESTONES = {
         `,
     },
     realm_crystal_mines: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Crystal Mines',
         trigger: 'realm_crystal_mines',
         text: 'TODO: Write lore text for exploring the Crystal Mines.',
     },
     realm_crystal_depths: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Crystal Depths',
         trigger: 'realm_crystal_depths',
         text: 'TODO: Write lore text for exploring the Crystal Depths.',
     },
     realm_verdant_depths: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Verdant Depths',
         trigger: 'realm_verdant_depths',
         text: 'TODO: Write lore text for exploring the Verdant Depths.',
     },
     realm_fungal_hollows: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Fungal Hollows',
         trigger: 'realm_fungal_hollows',
         text: 'TODO: Write lore text for exploring the Fungal Hollows.',
     },
     realm_primeval_canopy: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Primeval Canopy',
         trigger: 'realm_primeval_canopy',
         text: 'TODO: Write lore text for exploring the Primeval Canopy.',
     },
     realm_arcane_library: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Arcane Library',
         trigger: 'realm_arcane_library',
         text: `
@@ -1313,7 +1319,7 @@ export const STORY_MILESTONES = {
         grounds that the library sits on?`,
     },
     realm_ancient_university: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Ancient University',
         trigger: 'realm_ancient_university',
         text: `
@@ -1338,7 +1344,7 @@ export const STORY_MILESTONES = {
         what we needed to uncover some lost art or a powerful spell!`,
     },
     realm_abandoned_laboratory: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Abandoned Laboratory',
         trigger: 'realm_abandoned_laboratory',
         text: `
@@ -1374,37 +1380,37 @@ export const STORY_MILESTONES = {
         colony whenever you visit.`,
     },
     realm_shadow_realm: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Shadow Realm',
         trigger: 'realm_shadow_realm',
         text: 'TODO: Write lore text for exploring the Shadow Realm.',
     },
     realm_void_abyss: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Void Abyss',
         trigger: 'realm_void_abyss',
         text: 'TODO: Write lore text for exploring the Void Abyss.',
     },
     realm_oblivion_rift: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Oblivion Rift',
         trigger: 'realm_oblivion_rift',
         text: 'TODO: Write lore text for exploring the Oblivion Rift.',
     },
     realm_kingdom_outskirts: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Kingdom Outskirts',
         trigger: 'realm_kingdom_outskirts',
         text: 'TODO: Write lore text for exploring the Kingdom.',
     },
     realm_crusader_barracks: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Crusader Barracks',
         trigger: 'realm_crusader_barracks',
         text: 'TODO: Write lore text for exploring the Kingdom.',
     },
     realm_palace_fortress: {
-        tab: 'world',
+        tab: 'realms',
         title: 'Palace Fortress',
         trigger: 'realm_palace_fortress',
         text: `

@@ -3100,9 +3100,22 @@ export class UI {
 
         let html = '<div class="panel-close" data-panel-close="story">&times;</div>';
         html += '<h3 style="color:#ffcc44">Story</h3>';
+        const tabCounts = {};
+        for (const [key, m] of Object.entries(STORY_MILESTONES)) {
+            if (!tabCounts[m.tab]) tabCounts[m.tab] = { total: 0, unlocked: 0 };
+            tabCounts[m.tab].total++;
+            if (unlocked.has(key)) tabCounts[m.tab].unlocked++;
+        }
+        const tabLabel = (name, label) => {
+            const c = tabCounts[name] || { unlocked: 0, total: 0 };
+            return `${label} (${c.unlocked}/${c.total})`;
+        };
+
         html += '<div class="story-tabs">';
-        html += `<button class="story-tab-btn${tab === 'colony' ? ' active' : ''}" data-story-tab="colony">Colony</button>`;
-        html += `<button class="story-tab-btn${tab === 'world' ? ' active' : ''}" data-story-tab="world">World</button>`;
+        html += `<button class="story-tab-btn${tab === 'colony' ? ' active' : ''}" data-story-tab="colony">${tabLabel('colony', 'Colony')}</button>`;
+        html += `<button class="story-tab-btn${tab === 'research' ? ' active' : ''}" data-story-tab="research">${tabLabel('research', 'Research')}</button>`;
+        html += `<button class="story-tab-btn${tab === 'races' ? ' active' : ''}" data-story-tab="races">${tabLabel('races', 'Races')}</button>`;
+        html += `<button class="story-tab-btn${tab === 'realms' ? ' active' : ''}" data-story-tab="realms">${tabLabel('realms', 'Realms')}</button>`;
         html += '</div>';
 
         const entries = Object.entries(STORY_MILESTONES)
