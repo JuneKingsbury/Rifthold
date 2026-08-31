@@ -2296,13 +2296,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('start-changelog').addEventListener('click', () => {
-        const opening = changelogPanel.style.display === 'none';
-        closeModals();
-        if (opening) {
-            changelogPanel.style.display = 'block';
-            modalBackdrop.style.display = 'block';
-        }
+    document.getElementById('credits-changelog-btn').addEventListener('click', () => {
+        creditsPanel.style.display = 'none';
+        changelogPanel.style.display = 'block';
     });
 
     document.getElementById('start-devtools').addEventListener('click', () => {

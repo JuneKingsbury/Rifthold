@@ -55,9 +55,12 @@ export function renderCreditsHTML() {
     <div style="color:#ccc; margin-bottom:8px;"><b>Music & SFX</b></div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://rapidpunches.itch.io/game-of-the-unknown">GAME OF THE UNKNOWN</a> by RAPIDPUNCHES</div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://www.bfxr.net/">bfxr (custom SFX maker)</a> by increpare</div>
-    <div style="color:#aaa; margin-bottom:20px;"><a style="color:#aaa;" href="https://dagurasusk.itch.io/retrosounds">Retro Sounds</a> by DASK</div>
-    <div style="color:#666; font-size:10px; margin-top:20px;">Version 0.2 — Aug 2026</div>
+    <div style="color:#aaa; margin-bottom:24px;"><a style="color:#aaa;" href="https://dagurasusk.itch.io/retrosounds">Retro Sounds</a> by DASK</div>
+    <div style="color:#aaa; font-size:10px;"><i>Thank you for playing my game!</i> -Mars</div>
     <img style="float:none" class="pixel-art" src="portraits/mars.png" alt="A drawing of game dev Mars">
-    <div style="color:#aaa; font-size:10px; margin-top:0px;"><i>Thank you for playing my game!</i> -Mars</div>
+    <div style="margin-top:16px; border-top:1px solid #333; padding-top:12px;">
+        <div style="color:#666; font-size:10px; margin-bottom:8px;">Version 0.2 — Aug 2026</div>
+        <button id="credits-changelog-btn" style="background:#2a2a4e; border:1px solid #555; border-radius:4px; color:#aaccff; padding:6px 16px; cursor:pointer; font-family:inherit; font-size:11px;">View Changelog</button>
+    </div>
 </div>`;
 }
