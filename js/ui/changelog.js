@@ -1,3 +1,5 @@
+import { GAME_VERSION } from '../core/config/game.js';
+
 export const CHANGELOG = [
     { date: '2026-08-21', message: 'Initial changelog for v0.2.' },
 ];
@@ -59,7 +61,7 @@ export function renderCreditsHTML() {
     <div style="color:#aaa; font-size:10px;"><i>Thank you for playing my game!</i> -Mars</div>
     <img style="float:none" class="pixel-art" src="portraits/mars.png" alt="A drawing of game dev Mars">
     <div style="margin-top:16px; border-top:1px solid #333; padding-top:12px;">
-        <div style="color:#666; font-size:10px; margin-bottom:8px;">Version 0.2 — Aug 2026</div>
+        <div style="color:#666; font-size:10px; margin-bottom:8px;">Version ${GAME_VERSION}</div>
         <button id="credits-changelog-btn" style="background:#2a2a4e; border:1px solid #555; border-radius:4px; color:#aaccff; padding:6px 16px; cursor:pointer; font-family:inherit; font-size:11px;">View Changelog</button>
     </div>
 </div>`;
