@@ -11,10 +11,18 @@ export class CombatSystem {
         this.nextRaidTick = RAID_CONFIG.firstRaidTick;
         this.raidActive = false;
         this.raidStartTick = 0;
+        this.activeRaidType = null;
+        this.crusaderRaidTriggered = false;
+        this.crusaderRaidDefeated = false;
     }
 
     update(game) {
         if (CONFIG.PEACEFUL_MODE) return;
+
+        if (!this.raidActive && !this.crusaderRaidTriggered && !this.crusaderRaidDefeated &&
+            game.weather.year === 8 && game.weather.season === 'spring') {
+            this.startScriptedRaid(game, 'crusader_raid');
+        }
 
         if (this.raidActive) {
             this.updateRaid(game);
@@ -29,6 +37,54 @@ export class CombatSystem {
         }
     }
 
+    startScriptedRaid(game, raidTypeKey) {
+        const raidType = RAID_TYPES[raidTypeKey];
+        if (!raidType) return;
+
+        if (raidTypeKey === 'crusader_raid') this.crusaderRaidTriggered = true;
+
+        const raidLevel = 8;
+        const edge = Math.floor(Math.random() * 4);
+        let spawned = 0;
+
+        for (const entry of raidType.composition) {
+            const [minCount, maxCount] = entry.count;
+            const count = minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
+            for (let i = 0; i < count; i++) {
+                const pos = getEdgePosition(edge, spawned);
+                const entity = createRaidEntity(entry.entity, pos.x, pos.y, raidLevel, raidType.scaling);
+                if (entity) {
+                    game.raiders.push(entity);
+                    spawned++;
+                }
+            }
+        }
+
+        if (spawned === 0) return;
+
+        this.raidActive = true;
+        this.raidStartTick = game.tick;
+        this.activeRaidType = raidTypeKey;
+        const raidPos = { x: game.raiders[0]?.x || 0, y: game.raiders[0]?.y || 0 };
+        game.notifications.push({ text: `${raidType.name}! ${spawned} ${raidType.name === 'Crusader Raid' ? 'crusaders' : 'enemies'} approaching!`, tick: game.tick, type: 'danger' });
+        game.eventLog.add(game, `${raidType.name}! ${spawned} enemies attacking!`, 'danger', { type: 'position', ...raidPos });
+
+        game.events.pendingEvent = {
+            type: 'raid',
+            text: `${raidType.name}! ${spawned} enemies are approaching from the ${['north','east','south','west'][edge]}!`,
+            choices: ['Go To Raiders', 'Dismiss'],
+            data: raidPos,
+        };
+
+        if (game.settings.autoPauseHostile && !game.paused) {
+            game.togglePause();
+            game._eventPaused = true;
+        }
+
+        this.nextRaidTick = game.tick + RAID_CONFIG.minInterval +
+            Math.floor(Math.random() * (RAID_CONFIG.maxInterval - RAID_CONFIG.minInterval));
+    }
+
     startRaid(game) {
         const wealth = game.resources.getWealth();
         const timeFactor = Math.min(1, game.tick / RAID_CONFIG.timeScalingPeak);
@@ -37,7 +93,7 @@ export class CombatSystem {
             Math.floor(RAID_CONFIG.baseRaiders + scaledRaiders));
 
         const edge = Math.floor(Math.random() * 4);
-        const raidTypeKeys = Object.keys(RAID_TYPES);
+        const raidTypeKeys = Object.keys(RAID_TYPES).filter(k => !RAID_TYPES[k].scripted);
         const raidType = raidTypeKeys.length > 0 ? RAID_TYPES[raidTypeKeys[Math.floor(Math.random() * raidTypeKeys.length)]] : null;
 
         const raidLevel = Math.floor(timeFactor * 10) + 1;
@@ -100,7 +156,7 @@ export class CombatSystem {
 
         // Individual flee: each raider flees when critically wounded
         for (const raider of aliveRaiders) {
-            if (!raider.fleeing && raider.hp / raider.maxHp <= RAID_CONFIG.fleeHpFraction) {
+            if (!raider.noFlee && !raider.fleeing && raider.hp / raider.maxHp <= RAID_CONFIG.fleeHpFraction) {
                 raider.fleeing = true;
             }
         }
@@ -110,14 +166,14 @@ export class CombatSystem {
         const deadOrFleeing = initialCount - aliveRaiders.filter(r => !r.fleeing).length;
         if (deadOrFleeing >= Math.ceil(initialCount * RAID_CONFIG.routThreshold)) {
             for (const raider of aliveRaiders) {
-                raider.fleeing = true;
+                if (!raider.noFlee) raider.fleeing = true;
             }
         }
 
         // Safety timeout: all remaining raiders flee after a long time
         if (game.tick - this.raidStartTick > RAID_CONFIG.timeout) {
             for (const raider of aliveRaiders) {
-                raider.fleeing = true;
+                if (!raider.noFlee) raider.fleeing = true;
             }
         }
 
@@ -153,11 +209,17 @@ export class CombatSystem {
         }
 
         if (game.raiders.length === 0) {
+            const wasScripted = this.activeRaidType;
             this.raidActive = false;
+            this.activeRaidType = null;
             const text = allDead ? 'Raid defeated!' : 'Raiders fled!';
             game.notifications.push({ text, tick: game.tick, type: 'success' });
             game.eventLog.add(game, text, 'success', null);
             game.story.checkMilestone('first_raid_survived', game);
+            if (wasScripted === 'crusader_raid' && allDead) {
+                this.crusaderRaidDefeated = true;
+                game.story.checkMilestone('first_crusader_raid_survived', game);
+            }
             if (game.stats) game.stats.raidsDefeated++;
         }
     }

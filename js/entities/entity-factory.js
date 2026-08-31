@@ -40,6 +40,7 @@ export function createEntity(type, x, y, options = {}) {
         pathAge: 0,
     };
 
+    if (def.noFlee) entity.noFlee = true;
     if (def.aggroRange) entity.aggroRange = def.aggroRange;
     if (def.ranged) {
         entity.ranged = true;

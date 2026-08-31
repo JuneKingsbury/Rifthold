@@ -506,6 +506,7 @@ export const REALMS = {
         duration: [700, 1000], encounters: 8,
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         research: 'deep_delving',
+        requiresEvent: 'crusader_raid_defeated',
         loot: [
             { item: 'map_fragment', weight: 3 },
         ],

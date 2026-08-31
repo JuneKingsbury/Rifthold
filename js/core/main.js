@@ -1701,6 +1701,15 @@ class Game {
         this.notifications.push({ text: `[DEBUG] Triggered event: ${eventKey}`, tick: this.tick, type: 'success' });
     }
 
+    cheatTriggerRaid(raidTypeKey) {
+        if (this.combat.raidActive) {
+            this.notifications.push({ text: `[DEBUG] Raid already active!`, tick: this.tick, type: 'warning' });
+            return;
+        }
+        this.combat.startScriptedRaid(this, raidTypeKey);
+        this.notifications.push({ text: `[DEBUG] Triggered raid: ${raidTypeKey}`, tick: this.tick, type: 'success' });
+    }
+
     cheatAdvanceTime(ticks) {
         this.tick += ticks;
         this.notifications.push({ text: `[DEBUG] Advanced ${ticks} ticks`, tick: this.tick, type: 'success' });

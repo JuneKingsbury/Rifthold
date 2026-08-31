@@ -1,4 +1,4 @@
-import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS } from '../core/config.js';
+import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS, ENTITIES } from '../core/config.js';
 
 const MATERIAL_ITEMS = [
     { key: 'wood', char: '≡', color: '#8b6b3a', desc: 'Wood resource' },
@@ -33,27 +33,22 @@ const CHECKERBOARD_DARK = '#2a2a2a';
 const MIN_ZOOM = 2;
 const MAX_ZOOM = 64;
 
-const ENTITY_SPECIALS = [
+const ENTITY_MANUAL = [
     { key: 'colonist_drafted', char: '@', color: '#ff4444', desc: 'Colonist in combat mode' },
     { key: 'colonist_sleeping', char: '@', color: '#6688cc', desc: 'Colonist sleeping in bed' },
     { key: 'colonist_sleeping_ground', char: '@', color: '#445588', desc: 'Colonist sleeping on ground (no bed)' },
     { key: 'golem', char: 'G', color: '#cc8833', desc: 'Default golem sprite' },
-    { key: 'farmer_golem', char: 'G', color: '#55aa33', desc: 'Farmer Golem' },
-    { key: 'builder_golem', char: 'G', color: '#888888', desc: 'Builder Golem' },
-    { key: 'crafter_golem', char: 'G', color: '#aa6633', desc: 'Crafter Golem' },
-    { key: 'cook_golem', char: 'G', color: '#cc7722', desc: 'Cook Golem' },
-    { key: 'herder_golem', char: 'G', color: '#88aa33', desc: 'Herder Golem' },
-    { key: 'scholar_golem', char: 'G', color: '#4488ff', desc: 'Scholar Golem' },
-    { key: 'combat_golem', char: 'G', color: '#cc4444', desc: 'Combat Golem' },
-    { key: 'familiar', char: 'f', color: '#9966ff', desc: 'Summoned familiar' },
-    { key: 'ghost', char: 'g', color: '#88ccff', desc: 'Summoned ghost' },
     { key: 'raider', char: 'R', color: '#ff3333', desc: 'Enemy raider (fallback)' },
-    { key: 'raider_brute', char: 'R', color: '#ff3333', desc: 'Raider Brute' },
-    { key: 'raider_archer', char: 'R', color: '#ff6633', desc: 'Raider Archer' },
-    { key: 'crusader', char: 'C', color: '#dec630', desc: 'Enemy raider (crusader)' },
     { key: 'wave_enemy', char: 'V', color: '#aa33ff', desc: 'Wave enemy (fallback)' },
-    { key: 'void_walker', char: 'V', color: '#aa33ff', desc: 'Void Walker' },
-    { key: 'void_brute', char: 'V', color: '#7722cc', desc: 'Void Brute' },
+];
+
+const ENTITY_AUTO_CATEGORIES = ['golem', 'summon', 'enemy'];
+
+const ENTITY_SPECIALS = [
+    ...ENTITY_MANUAL,
+    ...Object.entries(ENTITIES)
+        .filter(([, def]) => ENTITY_AUTO_CATEGORIES.includes(def.category))
+        .map(([key, def]) => ({ key, char: def.char, color: def.color, desc: def.name || key })),
 ];
 
 const VARIANT_COLORS = ['#ffff00', '#00ffff', '#00ff00', '#ff88ff', '#ffaa00', '#88ffaa', '#ff8888', '#aaaaff'];

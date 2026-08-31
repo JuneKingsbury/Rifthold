@@ -17,6 +17,7 @@ export class ExplorationSystem {
         const dim = REALMS[realmKey];
         if (!dim) return false;
         if (dim.research && !game.research.isResearched(dim.research)) return false;
+        if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) return false;
         if (!game.power || !game.power.powered) return false;
         if (!game.mapIndex || game.mapIndex.getStructurePositions('rift_gate').size === 0) return false;
         return true;
@@ -27,9 +28,15 @@ export class ExplorationSystem {
         for (const [key, dim] of Object.entries(REALMS)) {
             if (dim.research && !game.research.isResearched(dim.research)) continue;
             if (dim.requiresRealm && !this.completedRealms.has(dim.requiresRealm)) continue;
+            if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) continue;
             results.push({ key, ...dim });
         }
         return results;
+    }
+
+    _checkEvent(game, eventKey) {
+        if (eventKey === 'crusader_raid_defeated') return game.combat.crusaderRaidDefeated;
+        return false;
     }
 
     sendExpedition(game, realmKey, colonistIds, packAnimalIds = [], difficulty = 1) {
