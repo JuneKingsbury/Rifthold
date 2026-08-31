@@ -156,7 +156,7 @@ export const RESEARCH = {
 
 export const DEMO_LOCKED_RESEARCH = new Set([
     'advanced_arcana', 'void_sorcery', 'masterwork', 'golem_craft', 'mana_weaving',
-    'mana_reservoir', 'brilliance', 'pyroclasm', 'void_summoning', 'void_architecture',
+    'mana_reservoir', 'brilliance', 'pyroclasm', 'void_architecture',
     'void_forging', 'planar_rift', 'deep_delving'
 ]);
 

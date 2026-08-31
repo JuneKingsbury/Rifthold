@@ -3016,7 +3016,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modalBackdrop.addEventListener('click', closeModals);
 
+    let _loadingSettings = false;
+
     function saveStartSettings() {
+        if (_loadingSettings) return;
         try {
             const s = JSON.parse(localStorage.getItem('colony_settings') || '{}');
             s.autoPauseHostile = document.getElementById('start-autopause-hostile').checked;
@@ -3051,8 +3054,8 @@ document.addEventListener('DOMContentLoaded', () => {
             s.notificationDuration = parseInt(document.getElementById('start-notif-dur').value) || 100;
             s.layoutMode = document.getElementById('start-layout-mode').value;
             s.temperatureUnit = document.getElementById('start-temp-unit').value;
-            s.musicVolume = parseInt(document.getElementById('start-music-vol').value) || 50;
-            s.sfxVolume = parseInt(document.getElementById('start-sfx-vol').value) || 50;
+            s.musicVolume = parseInt(document.getElementById('start-music-vol').value);
+            s.sfxVolume = parseInt(document.getElementById('start-sfx-vol').value);
             s.showColonistNames = document.getElementById('start-names').value;
             s.uiFontSize = parseInt(document.getElementById('start-ui-font-size').value) || 12;
             localStorage.setItem('colony_settings', JSON.stringify(s));
@@ -3063,7 +3066,14 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
     }
 
+    function syncDemoBanner() {
+        document.getElementById('demo-banner-start').style.display =
+            document.getElementById('start-demo-mode').checked ? '' : 'none';
+    }
+    document.getElementById('start-demo-mode').addEventListener('change', syncDemoBanner);
+
     function loadStartSettings() {
+        _loadingSettings = true;
         try {
             const s = JSON.parse(localStorage.getItem('colony_settings'));
             if (!s) return;
@@ -3089,25 +3099,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showMinimap != null) document.getElementById('start-minimap').checked = s.showMinimap;
             if (s.showFps != null) document.getElementById('start-fps').checked = s.showFps;
             if (s.fpsCap != null) document.getElementById('start-fps-cap').checked = s.fpsCap === 30;
-            if (s.ditherDistance) document.getElementById('start-dither-dist').value = s.ditherDistance;
-            if (s.ditherQuality) document.getElementById('start-dither-qual').value = s.ditherQuality;
+            if (s.ditherDistance != null) document.getElementById('start-dither-dist').value = s.ditherDistance;
+            if (s.ditherQuality != null) document.getElementById('start-dither-qual').value = s.ditherQuality;
             if (s.darkenOnPause != null) document.getElementById('start-darken-pause').checked = s.darkenOnPause;
-            if (s.toolbarMode) document.getElementById('start-toolbar-mode').value = s.toolbarMode;
+            if (s.toolbarMode != null) document.getElementById('start-toolbar-mode').value = s.toolbarMode;
             if (s.largeClickTargets != null) document.getElementById('start-large-clicks').checked = s.largeClickTargets;
             if (s.pauseOnFocusLoss != null) document.getElementById('start-pause-focus').checked = s.pauseOnFocusLoss;
-            if (s.colorblindMode) document.getElementById('start-colorblind').value = s.colorblindMode;
+            if (s.colorblindMode != null) document.getElementById('start-colorblind').value = s.colorblindMode;
             if (s.notificationDuration != null) document.getElementById('start-notif-dur').value = s.notificationDuration;
-            if (s.layoutMode) document.getElementById('start-layout-mode').value = s.layoutMode;
-            if (s.temperatureUnit) document.getElementById('start-temp-unit').value = s.temperatureUnit;
+            if (s.layoutMode != null) document.getElementById('start-layout-mode').value = s.layoutMode;
+            if (s.temperatureUnit != null) document.getElementById('start-temp-unit').value = s.temperatureUnit;
             if (s.musicVolume != null) { document.getElementById('start-music-vol').value = s.musicVolume; document.getElementById('start-music-vol-val').textContent = s.musicVolume; }
             if (s.sfxVolume != null) { document.getElementById('start-sfx-vol').value = s.sfxVolume; document.getElementById('start-sfx-vol-val').textContent = s.sfxVolume; }
-            if (s.showColonistNames) document.getElementById('start-names').value = s.showColonistNames;
-            if (s.uiFontSize) { document.getElementById('start-ui-font-size').value = s.uiFontSize; document.getElementById('start-ui-font-val').textContent = s.uiFontSize + 'px'; }
+            if (s.showColonistNames != null) document.getElementById('start-names').value = s.showColonistNames;
+            if (s.uiFontSize != null) { document.getElementById('start-ui-font-size').value = s.uiFontSize; document.getElementById('start-ui-font-val').textContent = s.uiFontSize + 'px'; }
             if (SoundManager) {
                 SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
                 SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
             }
-        } catch (e) {}
+            syncDemoBanner();
+        } catch (e) {} finally {
+            _loadingSettings = false;
+        }
     }
 
     document.getElementById('start-settings-panel').addEventListener('change', saveStartSettings);
@@ -3162,7 +3175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-ui-font-val').textContent = '12px';
         document.getElementById('start-autopause-hostile').checked = true;
         document.getElementById('start-autopause-event').checked = true;
-        document.getElementById('start-pause-death').checked = false;
+        document.getElementById('start-pause-death').checked = true;
         document.getElementById('start-pause-research').checked = true;
         document.getElementById('start-peaceful-check').checked = false;
         document.getElementById('start-demo-mode').checked = false;
@@ -3197,6 +3210,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-sfx-vol').value = 50;
         document.getElementById('start-sfx-vol-val').textContent = '50';
         saveStartSettings();
+        syncDemoBanner();
         if (SoundManager) {
             SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
             SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
@@ -3235,11 +3249,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    loadStartSettings();
     SoundManager.init();
     window.soundManager = SoundManager;
     window.soundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
     window.soundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
-    window.soundManager.playMusic('menu_theme');
+
+    function startMenuMusic() {
+        window.soundManager.playMusic('menu_theme');
+        document.removeEventListener('click', startMenuMusic);
+        document.removeEventListener('keydown', startMenuMusic);
+        document.removeEventListener('touchstart', startMenuMusic);
+    }
+    if (SoundManager.ctx && SoundManager.ctx.state === 'running') {
+        window.soundManager.playMusic('menu_theme');
+    } else {
+        document.addEventListener('click', startMenuMusic);
+        document.addEventListener('keydown', startMenuMusic);
+        document.addEventListener('touchstart', startMenuMusic);
+    }
 
     document.getElementById('start-game').addEventListener('click', () => {
         CONFIG.PEACEFUL_MODE = document.getElementById('start-peaceful-check').checked;

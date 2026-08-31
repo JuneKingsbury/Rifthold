@@ -37,7 +37,8 @@ export class WaveSystem {
         }
         if (this.highestWaveCompleted === 0) return base;
         const bonus = Math.floor(this.highestWaveCompleted / 2);
-        return Math.min(WAVE_CONFIG.colonistCapMax, base + bonus);
+        const max = game?.settings?.demoMode ? 8 : WAVE_CONFIG.colonistCapMax;
+        return Math.min(max, base + bonus);
     }
 
     canStartWave(game) {

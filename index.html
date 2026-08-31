@@ -25,6 +25,7 @@
         <canvas id="start-bg-canvas"></canvas>
         <h1>Rifthold</h1>
         <h2>Arcane Frontiers</h2>
+        <div id="demo-banner-start" style="display:none;">DEMO MODE</div>
         <p>
             Oversee a growing colony of settlers in a world of magic. Assign priorities, build structures,
             channel leylines, brew potions, and survive the seasons.
@@ -90,6 +91,13 @@
                 </div>
             </div>
             <div class="settings-section" data-start-tab="general">
+                <div class="settings-section-title">Save Data</div>
+                <div class="settings-row" style="gap:8px;">
+                    <button id="export-game" disabled style="flex:1;padding:4px 8px;font-size:11px;">Export Save</button>
+                    <button id="import-game" style="flex:1;padding:4px 8px;font-size:11px;">Import Save</button>
+                </div>
+            </div>
+            <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Audio</div>
                 <div class="settings-row">
                     <label for="start-music-vol">Music Volume: <span id="start-music-vol-val">70</span></label>
@@ -102,12 +110,6 @@
             </div>
             <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Gameplay</div>
-                <div class="settings-row"><input type="checkbox" id="start-autopause-hostile" checked><label for="start-autopause-hostile">Auto-pause on hostile event (raids)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-autopause-event" checked><label for="start-autopause-event">Auto-pause on choice events (wanderers, caravans)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-death"><label for="start-pause-death">Auto-pause on colonist death</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-research" checked><label for="start-pause-research">Auto-pause on research complete</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check">Peaceful mode (no raids/hostile animals)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode">Demo Mode (locks advanced research)</label></div>
                 <div class="settings-row">
                     <label for="start-autocook">Auto-cook meal target:</label>
                     <select id="start-autocook" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
@@ -127,6 +129,12 @@
                         <option value="48">Every 48 hours</option>
                     </select>
                 </div>
+                <div class="settings-row"><input type="checkbox" id="start-autopause-hostile" checked><label for="start-autopause-hostile">Auto-pause on hostile event (raids)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-autopause-event" checked><label for="start-autopause-event">Auto-pause on choice events (wanderers, caravans)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-pause-death"><label for="start-pause-death">Auto-pause on colonist death</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-pause-research" checked><label for="start-pause-research">Auto-pause on research complete</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check">Peaceful mode (no raids/hostile animals)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode">Demo Mode (locks advanced research)</label></div>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">
                 <div class="settings-section-title">Effects & Performance</div>
@@ -168,23 +176,21 @@
             <div class="settings-section" data-start-tab="general">
                 <div class="settings-section-title">Accessibility</div>
                 <div class="settings-row"><input type="checkbox" id="start-darken-pause" checked><label for="start-darken-pause">Darken screen when paused</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-pause-focus" checked><label for="start-pause-focus">Pause when window loses focus</label></div>
                 <div class="settings-row">
-                    <label for="start-toolbar-mode">Button bar:</label>
+                    <label for="start-toolbar-mode">Mobile button bar:</label>
                     <select id="start-toolbar-mode" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
                         <option value="auto" selected>Auto</option>
                         <option value="always">Always</option>
                         <option value="never">Never</option>
                     </select>
                 </div>
-                <div class="settings-row"><input type="checkbox" id="start-large-clicks"><label for="start-large-clicks">Larger click targets (buttons & checkboxes)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-focus" checked><label for="start-pause-focus">Pause when window loses focus</label></div>
                 <div class="settings-row">
-                    <label for="start-colorblind">Colorblind mode:</label>
-                    <select id="start-colorblind" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="none" selected>None</option>
-                        <option value="protanopia">Protanopia (red-blind)</option>
-                        <option value="deuteranopia">Deuteranopia (green-blind)</option>
-                        <option value="tritanopia">Tritanopia (blue-blind)</option>
+                    <label for="start-layout-mode">Layout mode:</label>
+                    <select id="start-layout-mode" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
+                        <option value="auto" selected>Auto (detect screen size)</option>
+                        <option value="separate">Separate</option>
+                        <option value="tabbed">Tabbed</option>
                     </select>
                 </div>
                 <div class="settings-row">
@@ -196,21 +202,16 @@
                         <option value="500">Persistent (500 ticks)</option>
                     </select>
                 </div>
-                <div class="settings-row">
-                    <label for="start-layout-mode">Layout mode:</label>
-                    <select id="start-layout-mode" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="auto" selected>Auto (detect screen size)</option>
-                        <option value="separate">Separate</option>
-                        <option value="tabbed">Tabbed</option>
-                    </select>
-                </div>
                 <div class="settings-row"><input type="checkbox" id="start-colonist-highlight"><label for="start-colonist-highlight">Show colonist color outline (sprite mode)</label></div>
-            </div>
-            <div class="settings-section" data-start-tab="general">
-                <div class="settings-section-title">Save Data</div>
-                <div class="settings-row" style="gap:8px;">
-                    <button id="export-game" disabled style="flex:1;padding:4px 8px;font-size:11px;">Export Save</button>
-                    <button id="import-game" style="flex:1;padding:4px 8px;font-size:11px;">Import Save</button>
+                <div class="settings-row"><input type="checkbox" id="start-large-clicks"><label for="start-large-clicks">Larger click targets (buttons & checkboxes)</label></div>
+                <div class="settings-row">
+                    <label for="start-colorblind">Colorblind mode:</label>
+                    <select id="start-colorblind" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
+                        <option value="none" selected>None</option>
+                        <option value="protanopia">Protanopia (red-blind)</option>
+                        <option value="deuteranopia">Deuteranopia (green-blind)</option>
+                        <option value="tritanopia">Tritanopia (blue-blind)</option>
+                    </select>
                 </div>
             </div>
             <div class="settings-section" data-start-tab="general" style="border-bottom:none; text-align:center;">

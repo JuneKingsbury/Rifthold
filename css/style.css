@@ -208,6 +208,18 @@ body {
 #status-bar .sep { color: #555; }
 #status-bar .info { color: #aaa; }
 #status-bar .peaceful { color: #66ddff; font-weight: bold; }
+#status-bar .demo-mode { color: #ff6666; font-weight: bold; }
+
+#demo-banner-start {
+    background: #ff666622;
+    border: 1px solid #ff6666;
+    border-radius: 4px;
+    color: #ff6666;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    padding: 4px 16px;
+}
 
 img.pixel-art {
   image-rendering: pixelated;

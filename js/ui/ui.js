@@ -499,7 +499,8 @@ export class UI {
             `<span class="info status-extra">Mood:${avgMood}%</span>` +
             (waveStr ? `<span class="info" style="color:#cc00ff">${waveStr}</span>` : '') +
             (pendingTasks > 0 ? `<span class="info status-extra" style="color:#ccaa44">Tasks:${pendingTasks}</span>` : '') +
-            (CONFIG.PEACEFUL_MODE ? `<span class="peaceful">PEACEFUL</span>` : '');
+            (CONFIG.PEACEFUL_MODE ? `<span class="peaceful">PEACEFUL</span>` : '') +
+            (this.game.settings.demoMode ? `<span class="demo-mode">DEMO</span>` : '');
 
         if (html !== this._lastStatusHtml) {
             this._lastStatusHtml = html;
