@@ -7,6 +7,7 @@ import { FOODSTUFFS } from '../systems/resources.js';
 import { spawnSummon } from './summons.js';
 import { getNextId } from './entity-factory.js';
 import { completeTask } from './task-executor.js';
+import { getCraftSpeedBonus, getSpellCooldownMult } from '../systems/complexBuildings.js';
 
 function hslToHex(h, s, l) {
     s /= 100; l /= 100;
@@ -614,7 +615,7 @@ function tryAutocastSpells(colonist, game) {
         const spell = SPELLS[spellKey];
         if (!spell || spell.castType !== 'auto') continue;
         if (colonist.disabledSpells && colonist.disabledSpells.includes(spellKey)) continue;
-        if (colonist._spellCooldowns[spellKey] && game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown) continue;
+        if (colonist._spellCooldowns[spellKey] && game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown * getSpellCooldownMult(game)) continue;
         const costReduction = getEquipmentStat(colonist, 'spellCostReduction');
         const effectiveCost = Math.max(1, Math.floor(spell.manaCost * (1 - costReduction)));
         if (colonist.mana < effectiveCost) {
@@ -1297,6 +1298,10 @@ function updateWorking(colonist, game) {
         if (roomId !== null && roomId !== undefined && game.workshopQualities[roomId]) {
             speed *= game.workshopQualities[roomId].speedMult;
         }
+    }
+
+    if (task.type === 'craft' || task.type === 'cook') {
+        speed *= getCraftSpeedBonus(game);
     }
 
     if (colonist.activeEffects) {

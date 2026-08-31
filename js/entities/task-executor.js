@@ -4,6 +4,7 @@ import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana } from './colonist.js';
 import { getHarvestYield } from '../systems/farming.js';
 import { manhattanDist } from '../world/pathfinding.js';
+import { getCraftQualityBonus } from '../systems/complexBuildings.js';
 
 function applyQuality(item, colonist, game, ...statKeys) {
     let skill = colonist.skills.crafting || 1;
@@ -16,6 +17,7 @@ function applyQuality(item, colonist, game, ...statKeys) {
     if (colonist.traits.includes('creative')) skill += TRAITS.creative.qualityBonus;
     if (colonist.traits.includes('lucky')) skill += TRAITS.lucky.qualityBonus;
     if (game && game.research.isResearched('artisans_touch')) skill += WORK_CONFIG.artisanQualityBonus;
+    if (game) skill += getCraftQualityBonus(game);
     const chances = QUALITY_TIERS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
     const total = chances.reduce((s, c) => s + c, 0);
     let roll = Math.random() * total;

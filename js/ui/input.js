@@ -3,6 +3,7 @@ import { designateBuild, designateChop, designateMine, cancelDesignation } from 
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { isPassable } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
+import { getSpellCooldownMult } from '../systems/complexBuildings.js';
 
 export class InputHandler {
     constructor(game, preElement) {
@@ -802,7 +803,7 @@ export class InputHandler {
             return;
         }
         if (colonist._spellCooldowns && colonist._spellCooldowns[spellKey] &&
-            this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown) {
+            this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown * getSpellCooldownMult(this.game)) {
             this.game.notifications.push({ text: `${spell.name} is on cooldown`, tick: this.game.tick, type: 'danger' });
             return;
         }
@@ -869,7 +870,7 @@ export class InputHandler {
         }
 
         if (!colonist._spellCooldowns) colonist._spellCooldowns = {};
-        if (colonist._spellCooldowns[spellKey] && this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown) {
+        if (colonist._spellCooldowns[spellKey] && this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown * getSpellCooldownMult(this.game)) {
             this.game.notifications.push({ text: `${spell.name} is on cooldown`, tick: this.game.tick, type: 'danger' });
             this.spellTargeting = null;
             return;

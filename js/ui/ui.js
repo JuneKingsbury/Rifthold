@@ -1,7 +1,7 @@
 import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
-import { getComplexStructureAt } from '../systems/complexBuildings.js';
+import { getComplexStructureAt, getSpellCooldownMult } from '../systems/complexBuildings.js';
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
@@ -1109,8 +1109,9 @@ export class UI {
                 for (const spellKey of colonist.knownSpells) {
                     const spell = SPELLS[spellKey];
                     if (!spell) continue;
-                    const onCooldown = colonist._spellCooldowns?.[spellKey] && this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown;
-                    const cdRemaining = onCooldown ? spell.cooldown - (this.game.tick - colonist._spellCooldowns[spellKey]) : 0;
+                    const effectiveCd = spell.cooldown * getSpellCooldownMult(this.game);
+                    const onCooldown = colonist._spellCooldowns?.[spellKey] && this.game.tick - colonist._spellCooldowns[spellKey] < effectiveCd;
+                    const cdRemaining = onCooldown ? Math.ceil(effectiveCd - (this.game.tick - colonist._spellCooldowns[spellKey])) : 0;
                     const hasManaForSpell = colonist.mana >= spell.manaCost;
                     const isDisabled = colonist.disabledSpells && colonist.disabledSpells.includes(spellKey);
                     let spellHtml = '';
@@ -1664,6 +1665,17 @@ export class UI {
                 html += `<div class="info-row" style="color:${hpColor}">HP: ${currentHp} / ${maxHp}</div>`;
             }
             html += this.getStructureDescription(tile.structure);
+            if (tile.structure === 'forge_core' || tile.structure === 'ritual_core') {
+                const cs = getComplexStructureAt(this.game, x, y);
+                if (cs) {
+                    html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
+                    const def = COMPLEX_STRUCTURES[cs.key];
+                    if (def && tile.structure === 'forge_core')  html += `<div class="info-row" style="color:#88ff88;">x2.5 equipment craft speed, +2 equipment quality bonus</div>`;
+                    if (def && tile.structure === 'ritual_core') html += `<div class="info-row" style="color:#88ff88;">30% spell cooldown reduction</div>`;
+                } else {
+                    html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete, surround with the required layout to activate</div>`;
+                }
+            }
         }
         if (tile.floor) html += `<div class="info-row" style="color:#999">Floor: ${tile.floor.replace(/_/g,' ')}</div>`;
         if (tile.zone) {

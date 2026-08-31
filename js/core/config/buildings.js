@@ -55,8 +55,8 @@ export const BUILDINGS = {
     mana_relay:        { char: '⊛', color: '#aa88ff', cost: { planks: 3, runite: 2 }, work: 25, structureType: 'furniture', category: 'Arcane', research: 'arcane_conduits', power: { consumes: 1, radius: 3 }, description: 'Mana buildings within 3 tiles consume 1 less mana (min 1). Does not stack. Consumes 1 mana.' },
     artifact_pedestal: { char: '◆', color: '#ccaa44', cost: { stone: 8, runite: 2 }, work: 35, structureType: 'furniture', category: 'Arcane', research: 'arcane_infusion', description: 'Place an item to project its effect in a radius. Mana cost varies by item.' },
     beacon:            { char: '☀', color: '#ffffaa', cost: { stone: 4, runite: 3, planks: 2 }, work: 35, structureType: 'furniture', category: 'Arcane', lightRadius: 15, research: 'brilliance', power: { consumes: 4, radius: 10 }, description: 'Radiant beacon. Massive light radius 15. Consumes 4 mana.' },
-    ritual_core:       { char: '◎', color: '#aa44ff', cost: { runite: 5, void_essence: 3, planks: 4 }, work: 50, structureType: 'furniture', category: 'Arcane', research: 'advanced_arcana', description: 'Core of the Ritual Circle. Place altars around it to activate (-30% spell cooldowns).' },
-    forge_core:        { char: '⚒', color: '#ff8844', cost: { stone: 6, runite: 3, planks: 3 }, work: 40, structureType: 'furniture', category: 'Arcane', research: 'masterwork', description: 'Core of the Great Forge. Surround with walls + door to activate (2.5x equipment crafting).' },
+    ritual_core:       { char: '◎', color: '#aa44ff', cost: { runite: 5, void_essence: 3, planks: 4 }, work: 50, structureType: 'furniture', category: 'Arcane', research: 'advanced_arcana', description: 'Core of the Ritual Circle. Place walls in a diamond pattern around it to activate (-30% spell cooldowns colony-wide).' },
+    forge_core:        { char: '⚒', color: '#ff8844', cost: { stone: 6, runite: 3, planks: 3 }, work: 40, structureType: 'furniture', category: 'Arcane', research: 'masterwork', description: 'Core of the Great Forge. Surround with walls on all sides to activate (2.5x crafting speed & +2 quality bonus colony-wide).' },
     rift_gate:         { char: 'Ω', color: '#33ccff', cost: { runite: 4, stone: 6, planks: 4, void_essence: 8 }, work: 60, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'planar_rift', maxCount: 1, power: { consumes: 6 }, description: 'Send exploration parties to other realms. Consumes 6 mana.' },
 };
 
@@ -105,10 +105,10 @@ export const COMPLEX_STRUCTURES = {
         layout: [
             { dx: -1, dy: -1, req: 'wall' }, { dx: 0, dy: -1, req: 'wall' }, { dx: 1, dy: -1, req: 'wall' },
             { dx: -1, dy: 0, req: 'wall' },  { dx: 1, dy: 0, req: 'wall' },
-            { dx: -1, dy: 1, req: 'wall' },  { dx: 0, dy: 1, req: 'door' },  { dx: 1, dy: 1, req: 'wall' },
+            { dx: -1, dy: 1, req: 'wall' },  { dx: 0, dy: 1, req: 'wall' },  { dx: 1, dy: 1, req: 'wall' },
         ],
-        effect: { craftSpeedMult: 2.5, craftCategories: ['Weapons', 'Armor', 'Tools'] },
-        description: '3x3 enclosed room with Forge Core at center. Walls on all sides, door on one. 2.5x equipment crafting speed.',
+        effect: { craftSpeedMult: 2.5, qualityBonus: 2 },
+        description: '3x3 walled enclosure with Forge Core at center. Walls on all sides. 2.5x crafting speed & +2 quality bonus colony-wide.',
     },
     ritual_circle: {
         name: 'Ritual Circle',
@@ -121,7 +121,7 @@ export const COMPLEX_STRUCTURES = {
             { dx: -1, dy: 1, req: 'wall' }, { dx: 1, dy: 1, req: 'wall' },
             { dx: 0, dy: 2, req: 'wall' },
         ],
-        effect: { spellCooldownMult: 0.7, radius: 6 },
-        description: 'Diamond pattern (5x5) with Ritual Core at center. Walls at cardinal + diagonal positions. Reduces spell cooldowns by 30% in radius 6.',
+        effect: { spellCooldownMult: 0.7 },
+        description: 'Diamond pattern (5x5) with Ritual Core at center. Walls at cardinal + diagonal positions. Reduces spell cooldowns by 30% colony-wide.',
     },
 };

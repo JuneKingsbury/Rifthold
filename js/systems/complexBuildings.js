@@ -1,5 +1,4 @@
-import { COMPLEX_STRUCTURES } from '../core/config.js';
-import { manhattanDist } from '../world/pathfinding.js';
+import { COMPLEX_STRUCTURES, WALL_STRUCTURES, DOOR_STRUCTURES } from '../core/config.js';
 
 export function checkComplexStructures(game) {
     const active = [];
@@ -29,8 +28,8 @@ function patternMatches(map, cx, cy, layout) {
         const ty = cy + cell.dy;
         if (tx < 0 || ty < 0 || ty >= map.length || tx >= map[0].length) return false;
         const tile = map[ty][tx];
-        if (cell.req === 'wall' && tile.structure !== 'wall' && tile.structure !== 'stone_wall') return false;
-        if (cell.req === 'door' && tile.structure !== 'door' && tile.structure !== 'void_door') return false;
+        if (cell.req === 'wall' && !WALL_STRUCTURES.has(tile.structure)) return false;
+        if (cell.req === 'door' && !DOOR_STRUCTURES.has(tile.structure)) return false;
         if (cell.req && cell.req !== 'wall' && cell.req !== 'door' && tile.structure !== cell.req) return false;
     }
     return true;
@@ -41,25 +40,26 @@ export function getComplexStructureAt(game, x, y) {
     return game.activeComplexStructures.find(s => s.x === x && s.y === y) || null;
 }
 
-export function getCraftSpeedBonus(game, colonist) {
+export function getCraftSpeedBonus(game) {
     if (!game.activeComplexStructures) return 1;
     for (const s of game.activeComplexStructures) {
-        if (s.effect.craftSpeedMult && (s.effect.craftCategory || s.effect.craftCategories)) {
-            const dist = manhattanDist(colonist.x, colonist.y, s.x, s.y);
-            if (dist <= 3) return s.effect.craftSpeedMult;
-        }
+        if (s.effect.craftSpeedMult) return s.effect.craftSpeedMult;
     }
     return 1;
 }
 
-export function getSpellCooldownMult(game, colonist) {
+export function getCraftQualityBonus(game) {
+    if (!game.activeComplexStructures) return 0;
+    for (const s of game.activeComplexStructures) {
+        if (s.effect.qualityBonus) return s.effect.qualityBonus;
+    }
+    return 0;
+}
+
+export function getSpellCooldownMult(game) {
     if (!game.activeComplexStructures) return 1;
     for (const s of game.activeComplexStructures) {
-        if (s.effect.spellCooldownMult) {
-            const radius = s.effect.radius || 6;
-            const dist = manhattanDist(colonist.x, colonist.y, s.x, s.y);
-            if (dist <= radius) return s.effect.spellCooldownMult;
-        }
+        if (s.effect.spellCooldownMult) return s.effect.spellCooldownMult;
     }
     return 1;
 }

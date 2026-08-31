@@ -35,6 +35,7 @@ import { manhattanDist } from '../world/pathfinding.js';
 import { renderGlossaryHTML, initGlossaryInteraction } from '../ui/glossary.js';
 import { renderChangelogHTML, initChangelogInteraction, renderCreditsHTML } from '../ui/changelog.js';
 import { checkComplexStructures } from '../systems/complexBuildings.js';
+import { COMPLEX_STRUCTURES } from './config.js';
 import { updateAutoRepair } from '../systems/auto-repair.js';
 import { StorySystem } from '../systems/story.js';
 import { TutorialSystem } from '../systems/tutorial.js';
@@ -418,7 +419,29 @@ class Game {
         if (this.roomsDirty) {
             const roomCount = detectRooms(this.map);
             this.mapIndex.rebuild(this.map);
+            const prevComplex = this.activeComplexStructures.slice();
             checkComplexStructures(this);
+            if (this._complexStructuresInitialized) {
+                const makeId = s => `${s.key}@${s.x},${s.y}`;
+                const prevIds = new Set(prevComplex.map(makeId));
+                const newIds = new Set(this.activeComplexStructures.map(makeId));
+                for (const s of this.activeComplexStructures) {
+                    if (!prevIds.has(makeId(s))) {
+                        const def = COMPLEX_STRUCTURES[s.key];
+                        this.notifications.push({ text: `${def.name} activated!`, tick: this.tick, type: 'success' });
+                        this.overlays.push({ type: 'floating_text', x: s.x, y: s.y, text: `${def.name} Active!`, color: '#44ffaa', fontSize: 12, ttl: 40, maxTtl: 40 });
+                        window.soundManager?.playSFX('spell_cast');
+                    }
+                }
+                for (const s of prevComplex) {
+                    if (!newIds.has(makeId(s))) {
+                        const def = COMPLEX_STRUCTURES[s.key];
+                        this.notifications.push({ text: `${def.name} deactivated`, tick: this.tick, type: 'danger' });
+                        this.overlays.push({ type: 'floating_text', x: s.x, y: s.y, text: `${def.name} Lost`, color: '#ff6644', fontSize: 12, ttl: 40, maxTtl: 40 });
+                    }
+                }
+            }
+            this._complexStructuresInitialized = true;
             const qualities = calculateRoomQualities(this.map, roomCount);
 
             // Build room center index in a single pass over the map.

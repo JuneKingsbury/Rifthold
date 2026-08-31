@@ -299,6 +299,7 @@ export function loadGame(game) {
         }
 
         game.roomsDirty = true;
+        game._complexStructuresInitialized = false;
 
         if (data.layout) {
             restoreLayout(data.layout);

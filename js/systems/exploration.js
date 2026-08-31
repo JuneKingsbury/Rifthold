@@ -2,6 +2,7 @@ import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, 
 import { getEquipmentStat, getEquippedItems } from '../entities/colonist.js';
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
+import { getSpellCooldownMult } from './complexBuildings.js';
 
 let nextExpeditionId = 1;
 
@@ -617,7 +618,7 @@ export class ExplorationSystem {
         if (!spell) return false;
         if (member.mana < spell.manaCost) return false;
         const lastCast = member.spellCooldowns[spellKey] || 0;
-        if (game.tick - lastCast < spell.cooldown) return false;
+        if (game.tick - lastCast < spell.cooldown * getSpellCooldownMult(game)) return false;
         return true;
     }
 
