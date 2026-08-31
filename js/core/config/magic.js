@@ -145,7 +145,7 @@ export const RESEARCH = {
     pyroclasm: { name: 'Pyroclasm', cost: 750, requires: ['brilliance'], tab: 'mana', description: 'Fire ward incinerates nearby foes', requiresTabCount: 3 },
 
     // Rifts
-    warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards' },
+    warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards and build tougher structures using bricks' },
     fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
     void_summoning: { name: 'Void Summoning', cost: 550, requires: ['ley_channeling', 'warding'], tab: 'rifts', description: 'Open portals to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['void_summoning'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
