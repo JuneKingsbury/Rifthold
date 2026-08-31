@@ -53,6 +53,7 @@ export class UI {
         this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0 };
         this.storyPanelVisible = false;
         this._storyTab = 'colony';
+        this._collapsedRealmGroups = new Set();
         this._lastStoryHtml = '';
         this._lastStoryHasNew = false;
         this._lastResearchNeedsAttention = false;
@@ -107,6 +108,18 @@ export class UI {
             const tab = e.target.closest('[data-story-tab]');
             if (tab) {
                 this._storyTab = tab.dataset.storyTab;
+                this._lastStoryHtml = '';
+                this.updateStoryPanel();
+                return;
+            }
+            const group = e.target.closest('[data-realm-group]');
+            if (group) {
+                const name = group.dataset.realmGroup;
+                if (this._collapsedRealmGroups.has(name)) {
+                    this._collapsedRealmGroups.delete(name);
+                } else {
+                    this._collapsedRealmGroups.add(name);
+                }
                 this._lastStoryHtml = '';
                 this.updateStoryPanel();
             }
@@ -3121,25 +3134,64 @@ export class UI {
         const entries = Object.entries(STORY_MILESTONES)
             .filter(([, m]) => m.tab === tab);
 
-        const unlockedEntries = entries.filter(([k]) => unlocked.has(k)).reverse();
-        const lockedEntries = entries.filter(([k]) => !unlocked.has(k));
-
         html += '<div class="story-entries">';
-        for (const [key, milestone] of unlockedEntries) {
-            const info = unlocked.get(key);
-            const dateStr = info ? `Year ${info.year}, ${info.season.charAt(0).toUpperCase() + info.season.slice(1)}` : '';
-            html += `<div class="story-entry unlocked">`;
-            if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
-            html += `<div class="story-entry-title">${milestone.title}</div>`;
-            html += `<div class="story-entry-text">${milestone.text}</div>`;
-            html += `</div>`;
+
+        if (tab === 'realms') {
+            const groups = [];
+            const groupMap = new Map();
+            for (const [key, milestone] of entries) {
+                const g = milestone.realmGroup;
+                if (!groupMap.has(g)) {
+                    const group = { name: g, entries: [] };
+                    groupMap.set(g, group);
+                    groups.push(group);
+                }
+                groupMap.get(g).entries.push([key, milestone]);
+            }
+            for (const group of groups) {
+                const groupUnlocked = group.entries.filter(([k]) => unlocked.has(k)).length;
+                const collapsed = this._collapsedRealmGroups.has(group.name);
+                const arrow = collapsed ? '&#9654;' : '&#9660;';
+                html += `<div class="realm-group-header" data-realm-group="${group.name}">${arrow} ${group.name} (${groupUnlocked}/${group.entries.length})</div>`;
+                if (!collapsed) {
+                    for (const [key, milestone] of group.entries) {
+                        if (unlocked.has(key)) {
+                            const info = unlocked.get(key);
+                            const dateStr = info ? `Year ${info.year}, ${info.season.charAt(0).toUpperCase() + info.season.slice(1)}` : '';
+                            html += `<div class="story-entry unlocked">`;
+                            if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
+                            html += `<div class="story-entry-title">${milestone.title}</div>`;
+                            html += `<div class="story-entry-text">${milestone.text}</div>`;
+                            html += `</div>`;
+                        } else {
+                            html += `<div class="story-entry locked">`;
+                            html += `<div class="story-entry-title">???</div>`;
+                            html += `<div class="story-entry-text">This tale has yet to unfold...</div>`;
+                            html += `</div>`;
+                        }
+                    }
+                }
+            }
+        } else {
+            const unlockedEntries = entries.filter(([k]) => unlocked.has(k)).reverse();
+            const lockedEntries = entries.filter(([k]) => !unlocked.has(k));
+            for (const [key, milestone] of unlockedEntries) {
+                const info = unlocked.get(key);
+                const dateStr = info ? `Year ${info.year}, ${info.season.charAt(0).toUpperCase() + info.season.slice(1)}` : '';
+                html += `<div class="story-entry unlocked">`;
+                if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
+                html += `<div class="story-entry-title">${milestone.title}</div>`;
+                html += `<div class="story-entry-text">${milestone.text}</div>`;
+                html += `</div>`;
+            }
+            for (const [key, milestone] of lockedEntries) {
+                html += `<div class="story-entry locked">`;
+                html += `<div class="story-entry-title">???</div>`;
+                html += `<div class="story-entry-text">This tale has yet to unfold...</div>`;
+                html += `</div>`;
+            }
         }
-        for (const [key, milestone] of lockedEntries) {
-            html += `<div class="story-entry locked">`;
-            html += `<div class="story-entry-title">???</div>`;
-            html += `<div class="story-entry-text">This tale has yet to unfold...</div>`;
-            html += `</div>`;
-        }
+
         html += '</div>';
 
         if (html !== this._lastStoryHtml) {

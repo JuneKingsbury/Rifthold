@@ -1220,6 +1220,7 @@ export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
     realm_crystal_caves: {
         tab: 'realms',
+        realmGroup: 'Crystal Caverns',
         title: 'Crystal Caves',
         trigger: 'realm_crystal_caves',
         text: `
@@ -1268,36 +1269,42 @@ export const STORY_MILESTONES = {
     },
     realm_crystal_mines: {
         tab: 'realms',
+        realmGroup: 'Crystal Caverns',
         title: 'Crystal Mines',
         trigger: 'realm_crystal_mines',
         text: 'TODO: Write lore text for exploring the Crystal Mines.',
     },
     realm_crystal_depths: {
         tab: 'realms',
+        realmGroup: 'Crystal Caverns',
         title: 'Crystal Depths',
         trigger: 'realm_crystal_depths',
         text: 'TODO: Write lore text for exploring the Crystal Depths.',
     },
     realm_verdant_depths: {
         tab: 'realms',
+        realmGroup: 'Verdant Wilds',
         title: 'Verdant Depths',
         trigger: 'realm_verdant_depths',
         text: 'TODO: Write lore text for exploring the Verdant Depths.',
     },
     realm_fungal_hollows: {
         tab: 'realms',
+        realmGroup: 'Verdant Wilds',
         title: 'Fungal Hollows',
         trigger: 'realm_fungal_hollows',
         text: 'TODO: Write lore text for exploring the Fungal Hollows.',
     },
     realm_primeval_canopy: {
         tab: 'realms',
+        realmGroup: 'Verdant Wilds',
         title: 'Primeval Canopy',
         trigger: 'realm_primeval_canopy',
         text: 'TODO: Write lore text for exploring the Primeval Canopy.',
     },
     realm_arcane_library: {
         tab: 'realms',
+        realmGroup: 'University Ruins',
         title: 'Arcane Library',
         trigger: 'realm_arcane_library',
         text: `
@@ -1320,6 +1327,7 @@ export const STORY_MILESTONES = {
     },
     realm_ancient_university: {
         tab: 'realms',
+        realmGroup: 'University Ruins',
         title: 'Ancient University',
         trigger: 'realm_ancient_university',
         text: `
@@ -1345,6 +1353,7 @@ export const STORY_MILESTONES = {
     },
     realm_abandoned_laboratory: {
         tab: 'realms',
+        realmGroup: 'University Ruins',
         title: 'Abandoned Laboratory',
         trigger: 'realm_abandoned_laboratory',
         text: `
@@ -1381,36 +1390,42 @@ export const STORY_MILESTONES = {
     },
     realm_shadow_realm: {
         tab: 'realms',
+        realmGroup: 'The Void',
         title: 'Shadow Realm',
         trigger: 'realm_shadow_realm',
         text: 'TODO: Write lore text for exploring the Shadow Realm.',
     },
     realm_void_abyss: {
         tab: 'realms',
+        realmGroup: 'The Void',
         title: 'Void Abyss',
         trigger: 'realm_void_abyss',
         text: 'TODO: Write lore text for exploring the Void Abyss.',
     },
     realm_oblivion_rift: {
         tab: 'realms',
+        realmGroup: 'The Void',
         title: 'Oblivion Rift',
         trigger: 'realm_oblivion_rift',
         text: 'TODO: Write lore text for exploring the Oblivion Rift.',
     },
     realm_kingdom_outskirts: {
         tab: 'realms',
+        realmGroup: 'The Kingdom',
         title: 'Kingdom Outskirts',
         trigger: 'realm_kingdom_outskirts',
         text: 'TODO: Write lore text for exploring the Kingdom.',
     },
     realm_crusader_barracks: {
         tab: 'realms',
+        realmGroup: 'The Kingdom',
         title: 'Crusader Barracks',
         trigger: 'realm_crusader_barracks',
         text: 'TODO: Write lore text for exploring the Kingdom.',
     },
     realm_palace_fortress: {
         tab: 'realms',
+        realmGroup: 'The Kingdom',
         title: 'Palace Fortress',
         trigger: 'realm_palace_fortress',
         text: `

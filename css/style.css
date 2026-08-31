@@ -1364,6 +1364,20 @@ img.pixel-art {
     gap: 8px;
 }
 
+.realm-group-header {
+    color: #cca844;
+    font-size: 0.95em;
+    padding: 6px 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #333;
+    user-select: none;
+}
+
+.realm-group-header:hover {
+    color: #ffcc44;
+    background: #1a1a2e;
+}
+
 .story-entry {
     padding: 10px 12px;
     border-radius: 4px;
