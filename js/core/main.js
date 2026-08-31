@@ -394,7 +394,7 @@ class Game {
         if (prof) { prof.countTick(); prof.begin(); }
 
         if (this.tick % 30 === 0 && window.soundManager) {
-            window.soundManager.updateMusicState(this);
+            if (!this._gameOver) window.soundManager.updateMusicState(this);
             window.soundManager.setMusicVolume(game.settings.musicVolume);
             window.soundManager.setSFXVolume(game.settings.sfxVolume);
         }
@@ -620,7 +620,7 @@ class Game {
         const overlay = document.getElementById('outro-overlay');
         if (overlay) {
             overlay.style.display = 'flex';
-            window.soundManager?.stopMusic();
+            window.soundManager?.playMusic('credits');
         }
     }
 

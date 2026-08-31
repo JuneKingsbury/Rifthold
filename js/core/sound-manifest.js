@@ -46,5 +46,6 @@ export const SOUND_MANIFEST = {
         ambient_night: 'audio/music/ambient_night.ogg',
         combat: 'audio/music/combat.ogg',
         menu_theme: 'audio/music/menu_theme.ogg',
+        credits: 'audio/music/credits.ogg',
     },
 };
