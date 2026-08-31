@@ -1,6 +1,7 @@
 import { CONFIG, ENTITIES, ALL_ITEMS } from './config.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
+import { recalcMaxMana, invalidateEquipStatCache } from '../entities/colonist.js';
 
 const SAVE_KEY = 'colony_save';
 const SAVE_VERSION = 7;
@@ -136,6 +137,10 @@ export function loadGame(game) {
         deserializeMap(game.map, data.map);
 
         game.colonists = data.colonists;
+        for (const c of game.colonists) {
+            recalcMaxMana(c);
+            invalidateEquipStatCache(c);
+        }
         game.rebuildColonistIndex();
         game.entities = data.entities || [];
         game.raiders = data.raiders || [];

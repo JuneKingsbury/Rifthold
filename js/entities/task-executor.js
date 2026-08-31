@@ -1,7 +1,7 @@
 import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS, BOOTS_ENCHANTMENT_EFFECTS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
-import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana } from './colonist.js';
+import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache } from './colonist.js';
 import { getHarvestYield } from '../systems/farming.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getCraftQualityBonus } from '../systems/complexBuildings.js';
@@ -501,6 +501,7 @@ export function completeTask(colonist, task, game) {
                 if (target && target.trinketBroken) {
                     target.trinketBroken = false;
                     target._repairQueued = false;
+                    invalidateEquipStatCache(target);
                     const artName = target.trinket?.name || 'trinket';
                     game.eventLog.add(game, `${artName} repaired at the anvil`, 'success', null);
                 }

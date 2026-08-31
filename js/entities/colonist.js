@@ -334,7 +334,7 @@ function updateHealth(colonist) {
 
 function updateMana(colonist) {
     if (colonist.mana >= colonist.maxMana) return;
-    const combinedLevel = Object.values(colonist.magicSkills).reduce((sum, lvl) => sum + lvl, 0);
+    const combinedLevel = colonist._combinedMagicLevel || 0;
     let regen = MANA_CONFIG.baseRegen + combinedLevel * MANA_CONFIG.regenPerMagicLevel;
     regen += getEquipmentStat(colonist, 'manaRegen');
     if (getEquipmentStat(colonist, 'manaRegenMultiplier')) regen *= getEquipmentStat(colonist, 'manaRegenMultiplier');
@@ -345,6 +345,7 @@ function updateMana(colonist) {
 
 export function recalcMaxMana(colonist) {
     const combinedLevel = Object.values(colonist.magicSkills).reduce((sum, lvl) => sum + lvl, 0);
+    colonist._combinedMagicLevel = combinedLevel;
     colonist.maxMana = MANA_CONFIG.baseMana + combinedLevel * MANA_CONFIG.manaPerMagicLevel;
 }
 
@@ -536,11 +537,22 @@ function getEquipmentSpellBonus(colonist) {
 }
 
 export function getEquipmentStat(colonist, stat) {
-    let total = 0;
-    for (const item of getEquippedItems(colonist)) {
-        if (item[stat]) total += item[stat];
+    if (!colonist._equipStatCache) {
+        const cache = {};
+        for (const item of getEquippedItems(colonist)) {
+            for (const key in item) {
+                if (typeof item[key] === 'number' && key !== 'tier' && key !== 'level') {
+                    cache[key] = (cache[key] || 0) + item[key];
+                }
+            }
+        }
+        colonist._equipStatCache = cache;
     }
-    return total;
+    return colonist._equipStatCache[stat] || 0;
+}
+
+export function invalidateEquipStatCache(colonist) {
+    colonist._equipStatCache = null;
 }
 
 function tryUsePotions(colonist, game) {
@@ -1727,6 +1739,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
             } else {
                 colonist[slot] = null;
             }
+            invalidateEquipStatCache(colonist);
             game.eventLog.add(game, `${colonist.name}'s ${item.name} shatters, reviving them!`, 'success', { type: 'colonist', id: colonist.id });
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '✦', color: '#ffdd44', ttl: 8 });
             revived = true;

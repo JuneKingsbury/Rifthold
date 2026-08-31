@@ -145,6 +145,10 @@ export class TaskQueue {
         return this.tasks.find(t => t.assignedTo === colonistId);
     }
 
+    getPendingCount() {
+        return this.tasks.reduce((n, t) => n + (t.status === 'pending' ? 1 : 0), 0);
+    }
+
     getPending() {
         return this.tasks.filter(t => t.status === 'pending');
     }

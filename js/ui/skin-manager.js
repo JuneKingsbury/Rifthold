@@ -295,6 +295,7 @@ export class SkinManager {
         }
 
         const result = this._finishColonistOutline(canvas, drafted, nameColor, highlight);
+        if (this._compositeCache.size > 200) this._compositeCache.clear();
         this._compositeCache.set(cacheKey, result);
         return result;
     }

@@ -404,6 +404,14 @@ export class UI {
     }
 
     updateStatusBar() {
+        const tickChanged = this.game.tick !== this._lastStatusTick || this._lastStatusPaused !== this.game.paused || this._lastStatusSpeed !== this.game.speed;
+        if (!tickChanged) {
+            this._updateSpeedButtons();
+            return;
+        }
+        this._lastStatusTick = this.game.tick;
+        this._lastStatusPaused = this.game.paused;
+        this._lastStatusSpeed = this.game.speed;
         const r = this.game.resources.stockpile;
         const season = this.game.weather.getSeasonDisplay();
         const weather = this.game.weather.getWeatherDisplay();
@@ -412,12 +420,14 @@ export class UI {
         const temp = useF ? Math.round(tempC * 9 / 5 + 32) : tempC;
         const tempUnit = useF ? 'F' : 'C';
         const speed = this.game.paused ? 'PAUSED' : `${this.game.speed}x`;
-        const colonists = this.game.colonists.filter(c => !c.golem);
-        const golems = this.game.colonists.filter(c => c.golem);
-        const aliveColonists = colonists.filter(c => c.hp > 0);
-        const aliveGolems = golems.filter(c => c.hp > 0);
-        const alive = aliveColonists.length;
-        const avgMood = alive > 0 ? Math.round(aliveColonists.reduce((sum, c) => sum + c.mood, 0) / alive) : 0;
+        let alive = 0, aliveGolemCount = 0, moodSum = 0;
+        for (const c of this.game.colonists) {
+            if (c.hp > 0) {
+                if (c.golem) { aliveGolemCount++; }
+                else { alive++; moodSum += c.mood; }
+            }
+        }
+        const avgMood = alive > 0 ? Math.round(moodSum / alive) : 0;
         const dayProgress = Math.floor((this.game.timeOfDay / CONFIG.TICKS_PER_DAY) * 24);
         const timeStr = `${String(dayProgress).padStart(2, '0')}:00`;
         const power = this.game.power;
@@ -428,7 +438,7 @@ export class UI {
             const crystalMax = 4 + (this.game.manaCrystalBonus || 0) + reservoirBonus;
             manaStr = `Mana:${power.getNetPower()} (${crystalCount}/${crystalMax})`;
         }
-        const pendingTasks = this.game.taskQueue.getPending().length;
+        const pendingTasks = this.game.taskQueue.getPendingCount();
 
         const waves = this.game.waves;
         const cap = waves.getColonistCap(this.game);
@@ -472,7 +482,7 @@ export class UI {
             `<span class="info">${timeStr}</span>` +
             `<span class="sep status-extra">|</span>` +
             `<span class="info status-extra">Pop:${alive}/${cap}</span>` +
-            (aliveGolems.length > 0 ? `<span class="info status-extra" style="color:#aaaaaa">Golems:${aliveGolems.length}</span>` : '') +
+            (aliveGolemCount > 0 ? `<span class="info status-extra" style="color:#aaaaaa">Golems:${aliveGolemCount}</span>` : '') +
             `<span class="info status-extra">Mood:${avgMood}%</span>` +
             (waveStr ? `<span class="info" style="color:#cc00ff">${waveStr}</span>` : '') +
             (pendingTasks > 0 ? `<span class="info status-extra" style="color:#ccaa44">Tasks:${pendingTasks}</span>` : '') +
@@ -482,6 +492,10 @@ export class UI {
             this._lastStatusHtml = html;
             document.getElementById('status-info').innerHTML = html;
         }
+        this._updateSpeedButtons();
+    }
+
+    _updateSpeedButtons() {
         const speedButtons = [
             { id: 'btn-pause', active: this.game.paused },
             { id: 'btn-speed-1', active: !this.game.paused && this.game.speed === 1 },
@@ -2553,6 +2567,7 @@ export class UI {
         graphics += this._settingsCheck('set-breathing', s.showBreathing, 'window.game.settings.showBreathing=this.checked', 'Entity breathing animation');
         graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
         graphics += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', 'Show FPS counter (top-right of game grid)');
+        graphics += this._settingsCheck('set-fps-cap', s.fpsCap === 30, 'window.game.settings.fpsCap=this.checked?30:60', 'Cap framerate to 30 FPS (reduces CPU/GPU usage)');
         graphics += `</div>`;
 
         // ===== CONTROLS TAB =====

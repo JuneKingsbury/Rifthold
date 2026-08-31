@@ -908,9 +908,13 @@ export class Renderer {
 
         const nameMode = game.settings.showColonistNames;
         if (nameMode === 'always' || nameMode === 'selected') {
+            const nameFontSize = Math.max(8, this.fontSize * 0.6);
+            if (!this._nameCache) this._nameCache = new Map();
+            if (this._nameCacheFontSize !== nameFontSize) {
+                this._nameCache.clear();
+                this._nameCacheFontSize = nameFontSize;
+            }
             ctx.save();
-            ctx.font = `${Math.max(8, this.fontSize * 0.6)}px monospace`;
-            ctx.textBaseline = 'bottom';
             ctx.globalAlpha = 0.8;
             for (const c of colonists) {
                 if (c.hp <= 0 || c.onExpedition) continue;
@@ -919,15 +923,34 @@ export class Renderer {
                 const sx = pos.x - camera.x;
                 const sy = pos.y - camera.y;
                 if (sx < 0 || sx >= vw || sy < 0 || sy >= vh) continue;
-                const nx = Math.round(sx * cw);
+                const color = c.nameColor || '#ffff00';
+                const cacheKey = `${c.id}:${c.name}:${color}`;
+                let cached = this._nameCache.get(cacheKey);
+                if (!cached) {
+                    const nameFont = `${nameFontSize}px monospace`;
+                    const offscreen = document.createElement('canvas');
+                    const offCtx = offscreen.getContext('2d');
+                    offCtx.font = nameFont;
+                    const tw = Math.ceil(offCtx.measureText(c.name).width) + 4;
+                    const th = Math.ceil(nameFontSize) + 4;
+                    offscreen.width = tw;
+                    offscreen.height = th;
+                    offCtx.font = nameFont;
+                    offCtx.textBaseline = 'bottom';
+                    const tx = 2, ty = th - 1;
+                    offCtx.fillStyle = '#000000';
+                    offCtx.fillText(c.name, tx - 1, ty - 1);
+                    offCtx.fillText(c.name, tx + 1, ty - 1);
+                    offCtx.fillText(c.name, tx - 1, ty + 1);
+                    offCtx.fillText(c.name, tx + 1, ty + 1);
+                    offCtx.fillStyle = color;
+                    offCtx.fillText(c.name, tx, ty);
+                    cached = { canvas: offscreen, ox: Math.round(tw / 2), oy: th - 1 };
+                    this._nameCache.set(cacheKey, cached);
+                }
+                const nx = Math.round((sx + 0.5) * cw);
                 const ny = Math.round(sy * ch) - 1;
-                ctx.fillStyle = '#000000';
-                ctx.fillText(c.name, nx - 1, ny - 1);
-                ctx.fillText(c.name, nx + 1, ny - 1);
-                ctx.fillText(c.name, nx - 1, ny + 1);
-                ctx.fillText(c.name, nx + 1, ny + 1);
-                ctx.fillStyle = c.nameColor || '#ffff00';
-                ctx.fillText(c.name, nx, ny);
+                ctx.drawImage(cached.canvas, nx - cached.ox, ny - cached.oy);
             }
             ctx.restore();
         }

@@ -5,7 +5,7 @@ import { Camera } from '../ui/camera.js';
 import { Renderer } from '../ui/renderer.js';
 import { InputHandler } from '../ui/input.js';
 import { SkinManager } from '../ui/skin-manager.js';
-import { createColonist, createGolem, refreshCustomColonist, updateColonist, addThought, grantCastXp } from '../entities/colonist.js';
+import { createColonist, createGolem, refreshCustomColonist, updateColonist, addThought, grantCastXp, invalidateEquipStatCache, recalcMaxMana } from '../entities/colonist.js';
 import { TaskQueue } from './tasks.js';
 import { ResourceManager } from '../systems/resources.js';
 import { detectRooms, calculateRoomQualities } from '../world/rooms.js';
@@ -90,6 +90,7 @@ class Game {
             ditherQuality: 'medium',
             showColonistHighlight: false,
             showTutorial: true,
+            fpsCap: 60,
             keyBindings: {},
         };
         try {
@@ -329,6 +330,12 @@ class Game {
             }
         }
 
+        if (this.settings.fpsCap === 30) {
+            const elapsed = timestamp - (this._lastRenderTime || 0);
+            if (elapsed < 33) { requestAnimationFrame(this.gameLoop); return; }
+            this._lastRenderTime = timestamp;
+        }
+
         if (this.followingColonist) {
             const fc = this.getColonist(this.followingColonist);
             if (fc && fc.hp > 0) {
@@ -531,13 +538,13 @@ class Game {
         updateSummons(this);
         if (prof) prof.mark('summons');
 
-        this.combatEffects = this.combatEffects.filter(e => e.ttl-- > 0);
+        { let w = 0; for (let r = 0; r < this.combatEffects.length; r++) { if (this.combatEffects[r].ttl-- > 0) this.combatEffects[w++] = this.combatEffects[r]; } this.combatEffects.length = w; }
         const now = performance.now();
-        this.projectiles = this.projectiles.filter(p => now < p._startTime + p._duration);
+        { let w = 0; for (let r = 0; r < this.projectiles.length; r++) { if (now < this.projectiles[r]._startTime + this.projectiles[r]._duration) this.projectiles[w++] = this.projectiles[r]; } this.projectiles.length = w; }
         if (this.divinationModifiers) {
-            this.divinationModifiers = this.divinationModifiers.filter(m => m.expiresAt > this.tick);
+            let w = 0; for (let r = 0; r < this.divinationModifiers.length; r++) { if (this.divinationModifiers[r].expiresAt > this.tick) this.divinationModifiers[w++] = this.divinationModifiers[r]; } this.divinationModifiers.length = w;
         }
-        this.overlays = this.overlays.filter(o => o.ttl !== undefined && o.ttl-- > 0);
+        { let w = 0; for (let r = 0; r < this.overlays.length; r++) { const o = this.overlays[r]; if (o.ttl !== undefined && o.ttl-- > 0) this.overlays[w++] = o; } this.overlays.length = w; }
 
         for (const c of this.colonists) {
             if (c.hp > 0 && c.state === 'working' && c.workProgress > 0) {
@@ -822,6 +829,7 @@ class Game {
     }
 
     _recalcEquipmentStats(c) {
+        invalidateEquipStatCache(c);
         const baseHp = c.golem ? (GOLEM_TYPES[c.golem]?.hp || c.maxHp) : COLONIST_CONFIG.maxHp;
         let bonus = 0;
         for (const item of [c.weapon, c.armor, c.helmet, c.clothes, c.boots, c.tool, c.trinket].filter(Boolean)) {
@@ -1660,6 +1668,7 @@ class Game {
             for (const school of Object.keys(c.magicSkills || {})) {
                 if (c.magicSkills[school] < 1) c.magicSkills[school] = 1;
             }
+            recalcMaxMana(c);
             count++;
         }
         this.notifications.push({ text: `[DEBUG] ${count} colonists granted ${starterSpells.length} starter spells + magic skills set to 1`, tick: this.tick, type: 'success' });
@@ -1825,6 +1834,7 @@ function fitGameFont() {
     if (window.game?.camera) {
         window.game.camera.clamp();
     }
+    if (window.game) window.game._lastRenderTime = 0;
 }
 
 function zoomIn() {
@@ -3016,6 +3026,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.showWeatherParticles = document.getElementById('start-weather').checked;
             s.showMinimap = document.getElementById('start-minimap').checked;
             s.showFps = document.getElementById('start-fps').checked;
+            s.fpsCap = document.getElementById('start-fps-cap').checked ? 30 : 60;
             s.ditherDistance = document.getElementById('start-dither-dist').value;
             s.ditherQuality = document.getElementById('start-dither-qual').value;
             s.darkenOnPause = document.getElementById('start-darken-pause').checked;
@@ -3063,6 +3074,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showWeatherParticles != null) document.getElementById('start-weather').checked = s.showWeatherParticles;
             if (s.showMinimap != null) document.getElementById('start-minimap').checked = s.showMinimap;
             if (s.showFps != null) document.getElementById('start-fps').checked = s.showFps;
+            if (s.fpsCap != null) document.getElementById('start-fps-cap').checked = s.fpsCap === 30;
             if (s.ditherDistance) document.getElementById('start-dither-dist').value = s.ditherDistance;
             if (s.ditherQuality) document.getElementById('start-dither-qual').value = s.ditherQuality;
             if (s.darkenOnPause != null) document.getElementById('start-darken-pause').checked = s.darkenOnPause;
@@ -3155,6 +3167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-minimap').checked = true;
         document.getElementById('start-equip-overlays').checked = true;
         document.getElementById('start-fps').checked = false;
+        document.getElementById('start-fps-cap').checked = false;
         document.getElementById('start-dither-dist').value = 'light';
         document.getElementById('start-dither-qual').value = 'medium';
         document.getElementById('start-darken-pause').checked = true;
@@ -3236,6 +3249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showWeatherParticles: document.getElementById('start-weather').checked,
             showMinimap: document.getElementById('start-minimap').checked,
             showFps: document.getElementById('start-fps').checked,
+            fpsCap: document.getElementById('start-fps-cap').checked ? 30 : 60,
             ditherDistance: document.getElementById('start-dither-dist').value,
             ditherQuality: document.getElementById('start-dither-qual').value,
             showColonistNames: document.getElementById('start-names').value,

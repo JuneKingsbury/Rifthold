@@ -1,5 +1,5 @@
 import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES } from '../core/config.js';
-import { getEquipmentStat, getEquippedItems } from '../entities/colonist.js';
+import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache } from '../entities/colonist.js';
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
 import { getSpellCooldownMult } from './complexBuildings.js';
@@ -91,6 +91,7 @@ export class ExplorationSystem {
                 if (item.consumable) {
                     game.resources.removeTrinket(item.key);
                     c.trinket = null;
+                    invalidateEquipStatCache(c);
                     game.eventLog.add(game, `${c.name}'s ${item.name} crumbles to dust as the expedition begins`, 'event', null);
                 }
             }
@@ -225,6 +226,7 @@ export class ExplorationSystem {
                     } else {
                         colonist[slot] = null;
                     }
+                    invalidateEquipStatCache(colonist);
                 }
                 return;
             }
