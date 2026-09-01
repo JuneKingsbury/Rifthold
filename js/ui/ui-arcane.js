@@ -1147,28 +1147,70 @@ const arcaneMethods = {
             ctx.stroke();
         }
 
-        const finishX = W - tileSize * 3;
-        const checkSize = 8;
-        for (let cy = 0; cy < floorTop; cy += checkSize) {
-            for (let cx = 0; cx < tileSize; cx += checkSize) {
-                const isWhite = ((cx / checkSize) + (cy / checkSize)) % 2 === 0;
-                ctx.fillStyle = isWhite ? '#ffffff' : '#111111';
-                ctx.fillRect(finishX + cx, cy, checkSize, checkSize);
+        const hasBoss = !!activeExp.bossEncounter;
+        if (!hasBoss) {
+            const finishX = W - tileSize * 3;
+            const checkSize = 8;
+            for (let cy = 0; cy < floorTop; cy += checkSize) {
+                for (let cx = 0; cx < tileSize; cx += checkSize) {
+                    const isWhite = ((cx / checkSize) + (cy / checkSize)) % 2 === 0;
+                    ctx.fillStyle = isWhite ? '#ffffff' : '#111111';
+                    ctx.fillRect(finishX + cx, cy, checkSize, checkSize);
+                }
             }
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, floorTop, W, floorBottom - floorTop);
+            ctx.clip();
+            ctx.transform(1, 0, diagSlope, 1, -diagSlope * floorTop, 0);
+            for (let cy = floorTop; cy < floorBottom; cy += checkSize) {
+                for (let cx = 0; cx < tileSize; cx += checkSize) {
+                    const isWhite = ((cx / checkSize) + (cy / checkSize)) % 2 === 0;
+                    ctx.fillStyle = isWhite ? '#ffffff' : '#111111';
+                    ctx.fillRect(finishX + cx, cy, checkSize, checkSize);
+                }
+            }
+            ctx.restore();
+        } else {
+            const voidX = W - tileSize * 2;
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(voidX, 0, W - voidX, wallH);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, wallH, W, floorBottom - wallH);
+            ctx.clip();
+            ctx.transform(1, 0, diagSlope, 1, -diagSlope * wallH, 0);
+            ctx.fillRect(voidX, wallH, W - voidX, floorBottom - wallH);
+            ctx.restore();
         }
+        const shadowW = 80;
+        const leftStart = -tileSize * 2;
+        const leftGrad = ctx.createLinearGradient(leftStart, 0, leftStart + shadowW, 0);
+        leftGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+        leftGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = leftGrad;
+        ctx.fillRect(leftStart, 0, shadowW, wallH);
         ctx.save();
         ctx.beginPath();
-        ctx.rect(0, floorTop, W, floorBottom - floorTop);
+        ctx.rect(0, wallH, W, floorBottom - wallH);
         ctx.clip();
-        ctx.transform(1, 0, diagSlope, 1, -diagSlope * floorTop, 0);
-        for (let cy = floorTop; cy < floorBottom; cy += checkSize) {
-            for (let cx = 0; cx < tileSize; cx += checkSize) {
-                const isWhite = ((cx / checkSize) + (cy / checkSize)) % 2 === 0;
-                ctx.fillStyle = isWhite ? '#ffffff' : '#111111';
-                ctx.fillRect(finishX + cx, cy, checkSize, checkSize);
-            }
-        }
+        ctx.transform(1, 0, diagSlope, 1, -diagSlope * wallH, 0);
+        ctx.fillRect(leftStart, wallH, shadowW, floorBottom - wallH);
         ctx.restore();
+        if (!hasBoss) {
+            const rightGrad = ctx.createLinearGradient(W - shadowW, 0, W, 0);
+            rightGrad.addColorStop(0, 'rgba(0,0,0,0)');
+            rightGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+            ctx.fillStyle = rightGrad;
+            ctx.fillRect(W - shadowW, 0, shadowW, wallH);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, wallH, W, floorBottom - wallH);
+            ctx.clip();
+            ctx.transform(1, 0, diagSlope, 1, -diagSlope * wallH, 0);
+            ctx.fillRect(W - shadowW, wallH, shadowW, floorBottom - wallH);
+            ctx.restore();
+        }
 
         const ambientCfg = {
             crystal_caves: { shape: 'diamond', color: '#4488ff', dx: 0, dy: 0.3 },
