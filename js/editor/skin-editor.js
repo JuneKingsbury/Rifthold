@@ -42,7 +42,7 @@ const ENTITY_MANUAL = [
     { key: 'wave_enemy', char: 'V', color: '#aa33ff', desc: 'Wave enemy (fallback)' },
 ];
 
-const ENTITY_AUTO_CATEGORIES = ['golem', 'summon', 'enemy'];
+const ENTITY_AUTO_CATEGORIES = ['golem', 'summon', 'enemy', 'boss'];
 
 const ENTITY_SPECIALS = [
     ...ENTITY_MANUAL,

@@ -30,6 +30,18 @@ export const ENTITIES = {
     crusader_archer: { name: 'Crusader Archer', char: 'C', color: '#d6a816', hp: 50, speed: 0.34, category: 'enemy', hostile: true, damage: 8, aggroRange: 30, noFlee: true, roles: [{ type: 'ranged_attacker', range: 8, preferDistance: 6 }], ranged: true, projectileChar: '-', projectileColor: '#d6d216', loot: [] },
     void_walker:     { name: 'Void Walker', char: 'V', color: '#aa33ff', hp: 30, speed: 0.21, category: 'enemy', hostile: true, damage: 4, roles: [{ type: 'nexus_target' }], loot: [] },
     void_brute:      { name: 'Void Brute', char: 'V', color: '#7722cc', hp: 80, speed: 0.14, category: 'enemy', hostile: true, damage: 10, roles: [{ type: 'nexus_target' }, { type: 'structure_breaker', breakSpeed: 2 }], loot: [] },
+
+    // === Expedition Bosses ===
+    boss_crystal_colossus:          { name: 'Crystal Colossus',          char: '▲', color: '#4488ff', category: 'boss' },
+    boss_crystal_colossus_enraged:  { name: 'Crystal Colossus (Enraged)',char: '▲', color: '#ff2222', category: 'boss' },
+    boss_ancient_treant:            { name: 'Ancient Treant',            char: '▲', color: '#22aa66', category: 'boss' },
+    boss_ancient_treant_enraged:    { name: 'Ancient Treant (Enraged)',  char: '▲', color: '#ff4400', category: 'boss' },
+    boss_arcane_construct:          { name: 'Arcane Construct',          char: '▲', color: '#ff8844', category: 'boss' },
+    boss_arcane_construct_enraged:  { name: 'Arcane Construct (Enraged)',char: '▲', color: '#ff0000', category: 'boss' },
+    boss_void_sovereign:            { name: 'Void Sovereign',            char: '▲', color: '#7722cc', category: 'boss' },
+    boss_void_sovereign_enraged:    { name: 'Void Sovereign (Enraged)',  char: '▲', color: '#ff0000', category: 'boss' },
+    boss_high_king:                 { name: 'The High King',             char: '▲', color: '#ddaa22', category: 'boss' },
+    boss_high_king_enraged:         { name: 'The High King (Enraged)',   char: '▲', color: '#ff2200', category: 'boss' },
 };
 
 export const ANIMALS = Object.fromEntries(

@@ -819,7 +819,39 @@ const arcaneMethods = {
                 const enemy = enemies[i];
                 const ey = H / 2 + (i - enemies.length / 2) * 16;
                 const ex = partyX + 60 + (ey - H / 2) * diagSlope;
-                if (enemySprite) {
+                if (enemy.isBoss) {
+                    const bossSpriteKey = enemy.enraged && enemy.enragedSprite ? enemy.enragedSprite : enemy.sprite;
+                    const bossSprite = useSkins && bossSpriteKey ? skinMgr.getSprite('entities', bossSpriteKey) : null;
+                    const bossColor = enemy.enraged ? (enemy.enragedColor || '#ff0000') : (enemy.color || '#ff8844');
+                    const sz = 10;
+                    if (bossSprite) {
+                        ctx.drawImage(bossSprite, ex - sz, ey - sz, sz * 2, sz * 2);
+                    } else {
+                        ctx.beginPath();
+                        ctx.moveTo(ex, ey - sz);
+                        ctx.lineTo(ex - sz * 0.85, ey + sz * 0.7);
+                        ctx.lineTo(ex + sz * 0.85, ey + sz * 0.7);
+                        ctx.closePath();
+                        ctx.fillStyle = bossColor;
+                        ctx.fill();
+                        ctx.strokeStyle = enemy.enraged ? '#ff0000' : '#880000';
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+                    }
+                    ctx.font = 'bold 8px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillStyle = enemy.enraged ? '#ff4444' : '#ffcc44';
+                    ctx.fillText(enemy.name, ex, ey - sz - 3);
+                    if (enemy.enraged) {
+                        ctx.globalAlpha = 0.25 + Math.sin(Date.now() * 0.008) * 0.15;
+                        ctx.fillStyle = '#ff0000';
+                        ctx.beginPath();
+                        ctx.arc(ex, ey, sz + 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.globalAlpha = 1;
+                    }
+                } else if (enemySprite) {
                     ctx.drawImage(enemySprite, ex - 7, ey - 7, 14, 14);
                 } else {
                     ctx.beginPath();
@@ -835,11 +867,13 @@ const arcaneMethods = {
                 }
                 if (enemy.maxHp) {
                     const eHpPct = enemy.hp / enemy.maxHp;
-                    const eBarW = 10, eBarH = 2;
+                    const eBarW = enemy.isBoss ? 16 : 10;
+                    const eBarH = enemy.isBoss ? 3 : 2;
+                    const eBarY = enemy.isBoss ? ey - 24 : ey - 11;
                     ctx.fillStyle = '#222';
-                    ctx.fillRect(ex - eBarW / 2, ey - 11, eBarW, eBarH);
+                    ctx.fillRect(ex - eBarW / 2, eBarY, eBarW, eBarH);
                     ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
-                    ctx.fillRect(ex - eBarW / 2, ey - 11, eBarW * eHpPct, eBarH);
+                    ctx.fillRect(ex - eBarW / 2, eBarY, eBarW * eHpPct, eBarH);
                 }
             }
 
@@ -881,7 +915,9 @@ const arcaneMethods = {
                 } else if (entry.type === 'combat' && text.includes('for ')) {
                     const dmgMatch = text.match(/for (\d+)/);
                     if (dmgMatch) {
-                        const isEnemyAttacking = text.startsWith('An enemy');
+                        const partyNames = activeExp.partySnapshot ? activeExp.partySnapshot.map(p => p.name) : [];
+                        const isPartyAttacking = partyNames.some(n => text.startsWith(n));
+                        const isEnemyAttacking = !isPartyAttacking;
                         const numColor = isEnemyAttacking ? '#ff6644' : '#ffff44';
                         const numX = isEnemyAttacking ? (partyX + Math.random() * 20) : (partyX + 45 + Math.random() * 25);
                         this._expVisState.effects.push({ type: 'damage_number', text: dmgMatch[1], color: numColor, x: numX, y: H / 2 - 5 + Math.random() * 15, frame: 0, maxFrames: 25 });

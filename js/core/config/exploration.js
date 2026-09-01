@@ -91,6 +91,21 @@ export const REALMS = {
             { item: 'ward_of_the_sentinel', weight: 3 },
         ],
         enemies: { hp: [100, 160], damage: [11, 17], count: [4, 7], sprite: 'ghost' },
+        boss: {
+            name: 'The Crystal Colossus',
+            hp: 500, damage: 25,
+            enrageThreshold: 0.3, enrageDamageMult: 1.5,
+            color: '#4488ff', enragedColor: '#ff2222',
+            sprite: 'boss_crystal_colossus', enragedSprite: 'boss_crystal_colossus_enraged',
+            guaranteedLoot: [
+                { item: 'crystal_aegis', chance: 0.5 },
+                { item: 'runite_hammer', chance: 0.5 },
+            ],
+            bonusResources: { runite: 8, void_essence: 4 },
+            defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
+            enrageText: 'The Crystal Colossus cracks and glows red! It becomes enraged!',
+            approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
+        },
         events: {
             ambient: [
                 '{name} feels immense pressure from the rock above.',
@@ -211,6 +226,21 @@ export const REALMS = {
             { item: 'staff_of_regrowth', weight: 3 },
         ],
         enemies: { hp: [80, 130], damage: [9, 14], count: [3, 6], sprite: 'ghost' },
+        boss: {
+            name: 'The Ancient Treant',
+            hp: 450, damage: 22,
+            enrageThreshold: 0.3, enrageDamageMult: 1.5,
+            color: '#22aa66', enragedColor: '#ff4400',
+            sprite: 'boss_ancient_treant', enragedSprite: 'boss_ancient_treant_enraged',
+            guaranteedLoot: [
+                { item: 'living_bark_armor', chance: 0.5 },
+                { item: 'heartwood_staff', chance: 0.5 },
+            ],
+            bonusResources: { wood: 15, berries: 10 },
+            defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
+            enrageText: 'The Ancient Treant roars! Roots erupt from the ground as it enrages!',
+            approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
+        },
         events: {
             ambient: [
                 '{name} climbs through roots thicker than castle walls.',
@@ -345,6 +375,21 @@ export const REALMS = {
             { item: 'scholars_spectacles', weight: 2 },
         ],
         enemies: { hp: [90, 150], damage: [10, 16], count: [3, 6], sprite: 'ghost' },
+        boss: {
+            name: 'The Arcane Construct',
+            hp: 480, damage: 24,
+            enrageThreshold: 0.3, enrageDamageMult: 1.5,
+            color: '#ff8844', enragedColor: '#ff0000',
+            sprite: 'boss_arcane_construct', enragedSprite: 'boss_arcane_construct_enraged',
+            guaranteedLoot: [
+                { item: 'arcane_amplifier', chance: 0.5 },
+                { item: 'staff_of_distortion', chance: 0.5 },
+            ],
+            bonusResources: { runite: 6, void_essence: 5 },
+            defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
+            enrageText: 'The Arcane Construct overclocks — its attacks become erratic and deadly!',
+            approachText: 'A half-finished golem lurches to life, crackling with unstable magic!',
+        },
         events: {
             ambient: [
                 '{name} passes containment chambers — most are cracked and empty.',
@@ -470,6 +515,22 @@ export const REALMS = {
             { item: 'cloak_of_shadows', weight: 3 },
         ],
         enemies: { hp: [160, 240], damage: [15, 22], count: [4, 8], sprite: 'ghost' },
+        boss: {
+            name: 'The Void Sovereign',
+            hp: 600, damage: 30,
+            enrageThreshold: 0.3, enrageDamageMult: 1.5,
+            color: '#7722cc', enragedColor: '#ff0000',
+            sprite: 'boss_void_sovereign', enragedSprite: 'boss_void_sovereign_enraged',
+            guaranteedLoot: [
+                { item: 'shard_of_oblivion', chance: 0.4 },
+                { item: 'voidheart', chance: 0.3 },
+                { item: 'armor_of_the_abyss', chance: 0.3 },
+            ],
+            bonusResources: { void_essence: 10 },
+            defeatText: 'The Void Sovereign collapses into nothingness, leaving only silence!',
+            enrageText: 'The Void Sovereign tears reality apart around it — enraged!',
+            approachText: 'A being of pure void materializes, its gaze alone warping the air!',
+        },
         events: {
             ambient: [
                 '{name} walks on platforms of solidified nothingness.',
@@ -563,6 +624,21 @@ export const REALMS = {
             { item: 'map_fragment', weight: 3 },
         ],
         enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
+        boss: {
+            name: 'The High King',
+            hp: 700, damage: 35,
+            enrageThreshold: 0.3, enrageDamageMult: 1.5,
+            color: '#ddaa22', enragedColor: '#ff2200',
+            sprite: 'boss_high_king', enragedSprite: 'boss_high_king_enraged',
+            guaranteedLoot: [
+                { item: 'shard_of_oblivion', chance: 0.5 },
+                { item: 'voidheart', chance: 0.5 },
+            ],
+            bonusResources: { gold: 50, void_essence: 8 },
+            defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
+            enrageText: 'The High King draws a second blade! His fury is unrelenting!',
+            approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
+        },
         events: {
             ambient: [
                 'TODO: {name} marvels at crystalline formations pulsing with light.',
@@ -586,6 +662,7 @@ export const EXPLORATION_CONFIG = {
     encounterSpacing: 0.2,
     baseFistDamage: 5,
     combatRoundTicks: 8,
+    bossTriggerPercent: 0.7,
     microEventChance: 0.04,
     trapDamageRange: [5, 15],
     trapChance: 0.3,

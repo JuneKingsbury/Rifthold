@@ -105,7 +105,7 @@ export class ExplorationSystem {
         }
         if (durationMult !== 1.0) duration = Math.floor(duration * durationMult);
         const diffSettings = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
-        const encounters = this._generateEncounters(dim, diffSettings);
+        const { encounters, bossEncounter } = this._generateEncounters(dim, diffSettings);
 
         const expedition = {
             id: nextExpeditionId++,
@@ -118,6 +118,8 @@ export class ExplorationSystem {
             startTick: null,
             duration,
             encounters,
+            bossEncounter,
+            bossTriggered: false,
             currentEncounter: 0,
             nextEncounterTick: null,
             status: 'gathering',
@@ -177,7 +179,13 @@ export class ExplorationSystem {
                     }
                 }
 
-                if (game.tick >= exp.nextEncounterTick && exp.currentEncounter < exp.encounters.length) {
+                const bossDue = exp.bossEncounter && !exp.bossTriggered
+                    && elapsed >= exp.duration * EXPLORATION_CONFIG.bossTriggerPercent;
+
+                if (bossDue && !exp.combat) {
+                    exp.bossTriggered = true;
+                    this._startEncounter(exp, game, exp.bossEncounter);
+                } else if (game.tick >= exp.nextEncounterTick && exp.currentEncounter < exp.encounters.length) {
                     this._startEncounter(exp, game);
                     exp.currentEncounter++;
                     exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
@@ -333,7 +341,29 @@ export class ExplorationSystem {
                 encounters.push({ type: 'loot', ...lootEntry });
             }
         }
-        return encounters;
+
+        let bossEncounter = null;
+        if (dim.boss) {
+            const bossHp = Math.round(dim.boss.hp * diffSettings.enemyHpMult);
+            const bossDmg = Math.round(dim.boss.damage * diffSettings.enemyDmgMult);
+            bossEncounter = {
+                type: 'combat',
+                isBoss: true,
+                enemies: [{
+                    hp: bossHp, maxHp: bossHp, damage: bossDmg,
+                    isBoss: true, name: dim.boss.name,
+                    enraged: false,
+                    enrageThreshold: dim.boss.enrageThreshold,
+                    enrageDamageMult: dim.boss.enrageDamageMult,
+                    color: dim.boss.color,
+                    enragedColor: dim.boss.enragedColor,
+                    sprite: dim.boss.sprite,
+                    enragedSprite: dim.boss.enragedSprite,
+                }],
+            };
+        }
+
+        return { encounters, bossEncounter };
     }
 
     _rollLoot(dim, diffSettings) {
@@ -423,8 +453,8 @@ export class ExplorationSystem {
     // Initiates an encounter from the pre-generated encounter list.
     // Encounters are either 'loot' (immediate reward) or 'combat' (triggers
     // the round-based combat loop in _updateCombat).
-    _startEncounter(exp, game) {
-        const encounter = exp.encounters[exp.currentEncounter];
+    _startEncounter(exp, game, encounterOverride) {
+        const encounter = encounterOverride || exp.encounters[exp.currentEncounter];
         if (!encounter) return;
 
         if (encounter.type === 'loot') {
@@ -450,14 +480,23 @@ export class ExplorationSystem {
         }
 
         const enemies = encounter.enemies.map(e => ({ ...e }));
-        const startMsg = pickRandom(EXPLORATION_EVENTS.combatStart);
-        this._addLog(exp, game, `${startMsg} (${enemies.length} foes)`, 'combat');
+
+        if (encounter.isBoss) {
+            const bossEnemy = enemies.find(e => e.isBoss);
+            const dim = REALMS[exp.realm];
+            const approachMsg = dim.boss?.approachText || `A powerful foe blocks the path: ${bossEnemy.name}!`;
+            this._addLog(exp, game, approachMsg, 'danger');
+        } else {
+            const startMsg = pickRandom(EXPLORATION_EVENTS.combatStart);
+            this._addLog(exp, game, `${startMsg} (${enemies.length} foes)`, 'combat');
+        }
 
         exp.combat = {
             enemies,
             roundTick: game.tick + EXPLORATION_CONFIG.combatRoundTicks,
             round: 0,
             encounterIndex: exp.currentEncounter,
+            isBoss: encounter.isBoss || false,
         };
     }
 
@@ -492,6 +531,7 @@ export class ExplorationSystem {
             for (let hit = 0; hit < hitsPerRound; hit++) {
                 const target = combat.enemies.find(e => e.hp > 0);
                 if (!target) break;
+                const targetLabel = target.isBoss ? target.name : 'an enemy';
                 let dmg = Math.floor((weaponDmg + randInt(0, 3)) * partyDmgMult);
                 let critHit = false;
                 if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
@@ -499,14 +539,14 @@ export class ExplorationSystem {
                 if (Math.random() < 0.15) {
                     const msg = pickRandom(EXPLORATION_EVENTS.combatMiss)
                         .replace('{attacker}', member.name)
-                        .replace('{target}', 'an enemy');
+                        .replace('{target}', targetLabel);
                     this._addLog(exp, game, msg, 'combat');
                 } else {
                     target.hp -= dmg;
-                    const hitMsg = critHit ? `${member.name} lands a critical strike for ${dmg} damage!` : null;
+                    const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
                     const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit)
                         .replace('{attacker}', member.name)
-                        .replace('{target}', 'an enemy')
+                        .replace('{target}', targetLabel)
                         .replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
                     const lifeSteal = memberItems.reduce((sum, it) => sum + (it.lifeSteal || 0), 0);
@@ -515,7 +555,8 @@ export class ExplorationSystem {
                         if (healed > 0) member.hp = Math.min(member.maxHp, member.hp + healed);
                     }
                     if (target.hp <= 0) {
-                        this._addLog(exp, game, `${member.name} slays a foe!`, 'success');
+                        const slayLabel = target.isBoss ? target.name : 'a foe';
+                        this._addLog(exp, game, `${member.name} slays ${slayLabel}!`, 'success');
                         const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0);
                         if (hpOnKill > 0) member.hp = Math.min(member.maxHp, member.hp + hpOnKill);
                     }
@@ -550,6 +591,13 @@ export class ExplorationSystem {
 
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
+            if (enemy.isBoss && !enemy.enraged && enemy.hp / enemy.maxHp <= enemy.enrageThreshold) {
+                enemy.enraged = true;
+                enemy.damage = Math.floor(enemy.damage * enemy.enrageDamageMult);
+                const dim = REALMS[exp.realm];
+                this._addLog(exp, game, dim.boss?.enrageText || `${enemy.name} becomes enraged!`, 'danger');
+            }
+            const attackerLabel = enemy.isBoss ? enemy.name : 'An enemy';
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             const enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
             for (let hit = 0; hit < enemyHits; hit++) {
@@ -558,10 +606,10 @@ export class ExplorationSystem {
                     const targetSummon = aliveSummons[randInt(0, aliveSummons.length - 1)];
                     let dmg = enemy.damage + randInt(0, 2);
                     if (Math.random() < 0.15) {
-                        this._addLog(exp, game, `An enemy misses the ${targetSummon.name}!`, 'combat');
+                        this._addLog(exp, game, `${attackerLabel} misses the ${targetSummon.name}!`, 'combat');
                     } else {
                         targetSummon.hp -= dmg;
-                        this._addLog(exp, game, `An enemy strikes the ${targetSummon.name} for ${dmg}!`, 'combat');
+                        this._addLog(exp, game, `${attackerLabel} strikes the ${targetSummon.name} for ${dmg}!`, 'combat');
                         if (targetSummon.hp <= 0) {
                             this._addLog(exp, game, `The ${targetSummon.name} is slain!`, 'danger');
                             exp.summons.splice(exp.summons.indexOf(targetSummon), 1);
@@ -581,7 +629,7 @@ export class ExplorationSystem {
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
                 const dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
-                    this._addLog(exp, game, `${target.name} dodges an attack!`, 'combat');
+                    this._addLog(exp, game, `${target.name} dodges ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
                     continue;
                 }
                 let dmg = enemy.damage + randInt(0, 2);
@@ -594,13 +642,13 @@ export class ExplorationSystem {
 
                 if (Math.random() < 0.15) {
                     const msg = pickRandom(EXPLORATION_EVENTS.combatMiss)
-                        .replace('{attacker}', 'An enemy')
+                        .replace('{attacker}', attackerLabel)
                         .replace('{target}', target.name);
                     this._addLog(exp, game, msg, 'combat');
                 } else {
                     target.hp -= dmg;
                     const msg = pickRandom(EXPLORATION_EVENTS.combatHit)
-                        .replace('{attacker}', 'An enemy')
+                        .replace('{attacker}', attackerLabel)
                         .replace('{target}', target.name)
                         .replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
@@ -608,7 +656,7 @@ export class ExplorationSystem {
                     if (thorns > 0 && enemy.hp > 0) {
                         enemy.hp -= thorns;
                         this._addLog(exp, game, `Thorns deal ${thorns} damage back!`, 'combat');
-                        if (enemy.hp <= 0) this._addLog(exp, game, `An enemy is slain by thorns!`, 'success');
+                        if (enemy.hp <= 0) this._addLog(exp, game, `${attackerLabel} is slain by thorns!`, 'success');
                     }
                     if (target.hp <= 0) {
                         this._checkExpeditionRevive(exp, target, game);
@@ -737,6 +785,25 @@ export class ExplorationSystem {
         const survived = exp.partySnapshot.filter(p => p.hp > 0).length;
         if (survived > 0) {
             const dim = REALMS[exp.realm];
+
+            if (exp.combat.isBoss && dim.boss) {
+                const boss = dim.boss;
+                this._addLog(exp, game, boss.defeatText, 'success');
+                if (!exp.loot._items) exp.loot._items = [];
+                for (const lootEntry of boss.guaranteedLoot) {
+                    if (Math.random() < lootEntry.chance) {
+                        exp.loot._items.push(lootEntry.item);
+                        const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
+                        this._addLog(exp, game, `Found ${itemName}!`, 'loot');
+                        break;
+                    }
+                }
+                for (const [res, amt] of Object.entries(boss.bonusResources)) {
+                    exp.loot[res] = (exp.loot[res] || 0) + amt;
+                    this._addLog(exp, game, `+${amt} ${res.replace(/_/g, ' ')} from the boss!`, 'loot');
+                }
+            }
+
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult');
             const dsCombat = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
             const lootEntry = this._rollLoot(dim, dsCombat);
