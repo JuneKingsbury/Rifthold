@@ -23,9 +23,9 @@ export const TRAIT_EXCLUSIONS = [
 
 export const TRAITS = {
     // ── Common ──────────────────────────────────────────────────────────────
-    hard_worker:   { name: 'Hard Worker',   weight: 10, value:  3, workSpeedMult: 1.2,  description: '+20% work speed' },
-    lazy:          { name: 'Lazy',          weight: 10, value: -2, workSpeedMult: 0.85, idleMoodBonus: 5, description: '-15% work speed, happy when idle' },
-    night_owl:     { name: 'Night Owl',     weight: 10, value:  1, nightSpeedMult: 1.2, daySpeedMult: 0.9, description: '+20% at night, -10% during day' },
+    hard_worker:   { name: 'Hard Worker',   weight: 10, value:  3, workSpeedMult: 1.2,  description: '+20% work speed', expedition: { fatigueMult: 0.9 } },
+    lazy:          { name: 'Lazy',          weight: 10, value: -2, workSpeedMult: 0.85, idleMoodBonus: 5, description: '-15% work speed, happy when idle', expedition: { fatigueMult: 1.3 } },
+    night_owl:     { name: 'Night Owl',     weight: 10, value:  1, nightSpeedMult: 1.2, daySpeedMult: 0.9, description: '+20% at night, -10% during day', expedition: { realmBonus: { shadow_realm: { damageMult: 1.2 }, void_abyss: { damageMult: 1.15 }, oblivion_rift: { damageMult: 1.1 } } } },
     early_bird:    { name: 'Early Bird',    weight: 10, value:  1, daySpeedMult: 1.2,   nightSpeedMult: 0.9, description: '+20% during day, -10% at night' },
     socialite:     { name: 'Socialite',     weight: 10, value:  1, nearOthersMoodBonus: 8, aloneMoodPenalty: -5, description: 'Happy near others, sad alone' },
     loner:         { name: 'Loner',         weight: 10, value:  0, aloneMoodBonus: 8,   nearOthersMoodPenalty: -5, description: 'Happy alone, stressed near others' },
@@ -33,23 +33,23 @@ export const TRAITS = {
     pessimist:     { name: 'Pessimist',     weight: 10, value: -2, negativeThoughtMult: 1.5, description: 'Negative thoughts 50% stronger' },
     gourmand:      { name: 'Gourmand',      weight: 10, value: -1, cookedFoodMoodBonus: 8, rawFoodMoodPenalty: -12, description: '+8 mood from cooked meals, -12 mood from raw food' },
     // ── Uncommon ────────────────────────────────────────────────────────────
-    green_thumb:   { name: 'Green Thumb',   weight: 7,  value:  2, farmingSpeedMult: 1.3, description: '+30% farming speed' },
+    green_thumb:   { name: 'Green Thumb',   weight: 7,  value:  2, farmingSpeedMult: 1.3, description: '+30% farming speed', expedition: { realmBonus: { verdant_depths: { lootMult: 1.2 }, fungal_hollows: { lootMult: 1.15 }, primeval_canopy: { lootMult: 1.1 } } } },
     iron_stomach:  { name: 'Iron Stomach',  weight: 7,  value:  2, hungerDecayMult: 0.5,  description: 'Gets hungry half as fast' },
-    tough:         { name: 'Tough',         weight: 7,  value:  3, damageTakenMult: 0.7,  description: 'Takes 30% less damage' },
-    brave:         { name: 'Brave',         weight: 6,  value:  2, fleeHpMult: 0.3,       description: 'Only flees at very low HP' },
-    quick:         { name: 'Quick',         weight: 7,  value:  2, moveSpeedBonus: 0.25,  description: 'Moves 25% faster' },
+    tough:         { name: 'Tough',         weight: 7,  value:  3, damageTakenMult: 0.7,  description: 'Takes 30% less damage', expedition: { trapDamageMult: 0.7, fatigueMult: 0.8 } },
+    brave:         { name: 'Brave',         weight: 6,  value:  2, fleeHpMult: 0.3,       description: 'Only flees at very low HP', expedition: { rallyChance: 0.1, rallyHeal: 0.05 } },
+    quick:         { name: 'Quick',         weight: 7,  value:  2, moveSpeedBonus: 0.25,  description: 'Moves 25% faster', expedition: { durationMult: 0.95, dodgeChanceMod: 0.05 } },
     sturdy:        { name: 'Sturdy',        weight: 6,  value:  1, damageTakenMult: 0.85, workSpeedMult: 0.9, description: 'Takes 15% less damage, -10% work speed' },
     light_sleeper: { name: 'Light Sleeper', weight: 7,  value:  0, restDecayMult: 1.4, sleepRestMult: 1.5, description: 'Gets tired faster, but recovers faster while sleeping' },
     deep_sleeper:  { name: 'Deep Sleeper',  weight: 7,  value:  0, restDecayMult: 0.7, sleepRestMult: 0.7, description: 'Gets tired slower, but recovers slower while sleeping' },
     creative:      { name: 'Creative',      weight: 6,  value:  3, craftingSpeedMult: 1.2, qualityBonus: 1, description: '+20% crafting speed, +1 quality tier chance' },
-    scholar:       { name: 'Scholar',       weight: 6,  value:  3, researchSpeedMult: 1.2, magicXpMult: 1.2, description: '+20% research speed, +20% magic XP gain' },
+    scholar:       { name: 'Scholar',       weight: 6,  value:  3, researchSpeedMult: 1.2, magicXpMult: 1.2, description: '+20% research speed, +20% magic XP gain', expedition: { puzzleSuccessBonus: 0.2 } },
     gluttonous:    { name: 'Gluttonous',    weight: 6,  value: -2, hungerDecayMult: 1.6,  description: 'Gets hungry 60% faster' },
     // ── Rare ────────────────────────────────────────────────────────────────
-    lucky:         { name: 'Lucky',         weight: 3,  value:  4, qualityBonus: 2, description: '+2 quality tier chance on all crafted items' },
+    lucky:         { name: 'Lucky',         weight: 3,  value:  4, qualityBonus: 2, description: '+2 quality tier chance on all crafted items', expedition: { rareEncounterMult: 1.3 } },
     pyromaniac:    { name: 'Pyromaniac',    weight: 2,  value: -3, fireChance: 0.001, description: 'Rare chance to start fires' },
     // ── Very Rare ───────────────────────────────────────────────────────────
     pacifist:         { name: 'Pacifist',         weight: 1, value: -2, description: 'Refuses to attack enemies, only flees' },
-    prodigy:          { name: 'Prodigy',          weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, description: 'Gains all XP 20% faster' },
+    prodigy:          { name: 'Prodigy',          weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, description: 'Gains all XP 20% faster', expedition: { xpMult: 1.3 } },
     magically_gifted: { name: 'Magically Gifted', weight: 2, value:  3, description: 'Starts with 2 levels in a random magic school and knows its starter spell' },
     // ── Race-specific ────────────────────────────────────────────────────────
     human:   { name: 'Human',   weight: 0, value:  10, allSkillXpMult: 1.2, description: 'A versatile member of Humanity (+20% non-magic skill exp)' },

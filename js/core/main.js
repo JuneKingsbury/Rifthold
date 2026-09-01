@@ -1228,16 +1228,114 @@ class Game {
         const packChecks = panel.querySelectorAll('.exp-pack-check:checked');
         const packIds = Array.from(packChecks).map(cb => parseInt(cb.value));
         const difficulty = this.ui._expDifficulty || 1;
-        const result = this.exploration.sendExpedition(this, realmKey, ids, packIds, difficulty);
+
+        const mutatorChecks = panel.querySelectorAll('.exp-mutator:checked');
+        const mutators = Array.from(mutatorChecks).map(cb => cb.value);
+
+        const potions = {};
+        const potionInputs = panel.querySelectorAll('.exp-potion');
+        for (const input of potionInputs) {
+            const count = parseInt(input.value) || 0;
+            if (count > 0) potions[input.dataset.potion] = count;
+        }
+
+        const backRowSet = this.ui._expBackRowIds || new Set();
+        const backRowIds = ids.filter(id => backRowSet.has(id));
+        const frontRowIds = ids.filter(id => !backRowSet.has(id));
+        const formation = { front: frontRowIds, back: backRowIds };
+
+        const options = { mutators, potions, formation };
+        const result = this.exploration.sendExpedition(this, realmKey, ids, packIds, difficulty, options);
         if (result) {
             this.notifications.push({ text: `Expedition launched to ${result.realmName}!`, tick: this.tick, type: 'success' });
             this.ui._arcaneExpSetup = null;
             this.ui._lastArcaneHtml = '';
-            this.ui._expVisState = { lastLogLen: 0, effects: [], partyX: 0 };
+            this.ui._expBackRowIds = new Set();
+            this.ui._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0 };
             this.ui.updateArcanePanel();
         } else {
             this.notifications.push({ text: 'Cannot launch expedition', tick: this.tick, type: 'danger' });
         }
+    }
+
+    retreatExpedition(expId) {
+        const result = this.exploration.retreatExpedition(this, expId);
+        if (result) {
+            this.notifications.push({ text: 'Retreat ordered!', tick: this.tick, type: 'info' });
+            this.ui._lastArcaneHtml = '';
+            this.ui.updateArcanePanel();
+        }
+    }
+
+    resolveExpeditionDecision(expId, choiceIndex) {
+        this.exploration.resolveDecision(this, expId, choiceIndex);
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
+    }
+
+    resolveExpeditionPuzzle(expId, checkIndex) {
+        this.exploration.resolvePuzzle(this, expId, checkIndex);
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
+    }
+
+    resolveExpeditionNpc(expId, choiceIndex) {
+        this.exploration.resolveNpc(this, expId, choiceIndex);
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
+    }
+
+    resolveExpeditionTrap(expId, checkIndex) {
+        this.exploration.resolveTrap(this, expId, checkIndex);
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
+    }
+
+    saveExpeditionPreset() {
+        const panel = this.ui.elements.arcanePanel;
+        const ids = Array.from(panel.querySelectorAll('.exp-check:checked')).map(cb => parseInt(cb.value));
+        if (ids.length === 0) {
+            this.notifications.push({ text: 'Select colonists first', tick: this.tick, type: 'danger' });
+            return;
+        }
+        const nameInput = panel.querySelector('#exp-preset-name');
+        const customName = nameInput?.value?.trim();
+        const name = customName || `Preset ${this.exploration.partyPresets.length + 1}`;
+        const backRowSet = this.ui._expBackRowIds || new Set();
+        const backRowIds = ids.filter(id => backRowSet.has(id));
+        const frontRowIds = ids.filter(id => !backRowSet.has(id));
+
+        const potions = {};
+        for (const input of panel.querySelectorAll('.exp-potion')) {
+            const count = parseInt(input.value) || 0;
+            if (count > 0) potions[input.dataset.potion] = count;
+        }
+        const mutators = Array.from(panel.querySelectorAll('.exp-mutator:checked')).map(cb => cb.value);
+
+        this.exploration.savePartyPreset(name, ids, { front: frontRowIds, back: backRowIds }, potions, mutators);
+        this.notifications.push({ text: `Saved preset "${name}"`, tick: this.tick, type: 'success' });
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
+    }
+
+    deleteExpeditionPreset(name) {
+        this.exploration.deletePartyPreset(name);
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
+    }
+
+    loadExpeditionPreset(name) {
+        const preset = this.exploration.loadPartyPreset(name);
+        if (!preset) return;
+        const panel = this.ui.elements.arcanePanel;
+        panel.querySelectorAll('.exp-check').forEach(cb => {
+            cb.checked = preset.colonistIds.includes(parseInt(cb.value));
+        });
+        this.ui._expBackRowIds = new Set(preset.formation?.back || []);
+        this.ui._expPresetPotions = preset.potions || {};
+        this.ui._expPresetMutators = preset.mutators || [];
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
     }
 
     launchExpedition(realmKey) {

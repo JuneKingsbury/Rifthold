@@ -4,7 +4,7 @@ import { ensureEntityRoles } from '../entities/roles.js';
 import { recalcMaxMana, invalidateEquipStatCache } from '../entities/colonist.js';
 
 const SAVE_KEY = 'colony_save';
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 
 export function saveGame(game) {
     const layout = captureLayout();
@@ -84,6 +84,12 @@ export function saveGame(game) {
             expeditions: game.exploration.expeditions,
             completedExpeditions: game.exploration.completedExpeditions,
             completedRealms: [...(game.exploration.completedRealms || [])],
+            bestiary: Object.fromEntries(game.exploration.bestiary || new Map()),
+            expeditionXP: game.exploration.expeditionXP || {},
+            fatigueCooldowns: game.exploration.fatigueCooldowns || {},
+            realmHistory: game.exploration.realmHistory || [],
+            partyPresets: game.exploration.partyPresets || [],
+            activeRealmEvents: game.exploration.activeRealmEvents || [],
         },
 
         research: {
@@ -270,6 +276,13 @@ export function loadGame(game) {
             game.exploration.expeditions = data.exploration.expeditions || [];
             game.exploration.completedExpeditions = data.exploration.completedExpeditions || [];
             game.exploration.completedRealms = new Set(data.exploration.completedRealms || []);
+            game.exploration.bestiary = new Map(Object.entries(data.exploration.bestiary || {}));
+            game.exploration.expeditionXP = data.exploration.expeditionXP || {};
+            game.exploration.fatigueCooldowns = data.exploration.fatigueCooldowns || {};
+            game.exploration.realmHistory = data.exploration.realmHistory || [];
+            game.exploration.partyPresets = data.exploration.partyPresets || [];
+            game.exploration.activeRealmEvents = data.exploration.activeRealmEvents || [];
+            game.exploration.syncIdCounter();
         }
 
         if (data.stats) {

@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getComplexStructureAt, getSpellCooldownMult } from '../systems/complexBuildings.js';
@@ -407,11 +407,13 @@ export class UI {
         const hasNew = this.game.story.hasUnviewed();
         const researchNeedsAtt = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
         const currentManaCrystalBonus = this.game.manaCrystalBonus || 0;
-        const buildModeChanged = hasNew !== this._lastStoryHasNew || researchNeedsAtt !== this._lastResearchNeedsAttention || currentManaCrystalBonus !== this._lastManaCrystalBonus;
-        if (buildModeChanged) {
+        const expPending = !!this.game.exploration?.expeditions?.some(e => e.pendingDecision);
+        const modeBarChanged = hasNew !== this._lastStoryHasNew || researchNeedsAtt !== this._lastResearchNeedsAttention || currentManaCrystalBonus !== this._lastManaCrystalBonus || expPending !== this._lastExpPending;
+        if (modeBarChanged) {
             this._lastStoryHasNew = hasNew;
             this._lastResearchNeedsAttention = researchNeedsAtt;
             this._lastManaCrystalBonus = currentManaCrystalBonus;
+            this._lastExpPending = expPending;
             this.updateModeDisplay(this.game.input);
         }
     }
@@ -605,6 +607,10 @@ export class UI {
                 const btn = this.elements.modeBar.querySelector(`[data-mode-action="${hl}"]`);
                 if (btn) btn.classList.add('tutorial-highlight');
             }
+        }
+        if (this.game.exploration?.expeditions?.some(e => e.pendingDecision)) {
+            const btn = this.elements.modeBar.querySelector('[data-mode-action="arcane"]');
+            if (btn) btn.classList.add('tutorial-highlight');
         }
     }
 
@@ -1046,6 +1052,24 @@ export class UI {
         const allTraits = traitSpanArr.filter(Boolean).join(', ');
         if (allTraits) html += `<div class="info-row">Traits: ${allTraits}</div>`;
         html += `<div class="info-row">Bed: ${colonist.assignedBed ? `(${colonist.assignedBed.x},${colonist.assignedBed.y})` : 'None'}</div>`;
+        if (this.game.exploration) {
+            const expl = this.game.exploration;
+            const expLvl = expl.getExpeditionLevel(colonist.id);
+            const xpData = expl.expeditionXP[colonist.id];
+            if (colonist.onExpedition) {
+                html += `<div class="info-row"><span style="color:#cc88ff;">On Expedition</span></div>`;
+            } else if (expl.isFatigued(colonist.id, this.game.tick)) {
+                const remaining = expl.getFatigueRemaining(colonist.id, this.game.tick);
+                const days = Math.ceil(remaining / CONFIG.TICKS_PER_DAY);
+                html += `<div class="info-row"><span style="color:#ff6644;">Fatigued</span> <span style="color:#888;">(${days} day${days !== 1 ? 's' : ''} remaining)</span></div>`;
+            }
+            if (expLvl > 0 || xpData) {
+                const xp = xpData?.xp || 0;
+                const level = xpData?.level || 0;
+                const needed = 10 + level * 5;
+                html += `<div class="info-row">Adventurer Lv${level} <span style="color:#888;">(${xp}/${needed} XP)</span></div>`;
+            }
+        }
 
         // --- Skills ---
         html += `<div style="${sectionHdr}">Skills</div>`;
@@ -2035,7 +2059,8 @@ export class UI {
             const weapon = c.weapon?.name || 'Fists';
             html += `<div class="hud-colonist" data-colonist-id="${c.id}">`;
             const needsDots = `<span class="hud-dots"><span style="color:${moodColor}">●</span><span style="color:${hungerColor}">●</span><span style="color:${restColor}">●</span><span style="color:${hpColor}">●</span></span>`;
-            html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> ${needsDots} <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}</span>`;
+            const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ' <span style="color:#ff6644">[Fatigued]</span>' : '';
+            html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> ${needsDots} <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
             html += `<div class="hud-bars">Mood: <span style="color:${moodColor}">${c.mood.toFixed(0)} (${moodLevel})</span> | Hunger: <span style="color:${hungerColor}">${c.needs.hunger.toFixed(0)}</span> | Rest: <span style="color:${restColor}">${c.needs.rest.toFixed(0)}</span> | HP: <span style="color:${hpColor}">${Math.round(c.hp)}/${c.maxHp}</span></div>`;
             html += `</div>`;
         }
@@ -3130,6 +3155,8 @@ export class UI {
         html += `<button class="story-tab-btn${tab === 'research' ? ' active' : ''}" data-story-tab="research">${tabLabel('research', 'Research')}</button>`;
         html += `<button class="story-tab-btn${tab === 'races' ? ' active' : ''}" data-story-tab="races">${tabLabel('races', 'Races')}</button>`;
         html += `<button class="story-tab-btn${tab === 'realms' ? ' active' : ''}" data-story-tab="realms">${tabLabel('realms', 'Realms')}</button>`;
+        const bestiarySize = this.game.exploration?.bestiary?.size || 0;
+        html += `<button class="story-tab-btn${tab === 'bestiary' ? ' active' : ''}" data-story-tab="bestiary">Bestiary (${bestiarySize})</button>`;
         html += '</div>';
 
         const entries = Object.entries(STORY_MILESTONES)
@@ -3137,7 +3164,49 @@ export class UI {
 
         html += '<div class="story-entries">';
 
-        if (tab === 'realms') {
+        if (tab === 'bestiary') {
+            const bestiary = this.game.exploration?.bestiary;
+            if (!bestiary || bestiary.size === 0) {
+                html += `<div class="story-entry locked"><div class="story-entry-title">No entries yet</div><div class="story-entry-text">Encounter creatures on expeditions to fill the bestiary.</div></div>`;
+            } else {
+                const categories = { regular: [], elite: [], boss: [], npc: [] };
+                for (const [, entry] of bestiary) {
+                    const cat = entry.category || 'regular';
+                    if (categories[cat]) categories[cat].push(entry);
+                }
+                for (const [catKey, catEntries] of Object.entries(categories)) {
+                    if (catEntries.length === 0) continue;
+                    const catColors = { regular: '#ff4444', elite: '#ff8844', boss: '#ffcc44', npc: '#44ccff' };
+                    const catNames = { regular: 'Enemies', elite: 'Elites', boss: 'Bosses', npc: 'Encounters' };
+                    html += `<div style="color:${catColors[catKey]};font-weight:bold;margin-top:8px;margin-bottom:4px;font-size:0.95em;">${catNames[catKey]} (${catEntries.length})</div>`;
+                    for (const entry of catEntries) {
+                        const realmName = REALMS[entry.realm]?.name || entry.realm;
+                        let spriteHtml = '';
+                        const sm = this.game.skinManager;
+                        if (sm?.isActive && entry.sprite) {
+                            const sprite = sm.getSprite('entities', entry.sprite);
+                            if (sprite) {
+                                const c = document.createElement('canvas');
+                                c.width = sprite.width || sprite.naturalWidth || 16;
+                                c.height = sprite.height || sprite.naturalHeight || 16;
+                                c.getContext('2d').drawImage(sprite, 0, 0);
+                                spriteHtml = `<img src="${c.toDataURL('image/png')}" style="width:24px;height:24px;image-rendering:pixelated;vertical-align:middle;margin-right:6px;">`;
+                            }
+                        }
+                        if (!spriteHtml) {
+                            const color = entry.color || catColors[catKey];
+                            const symbol = catKey === 'boss' ? '&#9650;' : catKey === 'npc' ? '&#9786;' : '&#9668;';
+                            spriteHtml = `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${color};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
+                        }
+                        html += `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">`;
+                        html += spriteHtml;
+                        html += `<div><div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
+                        html += `<div class="story-entry-text" style="font-size:0.8em;">Found in: ${realmName} | Encountered: ${entry.count}x</div></div>`;
+                        html += `</div>`;
+                    }
+                }
+            }
+        } else if (tab === 'realms') {
             const groups = [];
             const groupMap = new Map();
             for (const [key, milestone] of entries) {

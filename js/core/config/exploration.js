@@ -1,9 +1,48 @@
+// Named enemy catalog — each enemy type has base stats, a sprite, and a color.
+// Realms reference these by key with a spawn weight.
+export const EXPEDITION_ENEMIES = {
+    // Crystal chain
+    crystal_bat:      { name: 'Crystal Bat',      hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff' },
+    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc' },
+    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff' },
+    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
+    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa' },
+
+    // Verdant chain
+    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44' },
+    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833' },
+    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
+    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
+    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622' },
+
+    // Arcane chain
+    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
+    tome_guardian:     { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc' },
+    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
+    construct:        { name: 'Arcane Construct',   hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
+    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
+
+    // Shadow chain
+    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588' },
+    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
+    shade:            { name: 'Shade',              hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
+    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
+    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
+
+    // Kingdom chain
+    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44' },
+    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33' },
+    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44' },
+    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
+    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88' },
+};
+
 // Exploration / realms. Used by exploration.js.
 export const REALMS = {
     crystal_caves: {
         name: 'Crystal Caves', difficulty: 1,
         chain: 'crystal', chainOrder: 1,
-        duration: [220, 380], encounters: 3,
+        duration: [220, 380], encounters: 5, combatEncounters: [1, 2],
         vis: { wall: 'stone_wall', floor: 'stone_floor' },
         loot: [
             { resource: 'stone', weight: 40, amount: [5, 12] },
@@ -11,7 +50,11 @@ export const REALMS = {
             { resource: 'void_essence', weight: 10, amount: [1, 3] },
             { item: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
+        enemies: { count: [2, 4], types: [
+            { key: 'crystal_bat', weight: 50 },
+            { key: 'shard_spider', weight: 30 },
+            { key: 'crystal_golem', weight: 20 },
+        ] },
         events: {
             ambient: [
                 '{name} marvels at crystalline formations pulsing with light.',
@@ -40,7 +83,7 @@ export const REALMS = {
     crystal_mines: {
         name: 'Crystal Mines', difficulty: 2,
         chain: 'crystal', chainOrder: 2,
-        duration: [350, 550], encounters: 4,
+        duration: [350, 550], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'stone_wall', floor: 'stone_floor' },
         requiresRealm: 'crystal_caves',
         loot: [
@@ -49,7 +92,12 @@ export const REALMS = {
             { resource: 'void_essence', weight: 15, amount: [2, 5] },
             { item: 'drum_of_rallying', weight: 3 },
         ],
-        enemies: { hp: [70, 110], damage: [7, 12], count: [3, 5], sprite: 'ghost' },
+        enemies: { count: [3, 5], types: [
+            { key: 'crystal_bat', weight: 20 },
+            { key: 'shard_spider', weight: 35 },
+            { key: 'crystal_golem', weight: 35 },
+            { key: 'runite_elemental', weight: 10 },
+        ] },
         events: {
             ambient: [
                 '{name} hears the echoing clink of ancient pickaxes.',
@@ -81,7 +129,7 @@ export const REALMS = {
     crystal_depths: {
         name: 'Crystal Depths', difficulty: 3,
         chain: 'crystal', chainOrder: 3,
-        duration: [500, 750], encounters: 6,
+        duration: [500, 750], encounters: 8, combatEncounters: [2, 4],
         vis: { wall: 'stone_wall', floor: 'stone_floor' },
         requiresRealm: 'crystal_mines',
         loot: [
@@ -90,7 +138,12 @@ export const REALMS = {
             { resource: 'stone', weight: 15, amount: [8, 18] },
             { item: 'ward_of_the_sentinel', weight: 3 },
         ],
-        enemies: { hp: [100, 160], damage: [11, 17], count: [4, 7], sprite: 'ghost' },
+        enemies: { count: [4, 7], types: [
+            { key: 'shard_spider', weight: 15 },
+            { key: 'crystal_golem', weight: 30 },
+            { key: 'runite_elemental', weight: 35 },
+            { key: 'crystal_wurm', weight: 20 },
+        ] },
         boss: {
             name: 'The Crystal Colossus',
             hp: 500, damage: 25,
@@ -137,7 +190,7 @@ export const REALMS = {
     verdant_depths: {
         name: 'Verdant Depths', difficulty: 1,
         chain: 'verdant', chainOrder: 1,
-        duration: [150, 280], encounters: 2,
+        duration: [150, 280], encounters: 4, combatEncounters: [1, 1],
         vis: { wall: 'wood_wall', floor: 'wood_floor' },
         loot: [
             { resource: 'wood', weight: 50, amount: [8, 15] },
@@ -145,7 +198,11 @@ export const REALMS = {
             { resource: 'berries', weight: 20, amount: [4, 8] },
             { item: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [30, 50], damage: [4, 6], count: [1, 3], sprite: 'ghost' },
+        enemies: { count: [1, 3], types: [
+            { key: 'vine_creeper', weight: 50 },
+            { key: 'thorn_beast', weight: 30 },
+            { key: 'spore_walker', weight: 20 },
+        ] },
         events: {
             ambient: [
                 '{name} pushes through thick vine curtains.',
@@ -174,7 +231,7 @@ export const REALMS = {
     fungal_hollows: {
         name: 'Fungal Hollows', difficulty: 2,
         chain: 'verdant', chainOrder: 2,
-        duration: [280, 450], encounters: 4,
+        duration: [280, 450], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'wood_wall', floor: 'wood_floor' },
         requiresRealm: 'verdant_depths',
         loot: [
@@ -183,7 +240,12 @@ export const REALMS = {
             { resource: 'potatoes', weight: 20, amount: [5, 10] },
             { item: 'cornucopia_charm', weight: 3 },
         ],
-        enemies: { hp: [55, 85], damage: [6, 10], count: [2, 5], sprite: 'ghost' },
+        enemies: { count: [2, 5], types: [
+            { key: 'vine_creeper', weight: 15 },
+            { key: 'thorn_beast', weight: 30 },
+            { key: 'spore_walker', weight: 30 },
+            { key: 'fungal_horror', weight: 25 },
+        ] },
         events: {
             ambient: [
                 '{name} ducks under a canopy of phosphorescent mushroom caps.',
@@ -215,7 +277,7 @@ export const REALMS = {
     primeval_canopy: {
         name: 'Primeval Canopy', difficulty: 3,
         chain: 'verdant', chainOrder: 3,
-        duration: [400, 600], encounters: 5,
+        duration: [400, 600], encounters: 7, combatEncounters: [2, 3],
         vis: { wall: 'wood_wall', floor: 'wood_floor' },
         requiresRealm: 'fungal_hollows',
         loot: [
@@ -225,7 +287,12 @@ export const REALMS = {
             { resource: 'void_essence', weight: 10, amount: [2, 5] },
             { item: 'staff_of_regrowth', weight: 3 },
         ],
-        enemies: { hp: [80, 130], damage: [9, 14], count: [3, 6], sprite: 'ghost' },
+        enemies: { count: [3, 6], types: [
+            { key: 'thorn_beast', weight: 15 },
+            { key: 'spore_walker', weight: 20 },
+            { key: 'fungal_horror', weight: 35 },
+            { key: 'canopy_stalker', weight: 30 },
+        ] },
         boss: {
             name: 'The Ancient Treant',
             hp: 450, damage: 22,
@@ -272,7 +339,7 @@ export const REALMS = {
     arcane_library: {
         name: 'Arcane Library', difficulty: 2,
         chain: 'arcane', chainOrder: 1,
-        duration: [180, 320], encounters: 2,
+        duration: [180, 320], encounters: 4, combatEncounters: [1, 1],
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         loot: [
             { resource: 'tome_of_magic_missile', weight: 20, amount: [1, 1] },
@@ -283,7 +350,11 @@ export const REALMS = {
             { resource: 'runite', weight: 20, amount: [2, 4] },
             { item: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [30, 50], damage: [4, 7], count: [1, 3], sprite: 'ghost' },
+        enemies: { count: [1, 3], types: [
+            { key: 'arcane_wisp', weight: 50 },
+            { key: 'tome_guardian', weight: 35 },
+            { key: 'spell_wraith', weight: 15 },
+        ] },
         research: 'arcane_studies',
         events: {
             ambient: [
@@ -315,7 +386,7 @@ export const REALMS = {
     ancient_university: {
         name: 'Ancient University', difficulty: 3,
         chain: 'arcane', chainOrder: 2,
-        duration: [320, 500], encounters: 4,
+        duration: [320, 500], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         requiresRealm: 'arcane_library',
         research: 'arcane_studies',
@@ -328,7 +399,12 @@ export const REALMS = {
             { resource: 'runite', weight: 25, amount: [3, 7] },
             { item: 'tome_of_shared_wisdom', weight: 3 },
         ],
-        enemies: { hp: [60, 100], damage: [7, 12], count: [2, 5], sprite: 'ghost' },
+        enemies: { count: [2, 5], types: [
+            { key: 'arcane_wisp', weight: 15 },
+            { key: 'tome_guardian', weight: 30 },
+            { key: 'spell_wraith', weight: 35 },
+            { key: 'construct', weight: 20 },
+        ] },
         events: {
             ambient: [
                 '{name} passes through a grand lecture hall where spectral students still sit.',
@@ -360,7 +436,7 @@ export const REALMS = {
     abandoned_laboratory: {
         name: 'Abandoned Laboratory', difficulty: 4,
         chain: 'arcane', chainOrder: 3,
-        duration: [450, 680], encounters: 6,
+        duration: [450, 680], encounters: 8, combatEncounters: [2, 4],
         vis: { wall: 'stone_wall', floor: 'stone_floor' },
         requiresRealm: 'ancient_university',
         research: 'arcane_studies',
@@ -374,7 +450,12 @@ export const REALMS = {
             { resource: 'void_essence', weight: 15, amount: [2, 6] },
             { item: 'scholars_spectacles', weight: 2 },
         ],
-        enemies: { hp: [90, 150], damage: [10, 16], count: [3, 6], sprite: 'ghost' },
+        enemies: { count: [3, 6], types: [
+            { key: 'spell_wraith', weight: 15 },
+            { key: 'construct', weight: 35 },
+            { key: 'lab_abomination', weight: 35 },
+            { key: 'tome_guardian', weight: 15 },
+        ] },
         boss: {
             name: 'The Arcane Construct',
             hp: 480, damage: 24,
@@ -422,14 +503,18 @@ export const REALMS = {
     shadow_realm: {
         name: 'Shadow Realm', difficulty: 3,
         chain: 'shadow', chainOrder: 1,
-        duration: [400, 650], encounters: 5,
+        duration: [400, 650], encounters: 7, combatEncounters: [2, 3],
         vis: { wall: 'void_wall', floor: 'stone_floor' },
         loot: [
             { resource: 'void_essence', weight: 40, amount: [3, 7] },
             { resource: 'runite', weight: 25, amount: [3, 6] },
             { item: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [80, 120], damage: [8, 14], count: [3, 6], sprite: 'ghost' },
+        enemies: { count: [3, 6], types: [
+            { key: 'shadow_imp', weight: 30 },
+            { key: 'void_stalker', weight: 35 },
+            { key: 'shade', weight: 35 },
+        ] },
         research: 'deep_delving',
         events: {
             ambient: [
@@ -463,7 +548,7 @@ export const REALMS = {
     void_abyss: {
         name: 'Void Abyss', difficulty: 4,
         chain: 'shadow', chainOrder: 2,
-        duration: [550, 800], encounters: 6,
+        duration: [550, 800], encounters: 7, combatEncounters: [3, 5],
         vis: { wall: 'void_wall', floor: 'stone_floor' },
         requiresRealm: 'shadow_realm',
         research: 'deep_delving',
@@ -472,7 +557,12 @@ export const REALMS = {
             { resource: 'runite', weight: 20, amount: [4, 8] },
             { item: 'voidwalkers_lantern', weight: 3 },
         ],
-        enemies: { hp: [120, 180], damage: [12, 18], count: [4, 7], sprite: 'ghost' },
+        enemies: { count: [4, 7], types: [
+            { key: 'void_stalker', weight: 20 },
+            { key: 'shade', weight: 30 },
+            { key: 'void_horror', weight: 35 },
+            { key: 'oblivion_spawn', weight: 15 },
+        ] },
         events: {
             ambient: [
                 '{name} cannot tell if they are walking on ground or floating.',
@@ -505,7 +595,7 @@ export const REALMS = {
     oblivion_rift: {
         name: 'Oblivion Rift', difficulty: 5,
         chain: 'shadow', chainOrder: 3,
-        duration: [700, 1000], encounters: 8,
+        duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
         vis: { wall: 'void_wall', floor: 'void_wall' },
         requiresRealm: 'void_abyss',
         research: 'deep_delving',
@@ -514,7 +604,11 @@ export const REALMS = {
             { resource: 'runite', weight: 20, amount: [5, 10] },
             { item: 'cloak_of_shadows', weight: 3 },
         ],
-        enemies: { hp: [160, 240], damage: [15, 22], count: [4, 8], sprite: 'ghost' },
+        enemies: { count: [4, 8], types: [
+            { key: 'shade', weight: 15 },
+            { key: 'void_horror', weight: 35 },
+            { key: 'oblivion_spawn', weight: 50 },
+        ] },
         boss: {
             name: 'The Void Sovereign',
             hp: 600, damage: 30,
@@ -564,14 +658,19 @@ export const REALMS = {
     kingdom_outskirts: {
         name: 'Kingdom Outskirts', difficulty: 5,
         chain: 'kingdom', chainOrder: 1,
-        duration: [700, 1000], encounters: 8,
+        duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
+
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         research: 'deep_delving',
         requiresEvent: 'crusader_raid_defeated',
         loot: [
             { item: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
+        enemies: { count: [2, 4], types: [
+            { key: 'kingdom_guard', weight: 50 },
+            { key: 'knight', weight: 35 },
+            { key: 'royal_mage', weight: 15 },
+        ] },
         events: {
             ambient: [
                 'TODO: {name} marvels at crystalline formations pulsing with light.',
@@ -590,14 +689,19 @@ export const REALMS = {
     crusader_barracks: {
         name: 'Crusader Barracks', difficulty: 7,
         chain: 'kingdom', chainOrder: 2,
-        duration: [700, 1000], encounters: 8,
+        duration: [700, 1000], encounters: 9, combatEncounters: [4, 6],
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         research: 'deep_delving',
         requiresRealm: 'kingdom_outskirts',
         loot: [
             { item: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
+        enemies: { count: [3, 5], types: [
+            { key: 'kingdom_guard', weight: 15 },
+            { key: 'knight', weight: 30 },
+            { key: 'crusader', weight: 35 },
+            { key: 'royal_mage', weight: 20 },
+        ] },
         events: {
             ambient: [
                 'TODO: {name} marvels at crystalline formations pulsing with light.',
@@ -616,14 +720,19 @@ export const REALMS = {
     palace_fortress: {
         name: 'Palace Fortress', difficulty: 9,
         chain: 'kingdom', chainOrder: 3,
-        duration: [700, 1000], encounters: 8,
+        duration: [700, 1000], encounters: 9, combatEncounters: [5, 7],
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         research: 'deep_delving',
         requiresRealm: 'crusader_barracks',
         loot: [
             { item: 'map_fragment', weight: 3 },
         ],
-        enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4], sprite: 'ghost' },
+        enemies: { count: [3, 6], types: [
+            { key: 'knight', weight: 15 },
+            { key: 'crusader', weight: 30 },
+            { key: 'royal_mage', weight: 25 },
+            { key: 'palace_champion', weight: 30 },
+        ] },
         boss: {
             name: 'The High King',
             hp: 700, damage: 35,
@@ -727,6 +836,617 @@ export const EXPLORATION_EVENTS = {
         '{name} collapses from their wounds!',
         '{name} is knocked unconscious!',
     ],
+};
+
+// Formation: front/back row positioning for expedition parties.
+export const FORMATION_CONFIG = {
+    rows: {
+        front: {
+            name: 'Front Row',
+            damageTakenMult: 1.3,
+            meleeDamageMult: 1.2,
+            spellDamageMult: 1.0,
+            targetPriorityMod: 5,
+        },
+        back: {
+            name: 'Back Row',
+            damageTakenMult: 0.7,
+            meleeDamageMult: 0.6,
+            spellDamageMult: 1.15,
+            targetPriorityMod: -5,
+        },
+    },
+    maxPerRow: 3,
+    defaultAssignment: 'front',
+};
+
+// Trap types.
+export const EXPEDITION_TRAPS = {
+    rockfall: {
+        name: 'Rockfall',
+        text: 'The ceiling groans — loose rocks begin to shift above!',
+        damageType: 'instant',
+        initialDamage: [5, 15],
+        checks: [
+            {
+                label: 'Shore up the ceiling',
+                description: 'Use building skill to brace the rocks',
+                skill: 'building', minLevel: 3,
+                traitBonus: ['tough', 'sturdy'],
+                successText: '{name} braces the ceiling — rocks held!',
+                failText: '{name} tries to brace it but rocks crash down!',
+            },
+            {
+                label: 'Dodge through quickly',
+                description: 'Sprint past the danger zone',
+                skill: null, traitAny: ['quick', 'lucky'],
+                successText: 'The party dashes through just in time!',
+                failText: 'Too slow — falling rocks strike the party!',
+            },
+        ],
+    },
+    poison_trap: {
+        name: 'Poison Trap',
+        text: 'A faint hissing sound — poison darts are primed in the walls!',
+        damageType: 'dot',
+        initialDamage: [3, 8],
+        dotDamage: [2, 4], dotTicks: 5, dotInterval: 10,
+        checks: [
+            {
+                label: 'Identify and neutralize',
+                description: 'Use research knowledge to disarm the mechanism',
+                skill: 'research', minLevel: 3,
+                traitBonus: ['scholar'],
+                successText: '{name} carefully disarms the dart mechanism!',
+                failText: '{name} fumbles — darts fire from the walls!',
+            },
+            {
+                label: 'Craft a quick antidote',
+                description: 'Prepare herbal protection with cooking skill',
+                skill: 'cooking', minLevel: 3,
+                traitBonus: ['iron_stomach'],
+                successText: '{name} brews a quick antidote — poison neutralized!',
+                failText: '{name} can\'t prepare it fast enough — the darts strike!',
+            },
+        ],
+    },
+    disarm_trap: {
+        name: 'Disarm Trap',
+        text: 'A magnetic mechanism hums — it could rip equipment loose!',
+        damageType: 'equipment',
+        initialDamage: [2, 5],
+        effect: { disableRandomSlot: true, disableDuration: 3 },
+        checks: [
+            {
+                label: 'Dismantle the mechanism',
+                description: 'Use crafting skill to safely take it apart',
+                skill: 'crafting', minLevel: 3,
+                traitBonus: ['sturdy'],
+                successText: '{name} dismantles the mechanism with expert precision!',
+                failText: '{name} triggers it — equipment ripped loose!',
+            },
+            {
+                label: 'Shield equipment with padding',
+                description: 'Use animal hides to insulate gear',
+                skill: 'animals', minLevel: 3,
+                traitBonus: ['sturdy'],
+                successText: '{name} wraps the gear safely — the pulse passes harmlessly!',
+                failText: 'The padding isn\'t enough — the magnetic pulse hits!',
+            },
+        ],
+    },
+    mana_siphon: {
+        name: 'Mana Siphon',
+        text: 'Glowing runes on the floor pulse hungrily — a mana drain!',
+        damageType: 'mana',
+        initialDamage: [0, 2],
+        manaDrain: [10, 25],
+        checks: [
+            {
+                label: 'Overload the runes',
+                description: 'Channel research knowledge to short-circuit the trap',
+                skill: 'research', minLevel: 4,
+                traitBonus: ['scholar'],
+                successText: '{name} overloads the runes — they shatter harmlessly!',
+                failText: '{name} can\'t contain it — mana drained!',
+            },
+            {
+                label: 'Cover the runes with earth',
+                description: 'Use farming knowledge to smother the trap',
+                skill: 'farming', minLevel: 3,
+                traitBonus: ['green_thumb'],
+                successText: '{name} packs earth over the runes — the glow fades!',
+                failText: 'The earth isn\'t enough — the siphon activates!',
+            },
+        ],
+    },
+};
+
+// Elite enemy modifiers.
+export const ELITE_MODIFIERS = {
+    regenerating: {
+        name: 'Regenerating', prefix: 'Regenerating', color: '#44ff44',
+        hpMult: 1.2, regenPerRound: 0.05, lootBonusMult: 1.5,
+    },
+    shielded: {
+        name: 'Shielded', prefix: 'Shielded', color: '#4488ff',
+        hpMult: 1.0, damageReduction: 0.3, lootBonusMult: 1.4,
+    },
+    vampiric: {
+        name: 'Vampiric', prefix: 'Vampiric', color: '#cc0044',
+        hpMult: 0.9, lifeSteal: 0.5, lootBonusMult: 1.6,
+    },
+    explosive: {
+        name: 'Explosive', prefix: 'Explosive', color: '#ff6600',
+        hpMult: 0.8, onDeath: { aoe: true, damage: [10, 20] }, lootBonusMult: 1.3,
+    },
+    swift: {
+        name: 'Swift', prefix: 'Swift', color: '#ffff44',
+        hpMult: 0.9, extraAttacks: 1, dodgeChance: 0.2, lootBonusMult: 1.4,
+    },
+};
+
+export const ELITE_CONFIG = {
+    baseChance: 0.08,
+    difficultyChanceBonus: 0.03,
+    maxModifiers: 1,
+    championChance: 0.02,
+};
+
+// Boss phase ability types: aoe, invulnerable, taunt, summon_adds, heal.
+
+// Mid-expedition decisions.
+export const EXPEDITION_DECISIONS = {
+    forked_path: {
+        text: 'The passage splits into two tunnels.',
+        triggerChance: 0.35,
+        realmFilter: null,
+        minDifficulty: 1,
+        choices: [
+            {
+                label: 'Left tunnel — narrow and dark',
+                description: 'More enemies, but rare loot chance doubled',
+                effects: { spawnCombat: { countMult: 1.5 }, nextLootRareMult: 2.0 },
+                logText: 'The party squeezes through the narrow left tunnel...',
+            },
+            {
+                label: 'Right path — wider, well-lit',
+                description: 'Safer passage, partial healing',
+                effects: { healParty: 0.15 },
+                logText: 'The party takes the wider right path...',
+            },
+        ],
+    },
+    mysterious_shrine: {
+        text: 'An ancient shrine glows with faint energy.',
+        triggerChance: 0.2,
+        realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
+        minDifficulty: 1,
+        choices: [
+            {
+                label: 'Pray at the shrine',
+                description: 'Restore mana, risk a trap',
+                effects: { restoreMana: 0.5, trapRisk: 0.3 },
+                logText: '{name} kneels before the shrine...',
+            },
+            {
+                label: 'Smash the shrine',
+                description: 'Guaranteed loot, enemies buffed',
+                effects: { grantLoot: { type: 'realm_roll', mult: 1.5 }, buffEnemies: { hpMult: 1.2 } },
+                logText: '{name} shatters the shrine with a heavy blow!',
+            },
+            {
+                label: 'Ignore it',
+                description: 'Play it safe',
+                effects: {},
+                logText: 'The party cautiously passes the shrine.',
+            },
+        ],
+    },
+    trapped_chest: {
+        text: 'A chest sits in the middle of the room, suspiciously obvious.',
+        triggerChance: 0.25,
+        realmFilter: null,
+        minDifficulty: 1,
+        choices: [
+            {
+                label: 'Open it carefully',
+                description: 'Decent loot if no trap triggers',
+                effects: { grantLoot: { type: 'realm_roll', mult: 1.0 }, trapRisk: 0.4 },
+                logText: 'The party carefully pries open the chest...',
+            },
+            {
+                label: 'Leave it alone',
+                description: 'No risk, no reward',
+                effects: {},
+                logText: 'The party leaves the chest untouched.',
+            },
+        ],
+    },
+    echoing_cry: {
+        text: 'A distant cry for help echoes through the passage.',
+        triggerChance: 0.2,
+        realmFilter: null,
+        minDifficulty: 1,
+        choices: [
+            {
+                label: 'Investigate',
+                description: 'Could be an ally or a trap',
+                effects: { npcChance: 0.6, trapRisk: 0.4 },
+                logText: 'The party follows the voice...',
+            },
+            {
+                label: 'Press on',
+                description: 'Stay focused on the mission',
+                effects: {},
+                logText: 'The party ignores the cry and continues forward.',
+            },
+        ],
+    },
+};
+
+// Puzzle encounters.
+export const PUZZLE_ENCOUNTERS = {
+    ancient_runes: {
+        text: 'Ancient runes cover a sealed door.',
+        triggerWeight: 10,
+        realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
+        checks: [
+            {
+                label: 'Decipher the runes',
+                requirement: { skill: 'research', minLevel: 5 },
+                traitBonus: ['scholar'],
+                success: { text: '{name} deciphers the runes — the door swings open!', reward: { type: 'bonus_loot', mult: 2.0 } },
+                failure: { text: '{name} triggers a ward — arcane backlash!', penalty: { type: 'damage', amount: [10, 20] } },
+            },
+            {
+                label: 'Break through the door',
+                requirement: { skill: 'building', minLevel: 3 },
+                traitBonus: ['tough', 'sturdy'],
+                success: { text: '{name} smashes through — but alerts nearby enemies!', reward: { type: 'bonus_loot', mult: 1.0 }, penalty: { type: 'spawn_combat' } },
+                failure: { text: '{name} injures themselves on the reinforced door.', penalty: { type: 'damage', amount: [5, 15] } },
+            },
+        ],
+    },
+    unstable_bridge: {
+        text: 'A crumbling bridge spans a dark chasm.',
+        triggerWeight: 8,
+        realmFilter: null,
+        checks: [
+            {
+                label: 'Carefully cross',
+                requirement: { traitAny: ['quick', 'lucky'] },
+                success: { text: 'The party nimbly crosses the bridge!', reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { text: '{name} slips — the bridge collapses!', penalty: { type: 'damage_all', amount: [5, 10] } },
+            },
+            {
+                label: 'Find another way around',
+                requirement: null,
+                success: { text: 'The party finds another way around safely.', reward: null },
+                failure: null,
+            },
+        ],
+    },
+    crystal_lock: {
+        text: 'A crystal-powered lock seals a vault door.',
+        triggerWeight: 7,
+        realmFilter: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
+        checks: [
+            {
+                label: 'Attune to the crystals',
+                requirement: { skill: 'research', minLevel: 4 },
+                traitBonus: ['scholar'],
+                success: { text: '{name} resonates with the crystal lock — it opens!', reward: { type: 'bonus_loot', mult: 2.5 } },
+                failure: { text: 'The crystal shatters — {name} is cut by the shards!', penalty: { type: 'damage', amount: [8, 16] } },
+            },
+            {
+                label: 'Force the lock',
+                requirement: { skill: 'crafting', minLevel: 4 },
+                traitBonus: ['creative'],
+                success: { text: '{name} pries the lock open with finesse!', reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { text: 'The mechanism jams — {name} strains a muscle.', penalty: { type: 'damage', amount: [3, 8] } },
+            },
+        ],
+    },
+    overgrown_path: {
+        text: 'Dense vegetation blocks the primary route.',
+        triggerWeight: 8,
+        realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
+        checks: [
+            {
+                label: 'Clear a path with tools',
+                requirement: { skill: 'farming', minLevel: 4 },
+                traitBonus: ['green_thumb'],
+                success: { text: '{name} expertly clears the growth — uncovering a hidden cache!', reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { text: 'Thorny vines lash back at {name}!', penalty: { type: 'damage', amount: [5, 12] } },
+            },
+            {
+                label: 'Push through',
+                requirement: null,
+                traitBonus: ['tough'],
+                success: { text: 'The party forces through, scratched but intact.', reward: null },
+                failure: { text: 'The vegetation fights back — everyone takes scratches.', penalty: { type: 'damage_all', amount: [3, 6] } },
+            },
+        ],
+    },
+};
+
+// NPC encounters.
+export const NPC_ENCOUNTERS = {
+    wounded_traveler: {
+        text: 'A wounded traveler lies beside the path.',
+        triggerWeight: 6,
+        realmFilter: null,
+        choices: [
+            {
+                label: 'Heal them',
+                requirement: { spellAny: ['mend', 'heal'] },
+                cost: { mana: 10 },
+                result: { text: '{name} heals the traveler, who offers a reward.', reward: { type: 'realm_roll', mult: 2.0 } },
+            },
+            {
+                label: 'Share supplies',
+                cost: { potionSlots: 1 },
+                result: { text: 'The traveler shares what they know of the realm.', reward: { type: 'reveal_encounters', count: 2 } },
+            },
+            {
+                label: 'Leave them',
+                result: { text: 'The party passes by without stopping.' },
+            },
+        ],
+    },
+    mercenary: {
+        text: 'A sellsword offers their blade, for a price.',
+        triggerWeight: 4,
+        realmFilter: null,
+        choices: [
+            {
+                label: 'Hire them',
+                cost: { loot: { resource: 'runite', amount: 3 } },
+                result: {
+                    text: 'The mercenary joins for the next 2 combats.',
+                    reward: { type: 'temp_ally', ally: { name: 'Mercenary', hp: 80, damage: 12, char: 'M', color: '#ccaa44', duration: 2 } },
+                },
+            },
+            {
+                label: 'Decline',
+                result: { text: 'The sellsword shrugs and disappears into the shadows.' },
+            },
+        ],
+    },
+    lost_scholar: {
+        text: 'A disoriented scholar clutches a bundle of notes.',
+        triggerWeight: 5,
+        realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
+        choices: [
+            {
+                label: 'Escort them to safety',
+                result: {
+                    text: 'The grateful scholar shares their research notes.',
+                    reward: { type: 'bonus_loot', mult: 1.5 },
+                },
+            },
+            {
+                label: 'Trade supplies for notes',
+                cost: { potionSlots: 1 },
+                result: { text: 'You exchange a potion for valuable notes.', reward: { type: 'bonus_loot', mult: 2.0 } },
+            },
+            {
+                label: 'Wish them luck',
+                result: { text: 'The scholar nods nervously and hurries away.' },
+            },
+        ],
+    },
+    shadow_merchant: {
+        text: 'A cloaked figure materializes from the darkness, wares floating around them.',
+        triggerWeight: 3,
+        realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
+        choices: [
+            {
+                label: 'Trade void essence for healing',
+                cost: { loot: { resource: 'void_essence', amount: 2 } },
+                result: { text: 'The merchant weaves void energy into restorative magic.', reward: { type: 'heal_party', amount: 0.3 } },
+            },
+            {
+                label: 'Trade void essence for power',
+                cost: { loot: { resource: 'void_essence', amount: 3 } },
+                result: { text: 'The merchant imbues the party with dark strength.', reward: { type: 'buff_party', damageMult: 1.3, duration: 2 } },
+            },
+            {
+                label: 'Decline',
+                result: { text: 'The figure fades back into the void.' },
+            },
+        ],
+    },
+};
+
+// Expedition potions.
+export const EXPEDITION_POTIONS = {
+    health_potion: {
+        name: 'Health Potion', resource: 'health_potion',
+        maxCarry: 5, useCondition: 'combat',
+        effect: { healTarget: 0.5 },
+        autoUse: { hpThreshold: 0.3 },
+        logText: '{name} drinks a health potion!',
+    },
+    mana_potion: {
+        name: 'Mana Potion', resource: 'mana_potion',
+        maxCarry: 5, useCondition: 'combat',
+        effect: { restoreMana: 0.5 },
+        autoUse: { manaThreshold: 0.2 },
+        logText: '{name} drinks a mana potion!',
+    },
+    antidote: {
+        name: 'Antidote', resource: 'antidote',
+        maxCarry: 5, useCondition: 'any',
+        effect: { clearDot: true },
+        autoUse: { hasDot: true },
+        logText: '{name} drinks an antidote!',
+    },
+};
+
+export const POTION_CARRY_CONFIG = {
+    packAnimalBonus: 2,
+};
+
+// Expedition mutators.
+export const EXPEDITION_MUTATORS = {
+    dense_fog: {
+        name: 'Dense Fog',
+        description: '-20% accuracy for both sides, +30% loot',
+        effects: { missChanceMod: 0.2, lootAmountMult: 1.3 },
+        incompatible: [],
+    },
+    blood_moon: {
+        name: 'Blood Moon',
+        description: '+50% enemy damage, +50% rare loot',
+        effects: { enemyDmgMult: 1.5, rareLootMult: 1.5 },
+        incompatible: [],
+    },
+    veterans_march: {
+        name: "Veteran's March",
+        description: '-30% duration, +25% enemy HP',
+        effects: { durationMult: 0.7, enemyHpMult: 1.25 },
+        incompatible: [],
+    },
+    arcane_surge: {
+        name: 'Arcane Surge',
+        description: '+50% spell damage, enemies resist 20% physical',
+        effects: { spellDamageMult: 1.5, enemyPhysicalResist: 0.2 },
+        incompatible: [],
+    },
+    thorns_aura: {
+        name: 'Thorns Aura',
+        description: 'Enemies take 5 damage when they attack, +20% enemy HP',
+        effects: { globalThorns: 5, enemyHpMult: 1.2 },
+        incompatible: [],
+    },
+    packmasters_bounty: {
+        name: "Packmaster's Bounty",
+        description: '+2 loot per drop, -20% party damage',
+        effects: { lootBonusFlat: 2, partyDamageMult: 0.8 },
+        incompatible: [],
+    },
+};
+
+// Fatigue cooldowns.
+export const FATIGUE_CONFIG = {
+    baseCooldownTicks: 200,
+    difficultyMult: { 1: 1.0, 2: 1.3, 3: 1.7, 4: 2.2, 5: 3.0 },
+    defeatPenalty: 1.5,
+    maxCooldownTicks: 1000,
+};
+
+// Expedition streaks.
+export const STREAK_CONFIG = {
+    historyLength: 10,
+    sameRealmDiminishing: { 2: 0.9, 3: 0.75, 4: 0.6, 5: 0.5 },
+    varietyBonus: {
+        name: 'Cartographer',
+        uniqueRealmsForBonus: 3,
+        lootMult: 1.25,
+        rareLootMult: 1.5,
+    },
+};
+
+// Expedition XP.
+export const EXPEDITION_XP_CONFIG = {
+    xpPerEncounter: 1,
+    xpPerBossKill: 5,
+    xpPerPuzzleSolved: 2,
+    xpPerDecision: 1,
+    xpToLevel: 10,
+    xpScalePerLevel: 5,
+    maxLevel: 10,
+    levelBonuses: {
+        1:  { expeditionDamageMult: 1.05 },
+        2:  { trapDamageMult: 0.9 },
+        3:  { ability: 'scout' },
+        4:  { expeditionDamageMult: 1.1 },
+        5:  { ability: 'rally' },
+        6:  { rareEncounterMult: 1.15 },
+        7:  { expeditionDamageMult: 1.15 },
+        8:  { ability: 'ambush' },
+        9:  { trapDamageMult: 0.8 },
+        10: { ability: 'veteran' },
+    },
+};
+
+// Realm events.
+export const REALM_EVENTS = {
+    crystal_surge: {
+        name: 'Crystal Surge',
+        description: 'Double runite drops, +50% enemy HP',
+        realms: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
+        effects: { resourceMult: { runite: 2.0 }, enemyHpMult: 1.5 },
+        duration: [2000, 4000],
+        weight: 10,
+    },
+    void_tide: {
+        name: 'Void Tide',
+        description: 'Void essence +75%, enemies deal splash damage',
+        realms: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
+        effects: { resourceMult: { void_essence: 1.75 }, enemyAoEChance: 0.15, enemyAoEDamage: [3, 6] },
+        duration: [2500, 5000],
+        weight: 8,
+    },
+    arcane_residue: {
+        name: 'Arcane Residue',
+        description: 'Mana regen doubled, +30% tome drops',
+        realms: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
+        effects: { manaRegenMult: 2.0, lootAmountMult: 1.3 },
+        duration: [1500, 3000],
+        weight: 8,
+    },
+    verdant_bloom: {
+        name: 'Verdant Bloom',
+        description: '+50% food drops, enemies regenerate',
+        realms: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
+        effects: { resourceMult: { berries: 1.5, potatoes: 1.5, wheat: 1.5 }, enemyRegenPerRound: 0.03 },
+        duration: [2000, 3500],
+        weight: 8,
+    },
+};
+
+export const REALM_EVENT_CONFIG = {
+    checkInterval: 500,
+    maxActiveEvents: 2,
+    baseChance: 0.15,
+};
+
+// Bestiary.
+export const BESTIARY_CONFIG = {
+    categories: {
+        regular: { name: 'Enemies', color: '#ff4444' },
+        elite: { name: 'Elites', color: '#ff8844' },
+        boss: { name: 'Bosses', color: '#ffcc44' },
+        npc: { name: 'Encounters', color: '#44ccff' },
+    },
+    completionRewards: {
+        25: { type: 'loot_bonus', value: 1.05, description: '+5% expedition loot' },
+        50: { type: 'loot_bonus', value: 1.1, description: '+10% expedition loot' },
+        75: { type: 'rare_bonus', value: 1.15, description: '+15% rare finds' },
+        100: { type: 'title', value: 'Master Explorer', description: 'Bestiary complete!' },
+    },
+};
+
+// Node map.
+export const NODE_MAP_CONFIG = {
+    nodeTypes: {
+        combat:   { icon: '⚔', color: '#ff4444', label: 'Combat' },
+        loot:     { icon: '◆', color: '#ffcc44', label: 'Treasure' },
+        decision: { icon: '?', color: '#44ccff', label: 'Choice' },
+        puzzle:   { icon: '⊕', color: '#aa88ff', label: 'Puzzle' },
+        npc:      { icon: '☺', color: '#88ff88', label: 'NPC' },
+        boss:     { icon: '☠', color: '#ff8844', label: 'Boss' },
+    },
+    canvasHeight: 60,
+    nodeRadius: 10,
+    nodeSpacing: 50,
+    lineColor: '#333',
+    completedColor: '#666',
+    currentColor: '#ffffff',
+    futureColor: '#444',
 };
 
 // Wave defense (void nexus) tuning. Used by waves.js.

@@ -1,4 +1,4 @@
-import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS, ENTITIES } from '../core/config.js';
+import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS, ENTITIES, EXPEDITION_ENEMIES } from '../core/config.js';
 
 const MATERIAL_ITEMS = [
     { key: 'wood', char: '≡', color: '#8b6b3a', desc: 'Wood resource' },
@@ -40,6 +40,7 @@ const ENTITY_MANUAL = [
     { key: 'golem', char: 'G', color: '#cc8833', desc: 'Default golem sprite' },
     { key: 'raider', char: 'R', color: '#ff3333', desc: 'Enemy raider (fallback)' },
     { key: 'wave_enemy', char: 'V', color: '#aa33ff', desc: 'Wave enemy (fallback)' },
+    { key: 'npc_ally', char: 'M', color: '#ccaa44', desc: 'Expedition: Hireable mercenary' },
 ];
 
 const ENTITY_AUTO_CATEGORIES = ['golem', 'summon', 'enemy', 'boss'];
@@ -120,6 +121,12 @@ const EFFECT_ITEMS = [
     { key: 'health_regen', char: '♥', color: '#66ff66', desc: 'Natural health regeneration' },
     { key: 'shadow', char: '1', color: '#0606065c', desc: 'Drop shadow for entities' },
     { key: 'in_water', char: '2', color: '#0606065c', desc: 'Partially underwater for entities' },
+    { key: 'slash', char: '✕', color: '#ffff44', desc: 'Expedition: melee attack X slash' },
+    { key: 'loot', char: '◆', color: '#ffcc44', desc: 'Expedition: loot found diamond' },
+    { key: 'danger', char: '!', color: '#ff2222', desc: 'Expedition: danger/trap flash' },
+    { key: 'hit_flash', char: '●', color: '#ff8844', desc: 'Expedition: hit impact burst' },
+    { key: 'spell_attack', char: '→', color: '#aa44ff', desc: 'Expedition: spell projectile' },
+    { key: 'spell_summon', char: '★', color: '#aa44ff', desc: 'Expedition: summon circle' },
 ];
 
 let editorInstance = null;
@@ -510,6 +517,9 @@ class SkinEditor {
                 }
                 for (const [key, def] of Object.entries(ANIMALS)) {
                     items.push({ key, char: def.char, color: def.color, desc: key, category: 'entities' });
+                }
+                for (const [key, def] of Object.entries(EXPEDITION_ENEMIES)) {
+                    items.push({ key, char: '▲', color: def.color || '#ff3333', desc: `Expedition: ${def.name}`, category: 'entities' });
                 }
                 break;
             case 'Items':

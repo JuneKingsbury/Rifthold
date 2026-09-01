@@ -1,4 +1,10 @@
-import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES } from '../core/config.js';
+import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS,
+    FORMATION_CONFIG, EXPEDITION_TRAPS, EXPEDITION_ENEMIES, ELITE_MODIFIERS, ELITE_CONFIG,
+    EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
+    EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
+    FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG,
+    REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG,
+} from '../core/config.js';
 import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache } from '../entities/colonist.js';
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
@@ -11,6 +17,20 @@ export class ExplorationSystem {
         this.expeditions = [];
         this.completedExpeditions = [];
         this.completedRealms = new Set();
+        this.bestiary = new Map();
+        this.expeditionXP = {};
+        this.fatigueCooldowns = {};
+        this.realmHistory = [];
+        this.partyPresets = [];
+        this.activeRealmEvents = [];
+        this.pendingSummary = null;
+    }
+
+    syncIdCounter() {
+        let maxId = 0;
+        for (const e of this.expeditions) if (e.id > maxId) maxId = e.id;
+        for (const e of this.completedExpeditions) if (e.id > maxId) maxId = e.id;
+        nextExpeditionId = maxId + 1;
     }
 
     canSend(game, realmKey) {
@@ -39,7 +59,7 @@ export class ExplorationSystem {
         return false;
     }
 
-    sendExpedition(game, realmKey, colonistIds, packAnimalIds = [], difficulty = 1) {
+    sendExpedition(game, realmKey, colonistIds, packAnimalIds = [], difficulty = 1, options = {}) {
         if (!this.canSend(game, realmKey)) return null;
         if (colonistIds.length === 0) return null;
 
@@ -53,6 +73,7 @@ export class ExplorationSystem {
             const c = game.getColonist(id);
             if (!c || c.hp <= 0 || c.onExpedition || c.drafted) continue;
             if (c.traits && c.traits.includes('pacifist')) continue;
+            if (this.fatigueCooldowns[id] && game.tick < this.fatigueCooldowns[id]) continue;
             party.push(c);
         }
 
@@ -103,9 +124,34 @@ export class ExplorationSystem {
                 }
             }
         }
+
+        const mutators = options.mutators || [];
+        for (const mutKey of mutators) {
+            const mut = EXPEDITION_MUTATORS[mutKey];
+            if (mut?.effects?.durationMult) durationMult *= mut.effects.durationMult;
+        }
+
+        const formation = options.formation || { front: party.map(c => c.id), back: [] };
+
         if (durationMult !== 1.0) duration = Math.floor(duration * durationMult);
         const diffSettings = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
-        const { encounters, bossEncounter } = this._generateEncounters(dim, diffSettings);
+        const { encounters, bossEncounter } = this._generateEncounters(dim, diffSettings, mutators, realmKey);
+
+        const nodeMap = this._generateNodeMap(encounters, bossEncounter);
+
+        const potionSupply = {};
+        if (options.potions) {
+            for (const [potionKey, count] of Object.entries(options.potions)) {
+                const def = EXPEDITION_POTIONS[potionKey];
+                if (!def || count <= 0) continue;
+                const available = game.resources.getPotionCount?.(def.resource) ?? 0;
+                const take = Math.min(count, def.maxCarry, available);
+                for (let i = 0; i < take; i++) game.resources.takePotion(def.resource);
+                if (take > 0) potionSupply[potionKey] = take;
+            }
+        }
+
+        const streakMultiplier = this._getStreakMultiplier(realmKey);
 
         const expedition = {
             id: nextExpeditionId++,
@@ -133,11 +179,29 @@ export class ExplorationSystem {
             lastMicroEventTick: 0,
             difficulty,
             diffSettings,
+            formation,
+            mutators,
+            potionSupply,
+            streakMultiplier,
+            activeEffects: [],
+            eliteKills: 0,
+            bossPhase: 0,
+            bossPhaseData: null,
+            pendingDecision: null,
+            discoveredEntries: [],
+            xpEarned: {},
+            nodeMap,
+            summary: {
+                damageDealt: {}, damageTaken: {}, spellsCast: {},
+                killCount: {}, healingDone: {},
+                potionsUsed: 0, decisionsCount: 0, puzzlesSolved: 0,
+            },
         };
 
         this.expeditions.push(expedition);
         const diffLabel = diffSettings.name !== 'Normal' ? ` (${diffSettings.name})` : '';
-        game.eventLog.add(game, `Expedition assembling for ${dim.name}${diffLabel}`, 'event', null);
+        const mutLabel = mutators.length > 0 ? ` [${mutators.map(k => EXPEDITION_MUTATORS[k]?.name || k).join(', ')}]` : '';
+        game.eventLog.add(game, `Expedition assembling for ${dim.name}${diffLabel}${mutLabel}`, 'event', null);
         return expedition;
     }
 
@@ -149,6 +213,8 @@ export class ExplorationSystem {
     }
 
     update(game) {
+        this._tickRealmEvents(game);
+
         for (const exp of this.expeditions) {
             if (exp.status === 'complete') continue;
 
@@ -156,6 +222,16 @@ export class ExplorationSystem {
                 this._updateGathering(exp, game);
                 continue;
             }
+
+            if (exp.pendingDecision) {
+                exp.startTick++;
+                if (!exp._wasPaused) {
+                    exp._wasPaused = true;
+                    if (!game.paused) game.togglePause();
+                }
+                continue;
+            }
+            if (exp._wasPaused) exp._wasPaused = false;
 
             const elapsed = game.tick - exp.startTick;
 
@@ -168,6 +244,8 @@ export class ExplorationSystem {
 
                 this._regenMana(exp, game);
                 this._tryHealSpells(exp, game);
+                this._updateActiveEffects(exp, game);
+                this._checkTraitRally(exp, game);
 
                 if (exp.summons && exp.summons.length > 0) {
                     for (let si = exp.summons.length - 1; si >= 0; si--) {
@@ -179,13 +257,13 @@ export class ExplorationSystem {
                     }
                 }
 
-                const bossDue = exp.bossEncounter && !exp.bossTriggered
-                    && elapsed >= exp.duration * EXPLORATION_CONFIG.bossTriggerPercent;
+                const allEncountersDone = exp.currentEncounter >= exp.encounters.length;
+                const bossDue = exp.bossEncounter && !exp.bossTriggered && allEncountersDone;
 
                 if (bossDue && !exp.combat) {
                     exp.bossTriggered = true;
                     this._startEncounter(exp, game, exp.bossEncounter);
-                } else if (game.tick >= exp.nextEncounterTick && exp.currentEncounter < exp.encounters.length) {
+                } else if (!allEncountersDone && game.tick >= exp.nextEncounterTick) {
                     this._startEncounter(exp, game);
                     exp.currentEncounter++;
                     exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
@@ -202,14 +280,18 @@ export class ExplorationSystem {
                     exp.loot = {};
                 }
 
-                if (elapsed >= exp.duration && exp.status === 'exploring') {
+                const expeditionDone = exp.bossEncounter
+                    ? (exp.bossTriggered && !exp.combat)
+                    : (allEncountersDone && !exp.combat);
+                if (expeditionDone && exp.status === 'exploring') {
                     exp.status = 'returning';
+                    exp.walkOffTick = game.tick + (exp.bossEncounter ? 80 : 60);
                     this._addLog(exp, game, 'Expedition complete — returning home', 'success');
                 }
             }
 
             if (exp.status === 'returning') {
-                const deadline = exp.retreatTick || (exp.startTick + Math.floor(exp.duration * EXPLORATION_CONFIG.returnTimeMult));
+                const deadline = exp.retreatTick || exp.walkOffTick || (exp.startTick + Math.floor(exp.duration * EXPLORATION_CONFIG.returnTimeMult));
                 if (game.tick >= deadline) {
                     this._completeExpedition(exp, game);
                 }
@@ -219,10 +301,426 @@ export class ExplorationSystem {
         this.expeditions = this.expeditions.filter(e => e.status !== 'complete');
     }
 
+    retreatExpedition(game, expId) {
+        const exp = this.expeditions.find(e => e.id === expId);
+        if (!exp || exp.status !== 'exploring') return false;
+        exp.status = 'returning';
+        exp.manualRetreat = true;
+        exp.retreatStartTick = game.tick;
+        exp.retreatTick = game.tick + Math.floor(EXPLORATION_CONFIG.retreatTicks * 0.5);
+        this._addLog(exp, game, 'Retreat ordered — returning with collected loot', 'info');
+        return true;
+    }
+
+    _unpauseAfterChoice(exp, game) {
+        if (exp._wasPaused && !exp.pendingDecision) {
+            exp._wasPaused = false;
+            if (game.paused) game.togglePause();
+        }
+    }
+
+    resolveDecision(game, expId, choiceIndex) {
+        const exp = this.expeditions.find(e => e.id === expId);
+        if (!exp || !exp.pendingDecision) return false;
+        const decision = exp.pendingDecision;
+        const choice = decision.choices[choiceIndex];
+        if (!choice) return false;
+
+        const member = exp.partySnapshot.find(p => p.hp > 0) || exp.partySnapshot[0];
+        const logText = (choice.logText || '').replace('{name}', member?.name || 'The party');
+        if (logText) this._addLog(exp, game, logText, 'info');
+
+        exp.pendingDecision = null;
+        this._applyDecisionEffects(exp, game, choice.effects || {}, decision.encounterIndex);
+        exp.summary.decisionsCount++;
+        this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerDecision);
+
+        if (!exp.pendingDecision && !exp.combat) {
+            if (exp.nodeMap) {
+                const node = exp.nodeMap.find(n => n.encounterIndex === decision.encounterIndex && !n.completed);
+                if (node) node.completed = true;
+            }
+            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
+        }
+        this._unpauseAfterChoice(exp, game);
+        return true;
+    }
+
+    resolvePuzzle(game, expId, checkIndex) {
+        const exp = this.expeditions.find(e => e.id === expId);
+        if (!exp || !exp.pendingDecision || exp.pendingDecision.type !== 'puzzle') return false;
+        const puzzle = exp.pendingDecision;
+
+        if (checkIndex === -1) {
+            this._addLog(exp, game, 'The party decides to move on.', 'info');
+            if (exp.nodeMap) {
+                const node = exp.nodeMap.find(n => n.encounterIndex === puzzle.encounterIndex && !n.completed);
+                if (node) node.completed = true;
+            }
+            exp.pendingDecision = null;
+            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
+            this._unpauseAfterChoice(exp, game);
+            return true;
+        }
+
+        const check = puzzle.checks[checkIndex];
+        if (!check) return false;
+
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        let bestMember = alive[0];
+        let canPass = !check.requirement;
+
+        if (check.requirement) {
+            if (check.requirement.skill) {
+                for (const m of alive) {
+                    const col = game.getColonist(m.id);
+                    if (col && col.skills?.[check.requirement.skill] >= check.requirement.minLevel) {
+                        bestMember = m;
+                        canPass = true;
+                        break;
+                    }
+                }
+            } else if (check.requirement.traitAny) {
+                for (const m of alive) {
+                    const col = game.getColonist(m.id);
+                    if (col?.traits?.some(t => check.requirement.traitAny.includes(t))) {
+                        bestMember = m;
+                        canPass = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        let traitBonus = 0;
+        if (check.traitBonus && bestMember) {
+            const col = game.getColonist(bestMember.id);
+            if (col?.traits) {
+                for (const t of check.traitBonus) {
+                    if (col.traits.includes(t)) traitBonus += 0.2;
+                    const traitDef = TRAITS[t];
+                    if (traitDef?.expedition?.puzzleSuccessBonus) traitBonus += traitDef.expedition.puzzleSuccessBonus;
+                }
+            }
+        }
+
+        const successChance = canPass ? Math.min(1, 0.7 + traitBonus) : 0.3;
+        const success = Math.random() < successChance;
+
+        if (success && check.success) {
+            const text = check.success.text.replace('{name}', bestMember?.name || 'The party');
+            this._addLog(exp, game, text, 'success');
+            if (check.success.reward) this._applyPuzzleReward(exp, game, check.success.reward);
+            if (check.success.penalty) this._applyPuzzlePenalty(exp, game, check.success.penalty, bestMember, puzzle.encounterIndex);
+            exp.summary.puzzlesSolved++;
+            this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerPuzzleSolved);
+        } else if (check.failure) {
+            const text = check.failure.text.replace('{name}', bestMember?.name || 'The party');
+            this._addLog(exp, game, text, 'danger');
+            if (check.failure.penalty) this._applyPuzzlePenalty(exp, game, check.failure.penalty, bestMember, puzzle.encounterIndex);
+        }
+
+        exp.pendingDecision = null;
+        if (!exp.combat) {
+            if (exp.nodeMap) {
+                const node = exp.nodeMap.find(n => n.encounterIndex === puzzle.encounterIndex && !n.completed);
+                if (node) node.completed = true;
+            }
+            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
+        }
+        this._unpauseAfterChoice(exp, game);
+        return true;
+    }
+
+    resolveNpc(game, expId, choiceIndex) {
+        const exp = this.expeditions.find(e => e.id === expId);
+        if (!exp || !exp.pendingDecision || exp.pendingDecision.type !== 'npc') return false;
+        const npc = exp.pendingDecision;
+
+        if (choiceIndex === -1) {
+            this._addLog(exp, game, 'The party moves on.', 'info');
+            if (exp.nodeMap) {
+                const node = exp.nodeMap.find(n => n.encounterIndex === npc.encounterIndex && !n.completed);
+                if (node) node.completed = true;
+            }
+            exp.pendingDecision = null;
+            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
+            this._unpauseAfterChoice(exp, game);
+            return true;
+        }
+
+        const choice = npc.choices[choiceIndex];
+        if (!choice) return false;
+
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        if (choice.requirement) {
+            const req = choice.requirement;
+            if (req.spellAny) {
+                const hasCaster = alive.some(m => m.knownSpells?.some(s => req.spellAny.includes(s)));
+                if (!hasCaster) {
+                    this._addLog(exp, game, 'No one in the party can do that.', 'info');
+                    return false;
+                }
+            }
+        }
+        const member = alive[0] || exp.partySnapshot[0];
+
+        if (choice.cost) {
+            if (choice.cost.mana) {
+                const caster = alive.find(m => m.mana >= choice.cost.mana);
+                if (!caster) {
+                    this._addLog(exp, game, 'Not enough mana to do that.', 'info');
+                    return false;
+                }
+                caster.mana -= choice.cost.mana;
+            }
+            if (choice.cost.potionSlots) {
+                const totalPotions = Object.values(exp.potionSupply || {}).reduce((s, v) => s + v, 0);
+                if (totalPotions < choice.cost.potionSlots) {
+                    this._addLog(exp, game, 'Not enough potions to share.', 'info');
+                    return false;
+                }
+                const potionKeys = Object.keys(exp.potionSupply || {});
+                let slotsToUse = choice.cost.potionSlots;
+                for (const pk of potionKeys) {
+                    if (slotsToUse <= 0) break;
+                    const take = Math.min(slotsToUse, exp.potionSupply[pk]);
+                    exp.potionSupply[pk] -= take;
+                    slotsToUse -= take;
+                    if (exp.potionSupply[pk] <= 0) delete exp.potionSupply[pk];
+                }
+            }
+            if (choice.cost.loot) {
+                const res = choice.cost.loot.resource;
+                const amt = choice.cost.loot.amount;
+                if ((exp.loot[res] || 0) < amt) {
+                    this._addLog(exp, game, `Not enough ${res.replace(/_/g, ' ')} to do that.`, 'info');
+                    return false;
+                }
+                exp.loot[res] -= amt;
+                if (exp.loot[res] <= 0) delete exp.loot[res];
+            }
+        }
+
+        if (choice.result) {
+            const text = choice.result.text.replace('{name}', member?.name || 'The party');
+            this._addLog(exp, game, text, choice.result.reward ? 'success' : 'info');
+            if (choice.result.reward) this._applyNpcReward(exp, game, choice.result.reward);
+            if (choice.result.penalty) this._applyPuzzlePenalty(exp, game, choice.result.penalty, member, npc.encounterIndex);
+        }
+
+        exp.pendingDecision = null;
+        if (!exp.combat) {
+            if (exp.nodeMap) {
+                const node = exp.nodeMap.find(n => n.encounterIndex === npc.encounterIndex && !n.completed);
+                if (node) node.completed = true;
+            }
+            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
+        }
+        this._unpauseAfterChoice(exp, game);
+        return true;
+    }
+
+    resolveTrap(game, expId, checkIndex) {
+        const exp = this.expeditions.find(e => e.id === expId);
+        if (!exp || !exp.pendingDecision || exp.pendingDecision.type !== 'trap') return false;
+        const trap = exp.pendingDecision;
+        const trapDef = EXPEDITION_TRAPS[trap.trapKey];
+        if (!trapDef) { exp.pendingDecision = null; this._unpauseAfterChoice(exp, game); return true; }
+
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        const ds = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
+
+        if (checkIndex === -1) {
+            this._applyTrapDamage(exp, game, trapDef, alive, ds);
+            const member = alive[randInt(0, alive.length - 1)];
+            this._addLog(exp, game, `The party braces for impact!`, 'info');
+            const remaining = trap.remainingTicks;
+            exp.pendingDecision = null;
+            exp.nextEncounterTick = game.tick + (remaining ?? Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing));
+            this._unpauseAfterChoice(exp, game);
+            return true;
+        }
+
+        const check = trap.checks[checkIndex];
+        if (!check) return false;
+
+        let bestMember = alive[0];
+        let bestLevel = 0;
+
+        if (check.skill) {
+            for (const m of alive) {
+                const col = game.getColonist(m.id);
+                const lvl = col?.skills?.[check.skill] || 0;
+                if (lvl > bestLevel) { bestLevel = lvl; bestMember = m; }
+            }
+        } else if (check.traitAny) {
+            for (const m of alive) {
+                const col = game.getColonist(m.id);
+                if (col?.traits?.some(t => check.traitAny.includes(t))) {
+                    bestMember = m;
+                    bestLevel = check.minLevel || 1;
+                    break;
+                }
+            }
+        }
+
+        let traitBonus = 0;
+        if (check.traitBonus && bestMember) {
+            const col = game.getColonist(bestMember.id);
+            if (col?.traits) {
+                for (const t of check.traitBonus) {
+                    if (col.traits.includes(t)) traitBonus += 0.15;
+                    const traitDef = TRAITS[t];
+                    if (traitDef?.expedition?.puzzleSuccessBonus) traitBonus += traitDef.expedition.puzzleSuccessBonus;
+                }
+            }
+        }
+
+        const minLevel = check.minLevel || 1;
+        const baseChance = check.skill
+            ? Math.min(0.9, 0.3 + (bestLevel / (minLevel + 2)) * 0.4)
+            : (bestLevel > 0 ? 0.7 : 0.4);
+        const successChance = Math.min(1, baseChance + traitBonus);
+        const success = Math.random() < successChance;
+
+        if (success) {
+            const text = (check.successText || 'Trap avoided!').replace('{name}', bestMember?.name || 'The party');
+            this._addLog(exp, game, text, 'success');
+        } else {
+            const text = (check.failText || 'The trap triggers!').replace('{name}', bestMember?.name || 'The party');
+            this._addLog(exp, game, text, 'danger');
+            this._applyTrapDamage(exp, game, trapDef, alive, ds);
+        }
+
+        const remaining = trap.remainingTicks;
+        exp.pendingDecision = null;
+        exp.nextEncounterTick = game.tick + (remaining ?? Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing));
+        this._unpauseAfterChoice(exp, game);
+        return true;
+    }
+
+    _pickEnemyFromRealm(dim) {
+        if (dim.enemies.types && dim.enemies.types.length > 0) {
+            const totalWeight = dim.enemies.types.reduce((s, t) => s + t.weight, 0);
+            let roll = Math.random() * totalWeight;
+            for (const t of dim.enemies.types) {
+                roll -= t.weight;
+                if (roll <= 0 && EXPEDITION_ENEMIES[t.key]) {
+                    return { ...EXPEDITION_ENEMIES[t.key], typeKey: t.key };
+                }
+            }
+            const fb = dim.enemies.types[0];
+            return { ...EXPEDITION_ENEMIES[fb.key], typeKey: fb.key };
+        }
+        return { hp: dim.enemies.hp || [30, 60], damage: dim.enemies.damage || [5, 10], name: null, sprite: null, color: null, typeKey: null };
+    }
+
+    _applyTrapDamage(exp, game, trapDef, alive, ds) {
+        const member = alive[randInt(0, alive.length - 1)];
+        const equipTrapMult = getPartyExpeditionEffect(exp.partySnapshot, 'trapDamageMult');
+        const traitTrapMult = this._getTraitExpeditionEffect(exp, 'trapDamageMult');
+        const xpTrapMult = this._getXpLevelBonus(member.id, 'trapDamageMult');
+        const baseDmg = randInt(trapDef.initialDamage[0], trapDef.initialDamage[1]);
+        const dmg = Math.max(0, Math.floor(baseDmg * equipTrapMult * traitTrapMult * xpTrapMult * (ds.trapDmgMult || 1)));
+
+        if (dmg > 0) {
+            member.hp -= dmg;
+            this._addLog(exp, game, `${member.name} takes ${dmg} damage!`, 'danger');
+            if (exp.summary) exp.summary.damageTaken[member.id] = (exp.summary.damageTaken[member.id] || 0) + dmg;
+        }
+
+        if (trapDef.damageType === 'dot' && trapDef.dotDamage) {
+            exp.activeEffects.push({
+                type: 'dot', targetId: member.id,
+                damageRange: trapDef.dotDamage, ticksRemaining: trapDef.dotTicks,
+                interval: trapDef.dotInterval, lastTick: game.tick,
+            });
+            this._addLog(exp, game, `${member.name} is poisoned!`, 'danger');
+        }
+        if (trapDef.damageType === 'mana' && trapDef.manaDrain) {
+            const drain = randInt(trapDef.manaDrain[0], trapDef.manaDrain[1]);
+            member.mana = Math.max(0, member.mana - drain);
+            this._addLog(exp, game, `${member.name} loses ${drain} mana!`, 'danger');
+        }
+        if (trapDef.damageType === 'equipment' && trapDef.effect?.disableRandomSlot) {
+            const equipSlots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+            const equippedSlots = equipSlots.filter(s => member[s]);
+            if (equippedSlots.length > 0) {
+                const slot = equippedSlots[randInt(0, equippedSlots.length - 1)];
+                if (!member._disabledSlots) member._disabledSlots = {};
+                member._disabledSlots[slot] = (trapDef.effect.disableDuration || 3);
+                this._addLog(exp, game, `${member.name}'s ${slot} was disabled!`, 'danger');
+            }
+        }
+
+        if (member.hp <= 0) {
+            this._checkExpeditionRevive(exp, member, game);
+        }
+    }
+
+    savePartyPreset(name, colonistIds, formation, potions, mutators) {
+        const existing = this.partyPresets.findIndex(p => p.name === name);
+        const preset = {
+            name,
+            colonistIds: [...colonistIds],
+            formation: formation ? { front: [...formation.front], back: [...formation.back] } : null,
+            potions: potions ? { ...potions } : {},
+            mutators: mutators ? [...mutators] : [],
+        };
+        if (existing >= 0) this.partyPresets[existing] = preset;
+        else this.partyPresets.push(preset);
+        if (this.partyPresets.length > 10) this.partyPresets.shift();
+    }
+
+    loadPartyPreset(name) {
+        return this.partyPresets.find(p => p.name === name) || null;
+    }
+
+    deletePartyPreset(name) {
+        this.partyPresets = this.partyPresets.filter(p => p.name !== name);
+    }
+
+    getActiveRealmEvents() {
+        return this.activeRealmEvents;
+    }
+
+    getRealmEvent(realmKey) {
+        return this.activeRealmEvents.find(e => e.realms.includes(realmKey)) || null;
+    }
+
+    isFatigued(colonistId, currentTick) {
+        const cd = this.fatigueCooldowns[colonistId];
+        return cd && currentTick < cd;
+    }
+
+    getFatigueRemaining(colonistId, currentTick) {
+        const cd = this.fatigueCooldowns[colonistId];
+        if (!cd || currentTick >= cd) return 0;
+        return cd - currentTick;
+    }
+
+    getExpeditionLevel(colonistId) {
+        const data = this.expeditionXP[colonistId];
+        if (!data) return 0;
+        return data.level || 0;
+    }
+
+    _getXpLevelBonus(colonistId, bonusKey) {
+        const level = this.getExpeditionLevel(colonistId);
+        let value = bonusKey.includes('Mult') ? 1.0 : 0;
+        for (let lv = 1; lv <= level; lv++) {
+            const bonus = EXPEDITION_XP_CONFIG.levelBonuses[lv];
+            if (!bonus || bonus[bonusKey] === undefined) continue;
+            if (bonusKey.includes('Mult')) value *= bonus[bonusKey];
+            else value += bonus[bonusKey];
+        }
+        return value;
+    }
+
     _addLog(exp, game, text, type = 'info') {
         const tick = game ? game.tick : 0;
         exp.log.push({ tick, text, type });
-        if (exp.log.length > 50) exp.log.shift();
     }
 
     _checkExpeditionRevive(exp, member, game) {
@@ -299,6 +797,7 @@ export class ExplorationSystem {
                     weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
                     boots: c.boots,
                     trinket: c.trinketBroken ? null : c.trinket,
+                    traits: c.traits || [],
                     knownSpells: c.knownSpells ? c.knownSpells.filter(s => !c.disabledSpells || !c.disabledSpells.includes(s)) : [],
                     mana: c.mana || 0,
                     maxMana: c.maxMana || 0,
@@ -308,6 +807,7 @@ export class ExplorationSystem {
                     effectiveCooldown: effCd,
                     shieldActive: false,
                     shieldReduction: 0,
+                    dodgeCharges: 0,
                 };
             });
             this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
@@ -316,51 +816,163 @@ export class ExplorationSystem {
         }
     }
 
-    _generateEncounters(dim, diffSettings) {
+    _generateEncounters(dim, diffSettings, mutators = [], realmKey = '') {
         const encounters = [];
         const totalEncounters = dim.encounters + (diffSettings.extraEncounters || 0);
-        for (let i = 0; i < totalEncounters; i++) {
-            const isCombat = Math.random() < 0.6;
-            if (isCombat) {
-                const baseCount = randInt(dim.enemies.count[0], dim.enemies.count[1]);
-                const count = Math.max(1, Math.round(baseCount * diffSettings.enemyCountMult));
-                const enemies = [];
-                for (let j = 0; j < count; j++) {
-                    const baseHp = randInt(dim.enemies.hp[0], dim.enemies.hp[1]);
-                    const baseDmg = randInt(dim.enemies.damage[0], dim.enemies.damage[1]);
-                    enemies.push({
-                        hp: Math.round(baseHp * diffSettings.enemyHpMult),
-                        maxHp: 0,
-                        damage: Math.round(baseDmg * diffSettings.enemyDmgMult),
-                    });
-                }
-                for (const e of enemies) e.maxHp = e.hp;
-                encounters.push({ type: 'combat', enemies });
-            } else {
-                const lootEntry = this._rollLoot(dim, diffSettings);
-                encounters.push({ type: 'loot', ...lootEntry });
+
+        let mutEnemyHpMult = 1.0;
+        let mutEnemyDmgMult = 1.0;
+        for (const mutKey of mutators) {
+            const mut = EXPEDITION_MUTATORS[mutKey];
+            if (mut?.effects?.enemyHpMult) mutEnemyHpMult *= mut.effects.enemyHpMult;
+            if (mut?.effects?.enemyDmgMult) mutEnemyDmgMult *= mut.effects.enemyDmgMult;
+        }
+        for (const event of this.activeRealmEvents) {
+            if (!event.realms?.includes(realmKey)) continue;
+            if (event.effects?.enemyHpMult) mutEnemyHpMult *= event.effects.enemyHpMult;
+            if (event.effects?.enemyDmgMult) mutEnemyDmgMult *= event.effects.enemyDmgMult;
+        }
+        const hpMult = diffSettings.enemyHpMult * mutEnemyHpMult;
+        const dmgMult = diffSettings.enemyDmgMult * mutEnemyDmgMult;
+
+        const decisionKeys = Object.keys(EXPEDITION_DECISIONS);
+        const puzzleKeys = Object.keys(PUZZLE_ENCOUNTERS).filter(k => {
+            const p = PUZZLE_ENCOUNTERS[k];
+            return !p.realmFilter || p.realmFilter.includes(realmKey);
+        });
+        const npcKeys = Object.keys(NPC_ENCOUNTERS).filter(k => {
+            const n = NPC_ENCOUNTERS[k];
+            return !n.realmFilter || n.realmFilter.includes(realmKey);
+        });
+
+        const combatRange = dim.combatEncounters || [1, Math.ceil(totalEncounters * 0.6)];
+        const combatCount = randInt(Math.min(combatRange[0], totalEncounters), Math.min(combatRange[1], totalEncounters));
+
+        const pickEnemyType = (types) => {
+            const totalWeight = types.reduce((s, t) => s + t.weight, 0);
+            let roll = Math.random() * totalWeight;
+            for (const t of types) {
+                roll -= t.weight;
+                if (roll <= 0) return EXPEDITION_ENEMIES[t.key] ? { ...EXPEDITION_ENEMIES[t.key], typeKey: t.key } : null;
             }
+            const fallbackKey = types[0].key;
+            return EXPEDITION_ENEMIES[fallbackKey] ? { ...EXPEDITION_ENEMIES[fallbackKey], typeKey: fallbackKey } : null;
+        };
+
+        const makeCombatEncounter = () => {
+            const baseCount = randInt(dim.enemies.count[0], dim.enemies.count[1]);
+            const count = Math.min(10, Math.max(1, Math.round(baseCount * diffSettings.enemyCountMult)));
+            const enemies = [];
+            for (let j = 0; j < count; j++) {
+                const eDef = dim.enemies.types ? pickEnemyType(dim.enemies.types) : null;
+                const baseHp = eDef ? randInt(eDef.hp[0], eDef.hp[1]) : randInt(dim.enemies.hp?.[0] || 30, dim.enemies.hp?.[1] || 60);
+                const baseDmg = eDef ? randInt(eDef.damage[0], eDef.damage[1]) : randInt(dim.enemies.damage?.[0] || 5, dim.enemies.damage?.[1] || 10);
+                const enemy = {
+                    hp: Math.round(baseHp * hpMult),
+                    maxHp: 0,
+                    damage: Math.round(baseDmg * dmgMult),
+                    name: eDef?.name || null,
+                    sprite: eDef?.sprite || null,
+                    color: eDef?.color || null,
+                    typeKey: eDef?.typeKey || null,
+                    spells: eDef?.spells || null,
+                };
+                enemy.maxHp = enemy.hp;
+                this._rollEliteModifier(enemy, diffSettings);
+                enemies.push(enemy);
+            }
+            return { type: 'combat', enemies };
+        };
+
+        for (let i = 0; i < combatCount; i++) {
+            encounters.push(makeCombatEncounter());
+        }
+
+        for (let i = combatCount; i < totalEncounters; i++) {
+            const roll = Math.random();
+
+            if (roll < 0.18 && decisionKeys.length > 0) {
+                const eligible = decisionKeys.filter(k => {
+                    const d = EXPEDITION_DECISIONS[k];
+                    return !d.realmFilter || d.realmFilter.includes(realmKey);
+                });
+                if (eligible.length > 0) {
+                    const dKey = eligible[randInt(0, eligible.length - 1)];
+                    encounters.push({ type: 'decision', decisionKey: dKey, ...EXPEDITION_DECISIONS[dKey] });
+                    continue;
+                }
+            }
+
+            if (roll < 0.30 && puzzleKeys.length > 0) {
+                const totalWeight = puzzleKeys.reduce((s, k) => s + (PUZZLE_ENCOUNTERS[k].triggerWeight || 1), 0);
+                let pRoll = Math.random() * totalWeight;
+                let pKey = puzzleKeys[0];
+                for (const k of puzzleKeys) {
+                    pRoll -= (PUZZLE_ENCOUNTERS[k].triggerWeight || 1);
+                    if (pRoll <= 0) { pKey = k; break; }
+                }
+                encounters.push({ type: 'puzzle', puzzleKey: pKey, ...PUZZLE_ENCOUNTERS[pKey] });
+                continue;
+            }
+
+            if (roll < 0.40 && npcKeys.length > 0) {
+                const totalWeight = npcKeys.reduce((s, k) => s + (NPC_ENCOUNTERS[k].triggerWeight || 1), 0);
+                let nRoll = Math.random() * totalWeight;
+                let nKey = npcKeys[0];
+                for (const k of npcKeys) {
+                    nRoll -= (NPC_ENCOUNTERS[k].triggerWeight || 1);
+                    if (nRoll <= 0) { nKey = k; break; }
+                }
+                encounters.push({ type: 'npc', npcKey: nKey, ...NPC_ENCOUNTERS[nKey] });
+                continue;
+            }
+
+            const lootEntry = this._rollLoot(dim, diffSettings);
+            encounters.push({ type: 'loot', ...lootEntry });
+        }
+
+        for (let i = encounters.length - 1; i > 0; i--) {
+            const j = randInt(0, i);
+            [encounters[i], encounters[j]] = [encounters[j], encounters[i]];
         }
 
         let bossEncounter = null;
         if (dim.boss) {
-            const bossHp = Math.round(dim.boss.hp * diffSettings.enemyHpMult);
-            const bossDmg = Math.round(dim.boss.damage * diffSettings.enemyDmgMult);
-            bossEncounter = {
-                type: 'combat',
-                isBoss: true,
-                enemies: [{
-                    hp: bossHp, maxHp: bossHp, damage: bossDmg,
-                    isBoss: true, name: dim.boss.name,
-                    enraged: false,
-                    enrageThreshold: dim.boss.enrageThreshold,
-                    enrageDamageMult: dim.boss.enrageDamageMult,
-                    color: dim.boss.color,
-                    enragedColor: dim.boss.enragedColor,
-                    sprite: dim.boss.sprite,
-                    enragedSprite: dim.boss.enragedSprite,
-                }],
-            };
+            const boss = dim.boss;
+            if (boss.phases) {
+                const phase0 = boss.phases[0];
+                const bossHp = Math.round(phase0.hp * hpMult);
+                const bossDmg = Math.round(phase0.damage * dmgMult);
+                bossEncounter = {
+                    type: 'combat', isBoss: true,
+                    bossPhases: boss.phases,
+                    enemies: [{
+                        hp: bossHp, maxHp: bossHp, damage: bossDmg,
+                        isBoss: true, name: boss.name,
+                        enraged: false,
+                        color: phase0.color || boss.color,
+                        sprite: phase0.sprite || boss.sprite,
+                        abilities: phase0.abilities || [],
+                    }],
+                };
+            } else {
+                const bossHp = Math.round(boss.hp * hpMult);
+                const bossDmg = Math.round(boss.damage * dmgMult);
+                bossEncounter = {
+                    type: 'combat', isBoss: true,
+                    enemies: [{
+                        hp: bossHp, maxHp: bossHp, damage: bossDmg,
+                        isBoss: true, name: boss.name,
+                        enraged: false,
+                        enrageThreshold: boss.enrageThreshold,
+                        enrageDamageMult: boss.enrageDamageMult,
+                        color: boss.color,
+                        enragedColor: boss.enragedColor,
+                        sprite: boss.sprite,
+                        enragedSprite: boss.enragedSprite,
+                    }],
+                };
+            }
         }
 
         return { encounters, bossEncounter };
@@ -418,16 +1030,18 @@ export class ExplorationSystem {
         const roll = Math.random();
 
         if (roll < EXPLORATION_CONFIG.trapChance) {
-            const trapMult = getPartyExpeditionEffect(exp.partySnapshot, 'trapDamageMult');
-            const baseDmg = randInt(EXPLORATION_CONFIG.trapDamageRange[0], EXPLORATION_CONFIG.trapDamageRange[1]);
-            const dmg = Math.floor(baseDmg * trapMult * ds.trapDmgMult);
-            member.hp -= dmg;
-            const trapPool = (dimEvents && dimEvents.traps) || EXPLORATION_EVENTS.traps;
-            const msg = pickRandom(trapPool).replace('{name}', member.name);
-            this._addLog(exp, game, `${msg} (${dmg} dmg)`, 'danger');
-            if (member.hp <= 0) {
-                this._checkExpeditionRevive(exp, member, game);
-            }
+            const trapKeys = Object.keys(EXPEDITION_TRAPS);
+            const trapKey = trapKeys[randInt(0, trapKeys.length - 1)];
+            const trapDef = EXPEDITION_TRAPS[trapKey];
+
+            exp.pendingDecision = {
+                type: 'trap',
+                trapKey,
+                text: trapDef.text,
+                checks: trapDef.checks,
+                remainingTicks: Math.max(0, exp.nextEncounterTick - game.tick),
+            };
+            this._addLog(exp, game, trapDef.text, 'danger');
         } else if (roll < EXPLORATION_CONFIG.trapChance + EXPLORATION_CONFIG.findItemChance) {
             const lootEntry = this._rollLoot(dim, ds);
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult');
@@ -450,32 +1064,78 @@ export class ExplorationSystem {
         }
     }
 
-    // Initiates an encounter from the pre-generated encounter list.
-    // Encounters are either 'loot' (immediate reward) or 'combat' (triggers
-    // the round-based combat loop in _updateCombat).
     _startEncounter(exp, game, encounterOverride) {
         const encounter = encounterOverride || exp.encounters[exp.currentEncounter];
         if (!encounter) return;
+
+        if (exp.nodeMap) {
+            const isBoss = encounter === exp.bossEncounter;
+            const node = isBoss
+                ? exp.nodeMap.find(n => n.type === 'boss' && !n.completed)
+                : exp.nodeMap.find(n => n.encounterIndex === exp.currentEncounter && !n.completed);
+            if (node) node.current = true;
+        }
+
+        this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerEncounter);
+
+        if (encounter.type === 'decision') {
+            exp.pendingDecision = {
+                type: 'decision',
+                decisionKey: encounter.decisionKey,
+                text: encounter.text,
+                choices: encounter.choices,
+                encounterIndex: exp.currentEncounter,
+            };
+            this._addLog(exp, game, encounter.text, 'info');
+            return;
+        }
+
+        if (encounter.type === 'puzzle') {
+            exp.pendingDecision = {
+                type: 'puzzle',
+                puzzleKey: encounter.puzzleKey,
+                text: encounter.text,
+                checks: encounter.checks,
+                encounterIndex: exp.currentEncounter,
+            };
+            this._addLog(exp, game, encounter.text, 'info');
+            return;
+        }
+
+        if (encounter.type === 'npc') {
+            exp.pendingDecision = {
+                type: 'npc',
+                npcKey: encounter.npcKey,
+                text: encounter.text,
+                choices: encounter.choices,
+                encounterIndex: exp.currentEncounter,
+            };
+            this._addLog(exp, game, encounter.text, 'info');
+            this._updateBestiary(exp, 'npc', encounter.npcKey, { name: encounter.text.slice(0, 40) });
+            return;
+        }
 
         if (encounter.type === 'loot') {
             const member = exp.partySnapshot.find(p => p.hp > 0) || exp.partySnapshot[0];
             const dim = REALMS[exp.realm];
             const discPool = (dim.events && dim.events.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
-            // A loot roll can be an item ({ item }) with no resource/amount. Items
-            // accumulate in exp.loot._items (matched to _completeExpedition); treating them
-            // as a resource wrote stockpile['undefined'] = NaN and permanently poisoned wealth.
-            // The previous .replace(encounter.resource) also threw on the item case, which is
-            // why the log line was commented out.
             if (encounter.item) {
                 if (!exp.loot._items) exp.loot._items = [];
                 exp.loot._items.push(encounter.item);
                 const itemName = ALL_ITEMS[encounter.item]?.name || encounter.item;
                 this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
             } else {
-                exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + encounter.amount;
-                this._addLog(exp, game, `${msg} (+${encounter.amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
+                const streakMult = exp.streakMultiplier || 1.0;
+                const amount = Math.floor(encounter.amount * streakMult);
+                exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + amount;
+                this._addLog(exp, game, `${msg} (+${amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
             }
+            if (exp.nodeMap) {
+                const node = exp.nodeMap.find(n => n.encounterIndex === exp.currentEncounter);
+                if (node) node.completed = true;
+            }
+            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
             return;
         }
 
@@ -486,9 +1146,30 @@ export class ExplorationSystem {
             const dim = REALMS[exp.realm];
             const approachMsg = dim.boss?.approachText || `A powerful foe blocks the path: ${bossEnemy.name}!`;
             this._addLog(exp, game, approachMsg, 'danger');
+            this._updateBestiary(exp, 'boss', bossEnemy.name, { name: bossEnemy.name, sprite: bossEnemy.sprite || dim.boss?.sprite, color: bossEnemy.color || dim.boss?.color });
+
+            if (encounter.bossPhases) {
+                exp.bossPhaseData = {
+                    currentPhaseIndex: 0,
+                    phases: encounter.bossPhases,
+                };
+            }
         } else {
             const startMsg = pickRandom(EXPLORATION_EVENTS.combatStart);
-            this._addLog(exp, game, `${startMsg} (${enemies.length} foes)`, 'combat');
+            const eliteNames = enemies.filter(e => e.elite).map(e => e.eliteName);
+            const eliteNote = eliteNames.length > 0 ? ` (includes ${eliteNames.join(', ')} elite!)` : '';
+            this._addLog(exp, game, `${startMsg} (${enemies.length} foes)${eliteNote}`, 'combat');
+
+            for (const e of enemies) {
+                if (e.elite) {
+                    const eName = e.name ? `${e.eliteName} ${e.name}` : `${e.eliteName} Enemy`;
+                    this._updateBestiary(exp, 'elite', `${e.eliteName}_${e.typeKey || 'enemy'}`, { name: eName, sprite: e.sprite, color: e.eliteColor || e.color || '#ff8833' });
+                } else {
+                    const bKey = e.typeKey || `enemy_${exp.realm}`;
+                    const bName = e.name || `${REALMS[exp.realm]?.name || exp.realm} Creature`;
+                    this._updateBestiary(exp, 'regular', bKey, { name: bName, sprite: e.sprite, color: e.color || '#ff3333' });
+                }
+            }
         }
 
         exp.combat = {
@@ -500,11 +1181,6 @@ export class ExplorationSystem {
         };
     }
 
-    // Round-based combat: runs one round per EXPLORATION_CONFIG.combatRoundTicks.
-    // Each round: party attacks (multi-hit from low cooldown), party spell phase,
-    // then enemies attack. Damage = base weapon + rand(0,3), modified by
-    // equipment stats and difficulty multipliers. 15% flat miss chance on both sides.
-    // Enemy targeting uses equipment targetPriority (taunt mechanic).
     _updateCombat(exp, game) {
         const combat = exp.combat;
         if (game.tick < combat.roundTick) return;
@@ -520,52 +1196,77 @@ export class ExplorationSystem {
             return;
         }
 
-        const partyDmgMult = getPartyExpeditionEffect(exp.partySnapshot, 'partyDamageMult');
+        this._tryUsePotions(exp, game);
+
+        const baseMissChance = 0.15 + this._getMutatorEffect(exp, 'missChanceMod');
+        const partyDmgMult = getPartyExpeditionEffect(exp.partySnapshot, 'partyDamageMult')
+            * this._getMutatorEffect(exp, 'partyDamageMult')
+            * this._getTraitExpeditionEffect(exp, 'expeditionDamageMult')
+            * (exp._tempDamageMult || 1.0);
+        const physResist = this._getMutatorEffect(exp, 'enemyPhysicalResist');
+        const globalThorns = this._getMutatorEffect(exp, 'globalThorns');
+
+        // ── Party attack phase ──
         for (const member of alive) {
             if (member.hp <= 0) continue;
-            let weaponDmg = member.weapon ? member.weapon.damage : EXPLORATION_CONFIG.baseFistDamage;
-            const memberItems = [member.weapon, member.armor, member.helmet, member.clothes, member.boots, member.tool, member.trinket].filter(Boolean);
+            const disabled = member._disabledSlots || {};
+            let weaponDmg = (member.weapon && !disabled.weapon) ? member.weapon.damage : EXPLORATION_CONFIG.baseFistDamage;
+            const slotNames = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+            const memberItems = slotNames.filter(s => member[s] && !disabled[s]).map(s => member[s]);
             for (const item of memberItems) { if (item !== member.weapon && item.damage) weaponDmg += item.damage; }
             const critChance = memberItems.reduce((sum, it) => sum + (it.critChance || 0), 0);
             const hitsPerRound = Math.max(1, Math.round(member.attackCooldown / member.effectiveCooldown));
+            const formDmgMult = this._applyFormationModifier(exp, member.id, 'meleeDamageMult');
+            const xpDmgMult = this._getXpLevelBonus(member.id, 'expeditionDamageMult');
+
             for (let hit = 0; hit < hitsPerRound; hit++) {
                 const target = combat.enemies.find(e => e.hp > 0);
                 if (!target) break;
-                const targetLabel = target.isBoss ? target.name : 'an enemy';
-                let dmg = Math.floor((weaponDmg + randInt(0, 3)) * partyDmgMult);
+                const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
+
+                if (target.eliteDodge && Math.random() < target.eliteDodge) {
+                    this._addLog(exp, game, `${targetLabel} dodges ${member.name}'s attack!`, 'combat');
+                    continue;
+                }
+
+                let dmg = Math.floor((weaponDmg + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * (1 - physResist));
                 let critHit = false;
                 if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
+                if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
 
-                if (Math.random() < 0.15) {
-                    const msg = pickRandom(EXPLORATION_EVENTS.combatMiss)
-                        .replace('{attacker}', member.name)
-                        .replace('{target}', targetLabel);
+                if (Math.random() < baseMissChance) {
+                    const msg = pickRandom(EXPLORATION_EVENTS.combatMiss).replace('{attacker}', member.name).replace('{target}', targetLabel);
                     this._addLog(exp, game, msg, 'combat');
                 } else {
                     target.hp -= dmg;
+                    if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
                     const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
-                    const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit)
-                        .replace('{attacker}', member.name)
-                        .replace('{target}', targetLabel)
-                        .replace('{dmg}', dmg);
+                    const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', member.name).replace('{target}', targetLabel).replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
                     const lifeSteal = memberItems.reduce((sum, it) => sum + (it.lifeSteal || 0), 0);
+                    if (target.eliteLifeSteal && target.eliteLifeSteal > 0) {
+                        // Vampiric enemies steal from the attacker
+                    }
                     if (lifeSteal > 0) {
                         const healed = Math.floor(dmg * lifeSteal);
-                        if (healed > 0) member.hp = Math.min(member.maxHp, member.hp + healed);
+                        if (healed > 0) { member.hp = Math.min(member.maxHp, member.hp + healed); if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed; }
                     }
                     if (target.hp <= 0) {
                         const slayLabel = target.isBoss ? target.name : 'a foe';
                         this._addLog(exp, game, `${member.name} slays ${slayLabel}!`, 'success');
+                        if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
                         const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0);
                         if (hpOnKill > 0) member.hp = Math.min(member.maxHp, member.hp + hpOnKill);
+                        if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
                     }
                 }
             }
         }
 
+        // ── Party spell phase ──
         this._tryCombatSpells(exp, game, alive, combat);
 
+        // ── Summons phase ──
         if (exp.summons && exp.summons.length > 0) {
             for (let si = exp.summons.length - 1; si >= 0; si--) {
                 const summon = exp.summons[si];
@@ -583,29 +1284,100 @@ export class ExplorationSystem {
                     } else {
                         summonTarget.hp -= sDmg;
                         this._addLog(exp, game, `The ${summon.name} attacks for ${sDmg}!`, 'combat');
-                        if (summonTarget.hp <= 0) this._addLog(exp, game, `The ${summon.name} slays a foe!`, 'success');
+                        if (summonTarget.hp <= 0) {
+                            this._addLog(exp, game, `The ${summon.name} slays a foe!`, 'success');
+                            if (summonTarget.elite) { exp.eliteKills++; this._processEliteOnDeath(summonTarget, exp, game); }
+                        }
                     }
                 }
             }
         }
 
+        // ── Elite abilities phase (regen etc) ──
+        for (const enemy of combat.enemies) {
+            if (enemy.hp > 0) this._processEliteAbilities(enemy, exp, game);
+        }
+
+        // ── Boss abilities phase ──
+        const bossEnemy = combat.enemies.find(e => e.isBoss && e.hp > 0);
+        if (bossEnemy) {
+            this._executeBossAbilities(bossEnemy, exp, game);
+        }
+
+        // ── Enemy attack phase ──
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
-            if (enemy.isBoss && !enemy.enraged && enemy.hp / enemy.maxHp <= enemy.enrageThreshold) {
+            if (enemy.isBoss && !enemy.enraged && enemy.enrageThreshold && enemy.hp / enemy.maxHp <= enemy.enrageThreshold) {
                 enemy.enraged = true;
-                enemy.damage = Math.floor(enemy.damage * enemy.enrageDamageMult);
+                enemy.damage = Math.floor(enemy.damage * (enemy.enrageDamageMult || 1.5));
                 const dim = REALMS[exp.realm];
                 this._addLog(exp, game, dim.boss?.enrageText || `${enemy.name} becomes enraged!`, 'danger');
             }
-            const attackerLabel = enemy.isBoss ? enemy.name : 'An enemy';
+            const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
-            const enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
+            let enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
+            if (enemy.eliteExtraAttacks) enemyHits += enemy.eliteExtraAttacks;
+
             for (let hit = 0; hit < enemyHits; hit++) {
+                if (enemy.spells && hit === 0) {
+                    let castSpell = false;
+                    for (const sp of enemy.spells) {
+                        if (Math.random() < sp.chance) {
+                            const spName = sp.spell.replace(/_/g, ' ');
+                            if (sp.healPct) {
+                                const allies = combat.enemies.filter(e => e.hp > 0 && e.hp < e.maxHp);
+                                if (allies.length > 0) {
+                                    const healTarget = allies[randInt(0, allies.length - 1)];
+                                    const heal = Math.floor(healTarget.maxHp * sp.healPct);
+                                    healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + heal);
+                                    this._addLog(exp, game, `${attackerLabel} casts ${spName}, healing for ${heal}!`, 'danger');
+                                    castSpell = true; break;
+                                }
+                            }
+                            if (sp.aoe) {
+                                const dmg = randInt(sp.damage[0], sp.damage[1]);
+                                for (const p of alive) {
+                                    if (p.hp <= 0) continue;
+                                    p.hp -= dmg;
+                                    if (exp.summary) exp.summary.damageTaken[p.id] = (exp.summary.damageTaken[p.id] || 0) + dmg;
+                                    if (p.hp <= 0) this._checkExpeditionRevive(exp, p, game);
+                                }
+                                this._addLog(exp, game, `${attackerLabel} casts ${spName}, hitting all for ${dmg}!`, 'danger');
+                            } else if (sp.damage) {
+                                const spTarget = alive.filter(p => p.hp > 0)[randInt(0, Math.max(0, alive.filter(p => p.hp > 0).length - 1))];
+                                if (spTarget) {
+                                    const dmg = randInt(sp.damage[0], sp.damage[1]);
+                                    spTarget.hp -= dmg;
+                                    if (exp.summary) exp.summary.damageTaken[spTarget.id] = (exp.summary.damageTaken[spTarget.id] || 0) + dmg;
+                                    this._addLog(exp, game, `${attackerLabel} casts ${spName} on ${spTarget.name} for ${dmg}!`, 'danger');
+                                    if (sp.lifesteal && enemy.hp > 0) {
+                                        const stolen = Math.floor(dmg * sp.lifesteal);
+                                        enemy.hp = Math.min(enemy.maxHp, enemy.hp + stolen);
+                                    }
+                                    if (spTarget.hp <= 0) this._checkExpeditionRevive(exp, spTarget, game);
+                                }
+                            }
+                            if (sp.dot && !sp.aoe) {
+                                const spTarget = alive.filter(p => p.hp > 0)[0];
+                                if (spTarget) {
+                                    exp.activeEffects.push({
+                                        type: 'dot', targetId: spTarget.id,
+                                        damageRange: sp.dot.damage, ticksRemaining: sp.dot.ticks,
+                                        interval: sp.dot.interval, lastTick: game.tick,
+                                    });
+                                }
+                            }
+                            castSpell = true; break;
+                        }
+                    }
+                    if (castSpell) continue;
+                }
+
                 const aliveSummons = exp.summons ? exp.summons.filter(s => s.hp > 0) : [];
                 if (aliveSummons.length > 0 && Math.random() < 0.5) {
                     const targetSummon = aliveSummons[randInt(0, aliveSummons.length - 1)];
                     let dmg = enemy.damage + randInt(0, 2);
-                    if (Math.random() < 0.15) {
+                    if (Math.random() < baseMissChance) {
                         this._addLog(exp, game, `${attackerLabel} misses the ${targetSummon.name}!`, 'combat');
                     } else {
                         targetSummon.hp -= dmg;
@@ -617,53 +1389,76 @@ export class ExplorationSystem {
                     }
                     continue;
                 }
-                let target = null;
+
                 let bestScore = Infinity;
+                const candidates = [];
                 for (const p of alive) {
                     if (p.hp <= 0) continue;
                     const priority = getTargetPriority(p);
-                    const score = -priority;
-                    if (score < bestScore) { bestScore = score; target = p; }
+                    const formPriority = this._applyFormationModifier(exp, p.id, 'targetPriorityMod');
+                    const score = -(priority + (formPriority !== 1.0 ? formPriority : 0));
+                    if (score < bestScore) { bestScore = score; candidates.length = 0; candidates.push(p); }
+                    else if (score === bestScore) { candidates.push(p); }
                 }
-                if (!target) break;
+                if (candidates.length === 0) break;
+                const target = candidates[randInt(0, candidates.length - 1)];
+
+                if (target.dodgeCharges > 0) {
+                    target.dodgeCharges--;
+                    this._addLog(exp, game, `${target.name} phases through ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
+                    continue;
+                }
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
-                const dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
+                let dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
+                dodgeChance += this._getTraitExpeditionEffect(exp, 'dodgeChanceMod');
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
                     this._addLog(exp, game, `${target.name} dodges ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
                     continue;
                 }
+
                 let dmg = enemy.damage + randInt(0, 2);
                 for (const item of targetItems) {
                     if (item.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - item.damageReduction)));
                 }
-                if (target.shieldActive) {
-                    dmg = Math.max(1, Math.floor(dmg * (1 - target.shieldReduction)));
-                }
+                if (target.shieldActive) dmg = Math.max(1, Math.floor(dmg * (1 - target.shieldReduction)));
+                const formDmgTaken = this._applyFormationModifier(exp, target.id, 'damageTakenMult');
+                dmg = Math.max(1, Math.floor(dmg * formDmgTaken));
 
-                if (Math.random() < 0.15) {
-                    const msg = pickRandom(EXPLORATION_EVENTS.combatMiss)
-                        .replace('{attacker}', attackerLabel)
-                        .replace('{target}', target.name);
+                if (Math.random() < baseMissChance) {
+                    const msg = pickRandom(EXPLORATION_EVENTS.combatMiss).replace('{attacker}', attackerLabel).replace('{target}', target.name);
                     this._addLog(exp, game, msg, 'combat');
                 } else {
                     target.hp -= dmg;
-                    const msg = pickRandom(EXPLORATION_EVENTS.combatHit)
-                        .replace('{attacker}', attackerLabel)
-                        .replace('{target}', target.name)
-                        .replace('{dmg}', dmg);
+                    if (exp.summary) exp.summary.damageTaken[target.id] = (exp.summary.damageTaken[target.id] || 0) + dmg;
+                    const msg = pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', attackerLabel).replace('{target}', target.name).replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
-                    const thorns = targetItems.reduce((sum, it) => sum + (it.thornsDamage || 0), 0);
+
+                    // Thorns from equipment + mutators
+                    let thorns = targetItems.reduce((sum, it) => sum + (it.thornsDamage || 0), 0) + globalThorns;
                     if (thorns > 0 && enemy.hp > 0) {
                         enemy.hp -= thorns;
                         this._addLog(exp, game, `Thorns deal ${thorns} damage back!`, 'combat');
-                        if (enemy.hp <= 0) this._addLog(exp, game, `${attackerLabel} is slain by thorns!`, 'success');
+                        if (enemy.hp <= 0) {
+                            this._addLog(exp, game, `${attackerLabel} is slain by thorns!`, 'success');
+                            if (enemy.elite) { exp.eliteKills++; this._processEliteOnDeath(enemy, exp, game); }
+                        }
                     }
+
+                    // Vampiric elite life steal
+                    if (enemy.eliteLifeSteal && enemy.hp > 0) {
+                        const stolen = Math.floor(dmg * enemy.eliteLifeSteal);
+                        enemy.hp = Math.min(enemy.maxHp, enemy.hp + stolen);
+                    }
+
                     if (target.hp <= 0) {
                         this._checkExpeditionRevive(exp, target, game);
                     }
                 }
             }
         }
+
+        // ── Boss phase check ──
+        this._updateBossPhase(exp, game);
 
         if (combat.enemies.every(e => e.hp <= 0) || alive.every(p => p.hp <= 0)) {
             this._finishCombat(exp, game);
@@ -688,14 +1483,14 @@ export class ExplorationSystem {
                 if (!spell || spell.trigger !== 'inCombat') continue;
                 if (!this._canCastSpell(member, spellKey, game)) continue;
 
-                member.mana -= spell.manaCost;
-                member.spellCooldowns[spellKey] = game.tick;
-
-                if (spell.effect === 'ranged_damage' || spell.effect === 'ranged_damage_aoe') {
+                if (spell.effect === 'ranged_damage' || spell.effect === 'ranged_damage_aoe' || spell.effect === 'melee_damage') {
+                    member.mana -= spell.manaCost;
+                    member.spellCooldowns[spellKey] = game.tick;
                     let dmg = spell.damage;
                     if (member.spellDamageBonus) {
                         dmg = Math.floor(dmg * (1 + member.spellDamageBonus));
                     }
+                    dmg = Math.floor(dmg * this._getMutatorEffect(exp, 'spellDamageMult') * this._applyFormationModifier(exp, member.id, 'spellDamageMult'));
                     if (spell.effect === 'ranged_damage_aoe') {
                         const targets = combat.enemies.filter(e => e.hp > 0).slice(0, 3);
                         for (const t of targets) {
@@ -716,7 +1511,18 @@ export class ExplorationSystem {
                         }
                     }
                     break;
+                } else if (spell.effect === 'teleport') {
+                    if (member.dodgeCharges > 0) continue;
+                    member.mana -= spell.manaCost;
+                    member.spellCooldowns[spellKey] = game.tick;
+                    const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
+                    member.dodgeCharges = (member.dodgeCharges || 0) + charges;
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} — phasing through attacks!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    break;
                 } else if (spell.effect === 'buff_defense' && !member.shieldActive) {
+                    member.mana -= spell.manaCost;
+                    member.spellCooldowns[spellKey] = game.tick;
                     member.shieldActive = true;
                     member.shieldReduction = spell.damageReduction;
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — shielded!`, 'combat');
@@ -727,6 +1533,8 @@ export class ExplorationSystem {
                     if (exp.summons.some(s => s.ownerId === member.id && s.hp > 0)) continue;
                     const summonDef = SUMMON_TYPES[spell.summonType];
                     if (!summonDef) break;
+                    member.mana -= spell.manaCost;
+                    member.spellCooldowns[spellKey] = game.tick;
                     exp.summons.push({
                         type: spell.summonType,
                         name: summonDef.name,
@@ -773,10 +1581,12 @@ export class ExplorationSystem {
 
     _regenMana(exp, game) {
         if (game.tick % 10 !== 0) return;
+        const regenMult = this._getRealmEventEffect(exp, 'manaRegenMult');
+        const regen = Math.max(1, Math.round(1 * regenMult));
         for (const member of exp.partySnapshot) {
             if (member.hp <= 0) continue;
             if (member.mana < member.maxMana) {
-                member.mana = Math.min(member.maxMana, member.mana + 1);
+                member.mana = Math.min(member.maxMana, member.mana + regen);
             }
         }
     }
@@ -785,6 +1595,13 @@ export class ExplorationSystem {
         const survived = exp.partySnapshot.filter(p => p.hp > 0).length;
         if (survived > 0) {
             const dim = REALMS[exp.realm];
+            const streakMult = exp.streakMultiplier || 1.0;
+            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult')
+                * this._getTraitExpeditionEffect(exp, 'lootMult')
+                * streakMult;
+            const lootBonusFlat = this._getMutatorEffect(exp, 'lootBonusFlat');
+            const lootAmountMutMult = this._getMutatorEffect(exp, 'lootAmountMult')
+                * this._getRealmEventEffect(exp, 'lootAmountMult');
 
             if (exp.combat.isBoss && dim.boss) {
                 const boss = dim.boss;
@@ -799,12 +1616,23 @@ export class ExplorationSystem {
                     }
                 }
                 for (const [res, amt] of Object.entries(boss.bonusResources)) {
-                    exp.loot[res] = (exp.loot[res] || 0) + amt;
-                    this._addLog(exp, game, `+${amt} ${res.replace(/_/g, ' ')} from the boss!`, 'loot');
+                    const boosted = Math.floor(amt * lootAmountMutMult) + lootBonusFlat;
+                    exp.loot[res] = (exp.loot[res] || 0) + boosted;
+                    this._addLog(exp, game, `+${boosted} ${res.replace(/_/g, ' ')} from the boss!`, 'loot');
+                }
+                this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerBossKill);
+            }
+
+            // Elite loot bonus
+            let eliteLootMult = exp._nextRareMult || 1.0;
+            if (exp._nextRareMult) exp._nextRareMult = null;
+            for (const enemy of exp.combat.enemies) {
+                if (enemy.hp <= 0 && enemy.elite) {
+                    const mod = ELITE_MODIFIERS[enemy.elite];
+                    if (mod?.lootBonusMult) eliteLootMult = Math.max(eliteLootMult, mod.lootBonusMult);
                 }
             }
 
-            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult');
             const dsCombat = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
             const lootEntry = this._rollLoot(dim, dsCombat);
             if (lootEntry.item) {
@@ -813,7 +1641,12 @@ export class ExplorationSystem {
                 const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
                 this._addLog(exp, game, `Victory! Found ${itemName}!`, 'success');
             } else {
-                const amount = Math.floor(lootEntry.amount * lootMult);
+                let resMult = 1.0;
+                for (const event of this.activeRealmEvents) {
+                    if (!event.realms?.includes(exp.realm)) continue;
+                    if (event.effects?.resourceMult?.[lootEntry.resource]) resMult *= event.effects.resourceMult[lootEntry.resource];
+                }
+                const amount = Math.floor(lootEntry.amount * lootMult * eliteLootMult * lootAmountMutMult * resMult) + lootBonusFlat;
                 exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
                 this._addLog(exp, game, `Victory! Looted ${amount} ${lootEntry.resource.replace(/_/g, ' ')}.`, 'success');
             }
@@ -823,17 +1656,35 @@ export class ExplorationSystem {
         for (const member of exp.partySnapshot) {
             member.shieldActive = false;
             member.shieldReduction = 0;
+            if (member._disabledSlots) {
+                for (const slot of Object.keys(member._disabledSlots)) {
+                    member._disabledSlots[slot]--;
+                    if (member._disabledSlots[slot] <= 0) delete member._disabledSlots[slot];
+                }
+            }
         }
-        const combatBonus = Math.floor(exp.duration * 0.05);
-        exp.startTick -= combatBonus;
+
+        if (exp.nodeMap) {
+            const node = exp.nodeMap.find(n => n.encounterIndex === exp.combat.encounterIndex);
+            if (node) node.completed = true;
+            const bossNode = exp.nodeMap.find(n => n.type === 'boss' && exp.combat.isBoss);
+            if (bossNode) bossNode.completed = true;
+        }
+
+        if (exp._tempDamageBuffCombats && exp._tempDamageBuffCombats > 0) {
+            exp._tempDamageBuffCombats--;
+            if (exp._tempDamageBuffCombats <= 0) exp._tempDamageMult = 1.0;
+        }
+
         exp.combat = null;
+        exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
     }
 
     _completeExpedition(exp, game) {
         exp.status = 'complete';
 
         const allDefeated = exp.partySnapshot.every(p => p.hp <= 0);
-        if (!allDefeated) {
+        if (!allDefeated && !exp.manualRetreat) {
             this.completedRealms.add(exp.realm);
             game.story.checkMilestone(`realm_${exp.realm}`, game);
             if (game.stats) game.stats.expeditionsCompleted++;
@@ -841,6 +1692,7 @@ export class ExplorationSystem {
         const gx = exp.gatePos.x;
         const gy = exp.gatePos.y;
 
+        const fatigueTicks = this._calculateFatigueCooldown(exp);
         for (const snapshot of exp.partySnapshot) {
             const colonist = game.getColonist(snapshot.id);
             if (!colonist) continue;
@@ -854,12 +1706,48 @@ export class ExplorationSystem {
             }
             colonist.mana = Math.min(colonist.maxMana, snapshot.mana);
             colonist.state = 'idle';
+
+            let personalFatigue = fatigueTicks;
+            if (colonist.traits) {
+                for (const traitKey of colonist.traits) {
+                    const t = TRAITS[traitKey];
+                    if (t?.expedition?.fatigueMult) personalFatigue = Math.floor(personalFatigue * t.expedition.fatigueMult);
+                }
+            }
+            if (snapshot.hp <= 0) personalFatigue = Math.floor(personalFatigue * FATIGUE_CONFIG.defeatPenalty);
+            this.fatigueCooldowns[snapshot.id] = game.tick + Math.min(personalFatigue, FATIGUE_CONFIG.maxCooldownTicks);
+
+            const xpData = this.expeditionXP[snapshot.id] || { xp: 0, level: 0 };
+            const earned = exp.xpEarned[snapshot.id] || 0;
+            xpData.xp += earned;
+            let needed = EXPEDITION_XP_CONFIG.xpToLevel + xpData.level * EXPEDITION_XP_CONFIG.xpScalePerLevel;
+            while (xpData.xp >= needed && xpData.level < EXPEDITION_XP_CONFIG.maxLevel) {
+                xpData.xp -= needed;
+                xpData.level++;
+                this._addLog(exp, game, `${snapshot.name} reached Adventurer level ${xpData.level}!`, 'success');
+                needed = EXPEDITION_XP_CONFIG.xpToLevel + xpData.level * EXPEDITION_XP_CONFIG.xpScalePerLevel;
+            }
+            this.expeditionXP[snapshot.id] = xpData;
         }
 
         if (exp.packAnimals) {
             for (const pa of exp.packAnimals) {
                 const animal = game.entities.find(a => a.id === pa.id);
                 if (animal) animal.onExpedition = false;
+            }
+        }
+
+        this.realmHistory.push(exp.realm);
+        if (this.realmHistory.length > STREAK_CONFIG.historyLength) this.realmHistory.shift();
+
+        for (const entry of exp.discoveredEntries) {
+            if (!this.bestiary.has(entry.key)) {
+                this.bestiary.set(entry.key, { ...entry, count: 1 });
+            } else {
+                const existing = this.bestiary.get(entry.key);
+                existing.count++;
+                if (!existing.sprite && entry.sprite) existing.sprite = entry.sprite;
+                if (!existing.color && entry.color) existing.color = entry.color;
             }
         }
 
@@ -880,12 +1768,12 @@ export class ExplorationSystem {
                 game.discoveredLoot.add(`${exp.realm}:${itemKey}`);
             }
         }
-        const parts = [];// = Object.entries(exp.loot).map(([k, v]) => `${v} ${k}`);
+        const parts = [];
         for (const itemKey of items) {
             parts.push(ALL_ITEMS[itemKey]?.name || itemKey);
         }
         for (const [res, amt] of Object.entries(exp.loot)) {
-            parts.push([`${amt}x ${ALL_ITEMS[res]?.name || res}`]);
+            parts.push(`${amt}x ${ALL_ITEMS[res]?.name || res}`);
         }
         const lootSummary = parts.join(', ');
         if (!allDefeated) {
@@ -899,6 +1787,497 @@ export class ExplorationSystem {
         this.completedExpeditions.push(exp);
         if (this.completedExpeditions.length > 10) {
             this.completedExpeditions.shift();
+        }
+        this.pendingSummary = exp;
+    }
+
+    dismissSummary() {
+        this.pendingSummary = null;
+    }
+
+
+    _generateNodeMap(encounters, bossEncounter) {
+        const nodes = [];
+        for (let i = 0; i < encounters.length; i++) {
+            nodes.push({ type: encounters[i].type === 'combat' ? 'combat' : (encounters[i].type || 'loot'), encounterIndex: i, completed: false, current: false });
+        }
+        if (bossEncounter) {
+            nodes.push({ type: 'boss', encounterIndex: -1, completed: false, current: false });
+        }
+        return nodes;
+    }
+
+    _applyFormationModifier(exp, memberId, stat) {
+        if (!exp.formation) return 1.0;
+        const row = exp.formation.back?.includes(memberId) ? 'back' : 'front';
+        const rowConfig = FORMATION_CONFIG.rows[row];
+        return rowConfig?.[stat] || 1.0;
+    }
+
+    _updateActiveEffects(exp, game) {
+        if (!exp.activeEffects || exp.activeEffects.length === 0) return;
+        for (let i = exp.activeEffects.length - 1; i >= 0; i--) {
+            const effect = exp.activeEffects[i];
+            if (effect.type === 'dot' && game.tick - (effect.lastTick || 0) >= effect.interval) {
+                const member = exp.partySnapshot.find(p => p.id === effect.targetId);
+                if (member && member.hp > 0) {
+                    const dmg = randInt(effect.damageRange[0], effect.damageRange[1]);
+                    member.hp -= dmg;
+                    effect.lastTick = game.tick;
+                    effect.ticksRemaining--;
+                    if (member.hp <= 0) this._checkExpeditionRevive(exp, member, game);
+                }
+            }
+            if (effect.ticksRemaining <= 0) {
+                exp.activeEffects.splice(i, 1);
+            }
+        }
+    }
+
+    _checkTraitRally(exp, game) {
+        if (game.tick % 20 !== 0) return;
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        const baseRallyChance = 0.02;
+        const baseRallyHeal = 0.03;
+        for (const member of alive) {
+            const col = game.getColonist(member.id);
+            let rallyChance = baseRallyChance;
+            let rallyHeal = baseRallyHeal;
+            if (col?.traits) {
+                for (const traitKey of col.traits) {
+                    const t = TRAITS[traitKey];
+                    if (t?.expedition?.rallyChance) rallyChance += t.expedition.rallyChance;
+                    if (t?.expedition?.rallyHeal) rallyHeal += t.expedition.rallyHeal;
+                }
+            }
+            if (Math.random() < rallyChance) {
+                const healAmt = Math.floor(member.maxHp * rallyHeal);
+                for (const m of alive) {
+                    m.hp = Math.min(m.maxHp, m.hp + healAmt);
+                    if (m.maxMana > 0) m.mana = Math.min(m.maxMana, m.mana + Math.floor(m.maxMana * 0.01));
+                }
+                this._addLog(exp, game, `${member.name} rallies the party! (+${healAmt} HP each)`, 'success');
+                if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healAmt * alive.length;
+                return;
+            }
+        }
+    }
+
+    _rollEliteModifier(enemy, diffSettings) {
+        const chance = ELITE_CONFIG.baseChance + ((diffSettings.enemyHpMult - 1) / 0.3) * ELITE_CONFIG.difficultyChanceBonus;
+        if (Math.random() >= chance) return;
+        const modKeys = Object.keys(ELITE_MODIFIERS);
+        const modKey = modKeys[randInt(0, modKeys.length - 1)];
+        const mod = ELITE_MODIFIERS[modKey];
+        enemy.elite = modKey;
+        enemy.eliteName = mod.prefix;
+        enemy.eliteColor = mod.color;
+        if (mod.hpMult) { enemy.hp = Math.round(enemy.hp * mod.hpMult); enemy.maxHp = enemy.hp; }
+        if (mod.damageReduction) enemy.eliteDR = mod.damageReduction;
+        if (mod.dodgeChance) enemy.eliteDodge = mod.dodgeChance;
+        if (mod.extraAttacks) enemy.eliteExtraAttacks = mod.extraAttacks;
+        if (mod.lifeSteal) enemy.eliteLifeSteal = mod.lifeSteal;
+        if (mod.regenPerRound) enemy.eliteRegen = mod.regenPerRound;
+        if (mod.onDeath) enemy.eliteOnDeath = mod.onDeath;
+    }
+
+    _processEliteAbilities(enemy, exp, game) {
+        if (!enemy.elite) return;
+        if (enemy.eliteRegen && enemy.hp > 0 && enemy.hp < enemy.maxHp) {
+            const regen = Math.floor(enemy.maxHp * enemy.eliteRegen);
+            enemy.hp = Math.min(enemy.maxHp, enemy.hp + regen);
+        }
+    }
+
+    _processEliteOnDeath(enemy, exp, game) {
+        if (!enemy.eliteOnDeath) return;
+        if (enemy.eliteOnDeath.aoe) {
+            const alive = exp.partySnapshot.filter(p => p.hp > 0);
+            const dmg = randInt(enemy.eliteOnDeath.damage[0], enemy.eliteOnDeath.damage[1]);
+            for (const m of alive) {
+                m.hp -= dmg;
+                if (m.hp <= 0) this._checkExpeditionRevive(exp, m, game);
+            }
+            this._addLog(exp, game, `The ${enemy.eliteName} enemy explodes! (${dmg} damage to all)`, 'danger');
+        }
+    }
+
+    _updateBossPhase(exp, game) {
+        if (!exp.bossPhaseData || !exp.combat?.isBoss) return;
+        const bossEnemy = exp.combat.enemies.find(e => e.isBoss);
+        if (!bossEnemy || bossEnemy.hp > 0) return;
+
+        const phases = exp.bossPhaseData.phases;
+        const nextIdx = exp.bossPhaseData.currentPhaseIndex + 1;
+        if (nextIdx >= phases.length) return;
+
+        const nextPhase = phases[nextIdx];
+        exp.bossPhaseData.currentPhaseIndex = nextIdx;
+
+        const oldPhase = phases[nextIdx - 1];
+        if (oldPhase.transitionText) {
+            this._addLog(exp, game, oldPhase.transitionText, 'danger');
+        }
+
+        bossEnemy.hp = Math.round(nextPhase.hp * (exp.diffSettings?.enemyHpMult || 1));
+        bossEnemy.maxHp = bossEnemy.hp;
+        bossEnemy.damage = Math.round(nextPhase.damage * (exp.diffSettings?.enemyDmgMult || 1));
+        if (nextPhase.color) bossEnemy.color = nextPhase.color;
+        if (nextPhase.sprite) bossEnemy.sprite = nextPhase.sprite;
+        bossEnemy.abilities = nextPhase.abilities || [];
+        bossEnemy.enraged = false;
+
+        this._addLog(exp, game, `${bossEnemy.name} enters phase: ${nextPhase.name}!`, 'danger');
+    }
+
+    _executeBossAbilities(bossEnemy, exp, game) {
+        if (!bossEnemy.abilities) return;
+        for (const ability of bossEnemy.abilities) {
+            if (ability.type === 'aoe' && Math.random() < (ability.chance || 0)) {
+                const alive = exp.partySnapshot.filter(p => p.hp > 0);
+                const dmg = randInt(ability.damage[0], ability.damage[1]);
+                for (const m of alive) {
+                    const formMult = this._applyFormationModifier(exp, m.id, 'damageTakenMult');
+                    const actualDmg = Math.floor(dmg * formMult);
+                    m.hp -= actualDmg;
+                    if (exp.summary) exp.summary.damageTaken[m.id] = (exp.summary.damageTaken[m.id] || 0) + actualDmg;
+                    if (m.hp <= 0) this._checkExpeditionRevive(exp, m, game);
+                }
+                this._addLog(exp, game, ability.text || `${bossEnemy.name} unleashes a devastating attack!`, 'danger');
+            } else if (ability.type === 'summon_adds' && Math.random() < (ability.chance || 0)) {
+                const count = ability.count || 2;
+                for (let i = 0; i < count; i++) {
+                    exp.combat.enemies.push({
+                        hp: Math.round(ability.hp * (exp.diffSettings?.enemyHpMult || 1)),
+                        maxHp: Math.round(ability.hp * (exp.diffSettings?.enemyHpMult || 1)),
+                        damage: Math.round(ability.damage * (exp.diffSettings?.enemyDmgMult || 1)),
+                    });
+                }
+                this._addLog(exp, game, ability.text || `${bossEnemy.name} summons reinforcements!`, 'danger');
+            }
+        }
+    }
+
+    _tryUsePotions(exp, game) {
+        if (!exp.potionSupply) return;
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        for (const [potionKey, count] of Object.entries(exp.potionSupply)) {
+            if (count <= 0) continue;
+            const def = EXPEDITION_POTIONS[potionKey];
+            if (!def) continue;
+            if (def.useCondition === 'combat' && !exp.combat) continue;
+
+            for (const member of alive) {
+                let shouldUse = false;
+                if (def.autoUse.hpThreshold && member.hp / member.maxHp <= def.autoUse.hpThreshold) shouldUse = true;
+                if (def.autoUse.manaThreshold && member.maxMana > 0 && member.mana / member.maxMana <= def.autoUse.manaThreshold) shouldUse = true;
+                if (def.autoUse.hasDot && exp.activeEffects?.some(e => e.targetId === member.id && e.type === 'dot')) shouldUse = true;
+
+                if (shouldUse) {
+                    exp.potionSupply[potionKey]--;
+                    if (exp.potionSupply[potionKey] <= 0) delete exp.potionSupply[potionKey];
+                    if (def.effect.healTarget) {
+                        const heal = Math.floor(member.maxHp * def.effect.healTarget);
+                        member.hp = Math.min(member.maxHp, member.hp + heal);
+                        if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + heal;
+                    }
+                    if (def.effect.restoreMana) {
+                        const restore = Math.floor(member.maxMana * def.effect.restoreMana);
+                        member.mana = Math.min(member.maxMana, member.mana + restore);
+                    }
+                    if (def.effect.clearDot) {
+                        exp.activeEffects = (exp.activeEffects || []).filter(e => e.targetId !== member.id || e.type !== 'dot');
+                    }
+                    this._addLog(exp, game, def.logText.replace('{name}', member.name), 'success');
+                    exp.summary.potionsUsed++;
+                    break;
+                }
+            }
+        }
+    }
+
+    _getMutatorEffect(exp, effectKey) {
+        if (!exp.mutators) return effectKey.includes('Mult') ? 1.0 : 0;
+        let value = effectKey.includes('Mult') ? 1.0 : 0;
+        for (const mutKey of exp.mutators) {
+            const mut = EXPEDITION_MUTATORS[mutKey];
+            if (!mut?.effects?.[effectKey]) continue;
+            if (effectKey.includes('Mult')) value *= mut.effects[effectKey];
+            else value += mut.effects[effectKey];
+        }
+        return value;
+    }
+
+    _getTraitExpeditionEffect(exp, effectKey) {
+        if (!exp.partySnapshot) return effectKey.includes('Mult') ? 1.0 : 0;
+        let value = effectKey.includes('Mult') ? 1.0 : 0;
+        for (const member of exp.partySnapshot) {
+            if (member.hp <= 0) continue;
+            if (!member.traits) continue;
+            for (const traitKey of member.traits) {
+                const t = TRAITS[traitKey];
+                if (!t?.expedition) continue;
+                if (t.expedition[effectKey]) {
+                    if (effectKey.includes('Mult')) value *= t.expedition[effectKey];
+                    else value += t.expedition[effectKey];
+                }
+                if (t.expedition.realmBonus?.[exp.realm]?.[effectKey]) {
+                    const bonus = t.expedition.realmBonus[exp.realm][effectKey];
+                    if (effectKey.includes('Mult')) value *= bonus;
+                    else value += bonus;
+                }
+            }
+        }
+        return value;
+    }
+
+    _calculateFatigueCooldown(exp) {
+        const base = FATIGUE_CONFIG.baseCooldownTicks;
+        const diffMult = FATIGUE_CONFIG.difficultyMult[exp.difficulty] || 1.0;
+        return Math.floor(base * diffMult);
+    }
+
+    _getStreakMultiplier(realmKey) {
+        let consecutive = 0;
+        for (let i = this.realmHistory.length - 1; i >= 0; i--) {
+            if (this.realmHistory[i] === realmKey) consecutive++;
+            else break;
+        }
+        const diminishing = STREAK_CONFIG.sameRealmDiminishing[Math.min(consecutive, 5)] || 1.0;
+
+        const recent = this.realmHistory.slice(-STREAK_CONFIG.varietyBonus.uniqueRealmsForBonus);
+        const unique = new Set(recent).size;
+        const varietyMult = unique >= STREAK_CONFIG.varietyBonus.uniqueRealmsForBonus ? STREAK_CONFIG.varietyBonus.lootMult : 1.0;
+
+        return diminishing * varietyMult;
+    }
+
+    _updateBestiary(exp, category, key, data) {
+        exp.discoveredEntries.push({ key: `${category}:${key}`, category, name: data.name || key, realm: exp.realm, sprite: data.sprite || null, color: data.color || null });
+    }
+
+    _awardExpeditionXP(exp, game, amount) {
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        for (const m of alive) {
+            let xp = amount;
+            const col = game.getColonist(m.id);
+            if (col?.traits) {
+                for (const t of col.traits) {
+                    const traitDef = TRAITS[t];
+                    if (traitDef?.expedition?.xpMult) xp = Math.floor(xp * traitDef.expedition.xpMult);
+                }
+            }
+            exp.xpEarned[m.id] = (exp.xpEarned[m.id] || 0) + xp;
+        }
+    }
+
+    _applyDecisionEffects(exp, game, effects, sourceEncounterIndex) {
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        if (effects.healParty && alive.length > 0) {
+            const heal = Math.floor(alive[0].maxHp * effects.healParty);
+            for (const m of alive) m.hp = Math.min(m.maxHp, m.hp + heal);
+            this._addLog(exp, game, `Party healed for ${heal} HP each.`, 'success');
+        }
+        if (effects.restoreMana) {
+            for (const m of alive) {
+                if (m.maxMana > 0) m.mana = Math.min(m.maxMana, m.mana + Math.floor(m.maxMana * effects.restoreMana));
+            }
+        }
+        if (effects.trapRisk && Math.random() < effects.trapRisk) {
+            const member = alive[randInt(0, alive.length - 1)];
+            const dmg = randInt(EXPLORATION_CONFIG.trapDamageRange[0], EXPLORATION_CONFIG.trapDamageRange[1]);
+            member.hp -= dmg;
+            this._addLog(exp, game, `A trap springs! ${member.name} takes ${dmg} damage!`, 'danger');
+            if (member.hp <= 0) this._checkExpeditionRevive(exp, member, game);
+        }
+        if (effects.npcChance && exp.partySnapshot.some(p => p.hp > 0) && Math.random() < effects.npcChance) {
+            const npcKeys = Object.keys(NPC_ENCOUNTERS).filter(k => {
+                const n = NPC_ENCOUNTERS[k];
+                return !n.realmFilter || n.realmFilter.includes(exp.realm);
+            });
+            if (npcKeys.length > 0) {
+                const nKey = npcKeys[randInt(0, npcKeys.length - 1)];
+                const npc = NPC_ENCOUNTERS[nKey];
+                exp.pendingDecision = { type: 'npc', npcKey: nKey, text: npc.text, choices: npc.choices, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter };
+                this._addLog(exp, game, npc.text, 'info');
+            }
+        }
+        if (effects.grantLoot) {
+            const dim = REALMS[exp.realm];
+            const lootEntry = this._rollLoot(dim, exp.diffSettings);
+            const mult = effects.grantLoot.mult || 1.0;
+            if (lootEntry.item) {
+                if (!exp.loot._items) exp.loot._items = [];
+                exp.loot._items.push(lootEntry.item);
+                this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
+            } else {
+                const amount = Math.floor(lootEntry.amount * mult);
+                exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
+                this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+            }
+        }
+        if (effects.spawnCombat && exp.partySnapshot.some(p => p.hp > 0)) {
+            const dim = REALMS[exp.realm];
+            const countMult = effects.spawnCombat.countMult || 1.0;
+            const baseCount = randInt(dim.enemies.count[0], dim.enemies.count[1]);
+            const count = Math.min(10, Math.max(1, Math.round(baseCount * countMult * (exp.diffSettings?.enemyCountMult || 1))));
+            const enemies = [];
+            for (let j = 0; j < count; j++) {
+                const eDef = this._pickEnemyFromRealm(dim);
+                const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
+                const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
+                enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null });
+            }
+            this._addLog(exp, game, `Enemies emerge! (${count} foes)`, 'combat');
+            exp.combat = {
+                enemies, roundTick: game.tick + EXPLORATION_CONFIG.combatRoundTicks,
+                round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
+            };
+        }
+        if (effects.nextLootRareMult) {
+            exp._nextRareMult = effects.nextLootRareMult;
+        }
+        if (effects.buffEnemies) {
+            for (const enc of exp.encounters.slice(exp.currentEncounter)) {
+                if (enc.type === 'combat') {
+                    for (const e of enc.enemies) {
+                        if (effects.buffEnemies.hpMult) {
+                            e.hp = Math.round(e.hp * effects.buffEnemies.hpMult);
+                            e.maxHp = e.hp;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    _applyPuzzleReward(exp, game, reward) {
+        if (!reward) return;
+        if (reward.type === 'bonus_loot') {
+            const dim = REALMS[exp.realm];
+            const lootEntry = this._rollLoot(dim, exp.diffSettings);
+            if (lootEntry.item) {
+                if (!exp.loot._items) exp.loot._items = [];
+                exp.loot._items.push(lootEntry.item);
+                this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
+            } else {
+                const amount = Math.floor(lootEntry.amount * (reward.mult || 1.0));
+                exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
+                this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+            }
+        }
+    }
+
+    _applyPuzzlePenalty(exp, game, penalty, member, sourceEncounterIndex) {
+        if (!penalty) return;
+        if (penalty.type === 'damage' && member) {
+            const dmg = randInt(penalty.amount[0], penalty.amount[1]);
+            member.hp -= dmg;
+            if (member.hp <= 0) this._checkExpeditionRevive(exp, member, game);
+        } else if (penalty.type === 'damage_all') {
+            const alive = exp.partySnapshot.filter(p => p.hp > 0);
+            const dmg = randInt(penalty.amount[0], penalty.amount[1]);
+            for (const m of alive) {
+                m.hp -= dmg;
+                if (m.hp <= 0) this._checkExpeditionRevive(exp, m, game);
+            }
+        } else if (penalty.type === 'spawn_combat') {
+            const dim = REALMS[exp.realm];
+            const count = Math.min(10, randInt(dim.enemies.count[0], dim.enemies.count[1]));
+            const enemies = [];
+            for (let j = 0; j < count; j++) {
+                const eDef = this._pickEnemyFromRealm(dim);
+                const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
+                const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
+                enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null });
+            }
+            this._addLog(exp, game, `Enemies alerted! (${count} foes)`, 'combat');
+            exp.combat = {
+                enemies, roundTick: game.tick + EXPLORATION_CONFIG.combatRoundTicks,
+                round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
+            };
+        }
+    }
+
+    _applyNpcReward(exp, game, reward) {
+        if (!reward) return;
+        if (reward.type === 'realm_roll') {
+            this._applyPuzzleReward(exp, game, { type: 'bonus_loot', mult: reward.mult });
+        } else if (reward.type === 'heal_party') {
+            const alive = exp.partySnapshot.filter(p => p.hp > 0);
+            for (const m of alive) {
+                const heal = Math.floor(m.maxHp * reward.amount);
+                m.hp = Math.min(m.maxHp, m.hp + heal);
+            }
+            this._addLog(exp, game, `Party healed!`, 'success');
+        } else if (reward.type === 'temp_ally' && reward.ally) {
+            if (!exp.summons) exp.summons = [];
+            exp.summons.push({
+                type: 'npc_ally', name: reward.ally.name,
+                hp: reward.ally.hp, maxHp: reward.ally.hp,
+                damage: reward.ally.damage,
+                char: reward.ally.char || 'A', color: reward.ally.color || '#ccaa44',
+                ownerId: null,
+                ticksRemaining: (reward.ally.duration || 2) * 200,
+                maxDuration: (reward.ally.duration || 2) * 200,
+            });
+            this._addLog(exp, game, `${reward.ally.name} joins the party!`, 'success');
+        } else if (reward.type === 'reveal_encounters') {
+            const count = reward.count || 1;
+            for (let i = 0; i < count && exp.currentEncounter + i < (exp.nodeMap?.length || 0); i++) {
+                const node = exp.nodeMap[exp.currentEncounter + i];
+                if (node) node.revealed = true;
+            }
+        } else if (reward.type === 'buff_party') {
+            // Temporary damage buff stored on expedition
+            exp._tempDamageMult = (exp._tempDamageMult || 1.0) * (reward.damageMult || 1.0);
+            exp._tempDamageBuffCombats = (reward.duration || 2);
+        } else if (reward.type === 'bonus_loot') {
+            this._applyPuzzleReward(exp, game, reward);
+        }
+    }
+
+    _getRealmEventEffect(exp, effectKey) {
+        let value = effectKey.includes('Mult') ? 1.0 : 0;
+        for (const event of this.activeRealmEvents) {
+            if (!event.realms?.includes(exp.realm)) continue;
+            const val = event.effects?.[effectKey];
+            if (val === undefined) continue;
+            if (effectKey.includes('Mult')) value *= val;
+            else value += val;
+        }
+        return value;
+    }
+
+    _tickRealmEvents(game) {
+        if (game.tick % REALM_EVENT_CONFIG.checkInterval !== 0) return;
+
+        for (let i = this.activeRealmEvents.length - 1; i >= 0; i--) {
+            if (game.tick >= this.activeRealmEvents[i].endTick) {
+                this.activeRealmEvents.splice(i, 1);
+            }
+        }
+
+        if (this.activeRealmEvents.length >= REALM_EVENT_CONFIG.maxActiveEvents) return;
+        if (Math.random() >= REALM_EVENT_CONFIG.baseChance) return;
+
+        const keys = Object.keys(REALM_EVENTS);
+        if (keys.length === 0) return;
+        const totalWeight = keys.reduce((s, k) => s + (REALM_EVENTS[k].weight || 1), 0);
+        let roll = Math.random() * totalWeight;
+        for (const key of keys) {
+            const event = REALM_EVENTS[key];
+            roll -= (event.weight || 1);
+            if (roll <= 0) {
+                if (this.activeRealmEvents.some(e => e.key === key)) break;
+                const duration = randInt(event.duration[0], event.duration[1]);
+                this.activeRealmEvents.push({
+                    key, name: event.name, description: event.description,
+                    realms: event.realms, effects: event.effects,
+                    startTick: game.tick, endTick: game.tick + duration,
+                });
+                break;
+            }
         }
     }
 }
@@ -929,6 +2308,15 @@ function getPartyExpeditionEffect(partySnapshot, effectKey) {
                 }
             }
         }
+        if (member.traits) {
+            for (const traitKey of member.traits) {
+                const t = TRAITS[traitKey];
+                if (t?.expedition?.[effectKey]) {
+                    if (effectKey.includes('Mult')) value *= t.expedition[effectKey];
+                    else value += t.expedition[effectKey];
+                }
+            }
+        }
     }
     return value;
 }
@@ -941,10 +2329,18 @@ function pickRandom(arr) {
     return arr[randInt(0, arr.length - 1)];
 }
 
-export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
+export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, mutators = []) {
     const realm = REALMS[realmKey];
     if (!realm) return null;
     const diff = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
+
+    let mutEnemyHpMult = 1.0, mutEnemyDmgMult = 1.0, mutPartyDmgMult = 1.0;
+    for (const mutKey of mutators) {
+        const mut = EXPEDITION_MUTATORS[mutKey];
+        if (mut?.effects?.enemyHpMult) mutEnemyHpMult *= mut.effects.enemyHpMult;
+        if (mut?.effects?.enemyDmgMult) mutEnemyDmgMult *= mut.effects.enemyDmgMult;
+        if (mut?.effects?.partyDamageMult) mutPartyDmgMult *= mut.effects.partyDamageMult;
+    }
 
     let totalDmg = 0, totalHp = 0, drProduct = 1, size = 0;
     const members = [];
@@ -973,10 +2369,15 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
         drProduct *= dr;
 
         const combatTraits = [];
+        const expeditionTraits = [];
         for (const traitKey of (c.traits || [])) {
             const t = TRAITS[traitKey];
             if (t && t.damageTakenMult) combatTraits.push({ name: t.name, description: t.description });
+            if (t?.expedition) expeditionTraits.push({ name: t.name, effects: Object.keys(t.expedition).join(', ') });
         }
+
+        const expLevel = game.exploration?.getExpeditionLevel(id) || 0;
+        const fatigue = game.exploration?.isFatigued(id, game.tick) || false;
 
         const memberSpells = [];
         for (const spellKey of (c.knownSpells || [])) {
@@ -996,7 +2397,10 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
                 else if (spell.effect === 'melee_damage') effectDesc = `${spell.damage} melee dmg`;
                 else if (spell.effect === 'heal') effectDesc = `heals ${spell.healAmount} HP`;
                 else if (spell.effect === 'buff_defense') effectDesc = `${Math.round(spell.damageReduction * 100)}% DR shield`;
-                else if (spell.effect === 'summon') {
+                else if (spell.effect === 'teleport') {
+                    const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
+                    effectDesc = `dodge ${charges} attack${charges > 1 ? 's' : ''}`;
+                } else if (spell.effect === 'summon') {
                     const st = SUMMON_TYPES[spell.summonType];
                     effectDesc = st ? `summons ${st.name} (${st.hp} HP, ${st.damage} dmg)` : 'summons ally';
                 } else effectDesc = spell.effect;
@@ -1006,10 +2410,11 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
         }
 
         members.push({
-            name: c.name, dmgPerRound: memberDmg, hitsPerRound, hp: c.maxHp,
+            name: c.name, id: c.id, dmgPerRound: memberDmg, hitsPerRound, hp: c.maxHp,
             dr: Math.round((1 - dr) * 100), maxMana: c.maxMana || 0,
-            traits: combatTraits, spells: memberSpells,
+            traits: combatTraits, expeditionTraits, spells: memberSpells,
             trinketName: c.trinket?.name || null,
+            expLevel, fatigued: fatigue,
         });
     }
 
@@ -1020,7 +2425,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
     const effectKeys = ['partyDamageMult', 'trapDamageMult', 'lootMult', 'rareEncounterMult', 'durationMult'];
     const mockSnapshot = colonistIds.map(id => {
         const c = game.getColonist(id);
-        return c ? { hp: c.hp, weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, boots: c.boots, tool: c.tool, trinket: c.trinketBroken ? null : c.trinket } : null;
+        return c ? { hp: c.hp, traits: c.traits || [], weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, boots: c.boots, tool: c.tool, trinket: c.trinketBroken ? null : c.trinket } : null;
     }).filter(Boolean);
     for (const key of effectKeys) {
         const val = getPartyExpeditionEffect(mockSnapshot, key);
@@ -1039,12 +2444,29 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
     }
 
     const enemyCount = Math.round(((realm.enemies.count[0] + realm.enemies.count[1]) / 2) * diff.enemyCountMult);
-    const enemyHp = ((realm.enemies.hp[0] + realm.enemies.hp[1]) / 2) * diff.enemyHpMult;
-    const enemyDmg = ((realm.enemies.damage[0] + realm.enemies.damage[1]) / 2) * diff.enemyDmgMult;
-    const combatEncounters = Math.ceil((realm.encounters + (diff.extraEncounters || 0)) * 0.6);
+    let enemyHp, enemyDmg;
+    if (realm.enemies.types && realm.enemies.types.length > 0) {
+        const totalWeight = realm.enemies.types.reduce((s, t) => s + t.weight, 0);
+        let avgHp = 0, avgDmg = 0;
+        for (const t of realm.enemies.types) {
+            const eDef = EXPEDITION_ENEMIES[t.key];
+            if (!eDef) continue;
+            const w = t.weight / totalWeight;
+            avgHp += ((eDef.hp[0] + eDef.hp[1]) / 2) * w;
+            avgDmg += ((eDef.damage[0] + eDef.damage[1]) / 2) * w;
+        }
+        enemyHp = avgHp * diff.enemyHpMult * mutEnemyHpMult;
+        enemyDmg = avgDmg * diff.enemyDmgMult * mutEnemyDmgMult;
+    } else {
+        enemyHp = ((realm.enemies.hp?.[0] || 30) + (realm.enemies.hp?.[1] || 60)) / 2 * diff.enemyHpMult * mutEnemyHpMult;
+        enemyDmg = ((realm.enemies.damage?.[0] || 5) + (realm.enemies.damage?.[1] || 10)) / 2 * diff.enemyDmgMult * mutEnemyDmgMult;
+    }
+    const combatRange = realm.combatEncounters || [1, Math.ceil(realm.encounters * 0.6)];
+    const combatEncounters = Math.ceil(((combatRange[0] + combatRange[1]) / 2) + (diff.extraEncounters || 0));
 
     const totalEnemyHp = enemyHp * enemyCount * combatEncounters;
-    const roundsToKill = totalEnemyHp / Math.max(1, totalDmg + 1.5);
+    const effectiveDmg = totalDmg * mutPartyDmgMult;
+    const roundsToKill = totalEnemyHp / Math.max(1, effectiveDmg + 1.5);
     const totalDmgToParty = roundsToKill * enemyDmg * enemyCount * (1 - avgDR) * 0.85;
     const ratio = totalHp / Math.max(1, totalDmgToParty);
 
@@ -1055,5 +2477,27 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty) {
     else if (ratio > 0.4) { rating = 'Dangerous'; color = '#ff8844'; }
     else { rating = 'Suicidal'; color = '#ff4444'; }
 
-    return { rating, color, totalDmg, totalHp, avgDR: Math.round(avgDR * 100), size, members, partyEffects, spellRoster };
+    const skillChecks = {};
+    const relevantSkills = new Set();
+    for (const puzzle of Object.values(PUZZLE_ENCOUNTERS)) {
+        if (puzzle.realmFilter && !puzzle.realmFilter.includes(realmKey)) continue;
+        for (const check of (puzzle.checks || [])) {
+            if (check.requirement?.skill) relevantSkills.add(check.requirement.skill);
+        }
+    }
+    for (const skillKey of relevantSkills) {
+        let best = 0, bestName = null;
+        for (const id of colonistIds) {
+            const c = game.getColonist(id);
+            if (!c || c.hp <= 0) continue;
+            const level = c.skills?.[skillKey] || 0;
+            if (level > best) { best = level; bestName = c.name; }
+        }
+        if (best > 0) {
+            const def = SKILLS[skillKey];
+            skillChecks[skillKey] = { name: def?.name || skillKey, level: best, colonist: bestName };
+        }
+    }
+
+    return { rating, color, totalDmg, totalHp, avgDR: Math.round(avgDR * 100), size, members, partyEffects, spellRoster, skillChecks };
 }
