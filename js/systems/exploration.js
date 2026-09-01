@@ -939,40 +939,23 @@ export class ExplorationSystem {
         let bossEncounter = null;
         if (dim.boss) {
             const boss = dim.boss;
-            if (boss.phases) {
-                const phase0 = boss.phases[0];
-                const bossHp = Math.round(phase0.hp * hpMult);
-                const bossDmg = Math.round(phase0.damage * dmgMult);
-                bossEncounter = {
-                    type: 'combat', isBoss: true,
-                    bossPhases: boss.phases,
-                    enemies: [{
-                        hp: bossHp, maxHp: bossHp, damage: bossDmg,
-                        isBoss: true, name: boss.name,
-                        enraged: false,
-                        color: phase0.color || boss.color,
-                        sprite: phase0.sprite || boss.sprite,
-                        abilities: phase0.abilities || [],
-                    }],
-                };
-            } else {
-                const bossHp = Math.round(boss.hp * hpMult);
-                const bossDmg = Math.round(boss.damage * dmgMult);
-                bossEncounter = {
-                    type: 'combat', isBoss: true,
-                    enemies: [{
-                        hp: bossHp, maxHp: bossHp, damage: bossDmg,
-                        isBoss: true, name: boss.name,
-                        enraged: false,
-                        enrageThreshold: boss.enrageThreshold,
-                        enrageDamageMult: boss.enrageDamageMult,
-                        color: boss.color,
-                        enragedColor: boss.enragedColor,
-                        sprite: boss.sprite,
-                        enragedSprite: boss.enragedSprite,
-                    }],
-                };
-            }
+            const maxPhases = diffSettings.bossPhases || 2;
+            const phases = boss.phases.slice(0, maxPhases);
+            const phase0 = phases[0];
+            const bossHp = Math.round(phase0.hp * hpMult);
+            const bossDmg = Math.round(phase0.damage * dmgMult);
+            bossEncounter = {
+                type: 'combat', isBoss: true,
+                bossPhases: phases,
+                enemies: [{
+                    hp: bossHp, maxHp: bossHp, damage: bossDmg,
+                    isBoss: true, name: boss.name,
+                    enraged: false,
+                    color: phase0.color,
+                    sprite: phase0.sprite,
+                    abilities: phase0.abilities || [],
+                }],
+            };
         }
 
         return { encounters, bossEncounter };
@@ -1307,12 +1290,6 @@ export class ExplorationSystem {
         // ── Enemy attack phase ──
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
-            if (enemy.isBoss && !enemy.enraged && enemy.enrageThreshold && enemy.hp / enemy.maxHp <= enemy.enrageThreshold) {
-                enemy.enraged = true;
-                enemy.damage = Math.floor(enemy.damage * (enemy.enrageDamageMult || 1.5));
-                const dim = REALMS[exp.realm];
-                this._addLog(exp, game, dim.boss?.enrageText || `${enemy.name} becomes enraged!`, 'danger');
-            }
             const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             let enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));

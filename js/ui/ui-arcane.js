@@ -48,6 +48,12 @@ const arcaneMethods = {
             if (tab === 'expeditions' && this._arcaneExpSetup) {
                 savedChecks = [...this.elements.arcanePanel.querySelectorAll('.exp-check:checked')].map(cb => cb.value);
                 savedPacks = [...this.elements.arcanePanel.querySelectorAll('.exp-pack-check:checked')].map(cb => cb.value);
+                this._savedMutators = [...this.elements.arcanePanel.querySelectorAll('.exp-mutator:checked')].map(cb => cb.value);
+                this._savedPotions = {};
+                this.elements.arcanePanel.querySelectorAll('.exp-potion').forEach(input => {
+                    const val = parseInt(input.value) || 0;
+                    if (val > 0) this._savedPotions[input.dataset.potion] = val;
+                });
             }
             this._lastArcaneHtml = html;
             this.elements.arcanePanel.innerHTML = html;
@@ -62,8 +68,22 @@ const arcaneMethods = {
                         if (cb) cb.checked = true;
                     }
                 }
+                if (this._savedMutators) {
+                    for (const mk of this._savedMutators) {
+                        const cb = this.elements.arcanePanel.querySelector(`.exp-mutator[value="${mk}"]`);
+                        if (cb) cb.checked = true;
+                    }
+                    this._savedMutators = null;
+                }
+                if (this._savedPotions) {
+                    for (const [pk, count] of Object.entries(this._savedPotions)) {
+                        const input = this.elements.arcanePanel.querySelector(`.exp-potion[data-potion="${pk}"]`);
+                        if (input) input.value = Math.min(count, parseInt(input.max) || count);
+                    }
+                    this._savedPotions = null;
+                }
                 const logEl = this.elements.arcanePanel.querySelector('.exp-log-container');
-                if (logEl) logEl.scrollTop = logEl.scrollHeight;
+                if (logEl) logEl.scrollTop = 0;
                 this._setupExpCheckboxLimits();
             }
         }
@@ -231,7 +251,8 @@ const arcaneMethods = {
                     }
 
                     html += `<div class="exp-log-container" style="max-height:200px;overflow-y:auto;" id="exp-log-active">`;
-                    for (const entry of exp.log) {
+                    for (let li = exp.log.length - 1; li >= 0; li--) {
+                        const entry = exp.log[li];
                         const color = this._expLogColor(entry.type);
                         html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
                     }
@@ -295,7 +316,8 @@ const arcaneMethods = {
                 }
 
                 html += `<div class="exp-log-container" style="max-height:200px;overflow-y:auto;" id="exp-log-last">`;
-                for (const entry of last.log) {
+                for (let li = last.log.length - 1; li >= 0; li--) {
+                    const entry = last.log[li];
                     const color = this._expLogColor(entry.type);
                     html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
                 }
@@ -875,7 +897,8 @@ const arcaneMethods = {
         // Full log (collapsible)
         html += `<details style="margin:8px 0;text-align:left;"><summary style="color:#88ccff;cursor:pointer;">Expedition Log (${exp.log.length} entries)</summary>`;
         html += `<div style="max-height:200px;overflow-y:auto;padding:4px;background:#111;border-radius:3px;">`;
-        for (const entry of exp.log) {
+        for (let li = exp.log.length - 1; li >= 0; li--) {
+            const entry = exp.log[li];
             const color = this._expLogColor(entry.type);
             html += `<div style="color:${color};font-size:0.85em;">${entry.text}</div>`;
         }

@@ -146,18 +146,37 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Crystal Colossus',
-            hp: 500, damage: 25,
-            enrageThreshold: 0.3, enrageDamageMult: 1.5,
-            color: '#4488ff', enragedColor: '#ff2222',
-            sprite: 'boss_crystal_colossus', enragedSprite: 'boss_crystal_colossus_enraged',
+            approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
+            defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
             guaranteedLoot: [
                 { item: 'crystal_aegis', chance: 0.5 },
                 { item: 'runite_hammer', chance: 0.5 },
             ],
             bonusResources: { runite: 8, void_essence: 4 },
-            defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
-            enrageText: 'The Crystal Colossus cracks and glows red! It becomes enraged!',
-            approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
+            phases: [
+                {
+                    name: 'Crystalline Form', hp: 300, damage: 20,
+                    color: '#4488ff', sprite: 'boss_crystal_colossus',
+                    transitionText: 'The Crystal Colossus cracks and glows red!',
+                },
+                {
+                    name: 'Enraged', hp: 250, damage: 30,
+                    color: '#ff2222', sprite: 'boss_crystal_colossus_enraged',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10], text: 'Orbiting crystal shards slice through the party!' }],
+                    transitionText: 'The Colossus fractures — shards orbit its molten core!',
+                },
+                {
+                    name: 'Storm of Shards', hp: 200, damage: 38,
+                    color: '#ff6644', sprite: 'boss_crystal_colossus_shattered',
+                    abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14], text: 'Crystal shards rain on the party!' }],
+                    transitionText: 'The Colossus reforms around a pulsing crystal heart!',
+                },
+                {
+                    name: 'Crystal Heart', hp: 150, damage: 45,
+                    color: '#ff0000', sprite: 'boss_crystal_colossus_heart',
+                    abilities: [{ type: 'aoe', chance: 0.3, damage: [12, 20], text: 'The crystal heart detonates in a blinding explosion!' }],
+                },
+            ],
         },
         events: {
             ambient: [
@@ -295,18 +314,37 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Ancient Treant',
-            hp: 450, damage: 22,
-            enrageThreshold: 0.3, enrageDamageMult: 1.5,
-            color: '#22aa66', enragedColor: '#ff4400',
-            sprite: 'boss_ancient_treant', enragedSprite: 'boss_ancient_treant_enraged',
+            approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
+            defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
             guaranteedLoot: [
                 { item: 'living_bark_armor', chance: 0.5 },
                 { item: 'heartwood_staff', chance: 0.5 },
             ],
             bonusResources: { wood: 15, berries: 10 },
-            defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
-            enrageText: 'The Ancient Treant roars! Roots erupt from the ground as it enrages!',
-            approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
+            phases: [
+                {
+                    name: 'Rooted', hp: 270, damage: 18,
+                    color: '#22aa66', sprite: 'boss_ancient_treant',
+                    transitionText: 'The Ancient Treant roars! Roots erupt from the ground!',
+                },
+                {
+                    name: 'Enraged', hp: 220, damage: 28,
+                    color: '#ff4400', sprite: 'boss_ancient_treant_enraged',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [4, 9], text: 'The Treant stomps the ground — roots burst up beneath the party!' }],
+                    transitionText: 'The Treant tears free from the earth, now mobile and furious!',
+                },
+                {
+                    name: 'Uprooted', hp: 180, damage: 35,
+                    color: '#cc3300', sprite: 'boss_ancient_treant_uprooted',
+                    abilities: [{ type: 'aoe', chance: 0.2, damage: [6, 12], text: 'Massive roots sweep through the party!' }],
+                    transitionText: 'The Treant splits apart — its heartwood pulses with primal fury!',
+                },
+                {
+                    name: 'Heartwood', hp: 130, damage: 42,
+                    color: '#ff0000', sprite: 'boss_ancient_treant_heartwood',
+                    abilities: [{ type: 'aoe', chance: 0.3, damage: [10, 18], text: 'Thorned vines lash out in all directions!' }],
+                },
+            ],
         },
         events: {
             ambient: [
@@ -458,18 +496,37 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Arcane Construct',
-            hp: 480, damage: 24,
-            enrageThreshold: 0.3, enrageDamageMult: 1.5,
-            color: '#ff8844', enragedColor: '#ff0000',
-            sprite: 'boss_arcane_construct', enragedSprite: 'boss_arcane_construct_enraged',
+            approachText: 'A half-finished golem lurches to life, crackling with unstable magic!',
+            defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
             guaranteedLoot: [
                 { item: 'arcane_amplifier', chance: 0.5 },
                 { item: 'staff_of_distortion', chance: 0.5 },
             ],
             bonusResources: { runite: 6, void_essence: 5 },
-            defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
-            enrageText: 'The Arcane Construct overclocks — its attacks become erratic and deadly!',
-            approachText: 'A half-finished golem lurches to life, crackling with unstable magic!',
+            phases: [
+                {
+                    name: 'Awakened', hp: 290, damage: 20,
+                    color: '#ff8844', sprite: 'boss_arcane_construct',
+                    transitionText: 'The Arcane Construct overclocks — sparks fly wildly!',
+                },
+                {
+                    name: 'Enraged', hp: 240, damage: 30,
+                    color: '#ff0000', sprite: 'boss_arcane_construct_enraged',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10], text: 'Absorbed magic discharges in a shockwave!' }],
+                    transitionText: 'The Construct absorbs ambient magic, warping the air around it!',
+                },
+                {
+                    name: 'Overcharged', hp: 190, damage: 38,
+                    color: '#ff4400', sprite: 'boss_arcane_construct_overcharged',
+                    abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14], text: 'Arcane bolts discharge in every direction!' }],
+                    transitionText: 'The Construct begins to destabilize — raw energy leaks from its core!',
+                },
+                {
+                    name: 'Meltdown', hp: 140, damage: 46,
+                    color: '#ff0000', sprite: 'boss_arcane_construct_meltdown',
+                    abilities: [{ type: 'aoe', chance: 0.35, damage: [12, 22], text: 'The Construct erupts in a cascade of unstable magic!' }],
+                },
+            ],
         },
         events: {
             ambient: [
@@ -611,19 +668,38 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Void Sovereign',
-            hp: 600, damage: 30,
-            enrageThreshold: 0.3, enrageDamageMult: 1.5,
-            color: '#7722cc', enragedColor: '#ff0000',
-            sprite: 'boss_void_sovereign', enragedSprite: 'boss_void_sovereign_enraged',
+            approachText: 'A being of pure void materializes, its gaze alone warping the air!',
+            defeatText: 'The Void Sovereign collapses into nothingness, leaving only silence!',
             guaranteedLoot: [
                 { item: 'shard_of_oblivion', chance: 0.4 },
                 { item: 'voidheart', chance: 0.3 },
                 { item: 'armor_of_the_abyss', chance: 0.3 },
             ],
             bonusResources: { void_essence: 10 },
-            defeatText: 'The Void Sovereign collapses into nothingness, leaving only silence!',
-            enrageText: 'The Void Sovereign tears reality apart around it — enraged!',
-            approachText: 'A being of pure void materializes, its gaze alone warping the air!',
+            phases: [
+                {
+                    name: 'Manifest', hp: 350, damage: 25,
+                    color: '#7722cc', sprite: 'boss_void_sovereign',
+                    transitionText: 'The Void Sovereign tears reality apart around it!',
+                },
+                {
+                    name: 'Enraged', hp: 300, damage: 38,
+                    color: '#ff0000', sprite: 'boss_void_sovereign_enraged',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [6, 12], text: 'Reality tears open — void energy rips through the party!' }],
+                    transitionText: 'The Sovereign phases between dimensions, becoming unstable!',
+                },
+                {
+                    name: 'Unbound', hp: 250, damage: 48,
+                    color: '#aa00ff', sprite: 'boss_void_sovereign_unbound',
+                    abilities: [{ type: 'aoe', chance: 0.25, damage: [10, 18], text: 'Void tendrils lash out from every shadow!' }],
+                    transitionText: 'Reality shatters — the Sovereign reveals its true form!',
+                },
+                {
+                    name: 'True Form', hp: 200, damage: 58,
+                    color: '#ff00ff', sprite: 'boss_void_sovereign_true',
+                    abilities: [{ type: 'aoe', chance: 0.35, damage: [15, 25], text: 'The void itself screams, tearing at the party!' }],
+                },
+            ],
         },
         events: {
             ambient: [
@@ -735,18 +811,37 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The High King',
-            hp: 700, damage: 35,
-            enrageThreshold: 0.3, enrageDamageMult: 1.5,
-            color: '#ddaa22', enragedColor: '#ff2200',
-            sprite: 'boss_high_king', enragedSprite: 'boss_high_king_enraged',
+            approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
+            defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
             guaranteedLoot: [
                 { item: 'shard_of_oblivion', chance: 0.5 },
                 { item: 'voidheart', chance: 0.5 },
             ],
             bonusResources: { gold: 50, void_essence: 8 },
-            defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
-            enrageText: 'The High King draws a second blade! His fury is unrelenting!',
-            approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
+            phases: [
+                {
+                    name: 'The Duel', hp: 400, damage: 30,
+                    color: '#ddaa22', sprite: 'boss_high_king',
+                    transitionText: 'The High King draws a second blade! His fury is unrelenting!',
+                },
+                {
+                    name: 'Enraged', hp: 350, damage: 44,
+                    color: '#ff2200', sprite: 'boss_high_king_enraged',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [8, 14], text: 'The King cleaves with both blades in a wide arc!' }],
+                    transitionText: 'The King calls his royal guard to his side!',
+                },
+                {
+                    name: 'Royal Guard', hp: 300, damage: 52,
+                    color: '#ff4400', sprite: 'boss_high_king_guard',
+                    abilities: [{ type: 'summon_adds', chance: 0.2, count: 2, hp: 40, damage: 12, text: 'Royal guards charge into the fray!' }],
+                    transitionText: 'The King shatters his crown — dark energy surges through him!',
+                },
+                {
+                    name: 'Desperate', hp: 250, damage: 65,
+                    color: '#ff0000', sprite: 'boss_high_king_desperate',
+                    abilities: [{ type: 'aoe', chance: 0.3, damage: [15, 28], text: 'The King unleashes a devastating whirlwind of steel!' }],
+                },
+            ],
         },
         events: {
             ambient: [
@@ -780,11 +875,11 @@ export const EXPLORATION_CONFIG = {
 };
 
 export const EXPEDITION_DIFFICULTY = {
-    1: { name: 'Normal', enemyHpMult: 1, enemyDmgMult: 1, enemyCountMult: 1, trapDmgMult: 1, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 0 },
-    2: { name: 'Dangerous', enemyHpMult: 1.3, enemyDmgMult: 1.2, enemyCountMult: 1.25, trapDmgMult: 1.3, lootAmountMult: 1.5, rareLootMult: 1.5, extraEncounters: 1 },
-    3: { name: 'Perilous', enemyHpMult: 1.7, enemyDmgMult: 1.5, enemyCountMult: 1.5, trapDmgMult: 1.7, lootAmountMult: 2.0, rareLootMult: 2.5, extraEncounters: 2 },
-    4: { name: 'Deadly', enemyHpMult: 2.2, enemyDmgMult: 1.8, enemyCountMult: 1.75, trapDmgMult: 2.0, lootAmountMult: 3.0, rareLootMult: 4.0, extraEncounters: 3 },
-    5: { name: 'Suicidal', enemyHpMult: 3.0, enemyDmgMult: 2.2, enemyCountMult: 2.0, trapDmgMult: 2.5, lootAmountMult: 4.0, rareLootMult: 6.0, extraEncounters: 4 },
+    1: { name: 'Normal', enemyHpMult: 1, enemyDmgMult: 1, enemyCountMult: 1, trapDmgMult: 1, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 0, bossPhases: 2 },
+    2: { name: 'Dangerous', enemyHpMult: 1.3, enemyDmgMult: 1.2, enemyCountMult: 1.25, trapDmgMult: 1.3, lootAmountMult: 1.5, rareLootMult: 1.5, extraEncounters: 1, bossPhases: 2 },
+    3: { name: 'Perilous', enemyHpMult: 1.7, enemyDmgMult: 1.5, enemyCountMult: 1.5, trapDmgMult: 1.7, lootAmountMult: 2.0, rareLootMult: 2.5, extraEncounters: 2, bossPhases: 3 },
+    4: { name: 'Deadly', enemyHpMult: 2.2, enemyDmgMult: 1.8, enemyCountMult: 1.75, trapDmgMult: 2.0, lootAmountMult: 3.0, rareLootMult: 4.0, extraEncounters: 3, bossPhases: 3 },
+    5: { name: 'Suicidal', enemyHpMult: 3.0, enemyDmgMult: 2.2, enemyCountMult: 2.0, trapDmgMult: 2.5, lootAmountMult: 4.0, rareLootMult: 6.0, extraEncounters: 4, bossPhases: 4 },
 };
 
 export const EXPLORATION_EVENTS = {
