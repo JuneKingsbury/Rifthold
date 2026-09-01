@@ -1609,7 +1609,7 @@ const arcaneMethods = {
                     const summonerName = _findCaster(text);
                     const sp = summonerName ? _casterPos(summonerName) : { x: partyX + 25, y: H / 2 };
                     this._expVisState.effects.push({ type: 'spell_summon', x: sp.x + 15, y: sp.y, frame: 0, maxFrames: 40 });
-                } else if (text.includes('enters phase:') || text.includes('cracks') || text.includes('reforms')) {
+                } else if (text.includes('enters phase:')) {
                     const phaseName = text.match(/phase: (.+)!/)?.[1] || '';
                     this._expVisState.effects.push({ type: 'phase_transition', x: partyX + 80, y: H / 2, phaseName, frame: 0, maxFrames: 60 });
                     this._expVisState.shakeFrames = 15;

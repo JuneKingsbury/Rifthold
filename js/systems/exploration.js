@@ -1752,8 +1752,9 @@ export class ExplorationSystem {
         }
 
         const items = exp.loot._items || [];
-        delete exp.loot._items;
-        game.resources.add(exp.loot);
+        const lootResources = { ...exp.loot };
+        delete lootResources._items;
+        game.resources.add(lootResources);
         for (const itemKey of items) {
             game.resources.addItem({ ...ALL_ITEMS[itemKey], key: itemKey });
         }
