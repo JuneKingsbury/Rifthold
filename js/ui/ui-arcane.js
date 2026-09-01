@@ -185,7 +185,7 @@ const arcaneMethods = {
                         html += this._buildNodeMapHtml(exp);
                     }
 
-                    html += `<canvas class="exp-vis-canvas" width="720" height="140"></canvas>`;
+                    html += `<canvas class="exp-vis-canvas" width="768" height="192"></canvas>`;
 
                     // Pending decision/puzzle/NPC prompt
                     if (exp.pendingDecision) {
@@ -940,7 +940,7 @@ const arcaneMethods = {
                         : completedNodes;
                     const stableIdx = nodeIdx >= 0 ? nodeIdx : completedNodes;
                     snapPos = (stableIdx + 1) / segments;
-                    if (isBoss) snapPos = Math.min(snapPos, (W - 160) / W);
+                    if (isBoss) snapPos = Math.min(snapPos, (W - 200) / W);
                 } else {
                     snapPos = completedNodes / segments;
                 }
@@ -994,7 +994,7 @@ const arcaneMethods = {
                 const stableIdx = nodeIdx >= 0 ? nodeIdx : completedNodes;
                 targetProgress = (stableIdx + 1) / segments;
                 if (isBoss) {
-                    targetProgress = Math.min(targetProgress, (W - 160) / W);
+                    targetProgress = Math.min(targetProgress, (W - 200) / W);
                     this._expVisState._wasBossCombat = true;
                 }
                 this._expVisState._lastNodeTick = this.game.tick;
@@ -1056,8 +1056,8 @@ const arcaneMethods = {
         };
         const colors = realmColors[activeExp.realm] || realmColors.crystal_caves;
 
-        const tileSize = 12;
-        const wallRows = 2;
+        const tileSize = 32;
+        const wallRows = 1;
         const wallH = wallRows * tileSize;
         const skinMgrVis = this.game.skinManager;
         const useSkinVis = skinMgrVis && skinMgrVis.isActive;
@@ -1100,7 +1100,7 @@ const arcaneMethods = {
                     }
                 }
             }
-            for (let ty = wallH; ty < H - 14; ty += tileSize) {
+            for (let ty = wallH; ty < H - 16; ty += tileSize) {
                 if (floorSprite) {
                     ctx.drawImage(floorSprite, tx, ty, tileSize, tileSize);
                 } else if (floorDef) {
@@ -1119,7 +1119,7 @@ const arcaneMethods = {
         }
 
         const floorTop = wallH;
-        const floorBottom = H - 14;
+        const floorBottom = H - 16;
         const diagSlope = 0.4;
         const _now = performance.now();
         const _breathe = (seed) => {
@@ -1130,6 +1130,14 @@ const arcaneMethods = {
         const roomCount = 8;
         ctx.strokeStyle = '#111';
         ctx.lineWidth = 1;
+        const firstRx = (W / roomCount) - tileSize * 3;
+        if (firstRx >= 0) {
+            ctx.beginPath();
+            ctx.moveTo(firstRx, 0);
+            ctx.lineTo(firstRx, wallH);
+            ctx.lineTo(firstRx + (floorBottom - wallH) * diagSlope, floorBottom);
+            ctx.stroke();
+        }
         for (let i = 1; i < roomCount; i++) {
             const rx = (W / roomCount) * i;
             ctx.beginPath();
@@ -1139,8 +1147,8 @@ const arcaneMethods = {
             ctx.stroke();
         }
 
-        const finishX = W - tileSize * 5;
-        const checkSize = 6;
+        const finishX = W - tileSize * 3;
+        const checkSize = 8;
         for (let cy = 0; cy < floorTop; cy += checkSize) {
             for (let cx = 0; cx < tileSize; cx += checkSize) {
                 const isWhite = ((cx / checkSize) + (cy / checkSize)) % 2 === 0;
@@ -1214,10 +1222,10 @@ const arcaneMethods = {
 
         const barProgress = (activeExp.status === 'returning' && !activeExp.retreatTick) ? 1 : progress;
         ctx.fillStyle = '#222';
-        ctx.fillRect(0, H - 14, W, 14);
+        ctx.fillRect(0, H - 16, W, 16);
         ctx.fillStyle = isRetreating ? '#ff4444' : barProgress >= 1 ? '#44cc44' : colors.accent;
         ctx.globalAlpha = 0.6;
-        ctx.fillRect(0, H - 14, isRetreating ? W : W * barProgress, 14);
+        ctx.fillRect(0, H - 16, isRetreating ? W : W * barProgress, 16);
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#ccc';
         ctx.font = '10px monospace';
@@ -1252,8 +1260,8 @@ const arcaneMethods = {
         for (let i = 0; i < party.length; i++) {
             const p = party[i];
             const isBackRow = backRowIds.includes(p.id);
-            const py = H / 2 + (i - party.length / 2) * 21 + 6;
-            const px = partyX + (py - H / 2) * diagSlope - (isBackRow ? 18 : 0);
+            const py = H / 2 + (i - party.length / 2) * 28 + 14;
+            const px = partyX + (py - H / 2) * diagSlope - (isBackRow ? 24 : 0);
             const hpPct = p.maxHp > 0 ? p.hp / p.maxHp : 0;
             let bounceY = 0;
             if (isCelebrating && p.hp > 0) {
@@ -1263,7 +1271,7 @@ const arcaneMethods = {
             ctx.globalAlpha = p.hp <= 0 ? 0.15 : 0.25;
             ctx.fillStyle = '#000000';
             ctx.beginPath();
-            ctx.ellipse(px, py + 6, 7, 3, 0, 0, Math.PI * 2);
+            ctx.ellipse(px, py + 8, 10, 4, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1;
             if (p.hp <= 0) {
@@ -1291,9 +1299,9 @@ const arcaneMethods = {
                 }
                 const grow = p.hp > 0 ? _breathe(p.id || i) : 0;
                 if (sprite) {
-                    ctx.drawImage(sprite, px - 12, py + bounceY - 12 - grow, 24, 24 + grow);
+                    ctx.drawImage(sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow);
                 } else {
-                    ctx.font = 'bold 14px monospace';
+                    ctx.font = 'bold 18px monospace';
                     ctx.fillStyle = '#ccc';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -1301,7 +1309,7 @@ const arcaneMethods = {
                 }
             } else {
                 const grow = p.hp > 0 ? _breathe(p.id || i) : 0;
-                ctx.font = 'bold 14px monospace';
+                ctx.font = 'bold 18px monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 if (hpPct < 0.3) {
@@ -1315,9 +1323,9 @@ const arcaneMethods = {
             }
             ctx.globalAlpha = 1;
             if (p.hp > 0) {
-                const barW = 12, barH = 2;
+                const barW = 16, barH = 2;
                 const barX = px - barW / 2;
-                const barY = py + bounceY - 11;
+                const barY = py + bounceY - 15;
                 ctx.fillStyle = '#222';
                 ctx.fillRect(barX, barY, barW, barH);
                 ctx.fillStyle = hpPct > 0.6 ? '#44ff44' : hpPct > 0.3 ? '#ffaa44' : '#ff4444';
@@ -1335,29 +1343,29 @@ const arcaneMethods = {
         if (activeExp.packAnimals && activeExp.packAnimals.length > 0) {
             for (let i = 0; i < activeExp.packAnimals.length; i++) {
                 const pa = activeExp.packAnimals[i];
-                const pay = H / 2 + (i - activeExp.packAnimals.length / 2) * 21 + 6;
-                const pax = partyX - 24 + (pay - H / 2) * diagSlope;
+                const pay = H / 2 + (i - activeExp.packAnimals.length / 2) * 28 + 14;
+                const pax = partyX - 32 + (pay - H / 2) * diagSlope;
                 const animalDef = ANIMALS[pa.type];
                 ctx.globalAlpha = 0.25;
                 ctx.fillStyle = '#000000';
                 ctx.beginPath();
-                ctx.ellipse(pax, pay + 6, 7, 3, 0, 0, Math.PI * 2);
+                ctx.ellipse(pax, pay + 8, 10, 4, 0, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalAlpha = 1;
                 const paGrow = _breathe(100 + i);
                 if (useSkins) {
                     const sprite = skinMgr.getSprite('entities', pa.type);
                     if (sprite) {
-                        ctx.drawImage(sprite, pax - 12, pay - 12 - paGrow, 24, 24 + paGrow);
+                        ctx.drawImage(sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow);
                     } else {
-                        ctx.font = 'bold 14px monospace';
+                        ctx.font = 'bold 18px monospace';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillStyle = animalDef?.color || '#bbaa44';
                         ctx.fillText(animalDef?.char || 'a', pax, pay - paGrow);
                     }
                 } else {
-                    ctx.font = 'bold 14px monospace';
+                    ctx.font = 'bold 18px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = animalDef?.color || '#bbaa44';
@@ -1370,52 +1378,52 @@ const arcaneMethods = {
         for (let si = 0; si < activeSummons.length; si++) {
             const summon = activeSummons[si];
             const ownerIdx = party.findIndex(p => p.id === summon.ownerId);
-            const oy = ownerIdx >= 0 ? H / 2 + (ownerIdx - party.length / 2) * 21 + 6 : H / 2 + si * 14 - 6;
+            const oy = ownerIdx >= 0 ? H / 2 + (ownerIdx - party.length / 2) * 28 + 14 : H / 2 + si * 28 - 6;
             const sy = oy;
-            const sx = partyX + 22 + (sy - H / 2) * diagSlope;
+            const sx = partyX + 30 + (sy - H / 2) * diagSlope;
             ctx.globalAlpha = 0.2;
             ctx.fillStyle = '#000000';
             ctx.beginPath();
-            ctx.ellipse(sx, sy + 6, 7, 3, 0, 0, Math.PI * 2);
+            ctx.ellipse(sx, sy + 8, 10, 4, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.005 + si) * 0.15;
             ctx.strokeStyle = summon.color;
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(sx, sy, 12, 0, Math.PI * 2);
+            ctx.arc(sx, sy, 16, 0, Math.PI * 2);
             ctx.stroke();
             ctx.globalAlpha = 1;
             const sumGrow = _breathe(200 + si);
             if (useSkins) {
                 const sumSprite = skinMgr.getSprite('entities', summon.type);
                 if (sumSprite) {
-                    ctx.drawImage(sumSprite, sx - 12, sy - 12 - sumGrow, 24, 24 + sumGrow);
+                    ctx.drawImage(sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow);
                 } else {
-                    ctx.font = 'bold 14px monospace';
+                    ctx.font = 'bold 18px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = summon.color;
                     ctx.fillText(summon.char, sx, sy - sumGrow);
                 }
             } else {
-                ctx.font = 'bold 14px monospace';
+                ctx.font = 'bold 18px monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = summon.color;
                 ctx.fillText(summon.char, sx, sy - sumGrow);
             }
             const sHpPct = summon.hp / summon.maxHp;
-            const sBarW = 14, sBarH = 2;
+            const sBarW = 18, sBarH = 2;
             ctx.fillStyle = '#222';
-            ctx.fillRect(sx - sBarW / 2, sy - 9, sBarW, sBarH);
+            ctx.fillRect(sx - sBarW / 2, sy - 13, sBarW, sBarH);
             ctx.fillStyle = sHpPct > 0.6 ? '#44ff44' : sHpPct > 0.3 ? '#ffaa44' : '#ff4444';
-            ctx.fillRect(sx - sBarW / 2, sy - 9, sBarW * sHpPct, sBarH);
+            ctx.fillRect(sx - sBarW / 2, sy - 13, sBarW * sHpPct, sBarH);
             if (summon.maxDuration) {
                 const dPct = summon.ticksRemaining / summon.maxDuration;
                 ctx.fillStyle = '#222';
-                ctx.fillRect(sx - sBarW / 2, sy - 6, sBarW, sBarH);
+                ctx.fillRect(sx - sBarW / 2, sy - 10, sBarW, sBarH);
                 ctx.fillStyle = '#ddcc44';
-                ctx.fillRect(sx - sBarW / 2, sy - 6, sBarW * dPct, sBarH);
+                ctx.fillRect(sx - sBarW / 2, sy - 10, sBarW * dPct, sBarH);
             }
         }
 
@@ -1428,15 +1436,15 @@ const arcaneMethods = {
                 const isBackRow = i >= 5;
                 const rowIdx = isBackRow ? i - 5 : i;
                 const rowCount = isBackRow ? Math.min(enemies.length - 5, 5) : Math.min(enemies.length, 5);
-                const ey = H / 2 + (rowIdx - rowCount / 2) * 21 + 6;
-                const ex = partyX + 60 + (isBackRow ? 24 : 0) + (ey - H / 2) * diagSlope;
+                const ey = H / 2 + (rowIdx - rowCount / 2) * 28 + 14;
+                const ex = partyX + 80 + (isBackRow ? 32 : 0) + (ey - H / 2) * diagSlope;
                 ctx.globalAlpha = 0.25;
                 ctx.fillStyle = '#000000';
                 ctx.beginPath();
                 if (enemy.isBoss) {
-                    ctx.ellipse(ex, ey + 12, 14, 5, 0, 0, Math.PI * 2);
+                    ctx.ellipse(ex, ey + 16, 18, 6, 0, 0, Math.PI * 2);
                 } else {
-                    ctx.ellipse(ex, ey + 6, 7, 3, 0, 0, Math.PI * 2);
+                    ctx.ellipse(ex, ey + 8, 10, 4, 0, 0, Math.PI * 2);
                 }
                 ctx.fill();
                 ctx.globalAlpha = 1;
@@ -1445,7 +1453,7 @@ const arcaneMethods = {
                     const bossSpriteKey = enemy.enraged && enemy.enragedSprite ? enemy.enragedSprite : enemy.sprite;
                     const bossSprite = useSkins && bossSpriteKey ? skinMgr.getSprite('entities', bossSpriteKey) : null;
                     const bossColor = enemy.enraged ? (enemy.enragedColor || '#ff0000') : (enemy.color || '#ff8844');
-                    const sz = 20;
+                    const sz = 24;
                     if (bossSprite) {
                         ctx.drawImage(bossSprite, ex - sz, ey - sz - bGrow, sz * 2, sz * 2 + bGrow);
                     } else {
@@ -1460,7 +1468,7 @@ const arcaneMethods = {
                         ctx.lineWidth = 1.5;
                         ctx.stroke();
                     }
-                    ctx.font = 'bold 8px monospace';
+                    ctx.font = 'bold 10px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'bottom';
                     ctx.fillStyle = enemy.enraged ? '#ff4444' : '#ffcc44';
@@ -1478,12 +1486,12 @@ const arcaneMethods = {
                     const perEnemySpriteKey = enemy.sprite || enemySpriteKey;
                     const perEnemySprite = useSkins && perEnemySpriteKey ? skinMgr.getSprite('entities', perEnemySpriteKey) : null;
                     if (perEnemySprite) {
-                        ctx.drawImage(perEnemySprite, ex - 12, ey - 12 - eGrow, 24, 24 + eGrow);
+                        ctx.drawImage(perEnemySprite, ex - 16, ey - 16 - eGrow, 32, 32 + eGrow);
                     } else {
                         ctx.beginPath();
-                        ctx.moveTo(ex, ey - 10 - eGrow);
-                        ctx.lineTo(ex - 9, ey + 7);
-                        ctx.lineTo(ex + 9, ey + 7);
+                        ctx.moveTo(ex, ey - 14 - eGrow);
+                        ctx.lineTo(ex - 12, ey + 10);
+                        ctx.lineTo(ex + 12, ey + 10);
                         ctx.closePath();
                         ctx.fillStyle = enemy.elite ? (enemy.eliteColor || '#ff8833') : (enemy.color || '#ff3333');
                         ctx.fill();
@@ -1497,19 +1505,19 @@ const arcaneMethods = {
                     ctx.globalAlpha = 0.2 + Math.sin(Date.now() * 0.006 + i) * 0.1;
                     ctx.fillStyle = enemy.eliteColor || '#ff8833';
                     ctx.beginPath();
-                    ctx.arc(ex, ey, 14, 0, Math.PI * 2);
+                    ctx.arc(ex, ey, 18, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.globalAlpha = 1;
-                    ctx.font = 'bold 7px monospace';
+                    ctx.font = 'bold 8px monospace';
                     ctx.textAlign = 'center';
                     ctx.fillStyle = enemy.eliteColor || '#ff8833';
-                    ctx.fillText(enemy.eliteName || '', ex, ey - 16);
+                    ctx.fillText(enemy.eliteName || '', ex, ey - 20);
                 }
                 if (enemy.maxHp) {
                     const eHpPct = enemy.hp / enemy.maxHp;
-                    const eBarW = enemy.isBoss ? 24 : 14;
+                    const eBarW = enemy.isBoss ? 30 : 18;
                     const eBarH = enemy.isBoss ? 3 : 2;
-                    const eBarY = enemy.isBoss ? ey - 26 : ey - 14;
+                    const eBarY = enemy.isBoss ? ey - 32 : ey - 18;
                     ctx.fillStyle = '#222';
                     ctx.fillRect(ex - eBarW / 2, eBarY, eBarW, eBarH);
                     ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
@@ -1527,8 +1535,8 @@ const arcaneMethods = {
                 const idx = partyNames.indexOf(name);
                 if (idx < 0) return { x: partyX, y: H / 2 };
                 const isBack = backRowIds.includes(party[idx]?.id);
-                const cy = H / 2 + (idx - party.length / 2) * 20 + 4;
-                const cx = partyX + (cy - H / 2) * diagSlope - (isBack ? 18 : 0);
+                const cy = H / 2 + (idx - party.length / 2) * 28 + 14;
+                const cx = partyX + (cy - H / 2) * diagSlope - (isBack ? 24 : 0);
                 return { x: cx, y: cy };
             };
             const _findCaster = (text) => {
@@ -1554,27 +1562,27 @@ const arcaneMethods = {
                     const school = this._detectSpellSchool(text);
                     this._expVisState.effects.push({ type: 'spell_attack', school, x: cp.x + 15, y: cp.y, frame: 0, maxFrames: 25 });
                     const dmgMatch = text.match(/for (\d+)/);
-                    if (dmgMatch) this._expVisState.effects.push({ type: 'damage_number', text: dmgMatch[1], color: '#ffff44', x: partyX + 50 + Math.random() * 20, y: H / 2 - 10 + Math.random() * 15, frame: 0, maxFrames: 25 });
+                    if (dmgMatch) this._expVisState.effects.push({ type: 'damage_number', text: dmgMatch[1], color: '#ffff44', x: partyX + 70 + Math.random() * 20, y: H / 2 - 10 + Math.random() * 15, frame: 0, maxFrames: 25 });
                 } else if (text.includes('summons a')) {
                     const summonerName = _findCaster(text);
                     const sp = summonerName ? _casterPos(summonerName) : { x: partyX + 25, y: H / 2 };
                     this._expVisState.effects.push({ type: 'spell_summon', x: sp.x + 15, y: sp.y, frame: 0, maxFrames: 40 });
                 } else if (text.includes('enters phase:') || text.includes('cracks') || text.includes('reforms')) {
                     const phaseName = text.match(/phase: (.+)!/)?.[1] || '';
-                    this._expVisState.effects.push({ type: 'phase_transition', x: partyX + 60, y: H / 2, phaseName, frame: 0, maxFrames: 60 });
+                    this._expVisState.effects.push({ type: 'phase_transition', x: partyX + 80, y: H / 2, phaseName, frame: 0, maxFrames: 60 });
                     this._expVisState.shakeFrames = 15;
                     this._expVisState.flashFrames = 8;
                 } else if (text.includes('powerful foe') || text.includes('blocks the path')) {
                     const bossEnemy = activeExp.combat?.enemies?.find(e => e.isBoss);
                     this._expVisState.effects.push({
-                        type: 'boss_entrance', x: partyX + 60, y: H / 2,
+                        type: 'boss_entrance', x: partyX + 80, y: H / 2,
                         bossName: bossEnemy?.name || 'Boss', bossColor: bossEnemy?.color || '#ff8844',
                         frame: 0, maxFrames: 90,
                     });
                     this._expVisState.shakeFrames = 12;
                 } else if (text.includes('slays') || text.includes('is slain')) {
                     const isPartyKill = partyNames.some(n => text.startsWith(n));
-                    const deathX = isPartyKill ? (partyX + 50 + Math.random() * 20) : (partyX + Math.random() * 15);
+                    const deathX = isPartyKill ? (partyX + 70 + Math.random() * 20) : (partyX + Math.random() * 15);
                     this._expVisState.effects.push({ type: 'death_anim', x: deathX, y: H / 2 - 5 + Math.random() * 10, frame: 0, maxFrames: 30, color: isPartyKill ? '#ff4444' : '#888888' });
                     if (!isPartyKill) {
                         this._expVisState.effects.push({ type: 'loot', x: partyX + Math.random() * 20, y: H / 2 - 20 + Math.random() * 10, frame: 0, maxFrames: 40 });
@@ -1595,7 +1603,7 @@ const arcaneMethods = {
                         const isEnemyAttacking = !isPartyAttacking;
                         const dodgerName = (isMiss && !isPartyAttacking) ? _findCaster(text) : null;
                         const dodgerPos = dodgerName ? _casterPos(dodgerName) : null;
-                        const targetX = dodgerPos ? dodgerPos.x : (isPartyAttacking ? (partyX + 55 + Math.random() * 15) : (partyX + Math.random() * 15));
+                        const targetX = dodgerPos ? dodgerPos.x : (isPartyAttacking ? (partyX + 75 + Math.random() * 15) : (partyX + Math.random() * 15));
                         const targetY = dodgerPos ? dodgerPos.y : (H / 2 - 5 + Math.random() * 15);
                         const slashDir = isPartyAttacking ? 1 : -1;
                         const slashColor = isMiss ? '#888888' : (isPartyAttacking ? '#ffff44' : '#ff4444');
@@ -1701,7 +1709,7 @@ const arcaneMethods = {
                     ctx.drawImage(healSprite, eff.x - 8, eff.y - 8 - eff.frame * 0.8, 16, 16);
                 } else {
                     ctx.fillStyle = '#44ff44';
-                    ctx.font = 'bold 14px monospace';
+                    ctx.font = 'bold 18px monospace';
                     ctx.fillText('+', eff.x, eff.y - eff.frame * 0.8);
                     for (let s = 0; s < 3; s++) {
                         ctx.globalAlpha = alpha * 0.5;
