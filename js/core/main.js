@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -21,6 +21,8 @@ import { Minimap } from '../ui/minimap.js';
 import { ResearchSystem, updateResearch } from '../systems/research.js';
 import { updateTamedAnimals, designateTame } from '../entities/taming.js';
 import { updateSummons } from '../entities/summons.js';
+import { completeTask } from '../entities/task-executor.js';
+import { CROPS } from './config.js';
 import { syncEntityIdCounter, createWildAnimal } from '../entities/entity-factory.js';
 import { PowerSystem } from '../systems/power.js';
 import { ExplorationSystem } from '../systems/exploration.js';
@@ -666,6 +668,24 @@ class Game {
         c.priorities[skill] = (c.priorities[skill] - 1 + 6) % 6;
     }
 
+    // Toggle a school in/out of a colonist's attuned set. Attunement is a free
+    // choice: only spells from attuned schools autocast (in-world and on
+    // expeditions). Enforces the slot cap by evicting the oldest school when a
+    // new one is added beyond the limit.
+    toggleAttunement(colonistId, school) {
+        const c = this.getColonist(colonistId);
+        if (!c || !MAGIC_SKILLS[school]) return;
+        if (!Array.isArray(c.attunedSchools)) c.attunedSchools = [];
+        const idx = c.attunedSchools.indexOf(school);
+        if (idx >= 0) {
+            c.attunedSchools.splice(idx, 1);
+        } else {
+            c.attunedSchools.push(school);
+            const cap = MAGIC_STUDY_CONFIG.attunementSlots;
+            while (c.attunedSchools.length > cap) c.attunedSchools.shift();
+        }
+    }
+
     toggleDraft(colonistId) {
         const c = this.getColonist(colonistId);
         if (!c || c.hp <= 0) return;
@@ -848,6 +868,13 @@ class Game {
             if (bump === 'tier') tier = Math.min(4, tier + 1);
             else if (bump === 'quality') quality = 'superior';
             else if (bump === 'enchant') enchant = { tier: (enchant ? enchant.tier : 0) + 1 };
+        }
+        // Merchant's Eye: a living colonist with the trait raises the quality
+        // floor one band before the upward roll, so rewards arrive better.
+        if (!isTrinket && this.colonists.some(c => c.hp > 0 && !c.onExpedition && c.traits?.includes('merchants_eye'))) {
+            const order = TRADE_RIFT_CONFIG.qualityOrder;
+            const idx = order.indexOf(quality);
+            if (idx >= 0) quality = order[Math.min(order.length - 1, idx + 1)];
         }
         // Quality floor: the fulfill roll may only surprise UPWARD from the promise.
         if (!isTrinket) quality = this._rollQualityAtOrAbove(quality);
@@ -1619,6 +1646,61 @@ class Game {
                 this.notifications.push({ text: `${colonist.name} cast ${spell.name} — ${changed} tiles transformed!`, tick: this.tick, type: 'success' });
                 break;
             }
+            case 'finish_construction': {
+                // Stone Shape: instantly complete the nearest pending build task within
+                // range. Reuses completeTask for the tile change + queue cleanup, then
+                // restores the caster's own task pointers (completeTask resets them).
+                const savedTaskId = colonist.currentTaskId;
+                const savedState = colonist.state;
+                const savedProgress = colonist.workProgress;
+                let best = null, bestDist = Infinity;
+                for (const t of this.taskQueue.tasks) {
+                    if (t.type !== 'build') continue;
+                    const d = manhattanDist(pos.x, pos.y, t.x, t.y);
+                    if (d <= (spell.range || 12) && d < bestDist) { bestDist = d; best = t; }
+                }
+                if (best) {
+                    // completeTask emits the buildComplete visual and grants the caster
+                    // building XP; it also nulls the caster's task pointers, so save/restore.
+                    completeTask(colonist, best, this);
+                    colonist.currentTaskId = savedTaskId;
+                    colonist.state = savedState;
+                    colonist.workProgress = savedProgress;
+                    this.notifications.push({ text: `${colonist.name} shaped stone — construction complete!`, tick: this.tick, type: 'success' });
+                } else {
+                    this.notifications.push({ text: `No construction in range for ${spell.name}`, tick: this.tick, type: 'warning' });
+                }
+                break;
+            }
+            case 'ripen_crops': {
+                // Verdant Bloom: instantly ripen growing crops in the target area whose
+                // growth is at least ripenThreshold of the way to maturity.
+                let ripened = 0;
+                for (let dy = -spell.radius; dy <= spell.radius; dy++) {
+                    for (let dx = -spell.radius; dx <= spell.radius; dx++) {
+                        const tx = pos.x + dx;
+                        const ty = pos.y + dy;
+                        if (tx < 0 || ty < 0 || tx >= CONFIG.MAP_WIDTH || ty >= CONFIG.MAP_HEIGHT) continue;
+                        const tile = this.map[ty][tx];
+                        if (tile.zone && tile.zone.state === 'growing') {
+                            const crop = CROPS[tile.zone.crop];
+                            if (!crop) continue;
+                            if (tile.zone.growth >= crop.growthTicks * (spell.ripenThreshold || 0.5)) {
+                                tile.zone.growth = crop.growthTicks;
+                                tile.zone.state = 'ready';
+                                if (!this.taskQueue.getByPosition(tx, ty)) {
+                                    this.taskQueue.add({ type: 'harvest', skillRequired: 'farming', x: tx, y: ty, workAmount: WORK_CONFIG.harvestWork });
+                                }
+                                ripened++;
+                            }
+                            this.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: COMBAT_VISUALS.spellGrowthColor, ttl: 4 });
+                        }
+                    }
+                }
+                window.soundManager?.playSFX('spell_growth');
+                this.notifications.push({ text: `${colonist.name} cast ${spell.name} — ${ripened} crops ripened!`, tick: this.tick, type: 'success' });
+                break;
+            }
         }
         this.combatEffects.push({
             x: colonist.x, y: colonist.y,
@@ -1915,6 +1997,28 @@ class Game {
             count++;
         }
         this.notifications.push({ text: `[DEBUG] ${count} colonists granted ${starterSpells.length} starter spells + magic skills set to 1`, tick: this.tick, type: 'success' });
+    }
+
+    cheatGrantAllSpells() {
+        const allSpells = Object.entries(SPELLS)
+            .filter(([, spell]) => spell.minLevel <= 10)
+            .map(([key]) => key);
+        let count = 0;
+        for (const c of this.colonists) {
+            if (c.golem || c.hp <= 0) continue;
+            if (!c.knownSpells) c.knownSpells = [];
+            for (const spellKey of allSpells) {
+                if (!c.knownSpells.includes(spellKey)) {
+                    c.knownSpells.push(spellKey);
+                }
+            }
+            for (const school of Object.keys(c.magicSkills || {})) {
+                if (c.magicSkills[school] < 8) c.magicSkills[school] = 8;
+            }
+            recalcMaxMana(c);
+            count++;
+        }
+        this.notifications.push({ text: `[DEBUG] ${count} colonists granted ${allSpells.length} starter spells + magic skills set to 8`, tick: this.tick, type: 'success' });
     }
 
     cheatSpawnItem(category, key) {

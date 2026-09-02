@@ -5,7 +5,7 @@
  * tick but self-throttles: opinion decay and the interaction scan are gated on
  * SOCIAL_CONFIG intervals, and each colonist pair has an interaction cooldown.
  */
-import { SOCIAL_INTERACTIONS, SOCIAL_CONFIG, THOUGHTS } from '../core/config.js';
+import { SOCIAL_INTERACTIONS, SOCIAL_CONFIG, THOUGHTS, TRAITS } from '../core/config.js';
 import { getRelationshipTier } from './social-utils.js';
 import { addThought } from '../entities/colonist.js';
 import { manhattanDist } from '../world/pathfinding.js';
@@ -81,12 +81,26 @@ function checkRelationshipChange(colonist, other, prevTierKey, game) {
     }
 }
 
+// Scale an interaction's opinion delta by the actor's social traits. Charismatic
+// boosts positive deltas. Abrasive deepens negative ones. Valence 0 is untouched.
+function scaleOpinionDelta(colonist, interaction) {
+    let delta = interaction.opinionDelta;
+    if (interaction.opinionDelta > 0 && colonist.traits?.includes('charismatic')) {
+        delta *= TRAITS.charismatic.positiveInteractionMult;
+    } else if (interaction.opinionDelta < 0 && colonist.traits?.includes('abrasive')) {
+        delta *= TRAITS.abrasive.negativeInteractionMult;
+    }
+    return Math.round(delta);
+}
+
 function applyInteraction(a, b, interaction, game) {
     const prevTierA = getRelationshipTier(getOpinion(a, b.id)).key;
     const prevTierB = getRelationshipTier(getOpinion(b, a.id)).key;
 
-    setOpinion(a, b.id, getOpinion(a, b.id) + interaction.opinionDelta);
-    setOpinion(b, a.id, getOpinion(b, a.id) + interaction.opinionDelta);
+    // Charismatic amplifies positive opinion gains; Abrasive amplifies negative
+    // losses. Scaled per-participant based on the interaction's valence sign.
+    setOpinion(a, b.id, getOpinion(a, b.id) + scaleOpinionDelta(a, interaction));
+    setOpinion(b, a.id, getOpinion(b, a.id) + scaleOpinionDelta(b, interaction));
 
     if (interaction.thoughtKey && THOUGHTS[interaction.thoughtKey]) {
         const t = THOUGHTS[interaction.thoughtKey];

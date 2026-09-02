@@ -1,4 +1,4 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, COMBAT_VISUALS } from '../core/config.js';
+import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, COMBAT_VISUALS, TRAITS } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal } from '../entities/entity-factory.js';
@@ -16,9 +16,13 @@ import { getPedestalEffect } from './artifacts.js';
 export function getTradeRates(game) {
     const markupMult = getPedestalEffect(game, 'tradeMarkupMult');
     const tradeRoutesMult = game.research.isResearched('trade_routes') ? (110 / 120) : 1;
+    // A living Silver Tongue colonist improves deals colony-wide (one applies, no stacking).
+    const silverTongue = game.colonists?.some(c => c.hp > 0 && !c.onExpedition && c.traits?.includes('silver_tongue'))
+        ? TRAITS.silver_tongue.tradeMarkupMult
+        : 1;
     return {
-        markup: TRADER_MARKUP * markupMult * tradeRoutesMult,
-        discount: game.research.isResearched('trade_routes') ? 0.85 : TRADER_DISCOUNT,
+        markup: TRADER_MARKUP * markupMult * tradeRoutesMult * silverTongue,
+        discount: (game.research.isResearched('trade_routes') ? 0.85 : TRADER_DISCOUNT) / silverTongue,
     };
 }
 

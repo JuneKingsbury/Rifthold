@@ -7,6 +7,37 @@ import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
 
+// Visual glyph + color for an expedition combat status effect. Poison ticks
+// damage, stun skips a turn, slow may cost a turn, weaken reduces output, burn
+// is a fire DoT. Kept in one place so party and enemy displays stay consistent.
+const _COMBAT_STATUS_ICONS = {
+    poison: { char: '☠', color: '#66cc44' },
+    burn: { char: '🔥', color: '#ff7733' },
+    stun: { char: '✦', color: '#ffcc44' },
+    slow: { char: '❄', color: '#66ccff' },
+    weaken: { char: '▼', color: '#cc88ff' },
+};
+
+function _combatStatusIcon(type) {
+    const def = _COMBAT_STATUS_ICONS[type];
+    if (!def) return `<span style="color:#aaa;font-size:0.85em;">${type}</span>`;
+    return `<span title="${type}" style="color:${def.color};font-size:0.9em;">${def.char}</span>`;
+}
+
+// Render a run of status icons for a combatant's statusEffects array, each
+// annotated with remaining rounds. Returns '' when there are none.
+function _combatStatusIcons(statusEffects) {
+    if (!statusEffects || statusEffects.length === 0) return '';
+    const active = statusEffects.filter(s => s.rounds > 0);
+    if (active.length === 0) return '';
+    return ' ' + active.map(s => {
+        const def = _COMBAT_STATUS_ICONS[s.type];
+        const color = def ? def.color : '#aaa';
+        const char = def ? def.char : s.type;
+        return `<span title="${s.type} (${s.rounds} rnd)" style="color:${color};font-size:0.85em;">${char}${s.rounds}</span>`;
+    }).join(' ');
+}
+
 export function installArcanePanel(UI) {
     Object.assign(UI.prototype, arcaneMethods);
 }
@@ -297,6 +328,7 @@ const arcaneMethods = {
                         let buffs = '';
                         if (p.shieldActive) buffs += ' <span style="color:#4488ff;font-size:0.85em;">Shield</span>';
                         if (p.dodgeCharges > 0) buffs += ` <span style="color:#aa44ff;font-size:0.85em;">Phase: ${p.dodgeCharges}</span>`;
+                        buffs += _combatStatusIcons(p.statusEffects);
                         html += `<div class="info-row" style="color:${color}; padding-left:8px;">${p.name}${rowLabel} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${manaStr}${buffs}${status}${threatStr}</div>`;
                     }
 
@@ -305,6 +337,18 @@ const arcaneMethods = {
                         html += `<div class="info-row" style="color:#ff8844;margin-top:4px;">Enemies: ${enemiesAlive.length}/${exp.combat.enemies.length}`;
                         const elites = enemiesAlive.filter(e => e.elite);
                         if (elites.length > 0) html += ` (<span style="color:${elites[0].eliteColor}">${elites.length} elite</span>)`;
+                        // Aggregate afflictions across living enemies so the player sees
+                        // poison/stun/slow/weaken landing without a per-enemy row.
+                        const statusCounts = {};
+                        for (const e of enemiesAlive) {
+                            if (!e.statusEffects) continue;
+                            for (const s of e.statusEffects) {
+                                if (s.rounds > 0) statusCounts[s.type] = (statusCounts[s.type] || 0) + 1;
+                            }
+                        }
+                        const statusStr = Object.entries(statusCounts)
+                            .map(([type, n]) => `${_combatStatusIcon(type)}${n > 1 ? '×' + n : ''}`).join(' ');
+                        if (statusStr) html += ` <span style="font-size:0.9em;">${statusStr}</span>`;
                         html += `</div>`;
                     }
 
@@ -1480,6 +1524,21 @@ const arcaneMethods = {
                     ctx.fillStyle = '#4466ff';
                     ctx.fillRect(barX, barY + 3, barW * manaPct, barH);
                 }
+                // Enemy-applied status glyphs above the party member's bars.
+                if (p.statusEffects && p.statusEffects.length > 0) {
+                    const active = p.statusEffects.filter(s => s.rounds > 0);
+                    if (active.length > 0) {
+                        ctx.font = '9px monospace';
+                        ctx.textAlign = 'center';
+                        const spacing = 9;
+                        const startX = px - ((active.length - 1) * spacing) / 2;
+                        for (let gi = 0; gi < active.length; gi++) {
+                            const sdef = _COMBAT_STATUS_ICONS[active[gi].type] || {};
+                            ctx.fillStyle = sdef.color || '#aaa';
+                            ctx.fillText(sdef.char || '?', startX + gi * spacing, barY - 4);
+                        }
+                    }
+                }
             }
         }
 
@@ -1665,6 +1724,22 @@ const arcaneMethods = {
                     ctx.fillRect(ex - eBarW / 2, eBarY, eBarW, eBarH);
                     ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
                     ctx.fillRect(ex - eBarW / 2, eBarY, eBarW * eHpPct, eBarH);
+                    // Status glyphs (poison/stun/slow/…) sit just above the HP bar so a
+                    // player can see afflictions land on individual enemies on the canvas.
+                    if (enemy.statusEffects && enemy.statusEffects.length > 0) {
+                        const active = enemy.statusEffects.filter(s => s.rounds > 0);
+                        if (active.length > 0) {
+                            ctx.font = '9px monospace';
+                            ctx.textAlign = 'center';
+                            const glyphs = active.map(s => (_COMBAT_STATUS_ICONS[s.type] || {}).char || '?');
+                            const spacing = 9;
+                            const startX = ex - ((active.length - 1) * spacing) / 2;
+                            for (let gi = 0; gi < active.length; gi++) {
+                                ctx.fillStyle = (_COMBAT_STATUS_ICONS[active[gi].type] || {}).color || '#aaa';
+                                ctx.fillText(glyphs[gi], startX + gi * spacing, eBarY - 3);
+                            }
+                        }
+                    }
                 }
             }
 

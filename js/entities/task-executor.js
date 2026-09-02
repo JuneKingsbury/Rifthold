@@ -7,6 +7,20 @@ import { manhattanDist } from '../world/pathfinding.js';
 import { getCraftQualityBonus } from '../systems/complexBuildings.js';
 import { applySpecificQuality, applyEnchantmentEffect } from './item-roll.js';
 
+// Scavenger trait: small chance to double the amount of one resource in a
+// gather yield ({ resourceKey: amount }). Mutates `output` in place. A floating
+// "+N" note is shown so the bonus is visible.
+function applyScavenger(colonist, output, game) {
+    if (!colonist.traits?.includes('scavenger')) return;
+    if (Math.random() >= TRAITS.scavenger.scavengeChance) return;
+    const keys = Object.keys(output).filter(k => output[k] > 0);
+    if (keys.length === 0) return;
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    const bonus = output[key];
+    output[key] += bonus;
+    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Scavenged +${bonus} ${key.replace(/_/g, ' ')}`, color: '#ffdd44', fontSize: 10, ttl: 18, maxTtl: 18 });
+}
+
 function applyQuality(item, colonist, game, ...statKeys) {
     let skill = colonist.skills.crafting || 1;
     if (game && game.workshopQualities) {
@@ -99,6 +113,7 @@ function advanceTomeStudy(colonist, game, rate) {
     let studyXpGain = MAGIC_STUDY_CONFIG.xpPerStudyTick;
     if (colonist.traits.includes('scholar')) studyXpGain *= TRAITS.scholar.magicXpMult;
     if (colonist.traits.includes('prodigy')) studyXpGain *= TRAITS.prodigy.magicXpMult;
+    if (colonist.traits.includes('magically_inept')) studyXpGain *= TRAITS.magically_inept.magicXpMult;
     studyXpGain *= getRaceModifier(colonist, 'magicXpMult', 1);
     colonist._magicXpAccumulator[school] += studyXpGain;
     if (game.tick % 10 === 0) {
@@ -115,7 +130,17 @@ function advanceTomeStudy(colonist, game, rate) {
         magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
     }
 
-    if (colonist.tomeProgress[tomeKey] >= tomeDef.learningWork) {
+    // Breadth penalty: learning a tome takes longer the more OTHER schools this
+    // colonist already knows spells in, so early focus is cheap and late generalizing
+    // is slow. Rewards committing a colonist to a small number of schools.
+    const otherSchools = new Set();
+    for (const known of colonist.knownSpells) {
+        const s = SPELLS[known]?.school;
+        if (s && s !== school) otherSchools.add(s);
+    }
+    const effectiveWork = tomeDef.learningWork * (1 + otherSchools.size * MAGIC_STUDY_CONFIG.breadthLearningPenalty);
+
+    if (colonist.tomeProgress[tomeKey] >= effectiveWork) {
         colonist.knownSpells.push(tomeDef.spell);
         colonist.equippedTome = null;
         delete colonist.tomeProgress[tomeKey];
@@ -161,6 +186,7 @@ export function completeTask(colonist, task, game) {
                     for (const [res, amt] of Object.entries(rDef.yield)) {
                         output[res] = rDef.perAmount ? tile.resource.amount * amt : amt;
                     }
+                    applyScavenger(colonist, output, game);
                     game.resources.add(output);
                 }
                 tile.resource = null;
@@ -193,6 +219,7 @@ export function completeTask(colonist, task, game) {
                 const crop = tile.zone.crop;
                 const yields = {};
                 yields[crop] = getHarvestYield(game, crop);
+                applyScavenger(colonist, yields, game);
                 game.resources.add(yields);
                 tile.zone.state = 'empty';
                 tile.zone.growth = 0;
@@ -272,7 +299,8 @@ export function completeTask(colonist, task, game) {
                     if (output.food && game.research.isResearched('alchemy')) {
                         output.food += WORK_CONFIG.alchemyFoodBonus;
                     }
-                    const cookBonus = getPedestalEffect(game, 'cookingBonusFood');
+                    let cookBonus = getPedestalEffect(game, 'cookingBonusFood');
+                    if (colonist.traits?.includes('chef')) cookBonus += TRAITS.chef.cookingBonusFood;
                     if (output.food && cookBonus > 0) output.food += cookBonus;
                     game.resources.add(output);
                 }
@@ -461,6 +489,7 @@ export function completeTask(colonist, task, game) {
             let xpGain = COLONIST_CONFIG.skillXpPerTask;
             if (colonist.pedestalSkillBonus) xpGain *= (1 + colonist.pedestalSkillBonus);
             if (colonist.traits.includes('prodigy')) xpGain *= TRAITS.prodigy.allSkillXpMult;
+            if (colonist.traits.includes('magically_inept')) xpGain *= TRAITS.magically_inept.mundaneXpMult;
             xpGain *= getRaceModifier(colonist, 'allSkillXpMult', 1);
             if (task.skillRequired === 'animals') xpGain *= getRaceModifier(colonist, 'animalXpMult', 1);
             colonist.skillXp[task.skillRequired] += xpGain;

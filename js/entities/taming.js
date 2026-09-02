@@ -1,4 +1,4 @@
-import { ANIMALS, TAMED_ANIMALS, WORK_CONFIG, THOUGHTS } from '../core/config.js';
+import { ANIMALS, TAMED_ANIMALS, WORK_CONFIG, THOUGHTS, TRAITS } from '../core/config.js';
 import { colonistTakeDamage, addThought } from './colonist.js';
 import { createTamedEntity } from './entity-factory.js';
 import { updateEntityRoles, updateEntityEffects } from './roles.js';
@@ -78,7 +78,10 @@ export function getTameChance(colonist, animalType, game) {
     let baseChance = tamedDef.baseTameChance || 0.4;
     if (animalType === 'wolf' && game?.research?.isResearched('wolf_mastery')) baseChance += 0.2;
     const skillBonus = (colonist.skills.animals || 0) * WORK_CONFIG.tameSkillChanceBonus;
-    return Math.min(1, baseChance + skillBonus);
+    let traitBonus = 0;
+    if (colonist.traits?.includes('beast_whisperer')) traitBonus += TRAITS.beast_whisperer.tameChanceBonus;
+    if (colonist.traits?.includes('skittish')) traitBonus -= TRAITS.skittish.tameChancePenalty;
+    return Math.max(0.05, Math.min(1, baseChance + skillBonus + traitBonus));
 }
 
 export function attemptDangerousTame(game, colonist, wildAnimalId) {

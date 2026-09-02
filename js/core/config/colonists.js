@@ -19,12 +19,38 @@ export const TRAIT_EXCLUSIONS = [
     ['iron_stomach', 'gluttonous'],
     ['quick', 'sturdy'],
     ['light_sleeper', 'deep_sleeper'],
+    ['brave', 'coward'],
+    ['coward', 'pacifist'],
+    ['workaholic', 'lazy'],
+    ['workaholic', 'hard_worker'],
+    ['optimist', 'volatile'],
+    ['pessimist', 'volatile'],
+    ['attuned', 'magically_inept'],
+    ['scholar', 'magically_inept'],
+    ['charismatic', 'abrasive'],
+    // Combat temperament: berserkers charge in, cowards break early.
+    ['berserker', 'coward'],
+    // Pacifists refuse to attack — no offensive-combat prowess traits.
+    ['berserker', 'pacifist'],
+    ['deadeye', 'pacifist'],
+    ['spellsword', 'pacifist'],
+    // Animals: a beast whisperer is not skittish around beasts.
+    ['beast_whisperer', 'skittish'],
+    // Food: gourmands can't stand raw food; a foraging gut is unbothered by it.
+    ['gourmand', 'foraging_gut'],
+    // Magically Inept is mutually exclusive with every magic-positive trait.
+    ['prodigy', 'magically_inept'],
+    ['magically_gifted', 'magically_inept'],
+    ['spellsword', 'magically_inept'],
+    // Temperament & sleep: resilient vs. volatile, restless vs. deep sleeper.
+    ['steadfast', 'volatile'],
+    ['insomniac', 'deep_sleeper'],
 ];
 
 export const TRAITS = {
     // ── Common ──────────────────────────────────────────────────────────────
-    hard_worker:   { name: 'Hard Worker',   weight: 10, value:  3, workSpeedMult: 1.2,  description: '+20% work speed', expedition: { fatigueMult: 0.9 } },
-    lazy:          { name: 'Lazy',          weight: 10, value: -2, workSpeedMult: 0.85, idleMoodBonus: 5, description: '-15% work speed, happy when idle', expedition: { fatigueMult: 1.3 } },
+    hard_worker:   { name: 'Hard Worker',   weight: 10, value:  3, workSpeedBonus: 0.2,   description: '+20% work speed', expedition: { fatigueMult: 0.9 } },
+    lazy:          { name: 'Lazy',          weight: 10, value: -2, workSpeedBonus: -0.15, idleMoodBonus: 5, description: '-15% work speed, happy when idle', expedition: { fatigueMult: 1.3 } },
     night_owl:     { name: 'Night Owl',     weight: 10, value:  1, nightSpeedMult: 1.2, daySpeedMult: 0.9, description: '+20% at night, -10% during day', expedition: { realmBonus: { shadow_realm: { damageMult: 1.2 }, void_abyss: { damageMult: 1.15 }, oblivion_rift: { damageMult: 1.1 } } } },
     early_bird:    { name: 'Early Bird',    weight: 10, value:  1, daySpeedMult: 1.2,   nightSpeedMult: 0.9, description: '+20% during day, -10% at night' },
     socialite:     { name: 'Socialite',     weight: 10, value:  1, nearOthersMoodBonus: 8, aloneMoodPenalty: -5, description: 'Happy near others, sad alone' },
@@ -35,10 +61,10 @@ export const TRAITS = {
     // ── Uncommon ────────────────────────────────────────────────────────────
     green_thumb:   { name: 'Green Thumb',   weight: 7,  value:  2, farmingSpeedMult: 1.3, description: '+30% farming speed', expedition: { realmBonus: { verdant_depths: { lootMult: 1.2 }, fungal_hollows: { lootMult: 1.15 }, primeval_canopy: { lootMult: 1.1 } } } },
     iron_stomach:  { name: 'Iron Stomach',  weight: 7,  value:  2, hungerDecayMult: 0.5,  description: 'Gets hungry half as fast' },
-    tough:         { name: 'Tough',         weight: 7,  value:  3, damageTakenMult: 0.7,  description: 'Takes 30% less damage', expedition: { trapDamageMult: 0.7, fatigueMult: 0.8 } },
+    tough:         { name: 'Tough',         weight: 7,  value:  3, damageReduction: 0.3,  description: 'Takes 30% less damage', expedition: { trapDamageMult: 0.7, fatigueMult: 0.8 } },
     brave:         { name: 'Brave',         weight: 6,  value:  2, fleeHpMult: 0.3,       description: 'Only flees at very low HP', expedition: { rallyChance: 0.1, rallyHeal: 0.05 } },
     quick:         { name: 'Quick',         weight: 7,  value:  2, moveSpeedBonus: 0.25,  description: 'Moves 25% faster', expedition: { durationMult: 0.95, dodgeChanceMod: 0.05 } },
-    sturdy:        { name: 'Sturdy',        weight: 6,  value:  1, damageTakenMult: 0.85, workSpeedMult: 0.9, description: 'Takes 15% less damage, -10% work speed' },
+    sturdy:        { name: 'Sturdy',        weight: 6,  value:  1, damageReduction: 0.15, workSpeedBonus: -0.1, description: 'Takes 15% less damage, -10% work speed' },
     light_sleeper: { name: 'Light Sleeper', weight: 7,  value:  0, restDecayMult: 1.4, sleepRestMult: 1.5, description: 'Gets tired faster, but recovers faster while sleeping' },
     deep_sleeper:  { name: 'Deep Sleeper',  weight: 7,  value:  0, restDecayMult: 0.7, sleepRestMult: 0.7, description: 'Gets tired slower, but recovers slower while sleeping' },
     creative:      { name: 'Creative',      weight: 6,  value:  3, craftingSpeedMult: 1.2, qualityBonus: 1, description: '+20% crafting speed, +1 quality tier chance' },
@@ -51,9 +77,54 @@ export const TRAITS = {
     pacifist:         { name: 'Pacifist',         weight: 1, value: -2, description: 'Refuses to attack enemies, only flees' },
     prodigy:          { name: 'Prodigy',          weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, description: 'Gains all XP 20% faster', expedition: { xpMult: 1.3 } },
     magically_gifted: { name: 'Magically Gifted', weight: 2, value:  3, description: 'Starts with 2 levels in a random magic school and knows its starter spell' },
+
+    // ── New: Direct combat (Gap A) ────────────────────────────────────────────
+    duelist:       { name: 'Duelist',       weight: 6, value:  2, dodgeChance: 0.12, description: '+12% chance to dodge attacks in combat' },
+    deadeye:       { name: 'Deadeye',        weight: 6, value:  2, critChance: 0.12, description: '+12% critical hit chance in combat' },
+    berserker:     { name: 'Berserker',      weight: 3, value:  2, lowHpDamageMult: 1.25, lowHpThreshold: 0.4, damageReduction: -0.1, description: '+25% damage dealt below 40% HP, but takes +10% damage' },
+    coward:        { name: 'Coward',         weight: 10, value: -2, fleeHpMult: 0.4, description: 'Flees from combat at much higher HP' },
+
+    // ── New: Taming & animals (Gap B) ─────────────────────────────────────────
+    beast_whisperer: { name: 'Beast Whisperer', weight: 6, value:  2, tameChanceBonus: 0.3, animalWorkMult: 1.2, description: '+30% taming success, +20% animal handling speed' },
+    menagerist:      { name: 'Menagerist',      weight: 5, value:  2, tamedAnimalMoodAura: 4, description: 'Cheered by nearby tamed animals' },
+    skittish:        { name: 'Skittish',        weight: 10, value: -1, tameChancePenalty: 0.25, description: '-25% taming success, unnerved by wild beasts' },
+
+    // ── New: Trade / gold (Gap C) ─────────────────────────────────────────────
+    silver_tongue:  { name: 'Silver Tongue',  weight: 6, value:  2, tradeMarkupMult: 0.9, description: 'Better trade prices while in the colony' },
+    merchants_eye:  { name: "Merchant's Eye", weight: 3, value:  3, tradeRewardQualityBonus: 1, description: 'Trade Rift rewards arrive at higher quality' },
+    scavenger:      { name: 'Scavenger',      weight: 6, value:  2, scavengeChance: 0.12, description: 'Chance to find bonus materials while gathering' },
+
+    // ── New: Cooking / food (Gap D) ───────────────────────────────────────────
+    chef:          { name: 'Chef',           weight: 6, value:  2, cookingBonusFood: 1, mealMoodDurationMult: 1.5, description: '+1 food per cook, meals lift mood longer' },
+    comfort_eater: { name: 'Comfort Eater',  weight: 10, value:  0, mealMoodBonus: 6, hungerDecayMult: 1.15, description: 'Eating restores extra mood, but gets hungry 15% faster' },
+    foraging_gut:  { name: 'Foraging Gut',   weight: 6, value:  2, rawFoodMoodPenalty: 0, description: 'No mood penalty from eating raw food' },
+
+    // ── New: Magic / mana (Gap E) ─────────────────────────────────────────────
+    attuned:        { name: 'Attuned',        weight: 6, value:  2, manaRegenBonus: 0.2, maxManaMult: 1.1, description: '+20% mana regen, +10% max mana' },
+    spellsword:     { name: 'Spellsword',     weight: 3, value:  3, spellDamageBonus: 0.15, description: '+15% spell damage', expedition: { spellDamageMult: 1.15 } },
+    magically_inept:{ name: 'Magically Inept', weight: 10, value: -2, magicXpMult: 0.7, mundaneXpMult: 1.1, description: '-30% magic XP, but +10% mundane skill XP' },
+
+    // ── New: Expedition layer (Gap F) ─────────────────────────────────────────
+    trailblazer:    { name: 'Trailblazer',    weight: 6, value:  2, description: 'Faster, more evasive on expeditions', expedition: { durationMult: 0.9, dodgeChanceMod: 0.05 } },
+    treasure_hunter:{ name: 'Treasure Hunter', weight: 3, value:  3, description: 'Finds more loot and rarer encounters on expeditions', expedition: { lootMult: 1.2, rareEncounterMult: 1.15 } },
+    trapsmith:      { name: 'Trapsmith',      weight: 6, value:  2, description: 'Takes far less trap damage; can disarm traps', expedition: { trapDamageMult: 0.6 } },
+    inspiring:      { name: 'Inspiring',      weight: 3, value:  3, description: 'Rallies the party more often and heals more', expedition: { rallyChance: 0.15, rallyHeal: 0.08 } },
+    void_touched:   { name: 'Void-Touched',   weight: 3, value:  2, description: 'Empowered within the shadowed realms', expedition: { realmBonus: { shadow_realm: { partyDamageMult: 1.2 }, void_abyss: { partyDamageMult: 1.15 }, oblivion_rift: { partyDamageMult: 1.1 } } } },
+
+    // ── New: Social / relationships (Gap G) ───────────────────────────────────
+    charismatic:    { name: 'Charismatic',    weight: 6, value:  2, positiveInteractionMult: 1.5, description: 'Builds friendships faster' },
+    abrasive:       { name: 'Abrasive',       weight: 10, value: -2, negativeInteractionMult: 1.5, description: 'Sours relationships faster' },
+    loyal:          { name: 'Loyal',          weight: 6, value:  2, loyalWorkMult: 1.1, description: 'Works harder near a friend or lover' },
+
+    // ── New: Mental resilience & flavor (Gap H) ───────────────────────────────
+    steadfast:      { name: 'Steadfast',      weight: 6, value:  2, breakThresholdMult: 0.6, description: 'Far more resistant to mental breaks' },
+    volatile:       { name: 'Volatile',       weight: 10, value: -1, positiveThoughtMult: 1.4, negativeThoughtMult: 1.4, description: 'Mood swings harder in both directions' },
+    workaholic:     { name: 'Workaholic',     weight: 6, value:  2, workSpeedBonus: 0.15, idleMoodPenalty: -5, description: '+15% work speed, but restless when idle' },
+    insomniac:      { name: 'Insomniac',      weight: 10, value: -1, sleepRestMult: 0.7, workSpeedBonus: 0.05, description: 'Recovers slowly from sleep, but always a bit more productive' },
+
     // ── Race-specific ────────────────────────────────────────────────────────
     human:   { name: 'Human',   weight: 0, value:  10, allSkillXpMult: 1.15, magicXpMult: 1.15, description: 'A versatile member of Humanity (learns all skills, magic and mundane, 15% faster)' },
-    nymph:   { name: 'Nymph',   weight: 0, value:  10, magicXpMult: 1.3, workSpeedMult: 0.85, description: 'A mystical member of the Nympha (+30% magic skill XP, but physically frail: -15% work speed)' },
+    nymph:   { name: 'Nymph',   weight: 0, value:  10, magicXpMult: 1.3, workSpeedBonus: -0.15, description: 'A mystical member of the Nympha (+30% magic skill XP, but physically frail: -15% work speed)' },
     ferin:   { name: 'Ferin',   weight: 0, value:  10, farmingSpeedMult: 1.2, animalXpMult: 1.5, animalWorkMult: 1.3, indoorMoodPenalty: -6, description: 'A wild member of the Ferini (+20% farming, gifted with animals, restless indoors)' },
     kobalos: { name: 'Kobalos', weight: 0, value:  10, moveSpeedBonus: 0.10, allyDamageReduction: 0.05, allyDamageReductionCap: 0.20, isolatedMoodPenalty: -6, rawFoodMoodPenalty: 0, description: 'A pack-minded member of the Kobaloi (+10% move speed, tougher near allies, no raw-food penalty, but rattled alone)' },
     bufos:   { name: 'Bufos',   weight: 0, value:  10, daySpeedMult: 1.15, nightSpeedMult: 0.85, restDecayMult: 0.85, description: 'A cold-blooded member of the Bufoi (+15% work by day, -15% by night, but rests efficiently)' },
@@ -211,6 +282,17 @@ export const MAGIC_STUDY_CONFIG = {
     xpPerCast: 0.015,
     magicXpToLevel: 0.8,
     magicXpScalePerLevel: 0.25,
+    // Specialization tuning. Each school level above a spell's minLevel makes that
+    // spell stronger, cheaper and faster to recast, rewarding deep single-school
+    // investment. Starting values — playtest and balance against SPELLS numbers.
+    spellPowerPerLevel: 0.08,          // +8% effect magnitude per level over minLevel
+    manaCostReductionPerLevel: 0.03,   // -3% mana cost per level over minLevel
+    manaCostReductionCap: 0.4,
+    cooldownReductionPerLevel: 0.02,   // -2% cooldown per level over minLevel
+    cooldownReductionCap: 0.3,
+    breadthLearningPenalty: 0.15,      // +15% tome work per other school already known
+    // How many schools a colonist can actively autocast from at once.
+    attunementSlots: 2,
 };
 
 export const TASK_CONFIG = {

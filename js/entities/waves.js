@@ -163,7 +163,16 @@ export class WaveSystem {
     }
 
     updateEnemy(enemy, game) {
-        enemy.moveCooldown -= enemy.speed;
+        // Colonist CC: a stunned void-wave enemy skips its turn. A slowed one moves
+        // and attacks at reduced effective speed. updateEntityRoles emits the pip
+        // for role-based enemies; emit here for the fallback path too.
+        if (enemy._stunnedUntil && game.tick < enemy._stunnedUntil) {
+            if (game.tick % 6 === 0) game.combatEffects.push({ x: enemy.x, y: enemy.y, char: '✦', color: '#ffccff', ttl: 4 });
+            return;
+        }
+        const slowMult = (enemy._slowUntil && game.tick < enemy._slowUntil) ? (enemy._slowMult || 0.5) : 1;
+        const effSpeed = enemy.speed * slowMult;
+        enemy.moveCooldown -= effSpeed;
         if (enemy.moveCooldown > 0) return;
         enemy.moveCooldown = 1;
 
@@ -172,7 +181,7 @@ export class WaveSystem {
             if (enemy.roles.some(r => r.type === 'nexus_target' || r.type === 'ranged_attacker')) return;
         }
 
-        const dur = CONFIG.TICK_RATE / (enemy.speed * game.speed);
+        const dur = CONFIG.TICK_RATE / (effSpeed * game.speed);
 
         const nearbyColonists = game.spatial
             ? game.spatial.colonists.query(enemy.x, enemy.y, 1)

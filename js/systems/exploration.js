@@ -1,11 +1,50 @@
-import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS,
+import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS,
     FORMATION_CONFIG, EXPEDITION_TRAPS, EXPEDITION_ENEMIES, ELITE_MODIFIERS, ELITE_CONFIG,
     EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
     EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
     FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG,
     REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG,
 } from '../core/config.js';
-import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache } from '../entities/colonist.js';
+import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned } from '../entities/colonist.js';
+
+// Precomputes a per-school equipment bonus map for a colonist so expedition combat can
+// scale spell damage by school without live equipment access. Mirrors the in-world
+// getEquipmentSchoolBonus: per-school `<school>Bonus` stats added to spellDamageBonus.
+function buildSchoolBonuses(colonist) {
+    const bonuses = {};
+    const base = getEquipmentStat(colonist, 'spellDamageBonus');
+    for (const school of Object.keys(MAGIC_SKILLS)) {
+        bonuses[school] = base + getEquipmentStat(colonist, `${school}Bonus`);
+    }
+    return bonuses;
+}
+
+// Expedition-side spell effect multiplier from school mastery. Mirrors the in-world
+// getSpellPower using the snapshot's magicSkills. Divination opts out.
+function expeditionSpellPower(member, spell) {
+    if (!spell || !spell.school) return 1;
+    if (spell.powerScale === 0 || spell.effect === 'divination_modifier') return 1;
+    const level = (member.magicSkills?.[spell.school]) || 0;
+    const over = Math.max(0, level - (spell.minLevel || 0));
+    const scale = spell.powerScale !== undefined ? spell.powerScale : MAGIC_STUDY_CONFIG.spellPowerPerLevel;
+    return 1 + over * scale;
+}
+
+// School-level mana-cost reduction, mirroring colonist.js getEffectiveManaCost.
+function expeditionCostReduction(member, spell) {
+    const level = (member.magicSkills?.[spell.school]) || 0;
+    const over = Math.max(0, level - (spell.minLevel || 0));
+    return Math.min(MAGIC_STUDY_CONFIG.manaCostReductionCap, over * MAGIC_STUDY_CONFIG.manaCostReductionPerLevel);
+}
+
+// School-level cooldown multiplier, mirroring colonist.js getSpellCooldownFactor.
+function expeditionCooldownFactor(member, spell) {
+    const level = (member.magicSkills?.[spell.school]) || 0;
+    const over = Math.max(0, level - (spell.minLevel || 0));
+    const reduction = Math.min(MAGIC_STUDY_CONFIG.cooldownReductionCap, over * MAGIC_STUDY_CONFIG.cooldownReductionPerLevel);
+    const gearReduction = member.spellCooldownReduction || 0;
+    return Math.max(0.1, (1 - reduction) * (1 - gearReduction));
+}
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
 import { getSpellCooldownMult } from './complexBuildings.js';
@@ -129,6 +168,12 @@ export class ExplorationSystem {
         }
         let durationMult = 1.0;
         for (const c of party) {
+            // Trait-based duration (e.g. Trailblazer). The expedition object doesn't
+            // exist yet, so scan the party directly like the equipment loop below.
+            for (const traitKey of (c.traits || [])) {
+                const mult = TRAITS[traitKey]?.expedition?.durationMult;
+                if (mult) durationMult *= mult;
+            }
             for (const item of getEquippedItems(c)) {
                 if (item.expedition?.durationMult) durationMult *= item.expedition.durationMult;
                 if (item.consumable) {
@@ -633,11 +678,10 @@ export class ExplorationSystem {
 
     _applyTrapDamage(exp, game, trapDef, alive, ds) {
         const member = alive[randInt(0, alive.length - 1)];
-        const equipTrapMult = getPartyExpeditionEffect(exp.partySnapshot, 'trapDamageMult');
-        const traitTrapMult = this._getTraitExpeditionEffect(exp, 'trapDamageMult');
+        const trapMult = getPartyExpeditionEffect(exp.partySnapshot, 'trapDamageMult', exp.realm);
         const xpTrapMult = this._getXpLevelBonus(member.id, 'trapDamageMult');
         const baseDmg = randInt(trapDef.initialDamage[0], trapDef.initialDamage[1]);
-        const dmg = Math.max(0, Math.floor(baseDmg * equipTrapMult * traitTrapMult * xpTrapMult * (ds.trapDmgMult || 1)));
+        const dmg = Math.max(0, Math.floor(baseDmg * trapMult * xpTrapMult * (ds.trapDmgMult || 1)));
 
         if (dmg > 0) {
             member.hp -= dmg;
@@ -813,13 +857,21 @@ export class ExplorationSystem {
                     boots: c.boots,
                     trinket: c.trinketBroken ? null : c.trinket,
                     traits: c.traits || [],
-                    knownSpells: c.knownSpells ? c.knownSpells.filter(s => !c.disabledSpells || !c.disabledSpells.includes(s)) : [],
+                    // Only spells from attuned schools (and not manually disabled) are
+                    // usable on expeditions, matching in-world autocast behavior.
+                    knownSpells: (c.knownSpells || []).filter(s =>
+                        (!c.disabledSpells || !c.disabledSpells.includes(s)) &&
+                        isSpellAttuned(c, SPELLS[s])),
+                    magicSkills: { ...(c.magicSkills || {}) },
                     mana: c.mana || 0,
                     maxMana: c.maxMana || 0,
                     spellCooldowns: {},
                     spellDamageBonus: getEquipmentStat(c, 'spellDamageBonus'),
+                    schoolBonuses: buildSchoolBonuses(c),
+                    spellHealBonus: getEquipmentStat(c, 'spellHealBonus'),
                     manaRegen: getEquipmentStat(c, 'manaRegen'),
                     spellCostReduction: getEquipmentStat(c, 'spellCostReduction'),
+                    spellCooldownReduction: getEquipmentStat(c, 'spellCooldownReduction'),
                     healthRegen: getEquipmentStat(c, 'healthRegen'),
                     attackCooldown: baseCd,
                     effectiveCooldown: effCd,
@@ -1009,7 +1061,7 @@ export class ExplorationSystem {
 
         const ds = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
         if (dimEvents && dimEvents.rare) {
-            const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult');
+            const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult', exp.realm);
             for (const rare of dimEvents.rare) {
                 if (Math.random() < rare.chance * rareEncounterMult * ds.rareLootMult) {
                     const msg = rare.text.replace('{name}', member.name);
@@ -1045,7 +1097,7 @@ export class ExplorationSystem {
             this._addLog(exp, game, trapDef.text, 'danger');
         } else if (roll < EXPLORATION_CONFIG.trapChance + EXPLORATION_CONFIG.findItemChance) {
             const lootEntry = this._rollLoot(dim, ds);
-            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult');
+            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm);
             const discPool = (dimEvents && dimEvents.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
             if (lootEntry.item) {
@@ -1197,12 +1249,22 @@ export class ExplorationSystem {
             return;
         }
 
+        // Apply DoTs and age out status effects at the top of the round, then
+        // re-check for a wipe (poison can be lethal) before anyone acts.
+        this._tickCombatStatus(exp, game, combat);
+        if (exp.partySnapshot.every(p => p.hp <= 0) || combat.enemies.every(e => e.hp <= 0)) {
+            this._finishCombat(exp, game);
+            return;
+        }
+
         this._tryUsePotions(exp, game);
 
         const baseMissChance = 0.15 + this._getMutatorEffect(exp, 'missChanceMod');
-        const partyDmgMult = getPartyExpeditionEffect(exp.partySnapshot, 'partyDamageMult')
+        // Passing exp.realm lets realmBonus traits (e.g. Void-Touched) contribute their
+        // realm-specific partyDamageMult here. Computed once, alongside items/flat traits.
+        const partyDmgMult = getPartyExpeditionEffect(exp.partySnapshot, 'partyDamageMult', exp.realm)
             * this._getMutatorEffect(exp, 'partyDamageMult')
-            * this._getTraitExpeditionEffect(exp, 'expeditionDamageMult')
+            * getPartyExpeditionEffect(exp.partySnapshot, 'expeditionDamageMult', exp.realm)
             * (exp._tempDamageMult || 1.0);
         const physResist = this._getMutatorEffect(exp, 'enemyPhysicalResist');
         const globalThorns = this._getMutatorEffect(exp, 'globalThorns');
@@ -1210,6 +1272,21 @@ export class ExplorationSystem {
         // ── Party attack phase ──
         for (const member of alive) {
             if (member.hp <= 0) continue;
+            // Enemy-applied crowd control on the party (framework): a stunned member
+            // can't attack this round. A slowed one may lose its turn. Weaken scales
+            // its outgoing damage.
+            if (this._hasCombatStatus(member, 'stun')) {
+                this._addLog(exp, game, `${member.name} is stunned and cannot attack!`, 'danger');
+                continue;
+            }
+            if (this._hasCombatStatus(member, 'slow')) {
+                const slowMult = this._combatStatusValue(member, 'slow', 'mult', 0.5);
+                if (Math.random() > slowMult) {
+                    this._addLog(exp, game, `${member.name} is slowed and loses their turn!`, 'danger');
+                    continue;
+                }
+            }
+            const memberWeaken = this._combatStatusValue(member, 'weaken', 'mult', 1);
             const disabled = member._disabledSlots || {};
             let weaponDmg = (member.weapon && !disabled.weapon) ? member.weapon.damage : EXPLORATION_CONFIG.baseFistDamage;
             const slotNames = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
@@ -1241,7 +1318,7 @@ export class ExplorationSystem {
                 // variance is likewise divided so a fast weapon's many swings don't
                 // accumulate more bonus roll than a slow one. Round (not floor) the
                 // per-hit value so splitting into more hits doesn't shave damage.
-                let dmg = Math.max(1, Math.round((perHitDmg + randInt(0, 3) / hitsPerRound) * partyDmgMult * formDmgMult * xpDmgMult * (1 - physResist)));
+                let dmg = Math.max(1, Math.round((perHitDmg + randInt(0, 3) / hitsPerRound) * partyDmgMult * formDmgMult * xpDmgMult * memberWeaken * (1 - physResist)));
                 let critHit = false;
                 if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
                 if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
@@ -1320,6 +1397,21 @@ export class ExplorationSystem {
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
             const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
+            // Crowd control from party spells: a stunned enemy forfeits its turn; a
+            // slowed one has a (1 - mult) chance to lose it. Weaken (below) scales the
+            // damage of whatever attacks it does land.
+            if (this._hasCombatStatus(enemy, 'stun')) {
+                this._addLog(exp, game, `${attackerLabel} is stunned and cannot act!`, 'combat');
+                continue;
+            }
+            if (this._hasCombatStatus(enemy, 'slow')) {
+                const slowMult = this._combatStatusValue(enemy, 'slow', 'mult', 0.5);
+                if (Math.random() > slowMult) {
+                    this._addLog(exp, game, `${attackerLabel} is slowed and loses its turn!`, 'combat');
+                    continue;
+                }
+            }
+            const enemyWeaken = this._combatStatusValue(enemy, 'weaken', 'mult', 1);
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             let enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
             if (enemy.eliteExtraAttacks) enemyHits += enemy.eliteExtraAttacks;
@@ -1366,11 +1458,24 @@ export class ExplorationSystem {
                             if (sp.dot && !sp.aoe) {
                                 const spTarget = alive.filter(p => p.hp > 0)[0];
                                 if (spTarget) {
-                                    exp.activeEffects.push({
-                                        type: 'dot', targetId: spTarget.id,
-                                        damageRange: sp.dot.damage, ticksRemaining: sp.dot.ticks,
-                                        interval: sp.dot.interval, lastTick: game.tick,
-                                    });
+                                    // Visible, round-scoped poison cleared at combat end.
+                                    // Rounds default from the legacy tick count so existing
+                                    // enemy configs keep their intended duration.
+                                    const rounds = sp.dot.rounds || sp.dot.ticks || 3;
+                                    this._applyCombatStatus(spTarget, sp.dot.status || 'poison', rounds, { damageRange: sp.dot.damage });
+                                    this._addLog(exp, game, `${spTarget.name} is poisoned!`, 'danger');
+                                }
+                            }
+                            // Framework: data-driven enemy crowd control. An enemy/boss
+                            // spell may carry a `cc` block to stun/slow/weaken the party.
+                            if (sp.cc) {
+                                const ccTargets = sp.cc.aoe ? alive.filter(p => p.hp > 0) : [alive.filter(p => p.hp > 0)[0]].filter(Boolean);
+                                for (const t of ccTargets) {
+                                    this._applyCombatStatus(t, sp.cc.type, sp.cc.rounds || 1, sp.cc.mult !== undefined ? { mult: sp.cc.mult } : {});
+                                }
+                                if (ccTargets.length > 0) {
+                                    const verb = sp.cc.type === 'stun' ? 'stuns' : sp.cc.type === 'slow' ? 'slows' : 'weakens';
+                                    this._addLog(exp, game, `${attackerLabel} casts ${spName} and ${verb} ${sp.cc.aoe ? 'the party' : ccTargets[0].name}!`, 'danger');
                                 }
                             }
                             castSpell = true; break;
@@ -1383,6 +1488,7 @@ export class ExplorationSystem {
                 if (aliveSummons.length > 0 && Math.random() < 0.5) {
                     const targetSummon = aliveSummons[randInt(0, aliveSummons.length - 1)];
                     let dmg = enemy.damage + randInt(0, 2);
+                    if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
                     if (Math.random() < baseMissChance) {
                         this._addLog(exp, game, `${attackerLabel} misses the ${targetSummon.name}!`, 'combat');
                     } else {
@@ -1430,13 +1536,14 @@ export class ExplorationSystem {
                 }
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
                 let dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
-                dodgeChance += this._getTraitExpeditionEffect(exp, 'dodgeChanceMod');
+                dodgeChance += getPartyExpeditionEffect(exp.partySnapshot, 'dodgeChanceMod', exp.realm);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
                     this._addLog(exp, game, `${target.name} dodges ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
                     continue;
                 }
 
                 let dmg = enemy.damage + randInt(0, 2);
+                if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
                 for (const item of targetItems) {
                     if (item.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - item.damageReduction)));
                 }
@@ -1489,8 +1596,10 @@ export class ExplorationSystem {
     // the colony-side calc in colonist.js (floor, min 1). All expedition cast paths
     // deduct through this so Ley Battery et al. discount spells on expeditions too.
     _spellManaCost(member, spell) {
-        const reduction = member.spellCostReduction || 0;
-        return Math.max(1, Math.floor(spell.manaCost * (1 - reduction)));
+        const gearReduction = member.spellCostReduction || 0;
+        const levelReduction = expeditionCostReduction(member, spell);
+        const mult = Math.max(0, (1 - levelReduction) * (1 - gearReduction));
+        return Math.max(1, Math.floor(spell.manaCost * mult));
     }
 
     _canCastSpell(member, spellKey, game) {
@@ -1498,7 +1607,8 @@ export class ExplorationSystem {
         if (!spell) return false;
         if (member.mana < this._spellManaCost(member, spell)) return false;
         const lastCast = member.spellCooldowns[spellKey] || 0;
-        if (game.tick - lastCast < spell.cooldown * getSpellCooldownMult(game)) return false;
+        const effectiveCd = spell.cooldown * getSpellCooldownMult(game) * expeditionCooldownFactor(member, spell);
+        if (game.tick - lastCast < effectiveCd) return false;
         return true;
     }
 
@@ -1511,16 +1621,19 @@ export class ExplorationSystem {
                 if (!spell || spell.trigger !== 'inCombat') continue;
                 if (!this._canCastSpell(member, spellKey, game)) continue;
 
-                if (spell.effect === 'ranged_damage' || spell.effect === 'ranged_damage_aoe' || spell.effect === 'melee_damage') {
+                const dmgEffects = ['ranged_damage', 'ranged_damage_aoe', 'melee_damage', 'chain_damage', 'ranged_damage_slow'];
+                if (dmgEffects.includes(spell.effect)) {
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
-                    let dmg = spell.damage;
-                    if (member.spellDamageBonus) {
-                        dmg = Math.floor(dmg * (1 + member.spellDamageBonus));
-                    }
+                    const schoolBonus = (member.schoolBonuses && member.schoolBonuses[spell.school]) || member.spellDamageBonus || 0;
+                    let dmg = Math.floor(spell.damage * expeditionSpellPower(member, spell) * (1 + schoolBonus));
                     dmg = Math.floor(dmg * this._getMutatorEffect(exp, 'spellDamageMult') * this._applyFormationModifier(exp, member.id, 'spellDamageMult'));
                     if (spell.effect === 'ranged_damage_aoe') {
-                        const targets = combat.enemies.filter(e => e.hp > 0).slice(0, 3);
+                        // Expedition combat is abstract (no tile positions), so an AoE
+                        // spell hits up to `radius * 2` foes instead of everything in a
+                        // physical blast. Falls back to 1 if radius is unset.
+                        const maxHits = (spell.radius || 1) * 2;
+                        const targets = combat.enemies.filter(e => e.hp > 0).slice(0, maxHits);
                         for (const t of targets) {
                             t.hp -= dmg;
                         }
@@ -1529,12 +1642,33 @@ export class ExplorationSystem {
                         for (const t of targets) {
                             if (t.hp <= 0) this._addLog(exp, game, `An enemy is destroyed by the blast!`, 'success');
                         }
+                    } else if (spell.effect === 'chain_damage') {
+                        // Arc across up to chainTargets foes, losing chainFalloff of the
+                        // damage each hop. Position-less expedition combat picks the next
+                        // living foe in order rather than by distance.
+                        const foes = combat.enemies.filter(e => e.hp > 0).slice(0, spell.chainTargets || 1);
+                        let hopDmg = dmg;
+                        let hitCount = 0;
+                        for (const t of foes) {
+                            const applied = Math.max(1, Math.floor(hopDmg));
+                            t.hp -= applied;
+                            hitCount++;
+                            if (t.hp <= 0) this._addLog(exp, game, `${member.name}'s ${spell.name} arcs through a foe, slaying it!`, 'success');
+                            hopDmg *= (spell.chainFalloff || 0.6);
+                        }
+                        this._addLog(exp, game, `${member.name} casts ${spell.name}, arcing through ${hitCount} ${hitCount === 1 ? 'foe' : 'foes'}!`, 'combat');
+                        game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     } else {
                         const target = combat.enemies.find(e => e.hp > 0);
                         if (target) {
                             target.hp -= dmg;
                             this._addLog(exp, game, `${member.name} casts ${spell.name} at an enemy for ${dmg} damage!`, 'combat');
                             game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                            // Frost Lance et al. slow the struck foe for a couple of rounds.
+                            if (spell.effect === 'ranged_damage_slow' && target.hp > 0) {
+                                this._applyCombatStatus(target, 'slow', spell.slowRounds || 2, { mult: spell.slowMult || 0.5 });
+                                this._addLog(exp, game, `The enemy is slowed by frost!`, 'combat');
+                            }
                             if (target.hp <= 0) this._addLog(exp, game, `${member.name}'s spell slays a foe!`, 'success');
                         }
                     }
@@ -1552,7 +1686,7 @@ export class ExplorationSystem {
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
                     member.shieldActive = true;
-                    member.shieldReduction = spell.damageReduction;
+                    member.shieldReduction = Math.min(0.75, spell.damageReduction * expeditionSpellPower(member, spell));
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — shielded!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     break;
@@ -1578,6 +1712,53 @@ export class ExplorationSystem {
                     this._addLog(exp, game, `${member.name} summons a ${summonDef.name}!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     break;
+                } else if (spell.effect === 'summon_swarm') {
+                    if (!exp.summons) exp.summons = [];
+                    if (exp.summons.some(s => s.ownerId === member.id && s.hp > 0)) continue;
+                    const summonDef = SUMMON_TYPES[spell.summonType];
+                    if (!summonDef) break;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    const count = spell.swarmCount || 3;
+                    for (let n = 0; n < count; n++) {
+                        exp.summons.push({
+                            type: spell.summonType,
+                            name: summonDef.name,
+                            hp: summonDef.hp,
+                            maxHp: summonDef.hp,
+                            damage: summonDef.damage,
+                            char: summonDef.char,
+                            color: summonDef.color,
+                            ownerId: member.id,
+                            ticksRemaining: summonDef.duration,
+                            maxDuration: summonDef.duration,
+                        });
+                    }
+                    this._addLog(exp, game, `${member.name} conjures a swarm of ${count} ${summonDef.name}s!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    break;
+                } else if (spell.effect === 'absorb_shield' && !member.shieldActive) {
+                    // Guardian Ward maps to the same shield channel as buff_defense in
+                    // expedition combat (position-less, so a flat pool ≈ a % reduction).
+                    // Its larger absorb reads as a higher DR here.
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member.shieldActive = true;
+                    member.shieldReduction = 0.5;
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} — a guardian ward absorbs incoming blows!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    break;
+                } else if (spell.effect === 'stun') {
+                    // Mesmerize: stun the frontmost foe(s) for a round. chainTargets>1
+                    // lets it catch a couple of enemies.
+                    const foes = combat.enemies.filter(e => e.hp > 0).slice(0, spell.chainTargets || 1);
+                    if (foes.length === 0) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    for (const t of foes) this._applyCombatStatus(t, 'stun', spell.stunRounds || 1);
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, stunning ${foes.length === 1 ? 'a foe' : foes.length + ' foes'}!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    break;
                 }
             }
         }
@@ -1587,22 +1768,74 @@ export class ExplorationSystem {
         const alive = exp.partySnapshot.filter(p => p.hp > 0);
         for (const member of alive) {
             if (member.knownSpells.length === 0) continue;
-            const hpRatio = member.hp / member.maxHp;
 
             for (const spellKey of member.knownSpells) {
                 const spell = SPELLS[spellKey];
-                if (!spell || spell.effect !== 'heal') continue;
-                const threshold = spell.hpThreshold || 0.5;
-                if (hpRatio >= threshold) continue;
-                if (!this._canCastSpell(member, spellKey, game)) continue;
+                if (!spell) continue;
 
-                member.mana -= this._spellManaCost(member, spell);
-                member.spellCooldowns[spellKey] = game.tick;
-                const healed = Math.min(spell.healAmount, member.maxHp - member.hp);
-                member.hp += healed;
-                this._addLog(exp, game, `${member.name} casts ${spell.name} and heals for ${healed} HP.`, 'success');
-                game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
-                break;
+                if (spell.effect === 'heal') {
+                    const threshold = spell.hpThreshold || 0.5;
+                    // Heals mend the most-wounded party member below thresholdm which may
+                    // be the caster themselves or any ally (expedition combat is abstract,
+                    // so range isn't modelled). No wounded member means no cast.
+                    const target = alive
+                        .filter(p => p.hp / p.maxHp < threshold)
+                        .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
+                    if (!target) continue;
+                    if (!this._canCastSpell(member, spellKey, game)) continue;
+
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    const healPower = spell.healAmount * expeditionSpellPower(member, spell) * (1 + (member.spellHealBonus || 0));
+                    const healed = Math.min(Math.round(healPower), target.maxHp - target.hp);
+                    target.hp += healed;
+                    const who = target === member ? '' : ` ${target.name}`;
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} and heals${who || ' themselves'} for ${healed} HP.`, 'success');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    break;
+                } else if (spell.effect === 'chain_heal') {
+                    const threshold = spell.hpThreshold || 0.7;
+                    // Bounce heal: mend up to chainTargets most-wounded allies below
+                    // threshold, losing chainFalloff of the potency per hop.
+                    const wounded = alive
+                        .filter(p => p.hp / p.maxHp < threshold && p.hp < p.maxHp)
+                        .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))
+                        .slice(0, spell.chainTargets || 1);
+                    if (wounded.length === 0) continue;
+                    if (!this._canCastSpell(member, spellKey, game)) continue;
+
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    let power = spell.healAmount * expeditionSpellPower(member, spell) * (1 + (member.spellHealBonus || 0));
+                    let total = 0;
+                    for (const t of wounded) {
+                        const healed = Math.min(Math.round(power), t.maxHp - t.hp);
+                        t.hp += healed;
+                        total += healed;
+                        if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed;
+                        power *= (spell.chainFalloff || 0.6);
+                    }
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, mending ${wounded.length} ${wounded.length === 1 ? 'ally' : 'allies'} for ${total} HP total.`, 'success');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    break;
+                } else if (spell.effect === 'cleanse') {
+                    // Strip lingering harmful effects. Between encounters the relevant
+                    // debuffs are exp.activeEffects DoTs (trap/enemy poison). Clear them
+                    // from the most-afflicted ally.
+                    const afflicted = alive
+                        .map(p => ({ p, n: (exp.activeEffects || []).filter(e => e.targetId === p.id && e.type === 'dot').length }))
+                        .filter(x => x.n > 0)
+                        .sort((a, b) => b.n - a.n)[0];
+                    if (!afflicted) continue;
+                    if (!this._canCastSpell(member, spellKey, game)) continue;
+
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    exp.activeEffects = (exp.activeEffects || []).filter(e => !(e.targetId === afflicted.p.id && e.type === 'dot'));
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, cleansing ${afflicted.p.name} of afflictions!`, 'success');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    break;
+                }
             }
         }
     }
@@ -1630,8 +1863,9 @@ export class ExplorationSystem {
         if (survived > 0) {
             const dim = REALMS[exp.realm];
             const streakMult = exp.streakMultiplier || 1.0;
-            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult')
-                * this._getTraitExpeditionEffect(exp, 'lootMult')
+            // Passing exp.realm lets realmBonus traits (e.g. Green Thumb) contribute
+            // their realm-specific lootMult. Items + flat traits + realmBonus, once.
+            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm)
                 * streakMult;
             const lootBonusFlat = this._getMutatorEffect(exp, 'lootBonusFlat');
             const lootAmountMutMult = this._getMutatorEffect(exp, 'lootAmountMult')
@@ -1690,6 +1924,9 @@ export class ExplorationSystem {
         for (const member of exp.partySnapshot) {
             member.shieldActive = false;
             member.shieldReduction = 0;
+            // Combat status effects are round-scoped: clear them so poison/slow/etc.
+            // never carry between encounters. (Enemies are discarded with exp.combat.)
+            member.statusEffects = [];
             if (member._disabledSlots) {
                 for (const slot of Object.keys(member._disabledSlots)) {
                     member._disabledSlots[slot]--;
@@ -1847,6 +2084,72 @@ export class ExplorationSystem {
         const row = exp.formation.back?.includes(memberId) ? 'back' : 'front';
         const rowConfig = FORMATION_CONFIG.rows[row];
         return rowConfig?.[stat] || 1.0;
+    }
+
+    // ── Combat status effects (round-scoped) ──────────────────────────────
+    // A unified, visible status layer shared by both sides of expedition combat.
+    // Player spells inflict slow/stun on enemies (Frost Lance, Mesmerize); enemy
+    // spells can inflict poison/stun/slow/weaken on the party (poison live today,
+    // the rest framework-ready). Durations count combat ROUNDS (not ticks) since
+    // expedition combat is round-based, and every status is cleared when combat
+    // ends (see _finishCombat) so nothing leaks between encounters.
+    //
+    // Shape: target.statusEffects = [{ type, rounds, damage?, mult? }]
+    //   poison/burn → deals `damage` HP per round
+    //   stun        → target skips its action that round
+    //   slow        → target has a (1 - mult) chance to lose its turn each round
+    //   weaken      → target's outgoing damage is scaled by `mult`
+    _applyCombatStatus(target, type, rounds, extra = {}) {
+        if (!target.statusEffects) target.statusEffects = [];
+        const existing = target.statusEffects.find(s => s.type === type);
+        // Refresh-not-stack: keep the longer duration and adopt the new magnitude.
+        if (existing) {
+            existing.rounds = Math.max(existing.rounds, rounds);
+            Object.assign(existing, extra);
+        } else {
+            target.statusEffects.push({ type, rounds, ...extra });
+        }
+    }
+
+    _hasCombatStatus(target, type) {
+        return !!(target.statusEffects && target.statusEffects.some(s => s.type === type && s.rounds > 0));
+    }
+
+    // Magnitude field (e.g. 'mult') of an active status, or `def` when absent.
+    _combatStatusValue(target, type, field, def) {
+        const s = target.statusEffects && target.statusEffects.find(x => x.type === type && x.rounds > 0);
+        return s && s[field] !== undefined ? s[field] : def;
+    }
+
+    // Runs once per combat round: applies DoT damage, then decrements and prunes
+    // every combatant's status effects on both sides.
+    _tickCombatStatus(exp, game, combat) {
+        const tick = (combatant, isParty) => {
+            if (!combatant.statusEffects || combatant.statusEffects.length === 0) return;
+            if (combatant.hp <= 0) { combatant.statusEffects = []; return; }
+            for (const s of combatant.statusEffects) {
+                if (s.type === 'poison' || s.type === 'burn') {
+                    // Per-round damage: a fixed `damage`, or a rolled `damageRange`.
+                    const dmg = s.damageRange ? randInt(s.damageRange[0], s.damageRange[1]) : (s.damage || 0);
+                    if (dmg > 0) {
+                        combatant.hp -= dmg;
+                        const label = s.type === 'poison' ? 'poison' : 'burning';
+                        if (isParty) {
+                            if (exp.summary) exp.summary.damageTaken[combatant.id] = (exp.summary.damageTaken[combatant.id] || 0) + dmg;
+                            this._addLog(exp, game, `${combatant.name} suffers ${dmg} ${label} damage!`, 'danger');
+                            if (combatant.hp <= 0) this._checkExpeditionRevive(exp, combatant, game);
+                        } else {
+                            this._addLog(exp, game, `An enemy takes ${dmg} ${label} damage!`, 'combat');
+                            if (combatant.hp <= 0) this._addLog(exp, game, `A foe succumbs to ${label}!`, 'success');
+                        }
+                    }
+                }
+                s.rounds--;
+            }
+            combatant.statusEffects = combatant.statusEffects.filter(s => s.rounds > 0);
+        };
+        for (const enemy of combat.enemies) tick(enemy, false);
+        for (const member of exp.partySnapshot) tick(member, true);
     }
 
     _updateActiveEffects(exp, game) {
@@ -2039,29 +2342,6 @@ export class ExplorationSystem {
             if (!mut?.effects?.[effectKey]) continue;
             if (effectKey.includes('Mult')) value *= mut.effects[effectKey];
             else value += mut.effects[effectKey];
-        }
-        return value;
-    }
-
-    _getTraitExpeditionEffect(exp, effectKey) {
-        if (!exp.partySnapshot) return effectKey.includes('Mult') ? 1.0 : 0;
-        let value = effectKey.includes('Mult') ? 1.0 : 0;
-        for (const member of exp.partySnapshot) {
-            if (member.hp <= 0) continue;
-            if (!member.traits) continue;
-            for (const traitKey of member.traits) {
-                const t = TRAITS[traitKey];
-                if (!t?.expedition) continue;
-                if (t.expedition[effectKey]) {
-                    if (effectKey.includes('Mult')) value *= t.expedition[effectKey];
-                    else value += t.expedition[effectKey];
-                }
-                if (t.expedition.realmBonus?.[exp.realm]?.[effectKey]) {
-                    const bonus = t.expedition.realmBonus[exp.realm][effectKey];
-                    if (effectKey.includes('Mult')) value *= bonus;
-                    else value += bonus;
-                }
-            }
         }
         return value;
     }
@@ -2324,32 +2604,35 @@ const PEDESTAL_TO_EXPEDITION = {
     blightImmunity: null,
 };
 
-function getPartyExpeditionEffect(partySnapshot, effectKey) {
-    let value = effectKey.includes('Mult') ? 1.0 : 0;
+// Single source of truth for a party-wide expedition effect. Aggregates, per living
+// member: equipped-item bonuses, active pedestal bonuses (mapped keys), flat trait
+// bonuses (expedition.<key>), and realm-specific trait bonuses
+// (expedition.realmBonus.<realm>.<key>) when `realm` is supplied. Each contributor is
+// counted exactly once. Do NOT also sum trait effects at the call site, or they double.
+// 'Mult' keys compose multiplicatively (base 1.0), others sum (base 0).
+function getPartyExpeditionEffect(partySnapshot, effectKey, realm) {
+    const isMult = effectKey.includes('Mult');
+    let value = isMult ? 1.0 : 0;
+    const apply = (v) => { if (isMult) value *= v; else value += v; };
     for (const member of partySnapshot) {
         if (member.hp <= 0) continue;
         const items = [member.weapon, member.armor, member.helmet, member.clothes, member.boots, member.tool, member.trinket].filter(Boolean);
         for (const item of items) {
-            if (item.expedition?.[effectKey]) {
-                if (effectKey.includes('Mult')) value *= item.expedition[effectKey];
-                else value += item.expedition[effectKey];
-            }
+            if (item.expedition?.[effectKey]) apply(item.expedition[effectKey]);
             if (item.pedestal && typeof item.pedestal.radius === 'number') {
                 for (const [pedestalKey, mappedKey] of Object.entries(PEDESTAL_TO_EXPEDITION)) {
                     if (mappedKey !== effectKey) continue;
                     if (!item.pedestal[pedestalKey]) continue;
-                    if (effectKey.includes('Mult')) value *= item.pedestal[pedestalKey];
-                    else value += item.pedestal[pedestalKey];
+                    apply(item.pedestal[pedestalKey]);
                 }
             }
         }
         if (member.traits) {
             for (const traitKey of member.traits) {
                 const t = TRAITS[traitKey];
-                if (t?.expedition?.[effectKey]) {
-                    if (effectKey.includes('Mult')) value *= t.expedition[effectKey];
-                    else value += t.expedition[effectKey];
-                }
+                if (!t?.expedition) continue;
+                if (t.expedition[effectKey]) apply(t.expedition[effectKey]);
+                if (realm && t.expedition.realmBonus?.[realm]?.[effectKey]) apply(t.expedition.realmBonus[realm][effectKey]);
             }
         }
     }
@@ -2407,7 +2690,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
         const expeditionTraits = [];
         for (const traitKey of (c.traits || [])) {
             const t = TRAITS[traitKey];
-            if (t && t.damageTakenMult) combatTraits.push({ name: t.name, description: t.description });
+            if (t && t.damageReduction) combatTraits.push({ name: t.name, description: t.description });
             if (t?.expedition) expeditionTraits.push({ name: t.name, effects: Object.keys(t.expedition).join(', ') });
         }
 
@@ -2419,7 +2702,10 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
             if (c.disabledSpells && c.disabledSpells.includes(spellKey)) continue;
             const spell = SPELLS[spellKey];
             if (!spell) continue;
-            const isExpeditionRelevant = spell.trigger === 'inCombat' || spell.trigger === 'lowHealth';
+            // Only attuned spells autocast on expeditions, so leave the rest out of the
+            // roster preview. It should show what the party will actually cast.
+            if (!isSpellAttuned(c, spell)) continue;
+            const isExpeditionRelevant = spell.trigger === 'inCombat' || spell.trigger === 'lowHealth' || spell.trigger === 'woundedNearby' || spell.trigger === 'debuffNearby';
             if (!isExpeditionRelevant) continue;
             memberSpells.push(spellKey);
             const existing = spellRoster.find(s => s.spellKey === spellKey);
@@ -2430,16 +2716,27 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
                 if (spell.effect === 'ranged_damage') effectDesc = `${spell.damage} dmg`;
                 else if (spell.effect === 'ranged_damage_aoe') effectDesc = `${spell.damage} AOE dmg`;
                 else if (spell.effect === 'melee_damage') effectDesc = `${spell.damage} melee dmg`;
+                else if (spell.effect === 'chain_damage') effectDesc = `${spell.damage} dmg, arcs to ${spell.chainTargets} foes`;
+                else if (spell.effect === 'ranged_damage_slow') effectDesc = `${spell.damage} dmg + slow`;
                 else if (spell.effect === 'heal') effectDesc = `heals ${spell.healAmount} HP`;
+                else if (spell.effect === 'chain_heal') effectDesc = `heals ${spell.healAmount} HP, chains to ${spell.chainTargets} allies`;
+                else if (spell.effect === 'cleanse') effectDesc = `cleanses debuffs`;
                 else if (spell.effect === 'buff_defense') effectDesc = `${Math.round(spell.damageReduction * 100)}% DR shield`;
+                else if (spell.effect === 'absorb_shield') effectDesc = `absorb ${spell.absorbAmount} dmg`;
+                else if (spell.effect === 'stun') effectDesc = `stuns ${spell.chainTargets > 1 ? spell.chainTargets + ' foes' : 'a foe'}`;
                 else if (spell.effect === 'teleport') {
                     const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
                     effectDesc = `dodge ${charges} attack${charges > 1 ? 's' : ''}`;
                 } else if (spell.effect === 'summon') {
                     const st = SUMMON_TYPES[spell.summonType];
                     effectDesc = st ? `summons ${st.name} (${st.hp} HP, ${st.damage} dmg)` : 'summons ally';
+                } else if (spell.effect === 'summon_swarm') {
+                    const st = SUMMON_TYPES[spell.summonType];
+                    effectDesc = st ? `summons ${spell.swarmCount}× ${st.name}` : 'summons swarm';
                 } else effectDesc = spell.effect;
-                let triggerDesc = spell.trigger === 'inCombat' ? 'in combat' : `HP < ${Math.round((spell.hpThreshold || 0.5) * 100)}%`;
+                let triggerDesc = spell.trigger === 'inCombat' ? 'in combat'
+                    : spell.trigger === 'debuffNearby' ? 'when debuffed'
+                    : `ally HP < ${Math.round((spell.hpThreshold || 0.5) * 100)}%`;
                 spellRoster.push({ spellKey, name: spell.name, school: spell.school, casters: [c.name], manaCost: spell.manaCost, triggerDesc, effectDesc });
             }
         }
@@ -2463,7 +2760,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
         return c ? { hp: c.hp, traits: c.traits || [], weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, boots: c.boots, tool: c.tool, trinket: c.trinketBroken ? null : c.trinket } : null;
     }).filter(Boolean);
     for (const key of effectKeys) {
-        const val = getPartyExpeditionEffect(mockSnapshot, key);
+        const val = getPartyExpeditionEffect(mockSnapshot, key, realmKey);
         if (key.includes('Mult') && val !== 1.0) partyEffects[key] = val;
         else if (!key.includes('Mult') && val !== 0) partyEffects[key] = val;
     }

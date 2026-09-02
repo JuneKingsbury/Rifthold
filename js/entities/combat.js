@@ -226,11 +226,21 @@ export class CombatSystem {
 }
 
 function updateRaider(raider, game) {
-    raider.moveCooldown -= raider.speed;
+    // Stun (colonist CC): skip the entire turn while the deadline holds. The
+    // visual pip is emitted by updateEntityRoles for role-based raiders; emit one
+    // here too so role-less raiders still show the stun.
+    if (raider._stunnedUntil && game.tick < raider._stunnedUntil) {
+        if (game.tick % 6 === 0) game.combatEffects.push({ x: raider.x, y: raider.y, char: '✦', color: '#ffccff', ttl: 4 });
+        return;
+    }
+    // Slow scales the effective speed used for both the cooldown gate and movement.
+    const slowMult = (raider._slowUntil && game.tick < raider._slowUntil) ? (raider._slowMult || 0.5) : 1;
+    const effSpeed = raider.speed * slowMult;
+    raider.moveCooldown -= effSpeed;
     if (raider.moveCooldown > 0) return;
     raider.moveCooldown = 1;
 
-    const dur = CONFIG.TICK_RATE / (raider.speed * game.speed);
+    const dur = CONFIG.TICK_RATE / (effSpeed * game.speed);
     if (raider.fleeing) {
         moveToEdge(raider, game, dur);
         return;

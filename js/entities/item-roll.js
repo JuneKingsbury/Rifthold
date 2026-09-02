@@ -170,35 +170,40 @@ export function applyEnchantmentEffect(item, type, enchantTier) {
     const mult = enchantTier.multiplier;
     const effect = table[keys[Math.floor(Math.random() * keys.length)]];
 
+    // All bonus effects are additive decimals (0.15 = +15%); the enchant tier
+    // scales the magnitude via `mult`. defenseMultiplier / damageMultiplier remain
+    // multiplicative because they scale a flat base stat (armor DR, weapon damage).
     // weapon effects
     if (effect.damageMultiplier) {
         item.damage = round2((item.damage || 0) * (effect.damageMultiplier * mult));
     } else if (effect.spellDamageBonus) {
-        item.spellDamageBonus = (item.spellDamageBonus || 0) + effect.spellDamageBonus * mult;
-    } else if (effect.critChanceBonus) {
-        item.critChance = (item.critChance || 0) + effect.critChanceBonus * mult;
-    } else if (effect.lifeStealBonus) {
-        item.lifeSteal = (item.lifeSteal || 0) + effect.lifeStealBonus * mult;
+        item.spellDamageBonus = round2((item.spellDamageBonus || 0) + effect.spellDamageBonus * mult);
+    } else if (effect.critChance) {
+        item.critChance = round2((item.critChance || 0) + effect.critChance * mult);
+    } else if (effect.lifeSteal) {
+        item.lifeSteal = round2((item.lifeSteal || 0) + effect.lifeSteal * mult);
     // armor / clothes effects
     } else if (effect.defenseMultiplier) {
         item.damageReduction = round2((item.damageReduction || 0) * (effect.defenseMultiplier * mult));
-    } else if (effect.manaRegenMultiplier) {
-        if (item.manaRegenMultiplier === undefined) item.manaRegenMultiplier = 1;
-        item.manaRegenMultiplier = round2(item.manaRegenMultiplier * (effect.manaRegenMultiplier * mult));
-    } else if (effect.thornsDamageBonus) {
-        item.thornsDamage = (item.thornsDamage || 0) + effect.thornsDamageBonus * mult;
-    } else if (effect.workSpeedMultiplier) {
-        // Clothes scale workSpeedBonus; tools scale the per-activity speeds.
-        if (item.workSpeedBonus) item.workSpeedBonus = round2(item.workSpeedBonus * (effect.workSpeedMultiplier * mult));
-        if (item.miningSpeed) item.miningSpeed = round2(item.miningSpeed * (effect.workSpeedMultiplier * mult));
-        if (item.choppingSpeed) item.choppingSpeed = round2(item.choppingSpeed * (effect.workSpeedMultiplier * mult));
-        if (item.farmingSpeed) item.farmingSpeed = round2(item.farmingSpeed * (effect.workSpeedMultiplier * mult));
-        if (item.craftingSpeed) item.craftingSpeed = round2(item.craftingSpeed * (effect.workSpeedMultiplier * mult));
-    } else if (effect.healthRegenMultiplier) {
-        if (item.healthRegenMultiplier === undefined) item.healthRegenMultiplier = 1;
-        item.healthRegenMultiplier = round2(item.healthRegenMultiplier * (effect.healthRegenMultiplier * mult));
-    } else if (effect.speedMultiplier) {
-        item.moveSpeedBonus = round2((item.moveSpeedBonus || 0) * (effect.speedMultiplier * mult));
+    } else if (effect.manaRegenBonus) {
+        // Additive % boost consumed at runtime as ×(1 + Σbonus). Stored as a plain
+        // bonus (not a live multiplier field) so getEquipmentStat's summing is correct.
+        item.manaRegenBonus = round2((item.manaRegenBonus || 0) + effect.manaRegenBonus * mult);
+    } else if (effect.thornsDamage) {
+        item.thornsDamage = round2((item.thornsDamage || 0) + effect.thornsDamage * mult);
+    } else if (effect.workSpeedBonus) {
+        // Clothes carry a flat workSpeedBonus; tools carry per-activity speed
+        // multipliers. Add the bonus to whichever fields the item already has.
+        const b = effect.workSpeedBonus * mult;
+        if (item.workSpeedBonus) item.workSpeedBonus = round2(item.workSpeedBonus + b);
+        if (item.miningSpeed) item.miningSpeed = round2(item.miningSpeed + b);
+        if (item.choppingSpeed) item.choppingSpeed = round2(item.choppingSpeed + b);
+        if (item.farmingSpeed) item.farmingSpeed = round2(item.farmingSpeed + b);
+        if (item.craftingSpeed) item.craftingSpeed = round2(item.craftingSpeed + b);
+    } else if (effect.healthRegenBonus) {
+        item.healthRegenBonus = round2((item.healthRegenBonus || 0) + effect.healthRegenBonus * mult);
+    } else if (effect.moveSpeedBonus) {
+        item.moveSpeedBonus = round2((item.moveSpeedBonus || 0) + effect.moveSpeedBonus * mult);
     }
 
     item.enchantment = effect;

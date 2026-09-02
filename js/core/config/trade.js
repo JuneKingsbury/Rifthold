@@ -13,7 +13,7 @@ export const CARAVAN_TRADES = [
     { give: { food: 6 }, receive: { stone: 5 } },
     { give: { stone: 8 }, receive: { runite: 2 } },
     { give: { runite: 3, food: 5 }, receive: { tome_of_magic_missile: 1 } },
-    { give: { runite: 3, food: 6 }, receive: { tome_of_heal: 1 } },
+    { give: { runite: 3, food: 6 }, receive: { tome_of_renewal: 1 } },
     { give: { runite: 4, food: 8 }, receive: { tome_of_haste: 1 } },
     { give: { void_essence: 2, runite: 3 }, receive: { tome_of_shield: 1 } },
     { give: { void_essence: 3, runite: 4 }, receive: { tome_of_warp: 1 } },
@@ -60,7 +60,7 @@ export const MERCHANTS = [
         name: 'Tome Peddler',              // magic focus: wands, circlets, spell tomes
         resourcePool: ['planks', 'runite', 'wood'],
         lowTierItems: ['wooden_wand', 'crystal_staff', 'mages_circlet', 'lantern'],
-        highTierItems: ['tome_of_spark', 'tome_of_mend', 'tome_of_smite', 'tome_of_magic_missile', 'tome_of_heal'],
+        highTierItems: ['tome_of_spark', 'tome_of_mend', 'tome_of_smite', 'tome_of_magic_missile', 'tome_of_renewal'],
         lowDrawCount: [1, 0.6],            // 1 guaranteed low + up to 1 more (60%)
         highDrawChances: [0.6, 0.3],
         qualityWeights: { poor: 2, normal: 5, fine: 2, superior: 1 },

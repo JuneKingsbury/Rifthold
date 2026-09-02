@@ -310,6 +310,21 @@ export class UI {
         this.elements.modeBar.addEventListener('mousemove', buildOptMove);
 
         this.elements.priorityPanel.addEventListener('click', (e) => {
+            const tabBtn = e.target.closest('[data-prio-tab]');
+            if (tabBtn) {
+                this._prioTab = tabBtn.dataset.prioTab;
+                this._lastPrioHtml = null;
+                this.updatePriorityPanel();
+                return;
+            }
+            const attuneCell = e.target.closest('[data-colonist-id][data-attune]');
+            if (attuneCell) {
+                const colonistId = parseInt(attuneCell.dataset.colonistId);
+                this.game.toggleAttunement(colonistId, attuneCell.dataset.attune);
+                this._lastPrioHtml = null;
+                this.updatePriorityPanel();
+                return;
+            }
             const cell = e.target.closest('[data-colonist-id][data-skill]');
             if (cell) {
                 const colonistId = parseInt(cell.dataset.colonistId);
@@ -896,7 +911,7 @@ export class UI {
         switch (spell.effect) {
             case 'ranged_damage': parts.push(`${spell.damage} dmg, range ${spell.range}`); break;
             case 'ranged_damage_aoe': parts.push(`${spell.damage} AoE dmg, range ${spell.range}, radius ${spell.radius}`); break;
-            case 'heal': parts.push(`Heals ${spell.healAmount} HP when below ${Math.round((spell.hpThreshold || 0.5) * 100)}%`); break;
+            case 'heal': parts.push(`Heals ${spell.healAmount} HP (self or ally) when below ${Math.round((spell.hpThreshold || 0.5) * 100)}%`); break;
             case 'buff_defense': parts.push(`-${Math.round(spell.damageReduction * 100)}% dmg taken, ${spell.duration}t`); break;
             case 'buff_speed': parts.push(`+${spell.workSpeedBonus > 1 ? Math.round((spell.workSpeedBonus - 1) * 100) + '% work speed' : ''}${spell.moveSpeedBonus ? ' +' + spell.moveSpeedBonus + ' move' : ''}, ${spell.duration}t`); break;
             case 'summon': parts.push(`Summon (${spell.summonHp} HP, ${spell.summonDamage} dmg, ${spell.summonDuration}t)`); break;
@@ -904,11 +919,28 @@ export class UI {
             case 'boost_crops': parts.push(`${spell.growthMult}x growth, radius ${spell.radius}, ${spell.duration}t`); break;
             case 'terraform': parts.push(`Flatten terrain, radius ${spell.radius}`); break;
             case 'divination_modifier': parts.push(`Passive divination effect, ${spell.duration}t`); break;
+            case 'chain_damage': parts.push(`${spell.damage} dmg, arcs to ${spell.chainTargets} foes (${Math.round((spell.chainFalloff || 0.6) * 100)}% falloff), range ${spell.range}`); break;
+            case 'ranged_damage_slow': parts.push(`${spell.damage} dmg + slow (${Math.round((1 - (spell.slowMult || 0.5)) * 100)}% slower), range ${spell.range}`); break;
+            case 'chain_heal': parts.push(`Heals ${spell.healAmount} HP, arcs to ${spell.chainTargets} allies (${Math.round((spell.chainFalloff || 0.6) * 100)}% falloff)`); break;
+            case 'cleanse': parts.push(`Removes poison/slow debuffs from an ally, range ${spell.range}`); break;
+            case 'absorb_shield': parts.push(`Absorbs ${spell.absorbAmount} dmg, radius ${spell.radius}, ${spell.duration}t`); break;
+            case 'buff_quality': parts.push(`+${spell.qualityBonus} work quality, radius ${spell.radius}, ${spell.duration}t`); break;
+            case 'buff_rest': parts.push(`${Math.round((spell.restDecayMult || 1) * 100)}% rest decay, radius ${spell.radius}, ${spell.duration}t`); break;
+            case 'stun': parts.push(`Stuns a foe (${spell.stunRounds || 1} rnd / ${spell.stunDuration}t), range ${spell.range}`); break;
+            case 'summon_swarm': parts.push(`Summons ${spell.swarmCount} spectral wisps`); break;
+            case 'finish_construction': parts.push(`Instantly completes a build, range ${spell.range}`); break;
+            case 'transmute': parts.push(spell.fromResource
+                ? `Converts ${spell.inputAmount} ${spell.fromResource.replace(/_/g, ' ')} → ${spell.outputAmount} ${spell.toResource.replace(/_/g, ' ')}`
+                : `Conjures ${spell.outputAmount} ${spell.toResource.replace(/_/g, ' ')}`); break;
+            case 'ripen_crops': parts.push(`Ripens crops past ${Math.round((spell.ripenThreshold || 0.5) * 100)}% growth, radius ${spell.radius}`); break;
             default: parts.push(spell.effect.replace(/_/g, ' '));
         }
         if (spell.trigger === 'inCombat') parts.push('Trigger: in combat');
         else if (spell.trigger === 'lowHealth') parts.push('Trigger: low HP');
+        else if (spell.trigger === 'woundedNearby') parts.push('Trigger: self or ally hurt');
         else if (spell.trigger === 'hasTask') parts.push('Trigger: while working');
+        else if (spell.trigger === 'debuffNearby') parts.push('Trigger: ally afflicted');
+        else if (spell.trigger === 'canTransmute') parts.push('Trigger: when materials available');
         return parts.join(' | ');
     }
 
@@ -1082,11 +1114,18 @@ export class UI {
         const hasMagic = colonist.magicSkills && Object.values(colonist.magicSkills).some(v => v > 0);
         if (hasMagic) {
             html += `<div class="info-row"><span style="color:#aa88ff">Mana: ${bar(colonist.mana / colonist.maxMana * 100)} ${Math.floor(colonist.mana)}/${colonist.maxMana}</span></div>`;
+            const attunedSchools = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
             html += `<div class="info-row">Magic: ${Object.entries(MAGIC_SKILLS).filter(([k]) => colonist.magicSkills[k] > 0).map(([k, def]) => {
                 const level = colonist.magicSkills[k];
-                const tip = magicXpTip(def, level, colonist._magicXpAccumulator?.[k] || 0);
-                return `<span class="skill-tip" data-tip="${tip}" style="color:#bb88ff">${def.name}:${level}</span>`;
+                const isAttuned = attunedSchools.includes(k);
+                const tip = magicXpTip(def, level, colonist._magicXpAccumulator?.[k] || 0) + (isAttuned ? ' — attuned' : '');
+                const style = isAttuned ? `color:${def.color};font-weight:bold` : 'color:#bb88ff';
+                return `<span class="skill-tip" data-tip="${tip}" style="${style}">${isAttuned ? '★' : ''}${def.name}:${level}</span>`;
             }).join(' ')}</div>`;
+            if (attunedSchools.length > 0) {
+                const names = attunedSchools.map(k => `<span style="color:${MAGIC_SKILLS[k].color}">${MAGIC_SKILLS[k].name}</span>`).join(', ');
+                html += `<div class="info-row" style="font-size:0.85em">Attuned: ${names} <span style="color:#666">(only these autocast)</span></div>`;
+            }
         }
 
         // --- Equipment ---
@@ -1159,35 +1198,72 @@ export class UI {
                 html += `<div class="info-row"><span style="color:#bb88ff">Studying: ${tomeDef.name} (${progress}%)</span></div>`;
             }
             if (colonist.knownSpells && colonist.knownSpells.length > 0) {
+                const attuned = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
+                // A spell is "inactive" when it's an auto-cast spell whose school isn't
+                // attuned. The colonist will never trigger it on its own. Targeted
+                // spells are always player-castable, so attunement doesn't sideline them.
+                const active = [];
+                const inactive = [];
                 for (const spellKey of colonist.knownSpells) {
                     const spell = SPELLS[spellKey];
                     if (!spell) continue;
+                    const notAttuned = attuned.length > 0 && !attuned.includes(spell.school);
+                    if (spell.castType === 'auto' && notAttuned) inactive.push(spellKey);
+                    else active.push(spellKey);
+                }
+
+                const renderSpellRow = (spellKey, notAttuned) => {
+                    const spell = SPELLS[spellKey];
                     const effectiveCd = spell.cooldown * getSpellCooldownMult(this.game);
                     const onCooldown = colonist._spellCooldowns?.[spellKey] && this.game.tick - colonist._spellCooldowns[spellKey] < effectiveCd;
                     const cdRemaining = onCooldown ? Math.ceil(effectiveCd - (this.game.tick - colonist._spellCooldowns[spellKey])) : 0;
                     const hasManaForSpell = colonist.mana >= spell.manaCost;
                     const isDisabled = colonist.disabledSpells && colonist.disabledSpells.includes(spellKey);
+                    const greyed = isDisabled || notAttuned;
                     let spellHtml = '';
                     if (spell.castType === 'auto') {
                         const checked = !isDisabled ? 'checked' : '';
                         spellHtml += `<input type="checkbox" ${checked} onchange="window.game.toggleSpell(${colonist.id},'${spellKey}')" style="margin-right:4px;vertical-align:middle">`;
                     }
                     const tipDesc = this._spellTooltip(spell);
-                    spellHtml += `<span class="skill-tip" data-tip="${tipDesc}" style="color:${isDisabled ? '#666' : '#bb88ff'}">${spell.name}</span> <span style="color:#666;font-size:0.85em">(${spell.manaCost} mana, ${spell.cooldown}t cd)</span>`;
+                    spellHtml += `<span class="skill-tip" data-tip="${tipDesc}" style="color:${greyed ? '#666' : '#bb88ff'}">${spell.name}</span> <span style="color:#666;font-size:0.85em">(${spell.manaCost} mana, ${spell.cooldown}t cd)</span>`;
                     if (spell.castType === 'targeted') {
                         const disabled = onCooldown || !hasManaForSpell;
                         const reason = onCooldown ? `${cdRemaining}t` : !hasManaForSpell ? 'low mana' : '';
                         spellHtml += disabled
                             ? ` <span style="color:#666">[${reason}]</span>`
                             : ` <button onclick="window.game.startSpellTargeting(${colonist.id},'${spellKey}')" style="font-size:0.8em">Cast</button>`;
+                    } else if (notAttuned) {
+                        spellHtml += ` <span style="color:#a66;font-size:0.8em">[not attuned]</span>`;
                     } else {
                         spellHtml += ` <span style="color:#555;font-size:0.8em">[auto${onCooldown ? `, ${cdRemaining}t` : ''}]</span>`;
                     }
-                    html += `<div class="info-row" style="padding-left:8px">${spellHtml}</div>`;
+                    return `<div class="info-row" style="padding-left:8px">${spellHtml}</div>`;
+                };
+
+                // Only draw the sub-headers when a split actually exists. A colonist
+                // with no attunement (or all spells in-school) reads as a flat list.
+                if (inactive.length > 0) {
+                    html += `<div class="info-row" style="padding-left:4px;color:#88cc88;font-size:0.85em;font-weight:bold">Active</div>`;
+                }
+                for (const spellKey of active) html += renderSpellRow(spellKey, false);
+                if (inactive.length > 0) {
+                    html += `<div class="info-row" style="padding-left:4px;color:#a66;font-size:0.85em;font-weight:bold">Inactive — not attuned</div>`;
+                    for (const spellKey of inactive) html += renderSpellRow(spellKey, true);
                 }
             }
             if (colonist.activeEffects && colonist.activeEffects.length > 0) {
-                const effects = colonist.activeEffects.map(e => `<span style="color:#88ffaa">${e.type} (${e.expiresAt - this.game.tick}t)</span>`).join(', ');
+                const effects = colonist.activeEffects.map(e => {
+                    const t = e.expiresAt - this.game.tick;
+                    switch (e.type) {
+                        case 'absorb': return `<span style="color:#88ccff">Ward (${e.absorbRemaining} absorb)</span>`;
+                        case 'quality': return `<span style="color:#ffcc66">Diligence (+${e.qualityBonus} quality, ${t}t)</span>`;
+                        case 'rest': return `<span style="color:#aaffcc">Tireless (${t}t)</span>`;
+                        case 'shield': return `<span style="color:#88ccff">Shield (${t}t)</span>`;
+                        case 'speed': return `<span style="color:#ffff88">Haste (${t}t)</span>`;
+                        default: return `<span style="color:#88ffaa">${e.type} (${t}t)</span>`;
+                    }
+                }).join(', ');
                 html += `<div class="info-row">Effects: ${effects}</div>`;
             }
             if (colonist.activeAuras && colonist.activeAuras.length > 0) {
@@ -1882,6 +1958,25 @@ export class UI {
     }
 
     updatePriorityPanel() {
+        if (!this._prioTab) this._prioTab = 'work';
+        const tabs =
+            '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+            `<button class="craft-tab${this._prioTab === 'work' ? ' active' : ''}" data-prio-tab="work">Work Priorities</button>` +
+            `<button class="craft-tab${this._prioTab === 'attune' ? ' active' : ''}" data-prio-tab="attune">Attunement</button>` +
+            '</div>';
+
+        const body = this._prioTab === 'attune' ? this._attunementGridHtml() : this._workPriorityGridHtml();
+        const heading = this._prioTab === 'attune'
+            ? `<h3>Magic Attunement (click to toggle, max ${MAGIC_STUDY_CONFIG.attunementSlots})</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Only spells from attuned schools autocast in the world and on expeditions. Free to change anytime.</div>`
+            : '<h3>Work Priorities (click to cycle, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Note: Golem priorities are locked to their specialization</div>';
+        const fullHtml = '<div class="panel-close" data-panel-close="priority">&times;</div>' + tabs + heading + body;
+        if (fullHtml !== this._lastPrioHtml) {
+            this._lastPrioHtml = fullHtml;
+            this.elements.priorityPanel.innerHTML = fullHtml;
+        }
+    }
+
+    _workPriorityGridHtml() {
         const skills = Object.keys(SKILLS);
         let html = '<table><tr><th>Colonist</th>';
         skills.forEach(s => { html += `<th>${s.substring(0, 8)}</th>`; });
@@ -1903,11 +1998,33 @@ export class UI {
             html += '</tr>';
         }
         html += '</table>';
-        const fullHtml = '<div class="panel-close" data-panel-close="priority">&times;</div><h3>Work Priorities (click to cycle, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Note: Golem priorities are locked to their specialization</div>' + html;
-        if (fullHtml !== this._lastPrioHtml) {
-            this._lastPrioHtml = fullHtml;
-            this.elements.priorityPanel.innerHTML = fullHtml;
+        return html;
+    }
+
+    _attunementGridHtml() {
+        const schools = Object.keys(MAGIC_SKILLS);
+        let html = '<table><tr><th>Colonist</th>';
+        schools.forEach(s => { html += `<th>${MAGIC_SKILLS[s].name.substring(0, 8)}</th>`; });
+        html += '</tr>';
+
+        for (const c of this.game.colonists) {
+            if (c.hp <= 0 || c.golem) continue;
+            html += `<tr><td style="color:${c.nameColor || '#ffff00'}">${c.name}</td>`;
+            const attuned = Array.isArray(c.attunedSchools) ? c.attunedSchools : [];
+            for (const s of schools) {
+                const level = (c.magicSkills && c.magicSkills[s]) || 0;
+                const isAttuned = attuned.includes(s);
+                const schoolColor = MAGIC_SKILLS[s].color;
+                const cellStyle = isAttuned
+                    ? `background-color:${schoolColor};color:#000;font-weight:bold;text-shadow:none;`
+                    : 'background-color:#1a1a2e;color:#666;';
+                const mark = isAttuned ? '★' : (level > 0 ? level : '-');
+                html += `<td class="prio-cell" data-colonist-id="${c.id}" data-attune="${s}" title="${MAGIC_SKILLS[s].name} (level ${level})" style="${cellStyle}">${mark}</td>`;
+            }
+            html += '</tr>';
         }
+        html += '</table>';
+        return html;
     }
 
     toggleCraftPanel() {
@@ -2647,6 +2764,7 @@ export class UI {
         general += `<button onclick="if(confirm('Grant 999 of all resources?'))window.game.cheatResources()" class="settings-btn settings-btn-danger" style="margin-top:8px;">Grant 999 Resources</button>`;
         general += `<button onclick="if(confirm('Complete all research?'))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">Grant All Research</button>`;
         general += `<button onclick="if(confirm('Grant all starter spells (level 0) to every colonist and set magic skills to 1?'))window.game.cheatGrantStarterSpells()" class="settings-btn settings-btn-danger">Grant All Starter Spells + Magic Lvl 1</button>`;
+        general += `<button onclick="if(confirm('Grant all spells to every colonist and set magic skills to 8?'))window.game.cheatGrantAllSpells()" class="settings-btn settings-btn-danger">Grant All Spells + Magic Lvl 8</button>`;
         general += `<button onclick="window.game.cheatSpawnColonist()" class="settings-btn settings-btn-danger">Grant New Colonist</button>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-trinket-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;

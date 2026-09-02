@@ -1,7 +1,7 @@
 import { CONFIG, ENTITIES, ALL_ITEMS } from './config.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
-import { recalcMaxMana, invalidateEquipStatCache } from '../entities/colonist.js';
+import { recalcMaxMana, invalidateEquipStatCache, defaultAttunedSchools } from '../entities/colonist.js';
 
 const SAVE_KEY = 'colony_save';
 const SAVE_VERSION = 9;
@@ -156,6 +156,11 @@ export function loadGame(game) {
         for (const c of game.colonists) {
             recalcMaxMana(c);
             invalidateEquipStatCache(c);
+            // Migration: default attunement for saves predating the attunement system.
+            // Pick the colonist's highest-level schools up to the slot count.
+            if (!Array.isArray(c.attunedSchools)) {
+                c.attunedSchools = defaultAttunedSchools(c);
+            }
         }
         game.rebuildColonistIndex();
         game.entities = data.entities || [];

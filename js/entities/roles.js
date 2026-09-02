@@ -390,6 +390,21 @@ export const ROLE_HANDLERS = {
 };
 
 export function updateEntityRoles(entity, game) {
+    // Crowd control (from colonist spells like Mesmerize): a stunned entity skips
+    // its whole turn (no move, no attack). This is the single chokepoint shared
+    // by raiders, void waves, and summons, so the stun-skip here covers every
+    // entity that flows through role, including summons, whose loop calls this
+    // directly. Slow is applied by the per-entity update wrappers at their
+    // moveCooldown gate (the master AI clock), not here, to avoid stacking with it.
+    if (entity._stunnedUntil && game.tick < entity._stunnedUntil) {
+        if (game.tick % 6 === 0) {
+            game.combatEffects.push({ x: entity.x, y: entity.y, char: '✦', color: '#ffccff', ttl: 4 });
+        }
+        return;
+    }
+    if (entity._slowUntil && game.tick < entity._slowUntil && game.tick % 8 === 0) {
+        game.combatEffects.push({ x: entity.x, y: entity.y, char: '❄', color: '#aaddff', ttl: 3 });
+    }
     for (const role of entity.roles) {
         const handler = ROLE_HANDLERS[role.type];
         if (handler && handler.update) {

@@ -38,7 +38,7 @@ const BASE_RECIPES = {
 
     // Abjuration
     craft_tome_of_mend: { input: { planks: 2, berries: 2 }, output: { tome_of_mend: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
-    craft_tome_of_heal: { input: { planks: 3, runite: 1, berries: 2 }, output: { tome_of_heal: 1 }, skill: 'crafting', ticks: 32, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_renewal: { input: { planks: 4, runite: 2, berries: 3 }, output: { tome_of_renewal: 1 }, skill: 'crafting', ticks: 40, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_shield: { input: { planks: 4, runite: 3, stone: 3 }, output: { tome_of_shield: 1 }, skill: 'crafting', ticks: 45, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
 
     // Enchantment
@@ -208,11 +208,24 @@ export const TRINKETS = {
     warden_censer: { name: "Warden's Censer", textColor:'#4488ff', tradeValue: 68, tier: 3, description: 'A censer of blessed smoke that knits the wounds of the bearer and nearby allies.', healthRegen: 0.05, pedestal: { radius: 6, manaCost: 2, healthRegen: 0.05 }, recipe: { input: { runite: 2, moonbloom: 3, planks: 2 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
     ley_battery: { name: 'Ley Battery', textColor:'#4488ff', tradeValue: 70, tier: 3, description: 'A crystal that siphons ambient ley energy, sustaining a caster mid-battle.', manaRegen: 0.08, spellCostReduction: 0.12, recipe: { input: { runite: 2, moonbloom: 2, void_essence: 1 }, ticks: 42, research: 'void_sorcery', station: 'enchanting_table' } },
     hunters_quiver: { name: "Hunter's Quiver", textColor:'#44cc44', tradeValue: 50, tier: 2, critChance: 0.1, attackSpeed: 0.1, description: 'An enchanted quiver whose arrows never run short.', recipe: { input: { runite: 1, leather: 3, planks: 1 }, ticks: 30, research: 'marksmanship', station: 'enchanting_table' } },
+
+    // ── School-focused trinkets ──
+    // Each pushes ONE school hard via a `<school>Bonus` stat (read alongside the
+    // generic spellDamageBonus by getEquipmentSchoolBonus), rewarding a colonist
+    // who commits to that school. A couple also carry non-damage spell stats
+    // (spellHealBonus, spellDurationBonus, spellCooldownReduction) so gear can
+    // amplify heals/buffs/recast rate, not just damage.
+    ember_sigil: { name: 'Ember Sigil', textColor:'#ff6644', tradeValue: 68, tier: 3, description: 'A searing rune that concentrates destructive fire. Amplifies Evocation spells.', evocationBonus: 0.4, recipe: { input: { runite: 2, void_essence: 1, planks: 2 }, ticks: 40, research: 'void_sorcery', station: 'enchanting_table' } },
+    verdant_talisman: { name: 'Verdant Talisman', textColor:'#88ff88', tradeValue: 62, tier: 3, description: 'A talisman pulsing with growth. Strengthens and prolongs Transmutation magic.', transmutationBonus: 0.35, spellDurationBonus: 0.25, recipe: { input: { moonbloom: 3, runite: 1, planks: 2 }, ticks: 40, research: 'advanced_arcana', station: 'enchanting_table' } },
+    healers_pendant: { name: "Healer's Pendant", textColor:'#44ff44', tradeValue: 66, tier: 3, description: 'A blessed pendant that magnifies restorative magic. Boosts Abjuration and healing.', abjurationBonus: 0.3, spellHealBonus: 0.3, recipe: { input: { moonbloom: 3, runite: 2, planks: 1 }, ticks: 42, research: 'advanced_arcana', station: 'enchanting_table' } },
+    charmweave_band: { name: 'Charmweave Band', textColor:'#88ffff', tradeValue: 60, tier: 3, description: 'A woven band that extends the reach of supportive magic. Boosts Enchantment.', enchantmentBonus: 0.3, spellDurationBonus: 0.3, recipe: { input: { runite: 2, leather: 2, moonbloom: 1 }, ticks: 38, research: 'advanced_arcana', station: 'enchanting_table' } },
+    summoners_focus: { name: "Summoner's Focus", textColor:'#9966ff', tradeValue: 74, tier: 3, description: 'A focus stone that quickens the summoner\'s art. Boosts Conjuration and recast speed.', conjurationBonus: 0.35, spellCooldownReduction: 0.2, recipe: { input: { void_essence: 2, runite: 2, planks: 1 }, ticks: 44, research: 'void_sorcery', station: 'enchanting_table' } },
+    seers_eye: { name: "Seer's Eye", textColor:'#ccaaff', tradeValue: 70, tier: 3, description: 'An unblinking eye that sharpens fate-magic, letting divinations be woven more often.', divinationBonus: 0.2, spellCooldownReduction: 0.25, recipe: { input: { moonbloom: 2, void_essence: 2, planks: 1 }, ticks: 44, research: 'advanced_arcana', station: 'enchanting_table' } },
 };
 
 export const POTIONS = {
     health_potion: { name: 'Health Potion', trigger: 'lowHealth', hpThreshold: 0.4, effect: 'heal', healAmount: 50, cooldown: 30, description: 'A restorative brew that mends wounds.', recipe: { input: { berries: 3, wheat: 1 }, skill: 'cooking', ticks: 16, station: 'alchemy_table', research: 'alchemy' } },
-    speed_potion: { name: 'Speed Potion', trigger: 'hasTask', effect: 'speed', moveSpeedBonus: 0.5, workSpeedBonus: 1.3, duration: 100, cooldown: 400, description: 'An invigorating tonic that quickens body and mind.', recipe: { input: { corn: 2, potatoes: 2, berries: 1 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'alchemy' } },
+    speed_potion: { name: 'Speed Potion', trigger: 'hasTask', effect: 'speed', moveSpeedBonus: 0.5, workSpeedBonus: 0.3, duration: 100, cooldown: 400, description: 'An invigorating tonic that quickens body and mind.', recipe: { input: { corn: 2, potatoes: 2, berries: 1 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'alchemy' } },
     mana_potion: { name: 'Mana Potion', trigger: 'lowMana', manaThreshold: 0.3, effect: 'restoreMana', manaAmount: 30, cooldown: 300, description: 'A shimmering elixir that restores magical energy.', recipe: { input: { moonbloom: 3, runite: 1 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'herbalism' } },
     resistance_potion: { name: 'Resistance Potion', trigger: 'inCombat', effect: 'resistance', damageReduction: 0.25, duration: 80, cooldown: 500, description: 'A thick draught that hardens the body against blows.', recipe: { input: { moonbloom: 2, stone: 2, iron: 1 }, skill: 'cooking', ticks: 25, station: 'alchemy_table', research: 'herbalism' } },
 };
@@ -237,37 +250,37 @@ export const ITEM_CHARS = {
 export const WEAPON_ENCHANTMENT_EFFECTS = {
     sharpness: { suffix: 'of Sharpness', description: 'Enchanted with sharpness, increasing attack damage by 15% per enchantment tier.', damageMultiplier: 1.15 },
     witchery: { suffix: 'of Witchery', description: 'Enchanted with witchery, increasing spell damage by 15% per enchantment tier.', spellDamageBonus: 0.15 },
-    piercing: { suffix: 'of Piercing', description: 'Enchanted with piercing, increasing the chance of critical strikes by 15% per enchantment tier.', critChanceBonus: 0.15 },
-    vampirism: { suffix: 'of Vampirism', description: 'Enchanted with vampirism, healing for 15% of damage dealt per enchantment tier.', lifeStealBonus: 0.15 },
+    piercing: { suffix: 'of Piercing', description: 'Enchanted with piercing, increasing the chance of critical strikes by 15% per enchantment tier.', critChance: 0.15 },
+    vampirism: { suffix: 'of Vampirism', description: 'Enchanted with vampirism, healing for 15% of damage dealt per enchantment tier.', lifeSteal: 0.15 },
     // distance: { suffix: 'of Distance', description: 'Enchanted with distance, increasing attack range by 15% per enchantment tier, even for melee weapons.', attackRangeMultiplier: 1.15 },
-    // velocity { suffix: 'of Velocity', description: 'Enchanted with velocity, increasing attack speed by 15% per enchantment tier.', attackSpeedMultiplier: 1.15 },
+    // velocity { suffix: 'of Velocity', description: 'Enchanted with velocity, increasing attack speed by 15% per enchantment tier.', attackSpeed: 0.15 },
     // greed { suffix: 'of Greed', description: 'Enchanted with greed, increasing exploration loot rarity by 15% per enchantment tier.', lootRarityMultiplier: 1.15 },
 };
 
 export const ARMOR_ENCHANTMENT_EFFECTS = {
     protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 15% per enchantment tier.', defenseMultiplier: 1.15 },
-    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenMultiplier: 1.15 },
-    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
-    // free_movement { suffix: 'of Free Movement', description: 'Enchanted with free movement, increasing movement and exploration speed by 10% per enchantment tier.', speedMultiplier: 1.10 },
-    // dodgeChance { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing dodge chance by 10% per enchantment tier.', dodgeChanceBonus: 0.10 },
+    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenBonus: 0.15 },
+    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamage: 0.15 },
+    // free_movement { suffix: 'of Free Movement', description: 'Enchanted with free movement, increasing movement and exploration speed by 10% per enchantment tier.', moveSpeedBonus: 0.10 },
+    // dodgeChance { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing dodge chance by 10% per enchantment tier.', dodgeChance: 0.10 },
 };
 
 export const CLOTHES_ENCHANTMENT_EFFECTS = {
-    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenMultiplier: 1.15 },
-    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamageBonus: 0.15 },
-    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedMultiplier: 1.15 },
-    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenMultiplier: 1.15 },
+    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenBonus: 0.15 },
+    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamage: 0.15 },
+    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedBonus: 0.15 },
+    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenBonus: 0.15 },
 };
 
 export const TOOL_ENCHANTMENT_EFFECTS = {
-    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedMultiplier: 1.15 },
-    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenMultiplier: 1.15 },
+    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedBonus: 0.15 },
+    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenBonus: 0.15 },
     // windfall: { suffix: 'of Windfall', description: 'Enchanted with windfall, increasing materials gained while gathering by 20% per enchantment tier.', gatheringMatMultiplier: 1.20 },
     // spellCostReduction
 };
 
 export const BOOTS_ENCHANTMENT_EFFECTS = {
-    swiftness: { suffix: 'of Swiftness', description: 'Enchanted with swiftness, increasing movement speed by 10% per enchantment tier.', speedMultiplier: 1.10 },
+    swiftness: { suffix: 'of Swiftness', description: 'Enchanted with swiftness, increasing movement speed by 10% per enchantment tier.', moveSpeedBonus: 0.10 },
 };
 
 // Unified item registry — every non-stackable item with its type and optional tradeValue.

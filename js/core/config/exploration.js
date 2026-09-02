@@ -387,7 +387,7 @@ export const REALMS = {
         vis: { wall: 'stone_wall', floor: 'wood_floor' },
         loot: [
             { resource: 'tome_of_magic_missile', weight: 20, amount: [1, 1] },
-            { resource: 'tome_of_heal', weight: 20, amount: [1, 1] },
+            { resource: 'tome_of_renewal', weight: 20, amount: [1, 1] },
             { resource: 'tome_of_haste', weight: 15, amount: [1, 1] },
             { resource: 'tome_of_warp', weight: 15, amount: [1, 1] },
             { resource: 'tome_of_circle_of_growth', weight: 10, amount: [1, 1] },
@@ -436,7 +436,7 @@ export const REALMS = {
         research: 'arcane_studies',
         loot: [
             { resource: 'tome_of_magic_missile', weight: 15, amount: [1, 1] },
-            { resource: 'tome_of_heal', weight: 15, amount: [1, 1] },
+            { resource: 'tome_of_renewal', weight: 15, amount: [1, 1] },
             { resource: 'tome_of_haste', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_warp', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_circle_of_growth', weight: 10, amount: [1, 1] },
@@ -486,7 +486,7 @@ export const REALMS = {
         research: 'arcane_studies',
         loot: [
             { resource: 'tome_of_magic_missile', weight: 12, amount: [1, 1] },
-            { resource: 'tome_of_heal', weight: 12, amount: [1, 1] },
+            { resource: 'tome_of_renewal', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_haste', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_warp', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_circle_of_growth', weight: 12, amount: [1, 1] },
@@ -1284,7 +1284,7 @@ export const NPC_ENCOUNTERS = {
         choices: [
             {
                 label: 'Heal them',
-                requirement: { spellAny: ['mend', 'heal'] },
+                requirement: { spellAny: ['mend', 'renewal'] },
                 cost: { mana: 10 },
                 result: { text: '{name} heals the traveler, who offers a reward.', reward: { type: 'realm_roll', mult: 2.0 } },
             },

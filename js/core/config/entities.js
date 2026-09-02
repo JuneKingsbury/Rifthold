@@ -13,6 +13,8 @@ export const ENTITIES = {
     familiar: { name: 'Familiar', char: 'f', color: '#9966ff', hp: 40, speed: 0.5, category: 'summon', damage: 8, summonDuration: 60, roles: [{ type: 'guard', guardRadius: 6, patrolRadius: 3 }, { type: 'summoned' }] },
     ghost:    { name: 'Ghost',    char: 'g', color: '#88ccff', hp: 25, speed: 0.7, category: 'summon', damage: 14, summonDuration: 80, roles: [{ type: 'guard', guardRadius: 8, patrolRadius: 4 }, { type: 'summoned' }] },
     monster:  { name: 'Monster',  char: 'M', color: '#ff4466', hp: 60, speed: 0.4, category: 'summon', damage: 20, summonDuration: 100, roles: [{ type: 'guard', guardRadius: 10, patrolRadius: 5 }, { type: 'summoned' }] },
+    // Weak, short-lived skirmisher conjured in packs by Spectral Swarm.
+    spectral_wisp: { name: 'Spectral Wisp', char: 'w', color: '#aaccff', hp: 12, speed: 0.6, category: 'summon', damage: 5, summonDuration: 45, roles: [{ type: 'guard', guardRadius: 7, patrolRadius: 4 }, { type: 'summoned' }] },
 
     // === Golems ===
     farmer_golem:    { name: 'Farmer Golem', char: 'G', color: '#55aa33', hp: 150, speed: 0.3, category: 'golem', traits: ['pacifist', 'green_thumb'], roles: [{ type: 'worker', specialty: 'farming', skillLevel: 6 }], cost: { stone: 10, runite: 3, void_essence: 2 }, craftTicks: 80 },

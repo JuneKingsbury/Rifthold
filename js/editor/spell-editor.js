@@ -8,6 +8,7 @@ const CAST_TYPES = ['auto', 'targeted'];
 const TRIGGERS = [
     { value: 'inCombat', label: 'In Combat' },
     { value: 'lowHealth', label: 'Low Health' },
+    { value: 'woundedNearby', label: 'Wounded Nearby (self/ally)' },
     { value: 'hasTask', label: 'Has Task' },
     { value: 'always', label: 'Always' },
 ];
@@ -559,6 +560,42 @@ class SpellEditor {
                 effect.modifiers = data.modifiers || {};
                 effect.duration = data.duration || 300;
                 break;
+            case 'chain_damage':
+                // A bouncing bolt — modelled in the editor as a plain damage effect;
+                // the chain params live on the exported config, not the visual editor.
+                effect.type = 'damage';
+                effect.value = data.damage || 10;
+                effect.range = data.range || 6;
+                if (data.projectileChar) effect.projectileChar = data.projectileChar;
+                if (data.projectileColor) effect.projectileColor = data.projectileColor;
+                break;
+            case 'ranged_damage_slow':
+                effect.type = 'damage';
+                effect.value = data.damage || 10;
+                effect.range = data.range || 6;
+                break;
+            case 'chain_heal':
+                effect.type = 'heal';
+                effect.value = data.healAmount || 15;
+                if (data.hpThreshold) effect.hpThreshold = data.hpThreshold;
+                break;
+            case 'absorb_shield':
+                effect.type = 'shield';
+                effect.absorb = data.absorbAmount || 20;
+                effect.duration = data.duration || 120;
+                break;
+            case 'stun':
+                effect.type = 'stun';
+                effect.duration = data.stunDuration || 45;
+                effect.range = data.range || 6;
+                break;
+            case 'summon_swarm':
+                effect.type = 'summon';
+                effect.summonType = data.summonType || 'spectral_wisp';
+                break;
+            // cleanse, buff_quality, buff_rest, transmute, finish_construction and
+            // ripen_crops have no visual-editor primitive; they pass through as their raw
+            // type (the picker falls back to a generic row) and stay config-authored.
         }
         return [effect];
     }

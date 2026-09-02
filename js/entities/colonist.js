@@ -142,6 +142,7 @@ export function createColonist(x, y, skillBias, existingNames = []) {
         mana: maxMana, maxMana,
         knownSpells: starterSpell ? [starterSpell] : [],
         disabledSpells: [],
+        attunedSchools: magicBias ? [magicBias] : [],
         equippedTome: null,
         tomeProgress: {},
         state: 'idle',
@@ -295,6 +296,7 @@ function updateNeeds(colonist, game) {
     let hungerMult = 1;
     if (colonist.traits.includes('iron_stomach')) hungerMult = TRAITS.iron_stomach.hungerDecayMult;
     if (colonist.traits.includes('gluttonous')) hungerMult *= TRAITS.gluttonous.hungerDecayMult;
+    if (colonist.traits.includes('comfort_eater')) hungerMult *= TRAITS.comfort_eater.hungerDecayMult;
     const hungerReduction = getEquipmentStat(colonist, 'hungerReduction');
     if (hungerReduction > 0) hungerMult *= (1 - hungerReduction);
     colonist.needs.hunger = Math.max(0, colonist.needs.hunger - NEED_DECAY.hunger * hungerMult);
@@ -303,6 +305,12 @@ function updateNeeds(colonist, game) {
     if (colonist.traits.includes('light_sleeper')) restDecayMult = TRAITS.light_sleeper.restDecayMult;
     if (colonist.traits.includes('deep_sleeper')) restDecayMult = TRAITS.deep_sleeper.restDecayMult;
     restDecayMult *= getRaceModifier(colonist, 'restDecayMult', 1);
+    // Tireless (enchantment) slows fatigue via an active 'rest' effect.
+    if (colonist.activeEffects) {
+        for (const e of colonist.activeEffects) {
+            if (e.type === 'rest' && e.restDecayMult) restDecayMult *= e.restDecayMult;
+        }
+    }
     colonist.needs.rest = Math.max(0, colonist.needs.rest - NEED_DECAY.rest * restDecayMult);
 
     if (game.weather.season === 'winter' && !isIndoors(colonist, game.map)) {
@@ -328,7 +336,7 @@ function updateHealth(colonist) {
     let regen = COLONIST_CONFIG.baseHealthRegen;
     regen += getEquipmentStat(colonist, 'healthRegen');
     regen += (colonist.pedestalHealthRegen || 0);
-    if (getEquipmentStat(colonist, 'healthRegenMultiplier')) regen *= getEquipmentStat(colonist, 'healthRegenMultiplier');
+    regen *= (1 + getEquipmentStat(colonist, 'healthRegenBonus'));
     if (colonist.state === 'sleeping') regen *= COLONIST_CONFIG.healthRegenWhileSleeping;
     else if (colonist.state === 'idle') regen *= COLONIST_CONFIG.healthRegenWhileIdle;
     colonist.hp = Math.min(colonist.maxHp, colonist.hp + regen);
@@ -339,16 +347,103 @@ function updateMana(colonist) {
     const combinedLevel = colonist._combinedMagicLevel || 0;
     let regen = MANA_CONFIG.baseRegen + combinedLevel * MANA_CONFIG.regenPerMagicLevel;
     regen += getEquipmentStat(colonist, 'manaRegen');
-    if (getEquipmentStat(colonist, 'manaRegenMultiplier')) regen *= getEquipmentStat(colonist, 'manaRegenMultiplier');
+    let manaBonus = getEquipmentStat(colonist, 'manaRegenBonus');
+    if (colonist.traits.includes('attuned')) manaBonus += TRAITS.attuned.manaRegenBonus;
+    regen *= (1 + manaBonus);
     if (colonist.state === 'sleeping') regen *= MANA_CONFIG.regenWhileSleeping;
     else if (colonist.state === 'idle') regen *= MANA_CONFIG.regenWhileIdle;
     colonist.mana = Math.min(colonist.maxMana, colonist.mana + regen);
 }
 
+// Picks a colonist's default attuned schools: the highest-level schools up to the
+// slot count. Used for save migration and as a fallback when none are set. Ties are
+// broken by MAGIC_SKILLS declaration order. Returns [] when the colonist has no magic.
+export function defaultAttunedSchools(colonist) {
+    const skills = colonist.magicSkills || {};
+    const ranked = Object.keys(skills)
+        .filter(s => (skills[s] || 0) > 0)
+        .sort((a, b) => (skills[b] || 0) - (skills[a] || 0));
+    return ranked.slice(0, MAGIC_STUDY_CONFIG.attunementSlots);
+}
+
+// Whether a spell may autocast for this colonist. Unattuned schools are silent, so a
+// colonist only actively channels magic from the (up to 2) schools the player assigns.
+export function isSpellAttuned(colonist, spell) {
+    if (!spell || !spell.school) return true;
+    const attuned = colonist.attunedSchools;
+    // No attunement set yet → allow everything (a not-yet-configured caster still works).
+    if (!Array.isArray(attuned) || attuned.length === 0) return true;
+    return attuned.includes(spell.school);
+}
+
+// Effect-magnitude multiplier from school mastery: each school level above a spell's
+// minLevel makes that spell stronger, rewarding deep single-school investment. Stacks
+// with equipment bonuses. Divination effects opt out (binary world-state changes).
+export function getSpellPower(colonist, spell) {
+    if (!spell || !spell.school) return 1;
+    if (spell.powerScale === 0 || spell.effect === 'divination_modifier') return 1;
+    const level = (colonist.magicSkills?.[spell.school]) || 0;
+    const over = Math.max(0, level - (spell.minLevel || 0));
+    const scale = spell.powerScale !== undefined ? spell.powerScale : MAGIC_STUDY_CONFIG.spellPowerPerLevel;
+    return 1 + over * scale;
+}
+
+// Per-school equipment bonus (e.g. an item with `evocationBonus`) plus the generic
+// `spellDamageBonus`, both additive. Lets gear commit a colonist to one school.
+function getEquipmentSchoolBonus(colonist, spell) {
+    let bonus = getEquipmentSpellBonus(colonist);
+    if (spell.school) bonus += getEquipmentStat(colonist, `${spell.school}Bonus`);
+    return bonus;
+}
+
+// Damage multiplier: school mastery (getSpellPower) times equipment bonuses.
+export function getSpellDamageMult(colonist, spell) {
+    return getSpellPower(colonist, spell) * (1 + getEquipmentSchoolBonus(colonist, spell));
+}
+
+// Duration multiplier for buffs/growth: school mastery times gear spellDurationBonus.
+export function getSpellDurationMult(colonist, spell) {
+    return getSpellPower(colonist, spell) * (1 + getEquipmentStat(colonist, 'spellDurationBonus'));
+}
+
+// School levels above minLevel make casting cheaper (mastery breeds efficiency).
+// Stacks with equipment spellCostReduction. Floors at 1 mana.
+export function getEffectiveManaCost(colonist, spell) {
+    const level = (colonist.magicSkills?.[spell.school]) || 0;
+    const over = Math.max(0, level - (spell.minLevel || 0));
+    const levelReduction = Math.min(
+        MAGIC_STUDY_CONFIG.manaCostReductionCap,
+        over * MAGIC_STUDY_CONFIG.manaCostReductionPerLevel,
+    );
+    const gearReduction = getEquipmentStat(colonist, 'spellCostReduction');
+    const mult = Math.max(0, (1 - levelReduction) * (1 - gearReduction));
+    return Math.max(1, Math.floor(spell.manaCost * mult));
+}
+
+// School levels above minLevel shorten cooldowns, so a specialist recasts faster.
+// Returns a multiplier applied on top of the global getSpellCooldownMult.
+export function getSpellCooldownFactor(colonist, spell) {
+    const level = (colonist.magicSkills?.[spell.school]) || 0;
+    const over = Math.max(0, level - (spell.minLevel || 0));
+    const reduction = Math.min(
+        MAGIC_STUDY_CONFIG.cooldownReductionCap,
+        over * MAGIC_STUDY_CONFIG.cooldownReductionPerLevel,
+    );
+    const gearReduction = getEquipmentStat(colonist, 'spellCooldownReduction');
+    return Math.max(0.1, (1 - reduction) * (1 - gearReduction));
+}
+
 export function recalcMaxMana(colonist) {
-    const combinedLevel = Object.values(colonist.magicSkills).reduce((sum, lvl) => sum + lvl, 0);
+    const levels = Object.values(colonist.magicSkills);
+    const combinedLevel = levels.reduce((sum, lvl) => sum + lvl, 0);
+    const maxLevel = levels.length ? Math.max(...levels) : 0;
     colonist._combinedMagicLevel = combinedLevel;
-    colonist.maxMana = MANA_CONFIG.baseMana + combinedLevel * MANA_CONFIG.manaPerMagicLevel;
+    // Focus-weighted pool: the highest school pays full rate, the rest pay only
+    // manaFocusFactor. Deep single-school investment grows mana faster than breadth.
+    const focusedLevels = maxLevel + (combinedLevel - maxLevel) * MANA_CONFIG.manaFocusFactor;
+    colonist.maxMana = MANA_CONFIG.baseMana + focusedLevels * MANA_CONFIG.manaPerMagicLevel;
+    if (colonist.traits.includes('attuned')) colonist.maxMana = Math.round(colonist.maxMana * TRAITS.attuned.maxManaMult);
+    colonist.maxMana = Math.round(colonist.maxMana);
 }
 
 function updateThoughts(colonist, game) {
@@ -377,6 +472,14 @@ function updateThoughts(colonist, game) {
     }
     if (colonist.traits.includes('lazy') && colonist.state === 'idle') {
         addThought(colonist, 'Relaxing', TRAITS.lazy.idleMoodBonus, 30, game.tick);
+    }
+    if (colonist.traits.includes('workaholic') && colonist.state === 'idle') {
+        addThought(colonist, 'Restless with nothing to do', TRAITS.workaholic.idleMoodPenalty, 30, game.tick);
+    }
+    if (colonist.traits.includes('menagerist')) {
+        const nearTamed = game.entities.some(e => e.category === 'animal' && e.tamed && e.hp > 0 &&
+            manhattanDist(colonist.x, colonist.y, e.x, e.y) <= COLONIST_CONFIG.socialRange);
+        if (nearTamed) addThought(colonist, 'Comforted by animals', TRAITS.menagerist.tamedAnimalMoodAura, 20, game.tick);
     }
 
     const indoorPenalty = getRaceModifier(colonist, 'indoorMoodPenalty', 0);
@@ -445,6 +548,10 @@ export function addThought(colonist, text, moodEffect, duration, tick) {
     let effect = moodEffect;
     if (effect > 0 && colonist.traits.includes('optimist')) effect *= TRAITS.optimist.positiveThoughtMult;
     if (effect < 0 && colonist.traits.includes('pessimist')) effect *= TRAITS.pessimist.negativeThoughtMult;
+    if (colonist.traits.includes('volatile')) {
+        if (effect > 0) effect *= TRAITS.volatile.positiveThoughtMult;
+        else if (effect < 0) effect *= TRAITS.volatile.negativeThoughtMult;
+    }
 
     colonist.thoughts.push({ text, moodEffect: effect, duration, tickAdded: tick });
 }
@@ -473,15 +580,39 @@ function getMoodLevel(mood) {
     return 'breaking';
 }
 
+// Whether a colonist should enter a mental break. Steadfast lowers the effective
+// breaking threshold, so it takes a deeper mood dip to trigger a break.
+function isBreaking(colonist) {
+    let threshold = MOOD_THRESHOLDS.stressed;
+    if (colonist.traits.includes('steadfast')) threshold *= TRAITS.steadfast.breakThresholdMult;
+    return colonist.mood < threshold;
+}
+
+// True if a friend, close friend, or lover is within social range. Backs the
+// Loyal trait's proximity work buff. Relationship tiers are stored per-colonist
+// in `relationships` (see social.js), keyed by the other colonist's id.
+function isNearFriend(colonist, game) {
+    const rels = colonist.relationships;
+    if (!rels) return false;
+    const friendTiers = ['friend', 'close_friend', 'lovers'];
+    return (game.colonists || []).some(other =>
+        other.id !== colonist.id && other.hp > 0 && !other.onExpedition &&
+        friendTiers.includes(rels[other.id]) &&
+        manhattanDist(colonist.x, colonist.y, other.x, other.y) <= COLONIST_CONFIG.socialRange);
+}
+
 function getWorkSpeed(colonist, game) {
     let speed = 1.0;
     const moodLevel = getMoodLevel(colonist.mood);
     speed *= MOOD_SPEED_MULT[moodLevel];
 
-    if (colonist.traits.includes('hard_worker')) speed *= TRAITS.hard_worker.workSpeedMult;
-    if (colonist.traits.includes('lazy')) speed *= TRAITS.lazy.workSpeedMult;
-    if (colonist.traits.includes('sturdy')) speed *= TRAITS.sturdy.workSpeedMult;
-    speed *= getRaceModifier(colonist, 'workSpeedMult', 1);
+    if (colonist.traits.includes('hard_worker')) speed *= (1 + TRAITS.hard_worker.workSpeedBonus);
+    if (colonist.traits.includes('lazy')) speed *= (1 + TRAITS.lazy.workSpeedBonus);
+    if (colonist.traits.includes('sturdy')) speed *= (1 + TRAITS.sturdy.workSpeedBonus);
+    if (colonist.traits.includes('workaholic')) speed *= (1 + TRAITS.workaholic.workSpeedBonus);
+    if (colonist.traits.includes('insomniac')) speed *= (1 + TRAITS.insomniac.workSpeedBonus);
+    if (colonist.traits.includes('loyal') && isNearFriend(colonist, game)) speed *= TRAITS.loyal.loyalWorkMult;
+    speed *= (1 + getRaceModifier(colonist, 'workSpeedBonus', 0));
 
     const t = game.timeOfDay / CONFIG.TICKS_PER_DAY;
     const isNight = t > DAY_NIGHT.nightStart || t < DAY_NIGHT.dayStart;
@@ -563,7 +694,26 @@ function getEquipmentSpellBonus(colonist) {
     for (const item of getEquippedItems(colonist)) {
         if (item.spellDamageBonus) bonus += item.spellDamageBonus;
     }
+    if (colonist.traits.includes('spellsword')) bonus += TRAITS.spellsword.spellDamageBonus;
     return bonus;
+}
+
+// Total crit chance from equipment plus the Deadeye trait.
+function getCritChance(colonist) {
+    let crit = getEquipmentStat(colonist, 'critChance');
+    if (colonist.traits.includes('deadeye')) crit += TRAITS.deadeye.critChance;
+    return crit;
+}
+
+// Trait-based multiplier on outgoing melee/ranged damage. Berserker ramps up
+// once the colonist drops below its HP threshold.
+function getTraitDamageMult(colonist) {
+    let mult = 1;
+    if (colonist.traits.includes('berserker') &&
+        colonist.hp < colonist.maxHp * TRAITS.berserker.lowHpThreshold) {
+        mult *= TRAITS.berserker.lowHpDamageMult;
+    }
+    return mult;
 }
 
 export function getEquipmentStat(colonist, stat) {
@@ -635,6 +785,7 @@ export function grantCastXp(colonist, spell, game) {
     let castXpGain = MAGIC_STUDY_CONFIG.xpPerCast;
     if (colonist.traits.includes('scholar')) castXpGain *= TRAITS.scholar.magicXpMult;
     if (colonist.traits.includes('prodigy')) castXpGain *= TRAITS.prodigy.magicXpMult;
+    if (colonist.traits.includes('magically_inept')) castXpGain *= TRAITS.magically_inept.magicXpMult;
     castXpGain *= getRaceModifier(colonist, 'magicXpMult', 1);
     colonist._magicXpAccumulator[school] += castXpGain;
     let magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
@@ -658,9 +809,11 @@ function tryAutocastSpells(colonist, game) {
         const spell = SPELLS[spellKey];
         if (!spell || spell.castType !== 'auto') continue;
         if (colonist.disabledSpells && colonist.disabledSpells.includes(spellKey)) continue;
-        if (colonist._spellCooldowns[spellKey] && game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown * getSpellCooldownMult(game)) continue;
-        const costReduction = getEquipmentStat(colonist, 'spellCostReduction');
-        const effectiveCost = Math.max(1, Math.floor(spell.manaCost * (1 - costReduction)));
+        // Only autocast from schools the colonist is attuned to (up to attunementSlots).
+        if (!isSpellAttuned(colonist, spell)) continue;
+        const effectiveCooldown = spell.cooldown * getSpellCooldownMult(game) * getSpellCooldownFactor(colonist, spell);
+        if (colonist._spellCooldowns[spellKey] && game.tick - colonist._spellCooldowns[spellKey] < effectiveCooldown) continue;
+        const effectiveCost = getEffectiveManaCost(colonist, spell);
         if (colonist.mana < effectiveCost) {
             game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'No mana', color: '#6688cc', fontSize: 10, ttl: 10, maxTtl: 10 });
             continue;
@@ -705,10 +858,15 @@ function shouldCastSpell(colonist, spell, game) {
         }
         case 'lowHealth':
             return colonist.hp < colonist.maxHp * (spell.hpThreshold || 0.5);
-        case 'allyLowHealth': {
+        case 'woundedNearby': {
+            // Fires when the caster, or any living ally within range, is below the
+            // heal threshold. The cast itself (see 'heal' effect) then mends whoever
+            // is most wounded among that set. One abjurer covers both self and their team.
+            const threshold = spell.hpThreshold || 0.5;
+            if (colonist.hp < colonist.maxHp * threshold) return true;
             const range = spell.range || COLONIST_CONFIG.hostileSearchRadius;
             return game.colonists.some(c => c.id !== colonist.id && c.hp > 0 &&
-                c.hp < c.maxHp * (spell.hpThreshold || 0.5) &&
+                c.hp < c.maxHp * threshold &&
                 manhattanDist(colonist.x, colonist.y, c.x, c.y) <= range);
         }
         case 'hasTask':
@@ -719,9 +877,58 @@ function shouldCastSpell(colonist, spell, game) {
             return true;
         case 'cropsNearby':
             return findNearestGrowingCrop(colonist, game, spell.range || 5) !== null;
+        case 'debuffNearby': {
+            // Fires when the caster or a living ally in range carries a harmful active
+            // effect (bleed/poison/burn DoT, or a slow). Used by Cleanse.
+            const range = spell.range || 6;
+            return getBuffTargets(colonist, game, range).some(hasHarmfulEffect);
+        }
+        case 'canTransmute':
+            // Fires when the transmutation's input is affordable. A spell with no
+            // `fromResource` (e.g. Transmute Stone, conjured from raw earth) is always
+            // castable; otherwise the stockpile must hold `inputAmount` of the input.
+            if (!spell.fromResource) return true;
+            return (game.resources.stockpile[spell.fromResource] || 0) >= (spell.inputAmount || 1);
         default:
             return false;
     }
+}
+
+// True when a colonist carries at least one harmful active effect (a DoT such as
+// bleed/poison/burn, or a movement/work slow). Beneficial effects (speed, shield,
+// absorb, quality, rest) are ignored. Used by Cleanse's trigger and effect.
+function hasHarmfulEffect(c) {
+    if (!c.activeEffects) return false;
+    return c.activeEffects.some(e => e.type === 'dot' || e.type === 'slow' || e.harmful);
+}
+
+// Returns the colonist plus any allied colonists within `radius` (Manhattan) — the
+// recipients of an area buff. When radius is falsy the buff is self-only, preserving
+// single-target behavior for spells that don't opt into an AoE. This is what lets one
+// enchanter/abjurer support squadmates who aren't attuned to that school themselves.
+function getBuffTargets(colonist, game, radius) {
+    if (!radius) return [colonist];
+    const targets = [colonist];
+    for (const c of game.colonists) {
+        if (c.id === colonist.id || c.hp <= 0) continue;
+        if (manhattanDist(colonist.x, colonist.y, c.x, c.y) <= radius) targets.push(c);
+    }
+    return targets;
+}
+
+// Picks the most wounded heal target (lowest HP fraction) among the caster and any
+// living ally within `range` that is below full HP. The caster is always a candidate
+// regardless of distance. Returns null only when nobody is wounded. Used by heals.
+function findMostWoundedTarget(colonist, game, range) {
+    let best = colonist.hp < colonist.maxHp ? colonist : null;
+    let bestFrac = best ? best.hp / best.maxHp : Infinity;
+    for (const c of game.colonists) {
+        if (c.id === colonist.id || c.hp <= 0 || c.hp >= c.maxHp) continue;
+        if (manhattanDist(colonist.x, colonist.y, c.x, c.y) > range) continue;
+        const frac = c.hp / c.maxHp;
+        if (frac < bestFrac) { bestFrac = frac; best = c; }
+    }
+    return best;
 }
 
 // Finds the nearest farm tile in the 'growing' state within `range` (Manhattan)
@@ -748,6 +955,35 @@ function findNearestGrowingCrop(colonist, game, range) {
     return best;
 }
 
+// All living hostile entities in the colony (raiders, void-wave enemies, and
+// untamed hostile wildlife). The target pool for damage/CC spells that arc or
+// bounce beyond a single foe. Mirrors the inline set built in ranged_damage_aoe.
+function getColonyHostiles(game) {
+    return [
+        ...game.raiders,
+        ...(game.waves ? game.waves.enemies : []),
+        ...game.entities.filter(w => w.category === 'animal' && !w.tamed && w.hostile),
+    ].filter(h => h.hp > 0);
+}
+
+// Applies a movement/attack "slow" to a hostile entity for `ticks`, stored as a
+// tick deadline the enemy AI (roles.js/combat.js) reads. slowMult<1 scales its
+// effective speed. Extends rather than stacks: keeps the later expiry.
+function applyEnemySlow(entity, ticks, slowMult, game) {
+    const until = game.tick + ticks;
+    if (!entity._slowUntil || until > entity._slowUntil) {
+        entity._slowUntil = until;
+        entity._slowMult = slowMult;
+    }
+}
+
+// Stuns a hostile entity for `ticks` (a tick deadline the enemy AI reads to skip
+// its attack and movement). Extends rather than stacks.
+function applyEnemyStun(entity, ticks, game) {
+    const until = game.tick + ticks;
+    if (!entity._stunnedUntil || until > entity._stunnedUntil) entity._stunnedUntil = until;
+}
+
 function applySpellEffect(colonist, spell, game) {
     switch (spell.effect) {
         case 'ranged_damage': {
@@ -756,9 +992,7 @@ function applySpellEffect(colonist, spell, game) {
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > spell.range) return;
             if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
-            let dmg = spell.damage;
-            const spellBonus = getEquipmentSpellBonus(colonist);
-            if (spellBonus) dmg = Math.floor(dmg * (1 + spellBonus));
+            const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
             target.hp -= dmg;
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
             const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
@@ -777,9 +1011,7 @@ function applySpellEffect(colonist, spell, game) {
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > spell.range) return;
             if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
-            let aoeDmg = spell.damage;
-            const aoeSpellBonus = getEquipmentSpellBonus(colonist);
-            if (aoeSpellBonus) aoeDmg = Math.floor(aoeDmg * (1 + aoeSpellBonus));
+            const aoeDmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
             const aoeProjDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
             game.projectiles.push({
                 fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y,
@@ -804,9 +1036,7 @@ function applySpellEffect(colonist, spell, game) {
             if (!target) return;
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > (spell.range || 1)) return;
-            let dmg = spell.damage;
-            const spellBonus = getEquipmentSpellBonus(colonist);
-            if (spellBonus) dmg = Math.floor(dmg * (1 + spellBonus));
+            const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
             target.hp -= dmg;
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
             colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
@@ -819,6 +1049,10 @@ function applySpellEffect(colonist, spell, game) {
             // trigger guarantees one exists, but guard anyway.
             const center = findNearestGrowingCrop(colonist, game, spell.range || 5);
             if (!center) return;
+            // School mastery boosts growth strength above the baseline of 1.0.
+            const cropPower = getSpellPower(colonist, spell);
+            const boostedMult = 1 + (spell.growthMult - 1) * cropPower;
+            const boostedDuration = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
             for (let dy = -spell.radius; dy <= spell.radius; dy++) {
                 for (let dx = -spell.radius; dx <= spell.radius; dx++) {
                     const tx = center.x + dx;
@@ -827,8 +1061,8 @@ function applySpellEffect(colonist, spell, game) {
                     const tile = game.map[ty][tx];
                     if (tile.zone && tile.zone.state === 'growing') {
                         if (!tile.zone._growthBoost) tile.zone._growthBoost = { mult: 1, expiresAt: 0 };
-                        tile.zone._growthBoost.mult = spell.growthMult;
-                        tile.zone._growthBoost.expiresAt = game.tick + spell.duration;
+                        tile.zone._growthBoost.mult = boostedMult;
+                        tile.zone._growthBoost.expiresAt = game.tick + boostedDuration;
                     }
                     game.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: COMBAT_VISUALS.spellGrowthColor, ttl: 4 });
                 }
@@ -836,36 +1070,53 @@ function applySpellEffect(colonist, spell, game) {
             window.soundManager?.playSFX('spell_growth');
             break;
         }
-        case 'heal':
-            if (spell.targetSelf) {
-                colonist.hp = Math.min(colonist.maxHp, colonist.hp + spell.healAmount);
-            }
-            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellHealChar, color: COMBAT_VISUALS.spellHealColor, ttl: 3 });
+        case 'heal': {
+            // Heal amount scales with school mastery and healing gear. Mends whoever is
+            // most wounded among the caster and nearby allies, so an abjurer supports
+            // both itself and colonists who aren't attuned to healing.
+            const healAmount = Math.round(spell.healAmount * getSpellPower(colonist, spell) * (1 + getEquipmentStat(colonist, 'spellHealBonus')));
+            const healTarget = findMostWoundedTarget(colonist, game, spell.range || 6);
+            if (!healTarget) return;
+            healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + healAmount);
+            game.combatEffects.push({ x: healTarget.x, y: healTarget.y, char: COMBAT_VISUALS.spellHealChar, color: COMBAT_VISUALS.spellHealColor, ttl: 3 });
             window.soundManager?.playSFX('spell_heal');
             break;
+        }
         case 'buff_speed': {
-            if (!colonist.activeEffects) colonist.activeEffects = [];
-            colonist.activeEffects.push({
-                type: 'speed',
-                source: 'spell',
-                moveSpeedBonus: spell.moveSpeedBonus || 0,
-                workSpeedBonus: spell.workSpeedBonus || 1.0,
-                expiresAt: game.tick + spell.duration,
-            });
-            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 2 });
+            // Buffs the caster plus nearby allied colonists (within spell.radius, if
+            // set) so a single enchanter accelerates the whole squad. Duration scales
+            // with school mastery and gear.
+            const duration = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.radius)) {
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({
+                    type: 'speed',
+                    source: 'spell',
+                    moveSpeedBonus: spell.moveSpeedBonus || 0,
+                    workSpeedBonus: spell.workSpeedBonus || 0,
+                    expiresAt: game.tick + duration,
+                });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 2 });
+            }
             window.soundManager?.playSFX('spell_buff');
             break;
         }
         case 'buff_defense': {
-            if (!colonist.activeEffects) colonist.activeEffects = [];
-            colonist.activeEffects.push({
-                type: 'shield',
-                source: 'spell',
-                damageReduction: spell.damageReduction || 0.3,
-                expiresAt: game.tick + spell.duration,
-            });
-            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellShieldChar, color: COMBAT_VISUALS.spellShieldColor, ttl: 3 });
-            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 3 });
+            // Shields the caster plus nearby allied colonists (within spell.radius, if
+            // set). Damage reduction scales with school mastery, capped below 100%.
+            const dr = Math.min(0.75, (spell.damageReduction || 0.3) * getSpellPower(colonist, spell));
+            const shieldDuration = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.radius)) {
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({
+                    type: 'shield',
+                    source: 'spell',
+                    damageReduction: dr,
+                    expiresAt: game.tick + shieldDuration,
+                });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellShieldChar, color: COMBAT_VISUALS.spellShieldColor, ttl: 3 });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 3 });
+            }
             window.soundManager?.playSFX('spell_shield');
             break;
         }
@@ -895,7 +1146,209 @@ function applySpellEffect(colonist, spell, game) {
             game.notifications.push({ text: `${colonist.name} cast ${spell.name}`, tick: game.tick, type: 'success' });
             break;
         }
+        case 'chain_damage': {
+            // Bolt hits the nearest hostile then arcs to successively nearer foes
+            // within chainRange, losing chainFalloff of its damage each hop. Never
+            // hits the same target twice. Damage scales with evocation mastery.
+            const first = findNearestHostile(colonist, game);
+            if (!first) return;
+            const dist = manhattanDist(colonist.x, colonist.y, first.x, first.y);
+            if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, first.x, first.y)) return;
+            const pool = getColonyHostiles(game);
+            const baseDmg = spell.damage * getSpellDamageMult(colonist, spell);
+            const hit = new Set();
+            let current = first;
+            let dmg = baseDmg;
+            let fromX = colonist.x, fromY = colonist.y;
+            for (let hop = 0; hop < (spell.chainTargets || 1) && current; hop++) {
+                hit.add(current);
+                const applied = Math.floor(dmg);
+                current.hp -= applied;
+                current._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
+                const projDur = (manhattanDist(fromX, fromY, current.x, current.y) / COMBAT_VISUALS.projectileSpeed) * 1000;
+                game.projectiles.push({
+                    fromX, fromY, toX: current.x, toY: current.y,
+                    char: spell.projectileChar || '⚡',
+                    color: spell.projectileColor || '#88ddff',
+                    skinKey: 'projectile_spell',
+                    _startTime: performance.now(), _duration: projDur,
+                });
+                // Find next-nearest unhit hostile within chainRange of current node.
+                fromX = current.x; fromY = current.y;
+                let next = null, nextDist = Infinity;
+                for (const h of pool) {
+                    if (hit.has(h)) continue;
+                    const d = manhattanDist(current.x, current.y, h.x, h.y);
+                    if (d <= (spell.chainRange || 4) && d < nextDist) { nextDist = d; next = h; }
+                }
+                current = next;
+                dmg *= (spell.chainFalloff || 0.6);
+            }
+            window.soundManager?.playSFX('spell_cast');
+            break;
+        }
+        case 'ranged_damage_slow': {
+            // Single-target damage that also slows the victim's movement/attacks.
+            const target = findNearestHostile(colonist, game);
+            if (!target) return;
+            const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
+            if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
+            const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
+            target.hp -= dmg;
+            target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
+            applyEnemySlow(target, spell.slowDuration || 60, spell.slowMult || 0.5, game);
+            const projDur = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
+            game.projectiles.push({
+                fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y,
+                char: spell.projectileChar || '❄',
+                color: spell.projectileColor || '#aaddff',
+                skinKey: 'projectile_spell',
+                _startTime: performance.now(), _duration: projDur,
+            });
+            game.combatEffects.push({ x: target.x, y: target.y, char: spell.projectileChar || '❄', color: spell.projectileColor || '#aaddff', ttl: 4 });
+            break;
+        }
+        case 'chain_heal': {
+            // Mirror of chain_damage on friendlies: mends the most-wounded ally in
+            // range, then bounces to successively nearer wounded allies within
+            // chainRange, losing chainFalloff of its potency each hop.
+            const healBase = spell.healAmount * getSpellPower(colonist, spell) * (1 + getEquipmentStat(colonist, 'spellHealBonus'));
+            const first = findMostWoundedTarget(colonist, game, spell.range || 6);
+            if (!first) return;
+            const healed = new Set();
+            let current = first;
+            let amount = healBase;
+            for (let hop = 0; hop < (spell.chainTargets || 1) && current; hop++) {
+                healed.add(current);
+                current.hp = Math.min(current.maxHp, current.hp + Math.round(amount));
+                game.combatEffects.push({ x: current.x, y: current.y, char: COMBAT_VISUALS.spellHealChar, color: COMBAT_VISUALS.spellHealColor, ttl: 3 });
+                // Next hop: nearest wounded, un-healed ally within chainRange.
+                let next = null, nextDist = Infinity;
+                for (const c of game.colonists) {
+                    if (healed.has(c) || c.hp <= 0 || c.hp >= c.maxHp) continue;
+                    const d = manhattanDist(current.x, current.y, c.x, c.y);
+                    if (d <= (spell.chainRange || 5) && d < nextDist) { nextDist = d; next = c; }
+                }
+                current = next;
+                amount *= (spell.chainFalloff || 0.6);
+            }
+            window.soundManager?.playSFX('spell_heal');
+            break;
+        }
+        case 'cleanse': {
+            // Strips harmful active effects (DoTs, slows) from the most-afflicted
+            // ally in range — the caster included. Also clears any slow deadline.
+            const targets = getBuffTargets(colonist, game, spell.range || 6).filter(hasHarmfulEffect);
+            if (targets.length === 0) return;
+            // Most-afflicted = most harmful effects stacked.
+            targets.sort((a, b) => countHarmful(b) - countHarmful(a));
+            const cleansed = targets[0];
+            cleansed.activeEffects = (cleansed.activeEffects || []).filter(e => !(e.type === 'dot' || e.type === 'slow' || e.harmful));
+            cleansed._slowUntil = 0;
+            game.combatEffects.push({ x: cleansed.x, y: cleansed.y, char: COMBAT_VISUALS.spellHealChar, color: '#ffffaa', ttl: 4 });
+            window.soundManager?.playSFX('spell_buff');
+            break;
+        }
+        case 'absorb_shield': {
+            // Grants a flat damage-absorbing barrier (consumed before HP in
+            // colonistTakeDamage) to the caster and nearby allies. Pool scales with
+            // school mastery; duration with mastery+gear.
+            const pool = Math.round(spell.absorbAmount * getSpellPower(colonist, spell));
+            const shieldDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.radius)) {
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({ type: 'absorb', source: 'spell', absorbRemaining: pool, expiresAt: game.tick + shieldDur });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellShieldChar, color: COMBAT_VISUALS.spellShieldColor, ttl: 3 });
+            }
+            window.soundManager?.playSFX('spell_shield');
+            break;
+        }
+        case 'buff_quality': {
+            // Grants a work-quality bonus to the caster and nearby working allies,
+            // read by task-executor's applyQuality. Duration scales with mastery.
+            const qDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.radius)) {
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({ type: 'quality', source: 'spell', qualityBonus: spell.qualityBonus || 1, expiresAt: game.tick + qDur });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 2 });
+            }
+            window.soundManager?.playSFX('spell_buff');
+            break;
+        }
+        case 'buff_rest': {
+            // Slows rest decay for the caster and nearby allies (read in updateNeeds).
+            const rDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.radius)) {
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({ type: 'rest', source: 'spell', restDecayMult: spell.restDecayMult || 0.5, expiresAt: game.tick + rDur });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 2 });
+            }
+            window.soundManager?.playSFX('spell_buff');
+            break;
+        }
+        case 'stun': {
+            // Briefly disables the nearest hostile (and, if chainTargets>1, up to that
+            // many nearby foes). The enemy AI skips attacks/movement while stunned.
+            const target = findNearestHostile(colonist, game);
+            if (!target) return;
+            const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
+            if (dist > spell.range) return;
+            applyEnemyStun(target, spell.stunDuration || 45, game);
+            const projDur = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
+            game.projectiles.push({
+                fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y,
+                char: spell.projectileChar || '✦',
+                color: spell.projectileColor || '#ffccff',
+                skinKey: 'projectile_spell',
+                _startTime: performance.now(), _duration: projDur,
+            });
+            game.combatEffects.push({ x: target.x, y: target.y, char: spell.projectileChar || '✦', color: spell.projectileColor || '#ffccff', ttl: 5 });
+            window.soundManager?.playSFX('spell_cast');
+            break;
+        }
+        case 'summon_swarm': {
+            // Conjures a pack of short-lived skirmishers on tiles around the caster.
+            const summonDef = SUMMON_TYPES[spell.summonType];
+            if (!summonDef) break;
+            const count = spell.swarmCount || 3;
+            const ring = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+            for (let i = 0; i < count; i++) {
+                const [ox, oy] = ring[i % ring.length];
+                spawnSummon(spell.summonType, colonist.x + ox, colonist.y + oy, colonist.id, game);
+            }
+            window.soundManager?.playSFX('spell_cast');
+            break;
+        }
+        case 'transmute': {
+            // Converts a batch of stockpiled material into another. `fromResource`/
+            // `inputAmount` is consumed (omitted → conjured from nothing) and
+            // `outputAmount` of `toResource` is produced. The canTransmute trigger has
+            // already verified affordability, but re-check so a manual/edge cast is safe.
+            const from = spell.fromResource;
+            const inAmt = spell.inputAmount || 0;
+            const to = spell.toResource;
+            const outAmt = spell.outputAmount || 1;
+            if (from && (game.resources.stockpile[from] || 0) < inAmt) {
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `No ${from.replace(/_/g, ' ')}`, color: '#aa8844', fontSize: 10, ttl: 10, maxTtl: 10 });
+                break;
+            }
+            if (from) game.resources.stockpile[from] -= inAmt;
+            game.resources.stockpile[to] = (game.resources.stockpile[to] || 0) + outAmt;
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellGrowthChar, color: '#ffdd44', ttl: 4 });
+            const fromStr = from ? `${inAmt} ${from.replace(/_/g, ' ')} → ` : '';
+            game.notifications.push({ text: `${colonist.name} transmuted ${fromStr}${outAmt} ${to.replace(/_/g, ' ')}`, tick: game.tick, type: 'success' });
+            break;
+        }
     }
+}
+
+// Number of harmful active effects on a colonist (DoTs, slows, flagged-harmful).
+// Used by Cleanse to pick the most-afflicted ally.
+function countHarmful(c) {
+    if (!c.activeEffects) return 0;
+    return c.activeEffects.reduce((n, e) => n + ((e.type === 'dot' || e.type === 'slow' || e.harmful) ? 1 : 0), 0);
 }
 
 function updateIdle(colonist, game) {
@@ -906,7 +1359,7 @@ function updateIdle(colonist, game) {
         return;
     }
 
-    if (getMoodLevel(colonist.mood) === 'breaking') {
+    if (isBreaking(colonist)) {
         colonist.state = 'wandering';
         colonist.stateTimer = COLONIST_CONFIG.breakingWanderDuration[0] + Math.floor(Math.random() * (COLONIST_CONFIG.breakingWanderDuration[1] - COLONIST_CONFIG.breakingWanderDuration[0]));
         game.story.checkMilestone('first_mental_break', game);
@@ -1363,7 +1816,7 @@ function updateWorking(colonist, game) {
         return;
     }
 
-    if (getMoodLevel(colonist.mood) === 'breaking') {
+    if (isBreaking(colonist)) {
         game.taskQueue.release(colonist.currentTaskId);
         colonist.currentTaskId = null;
         colonist.state = 'idle';
@@ -1382,6 +1835,7 @@ function updateWorking(colonist, game) {
     }
     if (task.skillRequired === 'farming') speed *= getRaceModifier(colonist, 'farmingSpeedMult', 1);
     if (task.skillRequired === 'animals') speed *= getRaceModifier(colonist, 'animalWorkMult', 1);
+    if (task.skillRequired === 'animals' && colonist.traits.includes('beast_whisperer')) speed *= TRAITS.beast_whisperer.animalWorkMult;
     if ((task.type === 'craft' || task.type === 'cook') && colonist.traits.includes('creative')) {
         speed *= TRAITS.creative.craftingSpeedMult;
     }
@@ -1407,7 +1861,7 @@ function updateWorking(colonist, game) {
 
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
-            if (e.type === 'speed' && e.workSpeedBonus) speed *= e.workSpeedBonus;
+            if (e.type === 'speed' && e.workSpeedBonus) speed *= (1 + e.workSpeedBonus);
         }
     }
 
@@ -1425,17 +1879,22 @@ function updateEating(colonist, game) {
         game.resources.stockpile.food--;
         colonist.needs.hunger = COLONIST_CONFIG.cookedFoodRestore;
         colonist.state = 'idle';
-        if (colonist.traits.includes('gourmand')) {
-            addThought(colonist, 'Delicious meal', TRAITS.gourmand.cookedFoodMoodBonus, COLONIST_CONFIG.mealMoodDuration, game.tick);
-        } else {
-            addThought(colonist, 'Ate a meal', COLONIST_CONFIG.mealMoodBonus, COLONIST_CONFIG.mealMoodDuration, game.tick);
-        }
+        let mealMood = colonist.traits.includes('gourmand')
+            ? TRAITS.gourmand.cookedFoodMoodBonus
+            : COLONIST_CONFIG.mealMoodBonus;
+        if (colonist.traits.includes('comfort_eater')) mealMood += TRAITS.comfort_eater.mealMoodBonus;
+        let mealDuration = COLONIST_CONFIG.mealMoodDuration;
+        if (colonist.traits.includes('chef')) mealDuration = Math.round(mealDuration * TRAITS.chef.mealMoodDurationMult);
+        addThought(colonist, colonist.traits.includes('gourmand') ? 'Delicious meal' : 'Ate a meal', mealMood, mealDuration, game.tick);
     } else {
         const eaten = eatRawFoodstuff(game);
         if (eaten) {
             colonist.needs.hunger = Math.min(100, colonist.needs.hunger + COLONIST_CONFIG.rawFoodRestore);
             colonist.state = 'idle';
-            if (colonist.traits.includes('gourmand')) {
+            if (colonist.traits.includes('foraging_gut')) {
+                // No mood hit from raw food; still note the meal briefly.
+                addThought(colonist, 'Ate raw food', TRAITS.foraging_gut.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+            } else if (colonist.traits.includes('gourmand')) {
                 addThought(colonist, 'Ate raw food', TRAITS.gourmand.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
             } else {
                 const rawPenalty = getRaceModifier(colonist, 'rawFoodMoodPenalty', COLONIST_CONFIG.rawFoodMoodPenalty);
@@ -1478,6 +1937,7 @@ function updateSleeping(colonist, game) {
     let sleepRestMult = 1;
     if (colonist.traits.includes('light_sleeper')) sleepRestMult = TRAITS.light_sleeper.sleepRestMult;
     if (colonist.traits.includes('deep_sleeper')) sleepRestMult = TRAITS.deep_sleeper.sleepRestMult;
+    if (colonist.traits.includes('insomniac')) sleepRestMult *= TRAITS.insomniac.sleepRestMult;
     colonist.needs.rest = Math.min(100, colonist.needs.rest + COLONIST_CONFIG.restPerTick * sleepRestMult);
     if (game.tick % 12 === 0) {
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Zzz', color: '#8888ff', fontSize: 10, ttl: 11, maxTtl: 11 });
@@ -1549,9 +2009,9 @@ function updateFighting(colonist, game) {
         return;
     }
 
-    const fleeThreshold = colonist.traits.includes('brave')
-        ? colonist.maxHp * TRAITS.brave.fleeHpMult
-        : COLONIST_CONFIG.fleeHpThreshold;
+    let fleeThreshold = COLONIST_CONFIG.fleeHpThreshold;
+    if (colonist.traits.includes('brave')) fleeThreshold = colonist.maxHp * TRAITS.brave.fleeHpMult;
+    else if (colonist.traits.includes('coward')) fleeThreshold = colonist.maxHp * TRAITS.coward.fleeHpMult;
     if (colonist.hp < fleeThreshold || colonist.traits.includes('pacifist')) {
         colonist.state = 'fleeing';
         return;
@@ -1565,7 +2025,7 @@ function updateFighting(colonist, game) {
     let atkSpeed = 1 + getEquipmentStat(colonist, 'attackSpeed');
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
-            if (e.type === 'attackSpeed' && e.attackSpeedBonus) atkSpeed += e.attackSpeedBonus;
+            if (e.type === 'attackSpeed' && e.attackSpeed) atkSpeed += e.attackSpeed;
         }
     }
     const effectiveCooldown = Math.max(1, Math.round(baseCooldown / atkSpeed));
@@ -1579,7 +2039,8 @@ function updateFighting(colonist, game) {
         }
         let dmg = weaponDmg + Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
-        const critChance = getEquipmentStat(colonist, 'critChance');
+        dmg = Math.floor(dmg * getTraitDamageMult(colonist));
+        const critChance = getCritChance(colonist);
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
@@ -1623,7 +2084,8 @@ function updateFighting(colonist, game) {
         }
         let dmg = weaponDmg + Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
-        const critChance = getEquipmentStat(colonist, 'critChance');
+        dmg = Math.floor(dmg * getTraitDamageMult(colonist));
+        const critChance = getCritChance(colonist);
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
@@ -1677,7 +2139,7 @@ function updateHunting(colonist, game) {
     let atkSpeed = 1 + getEquipmentStat(colonist, 'attackSpeed');
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
-            if (e.type === 'attackSpeed' && e.attackSpeedBonus) atkSpeed += e.attackSpeedBonus;
+            if (e.type === 'attackSpeed' && e.attackSpeed) atkSpeed += e.attackSpeed;
         }
     }
     const effectiveCooldown = Math.max(1, Math.round(baseCooldown / atkSpeed));
@@ -1815,7 +2277,8 @@ function isIndoors(colonist, map) {
 }
 
 export function colonistTakeDamage(colonist, damage, game, attacker) {
-    const dodgeChance = getEquipmentStat(colonist, 'dodgeChance');
+    let dodgeChance = getEquipmentStat(colonist, 'dodgeChance');
+    if (colonist.traits.includes('duelist')) dodgeChance += TRAITS.duelist.dodgeChance;
     if (dodgeChance > 0 && Math.random() < dodgeChance) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '~', color: '#88ccff', ttl: 4 });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Block!', color: '#4488ff', fontSize: 11, ttl: 12, maxTtl: 12 });
@@ -1823,8 +2286,9 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
         return;
     }
     let mult = 1;
-    if (colonist.traits.includes('tough')) mult *= TRAITS.tough.damageTakenMult;
-    if (colonist.traits.includes('sturdy')) mult *= TRAITS.sturdy.damageTakenMult;
+    if (colonist.traits.includes('tough')) mult *= (1 - TRAITS.tough.damageReduction);
+    if (colonist.traits.includes('sturdy')) mult *= (1 - TRAITS.sturdy.damageReduction);
+    if (colonist.traits.includes('berserker')) mult *= (1 - TRAITS.berserker.damageReduction);
     const perAlly = getRaceModifier(colonist, 'allyDamageReduction', 0);
     if (perAlly > 0) {
         const cap = getRaceModifier(colonist, 'allyDamageReductionCap', 0.2);
@@ -1849,7 +2313,25 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.shieldBlockChar, color: COMBAT_VISUALS.shieldBlockColor, ttl: COMBAT_VISUALS.shieldBlockTtl });
         window.soundManager?.playSFX('shield_block');
     }
-    const actualDmg = Math.floor(damage * mult);
+    let actualDmg = Math.floor(damage * mult);
+    // Guardian Ward: flat absorb barriers soak damage before HP, oldest first,
+    // and expire when drained. Distinct from % 'shield' reduction applied above.
+    if (colonist.activeEffects && actualDmg > 0) {
+        let absorbed = false;
+        for (const e of colonist.activeEffects) {
+            if (actualDmg <= 0) break;
+            if (e.type === 'absorb' && e.absorbRemaining > 0) {
+                const soak = Math.min(e.absorbRemaining, actualDmg);
+                e.absorbRemaining -= soak;
+                actualDmg -= soak;
+                absorbed = true;
+            }
+        }
+        if (absorbed) {
+            colonist.activeEffects = colonist.activeEffects.filter(e => e.type !== 'absorb' || e.absorbRemaining > 0);
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.shieldBlockChar, color: COMBAT_VISUALS.shieldBlockColor, ttl: COMBAT_VISUALS.shieldBlockTtl });
+        }
+    }
     colonist.hp -= actualDmg;
     colonist._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
     if (actualDmg >= 5) {
