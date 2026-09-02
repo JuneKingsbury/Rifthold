@@ -302,6 +302,7 @@ function updateNeeds(colonist, game) {
     let restDecayMult = 1;
     if (colonist.traits.includes('light_sleeper')) restDecayMult = TRAITS.light_sleeper.restDecayMult;
     if (colonist.traits.includes('deep_sleeper')) restDecayMult = TRAITS.deep_sleeper.restDecayMult;
+    restDecayMult *= getRaceModifier(colonist, 'restDecayMult', 1);
     colonist.needs.rest = Math.max(0, colonist.needs.rest - NEED_DECAY.rest * restDecayMult);
 
     if (game.weather.season === 'winter' && !isIndoors(colonist, game.map)) {
@@ -375,6 +376,22 @@ function updateThoughts(colonist, game) {
     }
     if (colonist.traits.includes('lazy') && colonist.state === 'idle') {
         addThought(colonist, 'Relaxing', TRAITS.lazy.idleMoodBonus, 30, game.tick);
+    }
+
+    const indoorPenalty = getRaceModifier(colonist, 'indoorMoodPenalty', 0);
+    if (indoorPenalty < 0) {
+        if (isIndoors(colonist, game.map)) {
+            addThought(colonist, 'Restless indoors', indoorPenalty, 20, game.tick);
+        } else {
+            addThought(colonist, 'At home outdoors', 3, 20, game.tick);
+        }
+    }
+
+    const isoPenalty = getRaceModifier(colonist, 'isolatedMoodPenalty', 0);
+    if (isoPenalty < 0) {
+        const nearOthers = game.colonists.some(c => c.id !== colonist.id && c.hp > 0 &&
+            manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.socialRange);
+        if (!nearOthers) addThought(colonist, 'Rattled alone', isoPenalty, 20, game.tick);
     }
 }
 
@@ -463,6 +480,7 @@ function getWorkSpeed(colonist, game) {
     if (colonist.traits.includes('hard_worker')) speed *= TRAITS.hard_worker.workSpeedMult;
     if (colonist.traits.includes('lazy')) speed *= TRAITS.lazy.workSpeedMult;
     if (colonist.traits.includes('sturdy')) speed *= TRAITS.sturdy.workSpeedMult;
+    speed *= getRaceModifier(colonist, 'workSpeedMult', 1);
 
     const t = game.timeOfDay / CONFIG.TICKS_PER_DAY;
     const isNight = t > DAY_NIGHT.nightStart || t < DAY_NIGHT.dayStart;
@@ -472,6 +490,7 @@ function getWorkSpeed(colonist, game) {
     if (colonist.traits.includes('early_bird')) {
         speed *= isNight ? TRAITS.early_bird.nightSpeedMult : TRAITS.early_bird.daySpeedMult;
     }
+    speed *= isNight ? getRaceModifier(colonist, 'nightSpeedMult', 1) : getRaceModifier(colonist, 'daySpeedMult', 1);
 
     return speed;
 }
@@ -499,7 +518,17 @@ function getMoveSpeedBonus(colonist) {
         }
     }
     if (colonist.traits.includes('quick')) bonus += TRAITS.quick.moveSpeedBonus;
+    bonus += getRaceModifier(colonist, 'moveSpeedBonus', 0);
     return Math.min(bonus, 0.8);
+}
+
+// Reads a numeric modifier field off the colonist's race entry in TRAITS.
+// Returns `def` when absent so callers can multiply/add unconditionally.
+// Anything without a `.race` (e.g. golems) falls through to the default.
+export function getRaceModifier(colonist, field, def) {
+    const raceDef = colonist.race ? TRAITS[colonist.race] : null;
+    const v = raceDef?.[field];
+    return typeof v === 'number' ? v : def;
 }
 
 function getEquipmentWorkBonus(colonist, task) {
@@ -605,6 +634,7 @@ export function grantCastXp(colonist, spell, game) {
     let castXpGain = MAGIC_STUDY_CONFIG.xpPerCast;
     if (colonist.traits.includes('scholar')) castXpGain *= TRAITS.scholar.magicXpMult;
     if (colonist.traits.includes('prodigy')) castXpGain *= TRAITS.prodigy.magicXpMult;
+    castXpGain *= getRaceModifier(colonist, 'magicXpMult', 1);
     colonist._magicXpAccumulator[school] += castXpGain;
     let magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
     while (colonist._magicXpAccumulator[school] >= magicXpNeeded && colonist.magicSkills[school] < 10) {
@@ -1349,6 +1379,8 @@ function updateWorking(colonist, game) {
     if (task.skillRequired === 'farming' && colonist.traits.includes('green_thumb')) {
         speed *= TRAITS.green_thumb.farmingSpeedMult;
     }
+    if (task.skillRequired === 'farming') speed *= getRaceModifier(colonist, 'farmingSpeedMult', 1);
+    if (task.skillRequired === 'animals') speed *= getRaceModifier(colonist, 'animalWorkMult', 1);
     if ((task.type === 'craft' || task.type === 'cook') && colonist.traits.includes('creative')) {
         speed *= TRAITS.creative.craftingSpeedMult;
     }
@@ -1405,7 +1437,8 @@ function updateEating(colonist, game) {
             if (colonist.traits.includes('gourmand')) {
                 addThought(colonist, 'Ate raw food', TRAITS.gourmand.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
             } else {
-                addThought(colonist, 'Ate raw food', COLONIST_CONFIG.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+                const rawPenalty = getRaceModifier(colonist, 'rawFoodMoodPenalty', COLONIST_CONFIG.rawFoodMoodPenalty);
+                addThought(colonist, 'Ate raw food', rawPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
             }
         } else {
             colonist.state = 'idle';
@@ -1791,6 +1824,19 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
     let mult = 1;
     if (colonist.traits.includes('tough')) mult *= TRAITS.tough.damageTakenMult;
     if (colonist.traits.includes('sturdy')) mult *= TRAITS.sturdy.damageTakenMult;
+    const perAlly = getRaceModifier(colonist, 'allyDamageReduction', 0);
+    if (perAlly > 0) {
+        const cap = getRaceModifier(colonist, 'allyDamageReductionCap', 0.2);
+        const inRange = c => c.hp > 0 &&
+            manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.socialRange;
+        // Allies = other colonists (incl. golems, which live in game.colonists) plus
+        // friendly entities: tamed animals and summons.
+        let nearAllies = game.colonists.reduce((n, c) =>
+            (c.id !== colonist.id && inRange(c)) ? n + 1 : n, 0);
+        nearAllies += game.entities.reduce((n, e) =>
+            ((e.category === 'summon' || (e.category === 'animal' && e.tamed)) && inRange(e)) ? n + 1 : n, 0);
+        mult *= (1 - Math.min(cap, perAlly * nearAllies));
+    }
     mult *= getEquipmentDamageReduction(colonist);
     let shieldAbsorbed = false;
     if (colonist.activeEffects) {

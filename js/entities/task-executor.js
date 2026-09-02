@@ -1,7 +1,7 @@
 import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
-import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache } from './colonist.js';
+import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache, getRaceModifier } from './colonist.js';
 import { getHarvestYield } from '../systems/farming.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getCraftQualityBonus } from '../systems/complexBuildings.js';
@@ -99,6 +99,7 @@ function advanceTomeStudy(colonist, game, rate) {
     let studyXpGain = MAGIC_STUDY_CONFIG.xpPerStudyTick;
     if (colonist.traits.includes('scholar')) studyXpGain *= TRAITS.scholar.magicXpMult;
     if (colonist.traits.includes('prodigy')) studyXpGain *= TRAITS.prodigy.magicXpMult;
+    studyXpGain *= getRaceModifier(colonist, 'magicXpMult', 1);
     colonist._magicXpAccumulator[school] += studyXpGain;
     if (game.tick % 10 === 0) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.xpGainChar, color: COMBAT_VISUALS.xpGainColor, ttl: COMBAT_VISUALS.xpGainTtl });
@@ -460,6 +461,8 @@ export function completeTask(colonist, task, game) {
             let xpGain = COLONIST_CONFIG.skillXpPerTask;
             if (colonist.pedestalSkillBonus) xpGain *= (1 + colonist.pedestalSkillBonus);
             if (colonist.traits.includes('prodigy')) xpGain *= TRAITS.prodigy.allSkillXpMult;
+            xpGain *= getRaceModifier(colonist, 'allSkillXpMult', 1);
+            if (task.skillRequired === 'animals') xpGain *= getRaceModifier(colonist, 'animalXpMult', 1);
             colonist.skillXp[task.skillRequired] += xpGain;
             let xpNeeded = COLONIST_CONFIG.skillXpToLevel + colonist.skills[task.skillRequired] * COLONIST_CONFIG.skillXpScalePerLevel;
             while (colonist.skillXp[task.skillRequired] >= xpNeeded && colonist.skills[task.skillRequired] < maxLevel) {

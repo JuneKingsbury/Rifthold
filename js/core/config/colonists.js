@@ -52,11 +52,11 @@ export const TRAITS = {
     prodigy:          { name: 'Prodigy',          weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, description: 'Gains all XP 20% faster', expedition: { xpMult: 1.3 } },
     magically_gifted: { name: 'Magically Gifted', weight: 2, value:  3, description: 'Starts with 2 levels in a random magic school and knows its starter spell' },
     // ── Race-specific ────────────────────────────────────────────────────────
-    human:   { name: 'Human',   weight: 0, value:  10, allSkillXpMult: 1.2, description: 'A versatile member of Humanity (+20% non-magic skill exp)' },
-    nymph:   { name: 'Nymph',   weight: 0, value:  10, magicXpMult: 1.2, restDecayMult: 1.1, sleepRestMult: 1.1, description: 'A mystical member of the Nympha (+20% magic skill exp, sleeps less often)' },
-    ferin:   { name: 'Ferin',   weight: 0, value:  10, farmingSpeedMult: 1.1, positiveThoughtMult: 1.2, description: 'A jovial member of the Ferini (+10% farming speed, +20% positive thought bonuses)' },
-    kobalos: { name: 'Kobalos', weight: 0, value:  10, moveSpeedBonus: 0.10, workSpeedMult: 1.2, rawFoodMoodPenalty: 0, description: 'A rambunctious member of the Kobaloi (+10% move speed, +20% work speed, no penalties when eating raw food)' },
-    bufos:   { name: 'Bufos',   weight: 0, value:  10, restDecayMult: 0.9, sleepRestMult: 0.9, daySpeedMult: 1.1, nightSpeedMult: 0.9, description: 'A cold-blooded member of the Bufoi (Rests longer, works best in the sun)' },
+    human:   { name: 'Human',   weight: 0, value:  10, allSkillXpMult: 1.15, magicXpMult: 1.15, description: 'A versatile member of Humanity (learns all skills, magic and mundane, 15% faster)' },
+    nymph:   { name: 'Nymph',   weight: 0, value:  10, magicXpMult: 1.3, workSpeedMult: 0.85, description: 'A mystical member of the Nympha (+30% magic skill XP, but physically frail: -15% work speed)' },
+    ferin:   { name: 'Ferin',   weight: 0, value:  10, farmingSpeedMult: 1.2, animalXpMult: 1.5, animalWorkMult: 1.3, indoorMoodPenalty: -6, description: 'A wild member of the Ferini (+20% farming, gifted with animals, restless indoors)' },
+    kobalos: { name: 'Kobalos', weight: 0, value:  10, moveSpeedBonus: 0.10, allyDamageReduction: 0.05, allyDamageReductionCap: 0.20, isolatedMoodPenalty: -6, rawFoodMoodPenalty: 0, description: 'A pack-minded member of the Kobaloi (+10% move speed, tougher near allies, no raw-food penalty, but rattled alone)' },
+    bufos:   { name: 'Bufos',   weight: 0, value:  10, daySpeedMult: 1.15, nightSpeedMult: 0.85, restDecayMult: 0.85, description: 'A cold-blooded member of the Bufoi (+15% work by day, -15% by night, but rests efficiently)' },
 };
 
 export const RACES = {
