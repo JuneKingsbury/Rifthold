@@ -13,11 +13,15 @@ export function updateWildlife(game) {
         const animal = game.entities[i];
         if (animal.category !== 'animal' || animal.tamed) continue;
         if (animal.hp <= 0) {
-            const def = ANIMALS[animal.type];
-            if (def) {
-                const yield_ = { meat: def.meatYield };
-                if (def.hideYield) yield_.hides = def.hideYield;
-                game.resources.add(yield_);
+            // Animals that wandered off the map die silently, no meat/hides. Only
+            // hunted or combat-killed animals (which never set _leftMap) yield loot.
+            if (!animal._leftMap) {
+                const def = ANIMALS[animal.type];
+                if (def) {
+                    const yield_ = { meat: def.meatYield };
+                    if (def.hideYield) yield_.hides = def.hideYield;
+                    game.resources.add(yield_);
+                }
             }
             game.entities.splice(i, 1);
             continue;
@@ -106,6 +110,7 @@ function updateAnimal(animal, game) {
 
     if (animal.x < 0 || animal.x >= CONFIG.MAP_WIDTH || animal.y < 0 || animal.y >= CONFIG.MAP_HEIGHT) {
         animal.hp = 0;
+        animal._leftMap = true;
     }
 }
 
@@ -183,13 +188,19 @@ function findNearestColonist(animal, game) {
 function fleeFrom(animal, threat, game, dur) {
     const dx = Math.sign(animal.x - threat.x);
     const dy = Math.sign(animal.y - threat.y);
-    const nx = animal.x + dx;
-    const ny = animal.y + dy;
-    if (isPassableForAnimals(game.map, nx, ny) || isEdgeExit(animal.x, animal.y, nx, ny)) {
-        moveEntity(animal, nx, ny, dur);
-    } else {
-        randomMove(animal, game, dur);
+    // Movement is cardinal only (no diagonals): step away along one axis. Try the
+    // axis of greater separation first so the animal flees in its best direction.
+    const steps = [];
+    if (dx !== 0) steps.push([animal.x + dx, animal.y]);
+    if (dy !== 0) steps.push([animal.x, animal.y + dy]);
+    if (Math.abs(animal.y - threat.y) > Math.abs(animal.x - threat.x)) steps.reverse();
+    for (const [nx, ny] of steps) {
+        if (isPassableForAnimals(game.map, nx, ny) || isEdgeExit(animal.x, animal.y, nx, ny)) {
+            moveEntity(animal, nx, ny, dur);
+            return;
+        }
     }
+    randomMove(animal, game, dur);
 }
 
 function moveToward(animal, target, game, dur) {

@@ -1,6 +1,6 @@
 import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG } from '../core/config.js';
-import { manhattanDist } from '../world/pathfinding.js';
-import { isPassable, isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
+import { manhattanDist, findPathForEnemies } from '../world/pathfinding.js';
+import { isPassable, isPassableForEnemies, isBreakableByEnemies, hasLineOfSight, findLineOfSightTile } from '../world/map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { colonistTakeDamage } from './colonist.js';
 
@@ -147,8 +147,20 @@ export const ROLE_HANDLERS = {
             }
 
             const dist = manhattanDist(entity.x, entity.y, target.x, target.y);
+            const hasLos = hasLineOfSight(game.map, entity.x, entity.y, target.x, target.y);
 
-            if (dist <= range && dist >= 2) {
+            if (dist <= range && dist >= 2 && !hasLos) {
+                // In range but a wall/door blocks the shot: step to a tile that
+                // reclaims line of sight rather than standing still. If no shootable
+                // tile is reachable (target sealed behind walls), lay siege — breach
+                // toward it instead of idling.
+                const losTile = findLineOfSightTile(game.map, entity.x, entity.y, target.x, target.y, range, isPassableForEnemies);
+                if (losTile) {
+                    moveToward(entity, losTile, game.map, dur, game);
+                } else {
+                    siegeMoveToward(entity, target, role, game.map, dur, game);
+                }
+            } else if (dist <= range && dist >= 2) {
                 if (canAttack(entity, game)) {
                     // A hostile entity's targets are colonists (see getTargets); they must take
                     // damage through colonistTakeDamage so armor/dodge/shield and the death path
@@ -172,7 +184,8 @@ export const ROLE_HANDLERS = {
                     fleeFrom(entity, target, game.map, dur, game);
                 }
             } else if (dist > range) {
-                moveToward(entity, target, game.map, dur, game);
+                // Out of range: close in, breaching walls if the target is sealed off.
+                siegeMoveToward(entity, target, role, game.map, dur, game);
             } else {
                 fleeFrom(entity, target, game.map, dur, game);
             }
@@ -222,7 +235,9 @@ export const ROLE_HANDLERS = {
                     game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
                 }
             } else {
-                moveToward(entity, target, game.map, dur, game);
+                // Siege: route toward the target, breaching walls/doors when the
+                // colonist is sealed off rather than freezing at the barrier.
+                siegeMoveToward(entity, target, role, game.map, dur, game);
             }
         },
     },
@@ -277,20 +292,8 @@ export const ROLE_HANDLERS = {
             if (!entity.path || entity.path.length === 0) return;
             const next = entity.path[0];
             if (isBreakableByEnemies(game.map, next.x, next.y)) {
-                const tile = game.map[next.y][next.x];
-                if (tile.structureHp === undefined) {
-                    tile.structureHp = BUILDINGS[tile.structure]?.hp || 50;
-                }
                 const breakDmg = entity.damage * (role.breakSpeed || 1);
-                tile.structureHp -= breakDmg;
-                game.combatEffects.push({ x: next.x, y: next.y, char: '*', color: '#ffaa00', ttl: 2 });
-                if (tile.structureHp <= 0) {
-                    const old = tile.structure;
-                    tile.structure = null;
-                    tile.structureHp = undefined;
-                    tile.passable = true;
-                    if (game.mapIndex) game.mapIndex.removeStructure(next.x, next.y, old);
-                    game.roomsDirty = true;
+                if (damageStructureTile(game.map, next.x, next.y, breakDmg, game)) {
                     entity.path = null;
                 }
             }
@@ -591,6 +594,84 @@ function moveToward(entity, target, map, dur, game) {
 
     entity._path.shift(); // consume the step.
     moveEntity(entity, nx, ny, dur);
+}
+
+// Applies breach damage to the breakable structure at (x,y). Lazily seeds
+// structureHp from the building def, spawns a hit FX, and once HP is depleted
+// removes the structure, reopens the tile, updates the map index, and flags
+// rooms dirty. Returns true if the structure was destroyed this call. Shared by
+// the structure_breaker role and the melee-charger siege fallback.
+function damageStructureTile(map, x, y, breakDmg, game) {
+    const tile = map[y][x];
+    if (tile.structureHp === undefined) {
+        tile.structureHp = BUILDINGS[tile.structure]?.hp || 50;
+    }
+    tile.structureHp -= breakDmg;
+    game.combatEffects.push({ x, y, char: '*', color: '#ffaa00', ttl: 2 });
+    if (tile.structureHp <= 0) {
+        const old = tile.structure;
+        tile.structure = null;
+        tile.structureHp = undefined;
+        tile.passable = true;
+        if (game.mapIndex) game.mapIndex.removeStructure(x, y, old);
+        game.roomsDirty = true;
+        // Clear dangling bed assignments and invalidate wave routing, matching
+        // combat.js attackStructure so a breached tile is handled the same way
+        // regardless of which breaker (raider siege, structure_breaker) opened it.
+        if (old === 'bed') {
+            for (const c of game.colonists) {
+                if (c.assignedBed && c.assignedBed.x === x && c.assignedBed.y === y) {
+                    c.assignedBed = null;
+                }
+            }
+        }
+        if (game.waves && game.waves.enemies) {
+            for (const enemy of game.waves.enemies) { enemy.path = null; }
+            game.waves.invalidatePathPreview();
+        }
+        return true;
+    }
+    return false;
+}
+
+// Siege-aware approach for hostiles: routes toward the target with
+// findPathForEnemies, which prefers open ground but treats breakable walls/doors
+// as high-cost passable tiles (see enemyPassability). When the cheapest route
+// runs through a wall — i.e. the target is walled off and going around is too
+// costly or impossible — the attacker breaches that wall instead of freezing.
+// Breaking is paced by the attacker's normal attack cooldown so it chips a wall
+// at the same rate it strikes a colonist. Uses a dedicated `_siegePath` cache
+// (distinct from moveToward's `_path`) so the {x,y} node format never collides
+// with moveToward's [x,y] arrays on entities that use both movers.
+function siegeMoveToward(entity, target, role, map, dur, game) {
+    const targetMoved =
+        !entity._siegeTarget ||
+        entity._siegeTarget.x !== target.x ||
+        entity._siegeTarget.y !== target.y;
+
+    if (targetMoved || !entity._siegePath || entity._siegePath.length === 0) {
+        entity._siegePath = findPathForEnemies(map, entity.x, entity.y, target.x, target.y) ?? [];
+        entity._siegeTarget = { x: target.x, y: target.y };
+    }
+
+    if (entity._siegePath.length === 0) return;
+
+    const next = entity._siegePath[0];
+
+    // A wall/door lies on the cheapest route: breach it rather than walk through.
+    if (isBreakableByEnemies(map, next.x, next.y)) {
+        if (!canAttack(entity, game)) return;
+        const breakDmg = entity.damage * (role.breakSpeed || 1);
+        if (damageStructureTile(map, next.x, next.y, breakDmg, game)) {
+            entity._siegePath = null; // route opened up — recompute next tick.
+        }
+        return;
+    }
+
+    if (game && game.isTileOccupied(next.x, next.y)) return;
+
+    entity._siegePath.shift();
+    moveEntity(entity, next.x, next.y, dur);
 }
 
 // A* path finding for the non-greedy movement option.

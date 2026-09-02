@@ -1,4 +1,4 @@
-import { CONFIG, WALL_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, CROPS } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, CROPS } from '../core/config.js';
 
 export function createTile(terrain) {
     return {
@@ -462,7 +462,34 @@ export function hasLineOfSight(map, x0, y0, x1, y1) {
         if (!tile) return false;
         if (tile.passable === false) return false;
         if (WALL_STRUCTURES.has(tile.structure)) return false;
+        if (DOOR_STRUCTURES.has(tile.structure)) return false;
     }
 
     return true;
+}
+
+// Finds the nearest tile the shooter can stand on that has line of sight to
+// (tx,ty), for repositioning a ranged attacker whose current shot is blocked.
+// Scans a box out to `radius` (the weapon's range), skips the shooter's own
+// tile, and requires: passCheck(map,x,y) true (isPassable for colonists,
+// isPassableForEnemies for hostiles), the tile within `radius` Manhattan of the
+// target so a shot is still possible, and clear LOS from the tile to the target.
+// Returns the closest qualifying tile by Manhattan distance to the shooter, or
+// null when no such tile exists.
+export function findLineOfSightTile(map, fromX, fromY, tx, ty, radius, passCheck) {
+    let best = null;
+    let bestDist = Infinity;
+    for (let y = fromY - radius; y <= fromY + radius; y++) {
+        for (let x = fromX - radius; x <= fromX + radius; x++) {
+            if (x === fromX && y === fromY) continue;
+            const shooterDist = Math.abs(x - fromX) + Math.abs(y - fromY);
+            if (shooterDist > radius || shooterDist >= bestDist) continue;
+            if (Math.abs(x - tx) + Math.abs(y - ty) > radius) continue;
+            if (!passCheck(map, x, y)) continue;
+            if (!hasLineOfSight(map, x, y, tx, ty)) continue;
+            best = { x, y };
+            bestDist = shooterDist;
+        }
+    }
+    return best;
 }

@@ -1,7 +1,7 @@
 import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
-import { isPassable, getMoveCost, hasLineOfSight, isWalkableFurniture } from '../world/map.js';
+import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture } from '../world/map.js';
 import { moveEntity, computeMoveDuration, computeMoveCooldown } from '../systems/movement-lerp.js';
 import { FOODSTUFFS } from '../systems/resources.js';
 import { spawnSummon } from './summons.js';
@@ -665,7 +665,12 @@ function shouldCastSpell(colonist, spell, game) {
             const hostile = findNearestHostile(colonist, game);
             if (!hostile) return false;
             const dist = manhattanDist(colonist.x, colonist.y, hostile.x, hostile.y);
-            return dist <= (spell.range || COLONIST_CONFIG.fightEngageDistance);
+            if (dist > (spell.range || COLONIST_CONFIG.fightEngageDistance)) return false;
+            // Damage spells need a clear shot. Buffs, teleports and summons may still
+            // trigger with an enemy behind cover.
+            const needsLos = spell.effect === 'ranged_damage' || spell.effect === 'ranged_damage_aoe';
+            if (needsLos && !hasLineOfSight(game.map, colonist.x, colonist.y, hostile.x, hostile.y)) return false;
+            return true;
         }
         case 'lowHealth':
             return colonist.hp < colonist.maxHp * (spell.hpThreshold || 0.5);
@@ -681,9 +686,35 @@ function shouldCastSpell(colonist, spell, game) {
         case 'always':
             if (spell.idleExclude && colonist.state === 'idle') return false;
             return true;
+        case 'cropsNearby':
+            return findNearestGrowingCrop(colonist, game, spell.range || 5) !== null;
         default:
             return false;
     }
+}
+
+// Finds the nearest farm tile in the 'growing' state within `range` (Manhattan)
+// of the colonist, used by crop-boost spells to decide whether to auto-cast and
+// where to center the effect. Returns {x, y} or null when none is in range.
+function findNearestGrowingCrop(colonist, game, range) {
+    let best = null;
+    let bestDist = Infinity;
+    const consider = (x, y) => {
+        const tile = game.map[y]?.[x];
+        if (!tile || !tile.zone || tile.zone.state !== 'growing') return;
+        const d = manhattanDist(colonist.x, colonist.y, x, y);
+        if (d <= range && d < bestDist) { bestDist = d; best = { x, y }; }
+    };
+    if (game.mapIndex) {
+        for (const { x, y } of game.mapIndex.getZonePositions()) consider(x, y);
+    } else {
+        for (let y = Math.max(0, colonist.y - range); y <= Math.min(game.map.length - 1, colonist.y + range); y++) {
+            for (let x = Math.max(0, colonist.x - range); x <= Math.min(game.map[y].length - 1, colonist.x + range); x++) {
+                consider(x, y);
+            }
+        }
+    }
+    return best;
 }
 
 function applySpellEffect(colonist, spell, game) {
@@ -693,6 +724,7 @@ function applySpellEffect(colonist, spell, game) {
             if (!target) return;
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
             let dmg = spell.damage;
             const spellBonus = getEquipmentSpellBonus(colonist);
             if (spellBonus) dmg = Math.floor(dmg * (1 + spellBonus));
@@ -713,6 +745,7 @@ function applySpellEffect(colonist, spell, game) {
             if (!target) return;
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
             let aoeDmg = spell.damage;
             const aoeSpellBonus = getEquipmentSpellBonus(colonist);
             if (aoeSpellBonus) aoeDmg = Math.floor(aoeDmg * (1 + aoeSpellBonus));
@@ -747,6 +780,29 @@ function applySpellEffect(colonist, spell, game) {
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
             colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
             game.combatEffects.push({ x: target.x, y: target.y, char: spell.projectileChar || '✝', color: spell.projectileColor || '#ffffaa', ttl: 4 });
+            break;
+        }
+        case 'boost_crops': {
+            // Center the boost box on the nearest growing crop (not the colonist)
+            // so the radius lands on actual crops. shouldCastSpell's cropsNearby
+            // trigger guarantees one exists, but guard anyway.
+            const center = findNearestGrowingCrop(colonist, game, spell.range || 5);
+            if (!center) return;
+            for (let dy = -spell.radius; dy <= spell.radius; dy++) {
+                for (let dx = -spell.radius; dx <= spell.radius; dx++) {
+                    const tx = center.x + dx;
+                    const ty = center.y + dy;
+                    if (tx < 0 || ty < 0 || tx >= CONFIG.MAP_WIDTH || ty >= CONFIG.MAP_HEIGHT) continue;
+                    const tile = game.map[ty][tx];
+                    if (tile.zone && tile.zone.state === 'growing') {
+                        if (!tile.zone._growthBoost) tile.zone._growthBoost = { mult: 1, expiresAt: 0 };
+                        tile.zone._growthBoost.mult = spell.growthMult;
+                        tile.zone._growthBoost.expiresAt = game.tick + spell.duration;
+                    }
+                    game.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: COMBAT_VISUALS.spellGrowthColor, ttl: 4 });
+                }
+            }
+            window.soundManager?.playSFX('spell_growth');
             break;
         }
         case 'heal':
@@ -1412,6 +1468,37 @@ function updateSleeping(colonist, game) {
     }
 }
 
+// Steps one tile along a cached A* path toward `dest` (an {x,y} tile) while a
+// colonist is in the fighting state. Routing (rather than the old greedy single-
+// axis stepping) lets a colonist leave a building through any door to reach a
+// raider, instead of only when a door happens to lie straight toward the threat.
+// `adjacent` true → path to a tile beside dest (melee: stand next to the target);
+// false → path onto dest itself (ranged: a specific line-of-sight tile). The path
+// is cached on the colonist and recomputed only when the target shifts, the path
+// runs out, or the colonist is no longer standing on it — so A* isn't re-run every
+// tick for every fighter during a wave.
+function fightStepToward(colonist, dest, adjacent, game) {
+    const targetMoved = !colonist._fightDest
+        || manhattanDist(dest.x, dest.y, colonist._fightDest.x, colonist._fightDest.y) > 1;
+    const path = colonist._fightPath;
+    const offPath = !path || path.length === 0
+        || (Math.abs(path[0].x - colonist.x) + Math.abs(path[0].y - colonist.y)) !== 1;
+    if (targetMoved || offPath) {
+        const fresh = adjacent
+            ? findPathAdjacent(game.map, colonist.x, colonist.y, dest.x, dest.y, game._occupiedTiles)
+            : findPath(game.map, colonist.x, colonist.y, dest.x, dest.y, game._occupiedTiles);
+        colonist._fightPath = fresh || [];
+        colonist._fightDest = { x: dest.x, y: dest.y };
+    }
+    if (colonist._fightPath.length === 0) return;
+    const next = colonist._fightPath[0];
+    if (!isPassable(game.map, next.x, next.y)) { colonist._fightPath = []; return; }
+    if (game.isTileOccupied(next.x, next.y)) return; // blocked by another entity; wait a tick
+    colonist._fightPath.shift();
+    const dur = CONFIG.TICK_RATE / game.speed;
+    moveEntity(colonist, next.x, next.y, dur);
+}
+
 function updateFighting(colonist, game) {
     const target = findNearestHostile(colonist, game);
     if (!target) {
@@ -1475,15 +1562,23 @@ function updateFighting(colonist, game) {
             skinKey: weapon.skinKey || 'projectile_arrow',
             _startTime: performance.now(), _duration: projDuration,
         });
-    } else if (dist > 1 && (!isRanged || dist > weaponRange)) {
-        const dx = Math.sign(target.x - colonist.x);
-        const dy = Math.sign(target.y - colonist.y);
-        const dur = CONFIG.TICK_RATE / game.speed;
-        if (dx !== 0 && isPassable(game.map, colonist.x + dx, colonist.y)) {
-            moveEntity(colonist, colonist.x + dx, colonist.y, dur);
-        } else if (dy !== 0 && isPassable(game.map, colonist.x, colonist.y + dy)) {
-            moveEntity(colonist, colonist.x, colonist.y + dy, dur);
+    } else if (isRanged && dist <= weaponRange && dist >= 2) {
+        // In range but the shot is blocked (the fire branch above requires LOS):
+        // route toward the nearest tile that can see the target instead of standing
+        // still and falling through to a melee swing. If no shootable tile exists
+        // within range, close on the target (path adjacent) to round the obstruction.
+        const losTile = findLineOfSightTile(game.map, colonist.x, colonist.y, target.x, target.y, weaponRange, isPassable);
+        if (losTile) {
+            fightStepToward(colonist, losTile, false, game);
+        } else {
+            fightStepToward(colonist, target, true, game);
         }
+        return;
+    } else if (dist > 1 && (!isRanged || dist > weaponRange)) {
+        // Route to a tile adjacent to the target so the colonist walks out through
+        // any door and around walls, rather than greedily stepping into a wall when
+        // the raider approaches from a side the door doesn't face.
+        fightStepToward(colonist, target, true, game);
         return;
     } else {
         if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;

@@ -45,8 +45,8 @@ export const SPELLS = {
     summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 4, manaCost: 40, cooldown: 600, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
 
     // Transmutation
-    nurture: { name: 'Nurture', school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 200, castType: 'targeted', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },
-    circle_of_growth: { name: 'Circle of Growth', school: 'transmutation', minLevel: 2, manaCost: 20, cooldown: 400, castType: 'targeted', effect: 'boost_crops', range: 10, radius: 3, growthMult: 2.0, duration: 200 },
+    nurture: { name: 'Nurture', school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 600, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },
+    circle_of_growth: { name: 'Circle of Growth', school: 'transmutation', minLevel: 2, manaCost: 20, cooldown: 1200, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 10, radius: 3, growthMult: 2.0, duration: 200 },
     level_field: { name: 'Level Field', school: 'transmutation', minLevel: 4, manaCost: 30, cooldown: 600, castType: 'targeted', effect: 'terraform', range: 8, radius: 3, targetTerrain: 'grass' },
     
     // Divination
