@@ -80,7 +80,7 @@ export const WEAPONS = {
     wooden_wand: { name: 'Wooden Wand', damage: 3, tier: 1, attackCooldown: 2, spellDamageBonus: 0.2, ranged: true, range: 5, projectileChar: '·', projectileColor: '#aaccff', skinKey: 'projectile_spell', description: 'A basic wand for aspiring mages. Attacks quickly.', recipe: { input: { wood: 3, planks: 1 }, ticks: 12, research: 'arcane_implements' } },
     crystal_staff: { name: 'Crystal Staff', damage: 8, tier: 2, spellDamageBonus: 0.35, ranged: true, range: 6, projectileChar: '✦', projectileColor: '#88ddff', skinKey: 'projectile_spell', description: 'A staff topped with a focusing crystal.', recipe: { input: { iron: 2, planks: 2, runite: 1 }, ticks: 28, research: 'arcane_implements', station: 'anvil' } },
     runic_wand: { name: 'Runic Wand', damage: 7, tier: 3, attackCooldown: 2, spellDamageBonus: 0.5, ranged: true, range: 7, projectileChar: '·', projectileColor: '#dd88ff', skinKey: 'projectile_spell', description: 'A wand inscribed with potent spell-amplifying runes. Attacks quickly.', recipe: { input: { runite: 2, planks: 2 }, ticks: 35, research: 'void_sorcery', station: 'enchanting_table' } },
-    void_staff: { name: 'Void Staff', damage: 12, tier: 4, spellDamageBonus: 0.65, ranged: true, range: 8, projectileChar: '✦', projectileColor: '#cc00ff', skinKey: 'projectile_spell', description: 'A staff channeling raw void energy.', recipe: { input: { void_essence: 5, runite: 2, planks: 2 }, ticks: 55, research: 'void_sorcery', station: 'enchanting_table' } },
+    void_staff: { name: 'Void Staff', damage: 16, tier: 4, spellDamageBonus: 0.65, ranged: true, range: 8, projectileChar: '✦', projectileColor: '#cc00ff', skinKey: 'projectile_spell', description: 'A staff channeling raw void energy.', recipe: { input: { void_essence: 5, runite: 2, planks: 2 }, ticks: 55, research: 'void_sorcery', station: 'enchanting_table' } },
     short_bow: { name: 'Short Bow', damage: 7, tier: 1, ranged: true, range: 5, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', description: 'A simple short-range bow.', recipe: { input: { wood: 3, leather: 1 }, ticks: 14 } },
     hunting_bow: { name: 'Hunting Bow', damage: 10, tier: 2, ranged: true, range: 6, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', description: 'A sturdy bow made for hunting.', recipe: { input: { planks: 2, leather: 2, iron: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
     iron_crossbow: { name: 'Iron Crossbow', tradeValue: 38, damage: 22, tier: 2, attackCooldown: 5, ranged: true, range: 7, projectileChar: '→', projectileColor: '#aaddff', skinKey: 'projectile_bolt', description: 'A mechanical crossbow with iron bolts. Slow but powerful.', recipe: { input: { iron: 3, planks: 2, leather: 1 }, ticks: 30, research: 'marksmanship', station: 'anvil' } },
@@ -89,36 +89,43 @@ export const WEAPONS = {
     void_blade: { name: 'Void Blade', damage: 52, tier: 4, attackCooldown: 5, description: 'The ultimate melee weapon, forged in the void. Slow but devastating.', recipe: { input: { void_essence: 6, runite: 2, planks: 1 }, ticks: 60, research: 'void_forging', station: 'enchanting_table' } },
 };
 
+// `order` groups a set's pieces together within a tier in the crafting menu
+// (the helmet/boots sharing the same number sit next to the matching body).
+// It is a within-tier tiebreaker only — tier remains the primary sort key.
 export const ARMORS = {
-    wool_parka: { name: 'Wool Parka', damageReduction: 0.04, tier: 1, coldResistance: 0.7, hungerReduction: 0.1, description: 'Warm wool parka. Resists cold and reduces hunger.', recipe: { input: { wool: 4, leather: 1 }, ticks: 16 } },
-    iron_brigandine: { name: 'Iron Brigandine', damageReduction: 0.08, tier: 1, description: 'Light iron armor offering basic protection.', recipe: { input: { iron: 2 }, ticks: 14, research: 'metalworking', station: 'anvil' } },
-    leather_vest: { name: 'Leather Vest', damageReduction: 0.10, tier: 1, description: 'A sturdy leather vest.', recipe: { input: { leather: 3 }, ticks: 18 } },
-    enchanted_tunic: { name: 'Enchanted Tunic', damageReduction: 0.12, tier: 2, spellDamageBonus: 0.10, description: 'A leather tunic woven with mana threads. Light protection with arcane attunement.', recipe: { input: { leather: 2, planks: 2, iron: 1 }, ticks: 24, research: 'mana_weaving', station: 'enchanting_table' } },
-    mana_weave_robe: { name: 'Mana-Weave Robe', damageReduction: 0.18, tier: 3, spellDamageBonus: 0.20, description: 'A robe woven with mana threads. Boosts spell damage.', recipe: { input: { runite: 2, leather: 2, iron: 1 }, ticks: 40, research: 'mana_weaving', station: 'enchanting_table' } },
-    iron_chainmail: { name: 'Iron Chainmail', damageReduction: 0.16, tier: 2, description: 'Interlocking iron rings for solid protection.', recipe: { input: { iron: 4, leather: 2 }, ticks: 30, research: 'metalworking', station: 'anvil' } },
-    runic_plate: { name: 'Runic Plate', tradeValue: 48, damageReduction: 0.24, tier: 3, description: 'Heavy plate armor inscribed with protective runes.', recipe: { input: { runite: 3, iron: 2, leather: 1 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
-    void_armor: { name: 'Void Armor', damageReduction: 0.3, tier: 4, description: 'Armor forged from void essence. Maximum protection.', recipe: { input: { void_essence: 5, runite: 2, iron: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
-    living_bark_armor: { name: 'Living Bark Armor', textColor: '#4488ff', tradeValue: 55, damageReduction: 0.35, tier: 3, description: 'Armor grown from a living tree. Regenerates the wearer.', healthRegen: 0.07 },
-    armor_of_the_abyss: { name: 'Armor of the Abyss', textColor: '#ff4444', tradeValue: 70, damageReduction: 0.45, tier: 4, description: 'Abyssal armor that draws fire and shrugs off blows.', targetPriority: 10 },
+    wool_parka: { name: 'Wool Parka', damageReduction: 0.04, tier: 1, order: 1, coldResistance: 0.7, hungerReduction: 0.1, description: 'Warm wool parka. Resists cold and reduces hunger.', recipe: { input: { wool: 4, leather: 1 }, ticks: 16 } },
+    iron_brigandine: { name: 'Iron Brigandine', damageReduction: 0.08, tier: 1, order: 3, description: 'Light iron armor offering basic protection.', recipe: { input: { iron: 2 }, ticks: 14, research: 'metalworking', station: 'anvil' } },
+    leather_vest: { name: 'Leather Vest', damageReduction: 0.10, tier: 1, order: 2, description: 'A sturdy leather vest.', recipe: { input: { leather: 3 }, ticks: 18 } },
+    enchanted_tunic: { name: 'Enchanted Tunic', damageReduction: 0.12, tier: 2, order: 4, spellDamageBonus: 0.10, description: 'A leather tunic woven with mana threads. Light protection with arcane attunement.', recipe: { input: { leather: 2, planks: 2, iron: 1 }, ticks: 24, research: 'mana_weaving', station: 'enchanting_table' } },
+    mana_weave_robe: { name: 'Mana-Weave Robe', damageReduction: 0.18, tier: 3, order: 6, spellDamageBonus: 0.20, description: 'A robe woven with mana threads. Boosts spell damage.', recipe: { input: { runite: 2, leather: 2, iron: 1 }, ticks: 40, research: 'mana_weaving', station: 'enchanting_table' } },
+    iron_chainmail: { name: 'Iron Chainmail', damageReduction: 0.16, tier: 2, order: 3, description: 'Interlocking iron rings for solid protection.', recipe: { input: { iron: 4, leather: 2 }, ticks: 30, research: 'metalworking', station: 'anvil' } },
+    runic_plate: { name: 'Runic Plate', tradeValue: 48, damageReduction: 0.24, tier: 3, order: 5, description: 'Heavy plate armor inscribed with protective runes.', recipe: { input: { runite: 3, iron: 2, leather: 1 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
+    void_armor: { name: 'Void Armor', damageReduction: 0.38, tier: 4, order: 8, description: 'Armor forged from void essence. Maximum protection.', recipe: { input: { void_essence: 5, runite: 2, iron: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    living_bark_armor: { name: 'Living Bark Armor', textColor: '#4488ff', tradeValue: 55, damageReduction: 0.35, tier: 3, order: 9, description: 'Armor grown from a living tree. Regenerates the wearer.', healthRegen: 0.07 },
+    duelists_silks: { name: "Duelist's Silks", tier: 3, order: 7, dodgeChance: 0.15, moveSpeedBonus: 0.1, description: 'Featherlight enchanted silks that let the wearer slip aside from incoming blows.', recipe: { input: { cloth: 3, runite: 1, void_essence: 1 }, ticks: 34, research: 'mana_weaving', station: 'enchanting_table' } },
+    armor_of_the_abyss: { name: 'Armor of the Abyss', textColor: '#ff4444', tradeValue: 70, damageReduction: 0.45, tier: 4, order: 10, description: 'Abyssal armor that draws fire and shrugs off blows.', targetPriority: 10 },
 };
 
+// `order` mirrors the matching body armor's value so a helmet renders next to
+// its set's chest piece within the tier (see ARMORS above).
 export const HELMETS = {
-    wool_cap: { name: 'Wool Cap', damageReduction: 0.02, tier: 1, coldResistance: 0.4, moodBonus: 3, description: 'A cozy wool cap. Keeps spirits and warmth up.', recipe: { input: { wool: 3 }, ticks: 10 } },
-    leather_cap: { name: 'Leather Cap', damageReduction: 0.05, tier: 1, description: 'A simple leather skullcap.', recipe: { input: { leather: 2 }, ticks: 12 } },
-    iron_helmet: { name: 'Iron Helmet', damageReduction: 0.08, tier: 2, description: 'A solid iron helmet.', recipe: { input: { iron: 3 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
-    mages_circlet: { name: "Mage's Circlet", damageReduction: 0.06, tier: 2, spellDamageBonus: 0.08, description: 'A circlet of woven iron and crystal. Focuses magical energy.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'arcane_implements', station: 'anvil' } },
-    runic_helm: { name: 'Runic Helm', tradeValue: 38, damageReduction: 0.14, tier: 3, description: 'A helm etched with protective runes.', recipe: { input: { runite: 2, iron: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
-    runic_hood: { name: 'Runic Hood', damageReduction: 0.10, tier: 3, spellDamageBonus: 0.12, description: 'A hood inscribed with runes of clarity. Amplifies spellcraft.', recipe: { input: { runite: 2, leather: 1 }, ticks: 32, research: 'mana_weaving', station: 'enchanting_table' } },
-    void_crown: { name: 'Void Crown', damageReduction: 0.18, tier: 4, spellDamageBonus: 0.15, description: 'A crown of void energy. Boosts spells and protection.', recipe: { input: { void_essence: 4, runite: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
-    mycelium_crown: { name: 'Mycelium Crown', textColor: '#4488ff', tradeValue: 50, damageReduction: 0.08, tier: 3, description: 'A crown woven from fungal threads. Enhances growth.', workSpeedBonus: 0.15, pedestal: { radius: 5, manaCost: 2, skillGrowthBonus: 0.15 }, expedition: { trapDamageMult: 0.6 } },
-    scholars_spectacles: { name: "Scholar's Spectacles", textColor: '#4488ff', tradeValue: 45, damageReduction: 0.04, tier: 2, description: 'Enchanted lenses that sharpen the mind.', workSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 2, skillGrowthBonus: 0.1 } },
+    wool_cap: { name: 'Wool Cap', damageReduction: 0.02, tier: 1, order: 1, coldResistance: 0.4, moodBonus: 3, description: 'A cozy wool cap. Keeps spirits and warmth up.', recipe: { input: { wool: 3 }, ticks: 10 } },
+    leather_cap: { name: 'Leather Cap', damageReduction: 0.05, tier: 1, order: 2, description: 'A simple leather skullcap.', recipe: { input: { leather: 2 }, ticks: 12 } },
+    iron_helmet: { name: 'Iron Helmet', damageReduction: 0.08, tier: 2, order: 3, description: 'A solid iron helmet.', recipe: { input: { iron: 3 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
+    mages_circlet: { name: "Mage's Circlet", damageReduction: 0.06, tier: 2, order: 4, spellDamageBonus: 0.08, description: 'A circlet of woven iron and crystal. Focuses magical energy.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'arcane_implements', station: 'anvil' } },
+    runic_helm: { name: 'Runic Helm', tradeValue: 38, damageReduction: 0.14, tier: 3, order: 5, description: 'A helm etched with protective runes.', recipe: { input: { runite: 2, iron: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
+    runic_hood: { name: 'Runic Hood', damageReduction: 0.10, tier: 3, order: 6, spellDamageBonus: 0.12, description: 'A hood inscribed with runes of clarity. Amplifies spellcraft.', recipe: { input: { runite: 2, leather: 1 }, ticks: 32, research: 'mana_weaving', station: 'enchanting_table' } },
+    void_crown: { name: 'Void Crown', damageReduction: 0.18, tier: 4, order: 8, spellDamageBonus: 0.15, description: 'A crown of void energy. Boosts spells and protection.', recipe: { input: { void_essence: 4, runite: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
+    mycelium_crown: { name: 'Mycelium Crown', textColor: '#4488ff', tradeValue: 50, damageReduction: 0.08, tier: 3, order: 9, description: 'A crown woven from fungal threads. Enhances growth.', workSpeedBonus: 0.15, pedestal: { radius: 5, manaCost: 2, skillGrowthBonus: 0.15 }, expedition: { trapDamageMult: 0.6 } },
+    scholars_spectacles: { name: "Scholar's Spectacles", textColor: '#4488ff', tradeValue: 45, damageReduction: 0.04, tier: 2, order: 10, description: 'Enchanted lenses that sharpen the mind.', workSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 2, skillGrowthBonus: 0.1 } },
+    sharpshooters_visor: { name: "Sharpshooter's Visor", damageReduction: 0.10, tier: 3, order: 7, critChance: 0.15, description: 'A visor with an enchanted lens that guides every shot to its mark.', recipe: { input: { runite: 2, iron: 1, leather: 1 }, ticks: 34, research: 'marksmanship', station: 'enchanting_table' } },
 };
 
 export const CLOTHES = {
     cotton_shirt: { name: 'Cotton Shirt', tier: 1, coldResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.05, description: 'A light cotton shirt. Comfortable for work.', recipe: { input: { cloth: 3 }, ticks: 14, station: 'loom' } },
     wool_tunic: { name: 'Wool Tunic', tier: 1, coldResistance: 0.5, moodBonus: 3, description: 'A warm wool tunic. Good protection from the cold.', recipe: { input: { wool: 4, cloth: 1 }, ticks: 18, station: 'loom' } },
     leather_jerkin: { name: 'Leather Jerkin', tier: 2, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, description: 'A rugged leather jerkin. Versatile in all seasons.', recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, station: 'loom' } },
-    cloak_of_shadows: { name: 'Cloak of Shadows', textColor: '#4488ff', tradeValue: 45, tier: 3, description: 'A cloak that makes the wearer harder to target.', targetPriority: -10 },
+    cloak_of_shadows: { name: 'Cloak of Shadows', tier: 3, textColor: '#4488ff', tradeValue: 45, description: 'A cloak that makes the wearer harder to target.', targetPriority: -10 },
 };
 
 export const BOOTS = {
@@ -198,6 +205,9 @@ export const TRINKETS = {
     voidheart: { name: 'Voidheart', textColor:'#ff4444', tradeValue: 120, tier: 4, description: 'The heart of the void itself. Ultimate arcane power.', spellDamageBonus: 0.5, moveSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 4, damageBonusMult: 1.2 } },
     amulet_of_fortune: { name: 'Amulet of Fortune', textColor:'#44cc44', tradeValue: 50, tier: 2, description: 'A lucky amulet that accelerates learning.', pedestal: { radius: 'global', manaCost: 1, skillGrowthBonus: 0.2 } },
     merchants_ring: { name: "Merchant's Ring", textColor:'#44cc44', tradeValue: 40, tier: 2, description: 'A ring favored by traders. Slightly improves deals.', pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.9 } },
+    warden_censer: { name: "Warden's Censer", textColor:'#4488ff', tradeValue: 68, tier: 3, description: 'A censer of blessed smoke that knits the wounds of the bearer and nearby allies.', healthRegen: 0.05, pedestal: { radius: 6, manaCost: 2, healthRegen: 0.05 }, recipe: { input: { runite: 2, moonbloom: 3, planks: 2 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
+    ley_battery: { name: 'Ley Battery', textColor:'#4488ff', tradeValue: 70, tier: 3, description: 'A crystal that siphons ambient ley energy, sustaining a caster mid-battle.', manaRegen: 0.08, spellCostReduction: 0.12, recipe: { input: { runite: 2, moonbloom: 2, void_essence: 1 }, ticks: 42, research: 'void_sorcery', station: 'enchanting_table' } },
+    hunters_quiver: { name: "Hunter's Quiver", textColor:'#44cc44', tradeValue: 50, tier: 2, critChance: 0.1, attackSpeed: 0.1, description: 'An enchanted quiver whose arrows never run short.', recipe: { input: { runite: 1, leather: 3, planks: 1 }, ticks: 30, research: 'marksmanship', station: 'enchanting_table' } },
 };
 
 export const POTIONS = {
@@ -260,16 +270,6 @@ export const BOOTS_ENCHANTMENT_EFFECTS = {
     swiftness: { suffix: 'of Swiftness', description: 'Enchanted with swiftness, increasing movement speed by 10% per enchantment tier.', speedMultiplier: 1.10 },
 };
 
-const ARMOR_PAIRS = [
-    ['wool_cap', HELMETS], ['wool_parka', ARMORS],
-    ['leather_cap', HELMETS], ['leather_vest', ARMORS],
-    ['iron_helmet', HELMETS], ['mages_circlet', HELMETS],
-    ['iron_brigandine', ARMORS], ['iron_chainmail', ARMORS], ['enchanted_tunic', ARMORS],
-    ['mana_weave_robe', ARMORS], ['runic_hood', HELMETS],
-    ['runic_helm', HELMETS], ['runic_plate', ARMORS],
-    ['void_crown', HELMETS], ['void_armor', ARMORS],
-];
-
 // Unified item registry — every non-stackable item with its type and optional tradeValue.
 // Built by merging all item dicts; SPELL_TOMES are merged in config/index.js after import.
 export const ALL_ITEMS = {};
@@ -296,7 +296,8 @@ for (const [type, dict] of _ITEM_SOURCES) {
 
 const EQUIPMENT_RECIPE_SOURCES = [
     { items: WEAPONS, category: 'Weapons', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
-    { items: ARMOR_PAIRS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' }, paired: true },
+    { items: HELMETS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
+    { items: ARMORS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
     { items: CLOTHES, category: 'Clothing', prefix: 'craft_', defaults: { skill: 'crafting', station: 'loom' } },
     { items: BOOTS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
     { items: TOOLS, category: 'Tools', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },
@@ -318,29 +319,15 @@ for (const [key, mat] of Object.entries(MATERIALS)) {
 
 Object.assign(RECIPES, BASE_RECIPES);
 
-for (const { items, category, prefix, defaults, paired } of EQUIPMENT_RECIPE_SOURCES) {
-    if (paired) {
-        for (const [key, source] of items) {
-            const item = source[key];
-            if (!item?.recipe) continue;
-            const r = item.recipe;
-            RECIPES[`${prefix}${key}`] = {
-                input: r.input, output: { [key]: 1 },
-                skill: r.skill || defaults.skill, ticks: r.ticks,
-                station: r.station || defaults.station, category,
-                ...(r.research ? { research: r.research } : {}),
-            };
-        }
-    } else {
-        for (const [key, item] of Object.entries(items)) {
-            if (!item.recipe) continue;
-            const r = item.recipe;
-            RECIPES[`${prefix}${key}`] = {
-                input: r.input, output: { [key]: 1 },
-                skill: r.skill || defaults.skill, ticks: r.ticks,
-                station: r.station || defaults.station, category,
-                ...(r.research ? { research: r.research } : {}),
-            };
-        }
+for (const { items, category, prefix, defaults } of EQUIPMENT_RECIPE_SOURCES) {
+    for (const [key, item] of Object.entries(items)) {
+        if (!item.recipe) continue;
+        const r = item.recipe;
+        RECIPES[`${prefix}${key}`] = {
+            input: r.input, output: { [key]: 1 },
+            skill: r.skill || defaults.skill, ticks: r.ticks,
+            station: r.station || defaults.station, category,
+            ...(r.research ? { research: r.research } : {}),
+        };
     }
 }

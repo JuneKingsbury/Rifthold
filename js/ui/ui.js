@@ -48,7 +48,7 @@ export class UI {
         this._researchTab = 'foundations';
         this.settingsPanelVisible = false;
         this.arcanePanelVisible = false;
-        this._arcaneTab = 'defense';
+        this._arcaneTab = 'nexus';
         this._arcaneExpSetup = null;
         this._lastArcaneHtml = '';
         this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0 };
@@ -1397,7 +1397,7 @@ export class UI {
         if (waves.active) {
             html += `<div class="info-row" style="color:#ff4444;">Wave ${waves.currentWave} — ${waves.enemies.length} enemies alive</div>`;
         }
-        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('defense')" style="background:#6622aa;color:white;">Open Rifts Panel</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('nexus')" style="background:#6622aa;color:white;">Open Rifts Panel</button></div>`;
         return html;
     }
 
@@ -1999,7 +1999,13 @@ export class UI {
                 const bKey = Object.keys(b.recipe.output)[0];
                 const aDef = WEAPONS[aKey] || ARMORS[aKey] || HELMETS[aKey] || CLOTHES[aKey] || BOOTS[aKey] || TOOLS[aKey];
                 const bDef = WEAPONS[bKey] || ARMORS[bKey] || HELMETS[bKey] || CLOTHES[bKey] || BOOTS[bKey] || TOOLS[bKey];
-                return (aDef?.tier || 0) - (bDef?.tier || 0);
+                // Tier is the primary grouping; `order` arranges set pieces within
+                // a tier (e.g. a helmet next to its matching body armor). Items
+                // without `order` sort last within their tier but keep insertion
+                // order among themselves (Array.sort is stable).
+                const tierDiff = (aDef?.tier || 0) - (bDef?.tier || 0);
+                if (tierDiff !== 0) return tierDiff;
+                return (aDef?.order ?? Infinity) - (bDef?.order ?? Infinity);
             });
         }
         for (const { key, recipe, canCraft, hasStation } of filtered) {

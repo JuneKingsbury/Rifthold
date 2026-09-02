@@ -878,6 +878,9 @@ export const EXPLORATION_CONFIG = {
     trapChance: 0.3,
     findItemChance: 0.3,
     ambientChance: 0.4,
+    // Enemy melee target selection: softmax-weighted by target priority.
+    // Lower temperature = enemies focus the highest-priority target more strongly.
+    targetingTemperature: 8,
 };
 
 export const EXPEDITION_DIFFICULTY = {

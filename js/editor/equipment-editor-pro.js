@@ -596,6 +596,7 @@ class EquipmentEditorPro {
         if (item.damage !== undefined) lines.push(`    damage: ${item.damage},`);
         if (item.damageReduction) lines.push(`    damageReduction: ${item.damageReduction},`);
         if (item.tier) lines.push(`    tier: ${item.tier},`);
+        if (item.order !== undefined) lines.push(`    order: ${item.order},`);
 
         const statKeys = [...Object.keys(STAT_META)];
         for (const sk of statKeys) {
@@ -754,16 +755,10 @@ class EquipmentEditorPro {
         }
         out += `};\n\n`;
 
-        const armorItems = [...this.items.entries()].filter(([, v]) => v.category === 'armor');
-        const helmetItems = [...this.items.entries()].filter(([, v]) => v.category === 'helmet');
-        out += `const ARMOR_PAIRS = [\n`;
-        for (const [key] of helmetItems) out += `    ['${key}', HELMETS],\n`;
-        for (const [key] of armorItems) out += `    ['${key}', ARMORS],\n`;
-        out += `];\n`;
-
         out += `const EQUIPMENT_RECIPE_SOURCES = [\n`;
         out += `    { items: WEAPONS, category: 'Weapons', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: ARMOR_PAIRS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' }, paired: true },\n`;
+        out += `    { items: HELMETS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
+        out += `    { items: ARMORS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
         out += `    { items: TOOLS, category: 'Tools', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
         out += `    { items: TRINKETS, category: 'Trinkets', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
         out += `    { items: POTIONS, category: 'Food & Potions', prefix: 'brew_', defaults: { skill: 'cooking', station: 'cauldron' } },\n`;
@@ -780,30 +775,16 @@ class EquipmentEditorPro {
         out += `    };\n`;
         out += `}\n\n`;
         out += `Object.assign(RECIPES, BASE_RECIPES);\n\n`;
-        out += `for (const { items, category, prefix, defaults, paired } of EQUIPMENT_RECIPE_SOURCES) {\n`;
-        out += `    if (paired) {\n`;
-        out += `        for (const [key, source] of items) {\n`;
-        out += `            const item = source[key];\n`;
-        out += `            if (!item?.recipe) continue;\n`;
-        out += `            const r = item.recipe;\n`;
-        out += `            RECIPES[\`\${prefix}\${key}\`] = {\n`;
-        out += `                input: r.input, output: { [key]: 1 },\n`;
-        out += `                skill: r.skill || defaults.skill, ticks: r.ticks,\n`;
-        out += `                station: r.station || defaults.station, category,\n`;
-        out += `                ...(r.research ? { research: r.research } : {}),\n`;
-        out += `            };\n`;
-        out += `        }\n`;
-        out += `    } else {\n`;
-        out += `        for (const [key, item] of Object.entries(items)) {\n`;
-        out += `            if (!item.recipe) continue;\n`;
-        out += `            const r = item.recipe;\n`;
-        out += `            RECIPES[\`\${prefix}\${key}\`] = {\n`;
-        out += `                input: r.input, output: { [key]: 1 },\n`;
-        out += `                skill: r.skill || defaults.skill, ticks: r.ticks,\n`;
-        out += `                station: r.station || defaults.station, category,\n`;
-        out += `                ...(r.research ? { research: r.research } : {}),\n`;
-        out += `            };\n`;
-        out += `        }\n`;
+        out += `for (const { items, category, prefix, defaults } of EQUIPMENT_RECIPE_SOURCES) {\n`;
+        out += `    for (const [key, item] of Object.entries(items)) {\n`;
+        out += `        if (!item.recipe) continue;\n`;
+        out += `        const r = item.recipe;\n`;
+        out += `        RECIPES[\`\${prefix}\${key}\`] = {\n`;
+        out += `            input: r.input, output: { [key]: 1 },\n`;
+        out += `            skill: r.skill || defaults.skill, ticks: r.ticks,\n`;
+        out += `            station: r.station || defaults.station, category,\n`;
+        out += `            ...(r.research ? { research: r.research } : {}),\n`;
+        out += `        };\n`;
         out += `    }\n`;
         out += `}\n`;
 

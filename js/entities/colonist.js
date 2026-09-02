@@ -327,6 +327,7 @@ function updateHealth(colonist) {
     if (colonist.hp >= colonist.maxHp) return;
     let regen = COLONIST_CONFIG.baseHealthRegen;
     regen += getEquipmentStat(colonist, 'healthRegen');
+    regen += (colonist.pedestalHealthRegen || 0);
     if (getEquipmentStat(colonist, 'healthRegenMultiplier')) regen *= getEquipmentStat(colonist, 'healthRegenMultiplier');
     if (colonist.state === 'sleeping') regen *= COLONIST_CONFIG.healthRegenWhileSleeping;
     else if (colonist.state === 'idle') regen *= COLONIST_CONFIG.healthRegenWhileIdle;

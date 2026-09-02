@@ -527,6 +527,7 @@ class Game {
                 c.pedestalWorkBonus = 0;
                 c.pedestalDamageBonus = 1;
                 c.pedestalSkillBonus = 0;
+                c.pedestalHealthRegen = 0;
                 c.activeAuras = [];
             }
             updatePedestals(this, structurePositions);
@@ -1995,6 +1996,7 @@ function applyAuraToColonists(game, pedestal, radius, centerX, centerY, auraLabe
         if (pedestal.workSpeedBonus) c.pedestalWorkBonus += pedestal.workSpeedBonus;
         if (pedestal.damageBonusMult) c.pedestalDamageBonus *= pedestal.damageBonusMult;
         if (pedestal.skillGrowthBonus) c.pedestalSkillBonus += pedestal.skillGrowthBonus;
+        if (pedestal.healthRegen) c.pedestalHealthRegen += pedestal.healthRegen;
         c.activeAuras.push(auraLabel);
     }
 }

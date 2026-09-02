@@ -1422,16 +1422,19 @@ const arcaneMethods = {
                 if (p.golem && p.golemType) {
                     sprite = skinMgr.getSprite('entities', p.golemType);
                 } else {
-                    if (p.armor || p.helmet || p.weapon || p.tool) {
+                    if (p.armor || p.helmet || p.weapon || p.tool || p.clothes) {
                         let armorKey = '';
                         let helmetKey = '';
                         let weaponKey = '';
                         let toolKey = '';
+                        let clothesKey = '';
                         if (p.armor) armorKey = p.armor.key;
                         if (p.helmet) helmetKey = p.helmet.key;
                         if (p.weapon) weaponKey = p.weapon.key;
                         if (p.tool) toolKey = p.tool.key;
-                        sprite = skinMgr.getCompositedColonistSprite(p.id, false, p.raceKey, armorKey, helmetKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, weaponKey, toolKey, false);
+                        // Clothes are only worn (and drawn) when no armor is equipped, matching the main-map renderer.
+                        if (!p.armor && p.clothes) clothesKey = p.clothes.key;
+                        sprite = skinMgr.getCompositedColonistSprite(p.id, false, p.raceKey, armorKey, helmetKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, weaponKey, toolKey, clothesKey, false);
                     }
                     else {
                         sprite = skinMgr.getColonistSprite(p.id, false, p.raceKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, false);

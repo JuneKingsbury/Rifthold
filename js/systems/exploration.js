@@ -807,7 +807,7 @@ export class ExplorationSystem {
                 const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
                 return {
                     id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp, raceKey: c.race,
-                    bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant,
+                    bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor,
                     golem: c.golem, golemType: c.golemType,
                     weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
                     boots: c.boots,
@@ -818,6 +818,9 @@ export class ExplorationSystem {
                     maxMana: c.maxMana || 0,
                     spellCooldowns: {},
                     spellDamageBonus: getEquipmentStat(c, 'spellDamageBonus'),
+                    manaRegen: getEquipmentStat(c, 'manaRegen'),
+                    spellCostReduction: getEquipmentStat(c, 'spellCostReduction'),
+                    healthRegen: getEquipmentStat(c, 'healthRegen'),
                     attackCooldown: baseCd,
                     effectiveCooldown: effCd,
                     shieldActive: false,
@@ -1213,7 +1216,14 @@ export class ExplorationSystem {
             const memberItems = slotNames.filter(s => member[s] && !disabled[s]).map(s => member[s]);
             for (const item of memberItems) { if (item !== member.weapon && item.damage) weaponDmg += item.damage; }
             const critChance = memberItems.reduce((sum, it) => sum + (it.critChance || 0), 0);
-            const hitsPerRound = Math.max(1, Math.round(member.attackCooldown / member.effectiveCooldown));
+            // Attacks-per-round scales with weapon speed: combatRoundTicks is the
+            // round's real-time span, so a fast weapon (low effective cooldown)
+            // swings more times within it than a slow one. Per-hit damage is
+            // weaponDmg/hitsPerRound, so total per-round output stays weaponDmg
+            // (DPS-neutral) — the only edge extra swings grant is more independent
+            // crit rolls, which is exactly the payoff for a high-crit build.
+            const hitsPerRound = Math.max(1, Math.round(EXPLORATION_CONFIG.combatRoundTicks / member.effectiveCooldown));
+            const perHitDmg = weaponDmg / hitsPerRound;
             const formDmgMult = this._applyFormationModifier(exp, member.id, 'meleeDamageMult');
             const xpDmgMult = this._getXpLevelBonus(member.id, 'expeditionDamageMult');
 
@@ -1227,7 +1237,11 @@ export class ExplorationSystem {
                     continue;
                 }
 
-                let dmg = Math.floor((weaponDmg + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * (1 - physResist));
+                // perHitDmg (= weaponDmg/hitsPerRound) keeps per-round output constant;
+                // variance is likewise divided so a fast weapon's many swings don't
+                // accumulate more bonus roll than a slow one. Round (not floor) the
+                // per-hit value so splitting into more hits doesn't shave damage.
+                let dmg = Math.max(1, Math.round((perHitDmg + randInt(0, 3) / hitsPerRound) * partyDmgMult * formDmgMult * xpDmgMult * (1 - physResist)));
                 let critHit = false;
                 if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
                 if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
@@ -1382,18 +1396,32 @@ export class ExplorationSystem {
                     continue;
                 }
 
-                let bestScore = Infinity;
-                const candidates = [];
+                // Softmax-weighted target selection: enemies strongly favor the
+                // highest-priority member but can occasionally strike lower-priority
+                // ones. Priority = equipment targetPriority + formation modifier.
+                const weighted = [];
+                let maxPr = -Infinity;
                 for (const p of alive) {
                     if (p.hp <= 0) continue;
-                    const priority = getTargetPriority(p);
                     const formPriority = this._applyFormationModifier(exp, p.id, 'targetPriorityMod');
-                    const score = -(priority + (formPriority !== 1.0 ? formPriority : 0));
-                    if (score < bestScore) { bestScore = score; candidates.length = 0; candidates.push(p); }
-                    else if (score === bestScore) { candidates.push(p); }
+                    const pr = getTargetPriority(p) + (formPriority !== 1.0 ? formPriority : 0);
+                    weighted.push({ member: p, pr });
+                    if (pr > maxPr) maxPr = pr;
                 }
-                if (candidates.length === 0) break;
-                const target = candidates[randInt(0, candidates.length - 1)];
+                if (weighted.length === 0) break;
+                // Subtract maxPr for numerical stability (top member weight = 1.0).
+                const temp = EXPLORATION_CONFIG.targetingTemperature;
+                let totalWeight = 0;
+                for (const w of weighted) {
+                    w.weight = Math.exp((w.pr - maxPr) / temp);
+                    totalWeight += w.weight;
+                }
+                let roll = Math.random() * totalWeight;
+                let target = weighted[weighted.length - 1].member;
+                for (const w of weighted) {
+                    roll -= w.weight;
+                    if (roll <= 0) { target = w.member; break; }
+                }
 
                 if (target.dodgeCharges > 0) {
                     target.dodgeCharges--;
@@ -1457,10 +1485,18 @@ export class ExplorationSystem {
         }
     }
 
+    // Effective mana cost after the member's equipment spellCostReduction, mirroring
+    // the colony-side calc in colonist.js (floor, min 1). All expedition cast paths
+    // deduct through this so Ley Battery et al. discount spells on expeditions too.
+    _spellManaCost(member, spell) {
+        const reduction = member.spellCostReduction || 0;
+        return Math.max(1, Math.floor(spell.manaCost * (1 - reduction)));
+    }
+
     _canCastSpell(member, spellKey, game) {
         const spell = SPELLS[spellKey];
         if (!spell) return false;
-        if (member.mana < spell.manaCost) return false;
+        if (member.mana < this._spellManaCost(member, spell)) return false;
         const lastCast = member.spellCooldowns[spellKey] || 0;
         if (game.tick - lastCast < spell.cooldown * getSpellCooldownMult(game)) return false;
         return true;
@@ -1476,7 +1512,7 @@ export class ExplorationSystem {
                 if (!this._canCastSpell(member, spellKey, game)) continue;
 
                 if (spell.effect === 'ranged_damage' || spell.effect === 'ranged_damage_aoe' || spell.effect === 'melee_damage') {
-                    member.mana -= spell.manaCost;
+                    member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
                     let dmg = spell.damage;
                     if (member.spellDamageBonus) {
@@ -1505,7 +1541,7 @@ export class ExplorationSystem {
                     break;
                 } else if (spell.effect === 'teleport') {
                     if (member.dodgeCharges > 0) continue;
-                    member.mana -= spell.manaCost;
+                    member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
                     const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
                     member.dodgeCharges = (member.dodgeCharges || 0) + charges;
@@ -1513,7 +1549,7 @@ export class ExplorationSystem {
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     break;
                 } else if (spell.effect === 'buff_defense' && !member.shieldActive) {
-                    member.mana -= spell.manaCost;
+                    member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
                     member.shieldActive = true;
                     member.shieldReduction = spell.damageReduction;
@@ -1525,7 +1561,7 @@ export class ExplorationSystem {
                     if (exp.summons.some(s => s.ownerId === member.id && s.hp > 0)) continue;
                     const summonDef = SUMMON_TYPES[spell.summonType];
                     if (!summonDef) break;
-                    member.mana -= spell.manaCost;
+                    member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
                     exp.summons.push({
                         type: spell.summonType,
@@ -1560,7 +1596,7 @@ export class ExplorationSystem {
                 if (hpRatio >= threshold) continue;
                 if (!this._canCastSpell(member, spellKey, game)) continue;
 
-                member.mana -= spell.manaCost;
+                member.mana -= this._spellManaCost(member, spell);
                 member.spellCooldowns[spellKey] = game.tick;
                 const healed = Math.min(spell.healAmount, member.maxHp - member.hp);
                 member.hp += healed;
@@ -1574,11 +1610,17 @@ export class ExplorationSystem {
     _regenMana(exp, game) {
         if (game.tick % 10 !== 0) return;
         const regenMult = this._getRealmEventEffect(exp, 'manaRegenMult');
-        const regen = Math.max(1, Math.round(1 * regenMult));
+        // This runs once per 10 ticks; equipment manaRegen/healthRegen are per-tick
+        // magnitudes (as applied in the colony loops), so scale them by 10 to match
+        // this cadence. Mana keeps its flat baseline of 1/interval on top.
         for (const member of exp.partySnapshot) {
             if (member.hp <= 0) continue;
             if (member.mana < member.maxMana) {
-                member.mana = Math.min(member.maxMana, member.mana + regen);
+                const manaGain = Math.max(1, Math.round((1 + (member.manaRegen || 0) * 10) * regenMult));
+                member.mana = Math.min(member.maxMana, member.mana + manaGain);
+            }
+            if (member.healthRegen && member.hp < member.maxHp) {
+                member.hp = Math.min(member.maxHp, member.hp + member.healthRegen * 10);
             }
         }
     }
