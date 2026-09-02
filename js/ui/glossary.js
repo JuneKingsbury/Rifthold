@@ -192,9 +192,10 @@ export const GLOSSARY = [
             {
                 subtitle: 'Complex Structures',
                 entries: [
-                    ['Pattern Activation', 'Certain multi-tile building patterns activate powerful colony-wide bonuses when completed. Build the core piece, then surround it with the required layout. Destroying any part of the pattern deactivates the bonus.'],
-                    ['Great Forge', 'A walled enclosure around a Forge Core that greatly increases all crafting speed (2.5x) and improves crafting quality (+2 bonus) colony-wide. Requires Masterwork research.</p><p><img style="border: 1px solid #ddd; width: 150px;" src="glossary_images/great_forge.png">'],
-                    ['Ritual Circle', 'A diamond pattern of walls around a Ritual Core that reduces spell cooldowns by 30% for all colonists colony-wide. Requires Advanced Arcana research.</p><p><img style="border: 1px solid #ddd; width: 150px;" src="glossary_images/ritual_circle.png">'],
+                    ['Pattern Activation', 'Certain multi-tile building patterns activate powerful colony-wide bonuses when completed. Build the core piece, then lay Ritual Chalk in the required layout around it. Destroying or removing any part of the pattern deactivates the bonus.'],
+                    ['Ritual Chalk', 'A special arcane floor tile used to activate complex structures. Lay it around a Forge Core or Ritual Core in the required pattern to bring the Great Forge or Ritual Circle to life. Unlocked with Arcane Infusion research, so it is available well before either core.'],
+                    ['Great Forge', 'A Forge Core surrounded on all sides by Ritual Chalk (3x3) that greatly increases all crafting speed (2.5x) and improves crafting quality (+2 bonus) colony-wide. Requires Masterwork research.</p><p><img style="border: 1px solid #ddd; width: 150px;" src="glossary_images/great_forge.png">'],
+                    ['Ritual Circle', 'A diamond pattern of Ritual Chalk around a Ritual Core that reduces spell cooldowns by 30% for all colonists colony-wide. Requires Advanced Arcana research.</p><p><img style="border: 1px solid #ddd; width: 150px;" src="glossary_images/ritual_circle.png">'],
                 ]
             },
         ]
@@ -326,6 +327,7 @@ export const GLOSSARY = [
                     ['Ğ', 'Golem Forge', '#cc8833'],
                     ['⚒', 'Forge Core', '#ff8844'],
                     ['◎', 'Ritual Core', '#aa44ff'],
+                    ['◌', 'Ritual Chalk', '#cc99ff'],
                     ['◆', 'Trinket Pedestal', '#ccaa44'],
                     ['⌂', 'Anvil', '#999999'],
                     ['Ħ', 'Inferno Ward', '#ff4400'],

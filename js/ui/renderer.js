@@ -1,4 +1,4 @@
-import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS } from '../core/config.js';
+import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES } from '../core/config.js';
 import { getTileVisuals } from '../world/map.js';
 import { OverlayRenderer } from './overlay-renderer.js';
 import { SkinManager } from './skin-manager.js';
@@ -649,9 +649,12 @@ export class Renderer {
                     const hl = !!(entity && entity.type === 'colonist' && game.settings.showColonistHighlight);
                     const sprite = this._resolveSprite(tile, entity, season, hl);
                     if (sprite) {
-                        // Draw entity shadow.
-                        const shadowSprite = sm.getSprite('effects', 'shadow');
-                        if (shadowSprite) ctx.drawImage(sm.getSprite('effects', 'shadow'), px, py, cw, ch);
+                        // Draw entity shadow. Skip it for flat furniture (rugs, chalk) that
+                        // sits on the ground and shouldn't cast a shadow — only when the
+                        // sprite is the structure itself, not an entity standing on the tile.
+                        const noShadow = !entity && tile.structure && BUILDINGS[tile.structure]?.noShadow;
+                        const shadowSprite = noShadow ? null : sm.getSprite('effects', 'shadow');
+                        if (shadowSprite) ctx.drawImage(shadowSprite, px, py, cw, ch);
                         // Determine any shake effects that need to be applied to the entity sprite before we draw it.
                         const shakeActive = showOverlays && enableScreenShake && entity && entity._atkShakeUntil > game.tick;
                         const shakePx = atkShakePx;
@@ -955,6 +958,34 @@ export class Renderer {
             ctx.restore();
         }
 
+        // --- Active complex structure glow ---
+        // A persistent, gently pulsing aura on each activated core so the player can
+        // see at a glance that a Great Forge / Ritual Circle is live — visible in
+        // daylight, complementing the night light source added in _getLightSources.
+        if (game.activeComplexStructures && game.activeComplexStructures.length) {
+            for (const s of game.activeComplexStructures) {
+                const def = COMPLEX_STRUCTURES[s.key];
+                if (!def || !def.activeLightRadius) continue;
+                const coreDef = BUILDINGS[def.coreBuild];
+                const cx = (s.x - camera.x + 0.5) * cw;
+                const cy = (s.y - camera.y + 0.5) * ch;
+                const pulse = 0.85 + 0.15 * Math.sin(tick * 0.15);
+                const radius = def.activeLightRadius * cw * 0.6 * pulse;
+                if (cx < -radius || cy < -radius || cx > this.canvas.width + radius || cy > this.canvas.height + radius) continue;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = 0.28 * pulse;
+                const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                gradient.addColorStop(0, coreDef?.color || '#ffffff');
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
         // --- Night overlay ---
         // Renders darkness as a per-tile alpha overlay. Uses a precomputed "light grid"
         // (Float32Array) so cost is O(viewport + sources*radius²) instead of
@@ -1115,6 +1146,16 @@ export class Renderer {
             }
             if (radius > 0) {
                 mobileSources.push({ x: c.x, y: c.y, radius });
+            }
+        }
+
+        // Active complex structures glow from their core so an activated Great Forge
+        // or Ritual Circle is obvious even in daylight-dimmed night lighting.
+        if (game.activeComplexStructures) {
+            for (const s of game.activeComplexStructures) {
+                if (s.x < x0 || s.x > x1 || s.y < y0 || s.y > y1) continue;
+                const radius = COMPLEX_STRUCTURES[s.key]?.activeLightRadius;
+                if (radius) sources.push({ x: s.x, y: s.y, radius });
             }
         }
 
