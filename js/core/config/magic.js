@@ -157,7 +157,7 @@ export const RESEARCH = {
 export const DEMO_LOCKED_RESEARCH = new Set([
     'advanced_arcana', 'void_sorcery', 'masterwork', 'golem_craft', 'mana_weaving',
     'mana_reservoir', 'brilliance', 'pyroclasm', 'void_architecture',
-    'void_forging', 'planar_rift', 'deep_delving'
+    'void_forging', 'deep_delving'
 ]);
 
 // Auto-derive unlocks from the 'research' field on buildings, recipes, and crops.

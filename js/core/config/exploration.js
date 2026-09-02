@@ -37,6 +37,12 @@ export const EXPEDITION_ENEMIES = {
     palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88' },
 };
 
+// Realm chains a demo-mode player may explore. All other chains stay locked
+// while demo mode is on, even if their research / event / prior-realm
+// prerequisites are otherwise met (e.g. defeating the year-8 crusader raid must
+// not open the kingdom chain in the demo).
+export const DEMO_ALLOWED_REALM_CHAINS = new Set(['crystal']);
+
 // Exploration / realms. Used by exploration.js.
 export const REALMS = {
     crystal_caves: {

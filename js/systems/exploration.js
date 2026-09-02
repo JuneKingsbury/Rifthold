@@ -1,4 +1,4 @@
-import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS,
+import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS,
     FORMATION_CONFIG, EXPEDITION_TRAPS, EXPEDITION_ENEMIES, ELITE_MODIFIERS, ELITE_CONFIG,
     EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
     EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
@@ -33,9 +33,23 @@ export class ExplorationSystem {
         nextExpeditionId = maxId + 1;
     }
 
+    // A realm is demo-locked when demo mode is on and its chain is not in the
+    // demo allow-list. This is independent of research / event / prior-realm
+    // gating, so an auto-unlock (e.g. crusader_raid_defeated) can never open a
+    // non-allowed chain while the demo is active.
+    _isRealmDemoLocked(game, dim) {
+        if (!dim || !game.settings?.demoMode) return false;
+        return !DEMO_ALLOWED_REALM_CHAINS.has(dim.chain);
+    }
+
+    isRealmDemoLocked(game, realmKey) {
+        return this._isRealmDemoLocked(game, REALMS[realmKey]);
+    }
+
     canSend(game, realmKey) {
         const dim = REALMS[realmKey];
         if (!dim) return false;
+        if (this._isRealmDemoLocked(game, dim)) return false;
         if (dim.research && !game.research.isResearched(dim.research)) return false;
         if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) return false;
         if (!game.power || !game.power.powered) return false;
@@ -46,6 +60,7 @@ export class ExplorationSystem {
     getAvailableRealms(game) {
         const results = [];
         for (const [key, dim] of Object.entries(REALMS)) {
+            if (this._isRealmDemoLocked(game, dim)) continue;
             if (dim.research && !game.research.isResearched(dim.research)) continue;
             if (dim.requiresRealm && !this.completedRealms.has(dim.requiresRealm)) continue;
             if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) continue;

@@ -271,7 +271,8 @@ const arcaneMethods = {
                     const chainRealms = allRealms.filter(r => r.chain === chain).sort((a, b) => a.chainOrder - b.chainOrder);
                     const completedCount = chainRealms.filter(r => expl.completedRealms.has(r.key)).length;
                     const anyVisible = chainRealms.some(r => dims.find(d => d.key === r.key) || expl.completedRealms.has(r.key));
-                    if (!anyVisible && !chainRealms.some(r => !r.research || this.game.research.isResearched(r.research))) continue;
+                    const anyDemoLocked = chainRealms.some(r => expl.isRealmDemoLocked(this.game, r.key));
+                    if (!anyVisible && !anyDemoLocked && !chainRealms.some(r => !r.research || this.game.research.isResearched(r.research))) continue;
                     html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
                     for (const realm of chainRealms) {
                         const available = dims.find(d => d.key === realm.key);
@@ -281,6 +282,8 @@ const arcaneMethods = {
                         const indent = indentPx > 0 ? `margin-left:${indentPx}px;border-left:2px solid #446;padding-left:8px;` : '';
                         if (available) {
                             html += `<div class="info-actions" style="${indent}"><button onclick="window.game.showExpeditionSetupInPanel('${realm.key}')" style="background:#1a4466;color:#88ddff;padding:6px 12px;border:none;border-radius:3px;cursor:pointer;margin:2px 0;">${realm.name} (Difficulty ${realm.difficulty})${badge}</button></div>`;
+                        } else if (expl.isRealmDemoLocked(this.game, realm.key)) {
+                            html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
                         } else if (realm.requiresEvent && !expl._checkEvent(this.game, realm.requiresEvent)) {
                             html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — locked</span></div>`;
                         } else if (realm.requiresRealm && !expl.completedRealms.has(realm.requiresRealm) && (!realm.research || this.game.research.isResearched(realm.research))) {
