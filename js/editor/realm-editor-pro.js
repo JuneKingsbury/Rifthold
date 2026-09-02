@@ -459,7 +459,7 @@ class RealmEditorPro {
 
         let html = '';
 
-        html += `<div class="fe-preview-section-title">Portal Panel View</div>`;
+        html += `<div class="fe-preview-section-title">Rifts Panel View</div>`;
         html += `<div class="fe-preview-ingame" style="padding:12px;">`;
         html += `<div style="color:${chainColor};font-weight:bold;margin-bottom:8px;">${(realm.chain || 'unknown').toUpperCase()} CHAIN</div>`;
 

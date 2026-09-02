@@ -110,6 +110,7 @@ export const RESEARCH = {
     ley_channeling: { name: 'Ley Channeling', cost: 300, requires: ['runecraft', 'metalworking'], tab: 'foundations', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
     alchemy: { name: 'Alchemy', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Cooking produces +2 bonus food per meal' },
     trade_routes: { name: 'Trade Routes', cost: 300, requires: ['alchemy'], tab: 'foundations', description: 'Caravans arrive more often and offer better prices' },
+    trade_rifts: { name: 'Trade Rifts', cost: 450, requires: ['trade_routes', 'void_summoning'], tab: 'foundations', description: 'Open Trade Rifts to barter materials with far-off traders for mystery goods' },
 
     // Wildlife
     beast_binding: { name: 'Beast Binding', cost: 280, requires: ['druidcraft'], tab: 'nature', description: 'Bind and pen creatures' },
@@ -147,17 +148,17 @@ export const RESEARCH = {
     // Rifts
     warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards and build tougher structures using bricks' },
     fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
-    void_summoning: { name: 'Void Summoning', cost: 550, requires: ['ley_channeling', 'warding'], tab: 'rifts', description: 'Open portals to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
+    void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling', 'warding'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['void_summoning'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
     void_forging: { name: 'Void Forging', cost: 750, requires: ['void_architecture', 'runeforging'], tab: 'rifts', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
-    planar_rift: { name: 'Planar Rift', cost: 800, requires: ['void_summoning', 'arcane_infusion'], tab: 'rifts', description: 'Open stable rifts for exploration expeditions', requiresMilestone: { stat: 'wavesCompleted', min: 1 } },
+    planar_rift: { name: 'Planar Rifts', cost: 800, requires: ['void_summoning', 'arcane_infusion'], tab: 'rifts', description: 'Open stable rifts for exploration expeditions', requiresMilestone: { stat: 'wavesCompleted', min: 1 } },
     deep_delving: { name: 'Deep Delving', cost: 1200, requires: ['planar_rift'], tab: 'rifts', description: 'Access deeper, more dangerous realms', requiresBuildings: { rift_gate: 1 }, requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, requiresTabCount: 3 },
 };
 
 export const DEMO_LOCKED_RESEARCH = new Set([
     'advanced_arcana', 'void_sorcery', 'masterwork', 'golem_craft', 'mana_weaving',
     'mana_reservoir', 'brilliance', 'pyroclasm', 'void_architecture',
-    'void_forging', 'deep_delving'
+    'void_forging', 'deep_delving', 'trade_rifts'
 ]);
 
 // Auto-derive unlocks from the 'research' field on buildings, recipes, and crops.

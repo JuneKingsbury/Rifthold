@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -24,6 +24,8 @@ import { updateSummons } from '../entities/summons.js';
 import { syncEntityIdCounter, createWildAnimal } from '../entities/entity-factory.js';
 import { PowerSystem } from '../systems/power.js';
 import { ExplorationSystem } from '../systems/exploration.js';
+import { TradeRiftSystem } from '../systems/traderift.js';
+import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
 import { saveGame, loadGame, hasSave, exportSave, importSave } from './save.js';
@@ -113,6 +115,7 @@ class Game {
         this.power = new PowerSystem();
         this.waves = new WaveSystem();
         this.exploration = new ExplorationSystem();
+        this.tradeRift = new TradeRiftSystem();
         this.eventLog = new EventLog();
         this.story = new StorySystem();
         this.tutorial = new TutorialSystem();
@@ -412,6 +415,15 @@ class Game {
         if (this.weather.season !== prevSeason) {
             this.eventLog.add(this, `Season changed to ${this.weather.season} (Year ${this.weather.year})`, 'event', null);
             this.weather.applySnow(this.map);
+            if (this.mapIndex.findFirst('trade_rift')) {
+                this.tradeRift.regenerate(this, 'season');
+                let msg = 'The Trade Rift shimmers! New seasonal requests have arrived.';
+                if (this.weather.seasonIndex === 0) {   // wrapped to spring = new year
+                    this.tradeRift.regenerate(this, 'year');
+                    msg = 'The Trade Rift blazes! Rare yearly commissions have arrived.';
+                }
+                this.notifications.push({ text: msg, tick: this.tick, type: 'success' });
+            }
         } else if (this.tick % 50 === 0) {
             this.weather.applySnow(this.map);
         }
@@ -772,6 +784,117 @@ class Game {
         this.resources.addItem({ ...ALL_ITEMS[key], key });
         this.notifications.push({ text: `Retrieved ${ALL_ITEMS[key]?.name || key} from pedestal`, tick: this.tick, type: 'success' });
         this.ui.showTileInfo(tile, x, y);
+    }
+
+    fulfillTradeRiftRequest(x, y, requestId) {
+        const tile = this.map[y][x];
+        if (tile.structure !== 'trade_rift') return;
+        if (!this.power.hasPower()) {
+            this.notifications.push({ text: 'The Trade Rift is unpowered and has no mana to open the rift.', tick: this.tick, type: 'warning' });
+            this.ui.updateArcanePanel();
+            return;
+        }
+        const req = this.tradeRift.requests.find(r => r.id === requestId);
+        if (!req || req.fulfilled) return;
+        if (!this.resources.has(req.cost)) {
+            this.notifications.push({ text: 'Not enough materials for this trade.', tick: this.tick, type: 'warning' });
+            return;
+        }
+        // Roll the concrete reward only now, so the exact item stays hidden until fulfilled.
+        const jackpot = Math.random() < TRADE_RIFT_CONFIG.jackpotChance;
+        const item = this._rollTradeRiftReward(req.reward, jackpot);
+        if (!item) {
+            this.notifications.push({ text: 'The rift flickers as the trader fails to deliver. Trade cancelled.', tick: this.tick, type: 'warning' });
+            return;
+        }
+        this.resources.deduct(req.cost);
+        this.resources.addItem(item);
+        req.fulfilled = true;
+        if (jackpot) {
+            this.notifications.push({ text: `The rift overflows! Received ${item.name}!`, tick: this.tick, type: 'success' });
+            window.soundManager?.playSFX('magic_levelup');
+        } else {
+            this.notifications.push({ text: `Trade complete! Received ${item.name}.`, tick: this.tick, type: 'success' });
+            window.soundManager?.playSFX('craft_complete');
+        }
+        this.ui.updateArcanePanel();
+    }
+
+    // Roll the concrete reward item for a fulfilled request. Branches on reward
+    // kind. Applies the quality floor, any promised pre-enchant, and (if jackpot)
+    // an over-delivery bonus. Returns null if no candidate item exists.
+    _rollTradeRiftReward(reward, jackpot) {
+        if (reward.kind === 'tome') {
+            const key = pickTomeKey(this);
+            return key ? rollItem(key, 'normal') : null;
+        }
+        if (reward.kind === 'artifact') {
+            const key = pickArtifactKey(this);
+            return key ? rollItem(key, 'normal') : null;
+        }
+
+        // Resolve tier/quality/enchant, applying jackpot bumps first so the
+        // promised values act as a floor the jackpot can raise.
+        let tier = reward.tier;
+        let quality = reward.quality;
+        let enchant = reward.enchant;   // null | { tier }
+        // Trinkets gain nothing from quality or enchantment (name-only mods), so a
+        // jackpot only bumps their tier and the quality floor is skipped. Keeps the
+        // delivered item consistent with the honest {normal, no-enchant} promise.
+        const isTrinket = reward.type === 'trinket';
+        if (jackpot) {
+            const bump = isTrinket ? 'tier' : this._pickJackpotBump(enchant);
+            if (bump === 'tier') tier = Math.min(4, tier + 1);
+            else if (bump === 'quality') quality = 'superior';
+            else if (bump === 'enchant') enchant = { tier: (enchant ? enchant.tier : 0) + 1 };
+        }
+        // Quality floor: the fulfill roll may only surprise UPWARD from the promise.
+        if (!isTrinket) quality = this._rollQualityAtOrAbove(quality);
+
+        // Candidates include non-craftable items (must match traderift.js _candidates).
+        const candidates = Object.entries(ALL_ITEMS)
+            .filter(([, d]) => d.type === reward.type && d.tier === tier);
+        // Fall back to the promised tier if a jackpot +1 tier has no candidate items.
+        const pool = candidates.length ? candidates
+            : Object.entries(ALL_ITEMS).filter(([, d]) => d.type === reward.type && d.tier === reward.tier);
+        if (!pool.length) return null;
+
+        const [key] = pool[Math.floor(Math.random() * pool.length)];
+        const item = rollItem(key, quality);
+        if (enchant) {
+            const eTier = ENCHANTMENT_TIERS.find(t => t.multiplier === enchant.tier)
+                || ENCHANTMENT_TIERS[Math.min(ENCHANTMENT_TIERS.length - 1, Math.max(0, enchant.tier - 1))];
+            applyEnchantmentEffect(item, reward.type, eTier);
+        }
+        return item;
+    }
+
+    // Choose a quality at or above the promised floor, with a small upward chance.
+    _rollQualityAtOrAbove(floorKey) {
+        const order = TRADE_RIFT_CONFIG.qualityOrder;
+        const floorIdx = order.indexOf(floorKey);
+        if (floorIdx < 0) return floorKey;
+        let idx = floorIdx;
+        // ~30% to step up one band, and a smaller chance to step again.
+        while (idx < order.length - 1 && Math.random() < 0.30) idx++;
+        return order[idx];
+    }
+
+    // Pick which jackpot bonus to apply. If the reward already has a max enchant,
+    // the enchant option is dropped so the jackpot is never wasted.
+    _pickJackpotBump(enchant) {
+        const weights = { ...TRADE_RIFT_CONFIG.jackpotWeights };
+        const maxEnchantMult = ENCHANTMENT_TIERS[ENCHANTMENT_TIERS.length - 1].multiplier;
+        if (enchant && enchant.tier >= maxEnchantMult) delete weights.enchant;
+        const entries = Object.entries(weights);
+        let total = 0;
+        for (const [, w] of entries) total += w;
+        let roll = Math.random() * total;
+        for (const [key, w] of entries) {
+            roll -= w;
+            if (roll <= 0) return key;
+        }
+        return entries[0]?.[0];
     }
 
     selectColonistById(colonistId) {

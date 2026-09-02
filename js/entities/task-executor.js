@@ -1,10 +1,11 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS, BOOTS_ENCHANTMENT_EFFECTS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache } from './colonist.js';
 import { getHarvestYield } from '../systems/farming.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getCraftQualityBonus } from '../systems/complexBuildings.js';
+import { applySpecificQuality, applyEnchantmentEffect } from './item-roll.js';
 
 function applyQuality(item, colonist, game, ...statKeys) {
     let skill = colonist.skills.crafting || 1;
@@ -37,17 +38,6 @@ function applyQuality(item, colonist, game, ...statKeys) {
     }
 }
 
-function applySpecificQuality(item, qualityTier, ...statKeys) {
-    let tier = QUALITY_TIERS.find(t => t.key === qualityTier);
-    if (!tier) return;
-    if (tier.key === 'normal') return;
-    item.quality = tier.key;
-    item.name = `${tier.prefix} ${item.name}`;
-    for (const stat of statKeys) {
-        if (item[stat]) item[stat] = Math.round(item[stat] * tier.multiplier * 100) / 100;
-    }
-}
-
 function applyEnchantment(item, colonist, game, type) {
     // Roll for enchantment tier based on colonist's enchantment skill and room quality.
     let skill = colonist.magicSkills.enchantment || 1;
@@ -66,133 +56,9 @@ function applyEnchantment(item, colonist, game, type) {
         if (roll <= 0) { tier = ENCHANTMENT_TIERS[i]; break; }
     }
 
-    // Roll for and apply the enchantment effect
-    let enchantmentEffect;
-    let randomKey = 0;
-    switch (type) {
-        case 'weapons':
-            // Roll for a random enchantment effect
-            randomKey = Object.keys(WEAPON_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(WEAPON_ENCHANTMENT_EFFECTS).length)];
-            enchantmentEffect = WEAPON_ENCHANTMENT_EFFECTS[randomKey];
-
-            // sharpness:
-            if (enchantmentEffect.damageMultiplier) item.damage = Math.round(item.damage * (enchantmentEffect.damageMultiplier * tier.multiplier) * 100) / 100;
-            // witchery:
-            else if (enchantmentEffect.spellDamageBonus) {
-                if (item.spellDamageBonus) {
-                    item.spellDamageBonus = item.spellDamageBonus + (enchantmentEffect.spellDamageBonus * tier.multiplier);
-                }
-                else {
-                    item.spellDamageBonus = enchantmentEffect.spellDamageBonus * tier.multiplier;
-                }
-            }
-            // piercing:
-            else if (enchantmentEffect.critChanceBonus) {
-                if (item.critChance) {
-                    item.critChance = item.critChance + (enchantmentEffect.critChanceBonus * tier.multiplier);
-                }
-                else {
-                    item.critChance = enchantmentEffect.critChanceBonus * tier.multiplier;
-                }
-            } 
-            // vampirism:
-            else if (enchantmentEffect.lifeStealBonus) {
-                if (item.lifeSteal) {
-                    item.lifeSteal = item.lifeSteal + (enchantmentEffect.lifeStealBonus * tier.multiplier);
-                }
-                else {
-                    item.lifeSteal = enchantmentEffect.lifeStealBonus * tier.multiplier;
-                }
-            }
-            
-            // distance:
-
-            // velocity:
-
-            // greed:
-
-            break;
-        case 'armors':
-        case 'helmets':
-            // Roll for a random enchantment effect
-            randomKey = Object.keys(ARMOR_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(ARMOR_ENCHANTMENT_EFFECTS).length)];
-            enchantmentEffect = ARMOR_ENCHANTMENT_EFFECTS[randomKey];
-
-            // protection:
-            if (enchantmentEffect.defenseMultiplier) item.damageReduction = Math.round((item.damageReduction || 0) * (enchantmentEffect.defenseMultiplier * tier.multiplier) * 100) / 100;
-            // wisdom:
-            else if (enchantmentEffect.manaRegenMultiplier) {
-                if (item.manaRegenMultiplier === undefined) {
-                    item.manaRegenMultiplier = 1;
-                }
-                item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * tier.multiplier) * 100) / 100;
-            }
-            // barbs:
-            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage = (item.thornsDamage || 0) + (enchantmentEffect.thornsDamageBonus * tier.multiplier);
-            // free_movement:
-
-            // dodge_change:
-
-            break;
-        case 'clothes':
-            randomKey = Object.keys(CLOTHES_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(CLOTHES_ENCHANTMENT_EFFECTS).length)];
-            enchantmentEffect = CLOTHES_ENCHANTMENT_EFFECTS[randomKey];
-
-            if (enchantmentEffect.manaRegenMultiplier) {
-                if (item.manaRegenMultiplier === undefined) {
-                    item.manaRegenMultiplier = 1;
-                }
-                item.manaRegenMultiplier = Math.round(item.manaRegenMultiplier * (enchantmentEffect.manaRegenMultiplier * tier.multiplier) * 100) / 100;
-            }
-            else if (enchantmentEffect.thornsDamageBonus) item.thornsDamage = (item.thornsDamage || 0) + (enchantmentEffect.thornsDamageBonus * tier.multiplier);
-            else if (enchantmentEffect.workSpeedMultiplier) {
-                if (item.workSpeedBonus) item.workSpeedBonus = Math.round(item.workSpeedBonus * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
-            }
-            else if (enchantmentEffect.healthRegenMultiplier) {
-                if (item.healthRegenMultiplier === undefined) {
-                    item.healthRegenMultiplier = 1;
-                }
-                item.healthRegenMultiplier = Math.round(item.healthRegenMultiplier * (enchantmentEffect.healthRegenMultiplier * tier.multiplier) * 100) / 100;
-            }
-            break;
-        case 'tools':
-            // Roll for a random enchantment effect
-            randomKey = Object.keys(TOOL_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(TOOL_ENCHANTMENT_EFFECTS).length)];
-            enchantmentEffect = TOOL_ENCHANTMENT_EFFECTS[randomKey];
-
-            // productivity:
-            if (enchantmentEffect.workSpeedMultiplier) {
-                if (item.miningSpeed) item.miningSpeed = Math.round(item.miningSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
-                if (item.choppingSpeed) item.choppingSpeed = Math.round(item.choppingSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
-                if (item.farmingSpeed) item.farmingSpeed = Math.round(item.farmingSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
-                if (item.craftingSpeed) item.craftingSpeed = Math.round(item.craftingSpeed * (enchantmentEffect.workSpeedMultiplier * tier.multiplier) * 100) / 100;
-            }
-            // renewal:
-            else if (enchantmentEffect.healthRegenMultiplier) {
-                if (item.healthRegenMultiplier === undefined) {
-                    item.healthRegenMultiplier = 1;
-                }
-                item.healthRegenMultiplier = Math.round(item.healthRegenMultiplier * (enchantmentEffect.healthRegenMultiplier * tier.multiplier) * 100) / 100;
-            }
-            // windfall:
-
-            // spellCostReduction:
-
-            break;
-        case 'boots':
-            randomKey = Object.keys(BOOTS_ENCHANTMENT_EFFECTS)[Math.floor(Math.random() * Object.keys(BOOTS_ENCHANTMENT_EFFECTS).length)];
-            enchantmentEffect = BOOTS_ENCHANTMENT_EFFECTS[randomKey];
-
-            if (enchantmentEffect.speedMultiplier) {
-                item.moveSpeedBonus = Math.round((item.moveSpeedBonus || 0) * (enchantmentEffect.speedMultiplier * tier.multiplier) * 100) / 100;
-            }
-            break;
-        default:
-            break;
-    }
-    item.enchantment = enchantmentEffect;
-    item.description = `${item.description} ${enchantmentEffect.description}`;
-    item.name = `${item.name} ${enchantmentEffect.suffix} ${tier.key}`; 
+    // Roll and apply a random enchantment effect at the skill-derived tier. The
+    // per-type effect application is shared with the Trade Rift via item-roll.js.
+    applyEnchantmentEffect(item, type, tier);
 }
 
 function applyThought(colonist, thoughtKey, tick) {
@@ -272,6 +138,10 @@ export function completeTask(colonist, task, game) {
             tile.designation = null;
             if (game.mapIndex) game.mapIndex.addStructure(task.x, task.y, task.buildType);
             if (task.buildType === 'bed') autoAssignNewBed(game, task.x, task.y);
+            if (task.buildType === 'trade_rift' && game.tradeRift && !game.tradeRift.seeded) {
+                game.tradeRift.regenerate(game, 'season');
+                game.tradeRift.regenerate(game, 'year');
+            }
             game.roomsDirty = true;
             if (game.waves && game.waves.active) game.waves.invalidatePathPreview();
             applyThought(colonist, 'built_something', game.tick);

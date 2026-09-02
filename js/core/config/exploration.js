@@ -1793,7 +1793,7 @@ export const STORY_MILESTONES = {
     },
     research_void_summoning: {
         tab: 'research',
-        title: 'Void Summoning',
+        title: 'Unstable Rifts',
         trigger: 'research_void_summoning',
         text: `
         Progress in your colony has rapidly slowed. Perhaps it's time to seek 
@@ -1803,7 +1803,7 @@ export const STORY_MILESTONES = {
     },
     research_planar_rift: {
         tab: 'research',
-        title: 'Planar Rift',
+        title: 'Planar Rifts',
         trigger: 'research_planar_rift',
         text: `
         While you find great success opening rifts to your colony, you wonder

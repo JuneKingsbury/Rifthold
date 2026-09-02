@@ -28,16 +28,19 @@ const arcaneMethods = {
     },
 
     updateArcanePanel() {
-        const tab = this._arcaneTab || 'defense';
+        const tab = this._arcaneTab || 'nexus';
         let html = '<div class="panel-close" data-panel-close="arcane">&times;</div>';
-        html += '<h3 style="color:#aa44ff">Arcane Portal</h3>';
+        html += '<h3 style="color:#aa44ff">Rifts</h3>';
         html += '<div class="arcane-tabs">';
-        html += `<button class="arcane-tab${tab === 'defense' ? ' active' : ''}" data-arcane-tab="defense">Defense</button>`;
+        html += `<button class="arcane-tab${tab === 'nexus' ? ' active' : ''}" data-arcane-tab="nexus">Nexus</button>`;
+        html += `<button class="arcane-tab${tab === 'requests' ? ' active' : ''}" data-arcane-tab="requests">Requests</button>`;
         html += `<button class="arcane-tab${tab === 'expeditions' ? ' active' : ''}" data-arcane-tab="expeditions">Expeditions</button>`;
         html += '</div>';
 
-        if (tab === 'defense') {
-            html += this._buildDefenseTabHtml();
+        if (tab === 'nexus') {
+            html += this._buildNexusTabHtml();
+        } else if (tab === 'requests') {
+            html += this._buildRequestsTabHtml();
         } else {
             html += this._buildExpeditionsTabHtml();
         }
@@ -91,7 +94,7 @@ const arcaneMethods = {
         if (tab === 'expeditions') this._renderExpeditionVis();
     },
 
-    _buildDefenseTabHtml() {
+    _buildNexusTabHtml() {
         let html = '';
         let hasNexus = false;
         for (const row of this.game.map) {
@@ -140,6 +143,75 @@ const arcaneMethods = {
 
         html += `</div>`;
         return html;
+    },
+
+    _buildRequestsTabHtml() {
+        let html = '';
+        const rift = this.game.mapIndex.findFirst('trade_rift');
+        if (!rift) {
+            html += `<div class="arcane-section" style="color:#888;padding:20px 0;text-align:center;">`;
+            html += `<div style="font-size:1.2em;color:#66ccaa;margin-bottom:8px;">Trade Rift Required</div>`;
+            html += `<div>Build a Trade Rift to barter surplus materials with far-off traders for mystery goods.</div>`;
+            html += `<div style="margin-top:6px;color:#666;">New offers arrive each season and year. Requires mana to fulfill.</div>`;
+            html += `</div>`;
+            return html;
+        }
+        const { x, y } = rift;
+
+        html += `<div class="arcane-section">`;
+        html += `<div class="info-row" style="color:#66ccaa;font-weight:bold;font-size:1.1em;">Trade Rift</div>`;
+        const powered = this.game.power.hasPower();
+        if (!powered) {
+            html += `<div class="info-row" style="color:#ff8844;">Unpowered — no mana to open the rift. Fulfillment disabled.</div>`;
+        }
+        const requests = this.game.tradeRift.requests;
+        if (!requests.length) {
+            html += `<div class="info-row" style="color:#888;">No requests posted — new offers arrive with the season.</div>`;
+            html += `</div>`;
+            return html;
+        }
+        const groups = [
+            { cadence: 'season', label: 'Seasonal Requests' },
+            { cadence: 'year', label: 'Annual Commissions' },
+        ];
+        for (const group of groups) {
+            const reqs = requests.filter(r => r.cadence === group.cadence);
+            if (!reqs.length) continue;
+            html += `<div class="info-row" style="color:#aaddcc;font-weight:bold;margin-top:4px;">${group.label}</div>`;
+            for (const req of reqs) {
+                const costStr = Object.entries(req.cost)
+                    .map(([k, qty]) => `${this._itemIcon(k, 'material')}${qty} ${k.replace(/_/g, ' ')}`)
+                    .join(' + ');
+                if (req.fulfilled) {
+                    html += `<div class="trade-rift-card fulfilled">`;
+                    html += `<div class="trade-rift-give">Gave ${costStr}</div>`;
+                    html += `<span class="trade-rift-reward" style="color:#888;">${req.vagueText}</span>`;
+                    html += `<div style="color:#66ccaa;">✓ Fulfilled</div>`;
+                    html += `</div>`;
+                    continue;
+                }
+                const rewardColor = this._tradeRiftRewardColor(req.reward);
+                const affordable = this.game.resources.has(req.cost);
+                const disabled = (!affordable || !powered) ? ' disabled' : '';
+                const reason = !powered ? ' (unpowered)' : (!affordable ? ' (short on materials)' : '');
+                html += `<div class="trade-rift-card">`;
+                html += `<div class="trade-rift-give">Give ${costStr}</div>`;
+                html += `<span class="trade-rift-reward">for <span style="color:${rewardColor};">${req.vagueText}</span></span>`;
+                html += `<div class="info-actions"><button onclick="window.game.fulfillTradeRiftRequest(${x},${y},${req.id})"${disabled}>Fulfill${reason}</button></div>`;
+                html += `</div>`;
+            }
+        }
+        html += `</div>`;
+        return html;
+    },
+
+    // Reward flavor color for a Trade Rift card. Tomes and artifacts get their own
+    // hues; equipment uses its promised quality band (enchanted gear reads magenta).
+    _tradeRiftRewardColor(reward) {
+        if (reward.kind === 'tome') return '#ccaaff';       // arcane violet
+        if (reward.kind === 'artifact') return '#ffcc44';   // relic gold
+        if (reward.enchant) return '#ff88ff';               // enchanted magenta
+        return this._qualityColor({ quality: reward.quality });
     },
 
     _buildExpeditionsTabHtml() {

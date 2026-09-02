@@ -646,6 +646,28 @@ img.pixel-art {
 
 .info-actions button:hover { background: #3a3a6a; }
 
+.trade-rift-card {
+    margin: 6px 0;
+    padding: 8px;
+    background: #1c1c30;
+    border: 1px solid #3a4a55;
+    border-left: 3px solid #66ccaa;
+    border-radius: 4px;
+}
+.trade-rift-card.fulfilled {
+    border-left-color: #555;
+    opacity: 0.6;
+}
+.trade-rift-card .trade-rift-give { color: #ccc; margin-bottom: 4px; }
+.trade-rift-card .trade-rift-reward { display: block; margin-bottom: 6px; }
+.trade-rift-card .info-actions { margin-top: 0; }
+.info-actions button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #222;
+}
+.info-actions button:disabled:hover { background: #222; }
+
 .info-actions select {
     padding: 3px 6px;
     font-family: inherit;
@@ -1241,7 +1263,7 @@ img.pixel-art {
     border-color: #444;
 }
 
-/* Arcane Portal Panel */
+/* Rifts Panel */
 #arcane-panel {
     min-width: min(780px, 92vw);
 }

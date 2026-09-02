@@ -4,7 +4,7 @@ import { ensureEntityRoles } from '../entities/roles.js';
 import { recalcMaxMana, invalidateEquipStatCache } from '../entities/colonist.js';
 
 const SAVE_KEY = 'colony_save';
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 
 export function saveGame(game) {
     const layout = captureLayout();
@@ -96,6 +96,13 @@ export function saveGame(game) {
             completed: [...game.research.completed],
             activeResearch: game.research.activeResearch,
             progress: game.research.progress,
+        },
+
+        tradeRift: {
+            requests: game.tradeRift.requests,
+            nextId: game.tradeRift.nextId,
+            seeded: game.tradeRift.seeded,
+            lastRefreshYear: game.tradeRift.lastRefreshYear,
         },
 
         stats: game.stats,
@@ -283,6 +290,13 @@ export function loadGame(game) {
             game.exploration.partyPresets = data.exploration.partyPresets || [];
             game.exploration.activeRealmEvents = data.exploration.activeRealmEvents || [];
             game.exploration.syncIdCounter();
+        }
+
+        if (data.tradeRift) {
+            game.tradeRift.requests = data.tradeRift.requests || [];
+            game.tradeRift.nextId = data.tradeRift.nextId || 1;
+            game.tradeRift.seeded = data.tradeRift.seeded || false;
+            game.tradeRift.lastRefreshYear = data.tradeRift.lastRefreshYear || 0;
         }
 
         if (data.stats) {

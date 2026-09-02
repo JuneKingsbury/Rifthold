@@ -225,7 +225,7 @@ export const GLOSSARY = [
             {
                 subtitle: 'Wave Defense',
                 entries: [
-                    ['Void Nexus', 'Build after researching Void Summoning. You can start wave challenges using the Portal menu (V). During a wave enemies spawn from portals and try to destroy the Nexus. Defend it from these attacks to earn rewards. Don\'t worry, if your Nexus is destroyed you can always build a new one to replace it.'],
+                    ['Void Nexus', 'Build after researching Unstable Rifts. You can start wave challenges using the Rifts menu (V). During a wave enemies spawn from portals and try to destroy the Nexus. Defend it from these attacks to earn rewards. Don\'t worry, if your Nexus is destroyed you can always build a new one to replace it.'],
                     ['How Waves Work', 'Each successive wave sends tougher and more numerous enemies. Defeat all enemies in a wave to complete it and unlock the next. Waves are strictly player-initiated, not automatic.'],
                     ['Colony Cap', 'Your maximum colonist count starts small. Completing Void Nexus waves is the primary way to increase it. Buildings like Hearth Shrines also add to the cap in exchange for mana from the grid.'],
                     ['Void Essence', 'Dropped by wave enemies. This rare resource is essential for crafting late-game equipment and advanced defensive structures.'],

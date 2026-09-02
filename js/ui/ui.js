@@ -593,7 +593,7 @@ export class UI {
             const researchStyle = researchNeedsAttention ? ' style="color:#ffcc44"' : '';
             html += `<span class="mode-opt" data-mode-action="research"${researchStyle}>[R]Research${researchNeedsAttention ? ' •' : ''}</span>`;
             html += `<span class="mode-opt" data-mode-action="inventory">[I]Inventory</span>`;
-            html += `<span class="mode-opt" data-mode-action="arcane">[V]Portal</span>`;
+            html += `<span class="mode-opt" data-mode-action="arcane">[V]Rifts</span>`;
             const storyNew = this.game.story.hasUnviewed() ? ' style="color:#ffcc44"' : '';
             html += `<span class="mode-opt" data-mode-action="story"${storyNew}>[J]Story${this.game.story.hasUnviewed() ? ' •' : ''}</span>`;
             html += '</span>';
@@ -1396,7 +1396,7 @@ export class UI {
         if (waves.active) {
             html += `<div class="info-row" style="color:#ff4444;">Wave ${waves.currentWave} — ${waves.enemies.length} enemies alive</div>`;
         }
-        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('defense')" style="background:#6622aa;color:white;">Open Portal Panel</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('defense')" style="background:#6622aa;color:white;">Open Rifts Panel</button></div>`;
         return html;
     }
 
@@ -1447,7 +1447,20 @@ export class UI {
             const pct = exp.status === 'gathering' ? 0 : Math.min(100, Math.floor((elapsed / totalDur) * 100));
             html += `<div class="info-row" style="color:#aaddff;">${exp.realmName} — ${exp.status} (${pct}%)</div>`;
         }
-        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('expeditions')" style="background:#1a4466;color:#88ddff;">Open Portal Panel</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('expeditions')" style="background:#1a4466;color:#88ddff;">Open Rifts Panel</button></div>`;
+        return html;
+    }
+
+    _buildTradeRiftInfoHtml(tile, x, y) {
+        let html = '';
+        html += `<div class="info-row" style="color:#66ccaa;font-weight:bold;">Trade Rift</div>`;
+        const requests = this.game.tradeRift.requests;
+        const open = requests.filter(r => !r.fulfilled).length;
+        html += `<div class="info-row">${open} open request${open === 1 ? '' : 's'}</div>`;
+        if (!this.game.power.hasPower()) {
+            html += `<div class="info-row" style="color:#ff8844;">Unpowered — no mana to open the rift.</div>`;
+        }
+        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('requests')" style="background:#1a5544;color:#88ddcc;">Open Rifts Panel</button></div>`;
         return html;
     }
 
@@ -1584,6 +1597,10 @@ export class UI {
 
         if (tile.structure === 'rift_gate') {
             html += this._buildRiftGateInfoHtml();
+        }
+
+        if (tile.structure === 'trade_rift') {
+            html += this._buildTradeRiftInfoHtml(tile, x, y);
         }
 
         if (tile.structure === 'golem_forge') {
@@ -1758,6 +1775,10 @@ export class UI {
 
         if (tile.structure === 'rift_gate') {
             html += this._buildRiftGateInfoHtml();
+        }
+
+        if (tile.structure === 'trade_rift') {
+            html += this._buildTradeRiftInfoHtml(tile, x, y);
         }
 
         if (tile.structure === 'golem_forge') {

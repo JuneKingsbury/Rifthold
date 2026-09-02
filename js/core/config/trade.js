@@ -76,3 +76,58 @@ export const TRADE_VALUES = {
 // Modified at runtime by: Trade Routes research (see getTradeRates), pedestal items (tradeMarkupMult).
 export const TRADER_MARKUP = 1.2;
 export const TRADER_DISCOUNT = 0.8;
+
+// Trade Rift request board. The board holds two independent groups of requests
+// on different refresh cadences:
+//   - 'season' requests refresh on every season change (easier, cheaper, lower tier).
+//   - 'year' requests refresh only at year rollover (harder, pricier, better rewards).
+//
+// A request's reward is a hidden spec rolled into a concrete item only when the
+// player fulfills it. Rewards come in three KINDS (rolled per request from the
+// cadence's kindWeights):
+//   - 'equipment' — a {type, tier, quality} spec; the promised quality is a FLOOR
+//     (the fulfill roll can only surprise upward). May arrive pre-enchanted.
+//   - 'tome'      — a random spell tome (dup-avoiding: prefers unlearned spells).
+//   - 'artifact'  — a random pedestal-effect relic (dup-avoiding; yearly-only).
+//
+// DESIGN INTENT (why this is worth engaging vs. just crafting):
+//   1. Cost is paid in SURPLUS COMMODITIES (wood/stone/food/…), not rare mats — so
+//      even a gold-negative trade converts overflow into finished gear.
+//   2. Promised quality is a floor, and equipment can arrive pre-enchanted —
+//      something crafting can't cheaply guarantee.
+//   3. Every fulfill has a JACKPOT chance to over-deliver (+tier / +quality /
+//      +enchant), turning the mystery into upside-only anticipation.
+// cost is sized from the reward's estimated gold value (rewardTierValue x quality
+// multiplier x a random costMargin) converted to material quantities via TRADE_VALUES.
+export const TRADE_RIFT_CONFIG = {
+    rewardTypes: ['weapon', 'armor', 'helmet', 'tool', 'clothes', 'boots', 'trinket'],
+    qualityAdjective: { poor: 'crude', normal: 'standard', fine: 'good', superior: 'excellent' },
+    qualityOrder: ['poor', 'normal', 'fine', 'superior'],  // ascending; used for the quality FLOOR
+    rewardTierValue: [10, 20, 40, 70, 110],   // approx gold value of a reward, indexed by tier 0-4
+    typeLabels: { weapon: 'Weapon', armor: 'Armor', helmet: 'Helmet', tool: 'Tool', clothes: 'Garment', boots: 'Boots', trinket: 'Trinket' },
+    tomeValue: 30,        // approx gold value used to size a tome request's cost
+    artifactValue: 90,    // approx gold value used to size an artifact request's cost
+    jackpotChance: 0.12,  // per-fulfill chance the rift over-delivers (both cadences)
+    // Weighted outcomes when a jackpot fires (see main.js applyJackpot).
+    jackpotWeights: { tier: 3, quality: 3, enchant: 4 },
+    season: {                                  // EASY — refreshes each season
+        count: 3,
+        kindWeights: { equipment: 8, tome: 2, artifact: 0 },  // no relics in the cheap tier
+        tierWeights: { 2: 3, 3: 2 },           // retiered up from {1,2} — matches mid-game unlock
+        qualityWeights: { poor: 1, normal: 3, fine: 1 },
+        enchantChance: 0.35,                   // chance an equipment reward is pre-enchanted
+        enchantTierWeights: { 1: 3, 2: 1 },    // enchant strength (ENCHANTMENT_TIERS multiplier)
+        costMargin: [0.9, 1.3],
+        costMaterials: ['wood', 'stone', 'food', 'planks', 'hides', 'cotton'],
+    },
+    year: {                                    // HARD — refreshes at year rollover
+        count: 2,
+        kindWeights: { equipment: 6, tome: 2, artifact: 2 },  // artifacts are the yearly carrot
+        tierWeights: { 3: 2, 4: 3 },           // leans into Tier 4
+        qualityWeights: { fine: 3, superior: 2 },
+        enchantChance: 0.75,
+        enchantTierWeights: { 2: 2, 3: 1 },
+        costMargin: [1.3, 1.8],
+        costMaterials: ['planks', 'bricks', 'leather', 'iron', 'cloth', 'wool', 'stone'],
+    },
+};
