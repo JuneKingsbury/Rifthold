@@ -1,6 +1,7 @@
 import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
+import { getItemTradeValue } from '../entities/item-roll.js';
 import { getComplexStructureAt, getSpellCooldownMult } from '../systems/complexBuildings.js';
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
@@ -2911,8 +2912,7 @@ export class UI {
         return `<span style="color:${color};font-weight:bold;margin-right:3px;font-size:0.9em;">${ch}</span>`;
     }
 
-    _getExclusiveItemTooltip(key) {
-        const item = ALL_ITEMS[key];
+    _getExclusiveItemTooltip(item) {
         if (!item) return '';
         if (item.type === 'trinket') return this._getTrinketTooltip(item);
         const lines = [];
@@ -2990,18 +2990,39 @@ export class UI {
         }
         if (data.exclusiveItems?.length > 0) {
             for (let si = 0; si < data.exclusiveItems.length; si++) {
-                const itemKey = data.exclusiveItems[si];
-                if (!itemKey) continue;  // already purchased this slot
-                const item = ALL_ITEMS[itemKey];
+                const item = data.exclusiveItems[si];   // a rolled instance (with quality) or null
+                if (!item) continue;  // already purchased this slot
                 const slotKey = `__exclusive_${si}`;
                 const isSelected = request[slotKey] ? ' active' : '';
-                const tip = this._getExclusiveItemTooltip(itemKey);
-                const exIcon = this._itemIcon(itemKey, item?.type);
+                const tip = this._getExclusiveItemTooltip(item);
+                const exIcon = this._itemIcon(item.key, item.type);
+                // Priced at face value to match computeTradeValues' exclusive-slot cost.
+                const price = getItemTradeValue(item);
                 html += `<div class="trade-exclusive-row skill-tip" data-tip="${tip.replace(/"/g, '&quot;')}">`;
-                html += `<div class="trade-item-name">${exIcon}${item?.name || itemKey}</div>`;
-                html += `<div class="trade-item-value">${item?.tradeValue ?? '?'}g</div>`;
+                html += `<div class="trade-item-name">${exIcon}${item.name || item.key}</div>`;
+                html += `<div class="trade-item-value">${price}g</div>`;
                 html += `<button class="trade-exclusive-toggle${isSelected}" onclick="window.game.${request[slotKey] ? 'tradeRemoveRequest' : 'tradeRequest'}('${slotKey}',1)">${request[slotKey] ? 'Remove' : 'Buy'}</button>`;
                 html += `</div>`;
+            }
+        }
+        // Stackable potions the merchant sells (traded like materials).
+        if (data.traderPotions && Object.keys(data.traderPotions).length > 0) {
+            for (const [key, amt] of Object.entries(data.traderPotions)) {
+                if (amt <= 0) continue;
+                const def = ALL_ITEMS[key];
+                const reqKey = `__buypotion_${key}`;
+                const reqAmt = request[reqKey] || 0;
+                const val = (getItemTradeValue(def) * effectiveMarkup).toFixed(1);
+                const selected = reqAmt > 0 ? ' selected' : '';
+                html += `<div class="trade-item-row${selected}">`;
+                html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${def?.name || key} <span style="color:#888;">×${amt}</span>`;
+                if (reqAmt > 0) html += `<span class="trade-item-badge">${reqAmt}</span>`;
+                html += `</div>`;
+                html += `<div class="trade-item-value">${val}g</div>`;
+                html += `<div class="trade-item-buttons">`;
+                html += `<button class="trade-btn" onclick="window.game.tradeRemoveRequest('${reqKey}',${step})">−</button>`;
+                html += `<button class="trade-btn" onclick="window.game.tradeRequest('${reqKey}',${step})">+</button>`;
+                html += `</div></div>`;
             }
         }
         html += `<div style="height:12px;"></div></div>`;
@@ -3022,7 +3043,7 @@ export class UI {
             const arr = this.game.resources[`${type}s`] || [];
             for (let i = 0; i < arr.length; i++) {
                 const item = arr[i];
-                if (item?.tradeValue) offerableEquip.push({ key: `__equip_${type}_${i}`, item, type });
+                if (getItemTradeValue(item) > 0) offerableEquip.push({ key: `__equip_${type}_${i}`, item, type });
             }
         }
 
@@ -3062,7 +3083,7 @@ export class UI {
         if (offerableEquip.length > 0) {
             html += `<div class="trade-section-label" style="color:#aaa;font-size:0.8em;padding:4px 0 2px;border-top:1px solid #333;margin-top:4px;">Equipment</div>`;
             for (const { key, item, type } of offerableEquip) {
-                const val = (item.tradeValue * effectiveDiscount).toFixed(1);
+                const val = (getItemTradeValue(item) * effectiveDiscount).toFixed(1);
                 const isOffered = !!offer[key];
                 const selected = isOffered ? ' selected' : '';
                 const icon = this._itemIcon(item.key || key, type);
@@ -3078,6 +3099,35 @@ export class UI {
                     html += `<button class="trade-btn" onclick="window.game.tradeOffer('${key}',1)">+</button>`;
                 }
                 html += `</div></div>`;
+            }
+        }
+
+        // Stackable potions the player can sell (only to merchants that buy potions).
+        if (!buyCategories || buyCategories.has('potion')) {
+            const potionCounts = {};
+            for (const p of (this.game.resources.potions || [])) {
+                const k = p.key ?? p.type;
+                potionCounts[k] = (potionCounts[k] || 0) + 1;
+            }
+            const sellablePotions = Object.entries(potionCounts).filter(([, c]) => c > 0);
+            if (sellablePotions.length > 0) {
+                html += `<div class="trade-section-label" style="color:#aaa;font-size:0.8em;padding:4px 0 2px;border-top:1px solid #333;margin-top:4px;">Potions</div>`;
+                for (const [key, count] of sellablePotions) {
+                    const def = ALL_ITEMS[key];
+                    const offKey = `__potion_${key}`;
+                    const offAmt = offer[offKey] || 0;
+                    const val = (getItemTradeValue(def) * effectiveDiscount).toFixed(1);
+                    const selected = offAmt > 0 ? ' selected' : '';
+                    html += `<div class="trade-item-row${selected}">`;
+                    html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${def?.name || key} <span style="color:#888;">×${count}</span>`;
+                    if (offAmt > 0) html += `<span class="trade-item-badge">${offAmt}</span>`;
+                    html += `</div>`;
+                    html += `<div class="trade-item-value">${val}g</div>`;
+                    html += `<div class="trade-item-buttons">`;
+                    html += `<button class="trade-btn" onclick="window.game.tradeRemoveOffer('${offKey}',${step})">−</button>`;
+                    html += `<button class="trade-btn" onclick="window.game.tradeOffer('${offKey}',${step})">+</button>`;
+                    html += `</div></div>`;
+                }
             }
         }
 

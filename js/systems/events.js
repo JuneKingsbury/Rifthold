@@ -1,4 +1,5 @@
 import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, COMBAT_VISUALS } from '../core/config.js';
+import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal } from '../entities/entity-factory.js';
 import { getPedestalEffect } from './artifacts.js';
@@ -19,6 +20,21 @@ export function getTradeRates(game) {
         markup: TRADER_MARKUP * markupMult * tradeRoutesMult,
         discount: game.research.isResearched('trade_routes') ? 0.85 : TRADER_DISCOUNT,
     };
+}
+
+// Weighted pick of a QUALITY_TIERS key from a { qualityKey: weight } map.
+// Falls back to 'normal' if the map is empty/absent.
+function weightedQuality(weights) {
+    const entries = Object.entries(weights || {}).filter(([, w]) => w > 0);
+    if (!entries.length) return 'normal';
+    let total = 0;
+    for (const [, w] of entries) total += w;
+    let roll = Math.random() * total;
+    for (const [key, w] of entries) {
+        roll -= w;
+        if (roll <= 0) return key;
+    }
+    return entries[entries.length - 1][0];
 }
 
 /**
@@ -45,7 +61,12 @@ export function computeTradeValues(offer, request, goldOffer, rates, tradeData, 
             const idx = parseInt(parts[4], 10);
             const arr = game?.resources[`${type}s`] || [];
             const item = arr[idx];
-            equipOfferVal += (item?.tradeValue || 0) * rates.discount;
+            equipOfferVal += getItemTradeValue(item) * rates.discount;
+        } else if (res.startsWith('__potion_')) {
+            // Player sells a stack of potions. Priced from the definition (all
+            // instances identical), like a stackable material.
+            const key = res.slice('__potion_'.length);
+            equipOfferVal += getItemTradeValue(ALL_ITEMS[key]) * amt * rates.discount;
         } else {
             resourceOfferVal += (TRADE_VALUES[res] || 1) * amt * rates.discount;
         }
@@ -56,7 +77,13 @@ export function computeTradeValues(offer, request, goldOffer, rates, tradeData, 
         if (amt <= 0) continue;
         if (res.startsWith('__exclusive_')) {
             const slotIdx = parseInt(res.split('_')[3], 10);
-            reqVal += ALL_ITEMS[tradeData.exclusiveItems?.[slotIdx]]?.tradeValue || 0;
+            // Slots hold rolled instances, so the price reflects the rolled quality.
+            // Exclusives are priced at face value (no markup) — matches prior behavior.
+            reqVal += getItemTradeValue(tradeData.exclusiveItems?.[slotIdx]);
+        } else if (res.startsWith('__buypotion_')) {
+            // Player buys a stack of potions from the merchant's potion stock.
+            const key = res.slice('__buypotion_'.length);
+            reqVal += getItemTradeValue(ALL_ITEMS[key]) * amt * rates.markup;
         } else if (res === '__gold') {
             reqVal += amt;
         } else {
@@ -271,12 +298,49 @@ export class EventSystem {
     }
 
     /**
+     * Draw items from one of a merchant's stock pools without replacement, rolling
+     * each to a per-merchant quality, and return the rolled instances.
+     *
+     * @param {string[]} keys       Candidate item keys (the pool).
+     * @param {number[]} drawChances Per-slot draw probabilities. The FIRST slot is
+     *                               always drawn (its chance value is ignored);
+     *                               each subsequent entry is a probability.
+     * @param {object}   merchant    The merchant (for qualityWeights).
+     * @return {object[]} Rolled item instances (may be shorter than drawChances).
+     */
+    _drawMerchantStock(keys, drawChances, merchant) {
+        const pool = [...(keys || [])];
+        const chances = drawChances || [];
+        const out = [];
+        for (let i = 0; i < chances.length; i++) {
+            if (pool.length === 0) break;
+            if (i > 0 && Math.random() >= chances[i]) continue;   // first slot guaranteed
+            const idx = Math.floor(Math.random() * pool.length);
+            const key = pool.splice(idx, 1)[0];
+            out.push(this._rollMerchantItem(key, merchant));
+        }
+        return out;
+    }
+
+    // Roll a concrete merchant item. Gear takes a per-merchant quality roll; item
+    // types with no quality-scaled stats (trinket/tome/potion/consumable) stay
+    // 'normal' so the prefix isn't a name-only lie (mirrors the Trade Rift rule).
+    _rollMerchantItem(key, merchant) {
+        const def = ALL_ITEMS[key];
+        const QUALITY_SCALED = new Set(['weapon', 'armor', 'helmet', 'tool', 'clothes', 'boots']);
+        const quality = (def && QUALITY_SCALED.has(def.type))
+            ? weightedQuality(merchant.qualityWeights)
+            : 'normal';
+        return rollItem(key, quality);
+    }
+
+    /**
      * Spawns a trade caravan event with randomized inventory.
      * Tuning knobs:
      *   - numItems: 3-6 resource types carried (change range for variety)
-     *   - per-item quantity: 3-10 units each
-     *   - exclusive item chance: 30% (change for rarity)
-     *   - traderGold: 20-49g (change range for economy pacing)
+     *   - per-merchant lowDrawCount / highDrawChances: exclusive stock size & rarity
+     *   - per-merchant qualityWeights: quality distribution on drawn gear
+     *   - traderGold: goldRange per merchant (change for economy pacing)
      */
     eventCaravan(game) {
         const merchant = MERCHANTS[Math.floor(Math.random() * MERCHANTS.length)];
@@ -288,20 +352,22 @@ export class EventSystem {
             traderResources[res] = (traderResources[res] || 0) + 3 + Math.floor(Math.random() * 8);
         }
 
-        // Build exclusive item list: 1 guaranteed + extra slots per extraItemChances.
-        // Draw without replacement so the same item never appears twice.
-        const pool = [...merchant.exclusiveItems];
-        const exclusiveItems = [];
-        if (pool.length > 0) {
-            const firstIdx = Math.floor(Math.random() * pool.length);
-            exclusiveItems.push(pool.splice(firstIdx, 1)[0]);
-            for (const chance of (merchant.extraItemChances || [])) {
-                if (pool.length === 0) break;
-                if (Math.random() < chance) {
-                    const idx = Math.floor(Math.random() * pool.length);
-                    exclusiveItems.push(pool.splice(idx, 1)[0]);
-                }
-            }
+        // Build the exclusive stock: a handful of low-tier items plus a few premium
+        // ones, each drawn without replacement and rolled to a per-merchant quality.
+        // Slots hold ROLLED INSTANCES (not key strings) so pricing/tooltips reflect
+        // the rolled quality. (pendingEvent isn't serialized so
+        // storing instances here needs no save-format change.)
+        const exclusiveItems = [
+            ...this._drawMerchantStock(merchant.lowTierItems, merchant.lowDrawCount, merchant),
+            ...this._drawMerchantStock(merchant.highTierItems, merchant.highDrawChances, merchant),
+        ];
+
+        // Stackable potion stock, rolled per-visit from the merchant's potionStock
+        // ranges. { key: count } traded in stacks like materials (see the
+        // __buypotion_/__potion_ lanes in computeTradeValues / executeBarterTrade).
+        const traderPotions = {};
+        for (const [key, [lo, hi]] of Object.entries(merchant.potionStock || {})) {
+            traderPotions[key] = lo + Math.floor(Math.random() * (hi - lo + 1));
         }
 
         const [gMin, gMax] = merchant.goldRange;
@@ -311,7 +377,7 @@ export class EventSystem {
             type: 'trade',
             text: `A ${merchant.name} arrives! Barter resources with the merchant.`,
             choices: ['Open Trade', 'Dismiss'],
-            data: { traderResources, exclusiveItems, traderGold, merchantName: merchant.name, buyCategories: merchant.buyCategories || null, merchantResourcePool: merchant.resourcePool || null },
+            data: { traderResources, exclusiveItems, traderPotions, traderGold, merchantName: merchant.name, buyCategories: merchant.buyCategories || null, merchantResourcePool: merchant.resourcePool || null },
         };
         game.notifications.push({ text: `${merchant.name} arrived!`, tick: game.tick, type: 'event' });
         game.eventLog.add(game, `${merchant.name} arrived`, 'event', null);
@@ -357,6 +423,9 @@ export class EventSystem {
                 const idx = parseInt(parts[4], 10);
                 const arr = game.resources[`${type}s`] || [];
                 if (!arr[idx]) return false;
+            } else if (res.startsWith('__potion_')) {
+                const key = res.slice('__potion_'.length);
+                if (game.resources.getPotionCount(key) < amt) return false;
             } else {
                 if ((game.resources.stockpile[res] || 0) < amt) return false;
             }
@@ -367,6 +436,9 @@ export class EventSystem {
             if (res.startsWith('__exclusive_')) {
                 const slotIdx = parseInt(res.split('_')[3], 10);
                 if (!data.exclusiveItems?.[slotIdx]) return false;
+            } else if (res.startsWith('__buypotion_')) {
+                const key = res.slice('__buypotion_'.length);
+                if ((data.traderPotions?.[key] || 0) < amt) return false;
             } else if (res === '__gold') {
                 if (amt > data.traderGold) return false;
             } else {
@@ -394,7 +466,13 @@ export class EventSystem {
         }
         for (const [res, amt] of Object.entries(offering)) {
             if (res.startsWith('__equip_')) continue;
-            if (amt > 0) game.resources.deduct({ [res]: amt });
+            if (amt <= 0) continue;
+            if (res.startsWith('__potion_')) {
+                const key = res.slice('__potion_'.length);
+                for (let n = 0; n < amt; n++) game.resources.takePotion(key);
+            } else {
+                game.resources.deduct({ [res]: amt });
+            }
         }
 
         // --- Execute: give player what they requested ---
@@ -402,10 +480,14 @@ export class EventSystem {
         for (const [res, amt] of Object.entries(requesting)) {
             if (res.startsWith('__exclusive_')) {
                 const slotIdx = parseInt(res.split('_')[3], 10);
-                const itemKey = data.exclusiveItems?.[slotIdx];
-                const def = itemKey ? ALL_ITEMS[itemKey] : null;
-                if (def) game.resources.addItem({ ...def, key: itemKey });
+                const rolled = data.exclusiveItems?.[slotIdx];   // a rolled instance (with quality)
+                if (rolled) game.resources.addItem(rolled);
                 if (data.exclusiveItems) data.exclusiveItems[slotIdx] = null;
+            } else if (res.startsWith('__buypotion_')) {
+                const key = res.slice('__buypotion_'.length);
+                for (let n = 0; n < amt; n++) game.resources.addItem(rollItem(key, 'normal'));
+                data.traderPotions[key] -= amt;
+                if (data.traderPotions[key] <= 0) delete data.traderPotions[key];
             } else if (res === '__gold') {
                 const goldAmt = Math.min(amt, data.traderGold);
                 if (goldAmt > 0) {

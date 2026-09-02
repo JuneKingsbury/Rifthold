@@ -48,7 +48,7 @@ const ITEM_META_KEYS = new Set([
     'pedestal', 'expedition', 'durability', 'consumable',
     'trigger', 'hpThreshold', 'effect', 'healAmount', 'duration', 'cooldown',
     'manaThreshold', 'manaAmount', 'moveSpeedBonus_potion', 'workSpeedBonus_potion',
-    'recipe', 'type', 'tradeValue', 'textColor', 'quality', 'enchantment',
+    'recipe', 'type', 'tradeValue', 'textColor', 'quality', 'enchantment', 'enchantTier',
 ]);
 
 export function formatStatValue(statKey, value) {

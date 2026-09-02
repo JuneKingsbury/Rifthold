@@ -1117,6 +1117,11 @@ class Game {
         if (resource.startsWith('__equip_')) {
             // Equipment items are single-unit — toggle on
             this.ui._tradeOffer[resource] = 1;
+        } else if (resource.startsWith('__potion_')) {
+            // Potions sell in stacks, capped by how many the player holds.
+            const key = resource.slice('__potion_'.length);
+            const max = this.resources.getPotionCount(key);
+            this.ui._tradeOffer[resource] = Math.min((this.ui._tradeOffer[resource] || 0) + amount, max);
         } else {
             const max = this.resources.stockpile[resource] || 0;
             this.ui._tradeOffer[resource] = Math.min((this.ui._tradeOffer[resource] || 0) + amount, max);
@@ -1144,6 +1149,11 @@ class Game {
         if (!this.ui._tradeRequest) this.ui._tradeRequest = {};
         if (resource.startsWith('__exclusive_')) {
             this.ui._tradeRequest[resource] = 1;
+        } else if (resource.startsWith('__buypotion_')) {
+            // Potions buy in stacks, capped by the merchant's potion stock.
+            const key = resource.slice('__buypotion_'.length);
+            const max = this.events.pendingEvent?.data?.traderPotions?.[key] || 0;
+            this.ui._tradeRequest[resource] = Math.min((this.ui._tradeRequest[resource] || 0) + amount, max);
         } else {
             const evt = this.events.pendingEvent;
             const max = evt?.data?.traderResources?.[resource] || 0;
