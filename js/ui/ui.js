@@ -2772,6 +2772,7 @@ export class UI {
         graphics += this._settingsCheck('set-portal-path', s.showPortalPath, 'window.game.settings.showPortalPath=this.checked', 'Portal path highlighting');
         graphics += this._settingsCheck('set-breathing', s.showBreathing, 'window.game.settings.showBreathing=this.checked', 'Entity breathing animation');
         graphics += this._settingsCheck('set-walk-sway', s.showWalkSway, 'window.game.settings.showWalkSway=this.checked', 'Walking sway animation');
+        graphics += this._settingsCheck('set-attack-swing', s.showAttackSwing, 'window.game.settings.showAttackSwing=this.checked', 'Attack swing animation');
         graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
         graphics += `<div class="settings-row"><label for="set-dither-dist">Dithering Distance:</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['none','Off'],['minimal','Minimal'],['light','Light (default)'],['normal','Normal'],['heavy','Heavy'],['extreme','Extreme']]) {
@@ -2945,11 +2946,12 @@ export class UI {
         s.showPortalPath = on;
         s.showBreathing = on;
         s.showWalkSway = on;
+        s.showAttackSwing = on;
         s.showMinimap = on;
         window.RENDER_CONFIG.terrainDithering = on;
         document.getElementById('minimap-container').style.display = on ? '' : 'none';
         if (!on) this.game.renderer?.skinManager?._compositeCache.clear();
-        const ids = ['set-night','set-weather','set-damage-flash','set-screen-shake','set-combat-particles','set-projectiles','set-equip-overlays','set-progress-bars','set-portal-path','set-breathing','set-walk-sway','set-minimap'];
+        const ids = ['set-night','set-weather','set-damage-flash','set-screen-shake','set-combat-particles','set-projectiles','set-equip-overlays','set-progress-bars','set-portal-path','set-breathing','set-walk-sway','set-attack-swing','set-minimap'];
         for (const id of ids) {
             const el = document.getElementById(id);
             if (el) el.checked = on;

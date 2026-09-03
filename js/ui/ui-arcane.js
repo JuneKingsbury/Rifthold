@@ -1,7 +1,7 @@
 import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, TRINKETS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS,
     EXPEDITION_MUTATORS, EXPEDITION_POTIONS, POTION_CARRY_CONFIG, FORMATION_CONFIG,
     ELITE_MODIFIERS, NODE_MAP_CONFIG, EXPEDITION_XP_CONFIG, BESTIARY_CONFIG,
-    getItemStatLines,
+    getItemStatLines, RENDER_CONFIG,
 } from '../core/config.js';
 import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
@@ -1431,6 +1431,52 @@ const arcaneMethods = {
         this._expVisState.partyX += (targetX - this._expVisState.partyX) * walkSpeed;
         const partyX = this._expVisState.partyX;
 
+        // Walking sway for the party (mirrors the main map's `_walkSway`). There are
+        // no discrete tile steps here — the party glides via `partyX` — so drive the
+        // sway phase off distance actually travelled (footstep cadence that freezes
+        // when stopped) and ramp amplitude with current speed, so members sway while
+        // walking between nodes and ease upright when stopped at a node / in combat.
+        const swayEnabled = RENDER_CONFIG.entityWalkSway && this.game.settings.showWalkSway;
+        const partySpeed = Math.abs(partyX - (this._expVisState._prevPartyX ?? partyX));
+        this._expVisState._prevPartyX = partyX;
+        // ~one full sway cycle per 16px travelled; phase only advances while moving.
+        this._expVisState._swayPhase = (this._expVisState._swayPhase ?? 0) + partySpeed * (Math.PI * 2 / 16);
+        // Smoothly ramp intensity 0→1 with speed so the sway fades to upright on arrival.
+        const swayTargetIntensity = Math.min(1, partySpeed / 0.6);
+        this._expVisState._swayIntensity = (this._expVisState._swayIntensity ?? 0)
+            + (swayTargetIntensity - (this._expVisState._swayIntensity ?? 0)) * 0.2;
+        const swayPhase = this._expVisState._swayPhase;
+        const swayIntensity = this._expVisState._swayIntensity;
+        // Per-member angle: seed parity flips lead side and offsets phase so the
+        // party doesn't rock in lockstep. Amplitude/toggle come from RENDER_CONFIG.
+        const _walkSway = (seed) => {
+            if (!swayEnabled) return 0;
+            const dir = (seed & 1) ? -1 : 1;
+            const phase = swayPhase + (seed % 1000) / 1000 * 6.28;
+            return Math.sin(phase) * RENDER_CONFIG.walkSwayAmplitudeRad * dir * swayIntensity;
+        };
+
+        // Attack swing: a quick lunge-and-return rotation when an entity lands a
+        // *basic* attack (the combat model stamps `_lastAttackTick`). We latch each
+        // stamp change to a wall-clock start on the entity object, then play
+        // `sin(π·t)` over `attackSwingDurationMs` — upright at both ends, leaning
+        // toward the opponent at the peak. `facing` is +1 for the party (faces
+        // right) and -1 for enemies (face left).
+        const swingEnabled = RENDER_CONFIG.entityAttackSwing && this.game.settings.showAttackSwing;
+        const _attackSwing = (ent, facing) => {
+            if (!swingEnabled || ent == null) return 0;
+            const tick = ent._lastAttackTick;
+            if (tick == null) return 0;
+            if (ent._swingSeenTick !== tick) {
+                ent._swingSeenTick = tick;
+                ent._swingStartMs = _now;
+            }
+            if (ent._swingStartMs == null) return 0;
+            const t = (_now - ent._swingStartMs) / RENDER_CONFIG.attackSwingDurationMs;
+            if (t < 0 || t >= 1) return 0;
+            return Math.sin(t * Math.PI) * RENDER_CONFIG.attackSwingAmplitudeRad * facing;
+        };
+
         const party = activeExp.partySnapshot || [];
         const backRowIds = activeExp.formation?.back || [];
         const skinMgr = this.game.skinManager;
@@ -1485,8 +1531,22 @@ const arcaneMethods = {
                     }
                 }
                 const grow = p.hp > 0 ? _breathe(p.id || i) : 0;
+                // Walking sway: pendulum rotation about the feet (bottom-center). Wraps
+                // only the sprite draw so the shadow and bars stay flat. Upright when stopped.
+                const swayAngle = p.hp > 0 ? _walkSway(p.id || i) + _attackSwing(p, 1) : 0;
                 if (sprite) {
-                    ctx.drawImage(sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow);
+                    if (swayAngle !== 0) {
+                        const pivotX = px;
+                        const pivotY = py + bounceY + 16;
+                        ctx.save();
+                        ctx.translate(pivotX, pivotY);
+                        ctx.rotate(swayAngle);
+                        ctx.translate(-pivotX, -pivotY);
+                        ctx.drawImage(sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow);
+                        ctx.restore();
+                    } else {
+                        ctx.drawImage(sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow);
+                    }
                 } else {
                     ctx.font = 'bold 18px monospace';
                     ctx.fillStyle = '#ccc';
@@ -1555,10 +1615,20 @@ const arcaneMethods = {
                 ctx.fill();
                 ctx.globalAlpha = 1;
                 const paGrow = _breathe(100 + i);
+                const paSway = _walkSway(100 + i);
                 if (useSkins) {
                     const sprite = skinMgr.getSprite('entities', pa.type);
                     if (sprite) {
-                        ctx.drawImage(sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow);
+                        if (paSway !== 0) {
+                            ctx.save();
+                            ctx.translate(pax, pay + 16);
+                            ctx.rotate(paSway);
+                            ctx.translate(-pax, -(pay + 16));
+                            ctx.drawImage(sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow);
+                            ctx.restore();
+                        } else {
+                            ctx.drawImage(sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow);
+                        }
                     } else {
                         ctx.font = 'bold 18px monospace';
                         ctx.textAlign = 'center';
@@ -1596,10 +1666,20 @@ const arcaneMethods = {
             ctx.stroke();
             ctx.globalAlpha = 1;
             const sumGrow = _breathe(200 + si);
+            const sumSway = _walkSway(200 + si) + _attackSwing(summon, 1);
             if (useSkins) {
                 const sumSprite = skinMgr.getSprite('entities', summon.type);
                 if (sumSprite) {
-                    ctx.drawImage(sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow);
+                    if (sumSway !== 0) {
+                        ctx.save();
+                        ctx.translate(sx, sy + 16);
+                        ctx.rotate(sumSway);
+                        ctx.translate(-sx, -(sy + 16));
+                        ctx.drawImage(sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow);
+                        ctx.restore();
+                    } else {
+                        ctx.drawImage(sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow);
+                    }
                 } else {
                     ctx.font = 'bold 18px monospace';
                     ctx.textAlign = 'center';
@@ -1650,6 +1730,8 @@ const arcaneMethods = {
                 }
                 ctx.fill();
                 ctx.globalAlpha = 1;
+                // Enemies face left, so an attack swing leans toward smaller x (-1).
+                const enemySwing = _attackSwing(enemy, -1);
                 if (enemy.isBoss) {
                     const bGrow = _breathe(400 + i);
                     const bossSpriteKey = enemy.enraged && enemy.enragedSprite ? enemy.enragedSprite : enemy.sprite;
@@ -1657,7 +1739,16 @@ const arcaneMethods = {
                     const bossColor = enemy.enraged ? (enemy.enragedColor || '#ff0000') : (enemy.color || '#ff8844');
                     const sz = 24;
                     if (bossSprite) {
-                        ctx.drawImage(bossSprite, ex - sz, ey - sz - bGrow, sz * 2, sz * 2 + bGrow);
+                        if (enemySwing !== 0) {
+                            ctx.save();
+                            ctx.translate(ex, ey + sz);
+                            ctx.rotate(enemySwing);
+                            ctx.translate(-ex, -(ey + sz));
+                            ctx.drawImage(bossSprite, ex - sz, ey - sz - bGrow, sz * 2, sz * 2 + bGrow);
+                            ctx.restore();
+                        } else {
+                            ctx.drawImage(bossSprite, ex - sz, ey - sz - bGrow, sz * 2, sz * 2 + bGrow);
+                        }
                     } else {
                         ctx.beginPath();
                         ctx.moveTo(ex, ey - sz - bGrow);
@@ -1688,7 +1779,16 @@ const arcaneMethods = {
                     const perEnemySpriteKey = enemy.sprite || enemySpriteKey;
                     const perEnemySprite = useSkins && perEnemySpriteKey ? skinMgr.getSprite('entities', perEnemySpriteKey) : null;
                     if (perEnemySprite) {
-                        ctx.drawImage(perEnemySprite, ex - 16, ey - 16 - eGrow, 32, 32 + eGrow);
+                        if (enemySwing !== 0) {
+                            ctx.save();
+                            ctx.translate(ex, ey + 16);
+                            ctx.rotate(enemySwing);
+                            ctx.translate(-ex, -(ey + 16));
+                            ctx.drawImage(perEnemySprite, ex - 16, ey - 16 - eGrow, 32, 32 + eGrow);
+                            ctx.restore();
+                        } else {
+                            ctx.drawImage(perEnemySprite, ex - 16, ey - 16 - eGrow, 32, 32 + eGrow);
+                        }
                     } else {
                         ctx.beginPath();
                         ctx.moveTo(ex, ey - 14 - eGrow);

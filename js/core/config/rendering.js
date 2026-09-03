@@ -43,6 +43,16 @@ export const RENDER_CONFIG = {
     entityWalkSway: true,
     walkSwayCycles: 1,
     walkSwayAmplitudeRad: 0.09,
+    // Attack swing: a quick lunge-and-return rotation on an entity's sprite when
+    // it lands (or attempts) a *basic* attack in expedition combat — NOT spells.
+    // The combat model stamps `entity._lastAttackTick = game.tick` on each basic
+    // attack; the expedition visual latches a tick change to a performance.now()
+    // start and plays `sin(π·t)` over `attackSwingDurationMs`, so the sprite is
+    // upright at both ends and leans toward its opponent at the peak. amplitude
+    // in radians (~0.35 ≈ 20°, more pronounced than the walking sway).
+    entityAttackSwing: true,
+    attackSwingDurationMs: 320,
+    attackSwingAmplitudeRad: 0.35,
     healthBarGreenThreshold: 0.5,
     healthBarYellowThreshold: 0.25,
     healthBarColors: { green: '#00ff00', yellow: '#ffaa00', red: '#ff3333' },

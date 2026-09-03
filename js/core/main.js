@@ -86,6 +86,7 @@ class Game {
             showPortalPath: true,
             showBreathing: true,
             showWalkSway: true,
+            showAttackSwing: true,
             showWarmthOverlay: false,
             showDefenseOverlay: false,
             showRoomOverlay: false,
@@ -1915,7 +1916,7 @@ class Game {
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
             largeClickTargets: false, pauseOnFocusLoss: true, enableScreenShake: true, colorblindMode: 'none',
             notificationDuration: 100, showDamageFlash: true, showCombatParticles: true, showProjectiles: true,
-            showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, layoutMode: 'auto',
+            showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, layoutMode: 'auto',
             musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
             ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true,
         });
@@ -3402,6 +3403,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.showPortalPath = document.getElementById('start-portal-path').checked;
             s.showBreathing = document.getElementById('start-breathing').checked;
             s.showWalkSway = document.getElementById('start-walk-sway').checked;
+            s.showAttackSwing = document.getElementById('start-attack-swing').checked;
             s.showNightLighting = document.getElementById('start-night').checked;
             s.showWeatherParticles = document.getElementById('start-weather').checked;
             s.showMinimap = document.getElementById('start-minimap').checked;
@@ -3460,6 +3462,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showPortalPath != null) document.getElementById('start-portal-path').checked = s.showPortalPath;
             if (s.showBreathing != null) document.getElementById('start-breathing').checked = s.showBreathing;
             if (s.showWalkSway != null) document.getElementById('start-walk-sway').checked = s.showWalkSway;
+            if (s.showAttackSwing != null) document.getElementById('start-attack-swing').checked = s.showAttackSwing;
             if (s.showNightLighting != null) document.getElementById('start-night').checked = s.showNightLighting;
             if (s.showWeatherParticles != null) document.getElementById('start-weather').checked = s.showWeatherParticles;
             if (s.showMinimap != null) document.getElementById('start-minimap').checked = s.showMinimap;
@@ -3557,6 +3560,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-portal-path').checked = true;
         document.getElementById('start-breathing').checked = true;
         document.getElementById('start-walk-sway').checked = true;
+        document.getElementById('start-attack-swing').checked = true;
         document.getElementById('start-night').checked = true;
         document.getElementById('start-weather').checked = true;
         document.getElementById('start-minimap').checked = true;
@@ -3656,6 +3660,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showPortalPath: document.getElementById('start-portal-path').checked,
             showBreathing: document.getElementById('start-breathing').checked,
             showWalkSway: document.getElementById('start-walk-sway').checked,
+            showAttackSwing: document.getElementById('start-attack-swing').checked,
             showNightLighting: document.getElementById('start-night').checked,
             showWeatherParticles: document.getElementById('start-weather').checked,
             showMinimap: document.getElementById('start-minimap').checked,

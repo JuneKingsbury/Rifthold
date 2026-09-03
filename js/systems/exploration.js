@@ -1313,6 +1313,9 @@ export class ExplorationSystem {
             for (let hit = 0; hit < hitsPerRound; hit++) {
                 const target = combat.enemies.find(e => e.hp > 0);
                 if (!target) break;
+                // Stamp the basic-attack tick so the expedition visual can play an
+                // attack-swing animation. Set only on basic attacks, never spells.
+                member._lastAttackTick = game.tick;
                 const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
 
                 if (target.eliteDodge && Math.random() < target.eliteDodge) {
@@ -1373,6 +1376,7 @@ export class ExplorationSystem {
                 }
                 const summonTarget = combat.enemies.find(e => e.hp > 0);
                 if (summonTarget) {
+                    summon._lastAttackTick = game.tick;
                     const sDmg = summon.damage + randInt(0, 2);
                     if (Math.random() < 0.1) {
                         this._addLog(exp, game, `The ${summon.name} misses!`, 'combat');
@@ -1489,6 +1493,10 @@ export class ExplorationSystem {
                     }
                     if (castSpell) continue;
                 }
+
+                // Basic-attack path begins here (spellcasts already `continue`d above).
+                // Stamp the tick so the expedition visual can play an attack swing.
+                enemy._lastAttackTick = game.tick;
 
                 const aliveSummons = exp.summons ? exp.summons.filter(s => s.hp > 0) : [];
                 if (aliveSummons.length > 0 && Math.random() < 0.5) {
