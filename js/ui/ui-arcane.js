@@ -1028,6 +1028,228 @@ const arcaneMethods = {
         return html;
     },
 
+    // ── Expedition entity animation composer ──────────────────────────────
+    //
+    // Every animated entity (party member, summon, enemy, boss) is drawn through
+    // a single composition step so overlapping/interrupting animations blend
+    // cleanly instead of fighting. Each animation writes to independent channels:
+    //   rot   (rad)  — additive: walk sway, lean, swing, crit, wobble, topple
+    //   dx,dy (px)   — additive: recoil, dodge hop, bob, stomp, shiver, ranged draw
+    //   sx,sy (mult) — multiplicative: crit punch, enrage, summon scale-in
+    //   alpha (mult) — multiplicative: death fade
+    //   projectile   — a one-shot spawn request the caller may honor (ranged)
+    //
+    // ONE-SHOT PRIORITY: transient actions (swing, recoil, dodge, crit, enrage,
+    // death) compete for a single per-entity slot. A new one-shot only takes the
+    // slot if its priority >= the current holder's — so a boss mid-stomp (60)
+    // ignores a hit recoil (20) and finishes the stomp, and death (100) overrides
+    // everything. Same-type re-trigger resets the timer for a crisp restart.
+    // Continuous states (sway/bob/lean/idle, poison shiver, low-HP breathing)
+    // blend on their own channels but are suppressed while a one-shot runs
+    // (locomotion) or while a dramatic one-shot >=60 runs (ambient shivers too).
+    //
+    // `facing` is +1 for the party/summons (face right) and -1 for enemies.
+    // `_now` is performance.now(); the entity object persists across frames, so
+    // we latch wall-clock start times on it (`_anim` scratch object).
+
+    // Progress (0..1) of a stamped tick-based one-shot, latching its start time.
+    // Returns null when inactive/expired. `key` namespaces the latch so different
+    // one-shots on the same entity don't clobber each other.
+    _animShotT(ent, tick, key, durationMs, now) {
+        if (tick == null) return null;
+        const a = ent._anim || (ent._anim = {});
+        const seenKey = key + 'Seen';
+        const startKey = key + 'Start';
+        if (a[seenKey] !== tick) { a[seenKey] = tick; a[startKey] = now; }
+        const start = a[startKey];
+        if (start == null) return null;
+        const t = (now - start) / durationMs;
+        return (t >= 0 && t < 1) ? t : null;
+    },
+
+    // Detect state changes that have no model stamp, by diffing values persisted
+    // on the entity across frames. Stamps `_lastHitTick` (hp dropped) and
+    // `_enrageTick` (enraged flipped on) using `now` as a monotonic latch key.
+    _stampEntityStateChanges(ent, now) {
+        if (ent._prevHp != null && ent.hp < ent._prevHp) ent._lastHitTick = now;
+        ent._prevHp = ent.hp;
+        const enr = !!ent.enraged;
+        if (enr && !ent._prevEnraged) ent._enrageTick = now;
+        ent._prevEnraged = enr;
+    },
+
+    _composeEntityAnim(ent, opts) {
+        const R = RENDER_CONFIG;
+        const now = opts.now;
+        const facing = opts.facing;
+        const swayAngle = opts.swayAngle || 0;      // pre-computed walk sway (already gated)
+        const speed = opts.speed || 0;              // 0..1 travel intensity
+        const out = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1, alpha: 1, projectile: null };
+        const extras = !!opts.extras;   // showExpeditionExtras — the 14 new effects
+        const swing = !!opts.swing;     // showAttackSwing — attack motion (pre-existing)
+        const alive = ent.hp == null || ent.hp > 0;
+        const P = R.expedAnimPriority;
+
+        // Resolve the single active one-shot by priority. Each candidate carries
+        // its progress t (0..1) and priority; highest priority with a live t wins.
+        let best = null;
+        const consider = (name, t, pr) => {
+            if (t == null) return;
+            if (!best || pr >= best.pr) best = { name, t, pr };
+        };
+        // Death — terminal, only when just died (hp<=0). Latched off a synthetic
+        // "death tick": we stamp the frame hp first crossed to <=0 via _anim.
+        if (!alive) {
+            const a = ent._anim || (ent._anim = {});
+            if (a.deathStartMs == null) a.deathStartMs = now;
+            const dt = (now - a.deathStartMs) / R.deathToppleDurationMs;
+            if (extras && R.expedDeathTopple && dt < 1) consider('death', dt, P.death);
+            else if (extras && R.expedDeathTopple) consider('death', 0.999, P.death); // hold toppled
+        } else if (ent._anim) {
+            ent._anim.deathStartMs = null; // revived — clear
+        }
+        if (alive) {
+            // Attack-speed scales the swing/crit duration: fast weapons play a
+            // snappy motion, slow/heavy ones a drawn-out one. Clamped so extremes
+            // stay readable. `_atkAnimMult` is the raw cooldown-to-baseline ratio.
+            const atkMult = Math.min(R.attackAnimMaxMult, Math.max(R.attackAnimMinMult, ent._atkAnimMult || 1));
+            const atkDur = R.attackSwingDurationMs * atkMult;
+            if (extras && R.expedEnrageStomp) consider('enrage', this._animShotT(ent, ent._enrageTick, 'enrage', R.enrageStompDurationMs, now), P.enrage);
+            if (swing && R.expedCritEmphasis) consider('crit', this._animShotT(ent, ent._lastCritTick, 'crit', atkDur, now), P.crit);
+            if (swing) consider('attack', this._animShotT(ent, ent._lastAttackTick, 'attack', atkDur, now), P.attack);
+            if (extras && R.expedCastWindup) consider('cast', this._animShotT(ent, ent._lastCastTick, 'cast', R.castWindupDurationMs, now), P.cast);
+            if (extras && R.expedDodgeHop) consider('dodge', this._animShotT(ent, ent._lastDodgeTick, 'dodge', R.dodgeHopDurationMs, now), P.dodge);
+            if (extras && R.expedHitRecoil) consider('recoil', this._animShotT(ent, ent._lastHitTick, 'recoil', R.hitRecoilDurationMs, now), P.recoil);
+        }
+
+        const oneShotActive = !!best;
+        const dramatic = best && best.pr >= P.enrage;
+
+        // ── Apply the winning one-shot ──
+        if (best) {
+            const t = best.t;
+            const arc = Math.sin(t * Math.PI);       // 0→1→0, upright/centered at ends
+            switch (best.name) {
+                case 'death':
+                    // Ease toward toppled (eased-out) and fade out.
+                    out.rot += R.deathToppleRad * facing * (1 - (1 - t) * (1 - t));
+                    out.alpha *= Math.max(0, 1 - t);
+                    break;
+                case 'enrage':
+                    out.dy += -Math.abs(Math.sin(t * Math.PI * 2)) * R.enrageStompPx; // two stomps
+                    out.sx *= 1 + R.enrageStompScale * arc;
+                    out.sy *= 1 + R.enrageStompScale * arc;
+                    break;
+                case 'crit':
+                    out.rot += R.critSwingAmplitudeRad * facing * arc;
+                    out.sx *= 1 + R.critPunchScale * arc;
+                    out.sy *= 1 + R.critPunchScale * arc;
+                    break;
+                case 'attack': {
+                    // Weapon-driven motion class. New values: 'Swing' | 'Stab' |
+                    // 'DrawAndShoot'; older stamps ('melee'/'bow'/'wand'/'ranged')
+                    // are mapped for safety against saved-in-flight expeditions.
+                    let kind = ent._lastAttackKind || 'Swing';
+                    if (kind === 'melee') kind = 'Swing';
+                    else if (kind === 'bow' || kind === 'wand' || kind === 'ranged') kind = 'DrawAndShoot';
+                    if (kind === 'DrawAndShoot') {
+                        // Pull back (away from foe), then snap forward and release a
+                        // projectile at the moment of release (~45% through).
+                        const draw = t < 0.5 ? (t / 0.5) : (1 - (t - 0.5) / 0.5);
+                        out.dx += (t < 0.45 ? -draw * R.hitRecoilPx : arc * R.hitRecoilPx * 1.5) * facing;
+                        if (t >= 0.45 && (ent._anim.attackFiredSeen !== ent._lastAttackTick)) {
+                            ent._anim.attackFiredSeen = ent._lastAttackTick;
+                            // Mote (glowing dot + trail) for casters, arrow streak for
+                            // archers. Party: wands/staves carry spellDamageBonus.
+                            // Enemies: no weapon, so spellcasters (with `spells`) fling
+                            // a mote, plain archers fling an arrow.
+                            const isCaster = (ent.weapon && ent.weapon.spellDamageBonus)
+                                || (!ent.weapon && ent.spells && ent.spells.length);
+                            out.projectile = isCaster ? 'wand' : 'bow';
+                        }
+                    } else if (kind === 'Stab') {
+                        // Forward linear thrust toward the foe, then retract. A hair
+                        // of forward tilt sells the lunge without a full rotation.
+                        out.dx += arc * R.attackStabThrustPx * facing;
+                        out.rot += 0.08 * facing * arc;
+                    } else {
+                        // 'Swing': rotation lunge toward the foe.
+                        out.rot += R.attackSwingAmplitudeRad * facing * arc;
+                    }
+                    break;
+                }
+                case 'cast':
+                    // Pull back (away from foe) then lean in as the spell releases.
+                    out.dx += -R.castWindupPx * facing * arc;
+                    out.rot += -0.08 * facing * arc;
+                    break;
+                case 'dodge':
+                    out.dy += -R.dodgeHopPx * arc;             // quick vertical juke
+                    out.dx += -R.hitRecoilPx * 0.5 * facing * arc;
+                    break;
+                case 'recoil':
+                    // Knock away from the attacker (opposite the entity's facing).
+                    out.dx += -R.hitRecoilPx * facing * arc;
+                    out.rot += -0.08 * facing * arc;
+                    break;
+            }
+        }
+
+        // ── Continuous states (blend unless suppressed) ──
+        if (!oneShotActive) {
+            out.rot += swayAngle;
+            if (extras && R.expedFootstepBob && speed > 0.01) {
+                // Bob at 2× the sway cadence; peaks at footfall. Uses sway sign via phase.
+                out.dy += -Math.abs(Math.sin((opts.swayPhase || 0))) * R.footstepBobPx * speed;
+            }
+            if (extras && R.expedTravelLean) out.rot += R.travelLeanRad * facing * speed;
+            if (extras && R.expedIdleShift && speed < 0.02) {
+                const ph = (now / R.idleShiftPeriodMs) * Math.PI * 2 + ((opts.seed || 0) % 1000) / 1000 * 6.28;
+                out.rot += Math.sin(ph) * R.idleShiftRad;
+            }
+        }
+        // Ambient status body-language — suppressed only by dramatic one-shots.
+        if (extras && !dramatic && alive && R.expedStatusBodyLanguage && ent.statusEffects) {
+            const active = ent.statusEffects.filter(s => s.rounds > 0);
+            const hasFreeze = active.some(s => s.type === 'slow');
+            const hasStun = active.some(s => s.type === 'stun');
+            const hasPoison = active.some(s => s.type === 'poison' || s.type === 'burn');
+            if (hasFreeze) out.dx += Math.sin(now * 0.05 + (opts.seed || 0)) * R.statusShiverPx;
+            if (hasStun) out.rot += Math.sin(now * 0.008 + (opts.seed || 0)) * R.statusWobbleRad;
+            if (hasPoison) out.dy += Math.sin(now * 0.004 + (opts.seed || 0)) * R.statusShiverPx * 0.5;
+        }
+
+        return out;
+    },
+
+    // Draw `sprite` at (dx,dy,w,h) with a composed animation transform applied
+    // about the pivot (pivotX,pivotY). Falls back to a plain drawImage when the
+    // transform is identity, to avoid needless save/restore churn.
+    _drawEntityWithAnim(ctx, sprite, dx, dy, w, h, pivotX, pivotY, anim) {
+        const identity = anim.rot === 0 && anim.dx === 0 && anim.dy === 0
+            && anim.sx === 1 && anim.sy === 1 && anim.alpha === 1;
+        if (identity) { ctx.drawImage(sprite, dx, dy, w, h); return; }
+        ctx.save();
+        if (anim.alpha !== 1) ctx.globalAlpha *= anim.alpha;
+        ctx.translate(pivotX + anim.dx, pivotY + anim.dy);
+        if (anim.rot !== 0) ctx.rotate(anim.rot);
+        if (anim.sx !== 1 || anim.sy !== 1) ctx.scale(anim.sx, anim.sy);
+        ctx.translate(-pivotX, -pivotY);
+        ctx.drawImage(sprite, dx, dy, w, h);
+        ctx.restore();
+    },
+
+    // Queue a ranged basic-attack projectile flying (fx,fy)→(tx,ty). `kind` is
+    // 'bow' or 'wand'; `weapon` supplies projectileChar/projectileColor when set.
+    _spawnExpedProjectile(kind, fx, fy, tx, ty, weapon) {
+        const char = (weapon && weapon.projectileChar) || (kind === 'wand' ? '·' : '-');
+        const color = (weapon && weapon.projectileColor) || (kind === 'wand' ? '#aaccff' : '#ffaa33');
+        this._expVisState.effects.push({
+            type: 'projectile', kind, char, color,
+            x: fx, y: fy, tx, ty, frame: 0, maxFrames: 12,
+        });
+    },
+
     _renderExpeditionVis() {
         const canvas = this.elements.arcanePanel.querySelector('.exp-vis-canvas');
         if (!canvas) return;
@@ -1477,6 +1699,29 @@ const arcaneMethods = {
             return Math.sin(t * Math.PI) * RENDER_CONFIG.attackSwingAmplitudeRad * facing;
         };
 
+        // Master gate for the richer expedition animation set (14 effects). Each
+        // still has its own RENDER_CONFIG.exped* flag for config-level tuning.
+        const extrasEnabled = this.game.settings.showExpeditionExtras !== false;
+        // Low-HP labored breathing: below `lowHpThreshold`, breathing deepens
+        // (amplitude scales up as hp→0). Returns a multiplier on the breathe grow.
+        const _lowHpBreathMult = (ent) => {
+            if (!extrasEnabled || !RENDER_CONFIG.expedLowHpLabored) return 1;
+            if (ent.maxHp == null || ent.maxHp <= 0 || ent.hp <= 0) return 1;
+            const ratio = ent.hp / ent.maxHp;
+            if (ratio >= RENDER_CONFIG.lowHpThreshold) return 1;
+            const f = 1 - ratio / RENDER_CONFIG.lowHpThreshold; // 0 at threshold → 1 at 0 hp
+            return 1 + (RENDER_CONFIG.lowHpBreathMult - 1) * f;
+        };
+        // Build the compose options for an entity in one place.
+        const _animFor = (ent, facing, seed, swayAngle) => {
+            this._stampEntityStateChanges(ent, _now);
+            return this._composeEntityAnim(ent, {
+                now: _now, facing, seed, swayAngle,
+                speed: swayIntensity, swayPhase,
+                extras: extrasEnabled, swing: swingEnabled,
+            });
+        };
+
         const party = activeExp.partySnapshot || [];
         const backRowIds = activeExp.formation?.back || [];
         const skinMgr = this.game.skinManager;
@@ -1530,23 +1775,21 @@ const arcaneMethods = {
                         sprite = skinMgr.getColonistSprite(p.id, false, p.raceKey, p.bodyVariant, p.hairVariant, p.shirtVariant, p.nameColor, false);
                     }
                 }
-                const grow = p.hp > 0 ? _breathe(p.id || i) : 0;
-                // Walking sway: pendulum rotation about the feet (bottom-center). Wraps
-                // only the sprite draw so the shadow and bars stay flat. Upright when stopped.
-                const swayAngle = p.hp > 0 ? _walkSway(p.id || i) + _attackSwing(p, 1) : 0;
+                const grow = p.hp > 0 ? _breathe(p.id || i) * _lowHpBreathMult(p) : 0;
+                // Compose all animation channels (sway, attack/crit swing, recoil,
+                // dodge, cast, death topple, status body-language, bob/lean/idle).
+                const swayAngle = p.hp > 0 ? _walkSway(p.id || i) : 0;
+                const anim = _animFor(p, 1, p.id || i, swayAngle);
+                // Victory flourish: a per-member weapon-raise tilt during celebration.
+                if (isCelebrating && p.hp > 0 && extrasEnabled && RENDER_CONFIG.expedVictoryFlourish) {
+                    const t = (Date.now() - this._expVisState._celebrateStart) / 1000;
+                    anim.rot += Math.sin(t * 4 + i * 1.2) * RENDER_CONFIG.victoryFlourishRad;
+                }
+                if (anim.projectile) {
+                    this._spawnExpedProjectile(anim.projectile, px + 8, py + bounceY, partyX + 90, H / 2 - 5 + Math.random() * 12, p.weapon);
+                }
                 if (sprite) {
-                    if (swayAngle !== 0) {
-                        const pivotX = px;
-                        const pivotY = py + bounceY + 16;
-                        ctx.save();
-                        ctx.translate(pivotX, pivotY);
-                        ctx.rotate(swayAngle);
-                        ctx.translate(-pivotX, -pivotY);
-                        ctx.drawImage(sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow);
-                        ctx.restore();
-                    } else {
-                        ctx.drawImage(sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow);
-                    }
+                    this._drawEntityWithAnim(ctx, sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow, px, py + bounceY + 16, anim);
                 } else {
                     ctx.font = 'bold 18px monospace';
                     ctx.fillStyle = '#ccc';
@@ -1615,20 +1858,12 @@ const arcaneMethods = {
                 ctx.fill();
                 ctx.globalAlpha = 1;
                 const paGrow = _breathe(100 + i);
-                const paSway = _walkSway(100 + i);
+                // Pack animals don't attack; they get sway + locomotion polish only.
+                const paAnim = _animFor(pa, 1, 100 + i, _walkSway(100 + i));
                 if (useSkins) {
                     const sprite = skinMgr.getSprite('entities', pa.type);
                     if (sprite) {
-                        if (paSway !== 0) {
-                            ctx.save();
-                            ctx.translate(pax, pay + 16);
-                            ctx.rotate(paSway);
-                            ctx.translate(-pax, -(pay + 16));
-                            ctx.drawImage(sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow);
-                            ctx.restore();
-                        } else {
-                            ctx.drawImage(sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow);
-                        }
+                        this._drawEntityWithAnim(ctx, sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow, pax, pay + 16, paAnim);
                     } else {
                         ctx.font = 'bold 18px monospace';
                         ctx.textAlign = 'center';
@@ -1665,21 +1900,21 @@ const arcaneMethods = {
             ctx.arc(sx, sy, 16, 0, Math.PI * 2);
             ctx.stroke();
             ctx.globalAlpha = 1;
-            const sumGrow = _breathe(200 + si);
-            const sumSway = _walkSway(200 + si) + _attackSwing(summon, 1);
+            const sumGrow = _breathe(200 + si) * _lowHpBreathMult(summon);
+            const sumAnim = _animFor(summon, 1, 200 + si, _walkSway(200 + si));
+            // Summon scale-in on arrival (first frames after it appears).
+            if (extrasEnabled && RENDER_CONFIG.expedSummonScale) {
+                if (summon._appearMs == null) summon._appearMs = _now;
+                const at = (_now - summon._appearMs) / RENDER_CONFIG.summonScaleDurationMs;
+                if (at >= 0 && at < 1) { const s = at * (2 - at); sumAnim.sx *= s; sumAnim.sy *= s; }
+            }
+            if (sumAnim.projectile) {
+                this._spawnExpedProjectile(sumAnim.projectile, sx + 8, sy, partyX + 90, H / 2 - 5 + Math.random() * 12, summon);
+            }
             if (useSkins) {
                 const sumSprite = skinMgr.getSprite('entities', summon.type);
                 if (sumSprite) {
-                    if (sumSway !== 0) {
-                        ctx.save();
-                        ctx.translate(sx, sy + 16);
-                        ctx.rotate(sumSway);
-                        ctx.translate(-sx, -(sy + 16));
-                        ctx.drawImage(sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow);
-                        ctx.restore();
-                    } else {
-                        ctx.drawImage(sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow);
-                    }
+                    this._drawEntityWithAnim(ctx, sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow, sx, sy + 16, sumAnim);
                 } else {
                     ctx.font = 'bold 18px monospace';
                     ctx.textAlign = 'center';
@@ -1730,25 +1965,19 @@ const arcaneMethods = {
                 }
                 ctx.fill();
                 ctx.globalAlpha = 1;
-                // Enemies face left, so an attack swing leans toward smaller x (-1).
-                const enemySwing = _attackSwing(enemy, -1);
+                // Enemies face left (facing = -1): swings/leans go toward smaller x.
+                const enemyAnim = _animFor(enemy, -1, (enemy.isBoss ? 400 : 300) + i, 0);
+                if (enemyAnim.projectile) {
+                    this._spawnExpedProjectile(enemyAnim.projectile, ex - 8, ey, partyX + 10, H / 2 - 5 + Math.random() * 12, enemy);
+                }
                 if (enemy.isBoss) {
-                    const bGrow = _breathe(400 + i);
+                    const bGrow = _breathe(400 + i) * _lowHpBreathMult(enemy);
                     const bossSpriteKey = enemy.enraged && enemy.enragedSprite ? enemy.enragedSprite : enemy.sprite;
                     const bossSprite = useSkins && bossSpriteKey ? skinMgr.getSprite('entities', bossSpriteKey) : null;
                     const bossColor = enemy.enraged ? (enemy.enragedColor || '#ff0000') : (enemy.color || '#ff8844');
                     const sz = 24;
                     if (bossSprite) {
-                        if (enemySwing !== 0) {
-                            ctx.save();
-                            ctx.translate(ex, ey + sz);
-                            ctx.rotate(enemySwing);
-                            ctx.translate(-ex, -(ey + sz));
-                            ctx.drawImage(bossSprite, ex - sz, ey - sz - bGrow, sz * 2, sz * 2 + bGrow);
-                            ctx.restore();
-                        } else {
-                            ctx.drawImage(bossSprite, ex - sz, ey - sz - bGrow, sz * 2, sz * 2 + bGrow);
-                        }
+                        this._drawEntityWithAnim(ctx, bossSprite, ex - sz, ey - sz - bGrow, sz * 2, sz * 2 + bGrow, ex, ey + sz, enemyAnim);
                     } else {
                         ctx.beginPath();
                         ctx.moveTo(ex, ey - sz - bGrow);
@@ -1775,20 +2004,11 @@ const arcaneMethods = {
                         ctx.globalAlpha = 1;
                     }
                 } else {
-                    const eGrow = _breathe(300 + i);
+                    const eGrow = _breathe(300 + i) * _lowHpBreathMult(enemy);
                     const perEnemySpriteKey = enemy.sprite || enemySpriteKey;
                     const perEnemySprite = useSkins && perEnemySpriteKey ? skinMgr.getSprite('entities', perEnemySpriteKey) : null;
                     if (perEnemySprite) {
-                        if (enemySwing !== 0) {
-                            ctx.save();
-                            ctx.translate(ex, ey + 16);
-                            ctx.rotate(enemySwing);
-                            ctx.translate(-ex, -(ey + 16));
-                            ctx.drawImage(perEnemySprite, ex - 16, ey - 16 - eGrow, 32, 32 + eGrow);
-                            ctx.restore();
-                        } else {
-                            ctx.drawImage(perEnemySprite, ex - 16, ey - 16 - eGrow, 32, 32 + eGrow);
-                        }
+                        this._drawEntityWithAnim(ctx, perEnemySprite, ex - 16, ey - 16 - eGrow, 32, 32 + eGrow, ex, ey + 16, enemyAnim);
                     } else {
                         ctx.beginPath();
                         ctx.moveTo(ex, ey - 14 - eGrow);
@@ -1903,10 +2123,10 @@ const arcaneMethods = {
                     const deathX = isPartyKill ? (partyX + 70 + Math.random() * 20) : (partyX + Math.random() * 15);
                     this._expVisState.effects.push({ type: 'death_anim', x: deathX, y: H / 2 - 5 + Math.random() * 10, frame: 0, maxFrames: 30, color: isPartyKill ? '#ff4444' : '#888888' });
                     if (!isPartyKill) {
-                        this._expVisState.effects.push({ type: 'loot', x: partyX + Math.random() * 20, y: H / 2 - 20 + Math.random() * 10, frame: 0, maxFrames: 40 });
+                        this._expVisState.effects.push({ type: 'loot', x: deathX, y: H / 2 - 5 + Math.random() * 10, tx: partyX + 40 + Math.random() * 20, ty: H / 2 - 24, frame: 0, maxFrames: 40 });
                     }
                 } else if (entry.type === 'loot' || entry.type === 'success') {
-                    this._expVisState.effects.push({ type: 'loot', x: partyX + Math.random() * 20, y: H / 2 - 20 + Math.random() * 10, frame: 0, maxFrames: 40 });
+                    this._expVisState.effects.push({ type: 'loot', x: partyX + 60 + Math.random() * 20, y: H / 2 + Math.random() * 10, tx: partyX + 40 + Math.random() * 20, ty: H / 2 - 24, frame: 0, maxFrames: 40 });
                 } else if (entry.type === 'danger') {
                     this._expVisState.effects.push({ type: 'danger', x: partyX - 5 + Math.random() * 30, y: H / 2, frame: 0, maxFrames: 20 });
                     this._expVisState.shakeFrames = 6;
@@ -1999,19 +2219,48 @@ const arcaneMethods = {
                 }
             } else if (eff.type === 'loot') {
                 const lootSprite = useSkins ? skinMgr.getSprite('effects', 'loot') : null;
-                const dy = -eff.frame * 0.5;
+                // Arc the loot toward the party (tx/ty) with a parabolic hop when the
+                // extras feature is on; otherwise fall back to the old straight rise.
+                let lx, ly;
+                if (extrasEnabled && RENDER_CONFIG.expedLootArc && eff.tx != null) {
+                    const p = eff.frame / eff.maxFrames;
+                    lx = eff.x + (eff.tx - eff.x) * p;
+                    ly = eff.y + (eff.ty - eff.y) * p - Math.sin(p * Math.PI) * 14; // hop apex mid-flight
+                } else {
+                    lx = eff.x;
+                    ly = eff.y - eff.frame * 0.5;
+                }
                 if (lootSprite) {
-                    ctx.drawImage(lootSprite, eff.x - 8, eff.y + dy - 8, 16, 16);
+                    ctx.drawImage(lootSprite, lx - 8, ly - 8, 16, 16);
                 } else {
                     ctx.fillStyle = '#ffcc44';
                     ctx.beginPath();
-                    ctx.moveTo(eff.x, eff.y + dy - 6);
-                    ctx.lineTo(eff.x - 5, eff.y + dy);
-                    ctx.lineTo(eff.x, eff.y + dy + 6);
-                    ctx.lineTo(eff.x + 5, eff.y + dy);
+                    ctx.moveTo(lx, ly - 6);
+                    ctx.lineTo(lx - 5, ly);
+                    ctx.lineTo(lx, ly + 6);
+                    ctx.lineTo(lx + 5, ly);
                     ctx.closePath();
                     ctx.fill();
                 }
+            } else if (eff.type === 'projectile') {
+                // A ranged basic-attack shot flying from attacker to target. `p` is
+                // 0..1 across its flight; arrow/bolt draws as a streak, wand mote as
+                // a glowing dot with a short trail.
+                const p = eff.frame / eff.maxFrames;
+                const cx = eff.x + (eff.tx - eff.x) * p;
+                const cy = eff.y + (eff.ty - eff.y) * p;
+                const ch = eff.char || '-';
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = eff.color || '#ffaa33';
+                ctx.font = 'bold 14px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (eff.kind === 'wand') {
+                    ctx.globalAlpha = 0.4;
+                    ctx.fillText(ch, cx - (eff.tx - eff.x) * 0.04, cy - (eff.ty - eff.y) * 0.04);
+                    ctx.globalAlpha = 1;
+                }
+                ctx.fillText(ch, cx, cy);
             } else if (eff.type === 'danger') {
                 const dangerSprite = useSkins ? skinMgr.getSprite('effects', 'danger') : null;
                 if (dangerSprite) {

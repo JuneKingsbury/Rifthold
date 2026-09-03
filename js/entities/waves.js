@@ -199,6 +199,8 @@ export class WaveSystem {
             const cooldown = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             if (game.tick - (enemy._lastAttackTick || 0) < cooldown) return;
             enemy._lastAttackTick = game.tick;
+            enemy._lastAttackKind = 'melee';
+            enemy._lastAttackDir = { dx: Math.sign(bestTarget.x - enemy.x), dy: Math.sign(bestTarget.y - enemy.y) };
             colonistTakeDamage(bestTarget, enemy.damage, game, enemy);
             return;
         }
@@ -213,6 +215,8 @@ export class WaveSystem {
             const cooldown = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             if (game.tick - (enemy._lastAttackTick || 0) < cooldown) return;
             enemy._lastAttackTick = game.tick;
+            enemy._lastAttackKind = 'melee';
+            enemy._lastAttackDir = { dx: Math.sign(this.nexusPosition.x - enemy.x), dy: Math.sign(this.nexusPosition.y - enemy.y) };
             this.nexusHp -= enemy.damage;
             const nexusTile = game.map[this.nexusPosition.y]?.[this.nexusPosition.x];
             if (nexusTile) nexusTile._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;

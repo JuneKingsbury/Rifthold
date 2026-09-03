@@ -823,6 +823,9 @@ function tryAutocastSpells(colonist, game) {
 
         colonist.mana -= effectiveCost;
         colonist._spellCooldowns[spellKey] = game.tick;
+        // Render latch for the per-school cast animation (js/ui/entity-animation.js).
+        colonist._lastCastTick = game.tick;
+        colonist._lastCastSchool = spell.school;
         applySpellEffect(colonist, spell, game);
         grantCastXp(colonist, spell, game);
         applyThought(colonist, 'cast_spell', game.tick);
@@ -2105,6 +2108,10 @@ function updateFighting(colonist, game) {
     if (isRanged && dist <= weaponRange && dist >= 2 && hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) {
         if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
         colonist._lastAttackTick = game.tick;
+        // Render latch for the attack animation (entity-animation.js). Motion class
+        // comes from the weapon's `attackAnim`; a ranged weapon defaults to DrawAndShoot.
+        colonist._lastAttackKind = (weapon && weapon.attackAnim) || 'DrawAndShoot';
+        colonist._lastAttackDir = { dx: Math.sign(target.x - colonist.x), dy: Math.sign(target.y - colonist.y) };
         let weaponDmg = weapon.damage;
         for (const item of getEquippedItems(colonist)) {
             if (item !== weapon && item.damage) weaponDmg += item.damage;
@@ -2150,6 +2157,10 @@ function updateFighting(colonist, game) {
     } else {
         if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
         colonist._lastAttackTick = game.tick;
+        // Render latch for the attack animation (entity-animation.js). Motion class
+        // comes from the weapon's `attackAnim`; unarmed/melee defaults to Swing.
+        colonist._lastAttackKind = (weapon && weapon.attackAnim) || 'Swing';
+        colonist._lastAttackDir = { dx: Math.sign(target.x - colonist.x), dy: Math.sign(target.y - colonist.y) };
         let weaponDmg = weapon ? weapon.damage : WEAPONS.fists.damage;
         for (const item of getEquippedItems(colonist)) {
             if (item !== weapon && item.damage) weaponDmg += item.damage;
@@ -2218,6 +2229,12 @@ function updateHunting(colonist, game) {
 
     if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
     colonist._lastAttackTick = game.tick;
+    // Render latch for the attack animation (entity-animation.js). Use the weapon's
+    // `attackAnim` when firing from range; a ranged weapon used point-blank swings.
+    colonist._lastAttackKind = (isRanged && dist >= 2)
+        ? ((weapon && weapon.attackAnim) || 'DrawAndShoot')
+        : ((weapon && !weapon.ranged && weapon.attackAnim) || 'Swing');
+    colonist._lastAttackDir = { dx: Math.sign(animal.x - colonist.x), dy: Math.sign(animal.y - colonist.y) };
 
     let huntDmg = weapon ? weapon.damage : WEAPONS.fists.damage;
     for (const item of getEquippedItems(colonist)) {

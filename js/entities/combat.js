@@ -281,6 +281,8 @@ function updateRaider(raider, game) {
         const cooldown = raider.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
         if (game.tick - (raider._lastAttackTick || 0) >= cooldown) {
             raider._lastAttackTick = game.tick;
+            raider._lastAttackKind = 'melee';
+            raider._lastAttackDir = { dx: Math.sign(nearest.x - raider.x), dy: Math.sign(nearest.y - raider.y) };
             colonistTakeDamage(nearest, raider.damage, game, raider);
         }
         return;

@@ -87,6 +87,10 @@ class Game {
             showBreathing: true,
             showWalkSway: true,
             showAttackSwing: true,
+            showActionAnimations: true,
+            showTreeSway: true,
+            showTerrainDetail: true,
+            showExpeditionExtras: true,
             showWarmthOverlay: false,
             showDefenseOverlay: false,
             showRoomOverlay: false,
@@ -1717,6 +1721,13 @@ class Game {
                 break;
             }
         }
+        // Render latch for the per-school cast animation (js/ui/entity-animation.js).
+        colonist._lastCastTick = this.tick;
+        colonist._lastCastSchool = spell.school;
+        // Face the cast target so the evocation thrust/recoil lean the right way.
+        if (pos && (pos.x !== colonist.x || pos.y !== colonist.y)) {
+            colonist._lastAttackDir = { dx: Math.sign(pos.x - colonist.x), dy: Math.sign(pos.y - colonist.y) };
+        }
         this.combatEffects.push({
             x: colonist.x, y: colonist.y,
             char: COMBAT_VISUALS.spellCastChar,
@@ -1916,7 +1927,7 @@ class Game {
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
             largeClickTargets: false, pauseOnFocusLoss: true, enableScreenShake: true, colorblindMode: 'none',
             notificationDuration: 100, showDamageFlash: true, showCombatParticles: true, showProjectiles: true,
-            showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, layoutMode: 'auto',
+            showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, showActionAnimations: true, showTreeSway: true, showTerrainDetail: true, showExpeditionExtras: true, layoutMode: 'auto',
             musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
             ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true,
         });
@@ -3404,6 +3415,10 @@ document.addEventListener('DOMContentLoaded', () => {
             s.showBreathing = document.getElementById('start-breathing').checked;
             s.showWalkSway = document.getElementById('start-walk-sway').checked;
             s.showAttackSwing = document.getElementById('start-attack-swing').checked;
+            s.showActionAnimations = document.getElementById('start-action-anims').checked;
+            s.showTreeSway = document.getElementById('start-tree-sway').checked;
+            s.showTerrainDetail = document.getElementById('start-terrain-detail').checked;
+            s.showExpeditionExtras = document.getElementById('start-expedition-extras').checked;
             s.showNightLighting = document.getElementById('start-night').checked;
             s.showWeatherParticles = document.getElementById('start-weather').checked;
             s.showMinimap = document.getElementById('start-minimap').checked;
@@ -3463,6 +3478,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showBreathing != null) document.getElementById('start-breathing').checked = s.showBreathing;
             if (s.showWalkSway != null) document.getElementById('start-walk-sway').checked = s.showWalkSway;
             if (s.showAttackSwing != null) document.getElementById('start-attack-swing').checked = s.showAttackSwing;
+            if (s.showActionAnimations != null) document.getElementById('start-action-anims').checked = s.showActionAnimations;
+            if (s.showTreeSway != null) document.getElementById('start-tree-sway').checked = s.showTreeSway;
+            if (s.showTerrainDetail != null) document.getElementById('start-terrain-detail').checked = s.showTerrainDetail;
+            if (s.showExpeditionExtras != null) document.getElementById('start-expedition-extras').checked = s.showExpeditionExtras;
             if (s.showNightLighting != null) document.getElementById('start-night').checked = s.showNightLighting;
             if (s.showWeatherParticles != null) document.getElementById('start-weather').checked = s.showWeatherParticles;
             if (s.showMinimap != null) document.getElementById('start-minimap').checked = s.showMinimap;
@@ -3561,6 +3580,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-breathing').checked = true;
         document.getElementById('start-walk-sway').checked = true;
         document.getElementById('start-attack-swing').checked = true;
+        document.getElementById('start-expedition-extras').checked = true;
         document.getElementById('start-night').checked = true;
         document.getElementById('start-weather').checked = true;
         document.getElementById('start-minimap').checked = true;
@@ -3661,6 +3681,10 @@ document.addEventListener('DOMContentLoaded', () => {
             showBreathing: document.getElementById('start-breathing').checked,
             showWalkSway: document.getElementById('start-walk-sway').checked,
             showAttackSwing: document.getElementById('start-attack-swing').checked,
+            showActionAnimations: document.getElementById('start-action-anims').checked,
+            showTreeSway: document.getElementById('start-tree-sway').checked,
+            showTerrainDetail: document.getElementById('start-terrain-detail').checked,
+            showExpeditionExtras: document.getElementById('start-expedition-extras').checked,
             showNightLighting: document.getElementById('start-night').checked,
             showWeatherParticles: document.getElementById('start-weather').checked,
             showMinimap: document.getElementById('start-minimap').checked,

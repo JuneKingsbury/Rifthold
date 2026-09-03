@@ -26,12 +26,12 @@ export const ENTITIES = {
     combat_golem:    { name: 'Combat Golem', char: 'G', color: '#cc4444', hp: 250, speed: 0.35, category: 'golem', traits: ['tough'], damage: 20, roles: [{ type: 'worker', specialty: 'combat', skillLevel: 6 }], cost: { stone: 15, runite: 5, void_essence: 4 }, craftTicks: 110 },
 
     // === Enemies ===
-    raider_brute:    { name: 'Raider', char: 'R', color: '#ff3333', hp: 50, speed: 0.28, category: 'enemy', hostile: true, damage: 5, aggroRange: 30, roles: [{ type: 'melee_charger' }], loot: [], lore: '' },
-    raider_archer:   { name: 'Raider Archer', char: 'R', color: '#ff6633', hp: 35, speed: 0.30, category: 'enemy', hostile: true, damage: 4, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', loot: [], lore: '' },
-    crusader:        { name: 'Crusader', char: 'C', color: '#d6d216', hp: 80, speed: 0.32, category: 'enemy', hostile: true, damage: 10, aggroRange: 40, noFlee: true, roles: [{ type: 'melee_charger' }], loot: [], lore: '' },
-    crusader_archer: { name: 'Crusader Archer', char: 'C', color: '#d6a816', hp: 50, speed: 0.34, category: 'enemy', hostile: true, damage: 8, aggroRange: 40, noFlee: true, roles: [{ type: 'ranged_attacker', range: 8, preferDistance: 6 }], ranged: true, projectileChar: '-', projectileColor: '#d6d216', loot: [], lore: '' },
-    void_walker:     { name: 'Void Walker', char: 'V', color: '#aa33ff', hp: 30, speed: 0.21, category: 'enemy', hostile: true, damage: 4, roles: [{ type: 'nexus_target' }], loot: [], lore: '' },
-    void_brute:      { name: 'Void Brute', char: 'V', color: '#7722cc', hp: 80, speed: 0.14, category: 'enemy', hostile: true, damage: 10, roles: [{ type: 'nexus_target' }, { type: 'structure_breaker', breakSpeed: 2 }], loot: [], lore: '' },
+    raider_brute:    { name: 'Raider', char: 'R', color: '#ff3333', hp: 50, speed: 0.28, category: 'enemy', hostile: true, damage: 5, aggroRange: 30, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', loot: [], lore: '' },
+    raider_archer:   { name: 'Raider Archer', char: 'R', color: '#ff6633', hp: 35, speed: 0.30, category: 'enemy', hostile: true, damage: 4, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', attackAnim: 'DrawAndShoot', loot: [], lore: '' },
+    crusader:        { name: 'Crusader', char: 'C', color: '#d6d216', hp: 80, speed: 0.32, category: 'enemy', hostile: true, damage: 10, aggroRange: 40, noFlee: true, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', loot: [], lore: '' },
+    crusader_archer: { name: 'Crusader Archer', char: 'C', color: '#d6a816', hp: 50, speed: 0.34, category: 'enemy', hostile: true, damage: 8, aggroRange: 40, noFlee: true, roles: [{ type: 'ranged_attacker', range: 8, preferDistance: 6 }], ranged: true, projectileChar: '-', projectileColor: '#d6d216', attackAnim: 'DrawAndShoot', loot: [], lore: '' },
+    void_walker:     { name: 'Void Walker', char: 'V', color: '#aa33ff', hp: 30, speed: 0.21, category: 'enemy', hostile: true, damage: 4, roles: [{ type: 'nexus_target' }], attackAnim: 'Swing', loot: [], lore: '' },
+    void_brute:      { name: 'Void Brute', char: 'V', color: '#7722cc', hp: 80, speed: 0.14, category: 'enemy', hostile: true, damage: 10, roles: [{ type: 'nexus_target' }, { type: 'structure_breaker', breakSpeed: 2 }], attackAnim: 'Swing', loot: [], lore: '' },
 
     // === Expedition Bosses ===
     boss_crystal_colossus:          { name: 'Crystal Colossus',          char: '▲', color: '#4488ff', category: 'boss' },

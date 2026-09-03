@@ -3,6 +3,7 @@ import { getTileVisuals } from '../world/map.js';
 import { OverlayRenderer } from './overlay-renderer.js';
 import { SkinManager } from './skin-manager.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
+import { getEntityTransform, getTreeSway, getGrassSway, getWaterWave, windStrengthFor } from './entity-animation.js';
 
 // The four cardinal neighbors checked per tile when dithering terrain edges.
 // Hoisted to module scope so it isn't reallocated per tile, per frame.
@@ -40,6 +41,11 @@ export class Renderer {
         this._portalPathMap = new Map();
         this._effectMap = new Map();
         this._movingEntities = [];
+        // Deferred melee attack effects (swing/stab). Because these are nudged toward
+        // the target, they can extend into an adjacent tile that is painted later in
+        // the tile loop; collecting them here and drawing after all tiles/entities
+        // keeps the effect on top of the target tile instead of being cut in half.
+        this._attackFx = [];
         this._structureMap = new Map();
 
         // Terrain dithering
@@ -275,6 +281,126 @@ export class Renderer {
         }
     }
 
+    // Draws the animated grass-tuft overlay (sways side-to-side in the wind about
+    // its base) for one tile. Shared by bare-grass tiles and tree tiles (where the
+    // tree sprite is later drawn on top). No-ops gracefully when the art is absent.
+    // Returns true if a tuft was drawn.
+    _drawGrassTuft(ctx, now, tileKey, wind, px, py, cw, ch) {
+        const tuft = this.skinManager.getSprite('effects', 'grass_tuft');
+        if (!tuft) return false;
+        const rot = getGrassSway(now, tileKey, wind);
+        if (rot !== 0) {
+            // Sway about the tuft base (bottom-center).
+            const pivotX = px + cw / 2;
+            const pivotY = py + ch;
+            ctx.save();
+            ctx.translate(pivotX, pivotY);
+            ctx.rotate(rot);
+            ctx.translate(-pivotX, -pivotY);
+            ctx.drawImage(tuft, px, py, cw, ch);
+            ctx.restore();
+        } else {
+            ctx.drawImage(tuft, px, py, cw, ch);
+        }
+        return true;
+    }
+
+    // Draws the animated water-wave overlay (slow vertical bob + alpha shimmer) for
+    // one water tile. Shared by bare-water tiles and water tiles that hold a swimming
+    // entity (drawn behind the entity in that case). No-ops gracefully when the art
+    // is absent. Returns true if the waves were drawn.
+    _drawWaterWaves(ctx, now, tileKey, px, py, cw, ch) {
+        const waves = this.skinManager.getSprite('effects', 'water_waves');
+        if (!waves) return false;
+        const w = getWaterWave(now, tileKey);
+        ctx.globalAlpha = w.alpha < 0 ? 0 : (w.alpha > 1 ? 1 : w.alpha);
+        ctx.drawImage(waves, px, py + w.offsetY, cw, ch);
+        ctx.globalAlpha = 1.0;
+        return true;
+    }
+
+    // Draws a sprite swaying about its base (bottom-center), like a tree in wind.
+    // `rot` is the sway rotation in radians; when 0 the sprite is drawn flat.
+    _drawSwayed(ctx, sprite, rot, dx, dy, dw, dh, pivotX, pivotY) {
+        if (rot !== 0) {
+            ctx.save();
+            ctx.translate(pivotX, pivotY);
+            ctx.rotate(rot);
+            ctx.translate(-pivotX, -pivotY);
+            ctx.drawImage(sprite, dx, dy, dw, dh);
+            ctx.restore();
+        } else {
+            ctx.drawImage(sprite, dx, dy, dw, dh);
+        }
+    }
+
+    // Draws the melee attack effect over an attacking entity, chosen by the weapon's
+    // motion class and aimed toward the target (rotated like a projectile). Swing
+    // weapons use `attack_swing`, Stab weapons use `attack_stab`; DrawAndShoot weapons
+    // draw no effect (their recoil + projectile already read as an attack). Legacy
+    // 'melee'/'ranged' stamps are mapped. No-ops gracefully when the art is absent.
+    _queueAttackEffect(simEnt, now, px, py, cw, ch) {
+        if (!simEnt) return;
+        let cls = simEnt._lastAttackKind || 'Swing';
+        if (cls === 'melee') cls = 'Swing';
+        else if (cls === 'ranged' || cls === 'bow' || cls === 'wand') cls = 'DrawAndShoot';
+        if (cls === 'DrawAndShoot') return;
+        const key = cls === 'Stab' ? 'attack_stab' : 'attack_swing';
+        const sprite = this.skinManager.getSprite('effects', key);
+        if (!sprite) return;
+        const A = RENDER_CONFIG.entityActionAnim;
+        // Latch a wall-clock start time to the attack tick so the effect plays once and
+        // briefly, independent of the coarse attack-shake tick window. Scratch lives on
+        // the persistent sim entity (the tile-loop's entity objects are rebuilt each tick).
+        const tick = simEnt._lastAttackTick;
+        if (tick == null) return;
+        if (simEnt._atkFxSeen !== tick) { simEnt._atkFxSeen = tick; simEnt._atkFxStart = now; }
+        const travel = A.attackEffectTravelMs || 150;
+        const prog = (now - simEnt._atkFxStart) / travel;
+        if (prog < 0 || prog >= 1) return;   // effect has already flown out and vanished
+        // Fade the effect out over the final `attackEffectFadeFrac` of its travel.
+        const fadeFrac = A.attackEffectFadeFrac || 0;
+        const alpha = (fadeFrac > 0 && prog > 1 - fadeFrac)
+            ? Math.max(0, (1 - prog) / fadeFrac) : 1;
+        const dir = simEnt._lastAttackDir;
+        if (dir && (dir.dx !== 0 || dir.dy !== 0)) {
+            // Sprite art points east (angle 0); rotate it to face the target, the same
+            // convention projectiles use (atan2(dy, dx) in screen space, +y down).
+            const angle = Math.atan2(dir.dy, dir.dx);
+            // Slide from a small start offset out toward the target over the travel
+            // window, like a short-range projectile: begins `attackEffectStartFrac` of a
+            // tile ahead of the attacker's center and travels `attackEffectLeadFrac` more.
+            const start = A.attackEffectStartFrac || 0;
+            const lead = start + (A.attackEffectLeadFrac || 0) * prog;
+            const cx = px + cw / 2 + dir.dx * cw * lead;
+            const cy = py + ch / 2 + dir.dy * ch * lead;
+            this._attackFx.push({ sprite, cx, cy, angle, cw, ch, alpha });
+        } else {
+            this._attackFx.push({ sprite, px, py, cw, ch, alpha });
+        }
+    }
+
+    // Draws every deferred melee attack effect collected this frame, then clears the
+    // queue. Called after all tiles and entities are painted so the effect sits on
+    // top of the target tile (see `_attackFx`).
+    _flushAttackEffects(ctx) {
+        for (const fx of this._attackFx) {
+            const fade = fx.alpha != null && fx.alpha < 1;
+            if (fade) { ctx.save(); ctx.globalAlpha = fx.alpha; }
+            if (fx.angle != null) {
+                ctx.save();
+                ctx.translate(fx.cx, fx.cy);
+                ctx.rotate(fx.angle);
+                ctx.drawImage(fx.sprite, -fx.cw / 2, -fx.ch / 2, fx.cw, fx.ch);
+                ctx.restore();
+            } else {
+                ctx.drawImage(fx.sprite, fx.px, fx.py, fx.cw, fx.ch);
+            }
+            if (fade) ctx.restore();
+        }
+        this._attackFx.length = 0;
+    }
+
     _resolveEffectSprite(effectOrKey) {
         if (typeof effectOrKey === 'string') {
             return this.skinManager.getSprite('effects', effectOrKey);
@@ -318,30 +444,9 @@ export class Renderer {
         return null;
     }
 
-    // Continuous sine "breath": returns px of extra sprite height this frame
-    // (0..breatheAmplitudePx). Driven by `now` (performance.now()) so it stays
-    // smooth at 60fps and continues while paused. `seed` decorrelates each
-    // entity's phase so the colony doesn't pulse in unison. Sub-pixel (no rounding).
-    _breatheGrow(now, seed) {
-        if (!RENDER_CONFIG.entityBreathing) return 0;
-        const phase = (now / RENDER_CONFIG.breathePeriodMs) * Math.PI * 2
-            + (seed % 1000) / 1000 * RENDER_CONFIG.breathePhaseSpread;
-        // 0.5 - 0.5*cos → smooth 0→1→0, peaks mid-cycle.
-        return (0.5 - 0.5 * Math.cos(phase)) * RENDER_CONFIG.breatheAmplitudePx;
-    }
-
-    // Walking "sway": returns a rotation angle (radians) for a moving sprite's
-    // pendulum rock. Driven by the move's progress `t` (0→1 across the tile step)
-    // rather than wall-clock time, so sin(t·2π·cycles) is exactly 0 at t=0 and
-    // t=1 — the sprite starts and ends every step perfectly upright (straight →
-    // left → right → straight for one cycle). `seed` parity flips which side the
-    // entity leads with; a sign flip preserves the zero endpoints.
-    _walkSway(t, seed) {
-        if (!RENDER_CONFIG.entityWalkSway) return 0;
-        const dir = (seed & 1) ? -1 : 1;
-        const phase = t * Math.PI * 2 * RENDER_CONFIG.walkSwayCycles;
-        return Math.sin(phase) * RENDER_CONFIG.walkSwayAmplitudeRad * dir;
-    }
+    // Entity breathing (height-stretch) and walk-sway (pendulum rotation) are now
+    // composed alongside the action animations in js/ui/entity-animation.js
+    // (getEntityTransform). The expedition view keeps its own copies.
 
     getNightDarkness(timeOfDay, season) {
         const t = timeOfDay / CONFIG.TICKS_PER_DAY;
@@ -373,6 +478,21 @@ export class Renderer {
         const showPortalPath = settings.showPortalPath;
         const showBreathing = settings.showBreathing;
         const showWalkSway = settings.showWalkSway;
+        const showActionAnimations = settings.showActionAnimations;
+        // Reused per-frame flag bundle for the action-animation composer, so it
+        // never touches game.settings in the hot loop. Mutated (not realloc'd).
+        const animFlags = this._animFlags || (this._animFlags = {});
+        animFlags.showBreathing = showBreathing;
+        animFlags.showWalkSway = showWalkSway;
+        animFlags.showActionAnimations = showActionAnimations;
+        // Tree sway: wind strength (0..1) from the active weather, resolved once
+        // per frame. `showTreeSway` gates the whole effect.
+        const showTreeSway = settings.showTreeSway && RENDER_CONFIG.treeSway && RENDER_CONFIG.treeSway.enabled;
+        const treeWind = showTreeSway ? windStrengthFor(weather.currentWeather) : 0;
+        // Animated terrain detail (grass tufts / water waves). Shares the tree wind
+        // for grass; water bobs on its own rhythm. Wind resolved once per frame.
+        const showTerrainDetail = settings.showTerrainDetail && RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.enabled;
+        const detailWind = showTerrainDetail ? windStrengthFor(weather.currentWeather) : 0;
         const sm = this.skinManager;
         const skinActive = sm.isActive;
         const atkShakePx = COMBAT_VISUALS.atkShakePx || 2;
@@ -449,7 +569,7 @@ export class Renderer {
                 if (isEntityMoving(e)) {
                     movingEntities.push({ entity: e, char: e.char, color: e.color, type: e.type });
                 } else {
-                    entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: e.type, entityId: e.id, _dmgFlashUntil: e._dmgFlashUntil });
+                    entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: e.type, entityId: e.id, _dmgFlashUntil: e._dmgFlashUntil, _sim: e });
                 }
             }
             if (game.waves) {
@@ -458,7 +578,7 @@ export class Renderer {
                     if (isEntityMoving(e)) {
                         movingEntities.push({ entity: e, char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type });
                     } else {
-                        entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, entityId: e.id, _dmgFlashUntil: e._dmgFlashUntil });
+                        entityMap.set(e.y * mapW + e.x, { char: e.char, color: e.color, type: 'wave_enemy', entityType: e.type, entityId: e.id, _dmgFlashUntil: e._dmgFlashUntil, _sim: e });
                     }
                 }
             }
@@ -469,7 +589,7 @@ export class Renderer {
                 if (isEntityMoving(r)) {
                     movingEntities.push({ entity: r, char: rChar, color: rColor, type: 'raider', entityType: r.type });
                 } else {
-                    entityMap.set(r.y * mapW + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, entityId: r.id, _dmgFlashUntil: r._dmgFlashUntil });
+                    entityMap.set(r.y * mapW + r.x, { char: rChar, color: rColor, type: 'raider', entityType: r.type, entityId: r.id, _dmgFlashUntil: r._dmgFlashUntil, _sim: r });
                 }
             }
             
@@ -490,7 +610,7 @@ export class Renderer {
                     const isSleeping = c.state === 'sleeping';
                     const sleepingInBed = isSleeping && c.assignedBed && c.x === c.assignedBed.x && c.y === c.assignedBed.y;
                     const isFreezing = !c.golem && c.thoughts && c.thoughts.some(t => t.text === 'Freezing outside');
-                    const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, entityId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, freezing: isFreezing, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, clothesKey: showEq ? ((!c.armor && c.clothes) ? c.clothes.key : null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
+                    const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, entityId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, freezing: isFreezing, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, _sim: c, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, clothesKey: showEq ? ((!c.armor && c.clothes) ? c.clothes.key : null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
                     if (isEntityMoving(c)) {
                         movingEntities.push({ entity: c, ...entData });
                     } else {
@@ -649,11 +769,42 @@ export class Renderer {
                         const ground = this._resolveGroundSprite(tile, season);
                         if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
                         const material = this._resolveMaterialSprite(tile, season);
-                        if (material) ctx.drawImage(material, px, py, cw, ch);
+                        if (material) {
+                            // A tree on a tile that also holds an entity sways behind the
+                            // entity, just as a bare tree tile sways (drawn later below).
+                            const matRot = (showTreeSway && tile.resource && tile.resource.type === 'tree')
+                                ? getTreeSway(now, tileKey, treeWind) : 0;
+                            this._drawSwayed(ctx, material, matRot, px, py, cw, ch, px + cw / 2, py + ch);
+                        }
+                    } else if (tile.resource) {
+                        // Resources (trees, stone, ore) are not full-tile sprites, so
+                        // without a ground pass they'd sit on the bare background. Draw
+                        // the terrain beneath; the resource sprite itself is drawn by the
+                        // main sprite path below (so it can carry the tree-sway transform).
+                        const ground = this._resolveGroundSprite(tile, season);
+                        if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                        // Grass tufts also sprout under trees on grass terrain: draw the
+                        // swaying tuft here so the tree sprite (drawn below) covers it.
+                        if (showTerrainDetail && tile.resource.type === 'tree'
+                            && tile.terrain === 'grass' && !tile.snowCovered && !tile.onFire) {
+                            this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch);
+                        }
                     }
                     const canDither = !tile.structure && !tile.resource && !tile.zone && !tile.floor;
                     if (entity) {
                         if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+                        // Terrain detail behind an entity so it stands on the same
+                        // animated ground as a bare tile: grass tufts on grass, water
+                        // waves on water. Water also keeps its `in_water` overlay on top
+                        // (drawn after the sprite), giving a swimmer both effects.
+                        if (showTerrainDetail && !tile.structure && !tile.resource
+                            && !tile.zone && !tile.floor && !tile.onFire) {
+                            if (tile.terrain === 'grass' && !tile.snowCovered) {
+                                this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch);
+                            } else if (tile.terrain === 'water') {
+                                this._drawWaterWaves(ctx, now, tileKey, px, py, cw, ch);
+                            }
+                        }
                         if (tile.structure) {
                             const structSprite = sm.getSprite('buildings', tile.structure);
                             if (structSprite) ctx.drawImage(structSprite, px, py, cw, ch);
@@ -669,7 +820,13 @@ export class Renderer {
                         // sprite is the structure itself, not an entity standing on the tile.
                         const noShadow = !entity && tile.structure && BUILDINGS[tile.structure]?.noShadow;
                         const shadowSprite = noShadow ? null : sm.getSprite('effects', 'shadow');
-                        if (shadowSprite) ctx.drawImage(shadowSprite, px, py, cw, ch);
+                        // A swimming entity has its shadow raised to the waterline so it
+                        // reads as sitting on the surface (half-submerged illusion).
+                        const detailCfg = RENDER_CONFIG.terrainDetail;
+                        const submerge = !!(entity && tile.terrain === 'water' && showTerrainDetail
+                            && detailCfg && detailCfg.enabled && detailCfg.submergeFrac > 0);
+                        const shadowLift = submerge ? ch * detailCfg.submergeFrac : 0;
+                        if (shadowSprite) ctx.drawImage(shadowSprite, px, py - shadowLift, cw, ch);
                         // Determine any shake effects that need to be applied to the entity sprite before we draw it.
                         const shakeActive = showOverlays && enableScreenShake && entity && entity._atkShakeUntil > game.tick;
                         const shakePx = atkShakePx;
@@ -677,12 +834,63 @@ export class Renderer {
                         const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
                         const hlOff = hl ? 1 : 0;
                         const bleed = entity ? 0 : 1;
+                        // Composed action-animation transform (breathe grow + one-shot
+                        // lunge/recoil/cast/hit + work bob). Scratch/stamps live on the
+                        // persistent sim entity (`_sim`); the per-tile map object is
+                        // rebuilt every tick. Non-entity sprites get no transform.
+                        const xf = entity ? getEntityTransform(entity._sim || entity, now, game, null, entity.entityId || 0, animFlags) : null;
+                        // Tree sway: non-entity tree resource tiles rock slowly about
+                        // their trunk base, faster and harder as the wind rises. Kept
+                        // independent of the entity transform; a tile with an entity
+                        // draws the entity sprite, not the tree, so they never coexist.
+                        const treeRot = (!entity && showTreeSway
+                            && tile.resource && tile.resource.type === 'tree')
+                            ? getTreeSway(now, tileKey, treeWind) : 0;
                         // Breathing: stretch height, anchor feet by nudging y up by the same amount.
-                        // Seeded by entity id so phase is continuous across stationary/moving transitions.
-                        const grow = (entity && showBreathing) ? this._breatheGrow(now, entity.entityId || 0) : 0;
-                        ctx.drawImage(sprite, px + shakeX - hlOff, py + shakeY - hlOff - grow, cw + hlOff * 2 + bleed, ch + hlOff * 2 + bleed + grow);
-                        // Draw the "in water" overlay on top of the entity when it's standing in a water tile.
-                        if (entity && tile.terrain === 'water') {
+                        const grow = xf ? xf.growPx : 0;
+                        const dx = px + shakeX - hlOff;
+                        const dy = py + shakeY - hlOff - grow;
+                        const dw = cw + hlOff * 2 + bleed;
+                        const dh = ch + hlOff * 2 + bleed + grow;
+                        // Submerged entities: clip the lower part of the sprite at a
+                        // gently bobbing waterline so it reads as partially under water
+                        // (the animated waves drawn behind show through the gap). This
+                        // replaces the old `in_water` overlay drawn on top. The waterline
+                        // shares the wave phase so the entity appears to ride the swell.
+                        // (`detailCfg`/`submerge` computed above for the shadow lift.)
+                        if (submerge) {
+                            const wavePhase = (now / detailCfg.waterPeriodMs) * Math.PI * 2
+                                + (tileKey % 1000) / 1000 * detailCfg.waterPhaseSpread;
+                            const bob = Math.sin(wavePhase) * detailCfg.submergeBobPx;
+                            const waterlineY = py + ch - ch * detailCfg.submergeFrac + bob;
+                            const clipTop = py - ch - grow;   // generous: never clip the head
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.rect(px - cw, clipTop, cw * 3, waterlineY - clipTop);
+                            ctx.clip();
+                        }
+                        if (xf && !xf.identity) {
+                            // Rotate/scale about the feet (bottom-center), translate by offset.
+                            const pivotX = px + cw / 2;
+                            const pivotY = py + ch;
+                            ctx.save();
+                            ctx.translate(pivotX + xf.offsetX, pivotY + xf.offsetY);
+                            if (xf.rotation !== 0) ctx.rotate(xf.rotation);
+                            if (xf.scaleX !== 1 || xf.scaleY !== 1) ctx.scale(xf.scaleX, xf.scaleY);
+                            ctx.translate(-pivotX, -pivotY);
+                            ctx.drawImage(sprite, dx, dy, dw, dh);
+                            ctx.restore();
+                        } else {
+                            // Tree tiles sway about the trunk base (bottom-center) so the
+                            // canopy leans while the roots stay put; treeRot is 0 otherwise
+                            // and the sprite draws flat.
+                            this._drawSwayed(ctx, sprite, treeRot, dx, dy, dw, dh, px + cw / 2, py + ch);
+                        }
+                        if (submerge) {
+                            ctx.restore();
+                        } else if (entity && tile.terrain === 'water') {
+                            // Fallback for when terrain detail is off: the legacy "in
+                            // water" overlay drawn on top of the entity.
                             const waterSprite = sm.getSprite('effects', 'in_water');
                             if (waterSprite) ctx.drawImage(waterSprite, px, py, cw, ch);
                         }
@@ -709,10 +917,19 @@ export class Renderer {
                             ctx.globalAlpha = 1.0;
                             lastColor = '';
                         }
-                        // If we are actively shaking after an attack begins, draw the attack_swing overlay effect.
+                        // If we are actively shaking after an attack begins, draw the
+                        // per-weapon attack effect (aimed at the target; DrawAndShoot none).
                         if (entity && shakeActive) {
-                            const swingSprite = sm.getSprite('effects', 'attack_swing');
-                            if (swingSprite) ctx.drawImage(swingSprite, px, py, cw, ch);
+                            this._queueAttackEffect(entity._sim || entity, now, px, py, cw, ch);
+                        }
+                        // Optional per-school cast overlay (null art → skipped gracefully).
+                        if (xf && xf.overlayKey) {
+                            const overlaySprite = sm.getSprite('effects', xf.overlayKey);
+                            if (overlaySprite) {
+                                ctx.globalAlpha = xf.overlayAlpha;
+                                ctx.drawImage(overlaySprite, px, py, cw, ch);
+                                ctx.globalAlpha = 1.0;
+                            }
                         }
                         // Draw any combat effects relevant for this entity sprite.
                         if (showOverlays && showDamageFlash && !entity && tile.structure && tile._dmgFlashUntil > game.tick) {
@@ -728,6 +945,23 @@ export class Renderer {
                             }
                         }
                         spriteDrawn = true;
+                    }
+
+                    // Animated terrain detail overlays on bare terrain (no entity,
+                    // structure, resource, zone, or floor). Grass tufts sway in the
+                    // wind; water waves bob up and down. Both use new `effects`
+                    // sprites and skip gracefully when the art is absent.
+                    if (showTerrainDetail && !entity && !tile.structure && !tile.resource
+                        && !tile.zone && !tile.floor && !tile.onFire) {
+                        if (tile.terrain === 'grass' && !tile.snowCovered) {
+                            if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch)) {
+                                spriteDrawn = true;
+                            }
+                        } else if (tile.terrain === 'water') {
+                            if (this._drawWaterWaves(ctx, now, tileKey, px, py, cw, ch)) {
+                                spriteDrawn = true;
+                            }
+                        }
                     }
 
                     // Draw the placed item image on top of its pedestal if applicable.
@@ -865,43 +1099,72 @@ export class Renderer {
                 const meHl = !!(me.type === 'colonist' && game.settings.showColonistHighlight);
                 const sprite = this._resolveSprite(destTile || {}, me, season, meHl);
                 if (sprite) {
-                    // Draw entity shadow.
+                    // "In water" when stepping between two water tiles (both source and
+                    // destination are water). If _prevX is null the entity is effectively
+                    // standing, so fall back to just the destination tile.
+                    const destWater = destTile && destTile.terrain === 'water';
+                    const prevTile = (ent._prevX != null) ? map[ent._prevY]?.[ent._prevX] : null;
+                    const inWater = destWater && (ent._prevX == null || (prevTile && prevTile.terrain === 'water'));
+                    // Submerge: clip the lower part of the sprite at a bobbing waterline
+                    // (matching the static path) so a swimmer reads as half-submerged.
+                    const detailCfg = RENDER_CONFIG.terrainDetail;
+                    const submerge = !!(inWater && showTerrainDetail
+                        && detailCfg && detailCfg.enabled && detailCfg.submergeFrac > 0);
+                    // Draw entity shadow, raised to the waterline while submerged.
                     const shadowSprite = sm.getSprite('effects', 'shadow');
-                    if (shadowSprite) ctx.drawImage(sm.getSprite('effects', 'shadow'), rpx, rpy, cw, ch);
+                    const shadowLift = submerge ? ch * detailCfg.submergeFrac : 0;
+                    if (shadowSprite) ctx.drawImage(shadowSprite, rpx, rpy - shadowLift, cw, ch);
                     // Draw entity.
                     const meHlOff = meHl ? 1 : 0;
-                    // Breathing: stretch height, anchor feet by nudging y up by the same amount.
-                    const grow = showBreathing ? this._breatheGrow(now, ent.id || 0) : 0;
-                    // Walking sway: pendulum rotation about the feet (bottom-center). Wraps
-                    // only the sprite draw so the shadow (above) and overlays (below) stay flat.
-                    // Driven by move progress (0→1) so the sprite is upright at the start and
-                    // end of the step. Progress is recomputed here (getEntityRenderPos leaves
-                    // _moveStartTime/_moveDuration intact); clamp so a just-finished step reads 1.
+                    // Move progress (0→1) drives the walk-sway; recomputed here because
+                    // getEntityRenderPos leaves _moveStartTime/_moveDuration intact.
+                    // Clamp so a just-finished step reads 1 (upright).
                     const moveT = ent._moveDuration > 0
                         ? Math.min(1, Math.max(0, (now - ent._moveStartTime) / ent._moveDuration))
                         : 1;
-                    const swayAngle = showWalkSway ? this._walkSway(moveT, ent.id || 0) : 0;
-                    if (swayAngle !== 0) {
+                    // Composed transform: breathe grow + walk-sway + one-shot action + work bob.
+                    // Wraps only the sprite draw so the shadow (above) and overlays (below) stay flat.
+                    const xf = getEntityTransform(ent, now, game, moveT, ent.id || 0, animFlags);
+                    const grow = xf.growPx;
+                    if (submerge) {
+                        const wavePhase = (now / detailCfg.waterPeriodMs) * Math.PI * 2
+                            + ((ent.x + ent.y * mapW) % 1000) / 1000 * detailCfg.waterPhaseSpread;
+                        const bob = Math.sin(wavePhase) * detailCfg.submergeBobPx;
+                        const waterlineY = rpy + ch - ch * detailCfg.submergeFrac + bob;
+                        const clipTop = rpy - ch - grow;   // generous: never clip the head
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(rpx - cw, clipTop, cw * 3, waterlineY - clipTop);
+                        ctx.clip();
+                    }
+                    if (!xf.identity) {
                         const pivotX = rpx + cw / 2;
                         const pivotY = rpy + ch;
                         ctx.save();
-                        ctx.translate(pivotX, pivotY);
-                        ctx.rotate(swayAngle);
+                        ctx.translate(pivotX + xf.offsetX, pivotY + xf.offsetY);
+                        if (xf.rotation !== 0) ctx.rotate(xf.rotation);
+                        if (xf.scaleX !== 1 || xf.scaleY !== 1) ctx.scale(xf.scaleX, xf.scaleY);
                         ctx.translate(-pivotX, -pivotY);
                         ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
                         ctx.restore();
                     } else {
                         ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
                     }
-                    // Draw the "in water" overlay when stepping between two water tiles (both the
-                    // source and destination tiles are water). If _prevX is null the entity is
-                    // effectively standing, so fall back to just the destination tile.
-                    const destWater = destTile && destTile.terrain === 'water';
-                    const prevTile = (ent._prevX != null) ? map[ent._prevY]?.[ent._prevX] : null;
-                    const inWater = destWater && (ent._prevX == null || (prevTile && prevTile.terrain === 'water'));
-                    if (inWater) {
+                    if (submerge) {
+                        ctx.restore();
+                    } else if (inWater) {
+                        // Fallback when terrain detail is off: legacy overlay on top.
                         const waterSprite = sm.getSprite('effects', 'in_water');
                         if (waterSprite) ctx.drawImage(waterSprite, rpx, rpy, cw, ch);
+                    }
+                    // Optional per-school cast overlay (null art → skipped gracefully).
+                    if (xf.overlayKey) {
+                        const overlaySprite = sm.getSprite('effects', xf.overlayKey);
+                        if (overlaySprite) {
+                            ctx.globalAlpha = xf.overlayAlpha;
+                            ctx.drawImage(overlaySprite, rpx, rpy, cw, ch);
+                            ctx.globalAlpha = 1.0;
+                        }
                     }
                 } else {
                     ctx.fillStyle = me.color;
@@ -925,14 +1188,18 @@ export class Renderer {
                     ctx.globalAlpha = 1.0;
                 }
                 if (shakeActive) {
-                    const swingSprite = sm.getSprite('effects', 'attack_swing');
-                    if (swingSprite) ctx.drawImage(swingSprite, rpx - shakeX, rpy - shakeY, cw, ch);
+                    this._queueAttackEffect(ent, now, rpx - shakeX, rpy - shakeY, cw, ch);
                 }
             } else {
                 ctx.fillStyle = (showOverlays && showDamageFlash && ent._dmgFlashUntil > game.tick) ? COMBAT_VISUALS.dmgFlashColor : me.color;
                 ctx.fillText(me.char, rpx + this._textOffsetX, rpy);
             }
         }
+
+        // Melee attack effects were deferred while the tile loop ran (an offset
+        // effect would otherwise be painted over by the target's tile, which the
+        // loop draws later). Flush them now, on top of every tile and entity.
+        this._flushAttackEffects(ctx);
 
         // --- Draw projectiles at interpolated positions ---
         if (game.projectiles && showOverlays && game.settings.showProjectiles) {

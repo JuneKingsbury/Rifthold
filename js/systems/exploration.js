@@ -878,6 +878,12 @@ export class ExplorationSystem {
                     healthRegen: getEquipmentStat(c, 'healthRegen'),
                     attackCooldown: baseCd,
                     effectiveCooldown: effCd,
+                    // Attack-animation speed: ratio of this fighter's effective
+                    // cooldown to the baseline. <1 for fast weapons (quick, snappy
+                    // motion), >1 for slow/heavy ones. The visual clamps it.
+                    _atkAnimMult: effCd / COLONIST_CONFIG.baseAttackCooldown,
+                    // Basic-attack motion class ('Swing' | 'Stab' | 'DrawAndShoot').
+                    attackAnim: (c.weapon && c.weapon.attackAnim) || (c.weapon && c.weapon.ranged ? 'DrawAndShoot' : 'Swing'),
                     shieldActive: false,
                     shieldReduction: 0,
                     dodgeCharges: 0,
@@ -949,6 +955,11 @@ export class ExplorationSystem {
                     color: eDef?.color || null,
                     typeKey: eDef?.typeKey || null,
                     spells: eDef?.spells || null,
+                    // Basic-attack motion + ranged projectile art for the visual.
+                    attackAnim: eDef?.attackAnim || 'Swing',
+                    ranged: eDef?.attackAnim === 'DrawAndShoot' || !!eDef?.ranged,
+                    projectileChar: eDef?.projectileChar || null,
+                    projectileColor: eDef?.projectileColor || null,
                 };
                 enemy.maxHp = enemy.hp;
                 this._rollEliteModifier(enemy, diffSettings);
@@ -1026,6 +1037,7 @@ export class ExplorationSystem {
                     enraged: false,
                     color: phase0.color,
                     sprite: phase0.sprite,
+                    attackAnim: boss.attackAnim || 'Swing',
                     abilities: phase0.abilities || [],
                 }],
             };
@@ -1314,11 +1326,20 @@ export class ExplorationSystem {
                 const target = combat.enemies.find(e => e.hp > 0);
                 if (!target) break;
                 // Stamp the basic-attack tick so the expedition visual can play an
-                // attack-swing animation. Set only on basic attacks, never spells.
+                // attack animation. Set only on basic attacks, never spells. Kind
+                // drives the motion class: melee = swing (rotation), ranged =
+                // draw/thrust + projectile.
                 member._lastAttackTick = game.tick;
+                // Motion class comes straight from the weapon's attackAnim
+                // ('Swing' | 'Stab' | 'DrawAndShoot'); `member.attackAnim` was
+                // resolved (with a ranged fallback) in the party snapshot.
+                member._lastAttackKind = member.attackAnim
+                    || (member.weapon && member.weapon.attackAnim)
+                    || (member.weapon && member.weapon.ranged ? 'DrawAndShoot' : 'Swing');
                 const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
 
                 if (target.eliteDodge && Math.random() < target.eliteDodge) {
+                    target._lastDodgeTick = game.tick;
                     this._addLog(exp, game, `${targetLabel} dodges ${member.name}'s attack!`, 'combat');
                     continue;
                 }
@@ -1338,6 +1359,8 @@ export class ExplorationSystem {
                 } else {
                     target.hp -= dmg;
                     if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
+                    // Stamp crit tick so the visual can play a stronger swing + punch.
+                    if (critHit) member._lastCritTick = game.tick;
                     const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
                     const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', member.name).replace('{target}', targetLabel).replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
@@ -1377,6 +1400,7 @@ export class ExplorationSystem {
                 const summonTarget = combat.enemies.find(e => e.hp > 0);
                 if (summonTarget) {
                     summon._lastAttackTick = game.tick;
+                    summon._lastAttackKind = summon.attackAnim || (summon.ranged ? 'DrawAndShoot' : 'Swing');
                     const sDmg = summon.damage + randInt(0, 2);
                     if (Math.random() < 0.1) {
                         this._addLog(exp, game, `The ${summon.name} misses!`, 'combat');
@@ -1423,6 +1447,9 @@ export class ExplorationSystem {
             }
             const enemyWeaken = this._combatStatusValue(enemy, 'weaken', 'mult', 1);
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
+            // Attack-animation speed (see party snapshot): <1 fast, >1 slow. The
+            // visual clamps it; here it's just the raw cooldown-to-baseline ratio.
+            enemy._atkAnimMult = enemyCd / COLONIST_CONFIG.baseAttackCooldown;
             let enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
             if (enemy.eliteExtraAttacks) enemyHits += enemy.eliteExtraAttacks;
 
@@ -1495,8 +1522,9 @@ export class ExplorationSystem {
                 }
 
                 // Basic-attack path begins here (spellcasts already `continue`d above).
-                // Stamp the tick so the expedition visual can play an attack swing.
+                // Stamp the tick so the expedition visual can play an attack animation.
                 enemy._lastAttackTick = game.tick;
+                enemy._lastAttackKind = enemy.attackAnim || (enemy.ranged ? 'DrawAndShoot' : 'Swing');
 
                 const aliveSummons = exp.summons ? exp.summons.filter(s => s.hp > 0) : [];
                 if (aliveSummons.length > 0 && Math.random() < 0.5) {
@@ -1545,6 +1573,7 @@ export class ExplorationSystem {
 
                 if (target.dodgeCharges > 0) {
                     target.dodgeCharges--;
+                    target._lastDodgeTick = game.tick;
                     this._addLog(exp, game, `${target.name} phases through ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
                     continue;
                 }
@@ -1552,6 +1581,7 @@ export class ExplorationSystem {
                 let dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
                 dodgeChance += getPartyExpeditionEffect(exp.partySnapshot, 'dodgeChanceMod', exp.realm);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
+                    target._lastDodgeTick = game.tick;
                     this._addLog(exp, game, `${target.name} dodges ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
                     continue;
                 }
@@ -1639,6 +1669,7 @@ export class ExplorationSystem {
                 if (dmgEffects.includes(spell.effect)) {
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     const schoolBonus = (member.schoolBonuses && member.schoolBonuses[spell.school]) || member.spellDamageBonus || 0;
                     let dmg = Math.floor(spell.damage * expeditionSpellPower(member, spell) * (1 + schoolBonus));
                     dmg = Math.floor(dmg * this._getMutatorEffect(exp, 'spellDamageMult') * this._applyFormationModifier(exp, member.id, 'spellDamageMult'));
@@ -1691,6 +1722,7 @@ export class ExplorationSystem {
                     if (member.dodgeCharges > 0) continue;
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
                     member.dodgeCharges = (member.dodgeCharges || 0) + charges;
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — phasing through attacks!`, 'combat');
@@ -1699,6 +1731,7 @@ export class ExplorationSystem {
                 } else if (spell.effect === 'buff_defense' && !member.shieldActive) {
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     member.shieldActive = true;
                     member.shieldReduction = Math.min(0.75, spell.damageReduction * expeditionSpellPower(member, spell));
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — shielded!`, 'combat');
@@ -1711,6 +1744,7 @@ export class ExplorationSystem {
                     if (!summonDef) break;
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     exp.summons.push({
                         type: spell.summonType,
                         name: summonDef.name,
@@ -1733,6 +1767,7 @@ export class ExplorationSystem {
                     if (!summonDef) break;
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     const count = spell.swarmCount || 3;
                     for (let n = 0; n < count; n++) {
                         exp.summons.push({
@@ -1757,6 +1792,7 @@ export class ExplorationSystem {
                     // Its larger absorb reads as a higher DR here.
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     member.shieldActive = true;
                     member.shieldReduction = 0.5;
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — a guardian ward absorbs incoming blows!`, 'combat');
@@ -1769,6 +1805,7 @@ export class ExplorationSystem {
                     if (foes.length === 0) continue;
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     for (const t of foes) this._applyCombatStatus(t, 'stun', spell.stunRounds || 1);
                     this._addLog(exp, game, `${member.name} casts ${spell.name}, stunning ${foes.length === 1 ? 'a foe' : foes.length + ' foes'}!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
@@ -1800,6 +1837,7 @@ export class ExplorationSystem {
 
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     const healPower = spell.healAmount * expeditionSpellPower(member, spell) * (1 + (member.spellHealBonus || 0));
                     const healed = Math.min(Math.round(healPower), target.maxHp - target.hp);
                     target.hp += healed;
@@ -1820,6 +1858,7 @@ export class ExplorationSystem {
 
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     let power = spell.healAmount * expeditionSpellPower(member, spell) * (1 + (member.spellHealBonus || 0));
                     let total = 0;
                     for (const t of wounded) {
@@ -1845,6 +1884,7 @@ export class ExplorationSystem {
 
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
                     exp.activeEffects = (exp.activeEffects || []).filter(e => !(e.targetId === afflicted.p.id && e.type === 'dot'));
                     this._addLog(exp, game, `${member.name} casts ${spell.name}, cleansing ${afflicted.p.name} of afflictions!`, 'success');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
@@ -2480,7 +2520,7 @@ export class ExplorationSystem {
                 const eDef = this._pickEnemyFromRealm(dim);
                 const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
                 const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
-                enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null });
+                enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot' || !!eDef.ranged, projectileChar: eDef.projectileChar || null, projectileColor: eDef.projectileColor || null });
             }
             this._addLog(exp, game, `Enemies emerge! (${count} foes)`, 'combat');
             exp.combat = {
@@ -2543,7 +2583,7 @@ export class ExplorationSystem {
                 const eDef = this._pickEnemyFromRealm(dim);
                 const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
                 const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
-                enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null });
+                enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot' || !!eDef.ranged, projectileChar: eDef.projectileChar || null, projectileColor: eDef.projectileColor || null });
             }
             this._addLog(exp, game, `Enemies alerted! (${count} foes)`, 'combat');
             exp.combat = {

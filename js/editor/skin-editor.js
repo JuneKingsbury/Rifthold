@@ -111,7 +111,8 @@ const EFFECT_ITEMS = [
     { key: 'magic_levelup', char: '★', color: '#ffdd44', desc: 'Magic skill level-up icon' },
     { key: 'spell_cast', char: '◇', color: '#cc88ff', desc: 'Spell casting visual at caster' },
     { key: 'damage_flash', char: '█', color: '#ff2222', desc: 'Damage taken overlay (tints entity red)' },
-    { key: 'attack_swing', char: '/', color: '#ffffff', desc: 'Melee attack swing overlay' },
+    { key: 'attack_swing', char: '/', color: '#ffffff', desc: 'Swing-weapon attack overlay (aims at target)' },
+    { key: 'attack_stab', char: '↗', color: '#ffffff', desc: 'Stab-weapon attack overlay (aims at target)' },
     { key: 'projectile_arcane', char: '•', color: '#ff4444', desc: 'Arcane sentinel projectile' },
     { key: 'projectile_void', char: '•', color: '#cc00ff', desc: 'Void turret projectile' },
     { key: 'projectile_arrow', char: '-', color: '#ffaa33', desc: 'Arrow/ranged attack projectile' },
@@ -147,6 +148,13 @@ const EFFECT_ITEMS = [
     { key: 'hit_flash', char: '●', color: '#ff8844', desc: 'Expedition: hit impact burst' },
     { key: 'spell_attack', char: '→', color: '#aa44ff', desc: 'Expedition: spell projectile' },
     { key: 'spell_summon', char: '★', color: '#aa44ff', desc: 'Expedition: summon circle' },
+    { key: 'spell_evocation', char: '✸', color: '#ff6644', desc: 'Cast overlay: evocation (fire/force)' },
+    { key: 'spell_abjuration', char: '⛨', color: '#44aaff', desc: 'Cast overlay: abjuration (wards)' },
+    { key: 'spell_conjuration', char: '❖', color: '#aa66ff', desc: 'Cast overlay: conjuration (summoning)' },
+    { key: 'spell_enchantment', char: '❀', color: '#ff88dd', desc: 'Cast overlay: enchantment (charm)' },
+    { key: 'spell_transmutation', char: '⟳', color: '#66ddaa', desc: 'Cast overlay: transmutation (change)' },
+    { key: 'grass_tuft', char: '"', color: '#6aad44', desc: 'Grass tuft overlay (sways in wind on grass tiles)' },
+    { key: 'water_waves', char: '≈', color: '#55aaff', desc: 'Water wave overlay (bobs up/down on water tiles)' },
 ];
 
 let editorInstance = null;
