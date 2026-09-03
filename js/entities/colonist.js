@@ -1378,6 +1378,16 @@ function updateIdle(colonist, game) {
             colonist.state = 'fighting';
             return;
         }
+        // Engage if a nearby friend is actively fighting. Go help even if the
+        // threat itself is beyond normal auto-engage range.
+        const friendFighting = game.colonists.some(c =>
+            c.id !== colonist.id && c.hp > 0 && c.state === 'fighting' &&
+            manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.fightEngageDistance
+        );
+        if (friendFighting) {
+            colonist.state = 'fighting';
+            return;
+        }
     }
 
     // Start seeking food BEFORE the colonist encounters a mood debuff.
@@ -1733,7 +1743,14 @@ function tryCombatInterrupt(colonist, game) {
         const dist = manhattanDist(colonist.x, colonist.y, threat.x, threat.y);
         const wpnRange = getRangedWeaponRange(colonist, game);
         const autoEngageDist = Math.max(COLONIST_CONFIG.fightEngageDistance, wpnRange);
-        if (dist > autoEngageDist) return false;
+        if (dist > autoEngageDist) {
+            // Still interrupt if a nearby friend is already fighting.
+            const friendFighting = game.colonists.some(c =>
+                c.id !== colonist.id && c.hp > 0 && c.state === 'fighting' &&
+                manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.fightEngageDistance
+            );
+            if (!friendFighting) return false;
+        }
     }
 
     game.taskQueue.release(colonist.currentTaskId);
@@ -1745,6 +1762,27 @@ function tryCombatInterrupt(colonist, game) {
 
 function updateMoving(colonist, game) {
     if (tryCombatInterrupt(colonist, game)) return;
+
+    // If moving toward a hunt target and already within weapon range, start
+    // hunting immediately instead of walking all the way to the adjacent tile.
+    if (colonist.currentTaskId) {
+        const huntTask = game.taskQueue.getById(colonist.currentTaskId);
+        if (huntTask && huntTask.type === 'hunt' && huntTask.targetAnimalId) {
+            const animal = game.entities.find(a => a.id === huntTask.targetAnimalId && a.category === 'animal');
+            if (animal && animal.hp > 0) {
+                const weapon = colonist.weapon;
+                const attackRange = (weapon && weapon.ranged) ? getRangedWeaponRange(colonist, game) : 1;
+                if (manhattanDist(colonist.x, colonist.y, animal.x, animal.y) <= attackRange) {
+                    colonist.huntTargetId = huntTask.targetAnimalId;
+                    colonist.currentTaskId = null;
+                    colonist.path = [];
+                    game.taskQueue.complete(huntTask.id);
+                    colonist.state = 'hunting';
+                    return;
+                }
+            }
+        }
+    }
 
     if (colonist.moveCooldown > 0) {
         colonist.moveCooldown--;
@@ -2005,8 +2043,14 @@ function updateFighting(colonist, game) {
     const weaponReach = getRangedWeaponRange(colonist, game);
     const engageDist = Math.max(COLONIST_CONFIG.fightEngageDistance, weaponReach);
     if (dist > engageDist && !waveActive) {
-        colonist.state = 'idle';
-        return;
+        const friendFighting = game.colonists.some(c =>
+            c.id !== colonist.id && c.hp > 0 && c.state === 'fighting' &&
+            manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.fightEngageDistance
+        );
+        if (!friendFighting) {
+            colonist.state = 'idle';
+            return;
+        }
     }
 
     let fleeThreshold = COLONIST_CONFIG.fleeHpThreshold;
@@ -2153,6 +2197,12 @@ function updateHunting(colonist, game) {
     }
     huntDmg += Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
     if (colonist.pedestalDamageBonus > 1) huntDmg = Math.floor(huntDmg * colonist.pedestalDamageBonus);
+    huntDmg = Math.floor(huntDmg * getTraitDamageMult(colonist));
+    const critChance = getCritChance(colonist);
+    if (critChance > 0 && Math.random() < critChance) {
+        huntDmg *= 2;
+        game.combatEffects.push({ x: animal.x, y: animal.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
+    }
 
     animal.hp -= huntDmg;
     animal._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
