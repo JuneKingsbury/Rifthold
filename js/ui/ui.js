@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getItemTradeValue } from '../entities/item-roll.js';
@@ -2487,9 +2487,11 @@ export class UI {
                 let stats = `${w.damage}d (${(w.damage / cd).toFixed(1)} dps)`;
                 if (extras.length) stats += `, ${extras.join(', ')}`;
                 const tip = w.description || '';
+                const wec = ENCHANT_COST_BY_TIER[w.tier] ?? { resource: 'runite', amount: 5 };
+                const wecLabel = `${wec.amount} ${wec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${tip}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${w.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${w.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantWeapon(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${w.name.replace(/'/g, "\\\\'")} for ${wecLabel}?')){window.game.enchantWeapon(${i});}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${w.name.replace(/'/g, "\\\\'")}?')){window.game.discardWeapon(${i})}">♻</button></div>`;
             });
         }
@@ -2498,9 +2500,11 @@ export class UI {
             armors.forEach((a, i) => {
                 const stats = getItemStatLines(a).join(', ');
                 const tip = a.description || '';
+                const aec = ENCHANT_COST_BY_TIER[a.tier] ?? { resource: 'runite', amount: 5 };
+                const aecLabel = `${aec.amount} ${aec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${tip}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${a.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${a.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantArmor(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${a.name.replace(/'/g, "\\\\'")} for ${aecLabel}?')){window.game.enchantArmor(${i});}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardArmor(${i})}">♻</button></div>`;
             });
         }
@@ -2509,9 +2513,11 @@ export class UI {
             helmets.forEach((h, i) => {
                 const stats = getItemStatLines(h).join(', ');
                 const tip = h.description || '';
+                const hec = ENCHANT_COST_BY_TIER[h.tier] ?? { resource: 'runite', amount: 5 };
+                const hecLabel = `${hec.amount} ${hec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${tip}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${h.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${h.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantHelmet(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${h.name.replace(/'/g, "\\\\'")} for ${hecLabel}?')){window.game.enchantHelmet(${i});}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\\\'")}?')){window.game.discardHelmet(${i})}">♻</button></div>`;
             });
         }
@@ -2520,9 +2526,11 @@ export class UI {
             boots.forEach((b, i) => {
                 const stats = getItemStatLines(b).join(', ');
                 const tip = b.description || '';
+                const bec = ENCHANT_COST_BY_TIER[b.tier] ?? { resource: 'runite', amount: 5 };
+                const becLabel = `${bec.amount} ${bec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${tip}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${b.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${b.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantBoots(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${b.name.replace(/'/g, "\\\\'")} for ${becLabel}?')){window.game.enchantBoots(${i});}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${b.name.replace(/'/g, "\\\\'")}?')){window.game.discardBoots(${i})}">♻</button></div>`;
             });
         }
@@ -2531,9 +2539,11 @@ export class UI {
             clothes.forEach((c, i) => {
                 const stats = getItemStatLines(c).join(', ');
                 const tip = c.description || '';
+                const cec = ENCHANT_COST_BY_TIER[c.tier] ?? { resource: 'runite', amount: 5 };
+                const cecLabel = `${cec.amount} ${cec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${tip}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${c.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${c.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantClothes(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${c.name.replace(/'/g, "\\\\'")} for ${cecLabel}?')){window.game.enchantClothes(${i});}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${c.name.replace(/'/g, "\\\\'")}?')){window.game.discardClothes(${i})}">♻</button></div>`;
             });
         }
@@ -2542,9 +2552,11 @@ export class UI {
             tools.forEach((t, i) => {
                 const stats = getItemStatLines(t).join(', ');
                 const tip = t.description || '';
+                const tec = ENCHANT_COST_BY_TIER[t.tier] ?? { resource: 'runite', amount: 5 };
+                const tecLabel = `${tec.amount} ${tec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(t)}" data-tip="${tip}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${t.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(window.game.research.isResearched('arcane_infusion') && confirm('Enchant ${t.name.replace(/'/g, "\\\\'")} for 5 runite?')){window.game.enchantTool(${i});}else{alert('Arcane Infusion is required before you can Enchant your equipment!')}">✦</button>
+                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${t.name.replace(/'/g, "\\\\'")} for ${tecLabel}?')){window.game.enchantTool(${i});}">✦</button>
                         <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\\\'")}?')){window.game.discardTool(${i})}">♻</button></div>`;
             });
         }

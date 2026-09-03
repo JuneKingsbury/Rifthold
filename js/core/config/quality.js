@@ -6,6 +6,13 @@
  * config hub (index.js) so consumers import from '../core/config.js'.
  */
 
+export const ENCHANT_COST_BY_TIER = {
+    1: { resource: 'runite',       amount: 2  },
+    2: { resource: 'runite',       amount: 5  },
+    3: { resource: 'runite',       amount: 10 },
+    4: { resource: 'void_essence', amount: 3  },
+};
+
 export const ENCHANTMENT_TIERS = [
     { key: 'I',   multiplier: 1, baseChance: 0.60, perSkill: -0.05 },
     { key: 'II',  multiplier: 2, baseChance: 0.25, perSkill: 0 },

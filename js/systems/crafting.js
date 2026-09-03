@@ -4,7 +4,7 @@
  * auto-craft passes. updateAutoCook and updateAutoCraft are called from
  * simulationTick every 10th tick; queueCraftingOrder is player-driven.
  */
-import { RECIPES, WORK_CONFIG } from '../core/config.js';
+import { RECIPES, WORK_CONFIG, ENCHANT_COST_BY_TIER } from '../core/config.js';
 import { getEquippedItems } from '../entities/colonist.js';
 
 // Cached recipe availability — invalidated when resources, research, structures,
@@ -46,11 +46,13 @@ export function queueCraftingOrder(game, recipeKey) {
     return true;
 }
 
-export function queueEnchantingOrder(game, itemKey, itemQuality, itemType) {
+export function queueEnchantingOrder(game, itemKey, itemQuality, itemType, itemTier) {
     const station = findAvailableStation(game, 'enchanting_table');
-    if (!station || !station.powered) return false;
-    if (!game.resources.has({runite: 5})) return false;
-    game.resources.deduct({runite: 5});
+    if (!station) return 'No enchanting table has been built.';
+    if (!station.powered) return 'The enchanting table needs power.';
+    const cost = ENCHANT_COST_BY_TIER[itemTier] ?? { resource: 'runite', amount: 5 };
+    if (!game.resources.has({ [cost.resource]: cost.amount })) return `Not enough ${cost.resource.replace(/_/g, ' ')} (need ${cost.amount}).`;
+    game.resources.deduct({ [cost.resource]: cost.amount });
 
     let workAmount = 100; // Base work amount for enchanting, can be adjusted as needed.
 

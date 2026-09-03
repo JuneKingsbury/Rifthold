@@ -1043,12 +1043,16 @@ class Game {
 
     _enchantItem(itemIndex, itemType) {
         const itemKey = this.resources[itemType][itemIndex]?.key;
-        if (queueEnchantingOrder(this, itemKey, this.resources[itemType][itemIndex].quality, itemType)) {
+        const itemTier = this.resources[itemType][itemIndex]?.tier;
+        const result = queueEnchantingOrder(this, itemKey, this.resources[itemType][itemIndex].quality, itemType, itemTier);
+        if (result === true) {
             this.notifications.push({ text: `Queued Enchantment on ${itemKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
             // Discard original item if successfully queued for enchanting.
             const list = this.resources[itemType];
             const item = list.splice(itemIndex, 1)[0];
             this.ui.updateInventoryPanel();
+        } else {
+            this.notifications.push({ text: `Enchantment failed: ${result}`, tick: this.tick, type: 'warning' });
         }
     }
 
@@ -1081,7 +1085,7 @@ class Game {
     }
 
     enchant(item) {
-        if (queueEnchantingOrder(this, item)) {
+        if (queueEnchantingOrder(this, item) === true) {
             this.notifications.push({ text: `Queued Enchantment: ${item.name}`, tick: this.tick, type: 'success' });
         }
     }
@@ -1582,7 +1586,7 @@ class Game {
             const reservoirBonus = this.research.isResearched('mana_reservoir') ? 3 : 0;
             const newLimit = 4 + this.manaCrystalBonus + reservoirBonus;
             this.notifications.push({ text: `Crystal Capacitor used! Mana crystal limit: ${newLimit}`, tick: this.tick, type: 'success' });
-            this.eventLog.add(this, `Used Crystal Capacitor — mana crystal limit increased to ${newLimit}`, 'event', null);
+            this.eventLog.add(this, `Used Crystal Capacitor. Mana crystal limit increased to ${newLimit}`, 'event', null);
         }
     }
 
@@ -1631,7 +1635,7 @@ class Game {
                     }
                 }
                 window.soundManager?.playSFX('spell_growth');
-                this.notifications.push({ text: `${colonist.name} cast ${spell.name} — ${boosted} crops boosted!`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: `${colonist.name} cast ${spell.name}, boosting ${boosted} crops!`, tick: this.tick, type: 'success' });
                 break;
             }
             case 'terraform': {
@@ -1652,7 +1656,7 @@ class Game {
                     }
                 }
                 window.soundManager?.playSFX('spell_terraform');
-                this.notifications.push({ text: `${colonist.name} cast ${spell.name} — ${changed} tiles transformed!`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: `${colonist.name} cast ${spell.name}, transforming ${changed} tiles!`, tick: this.tick, type: 'success' });
                 break;
             }
             case 'finish_construction': {
@@ -1675,7 +1679,7 @@ class Game {
                     colonist.currentTaskId = savedTaskId;
                     colonist.state = savedState;
                     colonist.workProgress = savedProgress;
-                    this.notifications.push({ text: `${colonist.name} shaped stone — construction complete!`, tick: this.tick, type: 'success' });
+                    this.notifications.push({ text: `${colonist.name} shaped stone. Construction complete!`, tick: this.tick, type: 'success' });
                 } else {
                     this.notifications.push({ text: `No construction in range for ${spell.name}`, tick: this.tick, type: 'warning' });
                 }
@@ -1707,7 +1711,7 @@ class Game {
                     }
                 }
                 window.soundManager?.playSFX('spell_growth');
-                this.notifications.push({ text: `${colonist.name} cast ${spell.name} — ${ripened} crops ripened!`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: `${colonist.name} cast ${spell.name}, ripening ${ripened} crops!`, tick: this.tick, type: 'success' });
                 break;
             }
         }

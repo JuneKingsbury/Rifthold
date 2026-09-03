@@ -82,7 +82,7 @@ export class WaveSystem {
         ];
 
         game.notifications.push({ text: `Wave ${this.currentWave} begins! Defend the Void Nexus!`, tick: game.tick, type: 'danger' });
-        game.eventLog.add(game, `Wave ${this.currentWave} started — ${this.enemiesToSpawn} enemies incoming!`, 'danger', { type: 'position', ...nexus });
+        game.eventLog.add(game, `Wave ${this.currentWave} started. ${this.enemiesToSpawn} enemies incoming!`, 'danger', { type: 'position', ...nexus });
         game.overlays.push({ type: 'screenFlash', color: COMBAT_VISUALS.waveAlertColor, alpha: 0.2, ttl: COMBAT_VISUALS.waveAlertTtl });
         window.soundManager?.playSFX('wave_alert');
 
@@ -282,7 +282,7 @@ export class WaveSystem {
             game.story.checkMilestone('first_wave_completed', game);
             if (game.stats) game.stats.wavesCompleted++;
         } else {
-            game.notifications.push({ text: `Wave ${this.currentWave} failed — the Void Nexus was destroyed!`, tick: game.tick, type: 'danger' });
+            game.notifications.push({ text: `Wave ${this.currentWave} failed! The Void Nexus was destroyed!`, tick: game.tick, type: 'danger' });
             game.eventLog.add(game, `The Void Nexus was destroyed during wave ${this.currentWave}!`, 'danger', { type: 'position', ...this.nexusPosition });
             const tile = game.map[this.nexusPosition.y][this.nexusPosition.x];
             tile.structure = null;
