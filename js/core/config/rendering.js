@@ -34,6 +34,15 @@ export const RENDER_CONFIG = {
     breathePeriodMs: 3200,
     breatheAmplitudePx: 1.4,
     breathePhaseSpread: 6.28,
+    // Walking sway: subtle pendulum rotation on a sprite while it lerps between
+    // tiles, pivoting at the feet. Driven by the move's progress (0→1) rather than
+    // wall-clock time, so the sprite is guaranteed upright at both the start and
+    // end of every tile step. `walkSwayCycles` is the number of full sway cycles
+    // per tile step (1 = straight→left→right→straight). amplitude in radians
+    // (~0.09 ≈ 5°). Applied only to moving entities.
+    entityWalkSway: true,
+    walkSwayCycles: 1,
+    walkSwayAmplitudeRad: 0.09,
     healthBarGreenThreshold: 0.5,
     healthBarYellowThreshold: 0.25,
     healthBarColors: { green: '#00ff00', yellow: '#ffaa00', red: '#ff3333' },

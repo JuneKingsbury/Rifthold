@@ -330,6 +330,19 @@ export class Renderer {
         return (0.5 - 0.5 * Math.cos(phase)) * RENDER_CONFIG.breatheAmplitudePx;
     }
 
+    // Walking "sway": returns a rotation angle (radians) for a moving sprite's
+    // pendulum rock. Driven by the move's progress `t` (0→1 across the tile step)
+    // rather than wall-clock time, so sin(t·2π·cycles) is exactly 0 at t=0 and
+    // t=1 — the sprite starts and ends every step perfectly upright (straight →
+    // left → right → straight for one cycle). `seed` parity flips which side the
+    // entity leads with; a sign flip preserves the zero endpoints.
+    _walkSway(t, seed) {
+        if (!RENDER_CONFIG.entityWalkSway) return 0;
+        const dir = (seed & 1) ? -1 : 1;
+        const phase = t * Math.PI * 2 * RENDER_CONFIG.walkSwayCycles;
+        return Math.sin(phase) * RENDER_CONFIG.walkSwayAmplitudeRad * dir;
+    }
+
     getNightDarkness(timeOfDay, season) {
         const t = timeOfDay / CONFIG.TICKS_PER_DAY;
         const daylight = RENDER_CONFIG.seasonDaylight[season] || RENDER_CONFIG.seasonDaylight.default;
@@ -359,6 +372,7 @@ export class Renderer {
         const enableScreenShake = settings.enableScreenShake;
         const showPortalPath = settings.showPortalPath;
         const showBreathing = settings.showBreathing;
+        const showWalkSway = settings.showWalkSway;
         const sm = this.skinManager;
         const skinActive = sm.isActive;
         const atkShakePx = COMBAT_VISUALS.atkShakePx || 2;
@@ -858,7 +872,27 @@ export class Renderer {
                     const meHlOff = meHl ? 1 : 0;
                     // Breathing: stretch height, anchor feet by nudging y up by the same amount.
                     const grow = showBreathing ? this._breatheGrow(now, ent.id || 0) : 0;
-                    ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
+                    // Walking sway: pendulum rotation about the feet (bottom-center). Wraps
+                    // only the sprite draw so the shadow (above) and overlays (below) stay flat.
+                    // Driven by move progress (0→1) so the sprite is upright at the start and
+                    // end of the step. Progress is recomputed here (getEntityRenderPos leaves
+                    // _moveStartTime/_moveDuration intact); clamp so a just-finished step reads 1.
+                    const moveT = ent._moveDuration > 0
+                        ? Math.min(1, Math.max(0, (now - ent._moveStartTime) / ent._moveDuration))
+                        : 1;
+                    const swayAngle = showWalkSway ? this._walkSway(moveT, ent.id || 0) : 0;
+                    if (swayAngle !== 0) {
+                        const pivotX = rpx + cw / 2;
+                        const pivotY = rpy + ch;
+                        ctx.save();
+                        ctx.translate(pivotX, pivotY);
+                        ctx.rotate(swayAngle);
+                        ctx.translate(-pivotX, -pivotY);
+                        ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
+                        ctx.restore();
+                    } else {
+                        ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
+                    }
                     // Draw the "in water" overlay when stepping between two water tiles (both the
                     // source and destination tiles are water). If _prevX is null the entity is
                     // effectively standing, so fall back to just the destination tile.
