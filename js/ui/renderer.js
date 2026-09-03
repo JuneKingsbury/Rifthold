@@ -897,7 +897,14 @@ export class Renderer {
                 if (skinActive) {
                     const sprite = p.skinKey ? sm.getSprite('effects', p.skinKey) : null;
                     if (sprite) {
-                        ctx.drawImage(sprite, Math.round(screenX), Math.round(screenY), cw, ch);
+                        const angle = Math.atan2(p.toY - p.fromY, p.toX - p.fromX);
+                        const cx = Math.round(screenX) + cw / 2;
+                        const cy = Math.round(screenY) + ch / 2;
+                        ctx.save();
+                        ctx.translate(cx, cy);
+                        ctx.rotate(angle);
+                        ctx.drawImage(sprite, -cw / 2, -ch / 2, cw, ch);
+                        ctx.restore();
                     } else {
                         ctx.fillStyle = p.color;
                         ctx.fillText(p.char, Math.round(screenX) + this._textOffsetX, Math.round(screenY));
