@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getItemTradeValue } from '../entities/item-roll.js';
@@ -55,6 +55,7 @@ export class UI {
         this.storyPanelVisible = false;
         this._storyTab = 'colony';
         this._collapsedRealmGroups = new Set();
+        this._collapsedBestiarySections = new Set();
         this._lastStoryHtml = '';
         this._lastStoryHasNew = false;
         this._lastResearchNeedsAttention = false;
@@ -120,6 +121,17 @@ export class UI {
                     this._collapsedRealmGroups.delete(name);
                 } else {
                     this._collapsedRealmGroups.add(name);
+                }
+                this._lastStoryHtml = '';
+                this.updateStoryPanel();
+            }
+            const bSection = e.target.closest('[data-bestiary-section]');
+            if (bSection) {
+                const name = bSection.dataset.bestiarySection;
+                if (this._collapsedBestiarySections.has(name)) {
+                    this._collapsedBestiarySections.delete(name);
+                } else {
+                    this._collapsedBestiarySections.add(name);
                 }
                 this._lastStoryHtml = '';
                 this.updateStoryPanel();
@@ -3350,7 +3362,10 @@ export class UI {
         html += `<button class="story-tab-btn${tab === 'research' ? ' active' : ''}" data-story-tab="research">${tabLabel('research', 'Research')}</button>`;
         html += `<button class="story-tab-btn${tab === 'races' ? ' active' : ''}" data-story-tab="races">${tabLabel('races', 'Races')}</button>`;
         html += `<button class="story-tab-btn${tab === 'realms' ? ' active' : ''}" data-story-tab="realms">${tabLabel('realms', 'Realms')}</button>`;
-        const bestiarySize = this.game.exploration?.bestiary?.size || 0;
+        const bestiarySize = (this.game.exploration?.bestiary?.size || 0) +
+            (this.game.exploration?.wildlifeKills?.size || 0) +
+            (this.game.exploration?.raiderKills?.size || 0) +
+            (this.game.exploration?.summonsSeen?.size || 0);
         html += `<button class="story-tab-btn${tab === 'bestiary' ? ' active' : ''}" data-story-tab="bestiary">Bestiary (${bestiarySize})</button>`;
         html += '</div>';
 
@@ -3361,43 +3376,130 @@ export class UI {
 
         if (tab === 'bestiary') {
             const bestiary = this.game.exploration?.bestiary;
-            if (!bestiary || bestiary.size === 0) {
-                html += `<div class="story-entry locked"><div class="story-entry-title">No entries yet</div><div class="story-entry-text">Encounter creatures on expeditions to fill the bestiary.</div></div>`;
-            } else {
-                const categories = { regular: [], elite: [], boss: [], npc: [] };
-                for (const [, entry] of bestiary) {
-                    const cat = entry.category || 'regular';
-                    if (categories[cat]) categories[cat].push(entry);
+            const _bestiaryEntryHtml = (entry, spriteHtml) => {
+                const realmName = REALMS[entry.realm]?.name || entry.realm;
+                const entryTypeKey = entry.key?.split(':')[1];
+                const lore = entry.lore || EXPEDITION_ENEMIES[entryTypeKey]?.lore || NPC_ENCOUNTERS[entryTypeKey]?.lore || '';
+                const catColors = { regular: '#ff4444', boss: '#ffcc44', npc: '#44ccff' };
+                const catKey = entry.category === 'elite' ? 'regular' : (entry.category || 'regular');
+                if (!spriteHtml) {
+                    const color = entry.color || catColors[catKey] || '#ff4444';
+                    const symbol = catKey === 'boss' ? '&#9650;' : catKey === 'npc' ? '&#9786;' : '&#9668;';
+                    spriteHtml = `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${color};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
                 }
-                for (const [catKey, catEntries] of Object.entries(categories)) {
-                    if (catEntries.length === 0) continue;
-                    const catColors = { regular: '#ff4444', elite: '#ff8844', boss: '#ffcc44', npc: '#44ccff' };
-                    const catNames = { regular: 'Enemies', elite: 'Elites', boss: 'Bosses', npc: 'Encounters' };
-                    html += `<div style="color:${catColors[catKey]};font-weight:bold;margin-top:8px;margin-bottom:4px;font-size:0.95em;">${catNames[catKey]} (${catEntries.length})</div>`;
-                    for (const entry of catEntries) {
-                        const realmName = REALMS[entry.realm]?.name || entry.realm;
-                        let spriteHtml = '';
-                        const sm = this.game.skinManager;
-                        if (sm?.isActive && entry.sprite) {
-                            const sprite = sm.getSprite('entities', entry.sprite);
-                            if (sprite) {
-                                const c = document.createElement('canvas');
-                                c.width = sprite.width || sprite.naturalWidth || 16;
-                                c.height = sprite.height || sprite.naturalHeight || 16;
-                                c.getContext('2d').drawImage(sprite, 0, 0);
-                                spriteHtml = `<img src="${c.toDataURL('image/png')}" style="width:24px;height:24px;image-rendering:pixelated;vertical-align:middle;margin-right:6px;">`;
-                            }
+                let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
+                h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
+                h += `<div class="story-entry-text" style="font-size:0.8em;">Found in: ${realmName} | Encountered: ${entry.count}x</div>`;
+                if (entry.eliteCounts && Object.keys(entry.eliteCounts).length > 0) {
+                    const eliteParts = Object.values(entry.eliteCounts).map(e => `${e.name} ×${e.count}`);
+                    h += `<div class="story-entry-text" style="font-size:0.75em;color:#ff8844;">Elites: ${eliteParts.join(', ')}</div>`;
+                }
+                if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
+                return h + `</div></div>`;
+            };
+            const _killEntryHtml = (entry, spriteHtml, lore, showTamed) => {
+                if (!spriteHtml) {
+                    spriteHtml = `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${entry.color};vertical-align:middle;margin-right:6px;">${entry.char}</span>`;
+                }
+                let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
+                h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
+                let statLine = `Killed: ${entry.count}x | Drops: ${entry.drops || 'Nothing'}`;
+                if (showTamed && entry.tameCount) statLine += ` | Tamed: ${entry.tameCount}x`;
+                h += `<div class="story-entry-text" style="font-size:0.8em;">${statLine}</div>`;
+                if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
+                return h + `</div></div>`;
+            };
+            const _getSpriteHtml = (sprite) => {
+                const sm = this.game.skinManager;
+                if (sm?.isActive && sprite) {
+                    const img = sm.getSprite('entities', sprite);
+                    if (img) {
+                        const c = document.createElement('canvas');
+                        c.width = img.width || img.naturalWidth || 16;
+                        c.height = img.height || img.naturalHeight || 16;
+                        c.getContext('2d').drawImage(img, 0, 0);
+                        return `<img src="${c.toDataURL('image/png')}" style="width:24px;height:24px;image-rendering:pixelated;vertical-align:middle;margin-right:6px;">`;
+                    }
+                }
+                return '';
+            };
+            const _sectionHeader = (key, label, color, count) => {
+                const collapsed = this._collapsedBestiarySections.has(key);
+                const arrow = collapsed ? '&#9654;' : '&#9660;';
+                const countStr = count > 0 ? ` (${count})` : '';
+                return `<div class="realm-group-header" data-bestiary-section="${key}" style="color:${color};">${arrow} ${label}${countStr}</div>`;
+            };
+            const _emptyHint = (msg) =>
+                `<div class="story-entry locked" style="margin:2px 0;"><div class="story-entry-text">${msg}</div></div>`;
+
+            // Expedition sections
+            const categories = { regular: [], boss: [], npc: [] };
+            for (const [, entry] of (bestiary || [])) {
+                const cat = entry.category === 'elite' ? 'regular' : (entry.category || 'regular');
+                if (categories[cat]) categories[cat].push(entry);
+            }
+            const catColors = { regular: '#ff4444', boss: '#ffcc44', npc: '#44ccff' };
+            const catNames = { regular: 'Enemies', boss: 'Bosses', npc: 'Encounters' };
+            const catHints = {
+                regular: 'Send colonists on expeditions to encounter enemies.',
+                boss:    'Reach the final encounter of an expedition chain to face a boss.',
+                npc:     'Some expedition events end with a peaceful encounter instead of combat.',
+            };
+            for (const catKey of ['regular', 'boss', 'npc']) {
+                const catEntries = categories[catKey];
+                html += _sectionHeader(`exp_${catKey}`, catNames[catKey], catColors[catKey], catEntries.length);
+                if (!this._collapsedBestiarySections.has(`exp_${catKey}`)) {
+                    if (catEntries.length === 0) {
+                        html += _emptyHint(catHints[catKey]);
+                    } else {
+                        for (const entry of catEntries) {
+                            html += _bestiaryEntryHtml(entry, _getSpriteHtml(entry.sprite));
                         }
-                        if (!spriteHtml) {
-                            const color = entry.color || catColors[catKey];
-                            const symbol = catKey === 'boss' ? '&#9650;' : catKey === 'npc' ? '&#9786;' : '&#9668;';
-                            spriteHtml = `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${color};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
-                        }
-                        html += `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">`;
-                        html += spriteHtml;
-                        html += `<div><div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
-                        html += `<div class="story-entry-text" style="font-size:0.8em;">Found in: ${realmName} | Encountered: ${entry.count}x</div></div>`;
-                        html += `</div>`;
+                    }
+                }
+            }
+
+            // Wildlife section
+            const wildlifeKills = [...(this.game.exploration?.wildlifeKills?.values() || [])];
+            html += _sectionHeader('wildlife', 'Wildlife', '#88cc44', wildlifeKills.length);
+            if (!this._collapsedBestiarySections.has('wildlife')) {
+                if (wildlifeKills.length === 0) {
+                    html += _emptyHint('Hunt or tame a wild animal to add it here.');
+                } else {
+                    for (const entry of wildlifeKills) {
+                        html += _killEntryHtml(entry, _getSpriteHtml(entry.sprite), ANIMALS[entry.sprite]?.lore || entry.lore || '', true);
+                    }
+                }
+            }
+
+            // Raider section
+            const raiderKills = [...(this.game.exploration?.raiderKills?.values() || [])];
+            html += _sectionHeader('raiders', 'Raiders', '#ff6644', raiderKills.length);
+            if (!this._collapsedBestiarySections.has('raiders')) {
+                if (raiderKills.length === 0) {
+                    html += _emptyHint('Survive a raid and defeat enemy raiders to add them here.');
+                } else {
+                    for (const entry of raiderKills) {
+                        html += _killEntryHtml(entry, _getSpriteHtml(entry.sprite), ENTITIES[entry.sprite]?.lore || entry.lore || '');
+                    }
+                }
+            }
+
+            // Summons section
+            const summonsSeen = [...(this.game.exploration?.summonsSeen?.values() || [])];
+            html += _sectionHeader('summons', 'Summons', '#9966ff', summonsSeen.length);
+            if (!this._collapsedBestiarySections.has('summons')) {
+                if (summonsSeen.length === 0) {
+                    html += _emptyHint('Summon creatures during combat to add them here.');
+                } else {
+                    for (const entry of summonsSeen) {
+                        const lore = ENTITIES[entry.sprite]?.lore || entry.lore || '';
+                        const spriteHtml = _getSpriteHtml(entry.sprite) ||
+                            `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${entry.color};vertical-align:middle;margin-right:6px;">${entry.char}</span>`;
+                        let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
+                        h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
+                        if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
+                        html += h + `</div></div>`;
                     }
                 }
             }
@@ -3449,7 +3551,7 @@ export class UI {
                 html += `<div class="story-entry-text">${milestone.text}</div>`;
                 html += `</div>`;
             }
-            for (const [key, milestone] of lockedEntries) {
+            for (const [,] of lockedEntries) {
                 html += `<div class="story-entry locked">`;
                 html += `<div class="story-entry-title">???</div>`;
                 html += `<div class="story-entry-text">This tale has yet to unfold...</div>`;

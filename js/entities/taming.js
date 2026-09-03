@@ -69,6 +69,29 @@ export function completeTame(game, wildAnimalId) {
     game.notifications.push({ text: `Tamed a ${wildAnimal.type}!`, tick: game.tick, type: 'success' });
     game.eventLog.add(game, `Tamed a ${wildAnimal.type}`, 'success', { type: 'position', x: spawnX, y: spawnY });
     game.story.checkMilestone('first_animal_tamed', game);
+
+    if (game.exploration) {
+        const existing = game.exploration.wildlifeKills.get(wildAnimal.type);
+        if (existing) {
+            existing.tameCount = (existing.tameCount || 0) + 1;
+        } else {
+            const d = ANIMALS[wildAnimal.type];
+            const drops = [];
+            if (d?.meatYield) drops.push(`${d.meatYield} meat`);
+            if (d?.hideYield) drops.push(`${d.hideYield} hides`);
+            if (d?.woolYield) drops.push(`${d.woolYield} wool`);
+            game.exploration.wildlifeKills.set(wildAnimal.type, {
+                name: wildAnimal.type.charAt(0).toUpperCase() + wildAnimal.type.slice(1),
+                char: d?.char || '?',
+                color: d?.color || '#888888',
+                sprite: wildAnimal.type,
+                drops: drops.length ? drops.join(', ') : 'Nothing',
+                count: 0,
+                tameCount: 1
+            });
+        }
+    }
+
     return true;
 }
 

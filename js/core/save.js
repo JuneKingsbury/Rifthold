@@ -85,6 +85,9 @@ export function saveGame(game) {
             completedExpeditions: game.exploration.completedExpeditions,
             completedRealms: [...(game.exploration.completedRealms || [])],
             bestiary: Object.fromEntries(game.exploration.bestiary || new Map()),
+            wildlifeKills: Object.fromEntries(game.exploration.wildlifeKills || new Map()),
+            raiderKills: Object.fromEntries(game.exploration.raiderKills || new Map()),
+            summonsSeen: Object.fromEntries(game.exploration.summonsSeen || new Map()),
             expeditionXP: game.exploration.expeditionXP || {},
             fatigueCooldowns: game.exploration.fatigueCooldowns || {},
             realmHistory: game.exploration.realmHistory || [],
@@ -289,6 +292,9 @@ export function loadGame(game) {
             game.exploration.completedExpeditions = data.exploration.completedExpeditions || [];
             game.exploration.completedRealms = new Set(data.exploration.completedRealms || []);
             game.exploration.bestiary = new Map(Object.entries(data.exploration.bestiary || {}));
+            game.exploration.wildlifeKills = new Map(Object.entries(data.exploration.wildlifeKills || {}));
+            game.exploration.raiderKills = new Map(Object.entries(data.exploration.raiderKills || {}));
+            game.exploration.summonsSeen = new Map(Object.entries(data.exploration.summonsSeen || {}));
             game.exploration.expeditionXP = data.exploration.expeditionXP || {};
             game.exploration.fatigueCooldowns = data.exploration.fatigueCooldowns || {};
             game.exploration.realmHistory = data.exploration.realmHistory || [];

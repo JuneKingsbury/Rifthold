@@ -57,6 +57,9 @@ export class ExplorationSystem {
         this.completedExpeditions = [];
         this.completedRealms = new Set();
         this.bestiary = new Map();
+        this.wildlifeKills = new Map();
+        this.raiderKills = new Map();
+        this.summonsSeen = new Map();
         this.expeditionXP = {};
         this.fatigueCooldowns = {};
         this.realmHistory = [];
@@ -1164,7 +1167,7 @@ export class ExplorationSystem {
                 encounterIndex: exp.currentEncounter,
             };
             this._addLog(exp, game, encounter.text, 'info');
-            this._updateBestiary(exp, 'npc', encounter.npcKey, { name: encounter.text.slice(0, 40) });
+            this._updateBestiary(exp, 'npc', encounter.npcKey, { name: encounter.name || encounter.text.slice(0, 40), lore: encounter.lore || '', sprite: encounter.sprite || null });
             return;
         }
 
@@ -1214,14 +1217,17 @@ export class ExplorationSystem {
             this._addLog(exp, game, `${startMsg} (${enemies.length} foes)${eliteNote}`, 'combat');
 
             for (const e of enemies) {
-                if (e.elite) {
-                    const eName = e.name ? `${e.eliteName} ${e.name}` : `${e.eliteName} Enemy`;
-                    this._updateBestiary(exp, 'elite', `${e.eliteName}_${e.typeKey || 'enemy'}`, { name: eName, sprite: e.sprite, color: e.eliteColor || e.color || '#ff8833' });
-                } else {
-                    const bKey = e.typeKey || `enemy_${exp.realm}`;
-                    const bName = e.name || `${REALMS[exp.realm]?.name || exp.realm} Creature`;
-                    this._updateBestiary(exp, 'regular', bKey, { name: bName, sprite: e.sprite, color: e.color || '#ff3333' });
-                }
+                const bKey = e.typeKey || `enemy_${exp.realm}`;
+                const bName = e.name || `${REALMS[exp.realm]?.name || exp.realm} Creature`;
+                const catalogEntry = e.typeKey ? EXPEDITION_ENEMIES[e.typeKey] : null;
+                this._updateBestiary(exp, 'regular', bKey, {
+                    name: bName,
+                    sprite: e.sprite,
+                    color: e.color || '#ff3333',
+                    lore: catalogEntry?.lore || '',
+                    eliteModifier: e.elite || null,
+                    eliteName: e.eliteName || null,
+                });
             }
         }
 
@@ -2013,12 +2019,27 @@ export class ExplorationSystem {
 
         for (const entry of exp.discoveredEntries) {
             if (!this.bestiary.has(entry.key)) {
-                this.bestiary.set(entry.key, { ...entry, count: 1 });
+                const newEntry = { ...entry, count: 1 };
+                delete newEntry.eliteModifier;
+                delete newEntry.eliteName;
+                if (entry.eliteModifier) {
+                    newEntry.eliteCounts = { [entry.eliteModifier]: { name: entry.eliteName, count: 1 } };
+                }
+                if (!newEntry.lore) newEntry.lore = '';
+                this.bestiary.set(entry.key, newEntry);
             } else {
                 const existing = this.bestiary.get(entry.key);
                 existing.count++;
                 if (!existing.sprite && entry.sprite) existing.sprite = entry.sprite;
                 if (!existing.color && entry.color) existing.color = entry.color;
+                if (entry.eliteModifier) {
+                    if (!existing.eliteCounts) existing.eliteCounts = {};
+                    if (!existing.eliteCounts[entry.eliteModifier]) {
+                        existing.eliteCounts[entry.eliteModifier] = { name: entry.eliteName, count: 1 };
+                    } else {
+                        existing.eliteCounts[entry.eliteModifier].count++;
+                    }
+                }
             }
         }
 
@@ -2368,7 +2389,17 @@ export class ExplorationSystem {
     }
 
     _updateBestiary(exp, category, key, data) {
-        exp.discoveredEntries.push({ key: `${category}:${key}`, category, name: data.name || key, realm: exp.realm, sprite: data.sprite || null, color: data.color || null });
+        exp.discoveredEntries.push({
+            key: `${category}:${key}`,
+            category,
+            name: data.name || key,
+            realm: exp.realm,
+            sprite: data.sprite || null,
+            color: data.color || null,
+            lore: data.lore || '',
+            eliteModifier: data.eliteModifier || null,
+            eliteName: data.eliteName || null,
+        });
     }
 
     _awardExpeditionXP(exp, game, amount) {

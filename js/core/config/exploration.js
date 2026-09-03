@@ -2,39 +2,39 @@
 // Realms reference these by key with a spawn weight.
 export const EXPEDITION_ENEMIES = {
     // Crystal chain
-    crystal_bat:      { name: 'Crystal Bat',      hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff' },
-    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc' },
-    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff' },
-    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
-    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa' },
+    crystal_bat:      { name: 'Crystal Bat',      hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', lore: '' },
+    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', lore: '' },
+    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', lore: '' },
+    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', lore: '', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
+    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa', lore: '' },
 
     // Verdant chain
-    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44' },
-    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833' },
-    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
-    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
-    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622' },
+    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44', lore: '' },
+    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', lore: '' },
+    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', lore: '', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
+    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', lore: '', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
+    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', lore: '' },
 
     // Arcane chain
-    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
-    tome_guardian:     { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc' },
-    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
-    construct:        { name: 'Arcane Construct',   hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
-    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
+    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', lore: '', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
+    tome_guardian:     { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', lore: '' },
+    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', lore: '', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
+    construct:        { name: 'Arcane Construct',   hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', lore: '', spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
+    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', lore: '', spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
 
     // Shadow chain
-    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588' },
-    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
-    shade:            { name: 'Shade',              hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
-    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
-    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
+    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', lore: '' },
+    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', lore: '', spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
+    shade:            { name: 'Shade',              hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', lore: '', spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
+    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', lore: '', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
+    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', lore: '', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
 
     // Kingdom chain
-    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44' },
-    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33' },
-    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44' },
-    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
-    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88' },
+    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', lore: '' },
+    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', lore: '' },
+    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', lore: '' },
+    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', lore: '', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
+    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', lore: '' },
 };
 
 // Realm chains a demo-mode player may explore. All other chains stay locked
@@ -1278,6 +1278,8 @@ export const PUZZLE_ENCOUNTERS = {
 // NPC encounters.
 export const NPC_ENCOUNTERS = {
     wounded_traveler: {
+        name: 'Wounded Traveler',
+        lore: '',
         text: 'A wounded traveler lies beside the path.',
         triggerWeight: 6,
         realmFilter: null,
@@ -1300,6 +1302,9 @@ export const NPC_ENCOUNTERS = {
         ],
     },
     mercenary: {
+        name: 'Mercenary',
+        lore: '',
+        sprite: 'npc_ally',
         text: 'A sellsword offers their blade, for a price.',
         triggerWeight: 4,
         realmFilter: null,
@@ -1319,6 +1324,8 @@ export const NPC_ENCOUNTERS = {
         ],
     },
     lost_scholar: {
+        name: 'Lost Scholar',
+        lore: '',
         text: 'A disoriented scholar clutches a bundle of notes.',
         triggerWeight: 5,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -1342,6 +1349,8 @@ export const NPC_ENCOUNTERS = {
         ],
     },
     shadow_merchant: {
+        name: 'Shadow Merchant',
+        lore: '',
         text: 'A cloaked figure materializes from the darkness, wares floating around them.',
         triggerWeight: 3,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],

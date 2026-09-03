@@ -20,7 +20,28 @@ export function updateWildlife(game) {
                 if (def) {
                     const yield_ = { meat: def.meatYield };
                     if (def.hideYield) yield_.hides = def.hideYield;
+                    if (def.woolYield) yield_.wool = def.woolYield;
                     game.resources.add(yield_);
+                }
+                if (game.exploration) {
+                    const existing = game.exploration.wildlifeKills.get(animal.type);
+                    if (existing) {
+                        existing.count++;
+                    } else {
+                        const d = ANIMALS[animal.type];
+                        const drops = [];
+                        if (d?.meatYield) drops.push(`${d.meatYield} meat`);
+                        if (d?.hideYield) drops.push(`${d.hideYield} hides`);
+                        if (d?.woolYield) drops.push(`${d.woolYield} wool`);
+                        game.exploration.wildlifeKills.set(animal.type, {
+                            name: animal.type.charAt(0).toUpperCase() + animal.type.slice(1),
+                            char: d?.char || '?',
+                            color: d?.color || '#888888',
+                            sprite: animal.type,
+                            drops: drops.length ? drops.join(', ') : 'Nothing',
+                            count: 1
+                        });
+                    }
                 }
             }
             game.entities.splice(i, 1);

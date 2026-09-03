@@ -1,4 +1,4 @@
-import { CONFIG, RAID_CONFIG, RAID_TYPES, BUILDINGS, COMBAT_VISUALS, PATHFINDING_CONFIG, COLONIST_CONFIG } from '../core/config.js';
+import { CONFIG, ENTITIES, RAID_CONFIG, RAID_TYPES, BUILDINGS, COMBAT_VISUALS, PATHFINDING_CONFIG, COLONIST_CONFIG } from '../core/config.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { findPathForEnemies, manhattanDist } from '../world/pathfinding.js';
 import { colonistTakeDamage } from './colonist.js';
@@ -190,6 +190,24 @@ export class CombatSystem {
                     }
                     game.combatEffects.push({ x: raider.x, y: raider.y, char: COMBAT_VISUALS.lootDropChar, color: COMBAT_VISUALS.lootDropColor, ttl: COMBAT_VISUALS.lootDropTtl });
                     window.soundManager?.playSFX('loot_drop');
+                }
+                if (game.exploration) {
+                    const existing = game.exploration.raiderKills.get(raider.type);
+                    if (existing) {
+                        existing.count++;
+                    } else {
+                        const def = ENTITIES[raider.type];
+                        const lootEntries = raider.loot || def?.loot || [];
+                        const drops = lootEntries.map(d => `${d.amount || 1} ${d.item}${d.chance && d.chance < 1 ? ` (${Math.round(d.chance * 100)}%)` : ''}`);
+                        game.exploration.raiderKills.set(raider.type, {
+                            name: def?.name || raider.type,
+                            char: def?.char || 'R',
+                            color: def?.color || '#ff3333',
+                            sprite: raider.type,
+                            drops: drops.length ? drops.join(', ') : 'Nothing',
+                            count: 1
+                        });
+                    }
                 }
                 game.raiders.splice(i, 1);
                 continue;

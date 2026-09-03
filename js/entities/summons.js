@@ -1,4 +1,4 @@
-import { SUMMON_TYPES, COMBAT_VISUALS } from '../core/config.js';
+import { ENTITIES, SUMMON_TYPES, COMBAT_VISUALS } from '../core/config.js';
 import { createEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 
@@ -14,6 +14,16 @@ export function spawnSummon(summonType, x, y, ownerId, game) {
     game.combatEffects.push({ x, y, char: COMBAT_VISUALS.summonArriveChar, color: COMBAT_VISUALS.summonArriveColor, ttl: COMBAT_VISUALS.summonArriveTtl });
     window.soundManager?.playSFX('summon_arrival');
     game.entities.push(summon);
+    if (game.exploration && !game.exploration.summonsSeen.has(summonType)) {
+        const entityDef = ENTITIES[summonType];
+        game.exploration.summonsSeen.set(summonType, {
+            name: def.name || summonType,
+            char: entityDef?.char || def.char || '?',
+            color: def.color || '#9966ff',
+            sprite: summonType,
+            lore: entityDef?.lore || '',
+        });
+    }
     return summon;
 }
 
