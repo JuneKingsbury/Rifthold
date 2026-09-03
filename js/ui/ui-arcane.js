@@ -2221,6 +2221,7 @@ const arcaneMethods = {
     },
 
     getColonistTaskDescription(colonist) {
+        if (colonist._seekingWarmth) return `<span style="color:#88ddff;cursor:pointer" onclick="window.game.camera.centerOn(${colonist.x},${colonist.y})">Seeking warmth</span>`;
         const relaxLabel = getRelaxActivityLabel(colonist);
         if (relaxLabel) return `<span style="color:#88cc88;cursor:pointer" onclick="window.game.camera.centerOn(${colonist.x},${colonist.y})">${relaxLabel}</span>`;
         if (!colonist.currentTaskId) return `<span style="color:#666;cursor:pointer" onclick="window.game.camera.centerOn(${colonist.x},${colonist.y})">None</span>`;

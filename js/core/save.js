@@ -452,14 +452,14 @@ function captureLayout() {
     const footer = document.getElementById('game-footer');
     const colonistHud = document.getElementById('colonist-hud');
     const eventLog = document.getElementById('event-log');
-    const uiFontSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-size')) || 12;
+    const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1;
 
     return {
         gridColumns: container?.style.gridTemplateColumns || null,
         footerHeight: footer?.style.height || null,
         colonistHudFlex: colonistHud?.style.flex || null,
         eventLogFlex: eventLog?.style.flex || null,
-        uiFontSize,
+        uiFontScale,
     };
 }
 
@@ -474,5 +474,6 @@ function restoreLayout(layout) {
     if (layout.footerHeight) footer.style.height = layout.footerHeight;
     if (layout.colonistHudFlex) colonistHud.style.flex = layout.colonistHudFlex;
     if (layout.eventLogFlex) eventLog.style.flex = layout.eventLogFlex;
-    if (layout.uiFontSize) window.setUIFontSize(layout.uiFontSize);
+    if (layout.uiFontScale) window.setUIFontScale?.(layout.uiFontScale);
+    else if (layout.uiFontSize) window.setUIFontScale?.(layout.uiFontSize / 12);
 }

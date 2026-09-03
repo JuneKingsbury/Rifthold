@@ -309,17 +309,15 @@ export class SkinManager {
     }
 
     async _loadSkin(skinName) {
-        this._sprites.clear();
-        this._humanBodyCount = 0;
-        this._nymphBodyCount = 0;
-        this._ferinBodyCount = 0;
-        this._kobalosBodyCount = 0;
-        this._bufosBodyCount = 0;
-        this._hairCount = 0;
-        this._shirtCount = 0;
-
-        const loaded = await this._tryLoadFromZip(skinName) || await this._tryLoadFromFolder(skinName);
+        // Load into a staging map so the current sprites remain visible until
+        // the entire skin is ready, preventing a flash back to ASCII mid-load.
+        const staging = new Map();
+        const loaded = await this._tryLoadFromZip(skinName, staging) || await this._tryLoadFromFolder(skinName, staging);
         if (!loaded) return;
+
+        // Atomic swap: old sprites stay live until the new set is fully decoded.
+        this._sprites = staging;
+        this._compositeCache.clear();
 
         let bH = 0; while (this._sprites.has('entities:colonist_human_body_' + (bH + 1))) bH++;
         let bN = 0; while (this._sprites.has('entities:colonist_nymph_body_' + (bN + 1))) bN++;
@@ -337,7 +335,7 @@ export class SkinManager {
         this._shirtCount = s;
     }
 
-    async _tryLoadFromZip(skinName) {
+    async _tryLoadFromZip(skinName, target) {
         if (typeof JSZip === 'undefined') return false;
         try {
             const resp = await fetch(`skins/${skinName}.skin.zip`);
@@ -359,7 +357,7 @@ export class SkinManager {
                             const url = URL.createObjectURL(blob);
                             return this._loadImage(url).then(img => {
                                 URL.revokeObjectURL(url);
-                                if (img) this._sprites.set(category + ':' + key, img);
+                                if (img) target.set(category + ':' + key, img);
                             });
                         })
                     );
@@ -372,7 +370,7 @@ export class SkinManager {
         }
     }
 
-    async _tryLoadFromFolder(skinName) {
+    async _tryLoadFromFolder(skinName, target) {
         const basePath = `skins/${skinName}`;
         let manifest;
         try {
@@ -388,7 +386,7 @@ export class SkinManager {
             for (const key of keys) {
                 const path = `${basePath}/${category}/${key}.png`;
                 loadPromises.push(this._loadImage(path).then(img => {
-                    if (img) this._sprites.set(category + ':' + key, img);
+                    if (img) target.set(category + ':' + key, img);
                 }));
             }
         }

@@ -13,22 +13,29 @@ export class PowerSystem {
         this.totalConsumed = 0;
         this.powered = true;
         this.heaters = [];
+        this.passiveHeaters = [];
         this.lamps = [];
         this.turrets = [];
         this.voidTurrets = [];
         this.aoeWards = [];
+        this.relays = [];
+        this.passiveLamps = [];
     }
 
     update(game) {
         this.totalGenerated = 0;
         this.totalConsumed = 0;
         this.heaters = [];
+        this.passiveHeaters = [];
         this.lamps = [];
         this.poweredLamps = [];
         this.turrets = [];
         this.voidTurrets = [];
         this.aoeWards = [];
+        this.relays = [];
+        this.passiveLamps = [];
 
+        const isWinter = game.weather.season === 'winter';
         const allStructures = game.mapIndex.getAllStructurePositions();
         const relays = [];
         const consumers = [];
@@ -37,6 +44,11 @@ export class PowerSystem {
             const bDef = BUILDINGS[type];
             if (!bDef) continue;
 
+            // Non-powered warmth sources (campfire etc.)
+            if (bDef.warmRadius) {
+                this.passiveHeaters.push({ x, y, radius: bDef.warmRadius });
+            }
+
             if (bDef.power) {
                 const pwr = bDef.power;
                 if (pwr.generates) {
@@ -44,15 +56,20 @@ export class PowerSystem {
                     if (type === 'mana_crystal' && game.research.isResearched('mana_reservoir')) gen += 1;
                     this.totalGenerated += gen;
                 }
-                if (pwr.consumes) {
+                // seasonalHeat buildings (ember_heater) only draw mana and warm in winter
+                if (pwr.consumes && (!pwr.seasonalHeat || isWinter)) {
                     consumers.push({ x, y, type, consumes: pwr.consumes });
                 }
-                if (type === 'mana_relay') relays.push({ x, y, radius: pwr.radius || 3 });
+                if (type === 'mana_relay') {
+                    const r = pwr.radius || 3;
+                    relays.push({ x, y, radius: r });
+                    this.relays.push({ x, y, radius: r });
+                }
 
-                if (pwr.warmRadius) this.heaters.push({ x, y, radius: pwr.warmRadius });
+                if (pwr.warmRadius && (!pwr.seasonalHeat || isWinter)) this.heaters.push({ x, y, radius: pwr.warmRadius });
                 if (pwr.damage && pwr.warmRadius) this.aoeWards.push({ x, y, radius: pwr.warmRadius, damage: pwr.damage });
-                else if (pwr.damage && type === 'arcane_sentinel') this.turrets.push({ x, y });
-                else if (pwr.damage && type === 'void_turret') this.voidTurrets.push({ x, y });
+                else if (pwr.damage && type === 'arcane_sentinel') this.turrets.push({ x, y, radius: pwr.range || 4 });
+                else if (pwr.damage && type === 'void_turret') this.voidTurrets.push({ x, y, radius: pwr.range || 5 });
             }
 
             if (bDef.lightRadius) {
@@ -60,6 +77,7 @@ export class PowerSystem {
                     this.poweredLamps.push({ x, y, radius: bDef.lightRadius });
                 } else {
                     this.lamps.push({ x, y, radius: bDef.lightRadius });
+                    this.passiveLamps.push({ x, y, radius: bDef.lightRadius });
                 }
             }
         }
@@ -106,11 +124,12 @@ export class PowerSystem {
     }
 
     isTileWarmed(game, x, y) {
+        for (const h of this.passiveHeaters) {
+            if (manhattanDist(x, y, h.x, h.y) <= h.radius) return true;
+        }
         if (!this.powered) return false;
         for (const h of this.heaters) {
-            if (manhattanDist(x, y, h.x, h.y) <= h.radius) {
-                return true;
-            }
+            if (manhattanDist(x, y, h.x, h.y) <= h.radius) return true;
         }
         return false;
     }

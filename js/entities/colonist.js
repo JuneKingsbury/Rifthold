@@ -1402,6 +1402,32 @@ function updateIdle(colonist, game) {
         return;
     }
 
+    // Seek warmth when freezing and idle. Walk toward the nearest warmth source
+    // within range. Interrupted immediately if work or a threat appears (guard/
+    // task checks come right after).
+    if (colonist.thoughts.some(t => t.text === 'Freezing outside') &&
+        !game.power.isTileWarmed(game, colonist.x, colonist.y)) {
+        let bestTarget = null;
+        let bestDist = WARMTH_SEEK_RADIUS + 1;
+        for (const type of WARMTH_SEEK_TYPES) {
+            const pos = game.mapIndex.findNearest(type, colonist.x, colonist.y);
+            if (pos) {
+                const d = manhattanDist(colonist.x, colonist.y, pos.x, pos.y);
+                if (d < bestDist) { bestDist = d; bestTarget = pos; }
+            }
+        }
+        if (bestTarget && bestDist <= WARMTH_SEEK_RADIUS) {
+            const path = findPathAdjacent(game.map, colonist.x, colonist.y, bestTarget.x, bestTarget.y, game._occupiedTiles);
+            if (path && path.length > 0) {
+                colonist.path = path;
+                colonist.state = 'moving';
+                colonist._seekingWarmth = true;
+                return;
+            }
+        }
+    }
+    colonist._seekingWarmth = false;
+
     if (colonist.guardMode && colonist.guardPost) {
         updateGuarding(colonist, game);
         return;
@@ -1535,7 +1561,9 @@ export function getRelaxActivityLabel(colonist) {
     return info ? info.label : 'Relaxing';
 }
 
-const WARMTH_SOURCES = ['torch', 'hearth_shrine', 'ember_ward', 'inferno_ward'];
+const WARMTH_SOURCES = ['campfire', 'hearth_shrine', 'ember_heater', 'inferno_ward'];
+const WARMTH_SEEK_TYPES = ['campfire', 'ember_heater', 'inferno_ward', 'hearth_shrine'];
+const WARMTH_SEEK_RADIUS = 20;
 
 function randRange(range) {
     return range[0] + Math.floor(Math.random() * (range[1] - range[0]));

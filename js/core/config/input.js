@@ -25,6 +25,10 @@ export const DEFAULT_KEYMAP = {
     toggleInventory: ['i'],
     toggleArcane: ['v'],
     toggleStory: ['j'],
+    toggleWarmthOverlay: ['h'],
+    toggleDefenseOverlay: ['y'],
+    toggleRoomOverlay: ['u'],
+    toggleAuraOverlay: ['k'],
 
     pause: [' '],
     speedUp: ['.', '>'],
@@ -63,6 +67,10 @@ export const KEYBIND_ACTIONS = [
         { action: 'toggleInventory', label: 'Inventory panel' },
         { action: 'toggleArcane', label: 'Arcane panel' },
         { action: 'toggleStory', label: 'Story panel' },
+        { action: 'toggleWarmthOverlay', label: 'Toggle warmth overlay' },
+        { action: 'toggleDefenseOverlay', label: 'Toggle defense range overlay' },
+        { action: 'toggleRoomOverlay', label: 'Toggle room quality overlay' },
+        { action: 'toggleAuraOverlay', label: 'Toggle aura/range overlay' },
     ] },
     { group: 'Time & View', items: [
         { action: 'pause', label: 'Pause / unpause' },

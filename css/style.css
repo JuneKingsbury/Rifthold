@@ -15,7 +15,8 @@ html, body {
 }
 
 :root {
-    --ui-font-size: 12px;
+    --ui-font-scale: 1;
+    --ui-font-size: calc(12px * var(--ui-font-scale));
 }
 
 body {
@@ -159,7 +160,7 @@ body {
     border: 1px solid #555;
     border-radius: 3px;
     padding: 1px 6px;
-    font-size: 12px;
+    font-size: var(--ui-font-size);
     cursor: pointer;
     font-family: monospace;
     line-height: 1.2;
@@ -215,7 +216,7 @@ body {
     border: 1px solid #ff6666;
     border-radius: 4px;
     color: #ff6666;
-    font-size: 12px;
+    font-size: var(--ui-font-size);
     font-weight: bold;
     letter-spacing: 2px;
     padding: 4px 16px;
@@ -613,7 +614,7 @@ img.pixel-art {
     padding: 5px 10px;
     border-radius: 4px;
     border: 1px solid #555;
-    font-size: 11px;
+    font-size: var(--ui-font-size);
     white-space: nowrap;
     pointer-events: none;
     z-index: 9999;
@@ -747,7 +748,7 @@ img.pixel-art {
     background: rgba(10, 10, 20, 0.92);
     border: 1px solid #555;
     padding: 4px 8px;
-    font-size: 11px;
+    font-size: var(--ui-font-size);
     color: #ccc;
     border-radius: 3px;
     white-space: nowrap;
@@ -970,7 +971,7 @@ img.pixel-art {
     border: 1px solid #666;
     border-radius: 4px;
     padding: 8px 10px;
-    font-size: 11px;
+    font-size: var(--ui-font-size);
     color: #ccc;
     z-index: 10000;
     max-width: 240px;
@@ -1013,7 +1014,7 @@ img.pixel-art {
 #touch-toolbar button {
     padding: 6px 10px;
     font-family: inherit;
-    font-size: 12px;
+    font-size: var(--ui-font-size);
     background: #2a2a4a;
     border: 1px solid #555;
     color: #ccc;
@@ -2260,7 +2261,7 @@ img.pixel-art {
     border: 1px solid #444;
     border-radius: 3px;
     color: #888;
-    font-size: 11px;
+    font-size: inherit;
     cursor: pointer;
     font-family: inherit;
 }
@@ -2446,7 +2447,7 @@ details.settings-debug > summary::marker {
 /* Small screens / phones */
 @media (max-width: 768px) {
     body {
-        font-size: 12px;
+        font-size: var(--ui-font-size);
     }
 
     #start-screen h1 { font-size: 22px; }
@@ -4652,7 +4653,7 @@ details.settings-debug > summary::marker {
 #tutorial-note .tutorial-title {
     color: #ffcc00;
     font-weight: bold;
-    font-size: 12px;
+    font-size: var(--ui-font-size);
     margin-bottom: 2px;
 }
 

@@ -199,6 +199,22 @@ export class InputHandler {
             toggleInventory: () => this.game.ui.toggleInventoryPanel(),
             toggleArcane: () => this.game.ui.toggleArcanePanel(),
             toggleStory: () => this.game.ui.toggleStoryPanel(),
+            toggleWarmthOverlay: () => {
+                this.game.settings.showWarmthOverlay = !this.game.settings.showWarmthOverlay;
+                this.game.notifications.push({ text: `Warmth overlay ${this.game.settings.showWarmthOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+            },
+            toggleDefenseOverlay: () => {
+                this.game.settings.showDefenseOverlay = !this.game.settings.showDefenseOverlay;
+                this.game.notifications.push({ text: `Defense overlay ${this.game.settings.showDefenseOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+            },
+            toggleRoomOverlay: () => {
+                this.game.settings.showRoomOverlay = !this.game.settings.showRoomOverlay;
+                this.game.notifications.push({ text: `Room quality overlay ${this.game.settings.showRoomOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+            },
+            toggleAuraOverlay: () => {
+                this.game.settings.showAuraOverlay = !this.game.settings.showAuraOverlay;
+                this.game.notifications.push({ text: `Aura overlay ${this.game.settings.showAuraOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+            },
 
             pause: (e) => { e.preventDefault(); this.game.togglePause(); },
             speedUp: () => this.game.speedUp(),

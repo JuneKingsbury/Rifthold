@@ -475,7 +475,8 @@ export class Renderer {
                     const showEq = game.settings.showEquipmentOverlays;
                     const isSleeping = c.state === 'sleeping';
                     const sleepingInBed = isSleeping && c.assignedBed && c.x === c.assignedBed.x && c.y === c.assignedBed.y;
-                    const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, entityId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, clothesKey: showEq ? ((!c.armor && c.clothes) ? c.clothes.key : null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
+                    const isFreezing = !c.golem && c.thoughts && c.thoughts.some(t => t.text === 'Freezing outside');
+                    const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, entityId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, freezing: isFreezing, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, armorKey: showEq ? (c.armor?.key || null) : null, helmetKey: showEq ? (c.helmet?.key || null) : null, clothesKey: showEq ? ((!c.armor && c.clothes) ? c.clothes.key : null) : null, weaponKey: showEq ? (c.weapon?.key || null) : null, toolKey: showEq ? (c.tool?.key || null) : null };
                     if (isEntityMoving(c)) {
                         movingEntities.push({ entity: c, ...entData });
                     } else {
@@ -686,6 +687,14 @@ export class Renderer {
                                 lastColor = '';
                             }
                         }
+                        // Freeze tint: persistent cyan overlay while colonist has the freezing thought
+                        if (showOverlays && entity && entity.freezing) {
+                            ctx.globalAlpha = 0.35;
+                            ctx.fillStyle = '#88ddff';
+                            ctx.fillRect(px, py, cw, ch);
+                            ctx.globalAlpha = 1.0;
+                            lastColor = '';
+                        }
                         // If we are actively shaking after an attack begins, draw the attack_swing overlay effect.
                         if (entity && shakeActive) {
                             const swingSprite = sm.getSprite('effects', 'attack_swing');
@@ -874,6 +883,12 @@ export class Renderer {
                         ctx.fillRect(rpx, rpy, cw, ch);
                         ctx.globalAlpha = 1.0;
                     }
+                }
+                if (showOverlays && me.freezing) {
+                    ctx.globalAlpha = 0.35;
+                    ctx.fillStyle = '#88ddff';
+                    ctx.fillRect(rpx, rpy, cw, ch);
+                    ctx.globalAlpha = 1.0;
                 }
                 if (shakeActive) {
                     const swingSprite = sm.getSprite('effects', 'attack_swing');
@@ -1094,7 +1109,8 @@ export class Renderer {
     renderFps(fps) {
         const ctx = this.ctx;
         ctx.save();
-        ctx.font = 'bold 12px monospace';
+        const fpsFontSize = Math.round(12 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1));
+        ctx.font = `bold ${fpsFontSize}px monospace`;
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#ff3333';
         ctx.textAlign = 'left';

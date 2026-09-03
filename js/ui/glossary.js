@@ -178,7 +178,7 @@ export const GLOSSARY = [
                     ['Net Mana', 'Mana Crystals generate power while magical buildings consume it. If total consumption exceeds generation, all powered buildings shut off. Monitor the net mana display to stay in the positive.'],
                     ['Mana Crystals', 'Your primary power source. You start with a limited build cap that increases through research and rare consumables. Each crystal generates a base amount of mana for the grid.'],
                     ['Mana Relays', 'Reduce mana consumption of nearby buildings. Place relays in clusters of powered buildings to stretch your mana budget further. The reduction does not stack from multiple relays.'],
-                    ['Planning Your Grid', 'Balance generation versus consumption as you add powered buildings. Prioritize essential buildings (Ice Box, Ember Ward) and expand crystal capacity through research before adding luxury consumers.'],
+                    ['Planning Your Grid', 'Balance generation versus consumption as you add powered buildings. Prioritize essential buildings (Ice Box, Ember Heater) and expand crystal capacity through research before adding luxury consumers.'],
                 ]
             },
             {
@@ -217,7 +217,7 @@ export const GLOSSARY = [
                 entries: [
                     ['Raids', 'Hostile raiders attack your colony periodically. Raid strength scales with your colony\'s wealth and how long you\'ve been playing. Disabled in Peaceful Mode.'],
                     ['Guard Mode', 'Assign colonists to guard a position. They patrol nearby and automatically engage threats within a wider radius than normal, while still eating and sleeping when needed.'],
-                    ['Turrets & Wards', 'Arcane Sentinels and Void Turrets automatically attack enemies within range. Inferno Wards and Ember Wards damage or deter nearby hostiles. All defensive buildings consume mana from the grid.'],
+                    ['Turrets & Wards', 'Arcane Sentinels and Void Turrets automatically attack enemies within range. Inferno Wards and Ember Heaters damage or deter nearby hostiles. All defensive buildings consume mana from the grid.'],
                     ['Defensive Building', 'Use walls and doors to funnel enemies through chokepoints. Place turrets along the path they must take. Reinforce critical walls with higher-tier materials (Void Walls) for durability.'],
                     ['Peaceful Mode', 'A game setting that disables raids and hostile wildlife. The Void Nexus wave system still functions separately for players who want optional combat challenges.'],
                 ]
@@ -264,7 +264,7 @@ export const GLOSSARY = [
                     ['Spring', 'Moderate temperatures and normal crop growth. Wild animals appear more frequently. A good season for expanding farms and taming animals.'],
                     ['Summer', 'The hottest season with the fastest crop growth, but food also spoils faster. Risk of heat waves and fire events. Plan extra food storage.'],
                     ['Autumn', 'Cooling temperatures with slightly slower crop growth. Animal migrations commonly pass through, providing hunting opportunities.'],
-                    ['Winter', 'Cold temperatures halt most outdoor crop growth. Snow covers the ground. Colonists need warmth from Ember Wards, Inferno Wards, or indoor torches to avoid freezing.'],
+                    ['Winter', 'Cold temperatures halt most outdoor crop growth. Snow covers the ground. Colonists need warmth from Campfires, Ember Heaters, or Inferno Wards to avoid freezing. Freezing colonists will seek out nearby heat sources on their own. Press H to toggle the warmth overlay and see each source\'s coverage.'],
                     ['Weather Effects', 'Rain boosts crop growth and extinguishes fires. Thunderstorms can start fires via lightning. Blizzards halt all crop growth entirely. Weather varies by season.'],
                 ]
             },
@@ -303,6 +303,7 @@ export const GLOSSARY = [
                     ['Selection', 'Click to select a colonist, animal, or tile. Drag to box-select multiple. E selects all colonists. N jumps to next idle colonist.'],
                     ['Modes', 'B for Build mode, F for Farm Zone mode, G for Gather/Designate mode. X toggles deconstruct while in Build mode.'],
                     ['Panels', 'P (Priority), C (Craft), R (Research), I (Inventory), V (Arcane), J (Story). Esc closes any open panel.'],
+                    ['Overlays', 'H = Warmth (heat source radii). Y = Defense (turret and ward attack ranges). U = Room Quality (rooms colored by tier: blue = bare, green = mid, gold = best). K = Auras (mana relay discount zones, pedestal artifact radii, light source radii).'],
                     ['Combat Controls', 'Q drafts/undrafts selected colonists. Right-click moves drafted colonists. Number keys 1-9 cast the selected colonist\'s controllable spells.'],
                     ['Keybindings', 'All keys can be remapped in Settings under Controls / Keybindings.'],
                 ]

@@ -1,4 +1,4 @@
-import { CONFIG, RENDER_CONFIG } from '../core/config.js';
+import { CONFIG, RENDER_CONFIG, BUILDINGS, ALL_ITEMS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS } from '../core/config.js';
 
 export class OverlayRenderer {
     constructor(container) {
@@ -25,6 +25,7 @@ export class OverlayRenderer {
         const ctx = this.ctx;
         const cw = charWidth;
         const ch = charHeight;
+        this._uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (game.input && (game.input.mode === 'build' || game.input.mode === 'zone')) {
@@ -39,6 +40,19 @@ export class OverlayRenderer {
             this._renderWeatherParticles(ctx);
         } else if (this._weatherParticles.length > 0) {
             this._weatherParticles.length = 0;
+        }
+
+        if (game.settings.showWarmthOverlay) {
+            this._renderWarmthOverlay(ctx, game, cw, ch, camera);
+        }
+        if (game.settings.showDefenseOverlay) {
+            this._renderDefenseOverlay(ctx, game, cw, ch, camera);
+        }
+        if (game.settings.showRoomOverlay) {
+            this._renderRoomOverlay(ctx, game, cw, ch, camera);
+        }
+        if (game.settings.showAuraOverlay) {
+            this._renderAuraOverlay(ctx, game, cw, ch, camera);
         }
 
         if (game.radiusHighlight && game.selectedColonist) {
@@ -272,7 +286,7 @@ export class OverlayRenderer {
 
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.font = `bold ${overlay.fontSize || 12}px monospace`;
+        ctx.font = `bold ${Math.round((overlay.fontSize || 12) * (this._uiFontScale || 1))}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -295,7 +309,7 @@ export class OverlayRenderer {
         if (sx < -100 || sx > this.canvas.width + 100 || sy < -50 || sy > this.canvas.height + 50) return;
 
         const text = overlay.text || '...';
-        const fontSize = 11;
+        const fontSize = Math.round(11 * (this._uiFontScale || 1));
 
         ctx.save();
         ctx.globalAlpha = alpha;
@@ -327,6 +341,246 @@ export class OverlayRenderer {
         // Text
         ctx.fillStyle = overlay.color || '#ffffff';
         ctx.fillText(text, sx, sy);
+        ctx.restore();
+    }
+
+    _renderWarmthOverlay(ctx, game, cw, ch, camera) {
+        // Collect all active warmth sources: passive (campfire) and powered (ember_heater etc.)
+        const sources = [];
+        const isWinter = game.weather.season === 'winter';
+        const isPowered = game.power.hasPower();
+
+        const allStructures = game.mapIndex.getAllStructurePositions();
+        for (const { x, y, type } of allStructures) {
+            const bDef = BUILDINGS[type];
+            if (!bDef) continue;
+            // Non-powered warmth (campfire)
+            if (bDef.warmRadius) {
+                sources.push({ x, y, radius: bDef.warmRadius, passive: true });
+            }
+            // Powered warmth — only active when grid is powered; seasonal heaters only in winter
+            if (bDef.power?.warmRadius && isPowered) {
+                if (!bDef.power.seasonalHeat || isWinter) {
+                    sources.push({ x, y, radius: bDef.power.warmRadius, passive: false });
+                }
+            }
+        }
+
+        if (sources.length === 0) return;
+
+        ctx.save();
+        for (const src of sources) {
+            const r = src.radius;
+            // Outer glow fill — warm orange tint, fades toward edge
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    const dist = Math.abs(dx) + Math.abs(dy);
+                    if (dist > r) continue;
+                    const sx = (src.x + dx - camera.x) * cw;
+                    const sy = (src.y + dy - camera.y) * ch;
+                    if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) continue;
+                    const falloff = 1 - dist / (r + 1);
+                    ctx.globalAlpha = falloff * (src.passive ? 0.18 : 0.22);
+                    ctx.fillStyle = src.passive ? '#ff9933' : '#ff6622';
+                    ctx.fillRect(sx, sy, cw, ch);
+                }
+            }
+            // Border ring at the edge of the radius
+            ctx.globalAlpha = 0.55;
+            ctx.strokeStyle = src.passive ? '#ffaa44' : '#ff7733';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (Math.abs(dx) + Math.abs(dy) !== r) continue;
+                    const sx = (src.x + dx - camera.x) * cw;
+                    const sy = (src.y + dy - camera.y) * ch;
+                    if (Math.abs(dx) + Math.abs(dy + 1) > r) { ctx.moveTo(sx, sy + ch); ctx.lineTo(sx + cw, sy + ch); }
+                    if (Math.abs(dx) + Math.abs(dy - 1) > r) { ctx.moveTo(sx, sy); ctx.lineTo(sx + cw, sy); }
+                    if (Math.abs(dx + 1) + Math.abs(dy) > r) { ctx.moveTo(sx + cw, sy); ctx.lineTo(sx + cw, sy + ch); }
+                    if (Math.abs(dx - 1) + Math.abs(dy) > r) { ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + ch); }
+                }
+            }
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    // Shared helper: fills a Manhattan-diamond radius zone and draws its border.
+    // fillColor/borderColor are full CSS color strings (include alpha via rgba).
+    _drawRadiusZone(ctx, x, y, radius, fillAlpha, fillColor, borderColor, cw, ch, camera) {
+        ctx.fillStyle = fillColor;
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+                const sx = (x + dx - camera.x) * cw;
+                const sy = (y + dy - camera.y) * ch;
+                if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) continue;
+                ctx.globalAlpha = fillAlpha;
+                ctx.fillRect(sx, sy, cw, ch);
+            }
+        }
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+                const sx = (x + dx - camera.x) * cw;
+                const sy = (y + dy - camera.y) * ch;
+                if (Math.abs(dx) + Math.abs(dy + 1) > radius) { ctx.moveTo(sx, sy + ch); ctx.lineTo(sx + cw, sy + ch); }
+                if (Math.abs(dx) + Math.abs(dy - 1) > radius) { ctx.moveTo(sx, sy); ctx.lineTo(sx + cw, sy); }
+                if (Math.abs(dx + 1) + Math.abs(dy) > radius) { ctx.moveTo(sx + cw, sy); ctx.lineTo(sx + cw, sy + ch); }
+                if (Math.abs(dx - 1) + Math.abs(dy) > radius) { ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + ch); }
+            }
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
+
+    _renderDefenseOverlay(ctx, game, cw, ch, camera) {
+        if (!game.power.powered) return;
+        ctx.save();
+        // Arcane sentinels — red
+        for (const t of game.power.turrets) {
+            this._drawRadiusZone(ctx, t.x, t.y, t.radius, 0.12, '#ff4444', '#ff6666', cw, ch, camera);
+        }
+        // Void turrets — purple
+        for (const t of game.power.voidTurrets) {
+            this._drawRadiusZone(ctx, t.x, t.y, t.radius, 0.12, '#aa33ff', '#cc66ff', cw, ch, camera);
+        }
+        // Inferno wards — orange (damage zone, same as warmth radius)
+        for (const w of game.power.aoeWards) {
+            this._drawRadiusZone(ctx, w.x, w.y, w.radius, 0.12, '#ff6600', '#ff9933', cw, ch, camera);
+        }
+        ctx.restore();
+    }
+
+    _renderRoomOverlay(ctx, game, cw, ch, camera) {
+        // Tier → fill color maps. Index matches tier order (worst to best).
+        const bedroomColors  = ['#334466', '#2255aa', '#33aa66', '#aacc33', '#ffdd44'];
+        const townhallColors = ['#334466', '#2255aa', '#33aa66', '#ffdd44'];
+        const workshopColors = ['#334466', '#2255aa', '#33aa66', '#aacc33', '#ffdd44'];
+
+        const tileIndexOf = (tiers, tierKey) => tiers.findIndex(t => t.key === tierKey);
+
+        ctx.save();
+        const map = game.map;
+        const camX = camera.x, camY = camera.y;
+        const cWidth = this.canvas.width, cHeight = this.canvas.height;
+
+        for (let wy = camY; wy < camY + Math.ceil(cHeight / ch) + 1; wy++) {
+            const row = map[wy];
+            if (!row) continue;
+            for (let wx = camX; wx < camX + Math.ceil(cWidth / cw) + 1; wx++) {
+                const tile = row[wx];
+                if (!tile || tile.roomId == null) continue;
+                const px = (wx - camX) * cw;
+                const py = (wy - camY) * ch;
+
+                let color = null;
+                let tierIdx = 0;
+
+                const bq = game.roomQualities[tile.roomId];
+                const wq = game.workshopQualities[tile.roomId];
+                const thq = game.townHallQualities[tile.roomId];
+
+                if (bq) {
+                    tierIdx = tileIndexOf(ROOM_QUALITY_TIERS, bq.tier);
+                    color = bedroomColors[Math.max(0, tierIdx)];
+                } else if (wq) {
+                    tierIdx = tileIndexOf(WORKSHOP_QUALITY_TIERS, wq.tier);
+                    color = workshopColors[Math.max(0, tierIdx)];
+                } else if (thq) {
+                    tierIdx = tileIndexOf(TOWN_HALL_QUALITY_TIERS, thq.tier);
+                    color = townhallColors[Math.max(0, tierIdx)];
+                } else {
+                    // Enclosed room with no quality type — neutral tint
+                    color = '#444466';
+                }
+
+                ctx.globalAlpha = 0.35;
+                ctx.fillStyle = color;
+                ctx.fillRect(px, py, cw, ch);
+            }
+        }
+
+        // Room borders: draw edges where roomId changes or tile exits the room
+        ctx.globalAlpha = 0.7;
+        ctx.lineWidth = 1.5;
+        for (let wy = camY; wy < camY + Math.ceil(cHeight / ch) + 1; wy++) {
+            const row = map[wy];
+            if (!row) continue;
+            for (let wx = camX; wx < camX + Math.ceil(cWidth / cw) + 1; wx++) {
+                const tile = row[wx];
+                if (!tile || tile.roomId == null) continue;
+                const px = (wx - camX) * cw;
+                const py = (wy - camY) * ch;
+                const id = tile.roomId;
+
+                const bq = game.roomQualities[id];
+                const wq = game.workshopQualities[id];
+                const thq = game.townHallQualities[id];
+                let tierIdx = 0;
+                let colors = bedroomColors;
+                if (bq) { tierIdx = tileIndexOf(ROOM_QUALITY_TIERS, bq.tier); colors = bedroomColors; }
+                else if (wq) { tierIdx = tileIndexOf(WORKSHOP_QUALITY_TIERS, wq.tier); colors = workshopColors; }
+                else if (thq) { tierIdx = tileIndexOf(TOWN_HALL_QUALITY_TIERS, thq.tier); colors = townhallColors; }
+                ctx.strokeStyle = colors[Math.max(0, tierIdx)] || '#888899';
+
+                const neighborId = (dx, dy) => {
+                    const nr = map[wy + dy]; if (!nr) return null;
+                    const nt = nr[wx + dx]; return nt ? nt.roomId : null;
+                };
+                ctx.beginPath();
+                if (neighborId(0, -1) !== id) { ctx.moveTo(px, py); ctx.lineTo(px + cw, py); }
+                if (neighborId(0,  1) !== id) { ctx.moveTo(px, py + ch); ctx.lineTo(px + cw, py + ch); }
+                if (neighborId(-1, 0) !== id) { ctx.moveTo(px, py); ctx.lineTo(px, py + ch); }
+                if (neighborId( 1, 0) !== id) { ctx.moveTo(px + cw, py); ctx.lineTo(px + cw, py + ch); }
+                ctx.stroke();
+            }
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    _renderAuraOverlay(ctx, game, cw, ch, camera) {
+        ctx.save();
+        const isPowered = game.power.hasPower();
+
+        // Mana relay discount zones — purple
+        for (const r of game.power.relays) {
+            this._drawRadiusZone(ctx, r.x, r.y, r.radius, 0.12, '#9966ff', '#bb88ff', cw, ch, camera);
+        }
+
+        // Light radius buildings (candle, glowstone, beacon, campfire light) — yellow
+        // Only show buildings that have lightRadius but NOT warmRadius (campfire already on warmth overlay)
+        // and NOT power.damage (defense overlay). Use passiveLamps + powered lamps when grid is on.
+        const lightSources = [...game.power.passiveLamps];
+        if (isPowered) lightSources.push(...game.power.poweredLamps);
+        for (const l of lightSources) {
+            this._drawRadiusZone(ctx, l.x, l.y, l.radius, 0.10, '#ffee44', '#ffdd55', cw, ch, camera);
+        }
+
+        // Artifact pedestals with finite radius — gold
+        const allStructures = game.mapIndex.getAllStructurePositions();
+        for (const { x, y, type } of allStructures) {
+            if (type !== 'artifact_pedestal') continue;
+            const tile = game.map[y]?.[x];
+            if (!tile?.pedestalArtifact) continue;
+            const artDef = ALL_ITEMS[tile.pedestalArtifact];
+            if (!artDef?.pedestal?.radius || artDef.pedestal.radius === 'global') continue;
+            this._drawRadiusZone(ctx, x, y, artDef.pedestal.radius, 0.14, '#ccaa44', '#eedd66', cw, ch, camera);
+        }
+
+        // Colonist-carried trinket pedestals (moving aura sources) — gold, slightly brighter
+        for (const c of game.colonists) {
+            if (!c.trinket?.pedestal?.radius || c.trinket.pedestal.radius === 'global') continue;
+            this._drawRadiusZone(ctx, c.x, c.y, c.trinket.pedestal.radius, 0.14, '#ddbb44', '#ffee77', cw, ch, camera);
+        }
+
         ctx.restore();
     }
 

@@ -60,7 +60,7 @@ class Game {
             autoPauseEvent: true,
             pauseOnDeath: false,
             pauseOnResearch: true,
-            uiFontSize: 12,
+            uiFontScale: 1,
             autoCookTarget: 0,
             showOverlays: true,
             showNightLighting: true,
@@ -85,6 +85,10 @@ class Game {
             showProgressBars: true,
             showPortalPath: true,
             showBreathing: true,
+            showWarmthOverlay: false,
+            showDefenseOverlay: false,
+            showRoomOverlay: false,
+            showAuraOverlay: false,
             craftTargets: {},
             layoutMode: 'auto',
             musicVolume: 50,
@@ -253,8 +257,10 @@ class Game {
         requestAnimationFrame(() => resetMinimapSize());
 
         this.skinManager.init().then(() => {
-            if (this.settings.activeSkin !== 'ascii') {
-                this.skinManager.switchSkin(this.settings.activeSkin);
+            if (this.settings.activeSkin !== 'ascii' && this.skinManager.activeSkin !== this.settings.activeSkin) {
+                this.skinManager.switchSkin(this.settings.activeSkin).then(() => {
+                    this.ui.forceStatusBarRefresh();
+                });
             }
             this.ui.populateSkinDropdown();
         });
@@ -279,7 +285,10 @@ class Game {
         this.settings.activeSkin = skinName;
         localStorage.setItem('convocation_skin', skinName);
         this.renderer._ditherCache.clear();
-        if (this.ui) this.ui._buildingSpriteCache = null;
+        if (this.ui) {
+            this.ui._buildingSpriteCache = null;
+            this.ui.forceStatusBarRefresh();
+        }
     }
 
     setLayoutMode(mode) {
@@ -1896,7 +1905,7 @@ class Game {
         const craftTargets = this.settings.craftTargets || {};
         Object.assign(this.settings, {
             autoPauseHostile: true, autoPauseEvent: true, pauseOnDeath: false, pauseOnResearch: true,
-            uiFontSize: 12, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
+            uiFontScale: 1, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
             showWeatherParticles: true, showColonistNames: 'selected', showMinimap: true, showFps: false,
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
             largeClickTargets: false, pauseOnFocusLoss: true, enableScreenShake: true, colorblindMode: 'none',
@@ -1909,7 +1918,7 @@ class Game {
         this.settings.craftTargets = craftTargets;
         this.saveSettingsToStorage();
         // Re-apply live effects that have side effects beyond the settings object.
-        window.setUIFontSize?.(12);
+        window.setUIFontScale?.(1);
         if (window.soundManager) { window.soundManager.setMusicVolume(50); window.soundManager.setSFXVolume(50); }
         document.getElementById('game')?.classList.toggle('paused', this.paused && this.settings.darkenOnPause);
         document.getElementById('game-container')?.classList.toggle('large-targets', false);
@@ -1951,6 +1960,8 @@ class Game {
             if (this.settings.layoutMode && this.settings.layoutMode !== 'auto') {
                 this.setLayoutMode(this.settings.layoutMode);
             }
+            if (this.settings.uiFontScale != null) window.setUIFontScale?.(this.settings.uiFontScale);
+            else if (this.settings.uiFontSize != null) window.setUIFontScale?.(this.settings.uiFontSize / 12);
         }
     }
 
@@ -2246,14 +2257,23 @@ function resetMinimapSize() {
 
 window.resetMinimapSize = resetMinimapSize;
 
-function setUIFontSize(size) {
-    document.documentElement.style.setProperty('--ui-font-size', size + 'px');
+function setUIFontScale(scale) {
+    scale = parseFloat(scale) || 1;
+    document.documentElement.style.setProperty('--ui-font-scale', scale);
     const label = document.getElementById('ui-font-size-val');
-    if (label) label.textContent = size + 'px';
+    if (label) label.textContent = _fontScaleLabel(scale);
     window.resetMinimapSize?.();
 }
 
-window.setUIFontSize = setUIFontSize;
+function _fontScaleLabel(scale) {
+    scale = parseFloat(scale);
+    if (scale <= 0.8) return 'Small';
+    if (scale >= 1.2) return 'Large';
+    return 'Medium';
+}
+
+window.setUIFontScale = setUIFontScale;
+window.setUIFontSize = scale => setUIFontScale(scale);
 
 function initFooterTabs() {
     const footer = document.getElementById('game-footer');
@@ -3394,7 +3414,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.musicVolume = parseInt(document.getElementById('start-music-vol').value);
             s.sfxVolume = parseInt(document.getElementById('start-sfx-vol').value);
             s.showColonistNames = document.getElementById('start-names').value;
-            s.uiFontSize = parseInt(document.getElementById('start-ui-font-size').value) || 12;
+            s.uiFontScale = parseFloat(document.getElementById('start-ui-font-size').value) || 1;
             localStorage.setItem('colony_settings', JSON.stringify(s));
             if (SoundManager) {
                 SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
@@ -3451,7 +3471,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.musicVolume != null) { document.getElementById('start-music-vol').value = s.musicVolume; document.getElementById('start-music-vol-val').textContent = s.musicVolume; }
             if (s.sfxVolume != null) { document.getElementById('start-sfx-vol').value = s.sfxVolume; document.getElementById('start-sfx-vol-val').textContent = s.sfxVolume; }
             if (s.showColonistNames != null) document.getElementById('start-names').value = s.showColonistNames;
-            if (s.uiFontSize != null) { document.getElementById('start-ui-font-size').value = s.uiFontSize; document.getElementById('start-ui-font-val').textContent = s.uiFontSize + 'px'; }
+            if (s.uiFontScale != null) { document.getElementById('start-ui-font-size').value = s.uiFontScale; document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(s.uiFontScale); }
+            else if (s.uiFontSize != null) { const sc = s.uiFontSize / 12; document.getElementById('start-ui-font-size').value = sc; document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(sc); }
             if (SoundManager) {
                 SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
                 SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
@@ -3510,8 +3531,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('start-reset-defaults').addEventListener('click', () => {
         document.getElementById('start-skin').value = 'ascii';
         document.getElementById('start-names').value = 'selected';
-        document.getElementById('start-ui-font-size').value = 12;
-        document.getElementById('start-ui-font-val').textContent = '12px';
+        document.getElementById('start-ui-font-size').value = 1;
+        document.getElementById('start-ui-font-val').textContent = 'Medium';
         document.getElementById('start-autopause-hostile').checked = true;
         document.getElementById('start-autopause-event').checked = true;
         document.getElementById('start-pause-death').checked = true;
@@ -3634,7 +3655,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ditherDistance: document.getElementById('start-dither-dist').value,
             ditherQuality: document.getElementById('start-dither-qual').value,
             showColonistNames: document.getElementById('start-names').value,
-            uiFontSize: parseInt(document.getElementById('start-ui-font-size').value) || 12,
+            uiFontScale: parseFloat(document.getElementById('start-ui-font-size').value) || 1,
             activeSkin: document.getElementById('start-skin').value || '16x16_tiny_world',
             demoMode: document.getElementById('start-demo-mode').checked,
             darkenOnPause: document.getElementById('start-darken-pause').checked,
@@ -3648,7 +3669,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sfxVolume: parseInt(document.getElementById('start-sfx-vol').value),// || 50,
             temperatureUnit: document.getElementById('start-temp-unit').value || 'F',
         };
-        setUIFontSize(startSettings.uiFontSize);
+        setUIFontScale(startSettings.uiFontScale || 1);
         localStorage.setItem('convocation_skin', startSettings.activeSkin);
         RENDER_CONFIG.terrainDithering = document.getElementById('start-dither-dist').value !== 'none';
         const customDefs = readCustomColonistDefs();

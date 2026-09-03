@@ -46,7 +46,7 @@
         </div>
         <p style="font-size:12px; color:#999;">
             <b><u>Controls</u></b><br>
-            [WASD]/[Arrows]=Pan | [B]=Build | [F]=Farm | [G]=Gather | [P]=Priorities | [C]=Craft | [R]=Research | [I]=Inventory | [V]=Rifts | [J]=Story | [Esc]=Settings | [Tab]=Toggle Chop/Mine | [Space]=Pause | [,/&lt;]/[./&gt;]=Speed | [+]/[-]/[Wheel]=Zoom | [/]=Reset Minimap | [Q]=Draft/Undraft | [E]=Select All | [N]=Next Idle | [<b>[</b>]/[<b>]</b>]=Cycle Colonist | [Click]=Select/Place | [Click+Drag]=Area select | [Middle-drag]=Pan | [Right-click]=Cancel/Mark for Destruction | [Esc]=Close/Cancel<br>
+            [WASD]/[Arrows]=Pan | [B]=Build | [F]=Farm | [G]=Gather | [P]=Priorities | [C]=Craft | [R]=Research | [I]=Inventory | [V]=Rifts | [J]=Story | [H]=Warmth Overlay | [Y]=Defense Overlay | [U]=Room Quality Overlay | [K]=Aura Overlay | [Esc]=Settings | [Tab]=Toggle Chop/Mine | [Space]=Pause | [,/&lt;]/[./&gt;]=Speed | [+]/[-]/[Wheel]=Zoom | [/]=Reset Minimap | [Q]=Draft/Undraft | [E]=Select All | [N]=Next Idle | [<b>[</b>]/[<b>]</b>]=Cycle Colonist | [Click]=Select/Place | [Click+Drag]=Area select | [Middle-drag]=Pan | [Right-click]=Cancel/Mark for Destruction | [Esc]=Close/Cancel<br>
             Keys can be remapped in Settings &rarr; Controls / Keybindings.
         </p>
         <div id="version-label" style="color:#999;"></div>
@@ -57,10 +57,10 @@
                 <div style="color:#ffcc00; font-weight:bold;">Game Settings</div>
             </div>
             <div class="settings-tabs" style="display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid #444;">
-                <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">General</button>
-                <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Graphics</button>
-                <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Controls</button>
-                <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:12px;">Dev Tools</button>
+                <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">General</button>
+                <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Graphics</button>
+                <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Controls</button>
+                <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Dev Tools</button>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">
                 <div class="settings-section-title">Visual</div>
@@ -79,8 +79,8 @@
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label for="start-ui-font-size">UI Font Size: <span id="start-ui-font-val">12px</span></label>
-                    <input type="range" id="start-ui-font-size" min="8" max="20" value="12" style="width:80px" oninput="document.getElementById('start-ui-font-val').textContent=this.value+'px'">
+                    <label for="start-ui-font-size">UI Font Size: <span id="start-ui-font-val">Medium</span></label>
+                    <input type="range" id="start-ui-font-size" min="0.75" max="1.4" step="0.05" value="1" style="width:80px" oninput="document.getElementById('start-ui-font-val').textContent=this.value<=0.8?'Small':this.value>=1.2?'Large':'Medium'">
                 </div>
                 <div class="settings-row">
                     <label for="start-temp-unit">Temperature unit:</label>

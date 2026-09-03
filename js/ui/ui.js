@@ -446,6 +446,11 @@ export class UI {
         }
     }
 
+    forceStatusBarRefresh() {
+        this._lastStatusTick = -1;
+        this.updateStatusBar();
+    }
+
     updateStatusBar() {
         const tickChanged = this.game.tick !== this._lastStatusTick || this._lastStatusPaused !== this.game.paused || this._lastStatusSpeed !== this.game.speed;
         if (!tickChanged) {
@@ -1891,7 +1896,7 @@ export class UI {
         for (const c of colonists) {
             const moodLevel = getMoodLabel(c.mood);
             html += `<div style="border-top:1px solid #333;margin-top:4px;padding-top:4px;">`;
-            html += `<span class="info-header" style="font-size:12px;cursor:pointer;color:${c.nameColor || '#ffff00'}" onclick="window.game.selectColonistById(${c.id})">${c.name}</span>`;
+            html += `<span class="info-header" style="cursor:pointer;color:${c.nameColor || '#ffff00'}" onclick="window.game.selectColonistById(${c.id})">${c.name}</span>`;
             html += ` <span class="mood-${moodLevel}">${c.mood.toFixed(0)}</span>`;
             html += ` <span style="color:#888">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${c.golem ? ' [Golem]' : ''}</span>`;
             html += `<div class="info-row">HP:${Math.round(c.hp)} H:${c.needs.hunger.toFixed(0)} R:${c.needs.rest.toFixed(0)}</div>`;
@@ -2639,7 +2644,7 @@ export class UI {
         html += `<div class="settings-tabs" style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #444;">`;
         for (const [key, label] of tabs) {
             const active = tab === key;
-            html += `<button onclick="window.game.ui._setSettingsTab('${key}')" class="settings-tab-btn${active ? ' active' : ''}" style="flex:1;padding:5px 8px;background:${active ? '#2a2a4e' : '#16162a'};color:${active ? '#ffcc00' : '#999'};border:1px solid #444;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-family:inherit;font-size:12px;">${label}</button>`;
+            html += `<button onclick="window.game.ui._setSettingsTab('${key}')" class="settings-tab-btn${active ? ' active' : ''}" style="flex:1;padding:5px 8px;background:${active ? '#2a2a4e' : '#16162a'};color:${active ? '#ffcc00' : '#999'};border:1px solid #444;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-family:inherit;font-size:inherit;">${label}</button>`;
         }
         html += `</div>`;
 
@@ -2672,10 +2677,11 @@ export class UI {
             graphics += `<option value="${val}" ${s.showColonistNames === val ? 'selected' : ''}>${val.charAt(0).toUpperCase() + val.slice(1)}</option>`;
         }
         graphics += `</select></div>`;
-        const uiSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-size')) || 12;
+        const uiScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1;
+        const uiScaleLabel = uiScale <= 0.8 ? 'Small' : uiScale >= 1.2 ? 'Large' : 'Medium';
         graphics += `<div class="settings-row">`;
-        graphics += `<label for="set-ui-font-size">UI Font Size: <span id="ui-font-size-val">${uiSize}px</span></label>`;
-        graphics += `<input type="range" id="set-ui-font-size" min="8" max="20" value="${uiSize}" style="width:80px" oninput="document.getElementById('ui-font-size-val').textContent=this.value+'px';window.setUIFontSize(this.value)">`;
+        graphics += `<label for="set-ui-font-size">UI Font Size: <span id="ui-font-size-val">${uiScaleLabel}</span></label>`;
+        graphics += `<input type="range" id="set-ui-font-size" min="0.75" max="1.4" step="0.05" value="${uiScale}" style="width:80px" oninput="const lbl=this.value<=0.8?'Small':this.value>=1.2?'Large':'Medium';document.getElementById('ui-font-size-val').textContent=lbl;window.setUIFontScale(this.value);window.game.settings.uiFontScale=parseFloat(this.value);window.game.saveSettingsToStorage()">`;
         graphics += `</div>`;
         graphics += `<div class="settings-row"><label for="set-temp-unit">Temperature unit:</label><select id="set-temp-unit" onchange="window.game.settings.temperatureUnit=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['F','Fahrenheit (°F)'],['C','Celsius (°C)']]) {
