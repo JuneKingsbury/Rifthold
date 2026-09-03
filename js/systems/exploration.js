@@ -1202,7 +1202,7 @@ export class ExplorationSystem {
             const dim = REALMS[exp.realm];
             const approachMsg = dim.boss?.approachText || `A powerful foe blocks the path: ${bossEnemy.name}!`;
             this._addLog(exp, game, approachMsg, 'danger');
-            this._updateBestiary(exp, 'boss', bossEnemy.name, { name: bossEnemy.name, sprite: bossEnemy.sprite || dim.boss?.sprite, color: bossEnemy.color || dim.boss?.color });
+            this._updateBestiary(exp, 'boss', bossEnemy.name, { name: bossEnemy.name, sprite: bossEnemy.sprite || dim.boss?.sprite, color: bossEnemy.color || dim.boss?.color, lore: dim.boss?.lore || '' });
 
             if (encounter.bossPhases) {
                 exp.bossPhaseData = {

@@ -152,6 +152,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Crystal Colossus',
+            lore: '',
             approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
             defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
             guaranteedLoot: [
@@ -320,6 +321,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Ancient Treant',
+            lore: '',
             approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
             defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
             guaranteedLoot: [
@@ -502,6 +504,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Arcane Construct',
+            lore: '',
             approachText: 'A half-finished golem lurches to life, crackling with unstable magic!',
             defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
             guaranteedLoot: [
@@ -674,6 +677,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Void Sovereign',
+            lore: '',
             approachText: 'A being of pure void materializes, its gaze alone warping the air!',
             defeatText: 'The Void Sovereign collapses into nothingness, leaving only silence!',
             guaranteedLoot: [
@@ -817,6 +821,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The High King',
+            lore: '',
             approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
             defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
             guaranteedLoot: [
