@@ -1084,7 +1084,7 @@ const arcaneMethods = {
         const facing = opts.facing;
         const swayAngle = opts.swayAngle || 0;      // pre-computed walk sway (already gated)
         const speed = opts.speed || 0;              // 0..1 travel intensity
-        const out = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1, alpha: 1, projectile: null };
+        const out = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1, alpha: 1, projectile: null, meleeFx: null };
         const extras = !!opts.extras;   // showExpeditionExtras — the 14 new effects
         const swing = !!opts.swing;     // showAttackSwing — attack motion (pre-existing)
         const alive = ent.hp == null || ent.hp > 0;
@@ -1172,9 +1172,21 @@ const arcaneMethods = {
                         // of forward tilt sells the lunge without a full rotation.
                         out.dx += arc * R.attackStabThrustPx * facing;
                         out.rot += 0.08 * facing * arc;
+                        // Release a stab effect flying toward the foe at the thrust peak
+                        // (~45% through), fire-once per attack like the ranged projectile.
+                        if (t >= 0.45 && (ent._anim.meleeFxSeen !== ent._lastAttackTick)) {
+                            ent._anim.meleeFxSeen = ent._lastAttackTick;
+                            out.meleeFx = 'stab';
+                        }
                     } else {
                         // 'Swing': rotation lunge toward the foe.
                         out.rot += R.attackSwingAmplitudeRad * facing * arc;
+                        // Release a slash effect flying toward the foe at the swing peak
+                        // (~45% through), fire-once per attack like the ranged projectile.
+                        if (t >= 0.45 && (ent._anim.meleeFxSeen !== ent._lastAttackTick)) {
+                            ent._anim.meleeFxSeen = ent._lastAttackTick;
+                            out.meleeFx = 'swing';
+                        }
                     }
                     break;
                 }
@@ -1244,9 +1256,23 @@ const arcaneMethods = {
     _spawnExpedProjectile(kind, fx, fy, tx, ty, weapon) {
         const char = (weapon && weapon.projectileChar) || (kind === 'wand' ? '·' : '-');
         const color = (weapon && weapon.projectileColor) || (kind === 'wand' ? '#aaccff' : '#ffaa33');
+        // Weapons carry a `skinKey` (e.g. projectile_arrow/bolt/spell/void) resolved
+        // as an `effects` sprite; the render aims it toward the target when the art
+        // exists, else falls back to the char/color streak.
+        const skinKey = (weapon && weapon.skinKey) || null;
         this._expVisState.effects.push({
-            type: 'projectile', kind, char, color,
+            type: 'projectile', kind, char, color, skinKey,
             x: fx, y: fy, tx, ty, frame: 0, maxFrames: 12,
+        });
+    },
+
+    // Queue a melee basic-attack effect flying (fx,fy)->(tx,ty), mirroring the ranged
+    // projectile but short and quick. `kind` is 'stab' or 'swing'; it aims the sprite
+    // (attack_stab / attack_swing) toward the target the way projectiles are aimed.
+    _spawnExpedMelee(kind, fx, fy, tx, ty) {
+        this._expVisState.effects.push({
+            type: 'melee_fx', kind,
+            x: fx, y: fy, tx, ty, frame: 0, maxFrames: 8,
         });
     },
 
@@ -1788,6 +1814,9 @@ const arcaneMethods = {
                 if (anim.projectile) {
                     this._spawnExpedProjectile(anim.projectile, px + 8, py + bounceY, partyX + 90, H / 2 - 5 + Math.random() * 12, p.weapon);
                 }
+                if (anim.meleeFx) {
+                    this._spawnExpedMelee(anim.meleeFx, px + 8, py + bounceY, partyX + 70, H / 2 - 5 + Math.random() * 12);
+                }
                 if (sprite) {
                     this._drawEntityWithAnim(ctx, sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow, px, py + bounceY + 16, anim);
                 } else {
@@ -1911,6 +1940,9 @@ const arcaneMethods = {
             if (sumAnim.projectile) {
                 this._spawnExpedProjectile(sumAnim.projectile, sx + 8, sy, partyX + 90, H / 2 - 5 + Math.random() * 12, summon);
             }
+            if (sumAnim.meleeFx) {
+                this._spawnExpedMelee(sumAnim.meleeFx, sx + 8, sy, partyX + 70, H / 2 - 5 + Math.random() * 12);
+            }
             if (useSkins) {
                 const sumSprite = skinMgr.getSprite('entities', summon.type);
                 if (sumSprite) {
@@ -1969,6 +2001,9 @@ const arcaneMethods = {
                 const enemyAnim = _animFor(enemy, -1, (enemy.isBoss ? 400 : 300) + i, 0);
                 if (enemyAnim.projectile) {
                     this._spawnExpedProjectile(enemyAnim.projectile, ex - 8, ey, partyX + 10, H / 2 - 5 + Math.random() * 12, enemy);
+                }
+                if (enemyAnim.meleeFx) {
+                    this._spawnExpedMelee(enemyAnim.meleeFx, ex - 8, ey, partyX + 30, H / 2 - 5 + Math.random() * 12);
                 }
                 if (enemy.isBoss) {
                     const bGrow = _breathe(400 + i) * _lowHpBreathMult(enemy);
@@ -2143,13 +2178,10 @@ const arcaneMethods = {
                         const dodgerPos = dodgerName ? _casterPos(dodgerName) : null;
                         const targetX = dodgerPos ? dodgerPos.x : (isPartyAttacking ? (partyX + 75 + Math.random() * 15) : (partyX + Math.random() * 15));
                         const targetY = dodgerPos ? dodgerPos.y : (H / 2 - 5 + Math.random() * 15);
-                        const slashDir = isPartyAttacking ? 1 : -1;
-                        const slashColor = isMiss ? '#888888' : (isPartyAttacking ? '#ffff44' : '#ff4444');
-                        this._expVisState.effects.push({
-                            type: 'slash', x: targetX, y: targetY,
-                            dir: slashDir, color: slashColor,
-                            frame: 0, maxFrames: isMiss ? 10 : 15,
-                        });
+                        // The old generic slash-at-target on every attack was removed in
+                        // favor of the weapon-driven traveling melee_fx / projectile
+                        // spawned from the attacker's animation. hit_flash + damage
+                        // numbers still land here at the target on a hit.
                         if (isHit) {
                             const dmgMatch = text.match(/for (\d+)/);
                             if (dmgMatch) {
@@ -2196,28 +2228,7 @@ const arcaneMethods = {
             }
             const alpha = 1 - eff.frame / eff.maxFrames;
             ctx.globalAlpha = alpha;
-            if (eff.type === 'slash') {
-                const slashSprite = useSkins ? skinMgr.getSprite('effects', 'slash') : null;
-                const d = eff.dir || 1;
-                if (slashSprite) {
-                    ctx.save();
-                    ctx.translate(eff.x, eff.y);
-                    if (d < 0) ctx.scale(-1, 1);
-                    ctx.drawImage(slashSprite, -8, -8, 16, 16);
-                    ctx.restore();
-                } else {
-                    ctx.strokeStyle = eff.color || '#ffff44';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(eff.x - 6 * d, eff.y - 6);
-                    ctx.lineTo(eff.x + 6 * d, eff.y + 2);
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.moveTo(eff.x - 4 * d, eff.y + 4);
-                    ctx.lineTo(eff.x + 4 * d, eff.y - 4);
-                    ctx.stroke();
-                }
-            } else if (eff.type === 'loot') {
+            if (eff.type === 'loot') {
                 const lootSprite = useSkins ? skinMgr.getSprite('effects', 'loot') : null;
                 // Arc the loot toward the party (tx/ty) with a parabolic hop when the
                 // extras feature is on; otherwise fall back to the old straight rise.
@@ -2249,18 +2260,57 @@ const arcaneMethods = {
                 const p = eff.frame / eff.maxFrames;
                 const cx = eff.x + (eff.tx - eff.x) * p;
                 const cy = eff.y + (eff.ty - eff.y) * p;
-                const ch = eff.char || '-';
                 ctx.globalAlpha = 1;
-                ctx.fillStyle = eff.color || '#ffaa33';
-                ctx.font = 'bold 14px monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                if (eff.kind === 'wand') {
-                    ctx.globalAlpha = 0.4;
-                    ctx.fillText(ch, cx - (eff.tx - eff.x) * 0.04, cy - (eff.ty - eff.y) * 0.04);
-                    ctx.globalAlpha = 1;
+                // Prefer the weapon's projectile sprite (aimed at the target like the
+                // in-world renderer); fall back to the char/color streak when absent.
+                const projSprite = (useSkins && eff.skinKey) ? skinMgr.getSprite('effects', eff.skinKey) : null;
+                if (projSprite) {
+                    const angle = Math.atan2(eff.ty - eff.y, eff.tx - eff.x);
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(angle);
+                    ctx.drawImage(projSprite, -12, -12, 24, 24);
+                    ctx.restore();
+                } else {
+                    const ch = eff.char || '-';
+                    ctx.fillStyle = eff.color || '#ffaa33';
+                    ctx.font = 'bold 14px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    if (eff.kind === 'wand') {
+                        ctx.globalAlpha = 0.4;
+                        ctx.fillText(ch, cx - (eff.tx - eff.x) * 0.04, cy - (eff.ty - eff.y) * 0.04);
+                        ctx.globalAlpha = 1;
+                    }
+                    ctx.fillText(ch, cx, cy);
                 }
-                ctx.fillText(ch, cx, cy);
+            } else if (eff.type === 'melee_fx') {
+                // A melee basic-attack effect flying from attacker toward target, the
+                // short-range cousin of the projectile. Aims the weapon-class sprite
+                // (attack_stab / attack_swing) at the target like a projectile; falls
+                // back to a quick slash stroke when the art is absent.
+                const p = eff.frame / eff.maxFrames;
+                const cx = eff.x + (eff.tx - eff.x) * p;
+                const cy = eff.y + (eff.ty - eff.y) * p;
+                const angle = Math.atan2(eff.ty - eff.y, eff.tx - eff.x);
+                const key = eff.kind === 'stab' ? 'attack_stab' : 'attack_swing';
+                const meleeSprite = useSkins ? skinMgr.getSprite('effects', key) : null;
+                if (meleeSprite) {
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate(angle);
+                    ctx.drawImage(meleeSprite, -12, -12, 24, 24);
+                    ctx.restore();
+                } else {
+                    // Sprite art points east (angle 0); the stroke is drawn along it.
+                    const d = eff.tx >= eff.x ? 1 : -1;
+                    ctx.strokeStyle = eff.kind === 'stab' ? '#ffffff' : '#ffff44';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 6 * d, cy - 6);
+                    ctx.lineTo(cx + 6 * d, cy + 2);
+                    ctx.stroke();
+                }
             } else if (eff.type === 'danger') {
                 const dangerSprite = useSkins ? skinMgr.getSprite('effects', 'danger') : null;
                 if (dangerSprite) {
