@@ -1,4 +1,5 @@
 import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
+import { spawnParticle } from '../ui/overlay-renderer.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture } from '../world/map.js';
@@ -796,6 +797,18 @@ export function grantCastXp(colonist, spell, game) {
         game.notifications.push({ text: `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}`, tick: game.tick, type: 'success' });
         game.eventLog.add(game, `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}!`, 'success', { type: 'colonist', id: colonist.id });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${MAGIC_SKILLS[school].name} lvl ${colonist.magicSkills[school]}`, color: '#aa66ff', fontSize: 11, ttl: 20, maxTtl: 20 });
+        // Level-up starburst particles
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            spawnParticle(game, {
+                x: colonist.x + 0.5, y: colonist.y + 0.5,
+                vx: Math.cos(angle) * 0.5, vy: Math.sin(angle) * 0.5,
+                decay: 0.04,
+                color: i % 2 === 0 ? '#aa66ff' : '#ffdd44',
+                size: 3,
+                alpha: 1,
+            });
+        }
         window.soundManager?.playSFX('magic_levelup');
         magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
     }
@@ -1944,35 +1957,44 @@ function updateWorking(colonist, game) {
 
 
 function updateEating(colonist, game) {
-    if (game.resources.stockpile.food > 0) {
-        game.resources.stockpile.food--;
-        colonist.needs.hunger = COLONIST_CONFIG.cookedFoodRestore;
-        colonist.state = 'idle';
-        let mealMood = colonist.traits.includes('gourmand')
-            ? TRAITS.gourmand.cookedFoodMoodBonus
-            : COLONIST_CONFIG.mealMoodBonus;
-        if (colonist.traits.includes('comfort_eater')) mealMood += TRAITS.comfort_eater.mealMoodBonus;
-        let mealDuration = COLONIST_CONFIG.mealMoodDuration;
-        if (colonist.traits.includes('chef')) mealDuration = Math.round(mealDuration * TRAITS.chef.mealMoodDurationMult);
-        addThought(colonist, colonist.traits.includes('gourmand') ? 'Delicious meal' : 'Ate a meal', mealMood, mealDuration, game.tick);
-    } else {
-        const eaten = eatRawFoodstuff(game);
-        if (eaten) {
-            colonist.needs.hunger = Math.min(100, colonist.needs.hunger + COLONIST_CONFIG.rawFoodRestore);
-            colonist.state = 'idle';
-            if (colonist.traits.includes('foraging_gut')) {
-                // No mood hit from raw food; still note the meal briefly.
-                addThought(colonist, 'Ate raw food', TRAITS.foraging_gut.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
-            } else if (colonist.traits.includes('gourmand')) {
-                addThought(colonist, 'Ate raw food', TRAITS.gourmand.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
-            } else {
-                const rawPenalty = getRaceModifier(colonist, 'rawFoodMoodPenalty', COLONIST_CONFIG.rawFoodMoodPenalty);
-                addThought(colonist, 'Ate raw food', rawPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
-            }
+    // On first tick: consume food immediately, then count down visible eating duration
+    if (!colonist._eatTicksLeft) {
+        if (game.resources.stockpile.food > 0) {
+            game.resources.stockpile.food--;
+            colonist.needs.hunger = COLONIST_CONFIG.cookedFoodRestore;
+            let mealMood = colonist.traits.includes('gourmand')
+                ? TRAITS.gourmand.cookedFoodMoodBonus
+                : COLONIST_CONFIG.mealMoodBonus;
+            if (colonist.traits.includes('comfort_eater')) mealMood += TRAITS.comfort_eater.mealMoodBonus;
+            let mealDuration = COLONIST_CONFIG.mealMoodDuration;
+            if (colonist.traits.includes('chef')) mealDuration = Math.round(mealDuration * TRAITS.chef.mealMoodDurationMult);
+            addThought(colonist, colonist.traits.includes('gourmand') ? 'Delicious meal' : 'Ate a meal', mealMood, mealDuration, game.tick);
+            colonist._eatTicksLeft = 30;  // ~½s at 60fps to show the animation
         } else {
-            colonist.state = 'idle';
-            addThought(colonist, 'Starving', COLONIST_CONFIG.starvingMoodPenalty, COLONIST_CONFIG.starvingMoodDuration, game.tick);
+            const eaten = eatRawFoodstuff(game);
+            if (eaten) {
+                colonist.needs.hunger = Math.min(100, colonist.needs.hunger + COLONIST_CONFIG.rawFoodRestore);
+                if (colonist.traits.includes('foraging_gut')) {
+                    addThought(colonist, 'Ate raw food', TRAITS.foraging_gut.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+                } else if (colonist.traits.includes('gourmand')) {
+                    addThought(colonist, 'Ate raw food', TRAITS.gourmand.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+                } else {
+                    const rawPenalty = getRaceModifier(colonist, 'rawFoodMoodPenalty', COLONIST_CONFIG.rawFoodMoodPenalty);
+                    addThought(colonist, 'Ate raw food', rawPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+                }
+                colonist._eatTicksLeft = 45;
+            } else {
+                colonist.state = 'idle';
+                addThought(colonist, 'Starving', COLONIST_CONFIG.starvingMoodPenalty, COLONIST_CONFIG.starvingMoodDuration, game.tick);
+            }
         }
+        return;
+    }
+    // Count down the visible eating duration
+    colonist._eatTicksLeft--;
+    if (colonist._eatTicksLeft <= 0) {
+        colonist._eatTicksLeft = 0;
+        colonist.state = 'idle';
     }
 }
 

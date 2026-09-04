@@ -145,6 +145,8 @@ class Game {
         this.divinationModifiers = [];
         this.activeComplexStructures = [];
         this.overlays = [];
+        this.worldParticles = [];
+        this.alertRipple = null;
         this.notifications = [];
         this.cursor = null;
         this.selectedColonist = null;
@@ -582,6 +584,16 @@ class Game {
                     type: 'progress_bar', x: c.x, y: c.y,
                     progress: c.workProgress, color: '#44cc44', bgColor: '#222222',
                 });
+            }
+            // Sleeping zzz overlay: staggered per colonist so they don't all show at once
+            if (c.hp > 0 && c.state === 'sleeping' && !c.onExpedition) {
+                const seed = c.id % 240;
+                if (this.tick % 240 === seed) {
+                    this.overlays.push({
+                        type: 'floating_text', x: c.x, y: c.y,
+                        text: 'z', color: '#8899cc', fontSize: 10, ttl: 30, maxTtl: 30,
+                    });
+                }
             }
         }
         if (prof) prof.mark('effect-expiry+progressbars');

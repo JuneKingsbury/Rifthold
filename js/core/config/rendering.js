@@ -97,6 +97,11 @@ export const RENDER_CONFIG = {
         waterAlphaBase: 0.75,     // mean overlay opacity
         waterAlphaVar: 0.2,       // +/- shimmer about the base
         waterPhaseSpread: 6.28,
+        // Crop/flower sway (farm zone tiles with a planted crop)
+        cropCalmPeriodMs: 3800,
+        cropStormPeriodMs: 1400,
+        cropCalmSwayRad: 0.03,
+        cropStormSwayRad: 0.10,
         // Submerged entities: instead of an `in_water` overlay on top, the lower
         // fraction of the sprite is clipped away so the entity looks partially under
         // water (the animated water waves drawn behind it show through the gap). The

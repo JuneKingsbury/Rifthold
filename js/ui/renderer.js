@@ -1,9 +1,9 @@
 import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES } from '../core/config.js';
 import { getTileVisuals } from '../world/map.js';
-import { OverlayRenderer } from './overlay-renderer.js';
+import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
 import { SkinManager } from './skin-manager.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
-import { getEntityTransform, getTreeSway, getGrassSway, getWaterWave, windStrengthFor } from './entity-animation.js';
+import { getEntityTransform, getTreeSway, getGrassSway, getCropSway, getWaterWave, windStrengthFor, setSwayWind } from './entity-animation.js';
 
 // The four cardinal neighbors checked per tile when dithering terrain edges.
 // Hoisted to module scope so it isn't reallocated per tile, per frame.
@@ -52,6 +52,15 @@ export class Renderer {
         this._ditherMasks = null;
         this._ditherTileSize = 0;
         this._ditherCache = new Map();
+
+        // Per-tile amplitude boost for disturbed grass (entity footstep wake)
+        this._grassBoost = new Map();
+        // Water ripples (rain impacts + footsteps)
+        this._waterRipples = [];
+        // Brief flash when an entity enters a structure tile (door effect)
+        this._doorFlash = new Map();
+        // Set of "wx,wy" keys for buildings with a colonist actively working in them
+        this._workingBuildingSet = new Set();
 
         this.measureFont(RENDER_CONFIG.fontSize);
     }
@@ -291,7 +300,13 @@ export class Renderer {
     _drawGrassTuft(ctx, now, tileKey, wind, px, py, cw, ch) {
         const tuft = this.skinManager.getSprite('effects', 'grass_tuft');
         if (!tuft) return false;
-        const rot = getGrassSway(now, tileKey, wind);
+        const boostEntry = this._grassBoost.get(tileKey);
+        let boostAdd = 0;
+        if (boostEntry) {
+            const t = Math.min((now - boostEntry.startTime) / boostEntry.duration, 1);
+            boostAdd = Math.sin(t * Math.PI) * boostEntry.amp;
+        }
+        const rot = getGrassSway(now, tileKey, wind, boostAdd);
         if (rot !== 0) {
             // Sway about the tuft base (bottom-center).
             const pivotX = px + cw / 2;
@@ -306,6 +321,61 @@ export class Renderer {
             ctx.drawImage(tuft, px, py, cw, ch);
         }
         return true;
+    }
+
+    // Draws animated crop sway on a farm zone tile.
+    _drawCropSway(ctx, now, tileKey, wind, px, py, cw, ch, sprite) {
+        const rot = getCropSway(now, tileKey, wind);
+        if (rot !== 0) {
+            const pivotX = px + cw / 2;
+            const pivotY = py + ch;
+            ctx.save();
+            ctx.translate(pivotX, pivotY);
+            ctx.rotate(rot);
+            ctx.translate(-pivotX, -pivotY);
+            ctx.drawImage(sprite, px, py, cw, ch);
+            ctx.restore();
+        } else {
+            ctx.drawImage(sprite, px, py, cw, ch);
+        }
+    }
+
+    // Draw all active water ripples (rain impacts + footsteps).
+    _drawWaterRipples(ctx, camera, cw, ch) {
+        if (this._waterRipples.length === 0) return;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(120, 180, 255, 0.5)';
+        ctx.lineWidth = 1;
+        for (let i = this._waterRipples.length - 1; i >= 0; i--) {
+            const r = this._waterRipples[i];
+            r.r += r.speed;
+            r.alpha -= r.decay;
+            if (r.alpha <= 0 || r.r > r.maxR) {
+                this._waterRipples[i] = this._waterRipples[this._waterRipples.length - 1];
+                this._waterRipples.length--;
+                continue;
+            }
+            const sx = (r.x - camera.x + 0.5) * cw;
+            const sy = (r.y - camera.y + 0.5) * ch;
+            ctx.globalAlpha = r.alpha;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, r.r, r.r * 0.4, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    _spawnWaterRipple(wx, wy, cw, maxRMult) {
+        this._waterRipples.push({
+            x: wx + (Math.random() - 0.5) * 0.6,
+            y: wy + (Math.random() - 0.5) * 0.3,
+            r: 1,
+            maxR: cw * (maxRMult || 0.8),
+            speed: cw * 0.025,
+            alpha: 0.6,
+            decay: 0.025,
+        });
     }
 
     // Draws the animated water-wave overlay (slow vertical bob + alpha shimmer) for
@@ -491,11 +561,10 @@ export class Renderer {
         // Tree sway: wind strength (0..1) from the active weather, resolved once
         // per frame. `showTreeSway` gates the whole effect.
         const showTreeSway = settings.showTreeSway && RENDER_CONFIG.treeSway && RENDER_CONFIG.treeSway.enabled;
-        const treeWind = showTreeSway ? windStrengthFor(weather.currentWeather) : 0;
-        // Animated terrain detail (grass tufts / water waves). Shares the tree wind
-        // for grass; water bobs on its own rhythm. Wind resolved once per frame.
         const showTerrainDetail = settings.showTerrainDetail && RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.enabled;
-        const detailWind = showTerrainDetail ? windStrengthFor(weather.currentWeather) : 0;
+        // treeWind and detailWind are set below after dt is available
+        let treeWind = 0;
+        let detailWind = 0;
         const sm = this.skinManager;
         const skinActive = sm.isActive;
         const atkShakePx = COMBAT_VISUALS.atkShakePx || 2;
@@ -534,6 +603,39 @@ export class Renderer {
             }
         }
 
+        // Compute delta time for per-frame decay effects (grass boost, door flash)
+        const nowMs = now;
+        const dt = this._lastFrameTime ? Math.min((nowMs - this._lastFrameTime) / 1000, 0.1) : 0.016;
+        this._lastFrameTime = nowMs;
+
+        // Notify sway phase continuity when wind changes so grass/crops don't jump
+        const rawWind = windStrengthFor(weather.currentWeather);
+        setSwayWind(rawWind, now, dt);
+        treeWind = showTreeSway ? rawWind : 0;
+        detailWind = showTerrainDetail ? rawWind : 0;
+
+        // Expire grass boost entries past their duration
+        for (const [key, entry] of this._grassBoost) {
+            if (now - entry.startTime >= entry.duration) this._grassBoost.delete(key);
+        }
+
+        // Decay door flash map
+        for (const [key, frames] of this._doorFlash) {
+            this._doorFlash.set(key, frames - 1);
+            if (frames <= 1) this._doorFlash.delete(key);
+        }
+
+        // Rebuild working building set from currently working colonists
+        this._workingBuildingSet.clear();
+        for (const c of game.colonists) {
+            if (c.hp > 0 && !c.onExpedition && c.state === 'working' && c.currentTaskId != null) {
+                const task = game.taskQueue.getById(c.currentTaskId);
+                if (task && task.x != null && task.y != null) {
+                    this._workingBuildingSet.add(`${task.x},${task.y}`);
+                }
+            }
+        }
+
         ctx.fillStyle = RENDER_CONFIG.bgColor;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -558,6 +660,8 @@ export class Renderer {
         const rallySet = this._rallySet;
         const portalMap = this._portalMap;
         const portalPathMap = this._portalPathMap;
+        if (!this._dyingEntities) this._dyingEntities = [];
+        const dyingEntities = this._dyingEntities;
 
         if (this._lastEntityMapKey === camKey) {
             // entityMap, rallySet, portalMap, etc. are still valid, skip all the rebuild loops.
@@ -565,7 +669,19 @@ export class Renderer {
             this._lastEntityMapKey = camKey;
 
             entityMap.clear();
-            
+            dyingEntities.length = 0;
+
+            // Collect recently-dead entities for death dissolve animation
+            const DEATH_DISSOLVE_MS = 600;
+            const allEntities = [...entities, ...(game.waves?.enemies || []), ...raiders, ...game.colonists.filter(c => !c.onExpedition)];
+            for (const e of allEntities) {
+                if (e.hp > 0) continue;
+                if (!e._dyingStart) e._dyingStart = now;
+                if (now - e._dyingStart < DEATH_DISSOLVE_MS) {
+                    dyingEntities.push(e);
+                }
+            }
+
             movingEntities.length = 0;
             for (const e of entities) {
                 if (e.hp <= 0) continue;
@@ -925,6 +1041,95 @@ export class Renderer {
                         if (entity && shakeActive) {
                             this._queueAttackEffect(entity._sim || entity, now, px, py, cw, ch);
                         }
+
+                        // Mining/chopping debris particles on work-bob downstroke
+                        if (entity && entity._sim && entity._sim.state === 'working') {
+                            const A2 = RENDER_CONFIG.entityActionAnim;
+                            if (A2) {
+                                const bobPeriod = A2.workBobPeriodMs || 700;
+                                const bobPhase = ((now / bobPeriod) * Math.PI * 2) % (Math.PI * 2);
+                                const prevBobPhase = (((now - 16) / bobPeriod) * Math.PI * 2) % (Math.PI * 2);
+                                const onDownstroke = prevBobPhase < Math.PI && bobPhase >= Math.PI;
+                                if (onDownstroke && Math.random() < 0.4) {
+                                    const sim2 = entity._sim;
+                                    const task2 = (game.taskQueue && sim2.currentTaskId != null) ? game.taskQueue.getById(sim2.currentTaskId) : null;
+                                    const taskType = task2 ? task2.type : null;
+                                    if (taskType === 'mine') {
+                                        for (let dp = 0; dp < 3; dp++) {
+                                            const angle2 = Math.PI * 1.5 + (Math.random() - 0.5) * 1.2;
+                                            spawnParticle(game, {
+                                                x: wx + 0.5, y: wy + 0.7,
+                                                vx: Math.cos(angle2) * (0.2 + Math.random() * 0.2),
+                                                vy: Math.sin(angle2) * (0.2 + Math.random() * 0.2) - 0.1,
+                                                ay: 0.4,
+                                                decay: 0.06,
+                                                color: Math.random() < 0.5 ? '#888888' : '#aaaaaa',
+                                                size: 1.5,
+                                                alpha: 0.85,
+                                            });
+                                        }
+                                    } else if (taskType === 'chop') {
+                                        for (let dp = 0; dp < 2; dp++) {
+                                            const angle2 = -Math.PI * 0.5 + (Math.random() - 0.5) * 1.5;
+                                            spawnParticle(game, {
+                                                x: wx + 0.5, y: wy + 0.4,
+                                                vx: Math.cos(angle2) * (0.25 + Math.random() * 0.2),
+                                                vy: Math.sin(angle2) * (0.2 + Math.random() * 0.15) - 0.15,
+                                                ay: 0.4,
+                                                decay: 0.05,
+                                                color: Math.random() < 0.5 ? '#8B5E3C' : '#c49a6c',
+                                                size: 2,
+                                                alpha: 0.9,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Status effect auras
+                        if (entity && entity._sim) {
+                            const sim = entity._sim;
+                            if (sim.activeEffects) {
+                                for (const eff of sim.activeEffects) {
+                                    if (eff.type === 'burning' || eff.source === 'fire') {
+                                        if (Math.random() < 0.08) {
+                                            spawnParticle(game, {
+                                                x: wx + 0.3 + Math.random() * 0.4,
+                                                y: wy + 0.1,
+                                                vx: (Math.random() - 0.5) * 0.15,
+                                                vy: -0.3 - Math.random() * 0.15,
+                                                decay: 0.05,
+                                                color: Math.random() < 0.5 ? '#ff6600' : '#ffaa00',
+                                                size: 2 + Math.random(),
+                                                alpha: 0.8,
+                                            });
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        // Eating crumb particles
+                        if (entity && entity._sim && entity._sim.state === 'eating') {
+                            if (Math.random() < 0.10) {
+                                const crumbColors = ['#c8a46e', '#e8c87a', '#b87040', '#d4905a', '#f0d090', '#a06828', '#d4b870'];
+                                spawnParticle(game, {
+                                    x: wx + 0.3 + Math.random() * 0.4,
+                                    y: wy + 0.35 + Math.random() * 0.15,
+                                    vx: (Math.random() - 0.5) * 0.3,
+                                    vy: -0.08 - Math.random() * 0.1,
+                                    ay: 0.5,
+                                    decay: 0.12,
+                                    color: crumbColors[Math.floor(Math.random() * crumbColors.length)],
+                                    size: 1.5 + Math.random() * 2.5,
+                                    alpha: 0.9,
+                                    shape: 'square',
+                                    maxY: wy + 1,
+                                });
+                            }
+                        }
+
                         // Optional per-school cast overlay (null art → skipped gracefully).
                         if (xf && xf.overlayKey) {
                             const overlaySprite = sm.getSprite('effects', xf.overlayKey);
@@ -963,6 +1168,111 @@ export class Renderer {
                         } else if (tile.terrain === 'water') {
                             if (this._drawWaterWaves(ctx, now, tileKey, px, py, cw, ch)) {
                                 spriteDrawn = true;
+                                // Spawn rain ripples on water tiles during rain/thunderstorm
+                                const rainChance = weather.currentWeather === 'thunderstorm' ? 0.04 : weather.currentWeather === 'rain' ? 0.02 : 0;
+                                if (rainChance > 0 && Math.random() < rainChance) {
+                                    this._spawnWaterRipple(wx, wy, cw, 0.8);
+                                }
+                            }
+                        }
+                    }
+
+                    // Snow shimmer: random bright flecks on blizzard snow-covered tiles
+                    if (!entity && tile.snowCovered && weather.currentWeather === 'blizzard' && Math.random() < 0.005) {
+                        ctx.save();
+                        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                        ctx.beginPath();
+                        ctx.arc(px + Math.random() * cw, py + Math.random() * ch, 1, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    // Crop sway: zone tiles with a planted crop sway in the wind
+                    if (tile.zone && tile.zone.crop && showTerrainDetail) {
+                        const cropState = tile.zone.state || 'empty';
+                        const cropSprite = this.skinManager.getSprite('farms', tile.zone.crop + '_' + cropState)
+                            || this.skinManager.getSprite('farms', 'farm_' + cropState);
+                        if (cropSprite && !entity) {
+                            this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw, ch, cropSprite);
+                        }
+                    }
+
+                    // Smoke emission from active buildings
+                    if (tile.structure && !entity) {
+                        const bDef = BUILDINGS[tile.structure];
+                        if (bDef && bDef.smokeEmitter && Math.random() < 0.05) {
+                            const windDrift = (detailWind - 0.5) * 0.3;
+                            spawnParticle(game, {
+                                x: wx + 0.5 + (Math.random() - 0.5) * 0.3,
+                                y: wy - 0.1,
+                                vx: windDrift / cw * 40,
+                                vy: -0.35 - Math.random() * 0.2,
+                                decay: 0.008 + Math.random() * 0.006,
+                                color: `rgba(${140 + Math.floor(Math.random()*40)},${140 + Math.floor(Math.random()*40)},${140 + Math.floor(Math.random()*40)},1)`,
+                                size: 3 + Math.random() * 2,
+                                alpha: 0.45,
+                            });
+                        }
+                    }
+
+                    // Falling leaves: trees in autumn with enough wind
+                    if (tile.resource && tile.resource.type === 'tree' && season === 'autumn'
+                        && detailWind > 0.3 && Math.random() < 0.003) {
+                        const leafColors = ['#cc7722', '#dd9922', '#bb5511', '#eeaa22'];
+                        spawnParticle(game, {
+                            x: wx + 0.3 + Math.random() * 0.4,
+                            y: wy + 0.3,
+                            vx: (detailWind * 0.4 - 0.1) + (Math.random() - 0.5) * 0.15,
+                            vy: 0.2 + Math.random() * 0.15,
+                            decay: 0.004,
+                            color: leafColors[Math.floor(Math.random() * leafColors.length)],
+                            size: 2,
+                            alpha: 0.85,
+                            wobble: 6 + Math.random() * 4,
+                        });
+                    }
+
+                    // Door flash: brief white overlay when an entity just entered a structure tile
+                    if (tile.structure) {
+                        const flashFrames = this._doorFlash.get(tileKey);
+                        if (flashFrames > 0) {
+                            ctx.globalAlpha = Math.min(0.4, flashFrames / 8 * 0.4);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(px, py, cw, ch);
+                            ctx.globalAlpha = 1;
+                        }
+
+                        // Working building pulse glow
+                        if (this._workingBuildingSet.has(`${wx},${wy}`)) {
+                            const bDef = BUILDINGS[tile.structure];
+                            const pulse = 0.6 + 0.4 * Math.sin(now * 0.004);
+                            const glowColor = bDef?.workGlowColor || (tile.structure.includes('forge') || tile.structure.includes('smelter') ? '#ff8833' : tile.structure.includes('lab') || tile.structure.includes('library') ? '#4488ff' : tile.structure.includes('kitchen') || tile.structure.includes('cook') ? '#ffcc22' : '#88ff88');
+                            const radius = cw * 0.9 * pulse;
+                            ctx.save();
+                            ctx.globalCompositeOperation = 'lighter';
+                            ctx.globalAlpha = 0.18 * pulse;
+                            const wcx = px + cw / 2;
+                            const wcy = py + ch / 2;
+                            const grd = ctx.createRadialGradient(wcx, wcy, 0, wcx, wcy, radius);
+                            grd.addColorStop(0, glowColor);
+                            grd.addColorStop(1, 'transparent');
+                            ctx.fillStyle = grd;
+                            ctx.beginPath();
+                            ctx.arc(wcx, wcy, radius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
+                        }
+
+                        // Construction shake: buildings being built wobble on hack-bob downstroke
+                        if (tile.designation && tile.designation.type === 'build') {
+                            const structSprite = this.skinManager.getSprite('buildings', tile.designation.buildType);
+                            if (structSprite) {
+                                const shakeAmt = 0.5;
+                                const shakeX = Math.sin(now * 0.05) * shakeAmt;
+                                const shakeY = Math.abs(Math.sin(now * 0.05)) * 0.3;
+                                ctx.globalAlpha = 0.4;
+                                ctx.drawImage(structSprite, px + shakeX, py + shakeY, cw, ch);
+                                ctx.globalAlpha = 1;
                             }
                         }
                     }
@@ -1081,6 +1391,93 @@ export class Renderer {
                     ctx.globalAlpha = 1.0;
                     lastColor = '';
                 }
+
+                // Pulsing selection outline on buildings under cursor
+                if (spriteDrawn && cursor && cursor.x === wx && cursor.y === wy && tile.structure) {
+                    const pulseAlpha = 0.5 + 0.5 * Math.sin(now * 0.006);
+                    const pulseWidth = 1 + Math.sin(now * 0.006) * 0.5;
+                    ctx.save();
+                    ctx.strokeStyle = '#ffcc44';
+                    ctx.lineWidth = pulseWidth;
+                    ctx.globalAlpha = pulseAlpha;
+                    ctx.strokeRect(px + 0.5, py + 0.5, cw - 1, ch - 1);
+                    ctx.restore();
+                    lastColor = '';
+                }
+            }
+        }
+
+        // Draw water ripples on top of all tiles (rain impacts + footsteps)
+        this._drawWaterRipples(ctx, camera, cw, ch);
+
+        // --- Tile-entry detection: detect when a lerping entity arrives at its destination ---
+        // Used for footstep ripples, disturbed grass, and door flash.
+        for (const me of movingEntities) {
+            const ent = me.entity;
+            const lastTile = ent._lastRenderedTile;
+            if (!isEntityMoving(ent)) {
+                // Lerp just finished — ent.x/ent.y is the new tile
+                if (!lastTile || lastTile.x !== ent.x || lastTile.y !== ent.y) {
+                    const destTile = game.map[ent.y]?.[ent.x];
+                    if (destTile) {
+                        const destKey = ent.y * CONFIG.MAP_WIDTH + ent.x;
+                        if (destTile.terrain === 'water') {
+                            this._spawnWaterRipple(ent.x, ent.y, cw, 1.5);
+                        } else if (destTile.terrain === 'grass' && !destTile.snowCovered) {
+                            this._grassBoost.set(destKey, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.13 });
+                            for (const [ndx, ndy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                                const nx = ent.x + ndx, ny = ent.y + ndy;
+                                if (nx >= 0 && ny >= 0 && nx < CONFIG.MAP_WIDTH && ny < CONFIG.MAP_HEIGHT) {
+                                    const nk = ny * CONFIG.MAP_WIDTH + nx;
+                                    const existing = this._grassBoost.get(nk);
+                                    if (!existing) {
+                                        this._grassBoost.set(nk, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.07 });
+                                    }
+                                }
+                            }
+                        }
+                        if (destTile.structure) {
+                            this._doorFlash.set(destKey, 8);
+                        }
+                    }
+                    ent._lastRenderedTile = { x: ent.x, y: ent.y };
+                }
+            } else {
+                // Still moving — update last rendered tile to current destination so we
+                // only fire on the NEXT arrival (not retroactively on every frame)
+                if (!lastTile) ent._lastRenderedTile = { x: ent.x, y: ent.y };
+            }
+        }
+
+        // Also detect tile entry for stationary entities that just finished moving
+        for (const [, entData] of entityMap) {
+            const ent = entData._sim;
+            if (!ent) continue;
+            const lastTile = ent._lastRenderedTile;
+            if (!lastTile || lastTile.x !== ent.x || lastTile.y !== ent.y) {
+                const destTile = game.map[ent.y]?.[ent.x];
+                if (destTile) {
+                    const destKey = ent.y * CONFIG.MAP_WIDTH + ent.x;
+                    if (destTile.terrain === 'water') {
+                        this._spawnWaterRipple(ent.x, ent.y, cw, 1.5);
+                    } else if (destTile.terrain === 'grass' && !destTile.snowCovered) {
+                        this._grassBoost.set(destKey, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.13 });
+                        for (const [ndx, ndy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                            const nx = ent.x + ndx, ny = ent.y + ndy;
+                            if (nx >= 0 && ny >= 0 && nx < CONFIG.MAP_WIDTH && ny < CONFIG.MAP_HEIGHT) {
+                                const nk = ny * CONFIG.MAP_WIDTH + nx;
+                                const existing = this._grassBoost.get(nk);
+                                if (!existing) {
+                                    this._grassBoost.set(nk, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.07 });
+                                }
+                            }
+                        }
+                    }
+                    if (destTile.structure) {
+                        this._doorFlash.set(destKey, 8);
+                    }
+                }
+                ent._lastRenderedTile = { x: ent.x, y: ent.y };
             }
         }
 
@@ -1199,6 +1596,33 @@ export class Renderer {
             }
         }
 
+        // --- Death dissolve: topple + fade for recently-dead entities ---
+        if (skinActive && dyingEntities.length > 0) {
+            const DEATH_DISSOLVE_MS = 600;
+            for (const ent of dyingEntities) {
+                const elapsed = now - (ent._dyingStart || now);
+                const t = Math.min(1, elapsed / DEATH_DISSOLVE_MS);
+                const sx = ent.x - camera.x;
+                const sy = ent.y - camera.y;
+                if (sx < -1 || sx >= vw + 1 || sy < -1 || sy >= vh + 1) continue;
+                const rpx = Math.round(sx * cw);
+                const rpy = Math.round(sy * ch);
+                const sprite = this._resolveSprite(game.map[ent.y]?.[ent.x] || {}, { type: ent.type || 'raider', entityType: ent.type, char: ent.char, color: ent.color }, season, false);
+                if (!sprite) continue;
+                const toppleRot = t * 1.4;
+                const alpha = 1 - t;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                const pivotX = rpx + cw / 2;
+                const pivotY = rpy + ch;
+                ctx.translate(pivotX, pivotY);
+                ctx.rotate(toppleRot);
+                ctx.translate(-pivotX, -pivotY);
+                ctx.drawImage(sprite, rpx, rpy - t * 2, cw, ch);
+                ctx.restore();
+            }
+        }
+
         // Melee attack effects were deferred while the tile loop ran (an offset
         // effect would otherwise be painted over by the target's tile, which the
         // loop draws later). Flush them now, on top of every tile and entity.
@@ -1295,7 +1719,7 @@ export class Renderer {
                 const coreDef = BUILDINGS[def.coreBuild];
                 const cx = (s.x - camera.x + 0.5) * cw;
                 const cy = (s.y - camera.y + 0.5) * ch;
-                const pulse = 0.85 + 0.15 * Math.sin(tick * 0.15);
+                const pulse = 0.85 + 0.10 * Math.sin(now * 0.0031) + 0.07 * Math.sin(now * 0.0071);
                 const radius = def.activeLightRadius * cw * 0.6 * pulse;
                 if (cx < -radius || cy < -radius || cx > this.canvas.width + radius || cy > this.canvas.height + radius) continue;
                 ctx.save();

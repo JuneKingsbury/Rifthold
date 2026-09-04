@@ -49,12 +49,13 @@ function breatheGrow(now, seed) {
 
 // Walking "sway": pendulum rotation (radians) about the feet, driven by move
 // progress `t` (0→1) so the sprite is upright at both ends of every tile step.
-// `seed` parity flips the lead side. Ported from the renderer.
-function walkSway(t, seed) {
+// `seed` parity flips the lead side. `mood` (0-100) subtly scales amplitude.
+function walkSway(t, seed, mood) {
     if (!RENDER_CONFIG.entityWalkSway) return 0;
     const dir = (seed & 1) ? -1 : 1;
     const phase = t * Math.PI * 2 * RENDER_CONFIG.walkSwayCycles;
-    return Math.sin(phase) * RENDER_CONFIG.walkSwayAmplitudeRad * dir;
+    const moodMult = mood != null ? (mood > 70 ? 1.2 : mood < 30 ? 0.6 : 1.0) : 1.0;
+    return Math.sin(phase) * RENDER_CONFIG.walkSwayAmplitudeRad * dir * moodMult;
 }
 
 // Idle "sway": a slow low-amplitude weight-shift (radians) about the feet while
@@ -70,6 +71,37 @@ function idleSway(now, seed) {
 
 // Wind strength (0..1) for a weather type: how hard the trees should be blown.
 // Unknown weather falls back to the `clear` value (a gentle breeze).
+// Phase continuity state. When wind changes, we store an offset so sway picks up
+// from the same sine position rather than jumping to a new phase.
+// _smoothSwayWind lerps toward _lastSwayWind for amplitude only, so the wave
+// speed snaps (phase-corrected) but the size eases in gradually.
+let _swayPhaseOffset = 0;
+let _lastSwayWind = -1;
+let _smoothSwayWind = 0;
+
+export function setSwayWind(wind, now, dt) {
+    // Lerp amplitude wind toward target
+    if (_lastSwayWind >= 0) {
+        const rate = 1 - Math.pow(0.001, dt);  // ~3s transition
+        _smoothSwayWind += (wind - _smoothSwayWind) * rate;
+    } else {
+        _smoothSwayWind = wind;
+    }
+
+    if (_lastSwayWind === wind) return;
+    if (_lastSwayWind >= 0) {
+        const D = RENDER_CONFIG.terrainDetail;
+        if (D && D.enabled) {
+            const oldPeriod = D.grassCalmPeriodMs + (D.grassStormPeriodMs - D.grassCalmPeriodMs) * _lastSwayWind;
+            const newPeriod = D.grassCalmPeriodMs + (D.grassStormPeriodMs - D.grassCalmPeriodMs) * wind;
+            const oldPhase = (now / oldPeriod) * Math.PI * 2;
+            const newPhase = (now / newPeriod) * Math.PI * 2;
+            _swayPhaseOffset += oldPhase - newPhase;
+        }
+    }
+    _lastSwayWind = wind;
+}
+
 export function windStrengthFor(weatherType) {
     const W = RENDER_CONFIG.treeSway;
     if (!W || !W.windByWeather) return 0;
@@ -91,7 +123,7 @@ function treeSwayRotation(now, seed, wind) {
     // Gust envelope: 0.6..1.0 base swell, widening toward 0.3..1.0 at full wind.
     const gustPhase = (now / W.gustPeriodMs) * Math.PI * 2 + (seed % 997) / 997 * 6.28;
     const gust = 1 - (0.4 + 0.3 * wind) * (0.5 - 0.5 * Math.cos(gustPhase));
-    const amp = (W.calmSwayRad + (W.stormSwayRad - W.calmSwayRad) * wind) * gust;
+    const amp = (W.calmSwayRad + (W.stormSwayRad - W.calmSwayRad) * _smoothSwayWind) * gust;
     const dir = (seed & 1) ? -1 : 1;
     const phase = (now / period) * Math.PI * 2 + (seed % 1000) / 1000 * W.phaseSpread;
     return Math.abs(Math.sin(phase)) * amp * dir;
@@ -119,12 +151,29 @@ export function getTreeSway(now, seed, wind) {
  * @param {number} wind  Wind strength 0..1 (see windStrengthFor).
  * @returns {number} Rotation in radians (0 when disabled).
  */
-export function getGrassSway(now, seed, wind) {
+export function getGrassSway(now, seed, wind, boostAdd) {
     const D = RENDER_CONFIG.terrainDetail;
     if (!D || !D.enabled) return 0;
     const period = D.grassCalmPeriodMs + (D.grassStormPeriodMs - D.grassCalmPeriodMs) * wind;
-    const amp = D.grassCalmSwayRad + (D.grassStormSwayRad - D.grassCalmSwayRad) * wind;
-    const phase = (now / period) * Math.PI * 2 + (seed % 1000) / 1000 * D.grassPhaseSpread;
+    const baseAmp = D.grassCalmSwayRad + (D.grassStormSwayRad - D.grassCalmSwayRad) * _smoothSwayWind;
+    const phase = (now / period) * Math.PI * 2 + _swayPhaseOffset + (seed % 1000) / 1000 * D.grassPhaseSpread;
+    return Math.sin(phase) * baseAmp + (boostAdd || 0);
+}
+
+/**
+ * Crop/flower sway rotation (radians), lighter than grass tufts. Side-to-side sway
+ * driven by wind. Used for farm zone tiles with a crop planted.
+ */
+export function getCropSway(now, seed, wind) {
+    const D = RENDER_CONFIG.terrainDetail;
+    if (!D || !D.enabled) return 0;
+    const calm = D.cropCalmPeriodMs || 3800;
+    const storm = D.cropStormPeriodMs || 1400;
+    const calmAmp = D.cropCalmSwayRad || 0.03;
+    const stormAmp = D.cropStormSwayRad || 0.10;
+    const period = calm + (storm - calm) * wind;
+    const amp = calmAmp + (stormAmp - calmAmp) * _smoothSwayWind;
+    const phase = (now / period) * Math.PI * 2 + _swayPhaseOffset + (seed % 1000) / 1000 * 6.28;
     return Math.sin(phase) * amp;
 }
 
@@ -219,11 +268,24 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     _xf.overlayAlpha = 0;
 
     // ── Tier 1: ambient breathing (independent channel) ──
-    _xf.growPx = flags.showBreathing ? breatheGrow(now, seed) : 0;
+    // Sleeping: 3x amplitude slow breathing
+    if (flags.showBreathing) {
+        if (entity && entity.state === 'sleeping') {
+            const phase = (now / (RENDER_CONFIG.breathePeriodMs * 3)) * Math.PI * 2
+                + (seed % 1000) / 1000 * RENDER_CONFIG.breathePhaseSpread;
+            _xf.growPx = (0.5 - 0.5 * Math.cos(phase)) * RENDER_CONFIG.breatheAmplitudePx * 3;
+        } else {
+            _xf.growPx = breatheGrow(now, seed);
+        }
+    } else {
+        _xf.growPx = 0;
+    }
+
+    const mood = entity ? entity.mood : null;
 
     // ── Tier 2: ambient walk-sway (moving only) ──
     if (flags.showWalkSway && moveT != null) {
-        _xf.rotation += walkSway(moveT, seed);
+        _xf.rotation += walkSway(moveT, seed, mood);
     }
 
     const A = RENDER_CONFIG.entityActionAnim;
@@ -342,10 +404,69 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     }
 
     // ── Tier 2b: idle sway (stationary and otherwise inactive) ──
-    // The resting counterpart to walk-sway: applies only when the entity isn't
-    // moving, mid-one-shot, or working. Gated by the same walk-sway setting.
     if (flags.showWalkSway && moveT == null && !oneShotActive && !workActive) {
-        _xf.rotation += idleSway(now, seed);
+        if (entity && entity.state === 'sleeping') {
+            // Sleeping sway: very gentle side-to-side
+            const phase = (now / 5000) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
+            _xf.rotation += Math.sin(phase) * 0.015;
+        } else {
+            _xf.rotation += idleSway(now, seed);
+        }
+    }
+
+    // ── Tier 2c: eating animation ──
+    if (actionsOn && !oneShotActive && !workActive && entity && entity.state === 'eating') {
+        const phase = (now / 500) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
+        const facing = (seed & 1) ? 1 : -1;
+        _xf.rotation += facing * 0.08 * Math.abs(Math.sin(phase));
+        _xf.offsetY += Math.abs(Math.sin(phase)) * 1;
+    }
+
+    // ── Tier 2d: startle reaction (danger nearby) ──
+    if (actionsOn && entity && entity._startleUntil) {
+        const t = animShotT(entity._wanim || (entity._wanim = {}), entity._startleUntil, 'startle', 180, now);
+        if (t != null && !oneShotActive) {
+            const arc = Math.sin(t * Math.PI);
+            const facing = (seed & 1) ? 1 : -1;
+            _xf.offsetX += -facing * 3 * arc;
+            _xf.scaleY *= 1 - 0.08 * arc;
+        }
+    }
+
+    // ── Tier 2e: idle fidget (rare micro-gestures while truly idle) ──
+    if (actionsOn && !oneShotActive && !workActive && moveT == null
+        && entity && entity.state !== 'sleeping' && entity.state !== 'eating') {
+        const scratch = entity._wanim || (entity._wanim = {});
+        if (scratch.fidgetNext == null) {
+            scratch.fidgetNext = now + 10000 + Math.random() * 10000;
+        }
+        if (now >= scratch.fidgetNext) {
+            scratch.fidgetType = Math.floor(Math.random() * 3);
+            scratch.fidgetStart = now;
+            scratch.fidgetNext = now + 10000 + Math.random() * 10000;
+        }
+        if (scratch.fidgetStart != null) {
+            const elapsed = now - scratch.fidgetStart;
+            const fidgetDurations = [800, 600, 500];
+            const dur = fidgetDurations[scratch.fidgetType] || 700;
+            if (elapsed < dur) {
+                const ft = elapsed / dur;
+                const arc = Math.sin(ft * Math.PI);
+                if (scratch.fidgetType === 0) {
+                    // Look around: slow rotation oscillation
+                    _xf.rotation += Math.sin(ft * Math.PI * 3) * 0.06 * arc;
+                } else if (scratch.fidgetType === 1) {
+                    // Stretch: exaggerated breath peak
+                    _xf.growPx += arc * RENDER_CONFIG.breatheAmplitudePx * 2;
+                    _xf.offsetY -= arc * 2;
+                } else {
+                    // Foot tap: rapid small bobs
+                    _xf.offsetY += -Math.abs(Math.sin(ft * Math.PI * 4)) * 0.8;
+                }
+            } else {
+                scratch.fidgetStart = null;
+            }
+        }
     }
 
     _xf.identity = (_xf.rotation === 0 && _xf.offsetX === 0 && _xf.offsetY === 0

@@ -1,4 +1,5 @@
 import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
+import { spawnParticle } from '../ui/overlay-renderer.js';
 import { completeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache, getRaceModifier } from './colonist.js';
@@ -173,6 +174,19 @@ export function completeTask(colonist, task, game) {
             applyThought(colonist, 'built_something', game.tick);
             game.story.checkMilestone('first_building_placed', game);
             game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.buildCompleteChar, color: COMBAT_VISUALS.buildCompleteColor, ttl: COMBAT_VISUALS.buildCompleteTtl });
+            // Build-complete particle burst: starburst of white/yellow particles
+            for (let i = 0; i < 10; i++) {
+                const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.3;
+                const speed = 0.4 + Math.random() * 0.3;
+                spawnParticle(game, {
+                    x: task.x + 0.5, y: task.y + 0.5,
+                    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                    decay: 0.035,
+                    color: Math.random() < 0.5 ? '#ffffff' : '#ffee44',
+                    size: 2 + Math.random() * 2,
+                    alpha: 0.9,
+                });
+            }
             window.soundManager?.playSFX('build_complete');
             break;
         }

@@ -1,5 +1,23 @@
 import { CONFIG, RENDER_CONFIG, BUILDINGS, ALL_ITEMS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS } from '../core/config.js';
 
+export function spawnParticle(game, props) {
+    if (!game.worldParticles) game.worldParticles = [];
+    game.worldParticles.push({
+        x: props.x, y: props.y,
+        vx: props.vx || 0, vy: props.vy || 0,
+        ay: props.ay || 0,
+        life: 1,
+        decay: props.decay || 0.02,
+        color: props.color || '#ffffff',
+        size: props.size || 3,
+        alpha: props.alpha != null ? props.alpha : 1,
+        wobble: props.wobble || 0,
+        wobblePhase: Math.random() * Math.PI * 2,
+        shape: props.shape || 'circle',
+        maxY: props.maxY != null ? props.maxY : null,
+    });
+}
+
 export class OverlayRenderer {
     constructor(container) {
         this.canvas = document.createElement('canvas');
@@ -12,6 +30,12 @@ export class OverlayRenderer {
         this.ctx = this.canvas.getContext('2d', { alpha: true });
         this._weatherParticles = [];
         this._lastWeatherTime = 0;
+        this._lastParticleTime = 0;
+        this._lightningFlash = 0;      // remaining alpha for lightning flash
+        this._nextLightning = 0;       // wall-clock time for next lightning strike
+        this._activeWeather = null;    // weather type currently being rendered
+        this._weatherAlpha = 0;        // current opacity of weather particle layer (0..1)
+        this._weatherFading = false;   // true = fading out before switching type
     }
 
     resize(width, height) {
@@ -25,6 +49,7 @@ export class OverlayRenderer {
         const ctx = this.ctx;
         const cw = charWidth;
         const ch = charHeight;
+        const now = performance.now();
         this._uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -32,12 +57,24 @@ export class OverlayRenderer {
             this._renderBuildGrid(ctx, cw, ch, this.canvas.width, this.canvas.height);
         }
 
-        if (game.settings.showWeatherParticles && game.weather) {
-            const now = performance.now();
+        if (game.weather) {
             const dt = this._lastWeatherTime ? Math.min((now - this._lastWeatherTime) / 1000, 0.1) : 0.016;
             this._lastWeatherTime = now;
-            this._updateWeatherParticles(game.weather.currentWeather, this.canvas.width, this.canvas.height, dt);
-            this._renderWeatherParticles(ctx);
+            const targetWeather = game.settings.showWeatherParticles ? game.weather.currentWeather : 'clear';
+            this._updateWeatherParticles(targetWeather, this.canvas.width, this.canvas.height, dt, now);
+            if (this._weatherAlpha > 0 && this._weatherParticles.length > 0) {
+                ctx.save();
+                ctx.globalAlpha = this._weatherAlpha;
+                this._renderWeatherParticles(ctx);
+                ctx.restore();
+            }
+            if (this._lightningFlash > 0) {
+                ctx.save();
+                ctx.globalAlpha = this._lightningFlash;
+                ctx.fillStyle = '#ffffee';
+                ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                ctx.restore();
+            }
         } else if (this._weatherParticles.length > 0) {
             this._weatherParticles.length = 0;
         }
@@ -64,6 +101,19 @@ export class OverlayRenderer {
         }
         if (game.radiusHighlight) {
             this._renderRadiusHighlight(ctx, game.radiusHighlight, cw, ch, camera);
+        }
+
+        if (game.worldParticles) {
+            const dt = this._lastParticleTime ? Math.min((now - this._lastParticleTime) / 1000, 0.1) : 0.016;
+            this._lastParticleTime = now;
+            this._updateWorldParticles(game.worldParticles, dt);
+            if (game.worldParticles.length > 0) {
+                this._renderWorldParticles(ctx, game.worldParticles, cw, ch, camera);
+            }
+        }
+
+        if (game.alertRipple) {
+            this._renderAlertRipple(ctx, game.alertRipple, cw, ch, camera);
         }
 
         if (!game.settings.showOverlays || !game.overlays || game.overlays.length === 0) return;
@@ -117,9 +167,34 @@ export class OverlayRenderer {
         ctx.restore();
     }
 
-    _updateWeatherParticles(weatherType, canvasWidth, canvasHeight, dt) {
-        const targetCount = this._getParticleTarget(weatherType);
+    _updateWeatherParticles(weatherType, canvasWidth, canvasHeight, dt, now) {
+        const FADE_SPEED = 0.8;  // alpha units per second (~1.25s fade)
+        const hasParticles = this._getParticleTarget(weatherType) > 0;
+        const fadingOut = this._activeWeather !== weatherType || !hasParticles;
 
+        if (fadingOut) {
+            this._weatherAlpha = Math.max(0, this._weatherAlpha - FADE_SPEED * dt);
+            // Keep moving existing particles while fading — don't spawn new ones
+            for (let i = this._weatherParticles.length - 1; i >= 0; i--) {
+                const p = this._weatherParticles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                // Remove particles that leave the screen; don't replace them
+                if (p.y > canvasHeight || p.x > canvasWidth + 40 || p.x < -40) {
+                    this._weatherParticles.splice(i, 1);
+                }
+            }
+            if (this._weatherAlpha === 0) {
+                this._activeWeather = weatherType;
+                this._weatherParticles.length = 0;
+            }
+            return;
+        }
+
+        // Fade in
+        this._weatherAlpha = Math.min(1, this._weatherAlpha + FADE_SPEED * dt);
+
+        const targetCount = this._getParticleTarget(weatherType);
         while (this._weatherParticles.length < targetCount) {
             this._weatherParticles.push(this._spawnWeatherParticle(weatherType, canvasWidth, canvasHeight, true));
         }
@@ -131,9 +206,23 @@ export class OverlayRenderer {
             const p = this._weatherParticles[i];
             p.x += p.vx * dt;
             p.y += p.vy * dt;
-            if (p.y > canvasHeight || p.x > canvasWidth || p.x < -20) {
+            if (p.y > canvasHeight || p.x > canvasWidth + 40 || p.x < -40) {
                 this._weatherParticles[i] = this._spawnWeatherParticle(weatherType, canvasWidth, canvasHeight, false);
             }
+        }
+
+        // Lightning flash during thunderstorm
+        if (weatherType === 'thunderstorm') {
+            if (this._nextLightning === 0) this._nextLightning = now + 5000 + Math.random() * 15000;
+            if (now >= this._nextLightning) {
+                this._lightningFlash = 0.35;
+                this._nextLightning = now + 8000 + Math.random() * 20000;
+            }
+        } else {
+            this._nextLightning = 0;
+        }
+        if (this._lightningFlash > 0) {
+            this._lightningFlash = Math.max(0, this._lightningFlash - dt * 3);
         }
     }
 
@@ -143,44 +232,48 @@ export class OverlayRenderer {
             case 'thunderstorm': return 180;
             case 'snow': return 60;
             case 'blizzard': return 100;
+            case 'windy': return 18;
+            case 'cloudy': return 6;
             default: return 0;
         }
     }
 
     _spawnWeatherParticle(weatherType, canvasWidth, canvasHeight, randomY) {
-        const x = Math.random() * (canvasWidth + 40) - 20;
-        const y = randomY ? Math.random() * canvasHeight : -(Math.random() * 20);
+        const x = randomY ? Math.random() * (canvasWidth + 40) - 20 : -20 - Math.random() * 20;
+        const y = randomY ? Math.random() * canvasHeight : Math.random() * canvasHeight;
 
         switch (weatherType) {
             case 'rain':
             case 'thunderstorm':
-                return { x, y, vx: 30, vy: 250 + Math.random() * 100, type: 'rain' };
+                return { x: Math.random() * (canvasWidth + 40) - 20, y: randomY ? Math.random() * canvasHeight : -(Math.random() * 20), vx: 30, vy: 250 + Math.random() * 100, type: 'rain' };
             case 'snow':
-                return { x, y, vx: 5 + Math.random() * 10, vy: 30 + Math.random() * 20, size: 1.5 + Math.random() * 1.5, type: 'snow' };
+                return { x: Math.random() * (canvasWidth + 40) - 20, y: randomY ? Math.random() * canvasHeight : -(Math.random() * 20), vx: 5 + Math.random() * 10, vy: 30 + Math.random() * 20, size: 1.5 + Math.random() * 1.5, type: 'snow' };
             case 'blizzard':
-                return { x, y, vx: 40 + Math.random() * 30, vy: 50 + Math.random() * 30, size: 2 + Math.random() * 2, type: 'snow' };
+                return { x: Math.random() * (canvasWidth + 40) - 20, y: randomY ? Math.random() * canvasHeight : -(Math.random() * 20), vx: 40 + Math.random() * 30, vy: 50 + Math.random() * 30, size: 2 + Math.random() * 2, type: 'snow' };
+            case 'windy':
+                return { x, y, vx: 280 + Math.random() * 120, vy: (Math.random() - 0.5) * 20, len: 12 + Math.random() * 20, alpha: 0.12 + Math.random() * 0.12, type: 'wind' };
+            case 'cloudy':
+                return { x, y, vx: 60 + Math.random() * 40, vy: (Math.random() - 0.5) * 10, len: 6 + Math.random() * 10, alpha: 0.06 + Math.random() * 0.06, type: 'wind' };
             default:
                 return { x, y, vx: 0, vy: 0, size: 0, type: 'none' };
         }
     }
 
     _renderWeatherParticles(ctx) {
-        if (this._weatherParticles.length === 0) return;
-        ctx.save();
-        let hasRain = false;
-        let hasSnow = false;
+        let hasRain = false, hasSnow = false, hasWind = false;
         for (const p of this._weatherParticles) {
             if (p.type === 'rain') hasRain = true;
             else if (p.type === 'snow') hasSnow = true;
+            else if (p.type === 'wind') hasWind = true;
         }
         if (hasRain) {
-            ctx.strokeStyle = 'rgba(100, 150, 255, 0.4)';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(160, 200, 255, 0.6)';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             for (const p of this._weatherParticles) {
                 if (p.type !== 'rain') continue;
                 ctx.moveTo(p.x, p.y);
-                ctx.lineTo(p.x + 2, p.y + 8);
+                ctx.lineTo(p.x + 3, p.y + 14);
             }
             ctx.stroke();
         }
@@ -193,7 +286,17 @@ export class OverlayRenderer {
                 ctx.fill();
             }
         }
-        ctx.restore();
+        if (hasWind) {
+            ctx.lineWidth = 1;
+            for (const p of this._weatherParticles) {
+                if (p.type !== 'wind') continue;
+                ctx.strokeStyle = `rgba(200, 220, 255, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x - p.len, p.y);
+                ctx.stroke();
+            }
+        }
     }
 
     _renderProgressBar(ctx, overlay, cw, ch, camera) {
@@ -581,6 +684,69 @@ export class OverlayRenderer {
             this._drawRadiusZone(ctx, c.x, c.y, c.trinket.pedestal.radius, 0.14, '#ddbb44', '#ffee77', cw, ch, camera);
         }
 
+        ctx.restore();
+    }
+
+    _updateWorldParticles(particles, dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            if (p.ay) p.vy += p.ay * dt;
+            if (p.wobble) p.wobblePhase = (p.wobblePhase || 0) + p.wobble * dt;
+            p.life -= p.decay * dt;
+            if (p.maxY != null && p.y > p.maxY) p.life = 0;
+            if (p.life <= 0) {
+                particles[i] = particles[particles.length - 1];
+                particles.length--;
+            }
+        }
+    }
+
+    _renderWorldParticles(ctx, particles, cw, ch, camera) {
+        ctx.save();
+        for (const p of particles) {
+            const sx = (p.x - camera.x) * cw;
+            const sy = (p.y - camera.y) * ch;
+            if (sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20) continue;
+            const wobbleX = p.wobblePhase ? Math.sin(p.wobblePhase) * cw * 0.15 : 0;
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.life * (p.alpha || 1)));
+            ctx.fillStyle = p.color;
+            if (p.shape === 'square') {
+                const half = Math.max(0.5, p.size * 0.5);
+                ctx.fillRect(sx + wobbleX - half, sy - half, half * 2, half * 2);
+            } else {
+                ctx.beginPath();
+                ctx.arc(sx + wobbleX, sy, Math.max(0.5, p.size * p.life), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    _renderAlertRipple(ctx, ripple, cw, ch, camera) {
+        const now = performance.now();
+        const elapsed = now - ripple.startTime;
+        if (elapsed > ripple.duration) return;
+        const t = elapsed / ripple.duration;
+        const sx = (ripple.x - camera.x + 0.5) * cw;
+        const sy = (ripple.y - camera.y + 0.5) * ch;
+        const maxRadius = 15 * cw;
+        ctx.save();
+        ctx.strokeStyle = '#ff2222';
+        for (let i = 0; i < 3; i++) {
+            const ringT = Math.max(0, t - i * 0.12);
+            if (ringT <= 0) continue;
+            const r = ringT * maxRadius;
+            const alpha = Math.max(0, (1 - ringT) * 0.7);
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
         ctx.restore();
     }
 

@@ -1,4 +1,5 @@
 import { CONFIG, ENTITIES, RAID_CONFIG, RAID_TYPES, BUILDINGS, COMBAT_VISUALS, PATHFINDING_CONFIG, COLONIST_CONFIG } from '../core/config.js';
+import { spawnParticle } from '../ui/overlay-renderer.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { findPathForEnemies, manhattanDist } from '../world/pathfinding.js';
 import { colonistTakeDamage } from './colonist.js';
@@ -66,6 +67,8 @@ export class CombatSystem {
         this.raidStartTick = game.tick;
         this.activeRaidType = raidTypeKey;
         const raidPos = { x: game.raiders[0]?.x || 0, y: game.raiders[0]?.y || 0 };
+        _startleNearbyColonists(game, raidPos.x, raidPos.y);
+        game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
         game.notifications.push({ text: `${raidType.name}! ${spawned} ${raidType.name === 'Crusader Raid' ? 'crusaders' : 'enemies'} approaching!`, tick: game.tick, type: 'danger' });
         game.eventLog.add(game, `${raidType.name}! ${spawned} enemies attacking!`, 'danger', { type: 'position', ...raidPos });
 
@@ -126,6 +129,8 @@ export class CombatSystem {
         this.raidActive = true;
         this.raidStartTick = game.tick;
         const raidPos = { x: game.raiders[0]?.x || 0, y: game.raiders[0]?.y || 0 };
+        _startleNearbyColonists(game, raidPos.x, raidPos.y);
+        game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
         game.notifications.push({ text: `Raid! ${numRaiders} raiders approaching!`, tick: game.tick, type: 'danger' });
         game.eventLog.add(game, `Raid! ${numRaiders} raiders attacking!`, 'danger', { type: 'position', ...raidPos });
 
@@ -189,6 +194,21 @@ export class CombatSystem {
                         }
                     }
                     game.combatEffects.push({ x: raider.x, y: raider.y, char: COMBAT_VISUALS.lootDropChar, color: COMBAT_VISUALS.lootDropColor, ttl: COMBAT_VISUALS.lootDropTtl });
+                    // Loot arc particles: golden particles arc upward then fall
+                    const numLootParticles = 2 + Math.floor(Math.random() * 2);
+                    for (let lp = 0; lp < numLootParticles; lp++) {
+                        spawnParticle(game, {
+                            x: raider.x + 0.5 + (Math.random() - 0.5) * 0.3,
+                            y: raider.y + 0.5,
+                            vx: (Math.random() - 0.5) * 0.3,
+                            vy: -0.6 - Math.random() * 0.3,
+                            ay: 0.8,
+                            decay: 0.025,
+                            color: '#ffdd44',
+                            size: 2.5,
+                            alpha: 0.9,
+                        });
+                    }
                     window.soundManager?.playSFX('loot_drop');
                 }
                 if (game.exploration) {
@@ -429,4 +449,17 @@ function getEdgePosition(side, offset) {
 
 export function raiderTakeDamage(raider, damage) {
     raider.hp -= damage;
+}
+
+function _startleNearbyColonists(game, raidX, raidY) {
+    const STARTLE_RADIUS = 10;
+    for (const c of game.colonists) {
+        if (c.hp <= 0 || c.onExpedition) continue;
+        const dist = Math.abs(c.x - raidX) + Math.abs(c.y - raidY);
+        if (dist > STARTLE_RADIUS) continue;
+        // Closer colonists react more strongly and sooner
+        const delay = dist * 2; // ticks of delay before startle triggers visually
+        // Use a tick-based future stamp so the animation plays after a brief delay
+        c._startleUntil = game.tick + delay + 1;
+    }
 }
