@@ -1370,7 +1370,9 @@ export class ExplorationSystem {
                     const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
                     const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', member.name).replace('{target}', targetLabel).replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
-                    window.soundManager?.playExpSFX(critHit ? 'critical_hit' : 'colonist_damaged');
+                    const isRangedAttack = member.weapon && member.weapon.ranged;
+                    const rangedSfx = (member.weapon && member.weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
+                    window.soundManager?.playExpSFX(critHit ? 'critical_hit' : (isRangedAttack ? rangedSfx : 'colonist_damaged'));
                     const lifeSteal = memberItems.reduce((sum, it) => sum + (it.lifeSteal || 0), 0);
                     if (target.eliteLifeSteal && target.eliteLifeSteal > 0) {
                         // Vampiric enemies steal from the attacker

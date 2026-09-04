@@ -546,7 +546,7 @@ img.pixel-art {
 }
 
 #game.paused {
-    filter: saturate(0.5) brightness(0.85);
+    filter: saturate(0.7) brightness(0.9);
 }
 
 #game-canvas {

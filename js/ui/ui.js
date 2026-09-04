@@ -112,29 +112,34 @@ export class UI {
                 this._storyTab = tab.dataset.storyTab;
                 this._lastStoryHtml = '';
                 this.updateStoryPanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const group = e.target.closest('[data-realm-group]');
             if (group) {
                 const name = group.dataset.realmGroup;
-                if (this._collapsedRealmGroups.has(name)) {
+                const wasCollapsed = this._collapsedRealmGroups.has(name);
+                if (wasCollapsed) {
                     this._collapsedRealmGroups.delete(name);
                 } else {
                     this._collapsedRealmGroups.add(name);
                 }
                 this._lastStoryHtml = '';
                 this.updateStoryPanel();
+                window.soundManager?.playSFXPitched('button_click', wasCollapsed ? 3 : -3);
             }
             const bSection = e.target.closest('[data-bestiary-section]');
             if (bSection) {
                 const name = bSection.dataset.bestiarySection;
-                if (this._collapsedBestiarySections.has(name)) {
+                const wasCollapsed = this._collapsedBestiarySections.has(name);
+                if (wasCollapsed) {
                     this._collapsedBestiarySections.delete(name);
                 } else {
                     this._collapsedBestiarySections.add(name);
                 }
                 this._lastStoryHtml = '';
                 this.updateStoryPanel();
+                window.soundManager?.playSFXPitched('button_click', wasCollapsed ? 3 : -3);
             }
         });
 
@@ -145,6 +150,11 @@ export class UI {
                 this._arcaneExpSetup = null;
                 this._lastArcaneHtml = '';
                 this.updateArcanePanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
+                return;
+            }
+            if (e.target.closest('button')) {
+                window.soundManager?.playSFXPitched('button_click', 0);
             }
         });
 
@@ -154,6 +164,7 @@ export class UI {
                 this._craftTab = tab.dataset.craftTab;
                 this._lastCraftHtml = '';
                 this.updateCraftPanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const tierBtn = e.target.closest('[data-craft-tier]');
@@ -184,6 +195,7 @@ export class UI {
                 this._researchHideCompleted = !this._researchHideCompleted;
                 this._lastResearchHtml = null;
                 this.updateResearchPanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const tab = e.target.closest('[data-research-tab]');
@@ -191,6 +203,7 @@ export class UI {
                 this._researchTab = tab.dataset.researchTab;
                 this._lastResearchHtml = null;
                 this.updateResearchPanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const badge = e.target.closest('.research-cross-tab[data-jump-tab]');
@@ -198,6 +211,7 @@ export class UI {
                 this._researchTab = badge.dataset.jumpTab;
                 this._lastResearchHtml = null;
                 this.updateResearchPanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
             }
         });
 
@@ -269,18 +283,21 @@ export class UI {
             const catTab = e.target.closest('[data-build-cat]');
             if (catTab) {
                 this.game.input.setBuildCategory(catTab.dataset.buildCat);
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const cropOpt = e.target.closest('[data-crop-opt]');
             if (cropOpt) {
                 this.game.input.cropType = cropOpt.dataset.cropOpt;
                 this.updateModeDisplay(this.game.input);
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const desOpt = e.target.closest('[data-designate-mode]');
             if (desOpt) {
                 this.game.input.designateMode = desOpt.dataset.designateMode;
                 this.updateModeDisplay(this.game.input);
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const opt = e.target.closest('[data-build-opt]');
@@ -295,6 +312,7 @@ export class UI {
             this._hideBuildTooltip();
             this.game.input.buildType = buildType;
             this.updateModeDisplay(this.game.input);
+            window.soundManager?.playSFXPitched('button_click', 0);
         };
         const buildOptHover = (e) => {
             const card = e.target.closest('[data-build-opt]');
@@ -327,6 +345,7 @@ export class UI {
                 this._prioTab = tabBtn.dataset.prioTab;
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const attuneCell = e.target.closest('[data-colonist-id][data-attune]');
@@ -335,6 +354,7 @@ export class UI {
                 this.game.toggleAttunement(colonistId, attuneCell.dataset.attune);
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
+                // sound fired inside toggleAttunement with pitch based on add/remove
                 return;
             }
             const cell = e.target.closest('[data-colonist-id][data-skill]');
@@ -344,6 +364,7 @@ export class UI {
                 this.game.cyclePriority(colonistId, skill);
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
+                // sound fired inside cyclePriority with pitch based on new value
             }
         });
 
@@ -356,6 +377,7 @@ export class UI {
                 this.game.cycleBackPriority(colonistId, skill);
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
+                // sound fired inside cycleBackPriority with pitch based on new value
             }
         });
 
@@ -365,6 +387,7 @@ export class UI {
                 this._invTab = tabBtn.dataset.invTab;
                 this._lastInvHtml = null;
                 this.updateInventoryPanel();
+                window.soundManager?.playSFXPitched('button_click', 0);
                 return;
             }
             const btn = e.target.closest('[data-reserve-food]');
@@ -1956,11 +1979,11 @@ export class UI {
             if (!this._panelSessionActive) {
                 this._panelSessionActive = true;
                 this._wasPausedBeforePanel = this.game.paused;
-                if (!this.game.paused) this.game.togglePause();
+                if (!this.game.paused) this.game.togglePause(true);
             }
         } else {
             this._panelSessionActive = false;
-            if (!this._wasPausedBeforePanel && this.game.paused) this.game.togglePause();
+            if (!this._wasPausedBeforePanel && this.game.paused) this.game.togglePause(true);
         }
     }
 
@@ -1971,6 +1994,7 @@ export class UI {
         this._panelPause(opening);
         this.elements.priorityPanel.style.display = opening ? 'block' : 'none';
         if (opening) this.updatePriorityPanel();
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
         this._updateOverlay();
     }
 
@@ -2051,6 +2075,7 @@ export class UI {
         this._panelPause(opening);
         this.elements.craftPanel.style.display = opening ? 'block' : 'none';
         if (opening) this.updateCraftPanel();
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
         this._updateOverlay();
     }
 
@@ -2293,6 +2318,7 @@ export class UI {
         this._panelPause(opening);
         this.elements.inventoryPanel.style.display = opening ? 'block' : 'none';
         if (opening) this.updateInventoryPanel();
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
         this._updateOverlay();
     }
 
@@ -2628,6 +2654,7 @@ export class UI {
         this._panelPause(opening);
         this.elements.settingsPanel.style.display = opening ? 'block' : 'none';
         if (opening) this.updateSettingsPanel();
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
         this._updateOverlay();
     }
 
@@ -2906,6 +2933,7 @@ export class UI {
     _setSettingsTab(tab) {
         this._settingsTab = tab;
         this.updateSettingsPanel();
+        window.soundManager?.playSFXPitched('button_click', 0);
     }
 
     // Controls tab body: grouped rebindable keys + reset button. Delegates row
@@ -3027,6 +3055,7 @@ export class UI {
                 this.elements.eventPanel.className = '';
                 this._lastEventId = null;
                 this._tradeOpen = false;
+                window.soundManager?.playSFXPitched('open_close_click', -3);
             }
             return;
         }
@@ -3043,6 +3072,7 @@ export class UI {
         if (this._lastEventId === eventId) return;
         this._lastEventId = eventId;
         this.elements.eventPanel.style.display = 'block';
+        window.soundManager?.playSFXPitched('open_close_click', 3);
         this.elements.eventPanel.className = evt.type === 'raid' ? 'event-panel-raid' : '';
         let html = `<div class="event-text">${evt.text}</div><div class="event-choices">`;
         if (evt.type === 'trade') {
@@ -3370,6 +3400,7 @@ export class UI {
             this._lastStoryHtml = '';
             this.updateStoryPanel();
         }
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
         this._updateOverlay();
     }
 

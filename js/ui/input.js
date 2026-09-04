@@ -386,6 +386,7 @@ export class InputHandler {
         this.dragEnd = null;
         this.dragging = false;
         this.game.ui.updateModeDisplay(this);
+        window.soundManager?.playSFXPitched('open_close_click', mode === 'normal' ? -3 : 3);
     }
 
     onMouseDown(e) {

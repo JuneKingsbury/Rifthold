@@ -416,6 +416,7 @@ export function initGlossaryInteraction() {
             btn.style.background = '#446';
             btn.style.color = '#88ccff';
             sections.forEach(s => { s.style.display = s.dataset.section === idx ? 'block' : 'none'; });
+            window.soundManager?.playSFXPitched('button_click', 0);
         });
     });
 

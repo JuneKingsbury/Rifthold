@@ -82,11 +82,41 @@ class SoundManagerClass {
             const source = this.ctx.createBufferSource();
             source.buffer = buffer;
 
-            // Random offset between -300 and +300 cents (+/- 3 semitone)
-            const randomCents = (Math.random() * 2 - 1) * 300;
-            source.detune.value = randomCents;
+            // Random offset between -300 and +300 cents (+/- 3 semitones)
+            source.detune.value = (Math.random() * 2 - 1) * 300;
 
             source.connect(this.sfxGain);
+
+            this.activeSfxCount++;
+            source.onended = () => { this.activeSfxCount--; };
+            source.start(0);
+        } catch (e) { /* silent */ }
+    }
+
+    // Play a sound at a fixed pitch offset (semitones), bypassing random variance.
+    // Pass 0 for the default pitch, positive values for higher, negative for lower.
+    // Pass gainNode = this.expeditionSfxGain to bypass the expedition volume dampening.
+    async playSFXPitched(name, semitones = 0, gainNode = null) {
+        try {
+            if (!this.ctx || this.unavailable.has(name)) return;
+            if (this.activeSfxCount >= MAX_CONCURRENT_SFX) return;
+
+            const now = performance.now();
+            const last = this.lastPlayTime.get(name) || 0;
+            if (now - last < SFX_COOLDOWN_MS) return;
+            this.lastPlayTime.set(name, now);
+
+            if (this.ctx.state === 'suspended') await this.ctx.resume();
+
+            const buffer = await this._getBuffer(name, 'sfx');
+            if (!buffer) return;
+
+            const source = this.ctx.createBufferSource();
+            source.buffer = buffer;
+            const jitter = (Math.random() * 2 - 1) * 100; // ±1 semitone
+            source.detune.value = semitones * 100 + jitter;
+
+            source.connect(gainNode || this.sfxGain);
 
             this.activeSfxCount++;
             source.onended = () => { this.activeSfxCount--; };

@@ -17,6 +17,7 @@ const researchMethods = {
         } else {
             this._removeResearchKeyboard();
         }
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
         this._updateOverlay();
     },
 

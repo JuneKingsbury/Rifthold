@@ -525,6 +525,7 @@ function checkCriticalAlerts(colonist, game) {
         flags.freezing = true;
         game.notifications.push({ text: `${colonist.name} is freezing!`, tick: game.tick, type: 'danger' });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Freezing!', color: '#88ddff', fontSize: 11, ttl: 12, maxTtl: 12 });
+        window.soundManager?.playSFX('freezing');
     } else if (!freezing) {
         flags.freezing = false;
     }
@@ -2146,11 +2147,14 @@ function updateFighting(colonist, game) {
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
+            window.soundManager?.playSFX('critical_hit');
         }
         target.hp -= dmg;
         if (getEquipmentStat(colonist, 'lifeSteal')) colonist.hp = Math.min(colonist.maxHp, colonist.hp + Math.round(dmg * getEquipmentStat(colonist, 'lifeSteal')));
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
+        const sfxName = (weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
+        window.soundManager?.playSFX(sfxName);
         const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
         game.projectiles.push({
             fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y,
@@ -2195,6 +2199,7 @@ function updateFighting(colonist, game) {
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
+            window.soundManager?.playSFX('critical_hit');
         }
         target.hp -= dmg;
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
@@ -2270,6 +2275,7 @@ function updateHunting(colonist, game) {
     if (critChance > 0 && Math.random() < critChance) {
         huntDmg *= 2;
         game.combatEffects.push({ x: animal.x, y: animal.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
+        window.soundManager?.playSFX('critical_hit');
     }
 
     animal.hp -= huntDmg;
@@ -2277,6 +2283,8 @@ function updateHunting(colonist, game) {
     colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
 
     if (isRanged && dist >= 2) {
+        const huntSfxName = (weapon && weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
+        window.soundManager?.playSFX(huntSfxName);
         const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
         game.projectiles.push({
             fromX: colonist.x, fromY: colonist.y, toX: animal.x, toY: animal.y,

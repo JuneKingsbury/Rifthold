@@ -56,6 +56,7 @@ const arcaneMethods = {
             this._expVisState._snapToCurrentProgress = true;
             this.updateArcanePanel();
         }
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3, window.soundManager?.expeditionSfxGain);
         this._updateOverlay();
     },
 

@@ -437,7 +437,20 @@ class Game {
         if (prof) prof.mark('spatial.rebuild');
 
         const prevSeason = this.weather.season;
+        const prevWeather = this.weather.currentWeather;
         this.weather.update(this.tick, this.divinationModifiers);
+        if (this.weather.currentWeather !== prevWeather && window.soundManager) {
+            const weatherSfx = {
+                rain: 'rain_start',
+                thunderstorm: 'thunder_crack',
+                blizzard: 'blizzard_start',
+                snow: 'snow_start',
+                heatwave: 'heatwave_start',
+                clear: 'weather_clear',
+            };
+            const sfx = weatherSfx[this.weather.currentWeather];
+            if (sfx) window.soundManager.playSFX(sfx);
+        }
         if (this.weather.season !== prevSeason) {
             this.eventLog.add(this, `Season changed to ${this.weather.season} (Year ${this.weather.year})`, 'event', null);
             this.weather.applySnow(this.map);
@@ -663,10 +676,11 @@ class Game {
         return this._occupiedTiles ? this._occupiedTiles.has((y << 16) | x) : false;
     }
 
-    togglePause() {
+    togglePause(silent = false) {
         this.paused = !this.paused;
         document.getElementById('game').classList.toggle('paused', this.paused && this.settings.darkenOnPause);
         document.getElementById('pause-overlay').style.display = this.paused ? 'block' : 'none';
+        if (!silent) window.soundManager?.playSFXPitched('open_close_click', this.paused ? 3 : -3);
     }
 
     startOutro() {
@@ -701,12 +715,18 @@ class Game {
         const c = this.getColonist(colonistId);
         if (!c || c.golem) return;
         c.priorities[skill] = (c.priorities[skill] + 1) % 6;
+        // Low flat tone when cycling to disabled (0), higher pitch for increased priority
+        const semitones = c.priorities[skill] === 0 ? -5 : 3;
+        window.soundManager?.playSFXPitched('button_click', semitones);
     }
 
     cycleBackPriority(colonistId, skill) {
         const c = this.getColonist(colonistId);
         if (!c || c.golem) return;
         c.priorities[skill] = (c.priorities[skill] - 1 + 6) % 6;
+        // Low flat tone when landing on disabled (0), lower pitch for decreased priority
+        const semitones = c.priorities[skill] === 0 ? -5 : -3;
+        window.soundManager?.playSFXPitched('button_click', semitones);
     }
 
     // Toggle a school in/out of a colonist's attuned set. Attunement is a free
@@ -720,10 +740,12 @@ class Game {
         const idx = c.attunedSchools.indexOf(school);
         if (idx >= 0) {
             c.attunedSchools.splice(idx, 1);
+            window.soundManager?.playSFXPitched('button_click', -3);
         } else {
             c.attunedSchools.push(school);
             const cap = MAGIC_STUDY_CONFIG.attunementSlots;
             while (c.attunedSchools.length > cap) c.attunedSchools.shift();
+            window.soundManager?.playSFXPitched('button_click', 3);
         }
     }
 
@@ -1183,6 +1205,7 @@ class Game {
         this.ui._tradeGoldOffer = 0;
         this.ui._tradeStep = 1;
         this.ui._tradeDirty = true;
+        window.soundManager?.playSFXPitched('open_close_click', 3);
     }
 
     tradeOffer(resource, amount) {
@@ -1350,6 +1373,7 @@ class Game {
         if (backdrop) backdrop.style.display = 'block';
         const search = document.getElementById('glossary-search');
         if (search) search.focus();
+        window.soundManager?.playSFXPitched('open_close_click', 3);
     }
 
     togglePeaceful() {
@@ -1364,6 +1388,7 @@ class Game {
         if (this.research.selectResearch(techKey)) {
             const name = techKey.replace(/_/g, ' ');
             this.notifications.push({ text: `Now researching: ${name}`, tick: this.tick, type: 'info' });
+            window.soundManager?.playSFXPitched('button_click', 0);
         }
     }
 
@@ -1371,6 +1396,7 @@ class Game {
         if (this.research.activeResearch) {
             this.research.deselectResearch();
             this.notifications.push({ text: 'Research paused', tick: this.tick, type: 'info' });
+            window.soundManager?.playSFXPitched('button_click', -3);
         }
     }
 
@@ -3415,6 +3441,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Colonist panel: delegate button clicks to button_click, select/change to button_click.
+    // data-modal-close (× button) is handled by the start-screen delegated listener.
+    colonistsPanel.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (btn && !btn.hasAttribute('data-modal-close')) {
+            SoundManager.playSFXPitched('button_click', 0);
+        }
+    });
+    colonistsPanel.addEventListener('change', (e) => {
+        if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') {
+            SoundManager.playSFXPitched('button_click', 0);
+        }
+    });
+
     modalBackdrop.addEventListener('click', closeModals);
 
     let _loadingSettings = false;
@@ -3691,6 +3731,38 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('keydown', startMenuMusic);
         document.addEventListener('touchstart', startMenuMusic);
     }
+
+    // Single delegated listener owns all start-screen sounds — no button plays two sounds.
+    // data-modal-open  → open_close_click +3 when opening, -3 when toggling closed
+    // data-modal-close → open_close_click -3
+    // backdrop click   → open_close_click -3  (wired separately on modalBackdrop)
+    // credits-changelog-btn → open_close_click +3  (wired separately above)
+    // everything else  → button_click 0
+    document.getElementById('start-screen').addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        if (btn.hasAttribute('data-modal-close')) {
+            // Handled by the document-level listener below — don't double-fire.
+        } else if (btn.hasAttribute('data-modal-open')) {
+            // After the handler runs, check if a modal is now open
+            requestAnimationFrame(() => {
+                const nowOpen = [settingsPanel, glossaryPanel, creditsPanel, changelogPanel, colonistsPanel]
+                    .some(p => p && p.style.display !== 'none');
+                SoundManager.playSFXPitched('open_close_click', nowOpen ? 3 : -3);
+            });
+        } else {
+            SoundManager.playSFXPitched('button_click', 0);
+        }
+    });
+    modalBackdrop.addEventListener('click', () => SoundManager.playSFXPitched('open_close_click', -3));
+    document.getElementById('credits-changelog-btn').addEventListener('click', () => SoundManager.playSFXPitched('open_close_click', 3));
+
+    // Panels (glossary, credits, colonists etc.) are siblings of #start-screen, not children,
+    // so the start-screen delegated listener never sees their × buttons. Catch them here.
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-modal-close]');
+        if (btn) SoundManager.playSFXPitched('open_close_click', -3);
+    });
 
     document.getElementById('start-game').addEventListener('click', () => {
         CONFIG.PEACEFUL_MODE = document.getElementById('start-peaceful-check').checked;

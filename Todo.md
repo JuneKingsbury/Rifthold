@@ -23,7 +23,7 @@ All milestone triggers and story left to flesh out.
 - [ ] `palace_fortress`
 
 ### Audio Assets
-The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest.js`) but the `audio/` directory has no actual files. All paths are relative to the project root. Format: `.ogg` (Vorbis).
+The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest.js`). Music tracks are all present. The tables below list only the **missing** SFX files. All paths are relative to the project root. Format: `.ogg` (Vorbis).
 
 #### Combat SFX — `audio/sfx/combat/`
 
@@ -44,8 +44,11 @@ The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest
 |------|-------------|
 | `fire_ignite.ogg` | Fire starts (event or structure) |
 | `freezing.ogg` | Colonist freezing warning |
-| `rain_ambient.ogg` | Rain loop (loopable) |
-| `wind_blizzard.ogg` | Blizzard wind (loopable) |
+| `rain_start.ogg` | Weather transitions to rain |
+| `blizzard_start.ogg` | Weather transitions to blizzard |
+| `snow_start.ogg` | Weather transitions to snow |
+| `heatwave_start.ogg` | Weather transitions to heatwave |
+| `weather_clear.ogg` | Weather clears up |
 
 ### Cooking System
 Today the cooking system in Rifthold is really really simple. You throw 5 foodstuffs into a cauldron and 1 cooked food comes out.
