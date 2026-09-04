@@ -566,6 +566,11 @@ export function completeTask(colonist, task, game) {
             if (!colonist.skillXp[task.skillRequired]) colonist.skillXp[task.skillRequired] = 0;
             let xpGain = COLONIST_CONFIG.skillXpPerTask;
             if (colonist.pedestalSkillBonus) xpGain *= (1 + colonist.pedestalSkillBonus);
+            if (colonist.activeEffects) {
+                for (const e of colonist.activeEffects) {
+                    if (e.type === 'scholarship' && e.skillGrowthBonus) xpGain *= (1 + e.skillGrowthBonus);
+                }
+            }
             if (colonist.traits.includes('prodigy')) xpGain *= TRAITS.prodigy.allSkillXpMult;
             if (colonist.traits.includes('magically_inept')) xpGain *= TRAITS.magically_inept.mundaneXpMult;
             xpGain *= getRaceModifier(colonist, 'allSkillXpMult', 1);

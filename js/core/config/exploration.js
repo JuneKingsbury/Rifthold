@@ -1871,6 +1871,48 @@ export const EXPEDITION_POTIONS = {
         autoUse: { hasDot: true },
         logText: '{name} drinks an antidote!',
     },
+    battle_tonic: {
+        name: 'Battle Tonic', resource: 'battle_tonic',
+        maxCarry: 3, useCondition: 'combat',
+        effect: { buffCombat: { attackSpeed: 0.3, critChance: 0.15, duration: 5 } },
+        autoUse: { hpAbove: 0.7, onBoss: true },
+        logText: '{name} downs a battle tonic!',
+    },
+    smoke_draught: {
+        name: 'Smoke Draught', resource: 'smoke_draught',
+        maxCarry: 3, useCondition: 'combat',
+        effect: { buffDefense: { dodgeChance: 0.35, duration: 5 } },
+        autoUse: { hpThreshold: 0.7 },
+        logText: '{name} quaffs a smoke draught!',
+    },
+    lifesteal_elixir: {
+        name: 'Lifesteal Elixir', resource: 'lifesteal_elixir',
+        maxCarry: 3, useCondition: 'combat',
+        effect: { buffCombat: { hpOnKill: 25, duration: 5 } },
+        autoUse: { anyMemberAtOrBelow: 0.4 },
+        logText: '{name} drinks a lifesteal elixir!',
+    },
+    loot_elixir: {
+        name: 'Loot Elixir', resource: 'loot_elixir',
+        maxCarry: 2, useCondition: 'entry',
+        effect: { buffLoot: { lootMult: 1.5, rareEncounterMult: 1.4 } },
+        autoUse: { onEntry: true },
+        logText: 'The party uncorks a loot elixir before diving in.',
+    },
+    rally_brew: {
+        name: 'Rally Brew', resource: 'rally_brew',
+        maxCarry: 3, useCondition: 'combat',
+        effect: { rallyParty: { healPercent: 0.2, clearSlow: true } },
+        autoUse: { anyMemberSlowed: true },
+        logText: '{name} rallies the party with a brew!',
+    },
+    mana_surge: {
+        name: 'Mana Surge', resource: 'mana_surge',
+        maxCarry: 4, useCondition: 'combat',
+        effect: { restoreMana: 0.3, buffCombat: { spellCostReduction: 0.25, duration: 5 } },
+        autoUse: { manaThreshold: 0.4, requiresMana: true },
+        logText: '{name} surges with arcane power!',
+    },
 };
 
 export const POTION_CARRY_CONFIG = {

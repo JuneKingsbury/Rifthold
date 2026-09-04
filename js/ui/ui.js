@@ -2610,12 +2610,20 @@ export class UI {
             }
         }
         if (potions.length > 0) {
-            html += '<div class="info-row" style="color:#cc88aa;margin-top:8px;margin-bottom:4px;"><b>Potions:</b></div>';
+            html += '<div class="info-row" style="color:#cc88aa;margin-top:8px;margin-bottom:4px;"><b>Potions:</b> <span style="color:#666;font-size:0.8em;margin-left:4px;">Auto-use by colonists</span></div>';
             const potionCounts = countByKey(potions, p => p.key ?? p.type);
             for (const [type, count] of Object.entries(potionCounts)) {
                 const def = POTIONS[type];
                 const potionTip = this.getCraftOutputTip(type) || '';
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${potionTip}">${this._itemIcon(type, 'potion')}${def ? def.name : type}</span><span class="inv-amount">x${count}</span></div>`;
+                const autoUse = this.game.settings.potionAutoUse || {};
+                const isEnabled = autoUse[type] !== false;
+                html += `<div class="inv-row" style="display:flex;align-items:center;gap:6px;">`;
+                html += `<span class="inv-name skill-tip" data-tip="${potionTip}" style="flex:1;">${this._itemIcon(type, 'potion')}${def ? def.name : type}</span>`;
+                html += `<span class="inv-amount">x${count}</span>`;
+                html += `<label style="display:flex;align-items:center;gap:3px;font-size:0.8em;color:#aaa;white-space:nowrap;cursor:pointer;" title="Allow colonists to auto-use this potion">`;
+                html += `<input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="window.game.setPotionAutoUse('${type}', this.checked)" style="cursor:pointer;accent-color:#44cc88;">`;
+                html += `</label>`;
+                html += `</div>`;
             }
         }
         if (tomes.length > 0) {

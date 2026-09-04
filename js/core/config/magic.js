@@ -167,9 +167,11 @@ export const RESEARCH = {
     runecraft: { name: 'Runecraft', cost: 80, requires: [], tab: 'foundations', description: 'Etch runes into stone weapons'},
     metalworking: { name: 'Metalworking', cost: 100, requires: [], tab: 'foundations', description: 'Smelting metal and crafting gear at anvils' },
     ley_channeling: { name: 'Ley Channeling', cost: 300, requires: ['runecraft', 'metalworking'], tab: 'foundations', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
-    alchemy: { name: 'Alchemy', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Cooking produces +2 bonus food per meal' },
+    alchemy: { name: 'Alchemy', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Learn how to brew potions. Cooking also produces +2 bonus food per meal' },
     trade_routes: { name: 'Trade Routes', cost: 300, requires: ['alchemy'], tab: 'foundations', description: 'Caravans arrive more often and offer better prices' },
     trade_rifts: { name: 'Trade Rifts', cost: 450, requires: ['trade_routes', 'void_summoning'], tab: 'foundations', description: 'Open Trade Rifts to barter materials with far-off traders for mystery goods' },
+    domestic_alchemy: { name: 'Domestic Alchemy', cost: 280, requires: ['alchemy'], tab: 'foundations', description: 'Brew tonics for use around the colony' },
+    battle_brewing: { name: 'Battle Brewing', cost: 500, requires: ['domestic_alchemy', 'herbalism'], tab: 'foundations', description: 'Brew potions for expeditions, making it easier for your colonists to go further' },
 
     // Wildlife
     beast_binding: { name: 'Beast Binding', cost: 280, requires: ['druidcraft'], tab: 'nature', description: 'Bind and pen creatures' },

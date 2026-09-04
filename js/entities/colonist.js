@@ -317,7 +317,12 @@ function updateNeeds(colonist, game) {
     if (game.weather.season === 'winter' && !isIndoors(colonist, game.map)) {
         const warmed = game.power.isTileWarmed(game, colonist.x, colonist.y);
         if (!warmed) {
-            const coldRes = getEquipmentStat(colonist, 'coldResistance');
+            let coldRes = getEquipmentStat(colonist, 'coldResistance');
+            if (colonist.activeEffects) {
+                for (const e of colonist.activeEffects) {
+                    if (e.type === 'warmth' && e.coldResistanceBonus) coldRes += e.coldResistanceBonus;
+                }
+            }
             if (coldRes <= 0 || Math.random() >= coldRes) {
                 applyThought(colonist, 'freezing', game.tick);
             }
@@ -338,6 +343,11 @@ function updateHealth(colonist) {
     regen += getEquipmentStat(colonist, 'healthRegen');
     regen += (colonist.pedestalHealthRegen || 0);
     regen *= (1 + getEquipmentStat(colonist, 'healthRegenBonus'));
+    if (colonist.activeEffects) {
+        for (const e of colonist.activeEffects) {
+            if (e.type === 'healthRegen' && e.regenPerTick) regen += e.regenPerTick;
+        }
+    }
     if (colonist.state === 'sleeping') regen *= COLONIST_CONFIG.healthRegenWhileSleeping;
     else if (colonist.state === 'idle') regen *= COLONIST_CONFIG.healthRegenWhileIdle;
     colonist.hp = Math.min(colonist.maxHp, colonist.hp + regen);
@@ -572,6 +582,11 @@ function computeMood(colonist) {
     if (colonist.needs.rest < COLONIST_CONFIG.restMoodThreshold) mood += COLONIST_CONFIG.restMoodPenalty;
     if (colonist.assignedBed) mood += COLONIST_CONFIG.bedMoodBonus;
     mood += getEquipmentStat(colonist, 'moodBonus');
+    if (colonist.activeEffects) {
+        for (const e of colonist.activeEffects) {
+            if (e.type === 'mood' && e.moodBonus) mood += e.moodBonus;
+        }
+    }
     return Math.max(0, Math.min(100, mood));
 }
 
@@ -739,8 +754,11 @@ export function invalidateEquipStatCache(colonist) {
 
 function tryUsePotions(colonist, game) {
     if (!colonist._potionCooldowns) colonist._potionCooldowns = {};
+    const autoUseSettings = game.settings.potionAutoUse || {};
 
     for (const [key, potion] of Object.entries(POTIONS)) {
+        if (!potion.trigger) continue;
+        if (autoUseSettings[key] === false) continue;
         if (colonist._potionCooldowns[key] && game.tick - colonist._potionCooldowns[key] < potion.cooldown) continue;
         if (game.resources.getPotionCount(key) <= 0) continue;
 
@@ -749,28 +767,111 @@ function tryUsePotions(colonist, game) {
             shouldUse = colonist.hp < colonist.maxHp * potion.hpThreshold;
         } else if (potion.trigger === 'hasTask') {
             shouldUse = colonist.currentTaskId !== null && (colonist.state === 'moving' || colonist.state === 'working');
+        } else if (potion.trigger === 'lowMana') {
+            shouldUse = colonist.maxMana > 0 && colonist.mana < colonist.maxMana * (potion.manaThreshold || 0.3);
+        } else if (potion.trigger === 'inCombat') {
+            shouldUse = colonist.state === 'fighting';
+        } else if (potion.trigger === 'lowMood') {
+            shouldUse = colonist.mood < (potion.moodThreshold || 35);
+        } else if (potion.trigger === 'coldSeason') {
+            shouldUse = game.weather.season === 'winter' && !isIndoors(colonist, game.map);
+        } else if (potion.trigger === 'farming') {
+            const task = colonist.currentTaskId ? game.taskQueue.getById(colonist.currentTaskId) : null;
+            shouldUse = colonist.state === 'working' && (task?.type === 'plant' || task?.type === 'harvest');
+        } else if (potion.trigger === 'isStudying') {
+            const task = colonist.currentTaskId ? game.taskQueue.getById(colonist.currentTaskId) : null;
+            shouldUse = colonist.state === 'working' && task?.type === 'research';
+        } else if (potion.trigger === 'isCrafting') {
+            const task = colonist.currentTaskId ? game.taskQueue.getById(colonist.currentTaskId) : null;
+            shouldUse = colonist.state === 'working' && (task?.type === 'craft' || task?.type === 'cook');
         }
 
-        if (shouldUse) {
-            game.resources.takePotion(key);
-            colonist._potionCooldowns[key] = game.tick;
+        if (!shouldUse) continue;
 
-            if (potion.effect === 'heal') {
-                colonist.hp = Math.min(colonist.maxHp, colonist.hp + potion.healAmount);
-                game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.healTickChar, color: COMBAT_VISUALS.healTickColor, ttl: COMBAT_VISUALS.healTickTtl });
-            } else if (potion.effect === 'speed') {
-                if (!colonist.activeEffects) colonist.activeEffects = [];
-                colonist.activeEffects.push({
-                    type: 'speed',
-                    moveSpeedBonus: potion.moveSpeedBonus,
-                    workSpeedBonus: potion.workSpeedBonus,
-                    expiresAt: game.tick + potion.duration,
-                });
-                game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 3 });
-            }
-
-            game.notifications.push({ text: `${colonist.name} used ${potion.name}`, tick: game.tick, type: 'success' });
+        // Don't apply a buff that's already active from this potion
+        if (potion.effect === 'speed' || potion.effect === 'resistance' || potion.effect === 'healthRegen' ||
+            potion.effect === 'mood' || potion.effect === 'warmth' || potion.effect === 'blightWard' ||
+            potion.effect === 'scholarship' || potion.effect === 'focus') {
+            if (colonist.activeEffects?.some(e => e.source === key)) continue;
         }
+
+        game.resources.takePotion(key);
+        colonist._potionCooldowns[key] = game.tick;
+
+        if (potion.effect === 'heal') {
+            colonist.hp = Math.min(colonist.maxHp, colonist.hp + potion.healAmount);
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.healTickChar, color: COMBAT_VISUALS.healTickColor, ttl: COMBAT_VISUALS.healTickTtl });
+        } else if (potion.effect === 'restoreMana') {
+            colonist.mana = Math.min(colonist.maxMana, colonist.mana + (potion.manaAmount || 30));
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#8844ff', ttl: 3 });
+        } else if (potion.effect === 'speed') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'speed', source: key,
+                moveSpeedBonus: potion.moveSpeedBonus,
+                workSpeedBonus: potion.workSpeedBonus,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: COMBAT_VISUALS.spellBuffColor, ttl: 3 });
+        } else if (potion.effect === 'resistance') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'shield', source: key,
+                damageReduction: potion.damageReduction,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#ffaa33', ttl: 3 });
+        } else if (potion.effect === 'healthRegen') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'healthRegen', source: key,
+                regenPerTick: potion.regenPerTick,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.healTickChar, color: '#66ff88', ttl: 3 });
+        } else if (potion.effect === 'mood') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'mood', source: key,
+                moodBonus: potion.moodBonus,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#ffdd44', ttl: 3 });
+        } else if (potion.effect === 'warmth') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'warmth', source: key,
+                coldResistanceBonus: potion.coldResistanceBonus,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#ff8833', ttl: 3 });
+        } else if (potion.effect === 'blightWard') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'blightWard', source: key,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#44cc44', ttl: 3 });
+        } else if (potion.effect === 'scholarship') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'scholarship', source: key,
+                skillGrowthBonus: potion.skillGrowthBonus,
+                researchSpeedBonus: potion.researchSpeedBonus,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.xpGainChar, color: COMBAT_VISUALS.xpGainColor, ttl: 3 });
+        } else if (potion.effect === 'focus') {
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({
+                type: 'focus', source: key,
+                craftSpeedBonus: potion.craftSpeedBonus,
+                expiresAt: game.tick + potion.duration,
+            });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#44aaff', ttl: 3 });
+        }
+
+        game.notifications.push({ text: `${colonist.name} used ${potion.name}`, tick: game.tick, type: 'success' });
     }
 }
 
@@ -1926,6 +2027,11 @@ function updateWorking(colonist, game) {
     if (task.type === 'research' && colonist.traits.includes('scholar')) {
         speed *= TRAITS.scholar.researchSpeedMult;
     }
+    if (task.type === 'research' && colonist.activeEffects) {
+        for (const e of colonist.activeEffects) {
+            if (e.type === 'scholarship' && e.researchSpeedBonus) speed *= (1 + e.researchSpeedBonus);
+        }
+    }
     if (task.type === 'research' && game.tick % 10 === 0) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.xpGainChar, color: COMBAT_VISUALS.xpGainColor, ttl: COMBAT_VISUALS.xpGainTtl });
     }
@@ -1946,6 +2052,7 @@ function updateWorking(colonist, game) {
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
             if (e.type === 'speed' && e.workSpeedBonus) speed *= (1 + e.workSpeedBonus);
+            if (e.type === 'focus' && e.craftSpeedBonus && (task.type === 'craft' || task.type === 'cook')) speed *= (1 + e.craftSpeedBonus);
         }
     }
 

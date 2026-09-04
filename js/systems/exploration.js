@@ -309,6 +309,7 @@ export class ExplorationSystem {
                 this._tryHealSpells(exp, game);
                 this._updateActiveEffects(exp, game);
                 this._checkTraitRally(exp, game);
+                if (!exp._entryPotionsUsed) this._tryUsePotions(exp, game);
 
                 if (exp.summons && exp.summons.length > 0) {
                     for (let si = exp.summons.length - 1; si >= 0; si--) {
@@ -1076,7 +1077,7 @@ export class ExplorationSystem {
 
         const ds = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
         if (dimEvents && dimEvents.rare) {
-            const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult', exp.realm);
+            const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult', exp.realm) * (exp.potionLootBoosts?.rareEncounterMult || 1);
             for (const rare of dimEvents.rare) {
                 if (Math.random() < rare.chance * rareEncounterMult * ds.rareLootMult) {
                     const msg = rare.text.replace('{name}', member.name);
@@ -1114,7 +1115,7 @@ export class ExplorationSystem {
             window.soundManager?.playExpSFX('wave_alert');
         } else if (roll < EXPLORATION_CONFIG.trapChance + EXPLORATION_CONFIG.findItemChance) {
             const lootEntry = this._rollLoot(dim, ds);
-            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm);
+            const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm) * (exp.potionLootBoosts?.lootMult || 1);
             const discPool = (dimEvents && dimEvents.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
             if (lootEntry.item) {
@@ -1316,14 +1317,16 @@ export class ExplorationSystem {
             const slotNames = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
             const memberItems = slotNames.filter(s => member[s] && !disabled[s]).map(s => member[s]);
             for (const item of memberItems) { if (item !== member.weapon && item.damage) weaponDmg += item.damage; }
-            const critChance = memberItems.reduce((sum, it) => sum + (it.critChance || 0), 0);
+            let critChance = memberItems.reduce((sum, it) => sum + (it.critChance || 0), 0);
+            critChance += this._combatStatusValue(member, 'buff_critChance', 'value', 0);
             // Attacks-per-round scales with weapon speed: combatRoundTicks is the
             // round's real-time span, so a fast weapon (low effective cooldown)
             // swings more times within it than a slow one. Per-hit damage is
             // weaponDmg/hitsPerRound, so total per-round output stays weaponDmg
             // (DPS-neutral). The only edge extra swings grant is more independent
             // crit rolls, which is exactly the payoff for a high-crit build.
-            const hitsPerRound = Math.max(1, Math.round(EXPLORATION_CONFIG.combatRoundTicks / member.effectiveCooldown));
+            const atkSpeedBuff = 1 + this._combatStatusValue(member, 'buff_attackSpeed', 'value', 0);
+            const hitsPerRound = Math.max(1, Math.round(EXPLORATION_CONFIG.combatRoundTicks / (member.effectiveCooldown / atkSpeedBuff)));
             const perHitDmg = weaponDmg / hitsPerRound;
             const formDmgMult = this._applyFormationModifier(exp, member.id, 'meleeDamageMult');
             const xpDmgMult = this._getXpLevelBonus(member.id, 'expeditionDamageMult');
@@ -1386,7 +1389,8 @@ export class ExplorationSystem {
                         this._addLog(exp, game, `${member.name} slays ${slayLabel}!`, 'success');
                         window.soundManager?.playExpSFX('enemy_death');
                         if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
-                        const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0);
+                        const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0)
+                            + this._combatStatusValue(member, 'buff_hpOnKill', 'value', 0);
                         if (hpOnKill > 0) member.hp = Math.min(member.maxHp, member.hp + hpOnKill);
                         if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
                     }
@@ -1590,6 +1594,7 @@ export class ExplorationSystem {
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
                 let dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
                 dodgeChance += getPartyExpeditionEffect(exp.partySnapshot, 'dodgeChanceMod', exp.realm);
+                dodgeChance += this._combatStatusValue(target, 'buff_dodgeChance', 'value', 0);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
                     target._lastDodgeTick = game.tick;
                     this._addLog(exp, game, `${target.name} dodges ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
@@ -1652,8 +1657,9 @@ export class ExplorationSystem {
     // deduct through this so Ley Battery et al. discount spells on expeditions too.
     _spellManaCost(member, spell) {
         const gearReduction = member.spellCostReduction || 0;
+        const potionReduction = this._combatStatusValue(member, 'buff_spellCostReduction', 'value', 0);
         const levelReduction = expeditionCostReduction(member, spell);
-        const mult = Math.max(0, (1 - levelReduction) * (1 - gearReduction));
+        const mult = Math.max(0, (1 - levelReduction) * (1 - gearReduction) * (1 - potionReduction));
         return Math.max(1, Math.floor(spell.manaCost * mult));
     }
 
@@ -1942,7 +1948,7 @@ export class ExplorationSystem {
             // Passing exp.realm lets realmBonus traits (e.g. Green Thumb) contribute
             // their realm-specific lootMult. Items + flat traits + realmBonus, once.
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm)
-                * streakMult;
+                * streakMult * (exp.potionLootBoosts?.lootMult || 1);
             const lootBonusFlat = this._getMutatorEffect(exp, 'lootBonusFlat');
             const lootAmountMutMult = this._getMutatorEffect(exp, 'lootAmountMult')
                 * this._getRealmEventEffect(exp, 'lootAmountMult');
@@ -2114,6 +2120,15 @@ export class ExplorationSystem {
                         existing.eliteCounts[entry.eliteModifier].count++;
                     }
                 }
+            }
+        }
+
+        // Return any unused potions to the stockpile
+        if (exp.potionSupply) {
+            for (const [potionKey, count] of Object.entries(exp.potionSupply)) {
+                const def = EXPEDITION_POTIONS[potionKey];
+                const resource = def?.resource || potionKey;
+                for (let i = 0; i < count; i++) game.resources.addPotion({ key: resource, type: resource, name: def?.name || potionKey });
             }
         }
 
@@ -2394,17 +2409,74 @@ export class ExplorationSystem {
     _tryUsePotions(exp, game) {
         if (!exp.potionSupply) return;
         const alive = exp.partySnapshot.filter(p => p.hp > 0);
+
+        // Entry-condition potions fire once at the start of exploring (before first encounter).
+        if (exp.status === 'exploring' && !exp._entryPotionsUsed) {
+            exp._entryPotionsUsed = true;
+            for (const [potionKey, count] of Object.entries(exp.potionSupply)) {
+                if (count <= 0) continue;
+                const def = EXPEDITION_POTIONS[potionKey];
+                if (!def || def.useCondition !== 'entry') continue;
+                exp.potionSupply[potionKey]--;
+                if (exp.potionSupply[potionKey] <= 0) delete exp.potionSupply[potionKey];
+                if (def.effect.buffLoot) {
+                    if (!exp.potionLootBoosts) exp.potionLootBoosts = { lootMult: 1, rareEncounterMult: 1 };
+                    if (def.effect.buffLoot.lootMult) exp.potionLootBoosts.lootMult *= def.effect.buffLoot.lootMult;
+                    if (def.effect.buffLoot.rareEncounterMult) exp.potionLootBoosts.rareEncounterMult *= def.effect.buffLoot.rareEncounterMult;
+                }
+                this._addLog(exp, game, def.logText.replace('{name}', alive[0]?.name || 'The party'), 'success');
+                if (exp.summary) exp.summary.potionsUsed++;
+            }
+        }
+
         for (const [potionKey, count] of Object.entries(exp.potionSupply)) {
             if (count <= 0) continue;
             const def = EXPEDITION_POTIONS[potionKey];
             if (!def) continue;
             if (def.useCondition === 'combat' && !exp.combat) continue;
+            if (def.useCondition === 'entry') continue;
+
+            // Rally Brew: party-wide effect, uses on any slowed member
+            if (def.autoUse.anyMemberSlowed) {
+                const slowed = alive.find(p => this._hasCombatStatus(p, 'slow'));
+                if (slowed) {
+                    exp.potionSupply[potionKey]--;
+                    if (exp.potionSupply[potionKey] <= 0) delete exp.potionSupply[potionKey];
+                    if (def.effect.rallyParty) {
+                        const healPct = def.effect.rallyParty.healPercent || 0;
+                        for (const p of alive) {
+                            if (healPct > 0) {
+                                const heal = Math.floor(p.maxHp * healPct);
+                                p.hp = Math.min(p.maxHp, p.hp + heal);
+                                if (exp.summary) exp.summary.healingDone[p.id] = (exp.summary.healingDone[p.id] || 0) + heal;
+                            }
+                            if (def.effect.rallyParty.clearSlow) {
+                                if (p.statusEffects) p.statusEffects = p.statusEffects.filter(s => s.type !== 'slow');
+                            }
+                        }
+                    }
+                    this._addLog(exp, game, def.logText.replace('{name}', slowed.name), 'success');
+                    if (exp.summary) exp.summary.potionsUsed++;
+                }
+                continue;
+            }
 
             for (const member of alive) {
                 let shouldUse = false;
                 if (def.autoUse.hpThreshold && member.hp / member.maxHp <= def.autoUse.hpThreshold) shouldUse = true;
                 if (def.autoUse.manaThreshold && member.maxMana > 0 && member.mana / member.maxMana <= def.autoUse.manaThreshold) shouldUse = true;
                 if (def.autoUse.hasDot && exp.activeEffects?.some(e => e.targetId === member.id && e.type === 'dot')) shouldUse = true;
+                if (def.autoUse.anyMemberAtOrBelow) {
+                    shouldUse = alive.some(p => p.hp / p.maxHp <= def.autoUse.anyMemberAtOrBelow);
+                }
+                if (def.autoUse.requiresMana && (!member.maxMana || member.maxMana <= 0)) continue;
+                if (def.autoUse.onBoss && def.autoUse.hpAbove) {
+                    shouldUse = exp.combat?.enemies?.some(e => e.isBoss && e.hp > 0)
+                        && member.hp / member.maxHp >= def.autoUse.hpAbove;
+                } else if (def.autoUse.hpAbove && def.autoUse.hpThreshold) {
+                    shouldUse = member.hp / member.maxHp <= def.autoUse.hpThreshold
+                        && member.hp / member.maxHp > def.autoUse.hpAbove;
+                }
 
                 if (shouldUse) {
                     exp.potionSupply[potionKey]--;
@@ -2421,8 +2493,21 @@ export class ExplorationSystem {
                     if (def.effect.clearDot) {
                         exp.activeEffects = (exp.activeEffects || []).filter(e => e.targetId !== member.id || e.type !== 'dot');
                     }
+                    if (def.effect.buffCombat) {
+                        const b = def.effect.buffCombat;
+                        const rounds = b.duration || 3;
+                        if (b.attackSpeed) this._applyCombatStatus(member, 'buff_attackSpeed', rounds, { value: b.attackSpeed });
+                        if (b.critChance) this._applyCombatStatus(member, 'buff_critChance', rounds, { value: b.critChance });
+                        if (b.hpOnKill) this._applyCombatStatus(member, 'buff_hpOnKill', rounds, { value: b.hpOnKill });
+                        if (b.spellCostReduction) this._applyCombatStatus(member, 'buff_spellCostReduction', rounds, { value: b.spellCostReduction });
+                    }
+                    if (def.effect.buffDefense) {
+                        const b = def.effect.buffDefense;
+                        const rounds = b.duration || 3;
+                        if (b.dodgeChance) this._applyCombatStatus(member, 'buff_dodgeChance', rounds, { value: b.dodgeChance });
+                    }
                     this._addLog(exp, game, def.logText.replace('{name}', member.name), 'success');
-                    exp.summary.potionsUsed++;
+                    if (exp.summary) exp.summary.potionsUsed++;
                     break;
                 }
             }

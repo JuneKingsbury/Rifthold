@@ -97,6 +97,7 @@ class Game {
             showRoomOverlay: false,
             showAuraOverlay: false,
             craftTargets: {},
+            potionAutoUse: {},
             layoutMode: 'auto',
             musicVolume: 50,
             sfxVolume: 50,
@@ -1121,6 +1122,11 @@ class Game {
         this.settings.autoCookTarget = Math.max(0, Math.min(200, value || 0));
     }
 
+    setPotionAutoUse(potionKey, enabled) {
+        if (!this.settings.potionAutoUse) this.settings.potionAutoUse = {};
+        this.settings.potionAutoUse[potionKey] = enabled;
+    }
+
     craft(recipeKey) {
         if (queueCraftingOrder(this, recipeKey)) {
             this.notifications.push({ text: `Queued: ${recipeKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
@@ -1972,6 +1978,7 @@ class Game {
     resetAllSettings() {
         const keep = this.settings.keyBindings || {};
         const craftTargets = this.settings.craftTargets || {};
+        const potionAutoUse = this.settings.potionAutoUse || {};
         Object.assign(this.settings, {
             autoPauseHostile: true, autoPauseEvent: true, pauseOnDeath: false, pauseOnResearch: true,
             uiFontScale: 1, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
@@ -1985,6 +1992,7 @@ class Game {
         });
         this.settings.keyBindings = keep;
         this.settings.craftTargets = craftTargets;
+        this.settings.potionAutoUse = potionAutoUse;
         this.saveSettingsToStorage();
         // Re-apply live effects that have side effects beyond the settings object.
         window.setUIFontScale?.(1);
@@ -2235,6 +2243,12 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
         const auraLabel = { name: art.name, key: art.key, sourceType: 'colonist', colonistId: carrier.id };
         applyAuraToColonists(game, art.pedestal, radius, carrier.x, carrier.y, auraLabel);
         if (art.pedestal.blightImmunity) applyBlightImmunity(game, radius, carrier.x, carrier.y);
+    }
+
+    // Blight Ward potion: active colonists with the effect protect nearby crops.
+    for (const c of game.colonists) {
+        if (c.hp <= 0 || c.onExpedition || !c.activeEffects) continue;
+        if (c.activeEffects.some(e => e.type === 'blightWard')) applyBlightImmunity(game, 5, c.x, c.y);
     }
 }
 
