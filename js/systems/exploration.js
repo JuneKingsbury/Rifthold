@@ -556,12 +556,11 @@ export class ExplorationSystem {
             if (choice.cost.loot) {
                 const res = choice.cost.loot.resource;
                 const amt = choice.cost.loot.amount;
-                if ((exp.loot[res] || 0) < amt) {
+                if ((game.resources.stockpile[res] || 0) < amt) {
                     this._addLog(exp, game, `Not enough ${res.replace(/_/g, ' ')} to do that.`, 'info');
                     return false;
                 }
-                exp.loot[res] -= amt;
-                if (exp.loot[res] <= 0) delete exp.loot[res];
+                game.resources.deduct({ [res]: amt });
             }
         }
 

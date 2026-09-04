@@ -181,10 +181,12 @@ export function completeTask(colonist, task, game) {
                 spawnParticle(game, {
                     x: task.x + 0.5, y: task.y + 0.5,
                     vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-                    decay: 0.035,
+                    decay: 0.08,
                     color: Math.random() < 0.5 ? '#ffffff' : '#ffee44',
                     size: 2 + Math.random() * 2,
                     alpha: 0.9,
+                    shape: 'square',
+                    maxDist: 0.9,
                 });
             }
             window.soundManager?.playSFX('build_complete');
@@ -208,9 +210,39 @@ export function completeTask(colonist, task, game) {
                     tile.terrain = 'dirt';
                     tile.passable = true;
                     game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+                    for (let i = 0; i < 18; i++) {
+                        const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.4;
+                        const speed = 0.7 + Math.random() * 0.9;
+                        spawnParticle(game, {
+                            x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.5,
+                            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                            ay: 0.4,
+                            decay: 0.45,
+                            color: Math.random() < 0.5 ? '#888888' : '#aaaaaa',
+                            size: 2 + Math.random() * 2,
+                            alpha: 0.9,
+                            shape: 'square',
+                            maxY: task.y + 1,
+                        });
+                    }
                     window.soundManager?.playSFX('mine_hit');
                 }
                 else {
+                    for (let i = 0; i < 14; i++) {
+                        const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
+                        const speed = 0.7 + Math.random() * 0.9;
+                        spawnParticle(game, {
+                            x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.4,
+                            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                            ay: 0.4,
+                            decay: 0.45,
+                            color: Math.random() < 0.5 ? '#8B5E3C' : '#c49a6c',
+                            size: 2 + Math.random() * 2.5,
+                            alpha: 0.9,
+                            shape: 'square',
+                            maxY: task.y + 1,
+                        });
+                    }
                     window.soundManager?.playSFX('chop_hit');
                 }
             }
@@ -456,6 +488,22 @@ export function completeTask(colonist, task, game) {
                 game.roomsDirty = true;
                 applyThought(colonist, 'deconstructed', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+                window.soundManager?.playSFX('chop_hit');
+                for (let i = 0; i < 16; i++) {
+                    const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
+                    const speed = 0.7 + Math.random() * 0.9;
+                    spawnParticle(game, {
+                        x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.5,
+                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        ay: 0.4,
+                        decay: 0.45,
+                        color: Math.random() < 0.5 ? '#aaaaaa' : '#c49a6c',
+                        size: 2 + Math.random() * 2,
+                        alpha: 0.9,
+                        shape: 'square',
+                        maxY: task.y + 1,
+                    });
+                }
             }
             break;
         }
@@ -490,6 +538,22 @@ export function completeTask(colonist, task, game) {
                 game.roomsDirty = true;
                 applyThought(colonist, 'deconstructed', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+                window.soundManager?.playSFX('chop_hit');
+                for (let i = 0; i < 16; i++) {
+                    const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
+                    const speed = 0.7 + Math.random() * 0.9;
+                    spawnParticle(game, {
+                        x: task.x + 0.3 + Math.random() * 0.4, y: task.y + 0.5,
+                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        ay: 0.4,
+                        decay: 0.45,
+                        color: Math.random() < 0.5 ? '#aaaaaa' : '#c49a6c',
+                        size: 2 + Math.random() * 2,
+                        alpha: 0.9,
+                        shape: 'square',
+                        maxY: task.y + 1,
+                    });
+                }
             }
             break;
         }

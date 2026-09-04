@@ -16,6 +16,12 @@ export class Minimap {
         canvas.style.width = 'auto';
         canvas.style.height = 'auto';
 
+        this._cachedImageData = null;
+        this._lastTick = -1;
+        this._lastCamX = -1;
+        this._lastCamY = -1;
+        this._lastSeason = null;
+
         canvas.addEventListener('mousedown', (e) => { e.stopPropagation(); this.onClick(e); });
         canvas.addEventListener('mousemove', (e) => {
             if (e.buttons === 1) { e.stopPropagation(); this.onClick(e); }
@@ -46,54 +52,72 @@ export class Minimap {
     render() {
         const { map, colonists, entities, raiders, camera, weather } = this.game;
         const ctx = this.ctx;
-        const w = CONFIG.MAP_WIDTH * SCALE_X;
-        const h = CONFIG.MAP_HEIGHT * SCALE_Y;
-        const imageData = ctx.createImageData(w, h);
-        const data = imageData.data;
+        const tick = this.game.tick;
+        const season = weather.season;
+        const camX = camera.x;
+        const camY = camera.y;
 
-        for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
-            for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
-                const tile = map[y][x];
-                const color = this.getTileColor(tile, weather.season);
+        const contentChanged = tick !== this._lastTick || season !== this._lastSeason;
+        const cameraChanged = camX !== this._lastCamX || camY !== this._lastCamY;
 
-                for (let dy = 0; dy < SCALE_Y; dy++) {
-                    for (let dx = 0; dx < SCALE_X; dx++) {
-                        const px = x * SCALE_X + dx;
-                        const py = y * SCALE_Y + dy;
-                        const idx = (py * w + px) * 4;
-                        data[idx] = color[0];
-                        data[idx + 1] = color[1];
-                        data[idx + 2] = color[2];
-                        data[idx + 3] = 255;
+        if (contentChanged) {
+            const w = CONFIG.MAP_WIDTH * SCALE_X;
+            const h = CONFIG.MAP_HEIGHT * SCALE_Y;
+            if (!this._cachedImageData) this._cachedImageData = ctx.createImageData(w, h);
+            const data = this._cachedImageData.data;
+
+            for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
+                for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
+                    const tile = map[y][x];
+                    const color = this.getTileColor(tile, season);
+
+                    for (let dy = 0; dy < SCALE_Y; dy++) {
+                        for (let dx = 0; dx < SCALE_X; dx++) {
+                            const px = x * SCALE_X + dx;
+                            const py = y * SCALE_Y + dy;
+                            const idx = (py * w + px) * 4;
+                            data[idx] = color[0];
+                            data[idx + 1] = color[1];
+                            data[idx + 2] = color[2];
+                            data[idx + 3] = 255;
+                        }
                     }
                 }
             }
-        }
 
-        for (const c of colonists) {
-            if (c.hp <= 0) continue;
-            this.drawDot(data, c.x, c.y, [255, 255, 0]);
-        }
-        for (const e of entities) {
-            if (e.hp <= 0) continue;
-            if (e.tamed) {
-                this.drawDot(data, e.x, e.y, [100, 200, 100]);
-            } else if (e.category === 'animal') {
-                this.drawDot(data, e.x, e.y, e.hostile ? [180, 50, 50] : [150, 120, 80]);
+            for (const c of colonists) {
+                if (c.hp <= 0) continue;
+                this.drawDot(data, c.x, c.y, [255, 255, 0]);
             }
-        }
-        for (const r of raiders) {
-            if (r.hp <= 0) continue;
-            this.drawDot(data, r.x, r.y, [255, 50, 50]);
+            for (const e of entities) {
+                if (e.hp <= 0) continue;
+                if (e.tamed) {
+                    this.drawDot(data, e.x, e.y, [100, 200, 100]);
+                } else if (e.category === 'animal') {
+                    this.drawDot(data, e.x, e.y, e.hostile ? [180, 50, 50] : [150, 120, 80]);
+                }
+            }
+            for (const r of raiders) {
+                if (r.hp <= 0) continue;
+                this.drawDot(data, r.x, r.y, [255, 50, 50]);
+            }
+
+            this._lastTick = tick;
+            this._lastSeason = season;
         }
 
-        ctx.putImageData(imageData, 0, 0);
+        if (!contentChanged && !cameraChanged) return;
+
+        ctx.putImageData(this._cachedImageData, 0, 0);
+
+        this._lastCamX = camX;
+        this._lastCamY = camY;
 
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1;
         ctx.strokeRect(
-            camera.x * SCALE_X + 0.5,
-            camera.y * SCALE_Y + 0.5,
+            camX * SCALE_X + 0.5,
+            camY * SCALE_Y + 0.5,
             CONFIG.VIEWPORT_WIDTH * SCALE_X - 1,
             CONFIG.VIEWPORT_HEIGHT * SCALE_Y - 1
         );

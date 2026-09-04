@@ -65,6 +65,7 @@ class Game {
             showOverlays: true,
             showNightLighting: true,
             showWeatherParticles: true,
+            particleDensity: 100,
             showColonistNames: 'selected',
             showMinimap: true,
             showFps: false,
@@ -384,7 +385,13 @@ class Game {
         }
         if (this.settings.showMinimap) this.minimap.render();
         if (prof) prof.mark('frame:minimap');
-        this.ui.update();
+        if (this.ui.arcanePanelVisible) { this.ui.updateArcanePanel(); this._arcaneUpdatedThisFrame = true; }
+        if (this._uiDirty || timestamp - (this._lastUiUpdate || 0) >= 66) {
+            this._lastUiUpdate = timestamp;
+            this._uiDirty = false;
+            this.ui.update(this._arcaneUpdatedThisFrame);
+        }
+        this._arcaneUpdatedThisFrame = false;
         if (prof) prof.mark('frame:ui.update');
         requestAnimationFrame(this.gameLoop);
     }
@@ -1935,7 +1942,7 @@ class Game {
         Object.assign(this.settings, {
             autoPauseHostile: true, autoPauseEvent: true, pauseOnDeath: false, pauseOnResearch: true,
             uiFontScale: 1, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
-            showWeatherParticles: true, showColonistNames: 'selected', showMinimap: true, showFps: false,
+            showWeatherParticles: true, particleDensity: 100, showColonistNames: 'selected', showMinimap: true, showFps: false,
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
             largeClickTargets: false, pauseOnFocusLoss: true, enableScreenShake: true, colorblindMode: 'none',
             notificationDuration: 100, showDamageFlash: true, showCombatParticles: true, showProjectiles: true,
@@ -3434,6 +3441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.showExpeditionExtras = document.getElementById('start-expedition-extras').checked;
             s.showNightLighting = document.getElementById('start-night').checked;
             s.showWeatherParticles = document.getElementById('start-weather').checked;
+            s.particleDensity = parseInt(document.getElementById('start-particle-density').value) || 100;
             s.showMinimap = document.getElementById('start-minimap').checked;
             s.showFps = document.getElementById('start-fps').checked;
             s.fpsCap = document.getElementById('start-fps-cap').checked ? 30 : 60;
@@ -3497,6 +3505,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showExpeditionExtras != null) document.getElementById('start-expedition-extras').checked = s.showExpeditionExtras;
             if (s.showNightLighting != null) document.getElementById('start-night').checked = s.showNightLighting;
             if (s.showWeatherParticles != null) document.getElementById('start-weather').checked = s.showWeatherParticles;
+            if (s.particleDensity != null) { document.getElementById('start-particle-density').value = s.particleDensity; document.getElementById('start-particle-density-val').textContent = s.particleDensity + '%'; }
             if (s.showMinimap != null) document.getElementById('start-minimap').checked = s.showMinimap;
             if (s.showFps != null) document.getElementById('start-fps').checked = s.showFps;
             if (s.fpsCap != null) document.getElementById('start-fps-cap').checked = s.fpsCap === 30;
@@ -3596,6 +3605,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-expedition-extras').checked = true;
         document.getElementById('start-night').checked = true;
         document.getElementById('start-weather').checked = true;
+        document.getElementById('start-particle-density').value = 100;
+        document.getElementById('start-particle-density-val').textContent = '100%';
         document.getElementById('start-minimap').checked = true;
         document.getElementById('start-equip-overlays').checked = true;
         document.getElementById('start-fps').checked = false;
@@ -3700,6 +3711,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showExpeditionExtras: document.getElementById('start-expedition-extras').checked,
             showNightLighting: document.getElementById('start-night').checked,
             showWeatherParticles: document.getElementById('start-weather').checked,
+            particleDensity: parseInt(document.getElementById('start-particle-density').value) || 100,
             showMinimap: document.getElementById('start-minimap').checked,
             showFps: document.getElementById('start-fps').checked,
             fpsCap: document.getElementById('start-fps-cap').checked ? 30 : 60,

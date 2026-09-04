@@ -807,6 +807,7 @@ export function grantCastXp(colonist, spell, game) {
                 color: i % 2 === 0 ? '#aa66ff' : '#ffdd44',
                 size: 3,
                 alpha: 1,
+                shape: 'square',
             });
         }
         window.soundManager?.playSFX('magic_levelup');

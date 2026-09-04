@@ -207,6 +207,7 @@ export class CombatSystem {
                             color: '#ffdd44',
                             size: 2.5,
                             alpha: 0.9,
+                            shape: 'square',
                         });
                     }
                     window.soundManager?.playSFX('loot_drop');

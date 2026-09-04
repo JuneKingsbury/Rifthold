@@ -962,9 +962,14 @@ export class Renderer {
                         // their trunk base, faster and harder as the wind rises. Kept
                         // independent of the entity transform. A tile with an entity
                         // draws the entity sprite, not the tree, so they never coexist.
-                        const treeRot = (!entity && showTreeSway
+                        const isFlame = !entity && tile.structure && (tile.structure === 'candle' || tile.structure === 'campfire');
+                        const flameAmp = tile.structure === 'campfire' ? 0.07 : 0.03;
+                        const flameRot = isFlame
+                            ? Math.sin(now * 0.0006 + (tileKey % 100) * 0.63) * flameAmp
+                            : 0;
+                        const treeRot = flameRot || (!entity && showTreeSway
                             && tile.resource && tile.resource.type === 'tree')
-                            ? getTreeSway(now, tileKey, treeWind) : 0;
+                            ? flameRot || getTreeSway(now, tileKey, treeWind) : 0;
                         // Breathing: stretch height, anchor feet by nudging y up by the same amount.
                         const grow = xf ? xf.growPx : 0;
                         const dx = px + shakeX - hlOff;
@@ -1003,7 +1008,7 @@ export class Renderer {
                             // Tree tiles sway about the trunk base (bottom-center) so the
                             // canopy leans while the roots stay put. treeRot is 0 otherwise
                             // and the sprite draws flat.
-                            this._drawSwayed(ctx, sprite, treeRot, dx, dy, dw, dh, px + cw / 2, py + ch);
+                            this._drawSwayed(ctx, sprite, treeRot, dx, dy, dw, dh, px + cw / 2, isFlame ? py + ch * 0.5 : py + ch);
                         }
                         if (submerge) {
                             ctx.restore();
@@ -1042,15 +1047,9 @@ export class Renderer {
                             this._queueAttackEffect(entity._sim || entity, now, px, py, cw, ch);
                         }
 
-                        // Mining/chopping debris particles on work-bob downstroke
+                        // Mining/chopping debris particles
                         if (entity && entity._sim && entity._sim.state === 'working') {
-                            const A2 = RENDER_CONFIG.entityActionAnim;
-                            if (A2) {
-                                const bobPeriod = A2.workBobPeriodMs || 700;
-                                const bobPhase = ((now / bobPeriod) * Math.PI * 2) % (Math.PI * 2);
-                                const prevBobPhase = (((now - 16) / bobPeriod) * Math.PI * 2) % (Math.PI * 2);
-                                const onDownstroke = prevBobPhase < Math.PI && bobPhase >= Math.PI;
-                                if (onDownstroke && Math.random() < 0.4) {
+                            if (Math.random() < 0.25) {
                                     const sim2 = entity._sim;
                                     const task2 = (game.taskQueue && sim2.currentTaskId != null) ? game.taskQueue.getById(sim2.currentTaskId) : null;
                                     const taskType = task2 ? task2.type : null;
@@ -1058,32 +1057,35 @@ export class Renderer {
                                         for (let dp = 0; dp < 3; dp++) {
                                             const angle2 = Math.PI * 1.5 + (Math.random() - 0.5) * 1.2;
                                             spawnParticle(game, {
-                                                x: wx + 0.5, y: wy + 0.7,
+                                                x: task2.x + 0.5, y: task2.y + 0.7,
                                                 vx: Math.cos(angle2) * (0.2 + Math.random() * 0.2),
                                                 vy: Math.sin(angle2) * (0.2 + Math.random() * 0.2) - 0.1,
                                                 ay: 0.4,
                                                 decay: 0.06,
                                                 color: Math.random() < 0.5 ? '#888888' : '#aaaaaa',
-                                                size: 1.5,
+                                                size: 2.5,
                                                 alpha: 0.85,
+                                                shape: 'square',
+                                                maxY: task2.y + 1,
                                             });
                                         }
                                     } else if (taskType === 'chop') {
                                         for (let dp = 0; dp < 2; dp++) {
                                             const angle2 = -Math.PI * 0.5 + (Math.random() - 0.5) * 1.5;
                                             spawnParticle(game, {
-                                                x: wx + 0.5, y: wy + 0.4,
+                                                x: task2.x + 0.5, y: task2.y + 0.4,
                                                 vx: Math.cos(angle2) * (0.25 + Math.random() * 0.2),
                                                 vy: Math.sin(angle2) * (0.2 + Math.random() * 0.15) - 0.15,
                                                 ay: 0.4,
                                                 decay: 0.05,
                                                 color: Math.random() < 0.5 ? '#8B5E3C' : '#c49a6c',
-                                                size: 2,
+                                                size: 3,
                                                 alpha: 0.9,
+                                                shape: 'square',
+                                                maxY: task2.y + 1,
                                             });
                                         }
                                     }
-                                }
                             }
                         }
 
@@ -1103,6 +1105,7 @@ export class Renderer {
                                                 color: Math.random() < 0.5 ? '#ff6600' : '#ffaa00',
                                                 size: 2 + Math.random(),
                                                 alpha: 0.8,
+                                                shape: 'square',
                                             });
                                         }
                                         break;
@@ -1207,10 +1210,42 @@ export class Renderer {
                                 y: wy - 0.1,
                                 vx: windDrift / cw * 40,
                                 vy: -0.35 - Math.random() * 0.2,
-                                decay: 0.008 + Math.random() * 0.006,
+                                decay: 0.05 + Math.random() * 0.03,
                                 color: `rgba(${140 + Math.floor(Math.random()*40)},${140 + Math.floor(Math.random()*40)},${140 + Math.floor(Math.random()*40)},1)`,
                                 size: 3 + Math.random() * 2,
                                 alpha: 0.45,
+                                shape: 'square',
+                            });
+                        }
+                    }
+
+                    // Candle wisp and campfire ember particles
+                    if (tile.structure && !entity) {
+                        const bDef = BUILDINGS[tile.structure];
+                        if (bDef && bDef.candleEmitter && Math.random() < 0.03) {
+                            spawnParticle(game, {
+                                x: wx + 0.4 + Math.random() * 0.2,
+                                y: wy + 0.15 + Math.random() * 0.1,
+                                vx: (Math.random() - 0.5) * 0.06,
+                                vy: -0.18 - Math.random() * 0.1,
+                                decay: 0.06,
+                                color: Math.random() < 0.6 ? '#ffcc44' : '#ff8822',
+                                size: 1 + Math.random(),
+                                alpha: 0.7,
+                                shape: 'square',
+                            });
+                        }
+                        if (tile.structure === 'campfire' && Math.random() < 0.1) {
+                            spawnParticle(game, {
+                                x: wx + 0.3 + Math.random() * 0.4,
+                                y: wy + 0.2 + Math.random() * 0.2,
+                                vx: (Math.random() - 0.5) * 0.12,
+                                vy: -0.25 - Math.random() * 0.15,
+                                decay: 0.05,
+                                color: Math.random() < 0.5 ? '#ff6600' : '#ffaa00',
+                                size: 1.5 + Math.random() * 1.5,
+                                alpha: 0.75,
+                                shape: 'square',
                             });
                         }
                     }
@@ -1229,6 +1264,7 @@ export class Renderer {
                             size: 2,
                             alpha: 0.85,
                             wobble: 6 + Math.random() * 4,
+                            shape: 'square',
                         });
                     }
 
@@ -1814,21 +1850,44 @@ export class Renderer {
                 }
             }
 
-            // Draw the darkness overlay. Skip fully-lit tiles (shade < 1).
-            let lastDarkStyle = '';
-            for (let sy = 0; sy <= vh; sy++) {
+            // Draw the darkness overlay via an offscreen buffer: write alpha values
+            // into a small tile-resolution ImageData, put it onto a tiny offscreen
+            // canvas, then drawImage it scaled up onto the main canvas. This replaces
+            // thousands of fillRect calls with one drawImage composite.
+            const nightW = vw + 1;
+            const nightH = vh + 1;
+            if (!this._nightCanvas) {
+                this._nightCanvas = document.createElement('canvas');
+                this._nightCtx = this._nightCanvas.getContext('2d', { alpha: true });
+            }
+            if (this._nightCanvas.width !== nightW || this._nightCanvas.height !== nightH) {
+                this._nightCanvas.width = nightW;
+                this._nightCanvas.height = nightH;
+            }
+            if (!this._nightImageData || this._nightImageData.width !== nightW || this._nightImageData.height !== nightH) {
+                this._nightImageData = this._nightCtx.createImageData(nightW, nightH);
+            }
+            const nightData = this._nightImageData.data;
+            for (let sy = 0; sy < nightH; sy++) {
                 const rowOff = sy * vw;
-                for (let sx = 0; sx <= vw; sx++) {
+                for (let sx = 0; sx < nightW; sx++) {
                     const shade = Math.round((1 - lightGrid[rowOff + sx]) * steps);
-                    if (shade < 1) continue;
-                    const style = darkStyles[shade - 1];
-                    if (style !== lastDarkStyle) {
-                        ctx.fillStyle = style;
-                        lastDarkStyle = style;
+                    const pIdx = (sy * nightW + sx) * 4;
+                    if (shade < 1) {
+                        nightData[pIdx + 3] = 0;
+                    } else {
+                        nightData[pIdx] = nr;
+                        nightData[pIdx + 1] = ng;
+                        nightData[pIdx + 2] = nb;
+                        nightData[pIdx + 3] = Math.round(darkness * shade / steps * 255);
                     }
-                    ctx.fillRect(sx * cw, sy * ch, cw, ch);
                 }
             }
+            this._nightCtx.putImageData(this._nightImageData, 0, 0);
+            const prevSmoothing = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(this._nightCanvas, 0, 0, nightW, nightH, 0, 0, nightW * cw, nightH * ch);
+            ctx.imageSmoothingEnabled = prevSmoothing;
         }
 
         this.overlayRenderer.render(game, cw, ch, game.camera);

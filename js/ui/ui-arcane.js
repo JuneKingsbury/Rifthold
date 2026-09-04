@@ -855,7 +855,8 @@ const arcaneMethods = {
                     if (totalPotions < c.cost.potionSlots) { canAfford = false; reasonText = 'not enough potions'; }
                 }
                 if (canAfford && c.cost?.loot) {
-                    if ((exp.loot[c.cost.loot.resource] || 0) < c.cost.loot.amount) { canAfford = false; reasonText = `need ${c.cost.loot.amount} ${c.cost.loot.resource.replace(/_/g, ' ')}`; }
+                    const globalCount = this.game.resources.stockpile[c.cost.loot.resource] || 0;
+                    if (globalCount < c.cost.loot.amount) { canAfford = false; reasonText = `need ${c.cost.loot.amount} ${c.cost.loot.resource.replace(/_/g, ' ')}`; }
                 }
                 const costParts = [];
                 if (c.cost) {

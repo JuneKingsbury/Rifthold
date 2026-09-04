@@ -418,7 +418,7 @@ export class UI {
         });
     }
 
-    update() {
+    update(skipArcane) {
         this.updateStatusBar();
         this.updateNotifications();
         this.updateEventPanel();
@@ -428,7 +428,7 @@ export class UI {
         this.updateColonistHud();
         this.updateEventLog();
         if (this.inventoryVisible) this.updateInventoryPanel();
-        if (this.arcanePanelVisible) this.updateArcanePanel();
+        if (this.arcanePanelVisible && !skipArcane) this.updateArcanePanel();
         if (this.storyPanelVisible) this.updateStoryPanel();
         if (this._viewingRiftGate) this._refreshRiftGateInfo();
         if (this._viewingColonistId != null) this._refreshColonistInfo();
@@ -2763,6 +2763,9 @@ export class UI {
         graphics += this._settingsCheck('set-overlays', s.showOverlays, 'window.game.ui._toggleAllEffects(this.checked)', 'Master toggle: all combat/overlay effects');
         graphics += this._settingsCheck('set-night', s.showNightLighting, 'window.game.settings.showNightLighting=this.checked', 'Show night lighting/darkness (High Performance Impact)');
         graphics += this._settingsCheck('set-weather', s.showWeatherParticles, 'window.game.settings.showWeatherParticles=this.checked', 'Show weather particles');
+        graphics += `<div class="settings-row"><label for="set-particle-density">Particle Density: <span id="particle-density-val">${s.particleDensity || 100}%</span></label>`;
+        graphics += `<input type="range" id="set-particle-density" min="10" max="100" step="10" value="${s.particleDensity || 100}" style="width:80px" oninput="document.getElementById('particle-density-val').textContent=this.value+'%';window.game.settings.particleDensity=parseInt(this.value);window.game.saveSettingsToStorage()">`;
+        graphics += `</div>`;
         graphics += this._settingsCheck('set-damage-flash', s.showDamageFlash, 'window.game.settings.showDamageFlash=this.checked', 'Damage flash on hit');
         graphics += this._settingsCheck('set-screen-shake', s.enableScreenShake, 'window.game.settings.enableScreenShake=this.checked', 'Enable screen shake');
         graphics += this._settingsCheck('set-combat-particles', s.showCombatParticles, 'window.game.settings.showCombatParticles=this.checked', 'Combat/action particles (sparks, skulls)');

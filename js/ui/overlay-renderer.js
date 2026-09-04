@@ -15,6 +15,9 @@ export function spawnParticle(game, props) {
         wobblePhase: Math.random() * Math.PI * 2,
         shape: props.shape || 'circle',
         maxY: props.maxY != null ? props.maxY : null,
+        maxDist: props.maxDist != null ? props.maxDist : null,
+        originX: props.maxDist != null ? props.x : undefined,
+        originY: props.maxDist != null ? props.y : undefined,
     });
 }
 
@@ -61,7 +64,8 @@ export class OverlayRenderer {
             const dt = this._lastWeatherTime ? Math.min((now - this._lastWeatherTime) / 1000, 0.1) : 0.016;
             this._lastWeatherTime = now;
             const targetWeather = game.settings.showWeatherParticles ? game.weather.currentWeather : 'clear';
-            this._updateWeatherParticles(targetWeather, this.canvas.width, this.canvas.height, dt, now);
+            const density = (game.settings.particleDensity || 100) / 100;
+            this._updateWeatherParticles(targetWeather, this.canvas.width, this.canvas.height, dt, now, density);
             if (this._weatherAlpha > 0 && this._weatherParticles.length > 0) {
                 ctx.save();
                 ctx.globalAlpha = this._weatherAlpha;
@@ -167,9 +171,9 @@ export class OverlayRenderer {
         ctx.restore();
     }
 
-    _updateWeatherParticles(weatherType, canvasWidth, canvasHeight, dt, now) {
+    _updateWeatherParticles(weatherType, canvasWidth, canvasHeight, dt, now, density) {
         const FADE_SPEED = 0.8;  // alpha units per second (~1.25s fade)
-        const hasParticles = this._getParticleTarget(weatherType) > 0;
+        const hasParticles = this._getParticleTarget(weatherType, density) > 0;
         const fadingOut = this._activeWeather !== weatherType || !hasParticles;
 
         if (fadingOut) {
@@ -194,7 +198,7 @@ export class OverlayRenderer {
         // Fade in
         this._weatherAlpha = Math.min(1, this._weatherAlpha + FADE_SPEED * dt);
 
-        const targetCount = this._getParticleTarget(weatherType);
+        const targetCount = this._getParticleTarget(weatherType, density);
         while (this._weatherParticles.length < targetCount) {
             this._weatherParticles.push(this._spawnWeatherParticle(weatherType, canvasWidth, canvasHeight, true));
         }
@@ -226,16 +230,18 @@ export class OverlayRenderer {
         }
     }
 
-    _getParticleTarget(weatherType) {
+    _getParticleTarget(weatherType, density) {
+        let base;
         switch (weatherType) {
-            case 'rain': return 120;
-            case 'thunderstorm': return 180;
-            case 'snow': return 60;
-            case 'blizzard': return 100;
-            case 'windy': return 18;
-            case 'cloudy': return 6;
+            case 'rain': base = 120; break;
+            case 'thunderstorm': base = 180; break;
+            case 'snow': base = 60; break;
+            case 'blizzard': base = 100; break;
+            case 'windy': base = 18; break;
+            case 'cloudy': base = 6; break;
             default: return 0;
         }
+        return Math.round(base * (density != null ? density : 1));
     }
 
     _spawnWeatherParticle(weatherType, canvasWidth, canvasHeight, randomY) {
@@ -696,6 +702,10 @@ export class OverlayRenderer {
             if (p.wobble) p.wobblePhase = (p.wobblePhase || 0) + p.wobble * dt;
             p.life -= p.decay * dt;
             if (p.maxY != null && p.y > p.maxY) p.life = 0;
+            if (p.maxDist != null) {
+                const dx = p.x - p.originX, dy = p.y - p.originY;
+                if (dx * dx + dy * dy > p.maxDist * p.maxDist) p.life = 0;
+            }
             if (p.life <= 0) {
                 particles[i] = particles[particles.length - 1];
                 particles.length--;
