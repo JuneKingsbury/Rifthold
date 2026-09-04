@@ -2209,13 +2209,14 @@ function fitGameFont() {
     const fontSize = Math.max(MIN_FONT, Math.min(MAX_FONT, currentZoomFont));
     currentZoomFont = fontSize;
 
-    // Must match renderer.measureFont: charWidth/charHeight are ceil(fontSize * fontHeightMult).
-    // Deriving the viewport tile count from a different (float) cell size desyncs VIEWPORT_WIDTH
-    // from the tiles actually painted, which makes camera.centerOn miscenter (worse on narrow
-    // viewports and after a zoom changes fontSize).
-    const cellSize = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
-    CONFIG.VIEWPORT_WIDTH = Math.max(20, Math.floor(availWidth / cellSize));
-    CONFIG.VIEWPORT_HEIGHT = Math.max(10, Math.floor(availHeight / cellSize));
+    // Must match renderer.measureFont exactly. charWidth = round(ceil(fontSize * fontHeightMult) * dpr) / dpr
+    // so that tile positions land on integer physical pixels (avoids subpixel seams at non-integer DPR).
+    const dpr = window.devicePixelRatio || 1;
+    const logicalCellSize = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
+    const physCellSize = Math.round(logicalCellSize * dpr);
+    const cellSize = physCellSize / dpr;  // CSS pixels — same value renderer assigns to charWidth
+    CONFIG.VIEWPORT_WIDTH = Math.max(1, Math.floor(availWidth / cellSize));
+    CONFIG.VIEWPORT_HEIGHT = Math.max(1, Math.floor(availHeight / cellSize));
 
     document.documentElement.style.setProperty('--game-font-size', fontSize + 'px');
 

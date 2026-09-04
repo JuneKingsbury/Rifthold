@@ -61,7 +61,10 @@ export class Renderer {
         this.ctx.font = `${fontSize}px 'Courier New', monospace`;
         const metrics = this.ctx.measureText('M');
         this._textWidth = Math.ceil(metrics.width);
-        this.charHeight = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
+        const dpr = window.devicePixelRatio || 1;
+        const logicalHeight = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
+        const physHeight = Math.round(logicalHeight * dpr);  // integer physical pixels
+        this.charHeight = physHeight / dpr;                   // CSS pixels (possibly fractional)
         this.charWidth = this.charHeight;
         this._textOffsetX = Math.floor((this.charWidth - this._textWidth) / 2);
         this._resizeCanvas();
