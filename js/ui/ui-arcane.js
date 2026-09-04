@@ -48,6 +48,7 @@ const arcaneMethods = {
         this._closeAllPanels();
         this.arcanePanelVisible = opening;
         this.elements.arcanePanel.style.display = opening ? 'block' : 'none';
+        window.soundManager?.setExpeditionMode(opening);
         if (tab) this._arcaneTab = tab;
         if (opening) {
             this._arcaneExpSetup = null;

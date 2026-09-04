@@ -9,8 +9,10 @@ class SoundManagerClass {
         this.ctx = null;
         this.musicGain = null;
         this.sfxGain = null;
+        this.expeditionSfxGain = null;
         this.musicVolume = 70;
         this.sfxVolume = 80;
+        this.expeditionMode = false;
         this.bufferCache = new Map();
         this.unavailable = new Set();
         this.lastPlayTime = new Map();
@@ -25,10 +27,13 @@ class SoundManagerClass {
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
             this.musicGain = this.ctx.createGain();
             this.sfxGain = this.ctx.createGain();
+            this.expeditionSfxGain = this.ctx.createGain();
             this.musicGain.connect(this.ctx.destination);
             this.sfxGain.connect(this.ctx.destination);
+            this.expeditionSfxGain.connect(this.ctx.destination);
             this.musicGain.gain.value = this.musicVolume / 100;
             this.sfxGain.gain.value = this.sfxVolume / 100;
+            this.expeditionSfxGain.gain.value = this.sfxVolume / 100;
             if (this.ctx.state === 'suspended') {
                 this.ctx.resume();
             }
@@ -45,7 +50,17 @@ class SoundManagerClass {
     setSFXVolume(val) {
         this.sfxVolume = val;
         if (this.sfxGain) {
-            this.sfxGain.gain.value = val / 100;
+            this.sfxGain.gain.value = this.expeditionMode ? (val / 100) * 0.1 : val / 100;
+        }
+        if (this.expeditionSfxGain) {
+            this.expeditionSfxGain.gain.value = val / 100;
+        }
+    }
+
+    setExpeditionMode(active) {
+        this.expeditionMode = active;
+        if (this.sfxGain) {
+            this.sfxGain.gain.value = active ? (this.sfxVolume / 100) * 0.1 : this.sfxVolume / 100;
         }
     }
 
@@ -72,6 +87,33 @@ class SoundManagerClass {
             source.detune.value = randomCents;
 
             source.connect(this.sfxGain);
+
+            this.activeSfxCount++;
+            source.onended = () => { this.activeSfxCount--; };
+            source.start(0);
+        } catch (e) { /* silent */ }
+    }
+
+    async playExpSFX(name) {
+        try {
+            if (!this.ctx || this.unavailable.has(name)) return;
+            if (this.activeSfxCount >= MAX_CONCURRENT_SFX) return;
+
+            const now = performance.now();
+            const last = this.lastPlayTime.get(name) || 0;
+            if (now - last < SFX_COOLDOWN_MS) return;
+            this.lastPlayTime.set(name, now);
+
+            if (this.ctx.state === 'suspended') await this.ctx.resume();
+
+            const buffer = await this._getBuffer(name, 'sfx');
+            if (!buffer) return;
+
+            const source = this.ctx.createBufferSource();
+            source.buffer = buffer;
+            const randomCents = (Math.random() * 2 - 1) * 300;
+            source.detune.value = randomCents;
+            source.connect(this.expeditionSfxGain);
 
             this.activeSfxCount++;
             source.onended = () => { this.activeSfxCount--; };

@@ -808,6 +808,7 @@ export class ExplorationSystem {
         }
         exp.defeated.push(member.id);
         this._addLog(exp, game, pickRandom(EXPLORATION_EVENTS.combatDefeat).replace('{name}', member.name), 'danger');
+        window.soundManager?.playExpSFX('colonist_death');
     }
 
     _updateGathering(exp, game) {
@@ -1090,6 +1091,7 @@ export class ExplorationSystem {
                         exp.loot[rare.loot.resource] = (exp.loot[rare.loot.resource] || 0) + amount;
                         this._addLog(exp, game, `${msg} (+${amount} ${rare.loot.resource.replace(/_/g, ' ')})`, 'loot');
                     }
+                    window.soundManager?.playExpSFX('loot_drop');
                     return;
                 }
             }
@@ -1110,6 +1112,7 @@ export class ExplorationSystem {
                 remainingTicks: Math.max(0, exp.nextEncounterTick - game.tick),
             };
             this._addLog(exp, game, trapDef.text, 'danger');
+            window.soundManager?.playExpSFX('wave_alert');
         } else if (roll < EXPLORATION_CONFIG.trapChance + EXPLORATION_CONFIG.findItemChance) {
             const lootEntry = this._rollLoot(dim, ds);
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm);
@@ -1125,6 +1128,7 @@ export class ExplorationSystem {
                 exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + boostedAmount;
                 this._addLog(exp, game, `${msg} (+${boostedAmount} ${lootEntry.resource.replace(/_/g, ' ')})`, 'loot');
             }
+            window.soundManager?.playExpSFX('loot_drop');
         } else {
             const ambientPool = (dimEvents && dimEvents.ambient) || EXPLORATION_EVENTS.ambient;
             const msg = pickRandom(ambientPool).replace('{name}', member.name);
@@ -1199,6 +1203,7 @@ export class ExplorationSystem {
                 exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + amount;
                 this._addLog(exp, game, `${msg} (+${amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
             }
+            window.soundManager?.playExpSFX('loot_drop');
             if (exp.nodeMap) {
                 const node = exp.nodeMap.find(n => n.encounterIndex === exp.currentEncounter);
                 if (node) node.completed = true;
@@ -1214,6 +1219,7 @@ export class ExplorationSystem {
             const dim = REALMS[exp.realm];
             const approachMsg = dim.boss?.approachText || `A powerful foe blocks the path: ${bossEnemy.name}!`;
             this._addLog(exp, game, approachMsg, 'danger');
+            window.soundManager?.playExpSFX('wave_alert');
             this._updateBestiary(exp, 'boss', bossEnemy.name, { name: bossEnemy.name, sprite: bossEnemy.sprite || dim.boss?.sprite, color: bossEnemy.color || dim.boss?.color, lore: dim.boss?.lore || '' });
 
             if (encounter.bossPhases) {
@@ -1227,6 +1233,7 @@ export class ExplorationSystem {
             const eliteNames = enemies.filter(e => e.elite).map(e => e.eliteName);
             const eliteNote = eliteNames.length > 0 ? ` (includes ${eliteNames.join(', ')} elite!)` : '';
             this._addLog(exp, game, `${startMsg} (${enemies.length} foes)${eliteNote}`, 'combat');
+            window.soundManager?.playExpSFX('wave_alert');
 
             for (const e of enemies) {
                 const bKey = e.typeKey || `enemy_${exp.realm}`;
@@ -1364,6 +1371,7 @@ export class ExplorationSystem {
                     const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
                     const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', member.name).replace('{target}', targetLabel).replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
+                    window.soundManager?.playExpSFX(critHit ? 'critical_hit' : 'colonist_damaged');
                     const lifeSteal = memberItems.reduce((sum, it) => sum + (it.lifeSteal || 0), 0);
                     if (target.eliteLifeSteal && target.eliteLifeSteal > 0) {
                         // Vampiric enemies steal from the attacker
@@ -1375,6 +1383,7 @@ export class ExplorationSystem {
                     if (target.hp <= 0) {
                         const slayLabel = target.isBoss ? target.name : 'a foe';
                         this._addLog(exp, game, `${member.name} slays ${slayLabel}!`, 'success');
+                        window.soundManager?.playExpSFX('enemy_death');
                         if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
                         const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0);
                         if (hpOnKill > 0) member.hp = Math.min(member.maxHp, member.hp + hpOnKill);
@@ -1603,6 +1612,7 @@ export class ExplorationSystem {
                     if (exp.summary) exp.summary.damageTaken[target.id] = (exp.summary.damageTaken[target.id] || 0) + dmg;
                     const msg = pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', attackerLabel).replace('{target}', target.name).replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
+                    window.soundManager?.playExpSFX('colonist_damaged');
 
                     // Thorns from equipment + mutators
                     let thorns = targetItems.reduce((sum, it) => sum + (it.thornsDamage || 0), 0) + globalThorns;
@@ -1684,6 +1694,7 @@ export class ExplorationSystem {
                         }
                         this._addLog(exp, game, `${member.name} casts ${spell.name}! Hits ${targets.length} foes for ${dmg} each.`, 'combat');
                         game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                        window.soundManager?.playExpSFX('spell_cast');
                         for (const t of targets) {
                             if (t.hp <= 0) this._addLog(exp, game, `An enemy is destroyed by the blast!`, 'success');
                         }
@@ -1703,12 +1714,14 @@ export class ExplorationSystem {
                         }
                         this._addLog(exp, game, `${member.name} casts ${spell.name}, arcing through ${hitCount} ${hitCount === 1 ? 'foe' : 'foes'}!`, 'combat');
                         game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                        window.soundManager?.playExpSFX('spell_cast');
                     } else {
                         const target = combat.enemies.find(e => e.hp > 0);
                         if (target) {
                             target.hp -= dmg;
                             this._addLog(exp, game, `${member.name} casts ${spell.name} at an enemy for ${dmg} damage!`, 'combat');
                             game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                            window.soundManager?.playExpSFX('spell_cast');
                             // Frost Lance et al. slow the struck foe for a couple of rounds.
                             if (spell.effect === 'ranged_damage_slow' && target.hp > 0) {
                                 this._applyCombatStatus(target, 'slow', spell.slowRounds || 2, { mult: spell.slowMult || 0.5 });
@@ -1727,6 +1740,7 @@ export class ExplorationSystem {
                     member.dodgeCharges = (member.dodgeCharges || 0) + charges;
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — phasing through attacks!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_teleport');
                     break;
                 } else if (spell.effect === 'buff_defense' && !member.shieldActive) {
                     member.mana -= this._spellManaCost(member, spell);
@@ -1736,6 +1750,7 @@ export class ExplorationSystem {
                     member.shieldReduction = Math.min(0.75, spell.damageReduction * expeditionSpellPower(member, spell));
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — shielded!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_shield');
                     break;
                 } else if (spell.effect === 'summon') {
                     if (!exp.summons) exp.summons = [];
@@ -1759,6 +1774,7 @@ export class ExplorationSystem {
                     });
                     this._addLog(exp, game, `${member.name} summons a ${summonDef.name}!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('summon_arrival');
                     break;
                 } else if (spell.effect === 'summon_swarm') {
                     if (!exp.summons) exp.summons = [];
@@ -1785,6 +1801,7 @@ export class ExplorationSystem {
                     }
                     this._addLog(exp, game, `${member.name} conjures a swarm of ${count} ${summonDef.name}s!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('summon_arrival');
                     break;
                 } else if (spell.effect === 'absorb_shield' && !member.shieldActive) {
                     // Guardian Ward maps to the same shield channel as buff_defense in
@@ -1797,6 +1814,7 @@ export class ExplorationSystem {
                     member.shieldReduction = 0.5;
                     this._addLog(exp, game, `${member.name} casts ${spell.name} — a guardian ward absorbs incoming blows!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_shield');
                     break;
                 } else if (spell.effect === 'stun') {
                     // Mesmerize: stun the frontmost foe(s) for a round. chainTargets>1
@@ -1809,6 +1827,7 @@ export class ExplorationSystem {
                     for (const t of foes) this._applyCombatStatus(t, 'stun', spell.stunRounds || 1);
                     this._addLog(exp, game, `${member.name} casts ${spell.name}, stunning ${foes.length === 1 ? 'a foe' : foes.length + ' foes'}!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_cast');
                     break;
                 }
             }
@@ -1844,6 +1863,7 @@ export class ExplorationSystem {
                     const who = target === member ? '' : ` ${target.name}`;
                     this._addLog(exp, game, `${member.name} casts ${spell.name} and heals${who || ' themselves'} for ${healed} HP.`, 'success');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_heal');
                     break;
                 } else if (spell.effect === 'chain_heal') {
                     const threshold = spell.hpThreshold || 0.7;
@@ -1870,6 +1890,7 @@ export class ExplorationSystem {
                     }
                     this._addLog(exp, game, `${member.name} casts ${spell.name}, mending ${wounded.length} ${wounded.length === 1 ? 'ally' : 'allies'} for ${total} HP total.`, 'success');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_heal');
                     break;
                 } else if (spell.effect === 'cleanse') {
                     // Strip lingering harmful effects. Between encounters the relevant
@@ -1962,6 +1983,7 @@ export class ExplorationSystem {
                 exp.loot._items.push(lootEntry.item);
                 const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
                 this._addLog(exp, game, `Victory! Found ${itemName}!`, 'success');
+                window.soundManager?.playExpSFX('loot_drop');
             } else {
                 let resMult = 1.0;
                 for (const event of this.activeRealmEvents) {
@@ -1971,9 +1993,11 @@ export class ExplorationSystem {
                 const amount = Math.floor(lootEntry.amount * lootMult * eliteLootMult * lootAmountMutMult * resMult) + lootBonusFlat;
                 exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
                 this._addLog(exp, game, `Victory! Looted ${amount} ${lootEntry.resource.replace(/_/g, ' ')}.`, 'success');
+                window.soundManager?.playExpSFX('loot_drop');
             }
         } else {
             this._addLog(exp, game, 'The party has been overwhelmed...', 'danger');
+            window.soundManager?.playExpSFX('mental_break');
         }
         for (const member of exp.partySnapshot) {
             member.shieldActive = false;
@@ -2050,6 +2074,7 @@ export class ExplorationSystem {
                 xpData.xp -= needed;
                 xpData.level++;
                 this._addLog(exp, game, `${snapshot.name} reached Adventurer level ${xpData.level}!`, 'success');
+                window.soundManager?.playExpSFX('magic_levelup');
                 needed = EXPEDITION_XP_CONFIG.xpToLevel + xpData.level * EXPEDITION_XP_CONFIG.xpScalePerLevel;
             }
             this.expeditionXP[snapshot.id] = xpData;
@@ -2509,6 +2534,7 @@ export class ExplorationSystem {
                 exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
                 this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
             }
+            window.soundManager?.playExpSFX('loot_drop');
         }
         if (effects.spawnCombat && exp.partySnapshot.some(p => p.hp > 0)) {
             const dim = REALMS[exp.realm];
@@ -2559,6 +2585,7 @@ export class ExplorationSystem {
                 exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
                 this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
             }
+            window.soundManager?.playExpSFX('loot_drop');
         }
     }
 
