@@ -1190,14 +1190,29 @@ export class Renderer {
                         ctx.restore();
                     }
 
-                    // Crop sway: zone tiles with a planted crop sway in the wind
-                    if (tile.zone && tile.zone.crop && showTerrainDetail) {
+                    // Crop sway: zone tiles with a planted crop sway in the wind (skip empty)
+                    if (tile.zone && tile.zone.crop && tile.zone.state !== 'empty' && showTerrainDetail) {
                         const cropState = tile.zone.state || 'empty';
                         const cropSprite = this.skinManager.getSprite('farms', tile.zone.crop + '_' + cropState)
                             || this.skinManager.getSprite('farms', 'farm_' + cropState);
                         if (cropSprite && !entity) {
                             this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw, ch, cropSprite);
                         }
+                    }
+
+                    // Creeping miasma spore particles on blighted crop tiles
+                    if (tile.zone && tile.zone.blighted && Math.random() < 0.06) {
+                        spawnParticle(game, {
+                            x: wx + 0.2 + Math.random() * 0.6,
+                            y: wy + 0.2 + Math.random() * 0.4,
+                            vx: (Math.random() - 0.5) * 0.08,
+                            vy: -0.12 - Math.random() * 0.1,
+                            decay: 0.03 + Math.random() * 0.02,
+                            color: Math.random() < 0.5 ? '#7a5599' : '#88aa44',
+                            size: 2 + Math.random() * 2,
+                            alpha: 0.55,
+                            shape: 'square',
+                        });
                     }
 
                     // Smoke emission from active buildings

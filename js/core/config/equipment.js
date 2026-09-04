@@ -168,7 +168,7 @@ export const TOOLS = {
     drum_of_rallying: { name: 'Drum of Rallying', textColor: '#4488ff', tradeValue: 50, description: 'War drums that inspire nearby fighters.', attackSpeed: 0.15, pedestal: { radius: 8, manaCost: 3, damageBonusMult: 1.15 }, expedition: { partyDamageMult: 1.15 }, recipe: { input: { wood: 6, runite: 2, planks: 3 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
     runite_hammer: { name: 'Runite Hammer', textColor: '#4488ff', tradeValue: 50, description: 'A hammer pulsing with runic energy. Greatly speeds work.', workSpeedBonus: 0.35, pedestal: { radius: 5, manaCost: 2, workSpeedBonus: 0.2 } },
     heartwood_staff: { name: 'Heartwood Staff', textColor: '#4488ff', tradeValue: 55, description: 'A staff carved from ancient heartwood. Strong magic focus.', spellDamageBonus: 0.3, pedestal: { radius: 7, manaCost: 3, skillGrowthBonus: 0.1 } },
-    staff_of_regrowth: { name: 'Staff of Regrowth', textColor: '#4488ff', tradeValue: 45, description: 'A living staff that protects crops and amplifies spells.', spellDamageBonus: 0.2, pedestal: { radius: 6, manaCost: 2, blightImmunity: true } },
+    staff_of_regrowth: { name: 'Staff of Regrowth', textColor: '#4488ff', tradeValue: 45, description: 'A living staff that protects crops and amplifies spells.', spellDamageBonus: 0.2, pedestal: { radius: 6, manaCost: 2, blightImmunity: true, blightDamageReduction: 0.5 } },
     staff_of_distortion: { name: 'Staff of Distortion', textColor: '#f944ff', tradeValue: 60, description: 'A staff that warps space, confusing enemies.', spellDamageBonus: 0.4, targetPriority: -5, expedition: { partyDamageMult: 1.2, trapDamageMult: 1.3 } },
 };
 
@@ -188,7 +188,7 @@ build-defining relic outvalues mid-tier gear. Per-band trinket targets:
 their original 45–60 values; only the TRINKETS block below follows it.)
 */
 export const TRINKETS = {
-    seedkeepers_locket: { name: "Seedkeeper's Locket", textColor:'#4488ff', tradeValue: 72, tier: 3, description: 'A locket blessed by druids. Protects crops from blight.', pedestal: { radius: 8, manaCost: 1, blightImmunity: true }, expedition: { trapDamageMult: 0.7 } },
+    seedkeepers_locket: { name: "Seedkeeper's Locket", textColor:'#4488ff', tradeValue: 72, tier: 3, description: 'A locket blessed by druids. Protects crops from blight and damages blight blooms.', pedestal: { radius: 8, manaCost: 1, blightImmunity: true, blightBloomDamage: 2 }, expedition: { trapDamageMult: 0.7 } },
     hourglass_of_diligence: { name: 'Hourglass of Diligence', textColor:'#4488ff', tradeValue: 65, tier: 3, description: 'Time bends around this hourglass, hastening all labor.', workSpeedBonus: 0.25, pedestal: { radius: 5, manaCost: 2, workSpeedBonus: 0.15 } },
     lodestone_of_prosperity: { name: 'Lodestone of Prosperity', textColor:'#4488ff', tradeValue: 60, tier: 3, description: 'A magnetic stone that draws wanderers and traders to your colony.', pedestal: { radius: 'global', manaCost: 2, wandererChanceMult: 1.25, traderChanceMult: 1.25 } },
     cornucopia_charm: { name: 'Cornucopia Charm', textColor:'#44cc44', tradeValue: 48, tier: 2, description: 'A charm of abundance. Cooking yields extra food.', pedestal: { radius: 'global', manaCost: 1, cookingBonusFood: 1 } },

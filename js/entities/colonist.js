@@ -2053,6 +2053,7 @@ function updateWorking(colonist, game) {
         for (const e of colonist.activeEffects) {
             if (e.type === 'speed' && e.workSpeedBonus) speed *= (1 + e.workSpeedBonus);
             if (e.type === 'focus' && e.craftSpeedBonus && (task.type === 'craft' || task.type === 'cook')) speed *= (1 + e.craftSpeedBonus);
+            if (e.type === 'blightWard' && task.type === 'cleanse_blight') speed *= 2;
         }
     }
 
@@ -2256,6 +2257,7 @@ function updateFighting(colonist, game) {
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
             window.soundManager?.playSFX('critical_hit');
         }
+        if (target.category === 'blight_bloom' && colonist.activeEffects?.some(e => e.type === 'blightWard')) dmg *= 2;
         target.hp -= dmg;
         if (getEquipmentStat(colonist, 'lifeSteal')) colonist.hp = Math.min(colonist.maxHp, colonist.hp + Math.round(dmg * getEquipmentStat(colonist, 'lifeSteal')));
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
@@ -2308,6 +2310,7 @@ function updateFighting(colonist, game) {
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
             window.soundManager?.playSFX('critical_hit');
         }
+        if (target.category === 'blight_bloom' && colonist.activeEffects?.some(e => e.type === 'blightWard')) dmg *= 2;
         target.hp -= dmg;
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
@@ -2491,8 +2494,8 @@ function findNearestHostile(colonist, game) {
     let nearest = null;
     let minDist = Infinity;
     const waveEnemies = game.waves ? game.waves.enemies : [];
-    const hostileWild = game.entities.filter(w => w.category === 'animal' && !w.tamed && w.hostile);
-    for (const entity of [...hostileWild, ...game.raiders, ...waveEnemies]) {
+    const hostileEntities = game.entities.filter(w => w.hostile && !w.tamed && w.hp > 0);
+    for (const entity of [...hostileEntities, ...game.raiders, ...waveEnemies]) {
         if (entity.hp <= 0) continue;
         if (!entity.hostile && !waveEnemies.includes(entity)) continue;
         const dist = manhattanDist(colonist.x, colonist.y, entity.x, entity.y);

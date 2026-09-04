@@ -24,12 +24,20 @@ export const EVENTS = {
     caravan: { weight: 6, minTick: 640, cooldown: 1600, effect: 'custom' },
     fire: { weight: 4, minTick: 320, cooldown: 640, seasons: ['summer'], effect: 'custom' },
     blight: {
-        weight: 8, minTick: 320, cooldown: 960, seasons: ['summer', 'autumn'],
-        effect: 'crop_damage',
-        chance: 0.4,
-        thought: 'Crops died', moodChange: -15, moodDuration: 480,
-        notification: 'Crop blight! {count} plants destroyed.',
-        logMessage: 'Crop blight destroyed {count} plants', logType: 'danger',
+        weight: 7, minTick: 400, cooldown: 1200, seasons: ['spring', 'summer'],
+        effect: 'creeping_miasma',
+        initialTiles: [1, 3],
+        thought: 'Blight in the fields', moodChange: -8, moodDuration: 300,
+        notification: 'Dark spores settle on your crops! {count} tiles infected.',
+        logMessage: 'Creeping miasma infected {count} crop tiles', logType: 'danger',
+    },
+    blight_bloom: {
+        weight: 5, minTick: 600, cooldown: 1600, seasons: ['summer', 'autumn'],
+        effect: 'spawn_blight_bloom',
+        spawnCount: [1, 2],
+        thought: 'Blight has taken root', moodChange: -10, moodDuration: 200,
+        notification: 'Blight blooms have erupted in your fields!',
+        logMessage: 'Blight blooms spawned in the fields', logType: 'danger',
     },
     cold_snap: {
         weight: 7, minTick: 160, cooldown: 960, seasons: ['winter'],
@@ -108,6 +116,21 @@ export const FIRE_CONFIG = {
     spreadChance: 0.05,
     spreadTimerMin: 15,
     spreadTimerMax: 25,
+};
+
+export const BLIGHT_CONFIG = {
+    decayPerTick: 2,
+    spreadChance: 0.12,
+    maxSpreads: 3,
+    cleanseWork: 10,
+    bloomHp: 30,
+    bloomDamageRadius: 3,
+    bloomKillChance: 0.3,
+    bloomReproduceTicks: 120,
+    bloomReproduceChance: 0.25,
+    bloomPassiveDamageInterval: 10,
+    bloomPedestalDamage: 2,
+    bloomDamageReductionAura: 0.5,
 };
 
 // CARAVAN_TRADES moved to ./trade.js (still re-exported via index.js).

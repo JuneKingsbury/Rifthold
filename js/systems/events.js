@@ -1,7 +1,7 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, COMBAT_VISUALS, TRAITS } from '../core/config.js';
+import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
-import { createWildAnimal } from '../entities/entity-factory.js';
+import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { getPedestalEffect } from './artifacts.js';
 
 /**
@@ -157,6 +157,8 @@ export class EventSystem {
             case 'spawn_animals': this.handleSpawnAnimals(def, game); break;
             case 'mood': this.handleMood(def, game); break;
             case 'crop_damage': this.handleCropDamage(def, game); break;
+            case 'creeping_miasma': this.handleCreepingMiasma(def, game); break;
+            case 'spawn_blight_bloom': this.handleSpawnBlightBloom(def, game); break;
             case 'custom':
                 switch (eventKey) {
                     case 'wanderer': this.eventWanderer(game); break;
@@ -243,6 +245,105 @@ export class EventSystem {
                 for (const c of game.colonists) {
                     addThought(c, def.thought, def.moodChange, def.moodDuration, game.tick);
                 }
+            }
+        }
+    }
+
+    handleCreepingMiasma(def, game) {
+        const candidates = [];
+        const zonePositions = game.mapIndex ? game.mapIndex.getZonePositions() : null;
+        if (zonePositions) {
+            for (const { x, y } of zonePositions) {
+                const tile = game.map[y][x];
+                if (tile.zone?.state === 'growing' && !tile.zone.blighted && !tile.blightImmune) {
+                    candidates.push({ x, y });
+                }
+            }
+        } else {
+            for (let y = 0; y < game.map.length; y++) {
+                for (let x = 0; x < game.map[y].length; x++) {
+                    const tile = game.map[y][x];
+                    if (tile.zone?.state === 'growing' && !tile.zone.blighted && !tile.blightImmune) {
+                        candidates.push({ x, y });
+                    }
+                }
+            }
+        }
+        if (candidates.length === 0) return;
+
+        const [lo, hi] = def.initialTiles;
+        const count = Math.min(candidates.length, lo + Math.floor(Math.random() * (hi - lo + 1)));
+        for (let i = candidates.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+        }
+        const infected = candidates.slice(0, count);
+        for (const { x, y } of infected) {
+            const tile = game.map[y][x];
+            tile.zone.blighted = true;
+            tile.zone.blightSpreadCount = 0;
+            game.taskQueue.add({
+                type: 'cleanse_blight',
+                skillRequired: 'farming',
+                x, y,
+                workAmount: BLIGHT_CONFIG.cleanseWork,
+            });
+        }
+
+        const msg = def.notification.replace('{count}', count);
+        game.notifications.push({ text: msg, tick: game.tick, type: 'danger' });
+        game.eventLog.add(game, def.logMessage.replace('{count}', count), def.logType, infected[0] ? { type: 'position', x: infected[0].x, y: infected[0].y } : null);
+        if (def.thought) {
+            for (const c of game.colonists) {
+                addThought(c, def.thought, def.moodChange, def.moodDuration, game.tick);
+            }
+        }
+    }
+
+    handleSpawnBlightBloom(def, game) {
+        const candidates = [];
+        const zonePositions = game.mapIndex ? game.mapIndex.getZonePositions() : null;
+        if (zonePositions) {
+            for (const { x, y } of zonePositions) {
+                const tile = game.map[y][x];
+                if (tile.zone?.state === 'growing') candidates.push({ x, y });
+            }
+        } else {
+            for (let y = 0; y < game.map.length; y++) {
+                for (let x = 0; x < game.map[y].length; x++) {
+                    const tile = game.map[y][x];
+                    if (tile.zone?.state === 'growing') candidates.push({ x, y });
+                }
+            }
+        }
+        if (candidates.length === 0) return;
+
+        const [lo, hi] = def.spawnCount;
+        const count = Math.min(candidates.length, lo + Math.floor(Math.random() * (hi - lo + 1)));
+        for (let i = candidates.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+        }
+        const spawned = candidates.slice(0, count);
+        for (const { x, y } of spawned) {
+            const tile = game.map[y][x];
+            tile.zone.state = 'empty';
+            tile.zone.growth = 0;
+            game.entities.push({
+                type: 'blight_bloom', category: 'blight_bloom',
+                id: getNextId(),
+                hp: BLIGHT_CONFIG.bloomHp, maxHp: BLIGHT_CONFIG.bloomHp,
+                x, y, char: '☘', color: '#88aa22',
+                hostile: true, damage: 0, speed: 0,
+                rootedTick: game.tick,
+            });
+        }
+
+        game.notifications.push({ text: def.notification, tick: game.tick, type: 'danger' });
+        game.eventLog.add(game, def.logMessage, def.logType, spawned[0] ? { type: 'position', x: spawned[0].x, y: spawned[0].y } : null);
+        if (def.thought) {
+            for (const c of game.colonists) {
+                addThought(c, def.thought, def.moodChange, def.moodDuration, game.tick);
             }
         }
     }

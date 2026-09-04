@@ -3,7 +3,7 @@
  * crop growth/blight. updateFarming is called from simulationTick every 5th
  * tick; ready crops become harvest tasks for colonists.
  */
-import { CONFIG, CROPS, TERRAIN, WORK_CONFIG } from '../core/config.js';
+import { CONFIG, CROPS, TERRAIN, WORK_CONFIG, BLIGHT_CONFIG } from '../core/config.js';
 
 // Derived from the 'research' field on each crop entry
 export const CROP_RESEARCH_REQS = Object.fromEntries(
@@ -50,7 +50,7 @@ export function removeFarmZone(game, x, y) {
     tile.zone = null;
     if (game.mapIndex) game.mapIndex.removeZone(x, y);
     const task = game.taskQueue.getByPosition(x, y);
-    if (task && (task.type === 'plant' || task.type === 'harvest')) {
+    if (task && (task.type === 'plant' || task.type === 'harvest' || task.type === 'cleanse_blight')) {
         game.taskQueue.remove(task.id);
     }
 }
@@ -96,6 +96,21 @@ function updateFarmTile(game, x, y, season, growthMult) {
             });
         }
     } else if (tile.zone.state === 'growing') {
+        if (tile.zone.blighted) {
+            tile.zone.growth -= BLIGHT_CONFIG.decayPerTick;
+            if (tile.zone.growth <= 0) {
+                tile.zone.state = 'empty';
+                tile.zone.growth = 0;
+                tile.zone.blighted = false;
+                delete tile.zone.blightSpreadCount;
+                const task = game.taskQueue.getByPosition(x, y);
+                if (task && task.type === 'cleanse_blight') game.taskQueue.remove(task.id);
+            } else {
+                spreadBlight(game, x, y, tile);
+            }
+            return;
+        }
+
         let effectiveGrowthMult = growthMult;
         if (effectiveGrowthMult === 0 && game.research.isResearched('irrigation') && crop.seasons.includes !== undefined) {
             effectiveGrowthMult = 0.5;
@@ -147,6 +162,38 @@ function isAdjacentToWater(game, x, y) {
         }
     }
     return false;
+}
+
+function spreadBlight(game, x, y, tile) {
+    if ((tile.zone.blightSpreadCount || 0) >= BLIGHT_CONFIG.maxSpreads) return;
+    const mods = game.divinationModifiers || [];
+    if (mods.some(m => m.blightSpreadSuppressed)) return;
+    if (Math.random() >= BLIGHT_CONFIG.spreadChance) return;
+
+    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    const dir = dirs[Math.floor(Math.random() * dirs.length)];
+    const nx = x + dir[0], ny = y + dir[1];
+    if (ny < 0 || ny >= game.map.length || nx < 0 || nx >= game.map[0].length) return;
+
+    const neighbor = game.map[ny][nx];
+    if (!neighbor.zone || neighbor.zone.state !== 'growing' || neighbor.zone.blighted) return;
+    if (neighbor.blightImmune) return;
+
+    neighbor.zone.blighted = true;
+    neighbor.zone.blightSpreadCount = 0;
+    tile.zone.blightSpreadCount = (tile.zone.blightSpreadCount || 0) + 1;
+
+    const existingTask = game.taskQueue.getByPosition(nx, ny);
+    if (!existingTask) {
+        game.taskQueue.add({
+            type: 'cleanse_blight',
+            skillRequired: 'farming',
+            x: nx, y: ny,
+            workAmount: BLIGHT_CONFIG.cleanseWork,
+        });
+    }
+
+    game.combatEffects.push({ x: nx, y: ny, char: '*', color: '#88aa44', ttl: 3 });
 }
 
 export function getHarvestYield(game, cropType) {

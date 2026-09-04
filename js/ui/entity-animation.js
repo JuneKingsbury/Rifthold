@@ -169,8 +169,8 @@ export function getCropSway(now, seed, wind) {
     if (!D || !D.enabled) return 0;
     const calm = D.cropCalmPeriodMs || 3800;
     const storm = D.cropStormPeriodMs || 1400;
-    const calmAmp = D.cropCalmSwayRad || 0.03;
-    const stormAmp = D.cropStormSwayRad || 0.10;
+    const calmAmp = D.cropCalmSwayRad || 0.0017;
+    const stormAmp = D.cropStormSwayRad || 0.005;
     const period = calm + (storm - calm) * wind;
     const amp = calmAmp + (stormAmp - calmAmp) * _smoothSwayWind;
     const phase = (now / period) * Math.PI * 2 + _swayPhaseOffset + (seed % 1000) / 1000 * 6.28;

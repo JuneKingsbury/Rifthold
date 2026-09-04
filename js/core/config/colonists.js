@@ -310,6 +310,7 @@ export const TASK_SPEED_STATS = {
     chop: 'choppingSpeed',
     plant: 'farmingSpeed',
     harvest: 'farmingSpeed',
+    cleanse_blight: 'farmingSpeed',
     craft: 'craftingSpeed',
     cook: 'cookingSpeed',
     build: 'buildSpeed',

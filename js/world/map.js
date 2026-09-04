@@ -346,7 +346,7 @@ export function getTileVisuals(tile, season) {
         else if (tile.zone.state === 'growing') {
             const cropDef = tile.zone.crop && CROPS[tile.zone.crop];
             char = (cropDef && cropDef.char) || TILE_CHARS.farm_growing;
-            color = TILE_COLORS.farm_growing;
+            color = tile.zone.blighted ? '#7a5599' : TILE_COLORS.farm_growing;
         }
         else {
             char = TILE_CHARS.farm_empty;

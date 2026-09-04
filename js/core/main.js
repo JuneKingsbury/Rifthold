@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -23,7 +23,7 @@ import { updateTamedAnimals, designateTame } from '../entities/taming.js';
 import { updateSummons } from '../entities/summons.js';
 import { completeTask } from '../entities/task-executor.js';
 import { CROPS } from './config.js';
-import { syncEntityIdCounter, createWildAnimal } from '../entities/entity-factory.js';
+import { syncEntityIdCounter, createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { PowerSystem } from '../systems/power.js';
 import { ExplorationSystem } from '../systems/exploration.js';
 import { TradeRiftSystem } from '../systems/traderift.js';
@@ -573,6 +573,17 @@ class Game {
                 c.pedestalHealthRegen = 0;
                 c.activeAuras = [];
             }
+            for (const e of this.entities) {
+                if (e.category === 'blight_bloom') e._pedestalDmg = 0;
+            }
+            const zonePos = this.mapIndex ? this.mapIndex.getZonePositions() : null;
+            if (zonePos) {
+                for (const { x, y } of zonePos) {
+                    const zt = this.map[y][x];
+                    zt._blightDmgReduction = 0;
+                    zt.blightImmune = false;
+                }
+            }
             updatePedestals(this, structurePositions);
         }
         if (prof) prof.mark('power+tamed+auto+pedestals(%10)');
@@ -623,6 +634,7 @@ class Game {
         if (prof) prof.mark('effect-expiry+progressbars');
 
         updateWildlife(this);
+        updateBlightBlooms(this);
         if (prof) prof.mark('wildlife');
         this.combat.update(this);
         if (prof) prof.mark('combat');
@@ -2207,6 +2219,29 @@ function applyBlightImmunity(game, radius, centerX, centerY) {
     }
 }
 
+function applyBlightDamageReduction(game, reduction, radius, centerX, centerY) {
+    const mapHeight = game.map.length;
+    const mapWidth = game.map[0].length;
+    for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+            const ty = centerY + dy, tx = centerX + dx;
+            if (ty < 0 || ty >= mapHeight || tx < 0 || tx >= mapWidth) continue;
+            const tile = game.map[ty][tx];
+            if (tile.zone) tile._blightDmgReduction = Math.max(tile._blightDmgReduction || 0, reduction);
+        }
+    }
+}
+
+function applyBloomPedestalDamage(game, damage, radius, centerX, centerY) {
+    for (const bloom of game.entities) {
+        if (bloom.category !== 'blight_bloom' || bloom.hp <= 0) continue;
+        if (manhattanDist(bloom.x, bloom.y, centerX, centerY) <= radius) {
+            bloom._pedestalDmg = (bloom._pedestalDmg || 0) + damage;
+        }
+    }
+}
+
 function updatePedestals(game, structurePositions = game.mapIndex.getAllStructurePositions()) {
     const pedestals = structurePositions.filter(({ x, y }) => {
         const tile = game.map[y][x];
@@ -2232,6 +2267,8 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
         const radius = def.pedestal.radius;
         applyAuraToColonists(game, def.pedestal, radius, x, y, auraLabel);
         if (def.pedestal.blightImmunity) applyBlightImmunity(game, radius, x, y);
+        if (def.pedestal.blightDamageReduction) applyBlightDamageReduction(game, def.pedestal.blightDamageReduction, radius, x, y);
+        if (def.pedestal.blightBloomDamage) applyBloomPedestalDamage(game, def.pedestal.blightBloomDamage, radius, x, y);
     }
 
     for (const carrier of game.colonists) {
@@ -2243,12 +2280,94 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
         const auraLabel = { name: art.name, key: art.key, sourceType: 'colonist', colonistId: carrier.id };
         applyAuraToColonists(game, art.pedestal, radius, carrier.x, carrier.y, auraLabel);
         if (art.pedestal.blightImmunity) applyBlightImmunity(game, radius, carrier.x, carrier.y);
+        if (art.pedestal.blightDamageReduction) applyBlightDamageReduction(game, art.pedestal.blightDamageReduction, radius, carrier.x, carrier.y);
+        if (art.pedestal.blightBloomDamage) applyBloomPedestalDamage(game, art.pedestal.blightBloomDamage, radius, carrier.x, carrier.y);
     }
 
     // Blight Ward potion: active colonists with the effect protect nearby crops.
     for (const c of game.colonists) {
         if (c.hp <= 0 || c.onExpedition || !c.activeEffects) continue;
         if (c.activeEffects.some(e => e.type === 'blightWard')) applyBlightImmunity(game, 5, c.x, c.y);
+    }
+}
+
+function updateBlightBlooms(game) {
+    const blooms = game.entities.filter(e => e.category === 'blight_bloom');
+    for (let i = blooms.length - 1; i >= 0; i--) {
+        const bloom = blooms[i];
+        if (bloom._pedestalDmg > 0 && game.tick % BLIGHT_CONFIG.bloomPassiveDamageInterval === 0) {
+            bloom.hp -= bloom._pedestalDmg;
+            game.combatEffects.push({ x: bloom.x, y: bloom.y, char: '·', color: '#44ff88', ttl: 3 });
+        }
+        if (bloom.hp <= 0) {
+            game.combatEffects.push({ x: bloom.x, y: bloom.y, char: '*', color: '#88ff44', ttl: 5 });
+            for (const c of game.colonists) {
+                if (c.hp > 0) addThought(c, 'Destroyed a blight bloom', 5, 100, game.tick);
+            }
+            const kills = game.exploration.wildlifeKills;
+            if (kills.has('blight_bloom')) {
+                kills.get('blight_bloom').count++;
+            } else {
+                kills.set('blight_bloom', {
+                    name: 'Blight Bloom', char: '☘', color: '#88aa22',
+                    sprite: 'blight_bloom', drops: 'Nothing', lore: '', count: 1,
+                });
+            }
+            const idx = game.entities.indexOf(bloom);
+            if (idx >= 0) game.entities.splice(idx, 1);
+            continue;
+        }
+
+        bloom.char = bloom.hp < 10 ? '☠' : '☘';
+        bloom.color = bloom.hp < 10 ? '#aa4488' : '#88aa22';
+
+        if (game.tick % BLIGHT_CONFIG.bloomPassiveDamageInterval === 0) {
+            const { x, y } = bloom;
+            const r = BLIGHT_CONFIG.bloomDamageRadius;
+            const mapH = game.map.length, mapW = game.map[0].length;
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (Math.abs(dx) + Math.abs(dy) > r) continue;
+                    const ty = y + dy, tx = x + dx;
+                    if (ty < 0 || ty >= mapH || tx < 0 || tx >= mapW) continue;
+                    const tile = game.map[ty][tx];
+                    if (!tile.zone || tile.zone.state !== 'growing') continue;
+                    let killChance = BLIGHT_CONFIG.bloomKillChance;
+                    if (tile._blightDmgReduction) killChance *= (1 - tile._blightDmgReduction);
+                    if (Math.random() < killChance) {
+                        tile.zone.state = 'empty';
+                        tile.zone.growth = 0;
+                        game.combatEffects.push({ x: tx, y: ty, char: '×', color: '#aa4444', ttl: 3 });
+                    }
+                }
+            }
+        }
+
+        if (game.tick - bloom.rootedTick >= BLIGHT_CONFIG.bloomReproduceTicks &&
+            (game.tick - bloom.rootedTick) % BLIGHT_CONFIG.bloomReproduceTicks === 0 &&
+            Math.random() < BLIGHT_CONFIG.bloomReproduceChance) {
+            const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            const shuffled = dirs.sort(() => Math.random() - 0.5);
+            for (const [dx, dy] of shuffled) {
+                const nx = bloom.x + dx, ny = bloom.y + dy;
+                if (ny < 0 || ny >= game.map.length || nx < 0 || nx >= game.map[0].length) continue;
+                const tile = game.map[ny][nx];
+                if (!tile.zone || tile.zone.state !== 'growing') continue;
+                if (blooms.some(b => b.x === nx && b.y === ny)) continue;
+                tile.zone.state = 'empty';
+                tile.zone.growth = 0;
+                game.entities.push({
+                    type: 'blight_bloom', category: 'blight_bloom',
+                    id: getNextId(),
+                    hp: BLIGHT_CONFIG.bloomHp, maxHp: BLIGHT_CONFIG.bloomHp,
+                    x: nx, y: ny, char: '☘', color: '#88aa22',
+                    hostile: true, damage: 0, speed: 0,
+                    rootedTick: game.tick,
+                });
+                game.combatEffects.push({ x: nx, y: ny, char: '☘', color: '#88aa22', ttl: 5 });
+                break;
+            }
+        }
     }
 }
 

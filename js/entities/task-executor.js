@@ -377,6 +377,24 @@ export function completeTask(colonist, task, game) {
             applyThought(colonist, 'put_out_fire', game.tick);
             break;
         }
+        case 'cleanse_blight': {
+            const tile = game.map[task.y][task.x];
+            if (tile.zone && tile.zone.blighted) {
+                tile.zone.blighted = false;
+                delete tile.zone.blightSpreadCount;
+                game.combatEffects.push({ x: task.x, y: task.y, char: '+', color: '#44ff88', ttl: 3 });
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const speed = 0.3 + Math.random() * 0.2;
+                    spawnParticle(game, {
+                        x: task.x + 0.5, y: task.y + 0.5,
+                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        decay: 0.1, color: '#44ff88', size: 2, alpha: 0.8, shape: 'circle', maxDist: 0.7,
+                    });
+                }
+            }
+            break;
+        }
         case 'research': {
             let researchPts = Math.ceil((colonist.skills.research + 2) * 0.6);
             const researchMult = getEquipmentStat(colonist, 'researchSpeed');

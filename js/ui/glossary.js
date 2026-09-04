@@ -274,7 +274,8 @@ export const GLOSSARY = [
                     ['Farm Zones', 'Press F to enter Farm Zone mode. Select a crop type, then drag an area on grass or dirt. Colonists with Farming skill will automatically plant and harvest crops in the zone.'],
                     ['Crop Growth', 'Growth speed is affected by the current season, weather conditions, and magic spells. By default most crops do not grow during the winter season.'],
                     ['Available Crops', 'Crops range from basic (available immediately) to advanced (requiring research). Each has different season compatibility, growth speed, and yield. Some crops, like the magical Moonbloom, grow in all seasons.'],
-                    ['Crop Blight', 'A random event that destroys a portion of growing crops. More common in summer and autumn. Certain trinkets and Divination spells can reduce or outright prevent blights.'],
+                    ['Creeping Miasma', 'A blight that infects crop tiles in spring and summer, causing growth to decay. Spreads to adjacent crops over time. Farmers can cleanse infected tiles. Blight Ward potions double cleanse speed. Pedestal artifacts like the Seedkeeper\'s Locket create immunity zones.'],
+                    ['Blight Blooms', 'Hostile fungal entities that erupt on crop tiles in summer and autumn, destroying nearby crops rapidly. Must be killed by colonists in combat. The Seedkeeper\'s Locket passively damages blooms within its aura. Ward of Calamity prevents blooms from spawning.'],
                 ]
             },
             {
@@ -292,7 +293,7 @@ export const GLOSSARY = [
                 entries: [
                     ['Random Events', 'Various events trigger as your colony grows: new colonists arriving, trade caravans, crop blights, mineral windfalls, fires, cold snaps, animal migrations, and inspiration.'],
                     ['Wanderers', 'New colonists occasionally ask to join your colony. Wanderers are more likely when colony mood is high. Accept or reject based on their traits and skills. Once a wanderer joins your colony you will have no simple way to remove them from their new community.'],
-                    ['Destructive Events', 'Fires spread to adjacent flammable tiles (colonists auto-extinguish). Crop blight destroys growing plants in summer/autumn. Cold snaps kill all outdoor crops in winter.'],
+                    ['Destructive Events', 'Fires spread to adjacent flammable tiles (colonists auto-extinguish). Creeping miasma infects and decays crops in spring/summer. Blight blooms erupt on crops and destroy them in summer/autumn. Cold snaps kill all outdoor crops in winter.'],
                 ]
             },
             {
