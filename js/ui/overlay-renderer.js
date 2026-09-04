@@ -1,5 +1,11 @@
 import { CONFIG, RENDER_CONFIG, BUILDINGS, ALL_ITEMS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS } from '../core/config.js';
 
+// Pre-built O(1) tier-key → index maps so _renderRoomOverlay avoids a
+// findIndex scan (O(n) per visible tile) on every frame.
+const ROOM_TIER_INDEX = new Map(ROOM_QUALITY_TIERS.map((t, i) => [t.key, i]));
+const WORKSHOP_TIER_INDEX = new Map(WORKSHOP_QUALITY_TIERS.map((t, i) => [t.key, i]));
+const TOWN_HALL_TIER_INDEX = new Map(TOWN_HALL_QUALITY_TIERS.map((t, i) => [t.key, i]));
+
 export function spawnParticle(game, props) {
     if (!game.worldParticles) game.worldParticles = [];
     game.worldParticles.push({
@@ -480,7 +486,15 @@ export class OverlayRenderer {
         ctx.save();
         for (const src of sources) {
             const r = src.radius;
-            // Outer glow fill, warm orange tint, fades toward edge
+            const maxAlpha = src.passive ? 0.18 : 0.22;
+            ctx.fillStyle = src.passive ? '#ff9933' : '#ff6622';
+
+            // Group cells by distance bucket so we set globalAlpha once per
+            // distance value rather than once per cell (avoids ~400 style flushes
+            // per source with radius 10).
+            const buckets = new Array(r + 1);
+            for (let i = 0; i <= r; i++) buckets[i] = [];
+
             for (let dy = -r; dy <= r; dy++) {
                 for (let dx = -r; dx <= r; dx++) {
                     const dist = Math.abs(dx) + Math.abs(dy);
@@ -488,12 +502,20 @@ export class OverlayRenderer {
                     const sx = (src.x + dx - camera.x) * cw;
                     const sy = (src.y + dy - camera.y) * ch;
                     if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) continue;
-                    const falloff = 1 - dist / (r + 1);
-                    ctx.globalAlpha = falloff * (src.passive ? 0.18 : 0.22);
-                    ctx.fillStyle = src.passive ? '#ff9933' : '#ff6622';
-                    ctx.fillRect(sx, sy, cw, ch);
+                    buckets[dist].push(sx, sy);
                 }
             }
+
+            for (let dist = 0; dist <= r; dist++) {
+                const cells = buckets[dist];
+                if (cells.length === 0) continue;
+                const falloff = 1 - dist / (r + 1);
+                ctx.globalAlpha = falloff * maxAlpha;
+                for (let i = 0; i < cells.length; i += 2) {
+                    ctx.fillRect(cells[i], cells[i + 1], cw, ch);
+                }
+            }
+
             // Border ring at the edge of the radius
             ctx.globalAlpha = 0.55;
             ctx.strokeStyle = src.passive ? '#ffaa44' : '#ff7733';
@@ -573,8 +595,6 @@ export class OverlayRenderer {
         const townhallColors = ['#334466', '#2255aa', '#33aa66', '#ffdd44'];
         const workshopColors = ['#334466', '#2255aa', '#33aa66', '#aacc33', '#ffdd44'];
 
-        const tileIndexOf = (tiers, tierKey) => tiers.findIndex(t => t.key === tierKey);
-
         ctx.save();
         const map = game.map;
         const camX = camera.x, camY = camera.y;
@@ -597,14 +617,14 @@ export class OverlayRenderer {
                 const thq = game.townHallQualities[tile.roomId];
 
                 if (bq) {
-                    tierIdx = tileIndexOf(ROOM_QUALITY_TIERS, bq.tier);
-                    color = bedroomColors[Math.max(0, tierIdx)];
+                    tierIdx = ROOM_TIER_INDEX.get(bq.tier) ?? 0;
+                    color = bedroomColors[tierIdx];
                 } else if (wq) {
-                    tierIdx = tileIndexOf(WORKSHOP_QUALITY_TIERS, wq.tier);
-                    color = workshopColors[Math.max(0, tierIdx)];
+                    tierIdx = WORKSHOP_TIER_INDEX.get(wq.tier) ?? 0;
+                    color = workshopColors[tierIdx];
                 } else if (thq) {
-                    tierIdx = tileIndexOf(TOWN_HALL_QUALITY_TIERS, thq.tier);
-                    color = townhallColors[Math.max(0, tierIdx)];
+                    tierIdx = TOWN_HALL_TIER_INDEX.get(thq.tier) ?? 0;
+                    color = townhallColors[tierIdx];
                 } else {
                     // Enclosed room with no quality type, neutral tint
                     color = '#444466';
@@ -634,9 +654,9 @@ export class OverlayRenderer {
                 const thq = game.townHallQualities[id];
                 let tierIdx = 0;
                 let colors = bedroomColors;
-                if (bq) { tierIdx = tileIndexOf(ROOM_QUALITY_TIERS, bq.tier); colors = bedroomColors; }
-                else if (wq) { tierIdx = tileIndexOf(WORKSHOP_QUALITY_TIERS, wq.tier); colors = workshopColors; }
-                else if (thq) { tierIdx = tileIndexOf(TOWN_HALL_QUALITY_TIERS, thq.tier); colors = townhallColors; }
+                if (bq) { tierIdx = ROOM_TIER_INDEX.get(bq.tier) ?? 0; colors = bedroomColors; }
+                else if (wq) { tierIdx = WORKSHOP_TIER_INDEX.get(wq.tier) ?? 0; colors = workshopColors; }
+                else if (thq) { tierIdx = TOWN_HALL_TIER_INDEX.get(thq.tier) ?? 0; colors = townhallColors; }
                 ctx.strokeStyle = colors[Math.max(0, tierIdx)] || '#888899';
 
                 const neighborId = (dx, dy) => {

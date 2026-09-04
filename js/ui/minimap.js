@@ -16,8 +16,11 @@ export class Minimap {
         canvas.style.width = 'auto';
         canvas.style.height = 'auto';
 
-        this._cachedImageData = null;
-        this._lastTick = -1;
+        // Static terrain layer. Only rebuilt when terrain/structures change.
+        // Entity dots are composited on top each render call.
+        this._terrainImageData = null;
+        this._compositeImageData = null;
+        this._terrainDirty = true;
         this._lastCamX = -1;
         this._lastCamY = -1;
         this._lastSeason = null;
@@ -28,6 +31,10 @@ export class Minimap {
         });
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false });
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false });
+    }
+
+    markTerrainDirty() {
+        this._terrainDirty = true;
     }
 
     onTouch(e) {
@@ -52,63 +59,71 @@ export class Minimap {
     render() {
         const { map, colonists, entities, raiders, camera, weather } = this.game;
         const ctx = this.ctx;
-        const tick = this.game.tick;
         const season = weather.season;
         const camX = camera.x;
         const camY = camera.y;
 
-        const contentChanged = tick !== this._lastTick || season !== this._lastSeason;
-        const cameraChanged = camX !== this._lastCamX || camY !== this._lastCamY;
-
-        if (contentChanged) {
+        // Rebuild static terrain layer only when something structural changed
+        // (roomsDirty, season flip, fire/snow state) or on first render.
+        const seasonChanged = season !== this._lastSeason;
+        if (this._terrainDirty || seasonChanged) {
             const w = CONFIG.MAP_WIDTH * SCALE_X;
             const h = CONFIG.MAP_HEIGHT * SCALE_Y;
-            if (!this._cachedImageData) this._cachedImageData = ctx.createImageData(w, h);
-            const data = this._cachedImageData.data;
+            if (!this._terrainImageData) this._terrainImageData = ctx.createImageData(w, h);
+            const data = this._terrainImageData.data;
 
             for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
                 for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
                     const tile = map[y][x];
                     const color = this.getTileColor(tile, season);
-
-                    for (let dy = 0; dy < SCALE_Y; dy++) {
-                        for (let dx = 0; dx < SCALE_X; dx++) {
-                            const px = x * SCALE_X + dx;
-                            const py = y * SCALE_Y + dy;
-                            const idx = (py * w + px) * 4;
-                            data[idx] = color[0];
-                            data[idx + 1] = color[1];
-                            data[idx + 2] = color[2];
-                            data[idx + 3] = 255;
-                        }
-                    }
+                    const px0 = x * SCALE_X;
+                    const py0 = y * SCALE_Y;
+                    // Unrolled 2×2 write (SCALE_X=2, SCALE_Y=2). This avoids inner loop overhead.
+                    let idx = (py0 * w + px0) * 4;
+                    data[idx] = color[0]; data[idx+1] = color[1]; data[idx+2] = color[2]; data[idx+3] = 255;
+                    idx += 4;
+                    data[idx] = color[0]; data[idx+1] = color[1]; data[idx+2] = color[2]; data[idx+3] = 255;
+                    idx = ((py0 + 1) * w + px0) * 4;
+                    data[idx] = color[0]; data[idx+1] = color[1]; data[idx+2] = color[2]; data[idx+3] = 255;
+                    idx += 4;
+                    data[idx] = color[0]; data[idx+1] = color[1]; data[idx+2] = color[2]; data[idx+3] = 255;
                 }
             }
 
-            for (const c of colonists) {
-                if (c.hp <= 0) continue;
-                this.drawDot(data, c.x, c.y, [255, 255, 0]);
-            }
-            for (const e of entities) {
-                if (e.hp <= 0) continue;
-                if (e.tamed) {
-                    this.drawDot(data, e.x, e.y, [100, 200, 100]);
-                } else if (e.category === 'animal') {
-                    this.drawDot(data, e.x, e.y, e.hostile ? [180, 50, 50] : [150, 120, 80]);
-                }
-            }
-            for (const r of raiders) {
-                if (r.hp <= 0) continue;
-                this.drawDot(data, r.x, r.y, [255, 50, 50]);
-            }
-
-            this._lastTick = tick;
+            this._terrainDirty = false;
             this._lastSeason = season;
+            // Composite buffer must also be regenerated
+            this._compositeImageData = null;
         }
 
-        if (!contentChanged && !cameraChanged) return;
+        const cameraChanged = camX !== this._lastCamX || camY !== this._lastCamY;
 
-        ctx.putImageData(this._cachedImageData, 0, 0);
+        // Composite = terrain + entity dots. Rebuild every render call since
+        // entities move, but copying the terrain buffer is cheap (typed array copy).
+        const w = CONFIG.MAP_WIDTH * SCALE_X;
+        const h = CONFIG.MAP_HEIGHT * SCALE_Y;
+        if (!this._compositeImageData) this._compositeImageData = ctx.createImageData(w, h);
+        this._compositeImageData.data.set(this._terrainImageData.data);
+        const data = this._compositeImageData.data;
+
+        for (const c of colonists) {
+            if (c.hp <= 0) continue;
+            this.drawDot(data, c.x, c.y, [255, 255, 0]);
+        }
+        for (const e of entities) {
+            if (e.hp <= 0) continue;
+            if (e.tamed) {
+                this.drawDot(data, e.x, e.y, [100, 200, 100]);
+            } else if (e.category === 'animal') {
+                this.drawDot(data, e.x, e.y, e.hostile ? [180, 50, 50] : [150, 120, 80]);
+            }
+        }
+        for (const r of raiders) {
+            if (r.hp <= 0) continue;
+            this.drawDot(data, r.x, r.y, [255, 50, 50]);
+        }
+
+        ctx.putImageData(this._compositeImageData, 0, 0);
 
         this._lastCamX = camX;
         this._lastCamY = camY;

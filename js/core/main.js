@@ -441,6 +441,7 @@ class Game {
         if (this.weather.season !== prevSeason) {
             this.eventLog.add(this, `Season changed to ${this.weather.season} (Year ${this.weather.year})`, 'event', null);
             this.weather.applySnow(this.map);
+            if (this.minimap) this.minimap.markTerrainDirty();
             if (this.mapIndex.findFirst('trade_rift')) {
                 this.tradeRift.regenerate(this, 'season');
                 let msg = 'The Trade Rift shimmers! New seasonal requests have arrived.';
@@ -452,6 +453,7 @@ class Game {
             }
         } else if (this.tick % 50 === 0) {
             this.weather.applySnow(this.map);
+            if (this.minimap) this.minimap.markTerrainDirty();
         }
 
         if (this.tick % FOOD_DECAY_CONFIG.decayInterval === 0) {
@@ -528,6 +530,7 @@ class Game {
             this.workshopQualities = qualities.workshopQualities;
             this.townHallQualities = qualities.townHallQualities;
             this.roomsDirty = false;
+            if (this.minimap) this.minimap.markTerrainDirty();
         }
 
         if (prof) prof.mark('weather+decay+rooms');
@@ -617,7 +620,11 @@ class Game {
         if (prof) prof.mark('events');
         this.social.update(this);
         if (prof) prof.mark('social');
+        const hadFiresBefore = this.mapIndex.fires.size > 0;
         updateFires(this);
+        if (hadFiresBefore || this.mapIndex.fires.size > 0) {
+            if (this.minimap) this.minimap.markTerrainDirty();
+        }
         if (prof) prof.mark('fires');
 
         this._recipeCacheVersion++;

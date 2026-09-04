@@ -1451,15 +1451,38 @@ export class Renderer {
         for (const me of movingEntities) {
             const ent = me.entity;
             const lastTile = ent._lastRenderedTile;
+            // Water splash: fire at movement START (destination tile is ent.x/y once lerp begins)
+            if (isEntityMoving(ent) && !ent._lastWasMoving) {
+                const destTile = game.map[ent.y]?.[ent.x];
+                if (destTile && destTile.terrain === 'water') {
+                    const numSplash = 4 + Math.floor(Math.random() * 3);
+                    for (let sp = 0; sp < numSplash; sp++) {
+                        const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
+                        const speed = 0.35 + Math.random() * 0.35;
+                        spawnParticle(game, {
+                            x: ent.x + 0.3 + Math.random() * 0.4,
+                            y: ent.y + 0.4 + Math.random() * 0.2,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed,
+                            ay: 0.3,
+                            decay: 0.45,
+                            color: Math.random() < 0.5 ? '#88ccff' : '#aaddff',
+                            size: 1.5 + Math.random(),
+                            alpha: 0.75,
+                            shape: 'square',
+                            maxY: ent.y + 1,
+                        });
+                    }
+                }
+            }
+            ent._lastWasMoving = isEntityMoving(ent);
             if (!isEntityMoving(ent)) {
                 // Lerp just finished. ent.x/ent.y is the new tile.
                 if (!lastTile || lastTile.x !== ent.x || lastTile.y !== ent.y) {
                     const destTile = game.map[ent.y]?.[ent.x];
                     if (destTile) {
                         const destKey = ent.y * CONFIG.MAP_WIDTH + ent.x;
-                        if (destTile.terrain === 'water') {
-                            this._spawnWaterRipple(ent.x, ent.y, cw, 1.5);
-                        } else if (destTile.terrain === 'grass' && !destTile.snowCovered) {
+                        if (destTile.terrain === 'grass' && !destTile.snowCovered) {
                             this._grassBoost.set(destKey, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.13 });
                             for (const [ndx, ndy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
                                 const nx = ent.x + ndx, ny = ent.y + ndy;
