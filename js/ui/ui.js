@@ -19,7 +19,7 @@ import { installTutorialPanel } from './ui-tutorial.js';
 const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '❄', blizzard: '❅', heatwave: '♨' };
 
 // Skill/magic XP tooltip text, shared by the colonist tooltip refresh and the
-// colonist info panel so both show identical "— XP: x/y (z%)" (or "(MAX)") text.
+// colonist info panel so both show identical "XP: x/y (z%)" (or "(MAX)") text.
 function skillXpTip(def, level, xp) {
     const maxXp = COLONIST_CONFIG.skillXpToLevel + level * COLONIST_CONFIG.skillXpScalePerLevel;
     const pct = Math.floor((xp / maxXp) * 100);
@@ -1047,7 +1047,7 @@ export class UI {
             const parts = getNestedEffectLines(art.expedition);
             if (parts.length) lines.push(`Expedition: ${parts.join(', ')}`);
         }
-        if (art.durability) lines.push(`Breaks after ${art.durability.max} use(s) — repair at Anvil`);
+        if (art.durability) lines.push(`Breaks after ${art.durability.max} use(s). Repair at Anvil.`);
         if (art.consumable) lines.push('Consumed on use');
         return lines.join(' | ') || art.name;
     }
@@ -2917,7 +2917,7 @@ export class UI {
 
     // Capture the next keypress and assign it to the given action, then re-apply
     // to the live InputHandler and re-render. A second click cancels a pending
-    // capture; reserved structural keys are rejected with a notification.
+    // capture. Reserved structural keys are rejected with a notification.
     _startRebind(action, btn) {
         beginRebindCapture(
             action, btn,
@@ -3299,7 +3299,7 @@ export class UI {
 
         html += `<div style="height:12px;"></div></div></div>`;
 
-        // Deal meter — trade is valid when player is offering something and offer value covers request
+        // Deal meter. Trade is valid when player is offering something and offer value covers request.
         const hasOffer = offerVal > 0;
         const hasRequest = reqVal > 0;
         const canTrade = hasOffer && offerVal >= reqVal;

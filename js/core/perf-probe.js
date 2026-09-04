@@ -1,7 +1,7 @@
 /**
  * Lightweight, opt-in tick/frame profiler used to decide whether the Phase 6
  * "risky perf" candidates are worth pursuing. It is OFF by default and costs
- * nothing until enabled — the hot paths only run instrumentation behind a
+ * nothing until enabled. The hot paths only run instrumentation behind a
  * truthy `game._profiler` guard.
  *
  * Usage (from the browser console during a representative play session):
@@ -26,7 +26,7 @@ export class TickProfiler {
         this._startWall = performance.now();
     }
 
-    // Start of a mark chain — call once at the top of the span being profiled.
+    // Start of a mark chain. Call once at the top of the span being profiled.
     begin() {
         this._lastMark = performance.now();
     }
@@ -84,7 +84,7 @@ export class TickProfiler {
 
     report() {
         const s = this.snapshot();
-        // console.table renders the sorted rows; the header line carries context.
+        // console.table renders the sorted rows. The header line carries context.
         console.log(
             `[perf] ${s.ticks} ticks / ${s.frames} frames over ${s.wallMs}ms wall; ` +
             `measured ${s.totalMeasuredMs}ms across ${s.rows.length} sections`

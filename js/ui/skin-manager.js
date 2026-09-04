@@ -49,7 +49,7 @@ export class SkinManager {
                     this._skinNames = names;
                 }
             } catch (e) {
-                // index.json missing or malformed — just use ascii
+                // index.json missing or malformed. Just use ascii.
             }
         }
     }
@@ -120,7 +120,7 @@ export class SkinManager {
 
     // Returns a composited canvas (body + hair + tinted shirt) for a colonist,
     // or null if the active pack has no body sprites (ASCII mode).
-    // bodyVariant/hairVariant/shirtVariant are 1-based; missing/0 falls back to 1.
+    // bodyVariant/hairVariant/shirtVariant are 1-based. Missing/0 falls back to 1.
     _addOutline(canvas, color) {
         const w = canvas.width;
         const h = canvas.height;
@@ -160,7 +160,7 @@ export class SkinManager {
 
     // Applies the standard colonist outline (nameColor when highlighted, else black),
     // plus an additional purple ring around the whole sprite when the colonist is
-    // drafted — so drafted colonists read as combat-ready without a separate sprite.
+    // drafted, so drafted colonists read as combat-ready without a separate sprite.
     _finishColonistOutline(canvas, drafted, nameColor, highlight) {
         const inner = highlight && nameColor ? this._addOutline(canvas, nameColor) : this._addOutline(canvas, '#000000');
         if (!drafted) return inner;

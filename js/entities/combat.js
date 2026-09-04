@@ -156,7 +156,7 @@ export class CombatSystem {
         // killed inside updateRaid (colonist attacks kill them elsewhere), so if any were alive
         // here the list can only empty via the flee/OOB cull below -> "Raiders fled!". We must
         // still fall through to the processing loop so the final batch of corpses gets its death
-        // effects/loot and is spliced out; returning early here leaked them permanently.
+        // effects/loot and is spliced out. Returning early here leaked them permanently.
         const allDead = aliveRaiders.length === 0;
 
         // Individual flee: each raider flees when critically wounded
@@ -235,7 +235,7 @@ export class CombatSystem {
             updateRaider(raider, game);
             // Cull raiders that have left the map, and fleeing raiders that have reached a
             // border tile. moveToEdge parks a fleer on the edge (dx/dy become 0 there), so it
-            // never crosses the < 0 bound — without this an escaped fleer lingers forever and
+            // never crosses the < 0 bound. Without this an escaped fleer lingers forever and
             // keeps raidActive true, permanently blocking all future raids.
             const atBorder = raider.x <= 0 || raider.x >= CONFIG.MAP_WIDTH - 1 ||
                 raider.y <= 0 || raider.y >= CONFIG.MAP_HEIGHT - 1;
@@ -265,7 +265,7 @@ export class CombatSystem {
 
 function updateRaider(raider, game) {
     // Stun (colonist CC): skip the entire turn while the deadline holds. The
-    // visual pip is emitted by updateEntityRoles for role-based raiders; emit one
+    // visual pip is emitted by updateEntityRoles for role-based raiders. Emit one
     // here too so role-less raiders still show the stun.
     if (raider._stunnedUntil && game.tick < raider._stunnedUntil) {
         if (game.tick % 6 === 0) game.combatEffects.push({ x: raider.x, y: raider.y, char: '✦', color: '#ffccff', ttl: 4 });

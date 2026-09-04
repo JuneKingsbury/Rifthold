@@ -62,10 +62,10 @@ function enchantMultiplier(item) {
  * (an ALL_ITEMS entry) or a rolled instance (carrying key/quality/enchant).
  *
  * Base value precedence:
- *   1. def.tradeValue         — authoritative override (drop-only relics, tomes, trinkets)
- *   2. potion rule            — CRAFT_MARKUP·M + POTION_PREMIUM (no POWER table)
- *   3. recipe formula         — CRAFT_MARKUP·M + POWER + TIER_PREMIUM[tier]
- *   4. artifact-tier fallback — ARTIFACT_TIER_VALUE[tier] (no recipe, no override)
+ *   1. def.tradeValue:         authoritative override (drop-only relics, tomes, trinkets)
+ *   2. potion rule:            CRAFT_MARKUP·M + POTION_PREMIUM (no POWER table)
+ *   3. recipe formula:         CRAFT_MARKUP·M + POWER + TIER_PREMIUM[tier]
+ *   4. artifact-tier fallback: ARTIFACT_TIER_VALUE[tier] (no recipe, no override)
  * Then scaled by the instance's quality and enchant multipliers.
  *
  * @param item A definition or rolled instance. May be null/undefined.
@@ -192,7 +192,7 @@ export function applyEnchantmentEffect(item, type, enchantTier) {
     } else if (effect.thornsDamage) {
         item.thornsDamage = round2((item.thornsDamage || 0) + effect.thornsDamage * mult);
     } else if (effect.workSpeedBonus) {
-        // Clothes carry a flat workSpeedBonus; tools carry per-activity speed
+        // Clothes carry a flat workSpeedBonus. Tools carry per-activity speed
         // multipliers. Add the bonus to whichever fields the item already has.
         const b = effect.workSpeedBonus * mult;
         if (item.workSpeedBonus) item.workSpeedBonus = round2(item.workSpeedBonus + b);

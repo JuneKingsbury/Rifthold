@@ -363,7 +363,7 @@ export function completeTask(colonist, task, game) {
                 if (!game.events.pendingEvent) {
                     game.events.pendingEvent = {
                         type: 'research_complete',
-                        text: `Research Complete: ${name}!${desc ? ' — ' + desc : ''}`,
+                        text: `Research Complete: ${name}!${desc ? ' ' + desc : ''}`,
                         choices: ['Dismiss', 'Go to Research'],
                     };
                     if (game.settings.pauseOnResearch && !game.paused) {

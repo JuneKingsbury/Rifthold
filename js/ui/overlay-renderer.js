@@ -174,12 +174,12 @@ export class OverlayRenderer {
 
         if (fadingOut) {
             this._weatherAlpha = Math.max(0, this._weatherAlpha - FADE_SPEED * dt);
-            // Keep moving existing particles while fading — don't spawn new ones
+            // Keep moving existing particles while fading. Don't spawn new ones.
             for (let i = this._weatherParticles.length - 1; i >= 0; i--) {
                 const p = this._weatherParticles[i];
                 p.x += p.vx * dt;
                 p.y += p.vy * dt;
-                // Remove particles that leave the screen; don't replace them
+                // Remove particles that leave the screen. Don't replace them.
                 if (p.y > canvasHeight || p.x > canvasWidth + 40 || p.x < -40) {
                     this._weatherParticles.splice(i, 1);
                 }
@@ -461,7 +461,7 @@ export class OverlayRenderer {
             if (bDef.warmRadius) {
                 sources.push({ x, y, radius: bDef.warmRadius, passive: true });
             }
-            // Powered warmth — only active when grid is powered; seasonal heaters only in winter
+            // Powered warmth. Only active when grid is powered. Seasonal heaters only in winter.
             if (bDef.power?.warmRadius && isPowered) {
                 if (!bDef.power.seasonalHeat || isWinter) {
                     sources.push({ x, y, radius: bDef.power.warmRadius, passive: false });
@@ -474,7 +474,7 @@ export class OverlayRenderer {
         ctx.save();
         for (const src of sources) {
             const r = src.radius;
-            // Outer glow fill — warm orange tint, fades toward edge
+            // Outer glow fill, warm orange tint, fades toward edge
             for (let dy = -r; dy <= r; dy++) {
                 for (let dx = -r; dx <= r; dx++) {
                     const dist = Math.abs(dx) + Math.abs(dy);
@@ -546,15 +546,15 @@ export class OverlayRenderer {
     _renderDefenseOverlay(ctx, game, cw, ch, camera) {
         if (!game.power.powered) return;
         ctx.save();
-        // Arcane sentinels — red
+        // Arcane sentinels (red)
         for (const t of game.power.turrets) {
             this._drawRadiusZone(ctx, t.x, t.y, t.radius, 0.12, '#ff4444', '#ff6666', cw, ch, camera);
         }
-        // Void turrets — purple
+        // Void turrets (purple)
         for (const t of game.power.voidTurrets) {
             this._drawRadiusZone(ctx, t.x, t.y, t.radius, 0.12, '#aa33ff', '#cc66ff', cw, ch, camera);
         }
-        // Inferno wards — orange (damage zone, same as warmth radius)
+        // Inferno wards, orange (damage zone, same as warmth radius)
         for (const w of game.power.aoeWards) {
             this._drawRadiusZone(ctx, w.x, w.y, w.radius, 0.12, '#ff6600', '#ff9933', cw, ch, camera);
         }
@@ -600,7 +600,7 @@ export class OverlayRenderer {
                     tierIdx = tileIndexOf(TOWN_HALL_QUALITY_TIERS, thq.tier);
                     color = townhallColors[Math.max(0, tierIdx)];
                 } else {
-                    // Enclosed room with no quality type — neutral tint
+                    // Enclosed room with no quality type, neutral tint
                     color = '#444466';
                 }
 
@@ -653,12 +653,12 @@ export class OverlayRenderer {
         ctx.save();
         const isPowered = game.power.hasPower();
 
-        // Mana relay discount zones — purple
+        // Mana relay discount zones (purple)
         for (const r of game.power.relays) {
             this._drawRadiusZone(ctx, r.x, r.y, r.radius, 0.12, '#9966ff', '#bb88ff', cw, ch, camera);
         }
 
-        // Light radius buildings (candle, glowstone, beacon, campfire light) — yellow
+        // Light radius buildings (candle, glowstone, beacon, campfire light), yellow
         // Only show buildings that have lightRadius but NOT warmRadius (campfire already on warmth overlay)
         // and NOT power.damage (defense overlay). Use passiveLamps + powered lamps when grid is on.
         const lightSources = [...game.power.passiveLamps];
@@ -667,7 +667,7 @@ export class OverlayRenderer {
             this._drawRadiusZone(ctx, l.x, l.y, l.radius, 0.10, '#ffee44', '#ffdd55', cw, ch, camera);
         }
 
-        // Artifact pedestals with finite radius — gold
+        // Artifact pedestals with finite radius (gold)
         const allStructures = game.mapIndex.getAllStructurePositions();
         for (const { x, y, type } of allStructures) {
             if (type !== 'artifact_pedestal') continue;
@@ -678,7 +678,7 @@ export class OverlayRenderer {
             this._drawRadiusZone(ctx, x, y, artDef.pedestal.radius, 0.14, '#ccaa44', '#eedd66', cw, ch, camera);
         }
 
-        // Colonist-carried trinket pedestals (moving aura sources) — gold, slightly brighter
+        // Colonist-carried trinket pedestals (moving aura sources), gold, slightly brighter
         for (const c of game.colonists) {
             if (!c.trinket?.pedestal?.radius || c.trinket.pedestal.radius === 'global') continue;
             this._drawRadiusZone(ctx, c.x, c.y, c.trinket.pedestal.radius, 0.14, '#ddbb44', '#ffee77', cw, ch, camera);

@@ -238,7 +238,7 @@ const arcaneMethods = {
     },
 
     // Reward flavor color for a Trade Rift card. Tomes and artifacts get their own
-    // hues; equipment uses its promised quality band (enchanted gear reads magenta).
+    // hues. Equipment uses its promised quality band (enchanted gear reads magenta).
     _tradeRiftRewardColor(reward) {
         if (reward.kind === 'tome') return '#ccaaff';       // arcane violet
         if (reward.kind === 'artifact') return '#ffcc44';   // relic gold
@@ -1042,7 +1042,7 @@ const arcaneMethods = {
     //
     // ONE-SHOT PRIORITY: transient actions (swing, recoil, dodge, crit, enrage,
     // death) compete for a single per-entity slot. A new one-shot only takes the
-    // slot if its priority >= the current holder's — so a boss mid-stomp (60)
+    // slot if its priority >= the current holder's. A boss mid-stomp (60)
     // ignores a hit recoil (20) and finishes the stomp, and death (100) overrides
     // everything. Same-type re-trigger resets the timer for a crisp restart.
     // Continuous states (sway/bob/lean/idle, poison shiver, low-HP breathing)
@@ -1050,7 +1050,7 @@ const arcaneMethods = {
     // (locomotion) or while a dramatic one-shot >=60 runs (ambient shivers too).
     //
     // `facing` is +1 for the party/summons (face right) and -1 for enemies.
-    // `_now` is performance.now(); the entity object persists across frames, so
+    // `_now` is performance.now(). The entity object persists across frames, so
     // we latch wall-clock start times on it (`_anim` scratch object).
 
     // Progress (0..1) of a stamped tick-based one-shot, latching its start time.
@@ -1086,19 +1086,19 @@ const arcaneMethods = {
         const swayAngle = opts.swayAngle || 0;      // pre-computed walk sway (already gated)
         const speed = opts.speed || 0;              // 0..1 travel intensity
         const out = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1, alpha: 1, projectile: null, meleeFx: null };
-        const extras = !!opts.extras;   // showExpeditionExtras — the 14 new effects
-        const swing = !!opts.swing;     // showAttackSwing — attack motion (pre-existing)
+        const extras = !!opts.extras;   // showExpeditionExtras, the 14 new effects
+        const swing = !!opts.swing;     // showAttackSwing, attack motion (pre-existing)
         const alive = ent.hp == null || ent.hp > 0;
         const P = R.expedAnimPriority;
 
         // Resolve the single active one-shot by priority. Each candidate carries
-        // its progress t (0..1) and priority; highest priority with a live t wins.
+        // its progress t (0..1) and priority. Highest priority with a live t wins.
         let best = null;
         const consider = (name, t, pr) => {
             if (t == null) return;
             if (!best || pr >= best.pr) best = { name, t, pr };
         };
-        // Death — terminal, only when just died (hp<=0). Latched off a synthetic
+        // Death: terminal, only when just died (hp<=0). Latched off a synthetic
         // "death tick": we stamp the frame hp first crossed to <=0 via _anim.
         if (!alive) {
             const a = ent._anim || (ent._anim = {});
@@ -1107,7 +1107,7 @@ const arcaneMethods = {
             if (extras && R.expedDeathTopple && dt < 1) consider('death', dt, P.death);
             else if (extras && R.expedDeathTopple) consider('death', 0.999, P.death); // hold toppled
         } else if (ent._anim) {
-            ent._anim.deathStartMs = null; // revived — clear
+            ent._anim.deathStartMs = null; // revived, clear
         }
         if (alive) {
             // Attack-speed scales the swing/crit duration: fast weapons play a
@@ -1148,7 +1148,7 @@ const arcaneMethods = {
                     break;
                 case 'attack': {
                     // Weapon-driven motion class. New values: 'Swing' | 'Stab' |
-                    // 'DrawAndShoot'; older stamps ('melee'/'bow'/'wand'/'ranged')
+                    // 'DrawAndShoot'. Older stamps ('melee'/'bow'/'wand'/'ranged')
                     // are mapped for safety against saved-in-flight expeditions.
                     let kind = ent._lastAttackKind || 'Swing';
                     if (kind === 'melee') kind = 'Swing';
@@ -1212,7 +1212,7 @@ const arcaneMethods = {
         if (!oneShotActive) {
             out.rot += swayAngle;
             if (extras && R.expedFootstepBob && speed > 0.01) {
-                // Bob at 2× the sway cadence; peaks at footfall. Uses sway sign via phase.
+                // Bob at 2× the sway cadence, peaks at footfall. Uses sway sign via phase.
                 out.dy += -Math.abs(Math.sin((opts.swayPhase || 0))) * R.footstepBobPx * speed;
             }
             if (extras && R.expedTravelLean) out.rot += R.travelLeanRad * facing * speed;
@@ -1221,7 +1221,7 @@ const arcaneMethods = {
                 out.rot += Math.sin(ph) * R.idleShiftRad;
             }
         }
-        // Ambient status body-language — suppressed only by dramatic one-shots.
+        // Ambient status body-language, suppressed only by dramatic one-shots.
         if (extras && !dramatic && alive && R.expedStatusBodyLanguage && ent.statusEffects) {
             const active = ent.statusEffects.filter(s => s.rounds > 0);
             const hasFreeze = active.some(s => s.type === 'slow');
@@ -1253,12 +1253,12 @@ const arcaneMethods = {
     },
 
     // Queue a ranged basic-attack projectile flying (fx,fy)→(tx,ty). `kind` is
-    // 'bow' or 'wand'; `weapon` supplies projectileChar/projectileColor when set.
+    // 'bow' or 'wand'. `weapon` supplies projectileChar/projectileColor when set.
     _spawnExpedProjectile(kind, fx, fy, tx, ty, weapon) {
         const char = (weapon && weapon.projectileChar) || (kind === 'wand' ? '·' : '-');
         const color = (weapon && weapon.projectileColor) || (kind === 'wand' ? '#aaccff' : '#ffaa33');
         // Weapons carry a `skinKey` (e.g. projectile_arrow/bolt/spell/void) resolved
-        // as an `effects` sprite; the render aims it toward the target when the art
+        // as an `effects` sprite. The render aims it toward the target when the art
         // exists, else falls back to the char/color streak.
         const skinKey = (weapon && weapon.skinKey) || null;
         this._expVisState.effects.push({
@@ -1268,7 +1268,7 @@ const arcaneMethods = {
     },
 
     // Queue a melee basic-attack effect flying (fx,fy)->(tx,ty), mirroring the ranged
-    // projectile but short and quick. `kind` is 'stab' or 'swing'; it aims the sprite
+    // projectile but short and quick. `kind` is 'stab' or 'swing'. It aims the sprite
     // (attack_stab / attack_swing) toward the target the way projectiles are aimed.
     _spawnExpedMelee(kind, fx, fy, tx, ty) {
         this._expVisState.effects.push({
@@ -1681,14 +1681,14 @@ const arcaneMethods = {
         const partyX = this._expVisState.partyX;
 
         // Walking sway for the party (mirrors the main map's `_walkSway`). There are
-        // no discrete tile steps here — the party glides via `partyX` — so drive the
+        // no discrete tile steps here. The party glides via `partyX`, so drive the
         // sway phase off distance actually travelled (footstep cadence that freezes
         // when stopped) and ramp amplitude with current speed, so members sway while
         // walking between nodes and ease upright when stopped at a node / in combat.
         const swayEnabled = RENDER_CONFIG.entityWalkSway && this.game.settings.showWalkSway;
         const partySpeed = Math.abs(partyX - (this._expVisState._prevPartyX ?? partyX));
         this._expVisState._prevPartyX = partyX;
-        // ~one full sway cycle per 16px travelled; phase only advances while moving.
+        // ~one full sway cycle per 16px travelled. Phase only advances while moving.
         this._expVisState._swayPhase = (this._expVisState._swayPhase ?? 0) + partySpeed * (Math.PI * 2 / 16);
         // Smoothly ramp intensity 0→1 with speed so the sway fades to upright on arrival.
         const swayTargetIntensity = Math.min(1, partySpeed / 0.6);
@@ -1708,7 +1708,7 @@ const arcaneMethods = {
         // Attack swing: a quick lunge-and-return rotation when an entity lands a
         // *basic* attack (the combat model stamps `_lastAttackTick`). We latch each
         // stamp change to a wall-clock start on the entity object, then play
-        // `sin(π·t)` over `attackSwingDurationMs` — upright at both ends, leaning
+        // `sin(π·t)` over `attackSwingDurationMs`, upright at both ends, leaning
         // toward the opponent at the peak. `facing` is +1 for the party (faces
         // right) and -1 for enemies (face left).
         const swingEnabled = RENDER_CONFIG.entityAttackSwing && this.game.settings.showAttackSwing;
@@ -1888,7 +1888,7 @@ const arcaneMethods = {
                 ctx.fill();
                 ctx.globalAlpha = 1;
                 const paGrow = _breathe(100 + i);
-                // Pack animals don't attack; they get sway + locomotion polish only.
+                // Pack animals don't attack. They get sway + locomotion polish only.
                 const paAnim = _animFor(pa, 1, 100 + i, _walkSway(100 + i));
                 if (useSkins) {
                     const sprite = skinMgr.getSprite('entities', pa.type);
@@ -2232,7 +2232,7 @@ const arcaneMethods = {
             if (eff.type === 'loot') {
                 const lootSprite = useSkins ? skinMgr.getSprite('effects', 'loot') : null;
                 // Arc the loot toward the party (tx/ty) with a parabolic hop when the
-                // extras feature is on; otherwise fall back to the old straight rise.
+                // extras feature is on. Otherwise fall back to the old straight rise.
                 let lx, ly;
                 if (extrasEnabled && RENDER_CONFIG.expedLootArc && eff.tx != null) {
                     const p = eff.frame / eff.maxFrames;
@@ -2256,14 +2256,14 @@ const arcaneMethods = {
                 }
             } else if (eff.type === 'projectile') {
                 // A ranged basic-attack shot flying from attacker to target. `p` is
-                // 0..1 across its flight; arrow/bolt draws as a streak, wand mote as
+                // 0..1 across its flight. Arrow/bolt draws as a streak, wand mote as
                 // a glowing dot with a short trail.
                 const p = eff.frame / eff.maxFrames;
                 const cx = eff.x + (eff.tx - eff.x) * p;
                 const cy = eff.y + (eff.ty - eff.y) * p;
                 ctx.globalAlpha = 1;
                 // Prefer the weapon's projectile sprite (aimed at the target like the
-                // in-world renderer); fall back to the char/color streak when absent.
+                // in-world renderer. Falls back to the char/color streak when absent.
                 const projSprite = (useSkins && eff.skinKey) ? skinMgr.getSprite('effects', eff.skinKey) : null;
                 if (projSprite) {
                     const angle = Math.atan2(eff.ty - eff.y, eff.tx - eff.x);
@@ -2288,7 +2288,7 @@ const arcaneMethods = {
             } else if (eff.type === 'melee_fx') {
                 // A melee basic-attack effect flying from attacker toward target, the
                 // short-range cousin of the projectile. Aims the weapon-class sprite
-                // (attack_stab / attack_swing) at the target like a projectile; falls
+                // (attack_stab / attack_swing) at the target like a projectile. Falls
                 // back to a quick slash stroke when the art is absent.
                 const p = eff.frame / eff.maxFrames;
                 const cx = eff.x + (eff.tx - eff.x) * p;
@@ -2303,7 +2303,7 @@ const arcaneMethods = {
                     ctx.drawImage(meleeSprite, -12, -12, 24, 24);
                     ctx.restore();
                 } else {
-                    // Sprite art points east (angle 0); the stroke is drawn along it.
+                    // Sprite art points east (angle 0). The stroke is drawn along it.
                     const d = eff.tx >= eff.x ? 1 : -1;
                     ctx.strokeStyle = eff.kind === 'stab' ? '#ffffff' : '#ffff44';
                     ctx.lineWidth = 2;

@@ -97,7 +97,7 @@ function applyInteraction(a, b, interaction, game) {
     const prevTierA = getRelationshipTier(getOpinion(a, b.id)).key;
     const prevTierB = getRelationshipTier(getOpinion(b, a.id)).key;
 
-    // Charismatic amplifies positive opinion gains; Abrasive amplifies negative
+    // Charismatic amplifies positive opinion gains. Abrasive amplifies negative
     // losses. Scaled per-participant based on the interaction's valence sign.
     setOpinion(a, b.id, getOpinion(a, b.id) + scaleOpinionDelta(a, interaction));
     setOpinion(b, a.id, getOpinion(b, a.id) + scaleOpinionDelta(b, interaction));

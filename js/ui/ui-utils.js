@@ -10,7 +10,7 @@ export function getTargetPriority(x) {
 }
 
 // Tally items into a plain { key: count } object. keyFn maps each item to its
-// grouping key; used for inventory stacks (potions, tomes, tamed animals).
+// grouping key, used for inventory stacks (potions, tomes, tamed animals).
 export function countByKey(items, keyFn) {
     const counts = {};
     for (const item of items) {

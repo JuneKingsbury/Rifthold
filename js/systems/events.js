@@ -59,7 +59,7 @@ export function computeTradeValues(offer, request, goldOffer, rates, tradeData, 
     for (const [res, amt] of Object.entries(offer)) {
         if (amt <= 0) continue;
         if (res.startsWith('__equip_')) {
-            // __equip_<type>_<index> — look up item's tradeValue
+            // __equip_<type>_<index>: look up item's tradeValue
             const parts = res.split('_');
             const type = parts[3];
             const idx = parseInt(parts[4], 10);
@@ -82,7 +82,7 @@ export function computeTradeValues(offer, request, goldOffer, rates, tradeData, 
         if (res.startsWith('__exclusive_')) {
             const slotIdx = parseInt(res.split('_')[3], 10);
             // Slots hold rolled instances, so the price reflects the rolled quality.
-            // Exclusives are priced at face value (no markup) — matches prior behavior.
+            // Exclusives are priced at face value (no markup), matching prior behavior.
             reqVal += getItemTradeValue(tradeData.exclusiveItems?.[slotIdx]);
         } else if (res.startsWith('__buypotion_')) {
             // Player buys a stack of potions from the merchant's potion stock.
@@ -326,7 +326,7 @@ export class EventSystem {
         return out;
     }
 
-    // Roll a concrete merchant item. Gear takes a per-merchant quality roll; item
+    // Roll a concrete merchant item. Gear takes a per-merchant quality roll. Item
     // types with no quality-scaled stats (trinket/tome/potion/consumable) stay
     // 'normal' so the prefix isn't a name-only lie (mirrors the Trade Rift rule).
     _rollMerchantItem(key, merchant) {
@@ -396,7 +396,7 @@ export class EventSystem {
             this.pendingEvent = null;
             return;
         }
-        // choice 0 = Open Trade — handled by UI, keep event open
+        // choice 0 = Open Trade, handled by UI, keep event open
     }
 
     /**

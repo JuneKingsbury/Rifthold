@@ -43,7 +43,7 @@ export class Renderer {
         this._movingEntities = [];
         // Deferred melee attack effects (swing/stab). Because these are nudged toward
         // the target, they can extend into an adjacent tile that is painted later in
-        // the tile loop; collecting them here and drawing after all tiles/entities
+        // the tile loop. Collecting them here and drawing after all tiles/entities
         // keeps the effect on top of the target tile instead of being cut in half.
         this._attackFx = [];
         this._structureMap = new Map();
@@ -227,7 +227,7 @@ export class Renderer {
                     if (edgeDist >= depth) continue;
 
                     // t=0 at the edge, t=1 at full depth. intensity peaks at 0.5
-                    // at the border and fades to 0 — this creates a gradient from
+                    // at the border and fades to 0, creating a gradient from
                     // "half the pixels lit" at the seam to "none" deeper in.
                     const t = edgeDist / depth;
                     const intensity = 0.5 * (1 - t);
@@ -393,7 +393,7 @@ export class Renderer {
     }
 
     // Draws a sprite swaying about its base (bottom-center), like a tree in wind.
-    // `rot` is the sway rotation in radians; when 0 the sprite is drawn flat.
+    // `rot` is the sway rotation in radians. When 0 the sprite is drawn flat.
     _drawSwayed(ctx, sprite, rot, dx, dy, dw, dh, pivotX, pivotY) {
         if (rot !== 0) {
             ctx.save();
@@ -409,7 +409,7 @@ export class Renderer {
 
     // Draws the melee attack effect over an attacking entity, chosen by the weapon's
     // motion class and aimed toward the target (rotated like a projectile). Swing
-    // weapons use `attack_swing`, Stab weapons use `attack_stab`; DrawAndShoot weapons
+    // weapons use `attack_swing`, Stab weapons use `attack_stab`. DrawAndShoot weapons
     // draw no effect (their recoil + projectile already read as an attack). Legacy
     // 'melee'/'ranged' stamps are mapped. No-ops gracefully when the art is absent.
     _queueAttackEffect(simEnt, now, px, py, cw, ch) {
@@ -437,7 +437,7 @@ export class Renderer {
             ? Math.max(0, (1 - prog) / fadeFrac) : 1;
         const dir = simEnt._lastAttackDir;
         if (dir && (dir.dx !== 0 || dir.dy !== 0)) {
-            // Sprite art points east (angle 0); rotate it to face the target, the same
+            // Sprite art points east (angle 0). Rotate it to face the target, the same
             // convention projectiles use (atan2(dy, dx) in screen space, +y down).
             const angle = Math.atan2(dir.dy, dir.dx);
             // Slide from a small start offset out toward the target over the travel
@@ -644,7 +644,7 @@ export class Renderer {
         const ditherDepthFrac = DITHER_DISTANCE_MAP[game.settings.ditherDistance || 'normal'] ?? 0.3; 
         const ditherQualSetting = (game && game.settings.ditherQuality) || 'high';
         const ditherBlockSize = DITHER_QUALITY_MAP[game.settings.ditherQuality] ?? 1;
-        // Regenerate masks here, once, if inputs changed — moved out of the per-tile call:
+        // Regenerate masks here, once, if inputs changed. Moved out of the per-tile call:
         if (ditherOn && (!this._ditherMasks || this._ditherTileSize !== cw ||
             this._ditherDepthFraction !== ditherDepthFrac || this._ditherBlockSize !== ditherBlockSize)) {
             this._generateDitherMasks(ditherDepthFrac, ditherBlockSize);
@@ -898,7 +898,7 @@ export class Renderer {
                     } else if (tile.resource) {
                         // Resources (trees, stone, ore) are not full-tile sprites, so
                         // without a ground pass they'd sit on the bare background. Draw
-                        // the terrain beneath; the resource sprite itself is drawn by the
+                        // the terrain beneath. The resource sprite itself is drawn by the
                         // main sprite path below (so it can carry the tree-sway transform).
                         const ground = this._resolveGroundSprite(tile, season);
                         if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
@@ -935,7 +935,7 @@ export class Renderer {
                     const sprite = this._resolveSprite(tile, entity, season, hl);
                     if (sprite) {
                         // Draw entity shadow. Skip it for flat furniture (rugs, chalk) that
-                        // sits on the ground and shouldn't cast a shadow — only when the
+                        // sits on the ground and shouldn't cast a shadow. Only applies when the
                         // sprite is the structure itself, not an entity standing on the tile.
                         const noShadow = !entity && tile.structure && BUILDINGS[tile.structure]?.noShadow;
                         const shadowSprite = noShadow ? null : sm.getSprite('effects', 'shadow');
@@ -955,12 +955,12 @@ export class Renderer {
                         const bleed = entity ? 0 : 1;
                         // Composed action-animation transform (breathe grow + one-shot
                         // lunge/recoil/cast/hit + work bob). Scratch/stamps live on the
-                        // persistent sim entity (`_sim`); the per-tile map object is
+                        // persistent sim entity (`_sim`). The per-tile map object is
                         // rebuilt every tick. Non-entity sprites get no transform.
                         const xf = entity ? getEntityTransform(entity._sim || entity, now, game, null, entity.entityId || 0, animFlags) : null;
                         // Tree sway: non-entity tree resource tiles rock slowly about
                         // their trunk base, faster and harder as the wind rises. Kept
-                        // independent of the entity transform; a tile with an entity
+                        // independent of the entity transform. A tile with an entity
                         // draws the entity sprite, not the tree, so they never coexist.
                         const treeRot = (!entity && showTreeSway
                             && tile.resource && tile.resource.type === 'tree')
@@ -1001,7 +1001,7 @@ export class Renderer {
                             ctx.restore();
                         } else {
                             // Tree tiles sway about the trunk base (bottom-center) so the
-                            // canopy leans while the roots stay put; treeRot is 0 otherwise
+                            // canopy leans while the roots stay put. treeRot is 0 otherwise
                             // and the sprite draws flat.
                             this._drawSwayed(ctx, sprite, treeRot, dx, dy, dw, dh, px + cw / 2, py + ch);
                         }
@@ -1037,7 +1037,7 @@ export class Renderer {
                             lastColor = '';
                         }
                         // If we are actively shaking after an attack begins, draw the
-                        // per-weapon attack effect (aimed at the target; DrawAndShoot none).
+                        // per-weapon attack effect (aimed at the target, DrawAndShoot none).
                         if (entity && shakeActive) {
                             this._queueAttackEffect(entity._sim || entity, now, px, py, cw, ch);
                         }
@@ -1157,7 +1157,7 @@ export class Renderer {
 
                     // Animated terrain detail overlays on bare terrain (no entity,
                     // structure, resource, zone, or floor). Grass tufts sway in the
-                    // wind; water waves bob up and down. Both use new `effects`
+                    // wind. Water waves bob up and down. Both use new `effects`
                     // sprites and skip gracefully when the art is absent.
                     if (showTerrainDetail && !entity && !tile.structure && !tile.resource
                         && !tile.zone && !tile.floor && !tile.onFire) {
@@ -1416,7 +1416,7 @@ export class Renderer {
             const ent = me.entity;
             const lastTile = ent._lastRenderedTile;
             if (!isEntityMoving(ent)) {
-                // Lerp just finished — ent.x/ent.y is the new tile
+                // Lerp just finished. ent.x/ent.y is the new tile.
                 if (!lastTile || lastTile.x !== ent.x || lastTile.y !== ent.y) {
                     const destTile = game.map[ent.y]?.[ent.x];
                     if (destTile) {
@@ -1443,7 +1443,7 @@ export class Renderer {
                     ent._lastRenderedTile = { x: ent.x, y: ent.y };
                 }
             } else {
-                // Still moving — update last rendered tile to current destination so we
+                // Still moving. Update last rendered tile to current destination so we
                 // only fire on the NEXT arrival (not retroactively on every frame)
                 if (!lastTile) ent._lastRenderedTile = { x: ent.x, y: ent.y };
             }
@@ -1516,7 +1516,7 @@ export class Renderer {
                     if (shadowSprite) ctx.drawImage(shadowSprite, rpx, rpy - shadowLift, cw, ch);
                     // Draw entity.
                     const meHlOff = meHl ? 1 : 0;
-                    // Move progress (0→1) drives the walk-sway; recomputed here because
+                    // Move progress (0→1) drives the walk-sway. Recomputed here because
                     // getEntityRenderPos leaves _moveStartTime/_moveDuration intact.
                     // Clamp so a just-finished step reads 1 (upright).
                     const moveT = ent._moveDuration > 0
@@ -1710,7 +1710,7 @@ export class Renderer {
 
         // --- Active complex structure glow ---
         // A persistent, gently pulsing aura on each activated core so the player can
-        // see at a glance that a Great Forge / Ritual Circle is live — visible in
+        // see at a glance that a Great Forge / Ritual Circle is live, visible in
         // daylight, complementing the night light source added in _getLightSources.
         if (game.activeComplexStructures && game.activeComplexStructures.length) {
             for (const s of game.activeComplexStructures) {
@@ -1814,7 +1814,7 @@ export class Renderer {
                 }
             }
 
-            // Draw the darkness overlay — skip fully-lit tiles (shade < 1)
+            // Draw the darkness overlay. Skip fully-lit tiles (shade < 1).
             let lastDarkStyle = '';
             for (let sy = 0; sy <= vh; sy++) {
                 const rowOff = sy * vw;

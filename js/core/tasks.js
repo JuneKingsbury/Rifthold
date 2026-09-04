@@ -59,7 +59,7 @@ export class TaskQueue {
         this._pendingDirty = true;
     }
 
-    // Called per colonist per tick. Linear scan over pending tasks; the winner
+    // Called per colonist per tick. Linear scan over pending tasks. The winner
     // minimizes score = prio*10000 + dist, so colonist priority (lower number =
     // preferred) strictly dominates distance and distance only breaks ties within
     // a priority band. Any future spatial-index rewrite (Phase 6a) MUST reproduce
@@ -83,7 +83,7 @@ export class TaskQueue {
             if (failedTasks && failedTasks[t.id] !== undefined && tick - failedTasks[t.id] < 30) continue;
             if ((t.type === 'craft' || t.type === 'cook' || t.type === 'enchant') && this._busyStations.has(this._posKey(t.x, t.y))) continue;
 
-            // Lower priority number = higher preference; multiplied to dominate over distance
+            // Lower priority number = higher preference, multiplied to dominate over distance
             const prio = colonist.priorities[t.skillRequired];
             const dist = manhattanDist(colonist.x, colonist.y, t.x, t.y);
             const score = prio * 10000 + dist;

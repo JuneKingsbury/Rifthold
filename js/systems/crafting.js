@@ -7,7 +7,7 @@
 import { RECIPES, WORK_CONFIG, ENCHANT_COST_BY_TIER } from '../core/config.js';
 import { getEquippedItems } from '../entities/colonist.js';
 
-// Cached recipe availability — invalidated when resources, research, structures,
+// Cached recipe availability. Invalidated when resources, research, structures,
 // or the task queue change. Uses a version counter on game to detect staleness.
 let _recipeCache = null;
 let _recipeCacheVersion = -1;
@@ -131,7 +131,7 @@ export function updateAutoCook(game) {
 // Count items matching `outputKey` currently equipped by colonists, so the
 // auto-craft stock target isn't refilled just because gear moved from the store
 // onto a colonist. Equipped weapon/armor/helmet/tool/trinket/boots are the same
-// objects taken from the store arrays, so they keep their `.key`; tomes are
+// objects taken from the store arrays, so they keep their `.key`. Tomes are
 // tracked separately as the `equippedTome` key string.
 function countEquipped(game, outputKey) {
     let count = 0;

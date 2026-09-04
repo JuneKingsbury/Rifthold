@@ -120,7 +120,7 @@ export const PATHFINDING_CONFIG = {
     // Soft penalty added to the move-cost of a tile currently occupied by another
     // entity. Occupied tiles stay traversable so a path is always found, but this
     // makes A* route around other colonists (and pick distinct standing tiles)
-    // whenever an alternative of comparable length exists — stepping onto an
+    // whenever an alternative of comparable length exists. Stepping onto an
     // occupied tile only as a last resort. Tuned so a detour of a few tiles is
     // preferred over overlapping, while a long detour still yields to walking through.
     occupiedCostPenalty: 8,

@@ -868,7 +868,7 @@ class BlueprintEditor {
                 if (this.grid[y][x]) cells.push({ x, y, cell: this.grid[y][x] });
             }
         }
-        if (cells.length === 0) { alert('Nothing to export — place some buildings first.'); return; }
+        if (cells.length === 0) { alert('Nothing to export. Place some buildings first.'); return; }
 
         const name = this.blueprintName || 'unnamed_structure';
         const id = this.blueprintId || name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
@@ -894,7 +894,7 @@ class BlueprintEditor {
         if (cells.length === 1 && !cells[0].cell.isCustom) {
             const key = cells[0].cell.buildingKey;
             output += `// Single building: ${key} (already exists in config)\n`;
-            output += `// No export needed — use existing "${key}" definition.\n`;
+            output += `// No export needed. Use existing "${key}" definition.\n`;
             this._showExportModal(output);
             return;
         }
@@ -906,7 +906,7 @@ class BlueprintEditor {
 
         // Multi-cell: complex structure
         if (!this.coreCell || !this.grid[this.coreCell.y]?.[this.coreCell.x]) {
-            alert('Set a core cell first (tool 4) — it defines the center of the complex structure.');
+            alert('Set a core cell first (tool 4). It defines the center of the complex structure.');
             this._setTool('setCore');
             return;
         }
@@ -933,7 +933,7 @@ class BlueprintEditor {
         let effectStr = '{}';
         if (this.structureEffects.trim()) {
             try { JSON.parse(this.structureEffects); effectStr = this.structureEffects.trim(); }
-            catch { effectStr = '{ /* invalid JSON — fix manually */ }'; }
+            catch { effectStr = '{ /* invalid JSON, fix manually */ }'; }
         }
 
         output += '// === Add to COMPLEX_STRUCTURES in config.js ===\n';
@@ -987,7 +987,7 @@ class BlueprintEditor {
         modal.className = 'bp-modal';
         modal.innerHTML = `
             <div class="bp-modal-content bp-export-content">
-                <h3>Export — Copy to config.js</h3>
+                <h3>Export: Copy to config.js</h3>
                 <textarea id="bp-export-text" rows="20" readonly>${text}</textarea>
                 <div style="margin-top:8px">
                     <button id="bp-export-copy">Copy to Clipboard</button>

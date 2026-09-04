@@ -339,7 +339,7 @@ export class ExplorationSystem {
                     exp.status = 'returning';
                     exp.retreatStartTick = game.tick;
                     exp.retreatTick = game.tick + EXPLORATION_CONFIG.retreatTicks;
-                    this._addLog(exp, game, 'All explorers defeated — retreating empty-handed', 'danger');
+                    this._addLog(exp, game, 'All explorers defeated. Retreating empty-handed.', 'danger');
                     exp.loot = {};
                 }
 
@@ -349,7 +349,7 @@ export class ExplorationSystem {
                 if (expeditionDone && exp.status === 'exploring') {
                     exp.status = 'returning';
                     exp.walkOffTick = game.tick + (exp.bossEncounter ? 80 : 60);
-                    this._addLog(exp, game, 'Expedition complete — returning home', 'success');
+                    this._addLog(exp, game, 'Expedition complete. Returning home.', 'success');
                 }
             }
 
@@ -371,7 +371,7 @@ export class ExplorationSystem {
         exp.manualRetreat = true;
         exp.retreatStartTick = game.tick;
         exp.retreatTick = game.tick + Math.floor(EXPLORATION_CONFIG.retreatTicks * 0.5);
-        this._addLog(exp, game, 'Retreat ordered — returning with collected loot', 'info');
+        this._addLog(exp, game, 'Retreat ordered. Returning with collected loot.', 'info');
         return true;
     }
 
@@ -1322,7 +1322,7 @@ export class ExplorationSystem {
             // round's real-time span, so a fast weapon (low effective cooldown)
             // swings more times within it than a slow one. Per-hit damage is
             // weaponDmg/hitsPerRound, so total per-round output stays weaponDmg
-            // (DPS-neutral) — the only edge extra swings grant is more independent
+            // (DPS-neutral). The only edge extra swings grant is more independent
             // crit rolls, which is exactly the payoff for a high-crit build.
             const hitsPerRound = Math.max(1, Math.round(EXPLORATION_CONFIG.combatRoundTicks / member.effectiveCooldown));
             const perHitDmg = weaponDmg / hitsPerRound;
@@ -1338,7 +1338,7 @@ export class ExplorationSystem {
                 // draw/thrust + projectile.
                 member._lastAttackTick = game.tick;
                 // Motion class comes straight from the weapon's attackAnim
-                // ('Swing' | 'Stab' | 'DrawAndShoot'); `member.attackAnim` was
+                // ('Swing' | 'Stab' | 'DrawAndShoot'). `member.attackAnim` was
                 // resolved (with a ranged fallback) in the party snapshot.
                 member._lastAttackKind = member.attackAnim
                     || (member.weapon && member.weapon.attackAnim)
@@ -1351,7 +1351,7 @@ export class ExplorationSystem {
                     continue;
                 }
 
-                // perHitDmg (= weaponDmg/hitsPerRound) keeps per-round output constant;
+                // perHitDmg (= weaponDmg/hitsPerRound) keeps per-round output constant.
                 // variance is likewise divided so a fast weapon's many swings don't
                 // accumulate more bonus roll than a slow one. Round (not floor) the
                 // per-hit value so splitting into more hits doesn't shave damage.
@@ -1440,7 +1440,7 @@ export class ExplorationSystem {
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
             const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
-            // Crowd control from party spells: a stunned enemy forfeits its turn; a
+            // Crowd control from party spells: a stunned enemy forfeits its turn. A
             // slowed one has a (1 - mult) chance to lose it. Weaken (below) scales the
             // damage of whatever attacks it does land.
             if (this._hasCombatStatus(enemy, 'stun')) {
@@ -1457,7 +1457,7 @@ export class ExplorationSystem {
             const enemyWeaken = this._combatStatusValue(enemy, 'weaken', 'mult', 1);
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             // Attack-animation speed (see party snapshot): <1 fast, >1 slow. The
-            // visual clamps it; here it's just the raw cooldown-to-baseline ratio.
+            // visual clamps it. Here it's just the raw cooldown-to-baseline ratio.
             enemy._atkAnimMult = enemyCd / COLONIST_CONFIG.baseAttackCooldown;
             let enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
             if (enemy.eliteExtraAttacks) enemyHits += enemy.eliteExtraAttacks;
@@ -1738,7 +1738,7 @@ export class ExplorationSystem {
                     member._lastCastTick = game.tick;
                     const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
                     member.dodgeCharges = (member.dodgeCharges || 0) + charges;
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} — phasing through attacks!`, 'combat');
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, phasing through attacks!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     window.soundManager?.playExpSFX('spell_teleport');
                     break;
@@ -1748,7 +1748,7 @@ export class ExplorationSystem {
                     member._lastCastTick = game.tick;
                     member.shieldActive = true;
                     member.shieldReduction = Math.min(0.75, spell.damageReduction * expeditionSpellPower(member, spell));
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} — shielded!`, 'combat');
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} and raises a shield!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     window.soundManager?.playExpSFX('spell_shield');
                     break;
@@ -1812,7 +1812,7 @@ export class ExplorationSystem {
                     member._lastCastTick = game.tick;
                     member.shieldActive = true;
                     member.shieldReduction = 0.5;
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} — a guardian ward absorbs incoming blows!`, 'combat');
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}. A guardian ward absorbs incoming blows!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     window.soundManager?.playExpSFX('spell_shield');
                     break;
@@ -1918,7 +1918,7 @@ export class ExplorationSystem {
     _regenMana(exp, game) {
         if (game.tick % 10 !== 0) return;
         const regenMult = this._getRealmEventEffect(exp, 'manaRegenMult');
-        // This runs once per 10 ticks; equipment manaRegen/healthRegen are per-tick
+        // This runs once per 10 ticks. Equipment manaRegen/healthRegen are per-tick
         // magnitudes (as applied in the colony loops), so scale them by 10 to match
         // this cadence. Mana keeps its flat baseline of 1/interval on top.
         for (const member of exp.partySnapshot) {
@@ -2146,8 +2146,8 @@ export class ExplorationSystem {
             this._addLog(exp, game, `Returned with: ${lootSummary || 'nothing'}`, 'success');
             game.eventLog.add(game, `Expedition returned from ${exp.realmName}: ${lootSummary || 'nothing'}`, 'event', null);
         } else {
-            this._addLog(exp, game, `Party defeated — salvaged: ${lootSummary || 'nothing'}`, 'danger');
-            game.eventLog.add(game, `Expedition to ${exp.realmName} failed — salvaged: ${lootSummary || 'nothing'}`, 'warning', null);
+            this._addLog(exp, game, `Party defeated. Salvaged: ${lootSummary || 'nothing'}`, 'danger');
+            game.eventLog.add(game, `Expedition to ${exp.realmName} failed. Salvaged: ${lootSummary || 'nothing'}`, 'warning', null);
         }
 
         this.completedExpeditions.push(exp);
@@ -2182,7 +2182,7 @@ export class ExplorationSystem {
 
     // ── Combat status effects (round-scoped) ──────────────────────────────
     // A unified, visible status layer shared by both sides of expedition combat.
-    // Player spells inflict slow/stun on enemies (Frost Lance, Mesmerize); enemy
+    // Player spells inflict slow/stun on enemies (Frost Lance, Mesmerize). Enemy
     // spells can inflict poison/stun/slow/weaken on the party (poison live today,
     // the rest framework-ready). Durations count combat ROUNDS (not ticks) since
     // expedition combat is round-based, and every status is cleared when combat

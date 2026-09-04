@@ -4,7 +4,7 @@
 // a symbol physically lives in. Feature files: social.js (thoughts,
 // relationships, interactions), quality.js (quality tiers, salvage),
 // trade.js (merchants, caravan, trade values). Move a symbol between files
-// freely — only this hub needs to know where it lives.
+// freely. Only this hub needs to know where it lives.
 export { GAME_VERSION, CONFIG, DAY_NIGHT, EVENTS, FIRE_CONFIG, PATHFINDING_CONFIG } from './game.js';
 export { SKILLS, TRAITS, TRAIT_EXCLUSIONS, RACES, COLONIST_CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, COLONIST_APPEARANCE, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WORK_CONFIG, MAGIC_STUDY_CONFIG, TASK_CONFIG, TASK_SPEED_STATS, EASTER_EGG_COLONISTS } from './colonists.js';
 export { THOUGHTS, RELATIONSHIP_TIERS, SOCIAL_INTERACTIONS, SOCIAL_CONFIG } from './social.js';

@@ -39,7 +39,7 @@ export class ResourceManager {
     }
 
     // How many of `key` the colony currently holds in its store. Bulk resources
-    // and materials live in the stockpile; non-stackable gear/potions/tomes live
+    // and materials live in the stockpile. Non-stackable gear/potions/tomes live
     // in their own typed arrays (addItem routes them there, never to stockpile),
     // so a plain stockpile[key] lookup would always read 0 for those. Callers
     // that need the true on-hand quantity (e.g. auto-craft stock targets) must

@@ -139,7 +139,7 @@ export function loadGame(game) {
 
         const data = JSON.parse(json);
 
-        // Saves are not migrated across versions; a mismatch is discarded and the
+        // Saves are not migrated across versions. A mismatch is discarded and the
         // caller falls back to starting a fresh game.
         if (data.version !== SAVE_VERSION) {
             console.warn(`Incompatible save version ${data.version}, expected ${SAVE_VERSION}. Starting fresh.`);

@@ -126,7 +126,7 @@ const researchMethods = {
                 } else {
                     html += `<div class="research-node-cost">${tech.cost} pts</div>`;
                 }
-                // Gate requirements — show on locked nodes too so players can plan ahead
+                // Gate requirements. Show on locked nodes too so players can plan ahead.
                 if (!completed && !demoLocked) {
                     const gateLines = this._getGateRequirements(tech, research);
                     if (gateLines.length > 0) {
@@ -246,7 +246,7 @@ const researchMethods = {
             if (!node) { tappedKey = null; this._clearResearchHighlight(); return; }
             const key = node.dataset.key;
             if (key === tappedKey) {
-                // Second tap — if selectable, select it
+                // Second tap. If selectable, select it.
                 const research = this.game.research;
                 const tech = RESEARCH[key];
                 const completed = research.completed.has(key);

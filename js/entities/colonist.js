@@ -902,7 +902,7 @@ function shouldCastSpell(colonist, spell, game) {
         case 'canTransmute':
             // Fires when the transmutation's input is affordable. A spell with no
             // `fromResource` (e.g. Transmute Stone, conjured from raw earth) is always
-            // castable; otherwise the stockpile must hold `inputAmount` of the input.
+            // castable. Otherwise the stockpile must hold `inputAmount` of the input.
             if (!spell.fromResource) return true;
             return (game.resources.stockpile[spell.fromResource] || 0) >= (spell.inputAmount || 1);
         default:
@@ -918,7 +918,7 @@ function hasHarmfulEffect(c) {
     return c.activeEffects.some(e => e.type === 'dot' || e.type === 'slow' || e.harmful);
 }
 
-// Returns the colonist plus any allied colonists within `radius` (Manhattan) — the
+// Returns the colonist plus any allied colonists within `radius` (Manhattan), the
 // recipients of an area buff. When radius is falsy the buff is self-only, preserving
 // single-target behavior for spells that don't opt into an AoE. This is what lets one
 // enchanter/abjurer support squadmates who aren't attuned to that school themselves.
@@ -1255,7 +1255,7 @@ function applySpellEffect(colonist, spell, game) {
         }
         case 'cleanse': {
             // Strips harmful active effects (DoTs, slows) from the most-afflicted
-            // ally in range — the caster included. Also clears any slow deadline.
+            // ally in range (the caster included). Also clears any slow deadline.
             const targets = getBuffTargets(colonist, game, spell.range || 6).filter(hasHarmfulEffect);
             if (targets.length === 0) return;
             // Most-afflicted = most harmful effects stacked.
@@ -1270,7 +1270,7 @@ function applySpellEffect(colonist, spell, game) {
         case 'absorb_shield': {
             // Grants a flat damage-absorbing barrier (consumed before HP in
             // colonistTakeDamage) to the caster and nearby allies. Pool scales with
-            // school mastery; duration with mastery+gear.
+            // school mastery. Duration scales with mastery+gear.
             const pool = Math.round(spell.absorbAmount * getSpellPower(colonist, spell));
             const shieldDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
             for (const ally of getBuffTargets(colonist, game, spell.radius)) {
@@ -1496,7 +1496,7 @@ function updateIdle(colonist, game) {
         return;
     }
     // Note: _relaxCooldown is undefined until a colonist has relaxed at least
-    // once. Coalesce to 0 so a fresh colonist is immediately eligible — comparing
+    // once. Coalesce to 0 so a fresh colonist is immediately eligible. Comparing
     // undefined against a number is always false, which would gate relaxation off
     // forever otherwise.
     if (colonist._relaxCooldown > 0) {
@@ -1600,7 +1600,7 @@ function nearTile(colonist, game, radius, pred) {
 }
 
 // Randomly begin a relaxation activity. Returns true if one was started this tick.
-// The chosen activity is weighted; only activities whose context gate passes are
+// The chosen activity is weighted. Only activities whose context gate passes are
 // eligible. Hang Out (a reachable Town Hall) is the heaviest weight so it dominates
 // whenever a Town Hall exists.
 function tryStartRelaxing(colonist, game) {
@@ -1610,7 +1610,7 @@ function tryStartRelaxing(colonist, game) {
 
     const candidates = [];
 
-    // Hang Out — nearest Town Hall banner within range and reachable.
+    // Hang Out: nearest Town Hall banner within range and reachable.
     let hangOutTarget = null;
     const banner = game.mapIndex.findNearest('town_hall_banner', colonist.x, colonist.y);
     if (banner && manhattanDist(colonist.x, colonist.y, banner.x, banner.y) <= COLONIST_CONFIG.hangOutSearchRadius) {
@@ -1651,7 +1651,7 @@ function tryStartRelaxing(colonist, game) {
         if (roll < 0) { chosen = c.key; break; }
     }
 
-    // Hang Out walks to the Town Hall first; everything else relaxes in place.
+    // Hang Out walks to the Town Hall first. Everything else relaxes in place.
     if (chosen === 'hang_out' && hangOutTarget) {
         const path = findPathAdjacent(game.map, colonist.x, colonist.y, hangOutTarget.x, hangOutTarget.y, game._occupiedTiles);
         if (path && path.length > 0) {
@@ -1659,7 +1659,7 @@ function tryStartRelaxing(colonist, game) {
             colonist.state = 'moving';
             colonist._relaxAfterMove = true;
         } else {
-            // Town Hall is unreachable — fall back to a stroll rather than
+            // Town Hall is unreachable. Fall back to a stroll rather than
             // hanging out in place with no hall to gather in.
             chosen = 'stroll';
         }
@@ -1677,7 +1677,7 @@ function updateRelaxTick(colonist, game) {
     if (info && game.tick % 12 === 0) {
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: info.glyph, color: info.color, fontSize: 10, ttl: 11, maxTtl: 11 });
     }
-    // Strolling colonists amble about; other activities stand in place.
+    // Strolling colonists amble about. Other activities stand in place.
     if (colonist._relaxActivity === 'stroll' && Math.random() < COLONIST_CONFIG.wanderChance) {
         wander(colonist, game);
     }
@@ -1770,8 +1770,8 @@ function moveTowardPoint(colonist, tx, ty, map, dur, game) {
 // (unchanged legacy behavior). During a raid (or when hostile wildlife is about) the threat
 // must be within the colonist's auto-engage range, mirroring updateIdle so busy colonists
 // react to approaching raiders the same way idle ones do. The task is released back to the
-// queue rather than discarded, so an idle colonist — often this same one once the fight
-// ends — can reclaim it via findBestTask. (release() resets workDone, so partial progress is
+// queue rather than discarded, so an idle colonist (often this same one once the fight
+// ends) can reclaim it via findBestTask. (release() resets workDone, so partial progress is
 // lost, consistent with the wave path.)
 function tryCombatInterrupt(colonist, game) {
     const waveActive = game.waves && game.waves.active && game.waves.enemies.length > 0;
@@ -2060,7 +2060,7 @@ function updateSleeping(colonist, game) {
 // `adjacent` true → path to a tile beside dest (melee: stand next to the target);
 // false → path onto dest itself (ranged: a specific line-of-sight tile). The path
 // is cached on the colonist and recomputed only when the target shifts, the path
-// runs out, or the colonist is no longer standing on it — so A* isn't re-run every
+// runs out, or the colonist is no longer standing on it. A* isn't re-run every
 // tick for every fighter during a wave.
 function fightStepToward(colonist, dest, adjacent, game) {
     const targetMoved = !colonist._fightDest
@@ -2078,7 +2078,7 @@ function fightStepToward(colonist, dest, adjacent, game) {
     if (colonist._fightPath.length === 0) return;
     const next = colonist._fightPath[0];
     if (!isPassable(game.map, next.x, next.y)) { colonist._fightPath = []; return; }
-    if (game.isTileOccupied(next.x, next.y)) return; // blocked by another entity; wait a tick
+    if (game.isTileOccupied(next.x, next.y)) return; // blocked by another entity, wait a tick
     colonist._fightPath.shift();
     const dur = CONFIG.TICK_RATE / game.speed;
     moveEntity(colonist, next.x, next.y, dur);
@@ -2252,7 +2252,7 @@ function updateHunting(colonist, game) {
     if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
     colonist._lastAttackTick = game.tick;
     // Render latch for the attack animation (entity-animation.js). Use the weapon's
-    // `attackAnim` when firing from range; a ranged weapon used point-blank swings.
+    // `attackAnim` when firing from range. A ranged weapon used point-blank swings.
     colonist._lastAttackKind = (isRanged && dist >= 2)
         ? ((weapon && weapon.attackAnim) || 'DrawAndShoot')
         : ((weapon && !weapon.ranged && weapon.attackAnim) || 'Swing');

@@ -53,7 +53,7 @@ export const ANIMALS = Object.fromEntries(
 // Live derived view: flattens each tameable animal's structured `tamed`
 // roles/effects into the flat property shape (guardAnimal, produces, packAnimal,
 // happinessAura, …) that the taming and animal-handling code reads. Regenerated
-// from ENTITIES on load; edit ENTITIES, not this.
+// from ENTITIES on load. Edit ENTITIES, not this.
 export const TAMED_ANIMALS = Object.fromEntries(
     Object.entries(ANIMALS).filter(([, a]) => a.tameable).map(([k, a]) => {
         const t = a.tamed;

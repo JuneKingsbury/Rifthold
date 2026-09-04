@@ -6,7 +6,7 @@ const MAX_NODES = PATHFINDING_CONFIG.maxNodes;
 
 // Binary min-heap keyed on f-score for A* open set.
 // Duplicate entries are allowed: when a node's g-score improves, we push a new
-// entry with the lower f. The stale duplicate is harmless — it will be popped
+// entry with the lower f. The stale duplicate is harmless. It will be popped
 // later and skipped because the node is already in the closed set.
 class MinHeap {
     constructor() {
@@ -150,7 +150,7 @@ function colonistPassability(map, x, y, endX, endY) {
 // Builds a colonist passability callback that adds a soft cost penalty to tiles
 // currently occupied by another entity, so A* prefers routing around others but
 // still walks through occupancy when no better route exists. The path's own
-// endpoint is exempt — a colonist must still be able to reach a goal tile even
+// endpoint is exempt. A colonist must still be able to reach a goal tile even
 // if it is momentarily occupied. `occupied` is a Set of packed tile keys
 // (see tileKey); when absent, behavior is identical to colonistPassability.
 function makeColonistPassability(occupied) {

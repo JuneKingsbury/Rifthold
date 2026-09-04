@@ -152,7 +152,7 @@ export const ROLE_HANDLERS = {
             if (dist <= range && dist >= 2 && !hasLos) {
                 // In range but a wall/door blocks the shot: step to a tile that
                 // reclaims line of sight rather than standing still. If no shootable
-                // tile is reachable (target sealed behind walls), lay siege — breach
+                // tile is reachable (target sealed behind walls), lay siege and breach
                 // toward it instead of idling.
                 const losTile = findLineOfSightTile(game.map, entity.x, entity.y, target.x, target.y, range, isPassableForEnemies);
                 if (losTile) {
@@ -430,7 +430,7 @@ export function initEntityRoles(entity) {
  * Older/partial saves may omit `roles` (or store an empty array), so we
  * backfill from the entity definition. Tamed animals draw their roles from
  * `def.tamed.roles` rather than `def.roles` (a wild wolf fights; a tamed one
- * hauls/produces) — that branch only fires when both the entity is tamed and
+ * hauls/produces. That branch only fires when both the entity is tamed and
  * the def declares a tamed variant. Role objects are shallow-cloned so per-
  * entity role tweaks never mutate the shared config.
  *
@@ -652,8 +652,8 @@ function damageStructureTile(map, x, y, breakDmg, game) {
 // Siege-aware approach for hostiles: routes toward the target with
 // findPathForEnemies, which prefers open ground but treats breakable walls/doors
 // as high-cost passable tiles (see enemyPassability). When the cheapest route
-// runs through a wall — i.e. the target is walled off and going around is too
-// costly or impossible — the attacker breaches that wall instead of freezing.
+// runs through a wall (i.e. the target is walled off and going around is too
+// costly or impossible), so the attacker breaches that wall instead of freezing.
 // Breaking is paced by the attacker's normal attack cooldown so it chips a wall
 // at the same rate it strikes a colonist. Uses a dedicated `_siegePath` cache
 // (distinct from moveToward's `_path`) so the {x,y} node format never collides
@@ -678,7 +678,7 @@ function siegeMoveToward(entity, target, role, map, dur, game) {
         if (!canAttack(entity, game)) return;
         const breakDmg = entity.damage * (role.breakSpeed || 1);
         if (damageStructureTile(map, next.x, next.y, breakDmg, game)) {
-            entity._siegePath = null; // route opened up — recompute next tick.
+            entity._siegePath = null; // route opened up, recompute next tick.
         }
         return;
     }

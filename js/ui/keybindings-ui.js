@@ -6,7 +6,7 @@
 import { DEFAULT_KEYMAP, KEYBIND_ACTIONS } from '../core/config.js';
 
 const SETTINGS_KEY = 'colony_settings';
-// Keys handled structurally by the input handler; not rebindable.
+// Keys handled structurally by the input handler. Not rebindable.
 const RESERVED_KEYS = ['tab', 'escape', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 function readSettings() {
@@ -78,9 +78,9 @@ export function isReservedKey(key) {
 }
 
 // Build the grouped keybinding rows. `rebindExpr` is the JS expression string
-// placed in each rebind button's inline onclick; it receives the action name and
+// placed in each rebind button's inline onclick. It receives the action name and
 // the button element, e.g. "window.game.ui._startRebind" or "window.startRebindKey".
-// `resetExpr` is the expression for the per-row "Default" button; it receives the
+// `resetExpr` is the expression for the per-row "Default" button. It receives the
 // action name only. A trailing "(...)" call is appended to each automatically.
 // Keys bound to more than one action are highlighted in red as conflicts.
 export function keybindingRowsHtml(rebindExpr, resetExpr) {

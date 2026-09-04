@@ -180,7 +180,7 @@ export class InputHandler {
 
     // Named action handlers, keyed by the action names in DEFAULT_KEYMAP.
     // Each receives the KeyboardEvent so it can preventDefault where needed.
-    // Rebinding maps keys onto these action names; the handlers never change.
+    // Rebinding maps keys onto these action names. The handlers never change.
     buildActions() {
         return {
             panUp: () => this.game.camera.pan(0, -3),
@@ -803,7 +803,7 @@ export class InputHandler {
 
     // Number-key spell casting in normal mode: 1-9 map to the selected
     // colonist's known spells (in listed order). Only targeted spells enter
-    // targeting; auto spells are passive toggles and are skipped.
+    // targeting. Auto spells are passive toggles and are skipped.
     castSelectedColonistSpell(num) {
         const colonist = this.game.selectedColonist;
         if (!colonist || colonist.hp <= 0) return;

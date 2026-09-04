@@ -123,7 +123,7 @@ export class WaveSystem {
             }
             this.updateEnemy(enemy, game);
             // Cull a fleeing enemy that has reached (or left) the map border. A flee_on_damage
-            // enemy runs to the nearest edge and then idles there forever; since the wave only
+            // enemy runs to the nearest edge and then idles there forever. Since the wave only
             // ends when enemies.length === 0, a stranded fleer would soft-lock the wave.
             if (enemy.fleeing) {
                 const atBorder = enemy.x <= 0 || enemy.x >= CONFIG.MAP_WIDTH - 1 ||
@@ -165,7 +165,7 @@ export class WaveSystem {
     updateEnemy(enemy, game) {
         // Colonist CC: a stunned void-wave enemy skips its turn. A slowed one moves
         // and attacks at reduced effective speed. updateEntityRoles emits the pip
-        // for role-based enemies; emit here for the fallback path too.
+        // for role-based enemies. Emit here for the fallback path too.
         if (enemy._stunnedUntil && game.tick < enemy._stunnedUntil) {
             if (game.tick % 6 === 0) game.combatEffects.push({ x: enemy.x, y: enemy.y, char: '✦', color: '#ffccff', ttl: 4 });
             return;

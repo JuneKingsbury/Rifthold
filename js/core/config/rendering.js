@@ -46,7 +46,7 @@ export const RENDER_CONFIG = {
     // Idle sway: a slow, low-amplitude weight-shift while an entity is stationary
     // (not moving, not mid-action, not working), mirroring the expedition view's
     // `expedIdleShift`. Driven by performance.now() so it stays smooth and runs
-    // while paused; `seed` decorrelates each entity's phase. Gated by the same
+    // while paused. `seed` decorrelates each entity's phase. Gated by the same
     // `showWalkSway` setting (the sway family: moving → walk-sway, idle → shift).
     entityIdleSway: true,
     idleSwayPeriodMs: 2600,
@@ -55,7 +55,7 @@ export const RENDER_CONFIG = {
     // base, driven by performance.now() (smooth, runs while paused). The cadence
     // shortens and the amplitude grows with a wind strength (0..1) derived from
     // the active weather, so trees barely stir when it's clear and whip during a
-    // thunderstorm. A per-tile seed decorrelates phase; a slow gust envelope
+    // thunderstorm. A per-tile seed decorrelates phase. A slow gust envelope
     // makes the breeze wax and wane. Gated by the `showTreeSway` setting.
     // Composed in js/ui/entity-animation.js.
     treeSway: {
@@ -79,7 +79,7 @@ export const RENDER_CONFIG = {
     //   * water waves on water: bob slowly up and down (rise/fall) with a gentle
     //     alpha shimmer, independent of wind (water motion is its own rhythm).
     // Both are procedural transforms on new `effects` sprites (`grass_tuft`,
-    // `water_waves`); missing art simply skips the overlay. Per-tile seed
+    // `water_waves`). Missing art simply skips the overlay. Per-tile seed
     // decorrelates phase. Driven by performance.now() (smooth, runs while paused).
     // Gated by the `showTerrainDetail` setting. Composed in entity-animation.js.
     terrainDetail: {
@@ -110,9 +110,9 @@ export const RENDER_CONFIG = {
         submergeBobPx: 1.0,       // peak waterline rise/fall (px) for the float effect
     },
     // Attack swing: a quick lunge-and-return rotation on an entity's sprite when
-    // it lands (or attempts) a *basic* attack in expedition combat — NOT spells.
+    // it lands (or attempts) a *basic* attack in expedition combat. NOT spells.
     // The combat model stamps `entity._lastAttackTick = game.tick` on each basic
-    // attack; the expedition visual latches a tick change to a performance.now()
+    // attack. The expedition visual latches a tick change to a performance.now()
     // start and plays `sin(π·t)` over `attackSwingDurationMs`, so the sprite is
     // upright at both ends and leans toward its opponent at the peak. amplitude
     // in radians (~0.35 ≈ 20°, more pronounced than the walking sway).
@@ -134,8 +134,8 @@ export const RENDER_CONFIG = {
     // ── In-world "action" animations ───────────────────────────────────────
     // Layered on the regular map renderer (NOT the expedition view). A single
     // per-entity one-shot slot resolves melee/ranged/cast/hit by priority (higher
-    // wins; a new one-shot seizes the slot only if its priority >= the current
-    // holder's — so a dramatic action isn't cancelled by a minor reaction). Work
+    // wins. A new one-shot seizes the slot only if its priority >= the current
+    // holder's. A dramatic action isn't cancelled by a minor reaction. Work
     // is a continuous bob that blends only while the slot is free. All are gated
     // behind the single `showActionAnimations` setting; `enabled` here is a
     // config-level kill switch for tuning. Composed in js/ui/entity-animation.js,
@@ -170,7 +170,7 @@ export const RENDER_CONFIG = {
         castPulseScale: 0.12,
         castWobbleRad: 0.08,
         castSquash: 0.1,
-        // Per-school cast overlay effect keys (resolved with null fallback —
+        // Per-school cast overlay effect keys (resolved with null fallback,
         // missing art simply skips the overlay). Keys authored in skin-editor.js.
         castOverlayKeys: {
             evocation: 'spell_evocation',
@@ -188,7 +188,7 @@ export const RENDER_CONFIG = {
         hitSquash: 0.12,
         // One-shot slot priorities: higher wins, and a new one-shot replaces the
         // active holder only if its priority >= the holder's. cast == attack so a
-        // fresh action restarts crisply; hit is lowest so being struck mid-action
+        // fresh action restarts crisply. Hit is lowest so being struck mid-action
         // doesn't cancel the swing/cast (it plays only when the slot is free).
         priority: { cast: 40, attack: 40, hit: 20 },
     },
@@ -201,8 +201,8 @@ export const RENDER_CONFIG = {
     // one-shot slot so dramatic beats (death, enrage) aren't interrupted by
     // minor reactions (a hit recoil). See `_composeEntityAnim` in ui-arcane.js.
     //
-    // One-shot priorities (higher wins; a new one-shot replaces the active one
-    // only if its priority >= the active one's; death suppresses everything and
+    // One-shot priorities (higher wins). A new one-shot replaces the active one
+    // only if its priority >= the active one's. Death suppresses everything and
     // enrage/stomp suppresses ambient shivers too):
     expedAnimPriority: { death: 100, enrage: 60, crit: 50, attack: 40, cast: 40, dodge: 30, recoil: 20 },
     // Reactions to being hit

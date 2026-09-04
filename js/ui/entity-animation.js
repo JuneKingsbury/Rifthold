@@ -13,13 +13,13 @@ import { RENDER_CONFIG } from '../core/config.js';
 //        A single per-entity slot resolves melee / ranged / cast / hit by
 //        priority. A new one-shot seizes the slot only if its priority >= the
 //        current holder's, so a dramatic action (attack/cast, pr 40) isn't
-//        cancelled by being struck (hit, pr 20) — the hit flinch plays only when
+//        cancelled by being struck (hit, pr 20). The hit flinch plays only when
 //        the slot is otherwise free. Same-type re-trigger restarts the timer.
 //   4. Continuous work bob → rotation/offset (blends only while the slot is free)
 //
 // The descriptor is module-scope and reused every call (zero per-frame
 // allocation, like movement-lerp's `_pos`). Latch scratch (`_wanim`) is stored
-// on the PERSISTENT sim entity — the static renderer's per-tile entity objects
+// on the PERSISTENT sim entity. The static renderer's per-tile entity objects
 // are rebuilt every tick, so scratch there would not survive across ticks.
 
 // Reusable transform descriptor. `identity` reflects the AFFINE transform only
@@ -60,7 +60,7 @@ function walkSway(t, seed, mood) {
 
 // Idle "sway": a slow low-amplitude weight-shift (radians) about the feet while
 // an entity is stationary, driven by `now` (smooth, runs while paused). `seed`
-// decorrelates each entity's phase. The resting counterpart to walkSway; mirrors
+// decorrelates each entity's phase. The resting counterpart to walkSway, mirroring
 // the expedition view's `expedIdleShift`.
 function idleSway(now, seed) {
     if (!RENDER_CONFIG.entityIdleSway) return 0;
@@ -314,7 +314,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         const atkDur = atkClass === 'DrawAndShoot' ? A.rangedRecoilDurationMs : RENDER_CONFIG.attackSwingDurationMs;
         consider('cast', animShotT(scratch, entity._lastCastTick, 'cast', A.castDurationMs, now), P.cast);
         consider('attack', animShotT(scratch, entity._lastAttackTick, 'attack', atkDur, now), P.attack);
-        // Hit uses `_dmgFlashUntil` as its tick signal — it changes value on each
+        // Hit uses `_dmgFlashUntil` as its tick signal. It changes value on each
         // new hit that advances the tick, so no extra sim stamp is needed.
         consider('hit', animShotT(scratch, entity._dmgFlashUntil, 'hit', A.hitDurationMs, now), P.hit);
 
@@ -372,7 +372,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
                     break;
                 }
                 case 'hit':
-                    // Flinch: knock back (seed-parity direction — the victim doesn't
+                    // Flinch: knock back (seed-parity direction, the victim doesn't
                     // stamp the attacker's direction) + brief vertical squash.
                     _xf.offsetX += -facing * A.hitRecoilPx * arc;
                     _xf.scaleY *= 1 - A.hitSquash * arc;

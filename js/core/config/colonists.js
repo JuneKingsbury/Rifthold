@@ -9,7 +9,7 @@ export const SKILLS = {
 
 // THOUGHTS moved to ./social.js (still re-exported via index.js).
 
-// Mutually exclusive trait pairs — colonists cannot spawn with both.
+// Mutually exclusive trait pairs. Colonists cannot spawn with both.
 export const TRAIT_EXCLUSIONS = [
     ['hard_worker', 'lazy'],
     ['night_owl', 'early_bird'],
@@ -30,13 +30,13 @@ export const TRAIT_EXCLUSIONS = [
     ['charismatic', 'abrasive'],
     // Combat temperament: berserkers charge in, cowards break early.
     ['berserker', 'coward'],
-    // Pacifists refuse to attack — no offensive-combat prowess traits.
+    // Pacifists refuse to attack. No offensive-combat prowess traits.
     ['berserker', 'pacifist'],
     ['deadeye', 'pacifist'],
     ['spellsword', 'pacifist'],
     // Animals: a beast whisperer is not skittish around beasts.
     ['beast_whisperer', 'skittish'],
-    // Food: gourmands can't stand raw food; a foraging gut is unbothered by it.
+    // Food: gourmands can't stand raw food. A foraging gut is unbothered by it.
     ['gourmand', 'foraging_gut'],
     // Magically Inept is mutually exclusive with every magic-positive trait.
     ['prodigy', 'magically_inept'],
@@ -284,7 +284,7 @@ export const MAGIC_STUDY_CONFIG = {
     magicXpScalePerLevel: 0.25,
     // Specialization tuning. Each school level above a spell's minLevel makes that
     // spell stronger, cheaper and faster to recast, rewarding deep single-school
-    // investment. Starting values — playtest and balance against SPELLS numbers.
+    // investment. Starting values: playtest and balance against SPELLS numbers.
     spellPowerPerLevel: 0.08,          // +8% effect magnitude per level over minLevel
     manaCostReductionPerLevel: 0.03,   // -3% mana cost per level over minLevel
     manaCostReductionCap: 0.4,

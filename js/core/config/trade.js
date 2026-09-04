@@ -27,7 +27,7 @@ export const CARAVAN_TRADES = [
 //
 // qualityWeights biases the quality roll applied to each drawn gear item (weapon /
 // armor / helmet / tool / clothes / boots). Items without quality-scaled stats
-// (trinkets, tomes, potions, consumables) are always handed out at 'normal' — a
+// (trinkets, tomes, potions, consumables) are always handed out at 'normal', a
 // quality prefix on them would be name-only and misleading (mirrors the Trade Rift).
 //
 // buyCategories: item types this merchant will purchase from the player (null = anything).
@@ -40,7 +40,7 @@ export const MERCHANTS = [
         lowDrawCount: [1, 0.7, 0.4],       // 1 guaranteed low + up to 2 more (70%, 40%)
         highDrawChances: [0.4],            // 1 guaranteed premium + up to 1 more (40%)
         qualityWeights: { poor: 2, normal: 5, fine: 2, superior: 1 },
-        // potionStock: { key: [minQty, maxQty] } — stackable potions the merchant sells.
+        // potionStock: { key: [minQty, maxQty] }, stackable potions the merchant sells.
         potionStock: { health_potion: [2, 5] },
         goldRange: [20, 49],
         buyCategories: ['weapon', 'armor', 'helmet', 'tool', 'tome', 'consumable', 'potion'],
@@ -75,7 +75,7 @@ export const MERCHANTS = [
         lowDrawCount: [1, 0.6, 0.3],
         highDrawChances: [0.3],
         qualityWeights: { poor: 2, normal: 5, fine: 2, superior: 1 },
-        // The alchemist deals in potions — the widest brewed stock.
+        // The alchemist deals in potions, the widest brewed stock.
         potionStock: { health_potion: [2, 6], speed_potion: [1, 4], mana_potion: [1, 4], resistance_potion: [1, 3] },
         goldRange: [20, 45],
         buyCategories: ['weapon', 'armor', 'helmet', 'tool', 'tome', 'potion'],
@@ -108,15 +108,15 @@ export const TRADER_DISCOUNT = 0.8;
 // A request's reward is a hidden spec rolled into a concrete item only when the
 // player fulfills it. Rewards come in three KINDS (rolled per request from the
 // cadence's kindWeights):
-//   - 'equipment' — a {type, tier, quality} spec; the promised quality is a FLOOR
+//   - 'equipment': a {type, tier, quality} spec. The promised quality is a FLOOR
 //     (the fulfill roll can only surprise upward). May arrive pre-enchanted.
-//   - 'tome'      — a random spell tome (dup-avoiding: prefers unlearned spells).
-//   - 'artifact'  — a random pedestal-effect relic (dup-avoiding; yearly-only).
+//   - 'tome':      a random spell tome (dup-avoiding, prefers unlearned spells).
+//   - 'artifact':  a random pedestal-effect relic (dup-avoiding, yearly-only).
 //
 // DESIGN INTENT (why this is worth engaging vs. just crafting):
-//   1. Cost is paid in SURPLUS COMMODITIES (wood/stone/food/…), not rare mats — so
+//   1. Cost is paid in SURPLUS COMMODITIES (wood/stone/food/…), not rare mats. So
 //      even a gold-negative trade converts overflow into finished gear.
-//   2. Promised quality is a floor, and equipment can arrive pre-enchanted —
+//   2. Promised quality is a floor, and equipment can arrive pre-enchanted,
 //      something crafting can't cheaply guarantee.
 //   3. Every fulfill has a JACKPOT chance to over-deliver (+tier / +quality /
 //      +enchant), turning the mystery into upside-only anticipation.
@@ -133,17 +133,17 @@ export const TRADE_RIFT_CONFIG = {
     jackpotChance: 0.12,  // per-fulfill chance the rift over-delivers (both cadences)
     // Weighted outcomes when a jackpot fires (see main.js applyJackpot).
     jackpotWeights: { tier: 3, quality: 3, enchant: 4 },
-    season: {                                  // EASY — refreshes each season
+    season: {                                  // EASY, refreshes each season
         count: 3,
         kindWeights: { equipment: 8, tome: 2, artifact: 0 },  // no relics in the cheap tier
-        tierWeights: { 2: 3, 3: 2 },           // retiered up from {1,2} — matches mid-game unlock
+        tierWeights: { 2: 3, 3: 2 },           // retiered up from {1,2}, matches mid-game unlock
         qualityWeights: { poor: 1, normal: 3, fine: 1 },
         enchantChance: 0.35,                   // chance an equipment reward is pre-enchanted
         enchantTierWeights: { 1: 3, 2: 1 },    // enchant strength (ENCHANTMENT_TIERS multiplier)
         costMargin: [0.9, 1.3],
         costMaterials: ['wood', 'stone', 'food', 'planks', 'hides', 'cotton'],
     },
-    year: {                                    // HARD — refreshes at year rollover
+    year: {                                    // HARD, refreshes at year rollover
         count: 2,
         kindWeights: { equipment: 6, tome: 2, artifact: 2 },  // artifacts are the yearly carrot
         tierWeights: { 3: 2, 4: 3 },           // leans into Tier 4

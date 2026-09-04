@@ -179,7 +179,7 @@ class Game {
         this.gameLoop = this.gameLoop.bind(this);
     }
 
-    // O(1) colonist lookup by id — always use this instead of colonists.find()
+    // O(1) colonist lookup by id. Always use this instead of colonists.find().
     getColonist(id) {
         return this._colonistById.get(id) || null;
     }
@@ -403,15 +403,15 @@ class Game {
     //                .decayInterval).
     //
     // Deliberately NOT optimized (see Phase 3 notes): the spatial hashes are
-    // rebuilt from scratch every tick (entities move most ticks; n is small and
-    // an incremental path risks desync); findBestTask stays a linear scan (a task
+    // rebuilt from scratch every tick (entities move most ticks, n is small and
+    // an incremental path risks desync). findBestTask stays a linear scan (a task
     // spatial index is a correctness risk that needs measurement first). Both are
     // revisited under Phase 6 only if a timing probe shows they matter.
     simulationTick() {
         this.tick++;
         this.timeOfDay = this.tick % CONFIG.TICKS_PER_DAY;
 
-        // Phase 6 profiler hook — zero cost unless startPerfProbe() was called.
+        // Phase 6 profiler hook. Zero cost unless startPerfProbe() was called.
         const prof = this._profiler;
         if (prof) { prof.countTick(); prof.begin(); }
 
@@ -538,7 +538,7 @@ class Game {
             updateTamedAnimals(this);
             updateAutoCook(this);
             updateAutoCraft(this);
-            // Structure positions are stable within a tick; compute once and
+            // Structure positions are stable within a tick. Compute once and
             // share between auto-repair and pedestal scanning.
             const structurePositions = this.mapIndex.getAllStructurePositions();
             updateAutoRepair(this, structurePositions);
@@ -1174,7 +1174,7 @@ class Game {
     tradeOffer(resource, amount) {
         if (!this.ui._tradeOffer) this.ui._tradeOffer = {};
         if (resource.startsWith('__equip_')) {
-            // Equipment items are single-unit — toggle on
+            // Equipment items are single-unit. Toggle on
             this.ui._tradeOffer[resource] = 1;
         } else if (resource.startsWith('__potion_')) {
             // Potions sell in stacks, capped by how many the player holds.
@@ -1692,7 +1692,7 @@ class Game {
                 }
                 if (best) {
                     // completeTask emits the buildComplete visual and grants the caster
-                    // building XP; it also nulls the caster's task pointers, so save/restore.
+                    // building XP. It also nulls the caster's task pointers, so save/restore.
                     completeTask(colonist, best, this);
                     colonist.currentTaskId = savedTaskId;
                     colonist.state = savedState;
@@ -2226,7 +2226,7 @@ function fitGameFont() {
     const dpr = window.devicePixelRatio || 1;
     const logicalCellSize = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
     const physCellSize = Math.round(logicalCellSize * dpr);
-    const cellSize = physCellSize / dpr;  // CSS pixels — same value renderer assigns to charWidth
+    const cellSize = physCellSize / dpr;  // CSS pixels, same value renderer assigns to charWidth
     CONFIG.VIEWPORT_WIDTH = Math.max(1, Math.floor(availWidth / cellSize));
     CONFIG.VIEWPORT_HEIGHT = Math.max(1, Math.floor(availHeight / cellSize));
 
@@ -2405,7 +2405,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const versionLabel = document.getElementById('version-label');
     if (versionLabel) versionLabel.textContent = `v${GAME_VERSION}`;
 
-    // Shared skin manager — created early so start screen and game use the same instance
+    // Shared skin manager. Created early so start screen and game use the same instance.
     const sharedSkinManager = new SkinManager();
     window._sharedSkinManager = sharedSkinManager;
 
@@ -2823,7 +2823,7 @@ document.addEventListener('DOMContentLoaded', () => {
         randomHint.textContent = 'Random';
         randomView.appendChild(randomCanvas);
         randomView.appendChild(randomHint);
-        // Draw the ? fallback immediately; sprite may not exist
+        // Draw the ? fallback immediately. Sprite may not exist.
         (function() {
             const ctx = randomCanvas.getContext('2d');
             ctx.fillStyle = '#777';
@@ -2841,7 +2841,7 @@ document.addEventListener('DOMContentLoaded', () => {
         customView.style.flex = '1';
         slotEl.appendChild(customView);
 
-        // Swap arrow row — sits below the card content
+        // Swap arrow row, sits below the card content
         const arrowRow = document.createElement('div');
         arrowRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:4px;';
         const leftArrow = document.createElement('button');
@@ -2926,7 +2926,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const usingSprites = sharedSkinManager.isActive;
             const color = state.nameColor || COLONIST_COLORS[idx % COLONIST_COLORS.length];
 
-            // Color picker — always shown; drives both name color and shirt tint
+            // Color picker, always shown. Drives both name color and shirt tint.
             const colorRow = document.createElement('div');
             colorRow.style.cssText = 'margin-bottom:6px;';
             const colorLabel = document.createElement('div');
@@ -2940,13 +2940,13 @@ document.addEventListener('DOMContentLoaded', () => {
             colorInput.value = color;
             colorInput.style.cssText = 'width:44px; height:28px; padding:0; border:1px solid #555; border-radius:3px; background:none; cursor:pointer;';
             colorInput.title = 'Choose name & clothing color';
-            // 'input' fires on every drag — only update the live preview, no DOM rebuild.
+            // 'input' fires on every drag. Only update the live preview, no DOM rebuild.
             colorInput.addEventListener('input', () => {
                 state.nameColor = colorInput.value;
                 renderSlotSprite(previewCanvas, idx, state);
                 if (nameEl) renderSlotName(nameEl, state, idx);
             });
-            // 'change' fires when the picker closes — rebuild shirt thumbnails and save.
+            // 'change' fires when the picker closes. Rebuild shirt thumbnails and save.
             colorInput.addEventListener('change', () => {
                 state.nameColor = colorInput.value;
                 renderSlotSprite(previewCanvas, idx, state);
@@ -3041,7 +3041,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 v => sharedSkinManager.getColonistSprite(idx + 1, false, state.race, 1, v, 1, color));
             container.appendChild(hairRow);
 
-            // Shirt picker — previews with current color tint
+            // Shirt picker, previews with current color tint
             const shirtRow = document.createElement('div');
             shirtRow.style.cssText = 'margin-bottom:6px;';
             const shirtLabel = document.createElement('div');
@@ -3331,7 +3331,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSlotSprite(randomCanvas, idx, state);
             const sc = customView.querySelector('[data-slot-sprite]');
             if (sc) renderSlotSprite(sc, idx, state);
-            // The active pack may have changed — rebuild the appearance pickers.
+            // The active pack may have changed. Rebuild the appearance pickers.
             const ac = customView.querySelector('[data-slot-appearance]');
             const nd = customView.querySelector('[data-slot-name]');
             if (ac && sc) rebuildAppearancePickers(ac, sc, nd);
@@ -3529,7 +3529,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('start-settings-panel').addEventListener('input', saveStartSettings);
 
     // Start-screen settings tabs (General / Graphics / Controls). Sections are
-    // tagged with data-start-tab; we toggle visibility rather than re-render.
+    // tagged with data-start-tab. We toggle visibility rather than re-render.
     function setStartSettingsTab(tab) {
         document.querySelectorAll('#start-settings-panel [data-start-tab]').forEach(el => {
             el.style.display = el.getAttribute('data-start-tab') === tab ? '' : 'none';

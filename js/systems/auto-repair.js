@@ -5,7 +5,7 @@
  * unit-tested without booting the DOM-coupled engine.
  *
  * `structurePositions` is the shared per-tick snapshot from
- * mapIndex.getAllStructurePositions() — an array of { x, y, type }. It defaults
+ * mapIndex.getAllStructurePositions(), an array of { x, y, type }. It defaults
  * to a fresh scan when called standalone (e.g. from tests).
  */
 import { BUILDINGS, WORK_CONFIG } from '../core/config.js';

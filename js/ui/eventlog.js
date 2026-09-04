@@ -8,7 +8,7 @@ export class EventLog {
 
     add(game, text, type, linkedEntity) {
         // timeOfDay is tick % TICKS_PER_DAY (0 .. TICKS_PER_DAY-1), not a 0-100 value.
-        // Map it onto a 24h clock; dividing by 100 produced hours like 114:00.
+        // Map it onto a 24h clock. Dividing by 100 produced hours like 114:00.
         const fractionOfDay = game.timeOfDay / CONFIG.TICKS_PER_DAY;
         const totalMinutes = Math.floor(fractionOfDay * 24 * 60);
         const hours = Math.floor(totalMinutes / 60);

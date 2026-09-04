@@ -1,4 +1,4 @@
-// Named enemy catalog — each enemy type has base stats, a sprite, and a color.
+// Named enemy catalog. Each enemy type has base stats, a sprite, and a color.
 // Realms reference these by key with a spawn weight.
 export const EXPEDITION_ENEMIES = {
     // Crystal chain
@@ -2078,14 +2078,14 @@ export const WAVE_CONFIG = {
 };
 
 // ============================================================================
-// STORY MILESTONES — SPOILER WARNING!
+// STORY MILESTONES - SPOILER WARNING!
 // The text below contains narrative spoilers for Rifthold.
 // Do not read ahead if you want to experience the story organically in-game.
 // ============================================================================
 
 export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
-    // Colony tab — narrative story beats about your colony's journey
+    // Colony tab: narrative story beats about your colony's journey
     // -----------------------------------------------------------------------
     first_building: {
         tab: 'colony',
@@ -2239,7 +2239,7 @@ export const STORY_MILESTONES = {
         your colonists what they need to face these beasts with confidence.`,
     },
     // -----------------------------------------------------------------------
-    // Research tab — knowledge and technology discoveries
+    // Research tab: knowledge and technology discoveries
     // -----------------------------------------------------------------------
     research_runecraft: {
         tab: 'research',
@@ -2453,7 +2453,7 @@ export const STORY_MILESTONES = {
     },
 
     // -----------------------------------------------------------------------
-    // Races tab — lore about the peoples of the world
+    // Races tab: lore about the peoples of the world
     // -----------------------------------------------------------------------
     first_bufos_colonist: {
         tab: 'races',
@@ -2617,7 +2617,7 @@ export const STORY_MILESTONES = {
         We can only hope that these kinder humans are able to prosper.`,
     },
     // -----------------------------------------------------------------------
-    // Realms tab — exploration journals from other worlds
+    // Realms tab: exploration journals from other worlds
     // -----------------------------------------------------------------------
     realm_crystal_caves: {
         tab: 'realms',

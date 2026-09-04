@@ -91,7 +91,7 @@ export const WEAPONS = {
 
 // `order` groups a set's pieces together within a tier in the crafting menu
 // (the helmet/boots sharing the same number sit next to the matching body).
-// It is a within-tier tiebreaker only — tier remains the primary sort key.
+// It is a within-tier tiebreaker only. Tier remains the primary sort key.
 export const ARMORS = {
     wool_parka: { name: 'Wool Parka', damageReduction: 0.04, tier: 1, order: 1, coldResistance: 0.7, hungerReduction: 0.1, description: 'Warm wool parka. Resists cold and reduces hunger.', recipe: { input: { wool: 4, leather: 1 }, ticks: 16 } },
     iron_brigandine: { name: 'Iron Brigandine', damageReduction: 0.08, tier: 1, order: 3, description: 'Light iron armor offering basic protection.', recipe: { input: { iron: 2 }, ticks: 14, research: 'metalworking', station: 'anvil' } },
@@ -283,8 +283,8 @@ export const BOOTS_ENCHANTMENT_EFFECTS = {
     swiftness: { suffix: 'of Swiftness', description: 'Enchanted with swiftness, increasing movement speed by 10% per enchantment tier.', moveSpeedBonus: 0.10 },
 };
 
-// Unified item registry — every non-stackable item with its type and optional tradeValue.
-// Built by merging all item dicts; SPELL_TOMES are merged in config/index.js after import.
+// Unified item registry. Every non-stackable item with its type and optional tradeValue.
+// Built by merging all item dicts. SPELL_TOMES are merged in config/index.js after import.
 export const ALL_ITEMS = {};
 
 const _ITEM_SOURCES = [

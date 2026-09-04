@@ -561,7 +561,7 @@ class SpellEditor {
                 effect.duration = data.duration || 300;
                 break;
             case 'chain_damage':
-                // A bouncing bolt — modelled in the editor as a plain damage effect;
+                // A bouncing bolt, modelled in the editor as a plain damage effect.
                 // the chain params live on the exported config, not the visual editor.
                 effect.type = 'damage';
                 effect.value = data.damage || 10;
@@ -594,7 +594,7 @@ class SpellEditor {
                 effect.summonType = data.summonType || 'spectral_wisp';
                 break;
             // cleanse, buff_quality, buff_rest, transmute, finish_construction and
-            // ripen_crops have no visual-editor primitive; they pass through as their raw
+            // ripen_crops have no visual-editor primitive. They pass through as their raw
             // type (the picker falls back to a generic row) and stay config-authored.
         }
         return [effect];

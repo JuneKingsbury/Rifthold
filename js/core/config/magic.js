@@ -80,10 +80,10 @@ export const SPELLS = {
     circle_of_growth: { name: 'Circle of Growth', school: 'transmutation', minLevel: 2, manaCost: 20, cooldown: 1200, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 10, radius: 3, growthMult: 2.0, duration: 200 },
     level_field: { name: 'Level Field', school: 'transmutation', minLevel: 4, manaCost: 30, cooldown: 600, castType: 'targeted', effect: 'terraform', range: 8, radius: 3, targetTerrain: 'grass' },
     // Stone Shape instantly completes a targeted construction (build task) or repairs a
-    // damaged structure — matter shaped to will. Targeted so the player picks the tile.
+    // damaged structure, matter shaped to will. Targeted so the player picks the tile.
     stone_shape: { name: 'Stone Shape', school: 'transmutation', minLevel: 2, manaCost: 18, cooldown: 200, castType: 'targeted', effect: 'finish_construction', range: 12 },
     // Transmutation alchemy of the colony's stores, split into three tiers that each
-    // auto-cast (trigger 'canTransmute') only when the conversion is actually possible —
+    // auto-cast (trigger 'canTransmute') only when the conversion is actually possible,
     // i.e. enough of the input material is stockpiled. A missing `fromResource` means the
     // output is conjured from nothing (Transmute Stone). Cheaper/faster at the low tier,
     // costlier/slower and stingier at the high tier so runite stays scarce.
@@ -91,7 +91,7 @@ export const SPELLS = {
     transmute_iron: { name: 'Transmute Iron', school: 'transmutation', minLevel: 3, manaCost: 18, cooldown: 300, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'stone', inputAmount: 10, toResource: 'iron_ore', outputAmount: 6 },
     transmute_runite: { name: 'Transmute Runite', school: 'transmutation', minLevel: 4, manaCost: 28, cooldown: 500, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'iron', inputAmount: 8, toResource: 'runite', outputAmount: 2 },
     // Verdant Bloom instantly ripens all mature growing crops in radius (sets them ready to
-    // harvest). Targeted burst of growth — the payoff transmutation capstone for farms.
+    // harvest). Targeted burst of growth, the payoff transmutation capstone for farms.
     verdant_bloom: { name: 'Verdant Bloom', school: 'transmutation', minLevel: 4, manaCost: 28, cooldown: 500, castType: 'targeted', effect: 'ripen_crops', range: 10, radius: 3, ripenThreshold: 0.5 },
 
     // Divination

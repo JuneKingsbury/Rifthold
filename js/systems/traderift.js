@@ -10,13 +10,13 @@
  * Fulfilled requests stay in place (greyed) until their cadence next refreshes.
  *
  * Reward KINDS (rolled per request from the cadence's kindWeights):
- *   - 'equipment' — {type, tier, quality, enchant}; quality is a FLOOR at fulfill.
- *   - 'tome'      — a random spell tome.
- *   - 'artifact'  — a random pedestal relic (yearly-only via kindWeights).
+ *   - 'equipment': {type, tier, quality, enchant}; quality is a FLOOR at fulfill.
+ *   - 'tome':      a random spell tome.
+ *   - 'artifact':  a random pedestal relic (yearly-only via kindWeights).
  */
 import { ALL_ITEMS, QUALITY_TIERS, TRADE_VALUES, TRADE_RIFT_CONFIG } from '../core/config.js';
 
-// Weighted pick from a {value: weight} map. Keys are returned as-is (strings);
+// Weighted pick from a {value: weight} map. Keys are returned as-is (strings).
 // numeric keys (tiers) are coerced by the caller.
 function weightedPick(weights) {
     const entries = Object.entries(weights).filter(([, w]) => w > 0);
@@ -39,7 +39,7 @@ export class TradeRiftSystem {
         this.requests = [];       // active requests (both cadences) in one array
         this.lastRefreshYear = 0; // year of last yearly refresh
         this.seeded = false;      // populated at least once (drives build-time seeding)
-        this.nextId = 1;          // monotonic id — no leading underscore (save.js strips those)
+        this.nextId = 1;          // monotonic id, no leading underscore (save.js strips those)
     }
 
     /**
@@ -78,7 +78,7 @@ export class TradeRiftSystem {
         if (!candidates || !candidates.length) return null;
 
         // Trinkets have no quality-scaled stats and no enchant table, so they never
-        // carry quality or enchantment — the mods would be name-only, misleading the
+        // carry quality or enchantment. The mods would be name-only, misleading the
         // player and inflating the cost for a benefit that doesn't exist.
         const isTrinket = type === 'trinket';
         const quality = isTrinket ? 'normal' : weightedPick(cfg.qualityWeights);
@@ -158,7 +158,7 @@ export class TradeRiftSystem {
     _equipmentText(type, tier, quality, enchant) {
         const label = TRADE_RIFT_CONFIG.typeLabels[type] || type;
         const adj = TRADE_RIFT_CONFIG.qualityAdjective[quality];
-        // Enchanted rewards read as "rune-touched" — the flavor that signals the perk.
+        // Enchanted rewards read as "rune-touched", the flavor that signals the perk.
         const enchantWord = enchant ? 'rune-touched ' : '';
         // 'standard' (normal) quality reads better without the trailing clause.
         if (quality === 'normal') return `an unknown ${enchantWord}Tier ${tier} ${label}`;

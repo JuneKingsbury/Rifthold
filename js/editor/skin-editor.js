@@ -1831,7 +1831,7 @@ class SkinEditor {
     _pasteSprite() {
         if (!this.clipboard) {
             const el = document.getElementById('se-status');
-            el.textContent = 'Nothing to paste — copy a sprite first (C)';
+            el.textContent = 'Nothing to paste. Copy a sprite first (C).';
             return;
         }
         this._pushUndoSnapshot();
@@ -1936,7 +1936,7 @@ class SkinEditor {
 
     _pasteSelection() {
         if (!this._regionClipboard) {
-            document.getElementById('se-status').textContent = 'Nothing to paste — select and Ctrl+C first';
+            document.getElementById('se-status').textContent = 'Nothing to paste. Select a region and Ctrl+C first.';
             return;
         }
         this._commitSelection();
@@ -1945,7 +1945,7 @@ class SkinEditor {
         this.selection = { x: 0, y: 0, w: clip.w, h: clip.h };
         this._selPixels = new Uint8ClampedArray(clip.pixels);
         this._setTool('select');
-        document.getElementById('se-status').textContent = `Pasted ${clip.w}x${clip.h} region — drag to position, Esc to commit`;
+        document.getElementById('se-status').textContent = `Pasted ${clip.w}x${clip.h} region. Drag to position, Esc to commit.`;
     }
 
     _deleteSelection() {
@@ -2071,7 +2071,7 @@ class SkinEditor {
         const btn = document.getElementById('se-toggle-tlock');
         btn.classList.toggle('active', this.transparencyLock);
         document.getElementById('se-status').textContent = this.transparencyLock
-            ? 'Transparency lock ON — only draws on non-transparent pixels'
+            ? 'Transparency lock ON. Only draws on non-transparent pixels.'
             : 'Transparency lock OFF';
     }
 
@@ -2288,7 +2288,7 @@ class SkinEditor {
             document.getElementById('se-status').textContent = 'Onion skin OFF';
         } else {
             document.getElementById('se-toggle-onion').classList.add('active');
-            document.getElementById('se-status').textContent = 'Onion skin ON — select an object from palette to use as overlay';
+            document.getElementById('se-status').textContent = 'Onion skin ON. Select an object from the palette to use as overlay.';
             this._onionSkinKey = '__pending__';
         }
     }
@@ -2357,7 +2357,7 @@ class SkinEditor {
         this._showTilePreview = !this._showTilePreview;
         document.getElementById('se-toggle-tile').classList.toggle('active', this._showTilePreview);
         document.getElementById('se-status').textContent = this._showTilePreview
-            ? 'Tile preview ON — preview shows 3x3 tiled grid'
+            ? 'Tile preview ON. Preview shows 3x3 tiled grid.'
             : 'Tile preview OFF';
     }
 
@@ -2370,7 +2370,7 @@ class SkinEditor {
         this._showRefImage = !this._showRefImage;
         document.getElementById('se-toggle-ref').classList.toggle('active', this._showRefImage);
         document.getElementById('se-status').textContent = this._showRefImage
-            ? 'Reference image ON — shown behind canvas at 30% opacity'
+            ? 'Reference image ON. Shown behind canvas at 30% opacity.'
             : 'Reference image OFF';
     }
 
