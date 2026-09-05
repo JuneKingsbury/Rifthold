@@ -1929,6 +1929,10 @@ class Game {
         designateTame(this, animalId);
     }
 
+    reassignAnimalPen(animalId) {
+        this.input.startPenReassignTargeting(animalId);
+    }
+
     craftGolem(golemType) {
         if (!this.research.isResearched('golem_craft')) return;
         const def = GOLEM_TYPES[golemType];

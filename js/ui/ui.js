@@ -1801,8 +1801,25 @@ export class UI {
             const def = TAMED_ANIMALS[a.type];
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            html += `<div class="info-header" style="color:${color};">${a.type} (tamed)</div>`;
+            const petLabel = a.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
+            html += `<div class="info-header" style="color:${color};">${a.type} (tamed)${petLabel}</div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
+            if (a.bondedColonistId) {
+                const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
+                const bondName = bonded ? bonded.name : 'Unknown';
+                const PET_BOND_THRESHOLD = 5;
+                const bondDisplay = a.isPet ? `${bondName} (Pet)` : `${bondName} (Bond: ${a.bondLevel || 0}/${PET_BOND_THRESHOLD})`;
+                html += `<div class="info-row" style="color:#aaddff">Bonded: ${bondDisplay}</div>`;
+            }
+            if (def?.hungerRate) {
+                const threshold = def.hungerThreshold || 3;
+                const hunger = a.hunger || 0;
+                if (hunger >= threshold) {
+                    html += `<div class="info-row" style="color:#ff6644">Hungry! (${hunger}/${threshold}) — needs feeding</div>`;
+                } else if (hunger > 0) {
+                    html += `<div class="info-row" style="color:#ddaa44">Hunger: ${hunger}/${threshold}</div>`;
+                }
+            }
             if (a.roles && a.roles.length > 0) {
                 html += getRoleInfoHtml(a);
             } else {
@@ -1819,6 +1836,7 @@ export class UI {
             }
             html += getEffectInfoHtml(a);
             if (a.onExpedition) html += `<div class="info-row" style="color:#33ccff">On expedition</div>`;
+            html += `<button onclick="window.game.reassignAnimalPen(${a.id})">Reassign pen</button>`;
             html += `</div>`;
         }
 

@@ -108,6 +108,11 @@ export function createTamedEntity(type, x, y) {
         produceCooldown: ((tamed.roles || []).find(r => r.type === 'production') || {}).produceRate || 0,
         penX: x,
         penY: y,
+        bondedColonistId: null,
+        hunger: 0,
+        hungerTimer: 0,
+        bondLevel: 0,
+        isPet: false,
     };
 
     initEntityRoles(entity);

@@ -11,7 +11,15 @@ export function updateWildlife(game) {
 
     for (let i = game.entities.length - 1; i >= 0; i--) {
         const animal = game.entities[i];
-        if (animal.category !== 'animal' || animal.tamed) continue;
+        if (animal.category !== 'animal') continue;
+        if (animal.tamed) continue;
+
+        // Animal being led to pen: follow the colonist each tick.
+        if (animal.pendingTame) {
+            updatePendingLeadAnimal(animal, game);
+            continue;
+        }
+
         if (animal.hp <= 0) {
             // Animals that wandered off the map die silently, no meat/hides. Only
             // hunted or combat-killed animals (which never set _leftMap) yield loot.
@@ -137,14 +145,30 @@ function updateAnimal(animal, game) {
 
 function syncAnimalTasks(game) {
     for (const task of game.taskQueue.getAll()) {
-        if (task.type !== 'hunt' && task.type !== 'tame') continue;
+        if (task.type !== 'hunt' && task.type !== 'tame' && task.type !== 'lead_animal' && task.type !== 'feed_animal') continue;
         const animal = game.entities.find(a => a.id === task.targetAnimalId && a.category === 'animal');
         if (!animal || animal.hp <= 0) {
+            if (task.type === 'lead_animal' && animal) { animal.pendingTame = false; animal.leaderId = null; }
+            if (task.type === 'feed_animal' && animal) animal._feedTaskQueued = false;
             game.taskQueue.remove(task.id);
-        } else if (task.x !== animal.x || task.y !== animal.y) {
-            game.taskQueue.updatePosition(task.id, animal.x, animal.y);
+        } else if (task.type === 'hunt' || task.type === 'tame') {
+            if (task.x !== animal.x || task.y !== animal.y) {
+                game.taskQueue.updatePosition(task.id, animal.x, animal.y);
+            }
         }
     }
+}
+
+function updatePendingLeadAnimal(animal, game) {
+    if (!animal.leaderId) return;
+    const leader = game.colonists.find(c => c.id === animal.leaderId && c.hp > 0);
+    if (!leader) {
+        animal.pendingTame = false;
+        animal.leaderId = null;
+        return;
+    }
+    const dur = CONFIG.TICK_RATE / ((animal.speed || 0.3) * game.speed);
+    moveEntity(animal, leader.x, leader.y, dur);
 }
 
 function isBeingTamed(animal, game) {

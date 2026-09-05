@@ -275,6 +275,7 @@ export class InputHandler {
     handleEscape() {
         if (this.spellTargeting) { this.cancelSpellTargeting(); return; }
         if (this.guardPointTargeting) { this.cancelGuardPointTargeting(); return; }
+        if (this.penReassignTargeting) { this.cancelPenReassignTargeting(); return; }
         const ui = this.game.ui;
         const hadPanel = ui.priorityPanelVisible || ui.craftPanelVisible ||
             ui.researchPanelVisible || ui.inventoryVisible ||
@@ -772,6 +773,10 @@ export class InputHandler {
             this.executeGuardPointTarget(pos);
             return;
         }
+        if (this.penReassignTargeting) {
+            this.executePenReassignTarget(pos);
+            return;
+        }
         if (this.rallyMode) {
             this.handleRightClick(pos);
             return;
@@ -838,6 +843,35 @@ export class InputHandler {
     cancelSpellTargeting() {
         this.spellTargeting = null;
         this.game.notifications.push({ text: 'Spell targeting cancelled', tick: this.game.tick, type: 'event' });
+        this.game.ui.updateModeDisplay(this);
+    }
+
+    startPenReassignTargeting(animalId) {
+        this.penReassignTargeting = { animalId };
+        this.game.notifications.push({ text: 'Click a Beast Circle to reassign pen (Esc to cancel)', tick: this.game.tick, type: 'event' });
+        this.game.ui.updateModeDisplay(this);
+    }
+
+    cancelPenReassignTargeting() {
+        this.penReassignTargeting = null;
+        this.game.notifications.push({ text: 'Pen reassignment cancelled', tick: this.game.tick, type: 'event' });
+        this.game.ui.updateModeDisplay(this);
+    }
+
+    executePenReassignTarget(pos) {
+        const tile = this.game.map[pos.y]?.[pos.x];
+        if (!tile || tile.structure !== 'beast_circle') {
+            this.game.notifications.push({ text: 'Click on a Beast Circle to reassign', tick: this.game.tick, type: 'warning' });
+            return;
+        }
+        const { animalId } = this.penReassignTargeting;
+        const animal = this.game.entities.find(a => a.id === animalId && a.tamed);
+        if (animal) {
+            animal.penX = pos.x;
+            animal.penY = pos.y;
+            this.game.notifications.push({ text: `${animal.type} pen reassigned`, tick: this.game.tick, type: 'success' });
+        }
+        this.penReassignTargeting = null;
         this.game.ui.updateModeDisplay(this);
     }
 

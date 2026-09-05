@@ -1,4 +1,4 @@
-import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG } from '../core/config.js';
+import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG, TAMED_ANIMALS } from '../core/config.js';
 import { manhattanDist, findPathForEnemies } from '../world/pathfinding.js';
 import { isPassable, isPassableForEnemies, isBreakableByEnemies, hasLineOfSight, findLineOfSightTile } from '../world/map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
@@ -29,6 +29,10 @@ export const ROLE_HANDLERS = {
             let damage = role.guardDamage || entity.damage || 8;
             if (entity.tamed && entity.type === 'wolf' && game.research.isResearched('wolf_mastery')) {
                 damage += 4;
+            }
+            if (entity.bondedColonistId) {
+                const bonded = game.colonists?.find(c => c.id === entity.bondedColonistId && c.hp > 0);
+                if (bonded) damage += 1;
             }
 
             if (rs.state === 'retreating') {
@@ -92,17 +96,27 @@ export const ROLE_HANDLERS = {
         info(entity, role) {
             const rs = entity.roleState.production || {};
             const next = rs.cooldown || 0;
-            return `<div class="info-row" style="color:#88cc88">Produces: ${role.produces} (every ${role.produceRate || 80} ticks, next in ${next})</div>`;
+            const tamedDef = TAMED_ANIMALS[entity.type];
+            const threshold = tamedDef?.hungerThreshold || 3;
+            const hungerStr = (entity.hunger || 0) >= threshold ? ' <span style="color:#ff6644">Hungry!</span>' : '';
+            return `<div class="info-row" style="color:#88cc88">Produces: ${role.produces} (every ${role.produceRate || 80} ticks, next in ${next})${hungerStr}</div>`;
         },
         update(entity, role, game) {
             if (entity.onExpedition) return;
             const rs = entity.roleState.production;
+            const tamedDef = TAMED_ANIMALS[entity.type];
+            const threshold = tamedDef?.hungerThreshold || 3;
+            if ((entity.hunger || 0) >= threshold) return;
             rs.cooldown--;
             if (rs.cooldown <= 0) {
                 const output = {};
                 let amount = role.produceAmount || 1;
                 if (game.research.isResearched('husbandry')) {
                     amount = Math.ceil(amount * WORK_CONFIG.husbandryProductionMult);
+                }
+                if (entity.bondedColonistId) {
+                    const bonded = game.colonists?.find(c => c.id === entity.bondedColonistId && c.hp > 0);
+                    if (bonded) amount = Math.ceil(amount * 1.1);
                 }
                 output[role.produces] = amount;
                 game.resources.add(output);
@@ -344,6 +358,56 @@ export const ROLE_HANDLERS = {
         },
     },
 
+    pet: {
+        init(entity) {
+            entity.roleState.pet = { state: 'following', noHostileTicks: 0 };
+        },
+        info(entity) {
+            const rs = entity.roleState.pet || {};
+            const stateColor = rs.state === 'sheltering' ? '#ffaa00' : '#aaddff';
+            const stateLabel = rs.state === 'sheltering' ? 'Sheltering' : 'Following';
+            return `<div class="info-row" style="color:${stateColor}">Pet: ${stateLabel}</div>`;
+        },
+        update(entity, role, game) {
+            if (entity.onExpedition) return;
+            const rs = entity.roleState.pet;
+            const dur = CONFIG.TICK_RATE / (entity.speed * game.speed);
+
+            const HOSTILE_DETECT_RADIUS = 6;
+            const RESUME_FOLLOW_TICKS = 10;
+            const FOLLOW_RANGE = 8;
+
+            // Check for nearby hostiles.
+            const hasHostile = _petHasNearbyHostile(entity, game, HOSTILE_DETECT_RADIUS);
+
+            if (hasHostile) {
+                rs.state = 'sheltering';
+                rs.noHostileTicks = 0;
+                const pen = findPen(entity, game);
+                if (pen) moveToward(entity, pen, game.map, dur, game);
+                return;
+            }
+
+            if (rs.state === 'sheltering') {
+                rs.noHostileTicks = (rs.noHostileTicks || 0) + 1;
+                if (rs.noHostileTicks < RESUME_FOLLOW_TICKS) {
+                    const pen = findPen(entity, game);
+                    if (pen) moveToward(entity, pen, game.map, dur, game);
+                    return;
+                }
+                rs.state = 'following';
+            }
+
+            if (!entity.bondedColonistId) return;
+            const owner = game.colonists?.find(c => c.id === entity.bondedColonistId && c.hp > 0);
+            if (!owner) return;
+
+            const dist = manhattanDist(entity.x, entity.y, owner.x, owner.y);
+            if (dist > FOLLOW_RANGE) return;
+            if (dist > 2) moveToward(entity, owner, game.map, dur, game);
+        },
+    },
+
     worker: {
         init() {},
         info(entity, role) {
@@ -442,6 +506,10 @@ export function ensureEntityRoles(entity, def) {
         const roles = entity.tamed && def && def.tamed ? def.tamed.roles : def && def.roles;
         entity.roles = (roles || []).map(r => ({ ...r }));
     }
+    // Pet role is added dynamically at runtime, not in config. Restore it after load.
+    if (entity.isPet && !entity.roles.some(r => r.type === 'pet')) {
+        entity.roles.push({ type: 'pet' });
+    }
     if (!entity.roleState) entity.roleState = {};
     initEntityRoles(entity);
 }
@@ -509,6 +577,21 @@ const EFFECT_HANDLERS = {
         },
     },
 };
+
+function _petHasNearbyHostile(entity, game, radius) {
+    for (const r of game.raiders) {
+        if (r.hp > 0 && manhattanDist(entity.x, entity.y, r.x, r.y) <= radius) return true;
+    }
+    if (game.waves && game.waves.enemies) {
+        for (const e of game.waves.enemies) {
+            if (e.hp > 0 && manhattanDist(entity.x, entity.y, e.x, e.y) <= radius) return true;
+        }
+    }
+    for (const w of game.entities) {
+        if (w.category === 'animal' && !w.tamed && w.hostile && w.hp > 0 && manhattanDist(entity.x, entity.y, w.x, w.y) <= radius) return true;
+    }
+    return false;
+}
 
 function getHostiles(game, entity) {
     const hostiles = [];

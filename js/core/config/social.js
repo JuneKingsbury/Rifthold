@@ -28,6 +28,10 @@ export const THOUGHTS = {
     cast_spell:        { text: 'Cast a spell', moodEffect: 3, duration: 80 },
     tame_failed:       { text: 'Failed taming attempt!', moodEffect: -8, duration: 150 },
     wolf_retaliated:   { text: 'Wolf attacked during taming!', moodEffect: -12, duration: 200 },
+    fed_animal:        { text: 'Fed and bonded with an animal', moodEffect: 3, duration: 100 },
+    animal_died:       { text: 'My animal companion died', moodEffect: -8, duration: 150 },
+    pet_died:          { text: 'My beloved pet died', moodEffect: -15, duration: 300 },
+    animal_escaped:    { text: 'An animal escaped the colony', moodEffect: -5, duration: 150 },
     // Relaxation thoughts
     relaxed:           { text: 'Relaxed a while',          moodEffect: 4, duration: 200 },
     hung_out:          { text: 'Hung out in the hall',     moodEffect: 8, duration: 250 },

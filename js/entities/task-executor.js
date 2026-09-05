@@ -1,6 +1,6 @@
 import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
 import { spawnParticle } from '../ui/overlay-renderer.js';
-import { completeTame, attemptDangerousTame } from './taming.js';
+import { completeTame, finalizeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache, getRaceModifier } from './colonist.js';
 import { getHarvestYield } from '../systems/farming.js';
@@ -434,16 +434,85 @@ export function completeTask(colonist, task, game) {
             if (task.targetAnimalId) {
                 const wildAnimal = game.entities.find(a => a.id === task.targetAnimalId && a.category === 'animal' && !a.tamed);
                 const tamedDef = wildAnimal ? TAMED_ANIMALS[wildAnimal.type] : null;
+                let tameResult;
                 if (tamedDef && tamedDef.dangerousTame) {
                     const result = attemptDangerousTame(game, colonist, task.targetAnimalId);
-                    if (result === 'success') {
-                        applyThought(colonist, 'tamed_animal', game.tick);
-                        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Tamed!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
-                    }
+                    tameResult = result === 'success' ? true : false;
                 } else {
-                    if (completeTame(game, task.targetAnimalId)) {
-                        applyThought(colonist, 'tamed_animal', game.tick);
-                        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Tamed!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+                    tameResult = completeTame(game, task.targetAnimalId, colonist.id);
+                }
+                if (tameResult === true) {
+                    applyThought(colonist, 'tamed_animal', game.tick);
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Tamed!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+                } else if (tameResult === 'lead') {
+                    // Animal is pending lead. Enqueue a lead task and claim it immediately
+                    // so this colonist walks it to the pen without releasing to the pool.
+                    const animal = game.entities.find(a => a.id === task.targetAnimalId);
+                    if (animal) {
+                        const pen = game.mapIndex ? game.mapIndex.findNearest('beast_circle', colonist.x, colonist.y) : null;
+                        if (pen) {
+                            const leadTask = game.taskQueue.add({
+                                type: 'lead_animal',
+                                skillRequired: 'animals',
+                                x: pen.x,
+                                y: pen.y,
+                                penX: pen.x,
+                                penY: pen.y,
+                                workAmount: 5,
+                                targetAnimalId: task.targetAnimalId,
+                            });
+                            game.taskQueue.claim(leadTask.id, colonist.id);
+                            // Skip the normal task completion below so colonist stays active.
+                            game.taskQueue.complete(task.id);
+                            colonist.currentTaskId = leadTask.id;
+                            colonist.state = 'idle';
+                            colonist.workProgress = 0;
+                            return;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case 'lead_animal': {
+            if (task.targetAnimalId) {
+                finalizeTame(game, task.targetAnimalId, colonist.id, task.penX, task.penY);
+                applyThought(colonist, 'tamed_animal', game.tick);
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Settled in!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+            }
+            break;
+        }
+        case 'feed_animal': {
+            if (task.targetAnimalId) {
+                const animal = game.entities.find(a => a.id === task.targetAnimalId && a.tamed);
+                // Always clear the queued flag so a new task can be issued if food was unavailable.
+                if (animal) animal._feedTaskQueued = false;
+                if (animal && game.resources.has({ food: 1 })) {
+                    game.resources.deduct({ food: 1 });
+                    animal.hunger = 0;
+
+                    animal.bondLevel = (animal.bondLevel || 0) + 1;
+                    applyThought(colonist, 'fed_animal', game.tick);
+
+                    const PET_BOND_THRESHOLD = 5;
+                    const tamedDef = TAMED_ANIMALS[animal.type];
+                    if (animal.bondLevel >= PET_BOND_THRESHOLD && !animal.isPet && !tamedDef?.guardAnimal) {
+                        // Find a colonist without a pet. Prefer the feeder.
+                        const hasPet = (c) => game.entities.some(e => e.tamed && e.isPet && e.bondedColonistId === c.id);
+                        let owner = !hasPet(colonist) ? colonist : game.colonists.find(c => c.hp > 0 && !hasPet(c));
+                        if (owner) {
+                            animal.bondedColonistId = owner.id;
+                            animal.isPet = true;
+                            animal.roles.push({ type: 'pet' });
+                            if (!animal.roleState) animal.roleState = {};
+                            animal.roleState.pet = { state: 'following', noHostileTicks: 0 };
+                            game.notifications.push({ text: `${animal.type} bonded with ${owner.name} as a pet!`, tick: game.tick, type: 'success' });
+                        }
+                    }
+
+                    // Bond the animal to this colonist if it has no bond yet.
+                    if (!animal.bondedColonistId) {
+                        animal.bondedColonistId = colonist.id;
                     }
                 }
             }

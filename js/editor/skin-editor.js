@@ -488,6 +488,11 @@ class SkinEditor {
                     if (def.structureType === 'floor') continue;
                     items.push({ key, char: def.char, color: def.color, desc: def.description || key, category: 'buildings' });
                 }
+                items.push({ key: 'crystal_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
+                items.push({ key: 'verdant_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
+                items.push({ key: 'university_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
+                items.push({ key: 'abyss_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
+                items.push({ key: 'kingdom_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 break;
             case 'Terrain':
                 for (const [key, def] of Object.entries(TERRAIN)) {
@@ -594,6 +599,11 @@ class SkinEditor {
                     if (def.structureType !== 'floor') continue;
                     items.push({ key, char: def.char, color: def.color, desc: def.description || key, category: 'floors' });
                 }
+                items.push({ key: 'crystal_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
+                items.push({ key: 'verdant_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
+                items.push({ key: 'university_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
+                items.push({ key: 'abyss_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
+                items.push({ key: 'kingdom_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
                 break;
             case 'Farms':
                 items.push({ key: 'farm_empty', char: '=', color: '#8b6b3a', desc: 'Empty farm plot (generic)', category: 'farms' });
