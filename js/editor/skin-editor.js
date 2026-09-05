@@ -549,6 +549,7 @@ class SkinEditor {
                 for (const [key, def] of Object.entries(EXPEDITION_ENEMIES)) {
                     items.push({ key, char: '▲', color: def.color || '#ff3333', desc: `Expedition: ${def.name}`, category: 'entities' });
                 }
+                items.push({ key: 'blight_bloom', category: 'entities' });
                 break;
             case 'Items':
                 for (const [key, def] of Object.entries(WEAPONS)) {
