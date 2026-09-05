@@ -53,7 +53,7 @@ export const REALMS = {
         name: 'Crystal Caves', difficulty: 1,
         chain: 'crystal', chainOrder: 1,
         duration: [220, 380], encounters: 5, combatEncounters: [1, 2],
-        vis: { wall: 'stone_wall', floor: 'stone_floor' },
+        vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
         loot: [
             { resource: 'stone', weight: 40, amount: [5, 12] },
             { resource: 'runite', weight: 30, amount: [2, 5] },
@@ -94,7 +94,7 @@ export const REALMS = {
         name: 'Crystal Mines', difficulty: 2,
         chain: 'crystal', chainOrder: 2,
         duration: [350, 550], encounters: 6, combatEncounters: [1, 3],
-        vis: { wall: 'stone_wall', floor: 'stone_floor' },
+        vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
         requiresRealm: 'crystal_caves',
         loot: [
             { resource: 'runite', weight: 35, amount: [4, 9] },
@@ -140,7 +140,7 @@ export const REALMS = {
         name: 'Crystal Depths', difficulty: 3,
         chain: 'crystal', chainOrder: 3,
         duration: [500, 750], encounters: 8, combatEncounters: [2, 4],
-        vis: { wall: 'stone_wall', floor: 'stone_floor' },
+        vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
         requiresRealm: 'crystal_mines',
         loot: [
             { resource: 'runite', weight: 40, amount: [6, 14] },
@@ -223,7 +223,7 @@ export const REALMS = {
         name: 'Verdant Depths', difficulty: 1,
         chain: 'verdant', chainOrder: 1,
         duration: [150, 280], encounters: 4, combatEncounters: [1, 1],
-        vis: { wall: 'wood_wall', floor: 'wood_floor' },
+        vis: { wall: 'verdant_wall', floor: 'verdant_floor' },
         loot: [
             { resource: 'wood', weight: 50, amount: [8, 15] },
             { resource: 'wheat', weight: 20, amount: [5, 10] },
@@ -264,7 +264,7 @@ export const REALMS = {
         name: 'Fungal Hollows', difficulty: 2,
         chain: 'verdant', chainOrder: 2,
         duration: [280, 450], encounters: 6, combatEncounters: [1, 3],
-        vis: { wall: 'wood_wall', floor: 'wood_floor' },
+        vis: { wall: 'verdant_wall', floor: 'verdant_floor' },
         requiresRealm: 'verdant_depths',
         loot: [
             { resource: 'wood', weight: 35, amount: [10, 20] },
@@ -310,7 +310,7 @@ export const REALMS = {
         name: 'Primeval Canopy', difficulty: 3,
         chain: 'verdant', chainOrder: 3,
         duration: [400, 600], encounters: 7, combatEncounters: [2, 3],
-        vis: { wall: 'wood_wall', floor: 'wood_floor' },
+        vis: { wall: 'verdant_wall', floor: 'verdant_floor' },
         requiresRealm: 'fungal_hollows',
         loot: [
             { resource: 'wood', weight: 30, amount: [12, 24] },
@@ -393,7 +393,7 @@ export const REALMS = {
         name: 'Arcane Library', difficulty: 2,
         chain: 'arcane', chainOrder: 1,
         duration: [180, 320], encounters: 4, combatEncounters: [1, 1],
-        vis: { wall: 'stone_wall', floor: 'wood_floor' },
+        vis: { wall: 'university_wall', floor: 'university_floor' },
         loot: [
             { resource: 'tome_of_magic_missile', weight: 20, amount: [1, 1] },
             { resource: 'tome_of_renewal', weight: 20, amount: [1, 1] },
@@ -440,7 +440,7 @@ export const REALMS = {
         name: 'Ancient University', difficulty: 3,
         chain: 'arcane', chainOrder: 2,
         duration: [320, 500], encounters: 6, combatEncounters: [1, 3],
-        vis: { wall: 'stone_wall', floor: 'wood_floor' },
+        vis: { wall: 'university_wall', floor: 'university_floor' },
         requiresRealm: 'arcane_library',
         research: 'arcane_studies',
         loot: [
@@ -490,7 +490,7 @@ export const REALMS = {
         name: 'Abandoned Laboratory', difficulty: 4,
         chain: 'arcane', chainOrder: 3,
         duration: [450, 680], encounters: 8, combatEncounters: [2, 4],
-        vis: { wall: 'stone_wall', floor: 'stone_floor' },
+        vis: { wall: 'university_wall', floor: 'university_floor' },
         requiresRealm: 'ancient_university',
         research: 'arcane_studies',
         loot: [
@@ -578,7 +578,7 @@ export const REALMS = {
         name: 'Shadow Realm', difficulty: 3,
         chain: 'shadow', chainOrder: 1,
         duration: [400, 650], encounters: 7, combatEncounters: [2, 3],
-        vis: { wall: 'void_wall', floor: 'stone_floor' },
+        vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
         loot: [
             { resource: 'void_essence', weight: 40, amount: [3, 7] },
             { resource: 'runite', weight: 25, amount: [3, 6] },
@@ -623,7 +623,7 @@ export const REALMS = {
         name: 'Void Abyss', difficulty: 4,
         chain: 'shadow', chainOrder: 2,
         duration: [550, 800], encounters: 7, combatEncounters: [3, 5],
-        vis: { wall: 'void_wall', floor: 'stone_floor' },
+        vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
         requiresRealm: 'shadow_realm',
         research: 'deep_delving',
         loot: [
@@ -670,7 +670,7 @@ export const REALMS = {
         name: 'Oblivion Rift', difficulty: 5,
         chain: 'shadow', chainOrder: 3,
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
-        vis: { wall: 'void_wall', floor: 'void_wall' },
+        vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
         requiresRealm: 'void_abyss',
         research: 'deep_delving',
         loot: [
@@ -755,7 +755,7 @@ export const REALMS = {
         chain: 'kingdom', chainOrder: 1,
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
 
-        vis: { wall: 'stone_wall', floor: 'wood_floor' },
+        vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
         research: 'deep_delving',
         requiresEvent: 'crusader_raid_defeated',
         loot: [
@@ -802,7 +802,7 @@ export const REALMS = {
         name: 'Crusader Barracks', difficulty: 7,
         chain: 'kingdom', chainOrder: 2,
         duration: [700, 1000], encounters: 9, combatEncounters: [4, 6],
-        vis: { wall: 'stone_wall', floor: 'wood_floor' },
+        vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
         research: 'deep_delving',
         requiresRealm: 'kingdom_outskirts',
         loot: [
@@ -850,7 +850,7 @@ export const REALMS = {
         name: 'Palace Fortress', difficulty: 9,
         chain: 'kingdom', chainOrder: 3,
         duration: [700, 1000], encounters: 9, combatEncounters: [5, 7],
-        vis: { wall: 'stone_wall', floor: 'wood_floor' },
+        vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
         research: 'deep_delving',
         requiresRealm: 'crusader_barracks',
         loot: [
