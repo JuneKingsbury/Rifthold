@@ -206,6 +206,21 @@ body {
     min-width: 0;
 }
 #status-bar .res { color: #88cc88; }
+/* Resource-counter punch: a quick grow-then-settle when a counter's value
+   changes, drawing the eye to the resource that just ticked. inline-block so the
+   scale transform takes effect on the inline span. Origin left so it grows in
+   place without shoving neighbors. Suppressed under reduced motion (the JS gate
+   simply never adds the class). */
+#status-bar .res.res-punch {
+    display: inline-block;
+    transform-origin: left center;
+    animation: res-punch 0.32s ease-out;
+}
+@keyframes res-punch {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}
 #status-bar .sep { color: #555; }
 #status-bar .info { color: #aaa; }
 #status-bar .peaceful { color: #66ddff; font-weight: bold; }

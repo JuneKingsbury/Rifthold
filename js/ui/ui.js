@@ -538,13 +538,22 @@ export class UI {
             { key: 'runite', label: 'Runite', color: '#44ccff' },
             { key: 'void_essence', label: 'Void', color: '#9933ff' },
         ];
+        // Resource-counter punch: note which core resources changed value this
+        // update so we can replay a quick grow/shrink on their span once the DOM
+        // is rebuilt below. Compare the displayed (rounded) value so sub-integer
+        // gold drips don't punch every tick. First sighting just seeds the value.
+        if (!this._resPunchValues) this._resPunchValues = {};
+        const punchedKeys = [];
         let resHtml = '';
         for (const res of coreResources) {
             const raw = r[res.key] || 0;
             const val = res.key === 'gold' ? (raw % 1 !== 0 ? raw.toFixed(1) : raw) : Math.round(raw);
             if (!res.always && raw === 0) continue;
+            const prevVal = this._resPunchValues[res.key];
+            if (prevVal !== undefined && prevVal !== val) punchedKeys.push(res.key);
+            this._resPunchValues[res.key] = val;
             const alertAttr = resStyle(res.key, raw);
-            resHtml += `<span class="res"${alertAttr}>${resIcon(res.key, res.label, res.color)}${val}</span>`;
+            resHtml += `<span class="res" data-res="${res.key}"${alertAttr}>${resIcon(res.key, res.label, res.color)}${val}</span>`;
         }
         const html = resHtml +
             (manaStr ? `<span class="res" style="color:${power.hasPower() ? '#aa44ff' : '#ff6666'}">${manaStr}</span>` : '') +
@@ -564,7 +573,18 @@ export class UI {
 
         if (html !== this._lastStatusHtml) {
             this._lastStatusHtml = html;
-            document.getElementById('status-info').innerHTML = html;
+            const statusEl = document.getElementById('status-info');
+            statusEl.innerHTML = html;
+            // Punch the counters whose value just changed (skip under reduced
+            // motion). innerHTML was just rebuilt, so each span is a fresh DOM
+            // element; adding the class plays the keyframe once. The next value
+            // change rebuilds the span again, which re-triggers it.
+            if (punchedKeys.length && !this.game.settings.reduceMotion) {
+                for (const key of punchedKeys) {
+                    const span = statusEl.querySelector(`.res[data-res="${key}"]`);
+                    if (span) span.classList.add('res-punch');
+                }
+            }
         }
         this._updateSpeedButtons();
     }
