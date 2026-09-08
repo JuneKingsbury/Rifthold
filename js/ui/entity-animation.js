@@ -291,7 +291,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
 
     const mood = entity ? entity.mood : null;
 
-    // ── Tier 2: ambient walk-sway (moving only) ──
+    // ── Ambient walk-sway (moving only) ──
     if (flags.showWalkSway && moveT != null) {
         _xf.rotation += walkSway(moveT, seed, mood);
     }
@@ -299,7 +299,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     const A = RENDER_CONFIG.entityActionAnim;
     const actionsOn = !!(flags.showActionAnimations && A && A.enabled && entity);
 
-    // ── Tier 3: one-shot slot (priority-resolved) ──
+    // ── One-shot slot (priority-resolved) ──
     let oneShotActive = false;
     if (actionsOn) {
         const scratch = entity._wanim || (entity._wanim = {});
@@ -371,6 +371,17 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
                         }
                         _xf.rotation += RENDER_CONFIG.attackSwingAmplitudeRad * facing * arc;
                     }
+                    // Critical-hit emphasis: if this attack tick was a crit, layer a
+                    // stronger swing kick plus a scale "punch" (overshoot then settle)
+                    // on top of the base motion. Non-swings (DrawAndShoot) just punch.
+                    if (entity._lastAttackCrit === entity._lastAttackTick) {
+                        if (atkClass === 'Swing') {
+                            _xf.rotation += (RENDER_CONFIG.mainCritSwingAmplitudeRad || 0.6) * facing * arc * 0.5;
+                        }
+                        const punch = 1 + (RENDER_CONFIG.mainCritPunchScale || 0.15) * arc;
+                        _xf.scaleX *= punch;
+                        _xf.scaleY *= punch;
+                    }
                     break;
                 case 'cast': {
                     const school = entity._lastCastSchool;
@@ -390,7 +401,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         }
     }
 
-    // ── Tier 4: continuous work bob (blends only while the slot is free) ──
+    // ── Continuous work bob (blends only while the slot is free) ──
     // Ambient loop: suppressed under reduced motion (one-shot beats still play).
     let workActive = false;
     if (actionsOn && !flags.reduceMotion && !oneShotActive && entity.state === 'working') {
@@ -412,7 +423,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         }
     }
 
-    // ── Tier 2b: idle sway (stationary and otherwise inactive) ──
+    // ── Idle sway (stationary and otherwise inactive) ──
     if (flags.showWalkSway && moveT == null && !oneShotActive && !workActive) {
         if (entity && entity.state === 'sleeping') {
             // Sleeping sway: very gentle side-to-side
@@ -423,7 +434,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         }
     }
 
-    // ── Tier 2c: eating animation (ambient loop, off under reduced motion) ──
+    // ── Eating animation (ambient loop, off under reduced motion) ──
     if (actionsOn && !flags.reduceMotion && !oneShotActive && !workActive && entity && entity.state === 'eating') {
         const phase = (now / 500) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
         const facing = (seed & 1) ? 1 : -1;
@@ -431,7 +442,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         _xf.offsetY += Math.abs(Math.sin(phase)) * 1;
     }
 
-    // ── Tier 2d: startle reaction (danger nearby) ──
+    // ── Startle reaction (danger nearby) ──
     if (actionsOn && entity && entity._startleUntil) {
         const t = animShotT(entity._wanim || (entity._wanim = {}), entity._startleUntil, 'startle', 180, now);
         if (t != null && !oneShotActive) {
@@ -475,6 +486,58 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
                 }
             } else {
                 scratch.fidgetStart = null;
+            }
+        }
+    }
+
+    // ── Weather body-language (cold hunch + shiver) ──
+    // Ambient channel keyed on the frame's weather intensity (0 disables it, and it
+    // is already 0 under reduceMotion). Not played while sleeping. The "who feels
+    // the cold" test differs by entity kind:
+    //   Colonists (they carry `thoughts`) shiver only when actually freezing. The
+    //   sim's 'Freezing outside' thought already accounts for warm clothing
+    //   (coldResistance), warmth sources, and being indoors, so a properly-dressed
+    //   colonist does NOT shake.
+    //   Everything else (wildlife) has no clothing, so it reacts to any unroofed
+    //   tile in cold weather.
+    if (flags.weatherIntensity > 0 && entity && entity.state !== 'sleeping') {
+        let cold;
+        if (entity.thoughts) {
+            cold = entity.thoughts.some(t => t.text === 'Freezing outside');
+        } else {
+            const tile = game.map[entity.y] && game.map[entity.y][entity.x];
+            cold = !(tile && tile.roomId !== null && tile.roomId !== undefined);
+        }
+        if (cold) {
+            const WR = RENDER_CONFIG.weatherReaction;
+            const intensity = flags.weatherIntensity;
+            // Fast horizontal shiver.
+            const shPhase = (now / WR.shiverPeriodMs) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
+            _xf.offsetX += Math.sin(shPhase) * WR.shiverPx * intensity;
+            // Hunch: draw the sprite down/in a little (shrink height).
+            _xf.growPx -= WR.hunchShrinkPx * intensity;
+        }
+    }
+
+    // ── Wildlife idle body-language ──
+    // Slow ambient gesture for stationary, idle animals (wild or tamed), chosen by
+    // seed so a herd doesn't move in lockstep. Suppressed under reduced motion and
+    // whenever a one-shot or work channel owns the sprite.
+    if (!flags.reduceMotion && entity && entity.category === 'animal'
+        && moveT == null && !oneShotActive && !workActive) {
+        const WI = RENDER_CONFIG.wildlifeIdle;
+        if (WI && WI.enabled) {
+            const phase = (now / WI.periodMs) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
+            const kind = seed % 3;
+            if (kind === 0) {
+                // Tail-flick: gentle side-to-side rock.
+                _xf.rotation += Math.sin(phase) * WI.tailFlickRad;
+            } else if (kind === 1) {
+                // Head-bob: shallow vertical dip.
+                _xf.offsetY += Math.abs(Math.sin(phase)) * WI.headBobPx;
+            } else {
+                // Graze: deeper, slower vertical dip (head lowered to feed).
+                _xf.offsetY += Math.abs(Math.sin(phase * 0.5)) * WI.grazeDipPx;
             }
         }
     }

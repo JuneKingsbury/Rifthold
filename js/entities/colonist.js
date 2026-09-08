@@ -2298,6 +2298,9 @@ function updateFighting(colonist, game) {
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
             isCrit = true;
+            // Latch crit to this attack tick so the render one-shot (entity-animation.js)
+            // can add crit emphasis (stronger swing + scale punch).
+            colonist._lastAttackCrit = game.tick;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
             window.soundManager?.playSFX('critical_hit');
         }
@@ -2356,6 +2359,8 @@ function updateFighting(colonist, game) {
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
             isCrit = true;
+            // Latch crit to this attack tick for the render one-shot's crit emphasis.
+            colonist._lastAttackCrit = game.tick;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
             window.soundManager?.playSFX('critical_hit');
         }

@@ -252,6 +252,41 @@ export const RENDER_CONFIG = {
     expedVictoryFlourish: true,
     victoryFlourishRad: 0.5,     // per-entity weapon-raise tilt during celebration
     expedLootArc: true,          // loot effect arcs toward the party instead of dropping in place
+    // ── Main-game weather body-language (getEntityTransform tier) ──────────
+    // In cold/wet weather, an entity caught outdoors (no roof over its tile)
+    // hunches (shrinks a little, shoulders drawn in) and shivers (fast tiny
+    // horizontal jitter). Sheltered entities stand normally. Ambient channel:
+    // fully suppressed under reduceMotion. `intensity` per weather scales both
+    // the hunch and shiver; 0 = no reaction.
+    weatherReaction: {
+        enabled: true,
+        shiverPx: 0.7,           // peak horizontal jitter (px) at full intensity
+        shiverPeriodMs: 90,      // fast shiver cadence
+        hunchShrinkPx: 2.2,      // sprite-height reduction (px) at full intensity
+        // Cold weather only: the hunch/shiver reads as "freezing", so wet-but-not-cold
+        // weather (rain, thunderstorm) intentionally gets no reaction.
+        intensityByWeather: {
+            blizzard: 1.0, snow: 0.6,
+        },
+    },
+    // ── Wildlife idle body-language (getEntityTransform tier) ──────────────
+    // Animals (wild or tamed) that are stationary and idle play a slow ambient
+    // gesture chosen by a per-entity seed: a tail-flick rock, a head-bob dip, or
+    // a grazing dip. Ambient channel: suppressed under reduceMotion. Amplitudes
+    // are deliberately small so a field of critters reads as alive, not busy.
+    wildlifeIdle: {
+        enabled: true,
+        periodMs: 2400,          // one full idle-gesture cycle
+        tailFlickRad: 0.05,      // rock amplitude (radians) for the tail-flick kind
+        headBobPx: 1.2,          // vertical dip (px) for the head-bob kind
+        grazeDipPx: 1.6,         // deeper vertical dip (px) for the grazing kind
+    },
+    // Critical-hit emphasis for the main-game attack one-shot: a stronger swing
+    // and a scale "punch" (overshoot then settle) layered on top of the normal
+    // attack motion when the landed blow was a crit. Reuses the expedition crit
+    // feel; values mirror expedCritEmphasis above.
+    mainCritSwingAmplitudeRad: 0.6,
+    mainCritPunchScale: 0.15,
     healthBarGreenThreshold: 0.5,
     healthBarYellowThreshold: 0.25,
     healthBarColors: { green: '#00ff00', yellow: '#ffaa00', red: '#ff3333' },

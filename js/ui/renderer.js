@@ -720,6 +720,11 @@ export class Renderer {
         animFlags.showWalkSway = showWalkSway;
         animFlags.showActionAnimations = showActionAnimations;
         animFlags.reduceMotion = reduceMotion;
+        // Weather body-language intensity (0..1) for the active weather, resolved
+        // once per frame. 0 (or reduceMotion) disables the outdoor hunch/shiver.
+        const wr = RENDER_CONFIG.weatherReaction;
+        animFlags.weatherIntensity = (wr && wr.enabled && !reduceMotion)
+            ? (wr.intensityByWeather[weather.currentWeather] || 0) : 0;
         // Tree sway: wind strength (0..1) from the active weather, resolved once
         // per frame. `showTreeSway` gates the whole effect.
         const showTreeSway = settings.showTreeSway && !reduceMotion && RENDER_CONFIG.treeSway && RENDER_CONFIG.treeSway.enabled;
