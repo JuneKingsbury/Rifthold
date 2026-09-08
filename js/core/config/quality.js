@@ -29,10 +29,11 @@ export const QUALITY_TIERS = [
 
 export const ROOM_QUALITY_TIERS = [
     { key: 'bare', name: 'Bare room', minScore: 0, moodEffect: 10, duration: 300 },
-    { key: 'cozy', name: 'Cozy bedroom', minScore: 20, moodEffect: 14, duration: 350 },
-    { key: 'comfortable', name: 'Comfortable bedroom', minScore: 40, moodEffect: 18, duration: 400 },
-    { key: 'luxurious', name: 'Luxurious bedroom', minScore: 60, moodEffect: 22, duration: 450 },
-    { key: 'opulent', name: 'Opulent quarters', minScore: 80, moodEffect: 26, duration: 500 },
+    { key: 'modest', name: 'Modest bedroom', minScore: 20, moodEffect: 13, duration: 325 },
+    { key: 'cozy', name: 'Cozy bedroom', minScore: 40, moodEffect: 16, duration: 375 },
+    { key: 'comfortable', name: 'Comfortable bedroom', minScore: 60, moodEffect: 20, duration: 420 },
+    { key: 'fine', name: 'Fine bedroom', minScore: 75, moodEffect: 23, duration: 460 },
+    { key: 'luxurious', name: 'Luxurious bedroom', minScore: 90, moodEffect: 26, duration: 500 },
 ];
 
 export const TOWN_HALL_QUALITY_TIERS = [

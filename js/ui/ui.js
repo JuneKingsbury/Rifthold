@@ -688,9 +688,14 @@ export class UI {
             const atMax = !locked && this.isBuildingAtMax(opt);
             const canAfford = !locked && !atMax && this.game.resources.has(def.cost);
             let stateClass = locked ? ' build-card--locked' : atMax ? ' build-card--maxed' : !canAfford ? ' build-card--unaffordable' : '';
-            const bldSprite = this.game.skinManager?.isActive && this.game.skinManager.getSprite('buildings', opt);
+            const isFloorType = def.structureType === 'floor';
+            const bldSprite = this.game.skinManager?.isActive && (
+                isFloorType
+                    ? this.game.skinManager.getSprite('floors', opt)
+                    : this.game.skinManager.getSprite('buildings', opt)
+            );
             const bldIcon = bldSprite
-                ? `<img src="${this._getBuildingSpriteURL(opt)}" class="build-card-icon--sprite">`
+                ? `<img src="${this._getBuildingSpriteURL(opt, isFloorType)}" class="build-card-icon--sprite">`
                 : `<span style="color:${def.color}">${def.char}</span>`;
             const costHtml = Object.entries(def.cost).map(([k, v]) => this._buildCostChip(k, v)).join('');
             const overlayHtml = locked ? '<span class="build-card-overlay">LOCKED</span>' : atMax ? '<span class="build-card-overlay">MAX</span>' : '';
@@ -2449,10 +2454,11 @@ export class UI {
         return item.enchantment ? ' enchanted-text' : '';
     }
 
-    _getBuildingSpriteURL(buildingKey) {
+    _getBuildingSpriteURL(buildingKey, isFloor) {
         if (!this._buildingSpriteCache) this._buildingSpriteCache = new Map();
         if (this._buildingSpriteCache.has(buildingKey)) return this._buildingSpriteCache.get(buildingKey);
-        const sprite = this.game.skinManager.getSprite('buildings', buildingKey);
+        const category = isFloor ? 'floors' : 'buildings';
+        const sprite = this.game.skinManager.getSprite(category, buildingKey);
         if (!sprite) { this._buildingSpriteCache.set(buildingKey, null); return null; }
         const c = document.createElement('canvas');
         c.width = sprite.width || sprite.naturalWidth || 16;

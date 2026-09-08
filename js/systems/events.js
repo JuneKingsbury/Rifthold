@@ -156,6 +156,7 @@ export class EventSystem {
             case 'deposit': this.handleDeposit(def, game); break;
             case 'spawn_animals': this.handleSpawnAnimals(def, game); break;
             case 'mood': this.handleMood(def, game); break;
+            case 'trinket_find': this.handleTrinketFind(def, game); break;
             case 'crop_damage': this.handleCropDamage(def, game); break;
             case 'creeping_miasma': this.handleCreepingMiasma(def, game); break;
             case 'spawn_blight_bloom': this.handleSpawnBlightBloom(def, game); break;
@@ -220,6 +221,23 @@ export class EventSystem {
         if (alive.length === 0) return;
         const colonist = alive[Math.floor(Math.random() * alive.length)];
         addThought(colonist, def.thought, def.moodChange, def.moodDuration, game.tick);
+        const msg = def.notification.replace('{name}', colonist.name);
+        game.notifications.push({ text: msg, tick: game.tick, type: 'success' });
+        game.eventLog.add(game, def.logMessage.replace('{name}', colonist.name), def.logType, { type: 'colonist', id: colonist.id });
+    }
+
+    handleTrinketFind(def, game) {
+        const alive = game.colonists.filter(c => c.hp > 0);
+        if (alive.length === 0) return;
+        const colonist = alive[Math.floor(Math.random() * alive.length)];
+        addThought(colonist, def.thought, def.moodChange, def.moodDuration, game.tick);
+        if (def.trinketKey) {
+            const item = rollItem(def.trinketKey, 'normal');
+            if (item) {
+                item.type = 'trinket';
+                game.resources.addItem(item);
+            }
+        }
         const msg = def.notification.replace('{name}', colonist.name);
         game.notifications.push({ text: msg, tick: game.tick, type: 'success' });
         game.eventLog.add(game, def.logMessage.replace('{name}', colonist.name), def.logType, { type: 'colonist', id: colonist.id });

@@ -68,8 +68,8 @@ const BASE_RECIPES = {
 
 export const WEAPONS = {
     fists: { name: 'Fists', damage: 5, tier: 0, attackAnim: 'Swing', description: 'Bare fists.' },
-    stone_spear: { name: 'Stone Spear', damage: 8, tier: 1, attackAnim: 'Stab', description: 'A sharpened stone lashed to a stick.', recipe: { input: { stone: 2, wood: 1 }, ticks: 12 } },
-    wooden_club: { name: 'Wooden Club', damage: 10, tier: 1, attackAnim: 'Swing', description: 'A heavy wooden bludgeon.', recipe: { input: { wood: 2, planks: 1 }, ticks: 15 } },
+    stone_spear: { name: 'Stone Spear', damage: 9, tier: 1, critChance: 0.15, attackAnim: 'Stab', description: 'A sharpened stone lashed to a stick. Fast and precise, with a chance to land a critical hit.', recipe: { input: { stone: 2, wood: 1 }, ticks: 12 } },
+    wooden_club: { name: 'Wooden Club', damage: 11, tier: 1, attackAnim: 'Swing', description: 'A heavy wooden bludgeon. High raw damage, no tricks.', recipe: { input: { wood: 2, planks: 1 }, ticks: 15 } },
     iron_sword: { name: 'Iron Sword', tradeValue: 28, damage: 14, tier: 2, attackAnim: 'Swing', description: 'A reliable iron blade.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
     etched_axe: { name: 'Etched Axe', damage: 15, tier: 2, attackAnim: 'Swing', description: 'An axe inscribed with runes of sharpness.', recipe: { input: { iron: 2, planks: 1, stone: 1 }, ticks: 22, research: 'runecraft', station: 'anvil' } },
     etched_mace: { name: 'Etched Mace', damage: 17, tier: 2, attackAnim: 'Swing', description: 'A heavy mace with runes that make it heavier.', recipe: { input: { iron: 3, planks: 1 }, ticks: 24, research: 'runecraft', station: 'anvil' } },
@@ -196,6 +196,7 @@ export const TRINKETS = {
     voidwalkers_lantern: { name: "Voidwalker's Lantern", textColor:'#4488ff', tradeValue: 60, tier: 3, description: 'A lantern fueled by void energy. Reveals hidden paths.', expedition: { rareEncounterMult: 2.0 }, pedestal: { radius: 6, manaCost: 2, lightRadius: 4 } },
     map_fragment: { name: 'Map Fragment', textColor:'#cccccc', tradeValue: 25, tier: 2, description: 'A torn piece of an ancient map. Shortens expeditions.', consumable: true, expedition: { durationMult: 0.7 } },
     ward_of_the_sentinel: { name: 'Ward of the Sentinel', textColor:'#f944ff', tradeValue: 85, tier: 3, description: 'A one-use ward that revives the bearer from death.', autoReviveHp: 0.5, durability: { max: 1, breakOnUse: true }, recipe: { input: { void_essence: 4, runite: 3, stone: 2 }, ticks: 65, research: 'void_forging', station: 'enchanting_table' } },
+    rabbits_paw: { name: "Rabbit's Paw", textColor:'#cccccc', tradeValue: 18, tier: 1, description: 'A dried rabbit\'s paw worn for luck. Slightly improves expedition loot.', expedition: { lootMult: 1.15 } },
     hagglers_coin: { name: "Haggler's Coin", textColor:'#44cc44', tradeValue: 48, tier: 2, description: 'A lucky coin that improves trade deals.', pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.85 } },
     tome_of_shared_wisdom: { name: 'Tome of Shared Wisdom', textColor:'#4488ff', tradeValue: 65, tier: 3, description: 'A tome that accelerates skill growth for those nearby.', pedestal: { radius: 5, manaCost: 2, skillGrowthBonus: 0.1 } },
     arcane_amplifier: { name: 'Arcane Amplifier', textColor:'#4488ff', tradeValue: 72, tier: 3, description: 'A crystal that amplifies all magical output.', spellDamageBonus: 0.35, expedition: { partyDamageMult: 1.1 } },

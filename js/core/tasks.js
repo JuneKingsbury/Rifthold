@@ -78,13 +78,14 @@ export class TaskQueue {
         for (const t of this._pending) {
             // Re-check status since _pending is a cached snapshot
             if (t.status !== 'pending' || t.assignedTo !== null) continue;
-            if (colonist.priorities[t.skillRequired] <= 0) continue;
+            if (!t.urgent && colonist.priorities[t.skillRequired] <= 0) continue;
             // Skip tasks this colonist recently failed to reach (30-tick cooldown)
             if (failedTasks && failedTasks[t.id] !== undefined && tick - failedTasks[t.id] < 30) continue;
             if ((t.type === 'craft' || t.type === 'cook' || t.type === 'enchant') && this._busyStations.has(this._posKey(t.x, t.y))) continue;
 
-            // Lower priority number = higher preference, multiplied to dominate over distance
-            const prio = colonist.priorities[t.skillRequired];
+            // Lower priority number = higher preference, multiplied to dominate over distance.
+            // Urgent tasks (e.g. lead_animal) use a fixed very-low prio so they beat all others.
+            const prio = t.urgent ? 0.5 : colonist.priorities[t.skillRequired];
             const dist = manhattanDist(colonist.x, colonist.y, t.x, t.y);
             const score = prio * 10000 + dist;
 

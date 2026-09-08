@@ -75,7 +75,9 @@ function idleSway(now, seed) {
 // from the same sine position rather than jumping to a new phase.
 // _smoothSwayWind lerps toward _lastSwayWind for amplitude only, so the wave
 // speed snaps (phase-corrected) but the size eases in gradually.
+// Grass and crops use different period constants, so each gets its own offset.
 let _swayPhaseOffset = 0;
+let _cropSwayPhaseOffset = 0;
 let _lastSwayWind = -1;
 let _smoothSwayWind = 0;
 
@@ -92,11 +94,17 @@ export function setSwayWind(wind, now, dt) {
     if (_lastSwayWind >= 0) {
         const D = RENDER_CONFIG.terrainDetail;
         if (D && D.enabled) {
-            const oldPeriod = D.grassCalmPeriodMs + (D.grassStormPeriodMs - D.grassCalmPeriodMs) * _lastSwayWind;
-            const newPeriod = D.grassCalmPeriodMs + (D.grassStormPeriodMs - D.grassCalmPeriodMs) * wind;
-            const oldPhase = (now / oldPeriod) * Math.PI * 2;
-            const newPhase = (now / newPeriod) * Math.PI * 2;
-            _swayPhaseOffset += oldPhase - newPhase;
+            // Grass phase correction
+            const grassOldPeriod = D.grassCalmPeriodMs + (D.grassStormPeriodMs - D.grassCalmPeriodMs) * _lastSwayWind;
+            const grassNewPeriod = D.grassCalmPeriodMs + (D.grassStormPeriodMs - D.grassCalmPeriodMs) * wind;
+            _swayPhaseOffset += (now / grassOldPeriod) * Math.PI * 2 - (now / grassNewPeriod) * Math.PI * 2;
+
+            // Crop phase correction uses crop period constants to avoid a jump
+            const cropCalm = D.cropCalmPeriodMs || 3800;
+            const cropStorm = D.cropStormPeriodMs || 1400;
+            const cropOldPeriod = cropCalm + (cropStorm - cropCalm) * _lastSwayWind;
+            const cropNewPeriod = cropCalm + (cropStorm - cropCalm) * wind;
+            _cropSwayPhaseOffset += (now / cropOldPeriod) * Math.PI * 2 - (now / cropNewPeriod) * Math.PI * 2;
         }
     }
     _lastSwayWind = wind;
@@ -164,7 +172,7 @@ export function getGrassSway(now, seed, wind, boostAdd) {
  * Crop/flower sway rotation (radians), lighter than grass tufts. Side-to-side sway
  * driven by wind. Used for farm zone tiles with a crop planted.
  */
-export function getCropSway(now, seed, wind) {
+export function getCropSway(now, seed, wind, boostAdd) {
     const D = RENDER_CONFIG.terrainDetail;
     if (!D || !D.enabled) return 0;
     const calm = D.cropCalmPeriodMs || 3800;
@@ -173,8 +181,8 @@ export function getCropSway(now, seed, wind) {
     const stormAmp = D.cropStormSwayRad || 0.005;
     const period = calm + (storm - calm) * wind;
     const amp = calmAmp + (stormAmp - calmAmp) * _smoothSwayWind;
-    const phase = (now / period) * Math.PI * 2 + _swayPhaseOffset + (seed % 1000) / 1000 * 6.28;
-    return Math.sin(phase) * amp;
+    const phase = (now / period) * Math.PI * 2 + _cropSwayPhaseOffset + (seed % 1000) / 1000 * 6.28;
+    return Math.sin(phase) * amp + (boostAdd || 0);
 }
 
 // Reusable water-wave descriptor (offsetY px, alpha). Module-scope so the hot

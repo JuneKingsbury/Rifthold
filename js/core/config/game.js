@@ -104,10 +104,11 @@ export const EVENTS = {
     },
     found_trinket: {
         weight: 6, minTick: 320, cooldown: 960,
-        effect: 'mood',
+        effect: 'trinket_find',
+        trinketKey: 'rabbits_paw',
         thought: 'Found a lucky trinket', moodChange: 5, moodDuration: 350,
-        notification: '{name} found a lucky trinket.',
-        logMessage: '{name} found a lucky trinket', logType: 'success',
+        notification: "{name} found a Rabbit's Paw!",
+        logMessage: "{name} found a Rabbit's Paw", logType: 'success',
     },
 };
 

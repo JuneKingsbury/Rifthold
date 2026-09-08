@@ -160,7 +160,18 @@ function syncAnimalTasks(game) {
 }
 
 function updatePendingLeadAnimal(animal, game) {
-    if (!animal.leaderId) return;
+    // Sync leaderId to whoever currently holds the lead_animal task for this animal.
+    // This handles the case where the original tamer dropped the task and another
+    // colonist picked it up (or it was re-claimed after an interrupt).
+    const leadTask = game.taskQueue.getAll().find(
+        t => t.type === 'lead_animal' && t.targetAnimalId === animal.id && t.assignedTo !== null
+    );
+    if (leadTask) {
+        animal.leaderId = leadTask.assignedTo;
+    } else if (!animal.leaderId) {
+        return;
+    }
+
     const leader = game.colonists.find(c => c.id === animal.leaderId && c.hp > 0);
     if (!leader) {
         animal.pendingTame = false;

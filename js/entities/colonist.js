@@ -1478,6 +1478,28 @@ function updateIdle(colonist, game) {
         return;
     }
 
+    // If this colonist already has a claimed task (e.g. lead_animal assigned mid-tame),
+    // resume it immediately before any need/activity checks can divert them.
+    if (colonist.currentTaskId) {
+        const resumeTask = game.taskQueue.getById(colonist.currentTaskId);
+        if (resumeTask && resumeTask.status === 'in_progress') {
+            const path = findPathAdjacent(game.map, colonist.x, colonist.y, resumeTask.x, resumeTask.y, game._occupiedTiles);
+            if (path && path.length > 0) {
+                colonist.path = path;
+                colonist.state = 'moving';
+            } else if (manhattanDist(colonist.x, colonist.y, resumeTask.x, resumeTask.y) <= 1) {
+                colonist.state = 'working';
+                colonist.workProgress = 0;
+            } else {
+                game.taskQueue.release(colonist.currentTaskId);
+                colonist.currentTaskId = null;
+            }
+            return;
+        } else {
+            colonist.currentTaskId = null;
+        }
+    }
+
     if (isBreaking(colonist)) {
         colonist.state = 'wandering';
         colonist.stateTimer = COLONIST_CONFIG.breakingWanderDuration[0] + Math.floor(Math.random() * (COLONIST_CONFIG.breakingWanderDuration[1] - COLONIST_CONFIG.breakingWanderDuration[0]));
@@ -1900,6 +1922,8 @@ function tryCombatInterrupt(colonist, game) {
         }
     }
 
+    const currentTask = game.taskQueue.getById(colonist.currentTaskId);
+    if (currentTask && currentTask.urgent) return false;
     game.taskQueue.release(colonist.currentTaskId);
     colonist.currentTaskId = null;
     colonist.path = [];

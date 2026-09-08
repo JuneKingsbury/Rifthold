@@ -55,6 +55,8 @@ export class Renderer {
 
         // Per-tile amplitude boost for disturbed grass (entity footstep wake)
         this._grassBoost = new Map();
+        // Per-tile amplitude boost for disturbed crops (same mechanic as grass)
+        this._cropBoost = new Map();
         // Water ripples (rain impacts + footsteps)
         this._waterRipples = [];
         // Brief flash when an entity enters a structure tile (door effect)
@@ -147,9 +149,11 @@ export class Renderer {
         if (tile.structure) return sm.getSprite('buildings', tile.structure);
         if (tile.zone) {
             const state = tile.zone.state || 'empty';
-            if (tile.zone.crop) {
-                const cropSprite = sm.getSprite('farms', tile.zone.crop + '_' + state);
-                if (cropSprite) return cropSprite;
+            if (tile.zone.crop && state !== 'empty') {
+                // For non-empty planted tiles, return the static plot base so the
+                // crop sprite is drawn separately as a swaying overlay on top.
+                // Prefer farm_planted. Fall back to farm_empty so soil stays static.
+                return sm.getSprite('farms', 'farm_planted') || sm.getSprite('farms', 'farm_empty');
             }
             return sm.getSprite('farms', 'farm_' + state);
         }
@@ -324,8 +328,14 @@ export class Renderer {
     }
 
     // Draws animated crop sway on a farm zone tile.
-    _drawCropSway(ctx, now, tileKey, wind, px, py, cw, ch, sprite) {
-        const rot = getCropSway(now, tileKey, wind);
+    _drawCropSway(ctx, now, tileKey, wind, px, py, cw, ch, sprite, boostAdd) {
+        const boostEntry = this._cropBoost.get(tileKey);
+        let boost = boostAdd || 0;
+        if (boostEntry) {
+            const t = Math.min((now - boostEntry.startTime) / boostEntry.duration, 1);
+            boost += Math.sin(t * Math.PI) * boostEntry.amp;
+        }
+        const rot = getCropSway(now, tileKey, wind, boost);
         if (rot !== 0) {
             const pivotX = px + cw / 2;
             const pivotY = py + ch;
@@ -614,9 +624,12 @@ export class Renderer {
         treeWind = showTreeSway ? rawWind : 0;
         detailWind = showTerrainDetail ? rawWind : 0;
 
-        // Expire grass boost entries past their duration
+        // Expire grass and crop boost entries past their duration
         for (const [key, entry] of this._grassBoost) {
             if (now - entry.startTime >= entry.duration) this._grassBoost.delete(key);
+        }
+        for (const [key, entry] of this._cropBoost) {
+            if (now - entry.startTime >= entry.duration) this._cropBoost.delete(key);
         }
 
         // Decay door flash map
@@ -924,6 +937,27 @@ export class Renderer {
                                 this._drawWaterWaves(ctx, now, tileKey, px, py, cw, ch);
                             }
                         }
+                        // Farm tiles are drawn behind the entity here so colonists
+                        // appear on top of the plot, whether it's empty or planted.
+                        if (tile.zone) {
+                            const cropState = tile.zone.state || 'empty';
+                            const isPlanted = tile.zone.crop && cropState !== 'empty';
+                            const baseSprite = isPlanted
+                                ? (sm.getSprite('farms', 'farm_planted') || sm.getSprite('farms', 'farm_empty'))
+                                : sm.getSprite('farms', 'farm_' + cropState);
+                            if (baseSprite) ctx.drawImage(baseSprite, px, py, cw + 1, ch + 1);
+                            if (isPlanted) {
+                                const cropSprite = sm.getSprite('farms', tile.zone.crop + '_' + cropState)
+                                    || sm.getSprite('farms', 'farm_' + cropState);
+                                if (cropSprite) {
+                                    if (showTerrainDetail) {
+                                        this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw, ch, cropSprite);
+                                    } else {
+                                        ctx.drawImage(cropSprite, px, py, cw, ch);
+                                    }
+                                }
+                            }
+                        }
                         if (tile.structure) {
                             const structSprite = sm.getSprite('buildings', tile.structure);
                             if (structSprite) ctx.drawImage(structSprite, px, py, cw, ch);
@@ -1190,13 +1224,20 @@ export class Renderer {
                         ctx.restore();
                     }
 
-                    // Crop sway: zone tiles with a planted crop sway in the wind (skip empty)
-                    if (tile.zone && tile.zone.crop && tile.zone.state !== 'empty' && showTerrainDetail) {
+                    // Crop sway: zone tiles with a planted crop sway in the wind (skip empty).
+                    // The static plot base was already drawn by _resolveSprite; here we draw
+                    // only the crop sprite on top so the soil doesn't sway with the plant.
+                    // Tiles with an entity skip this: the ground pass above already drew them.
+                    if (tile.zone && tile.zone.crop && tile.zone.state !== 'empty' && !entity) {
                         const cropState = tile.zone.state || 'empty';
                         const cropSprite = this.skinManager.getSprite('farms', tile.zone.crop + '_' + cropState)
                             || this.skinManager.getSprite('farms', 'farm_' + cropState);
-                        if (cropSprite && !entity) {
-                            this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw, ch, cropSprite);
+                        if (cropSprite) {
+                            if (showTerrainDetail) {
+                                this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw, ch, cropSprite);
+                            } else {
+                                ctx.drawImage(cropSprite, px, py, cw, ch);
+                            }
                         }
                     }
 
@@ -1208,7 +1249,7 @@ export class Renderer {
                             vx: (Math.random() - 0.5) * 0.08,
                             vy: -0.12 - Math.random() * 0.1,
                             decay: 0.03 + Math.random() * 0.02,
-                            color: Math.random() < 0.5 ? '#7a5599' : '#88aa44',
+                            color: Math.random() < 0.5 ? '#9933cc' : '#bb44ff',
                             size: 2 + Math.random() * 2,
                             alpha: 0.55,
                             shape: 'square',
@@ -1510,6 +1551,19 @@ export class Renderer {
                                 }
                             }
                         }
+                        if (destTile.zone && destTile.zone.crop && destTile.zone.state !== 'empty') {
+                            this._cropBoost.set(destKey, { startTime: now, duration: 600, amp: (Math.random() < 0.5 ? 1 : -1) * 0.04 });
+                        }
+                        for (const [ndx, ndy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                            const nx = ent.x + ndx, ny = ent.y + ndy;
+                            if (nx >= 0 && ny >= 0 && nx < CONFIG.MAP_WIDTH && ny < CONFIG.MAP_HEIGHT) {
+                                const nk = ny * CONFIG.MAP_WIDTH + nx;
+                                const adjTile = game.map[ny]?.[nx];
+                                if (adjTile && adjTile.zone && adjTile.zone.crop && adjTile.zone.state !== 'empty' && !this._cropBoost.get(nk)) {
+                                    this._cropBoost.set(nk, { startTime: now, duration: 600, amp: (Math.random() < 0.5 ? 1 : -1) * 0.025 });
+                                }
+                            }
+                        }
                         if (destTile.structure) {
                             this._doorFlash.set(destKey, 8);
                         }
@@ -1544,6 +1598,19 @@ export class Renderer {
                                 if (!existing) {
                                     this._grassBoost.set(nk, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.07 });
                                 }
+                            }
+                        }
+                    }
+                    if (destTile.zone && destTile.zone.crop && destTile.zone.state !== 'empty') {
+                        this._cropBoost.set(destKey, { startTime: now, duration: 600, amp: (Math.random() < 0.5 ? 1 : -1) * 0.04 });
+                    }
+                    for (const [ndx, ndy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                        const nx = ent.x + ndx, ny = ent.y + ndy;
+                        if (nx >= 0 && ny >= 0 && nx < CONFIG.MAP_WIDTH && ny < CONFIG.MAP_HEIGHT) {
+                            const nk = ny * CONFIG.MAP_WIDTH + nx;
+                            const adjTile = game.map[ny]?.[nx];
+                            if (adjTile && adjTile.zone && adjTile.zone.crop && adjTile.zone.state !== 'empty' && !this._cropBoost.get(nk)) {
+                                this._cropBoost.set(nk, { startTime: now, duration: 600, amp: (Math.random() < 0.5 ? 1 : -1) * 0.025 });
                             }
                         }
                     }

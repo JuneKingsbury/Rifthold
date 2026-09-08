@@ -454,6 +454,7 @@ export function completeTask(colonist, task, game) {
                             const leadTask = game.taskQueue.add({
                                 type: 'lead_animal',
                                 skillRequired: 'animals',
+                                urgent: true,
                                 x: pen.x,
                                 y: pen.y,
                                 penX: pen.x,

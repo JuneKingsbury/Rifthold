@@ -607,6 +607,7 @@ class SkinEditor {
                 break;
             case 'Farms':
                 items.push({ key: 'farm_empty', char: '=', color: '#8b6b3a', desc: 'Empty farm plot (generic)', category: 'farms' });
+                items.push({ key: 'farm_planted', char: '=', color: '#6b4f2a', desc: 'Planted farm plot, static base drawn under swaying crop', category: 'farms' });
                 items.push({ key: 'farm_growing', char: '%', color: '#55aa33', desc: 'Growing crop (generic)', category: 'farms' });
                 items.push({ key: 'farm_ready', char: '*', color: '#ffdd00', desc: 'Ready to harvest (generic)', category: 'farms' });
                 for (const [key, def] of Object.entries(CROPS)) {
