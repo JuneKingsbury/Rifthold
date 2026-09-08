@@ -1,5 +1,5 @@
 import { CONFIG, ENTITIES, RAID_CONFIG, RAID_TYPES, BUILDINGS, COMBAT_VISUALS, PATHFINDING_CONFIG, COLONIST_CONFIG } from '../core/config.js';
-import { spawnParticle } from '../ui/overlay-renderer.js';
+import { spawnParticle, spawnStructureCrumble, spawnImpactSpray } from '../ui/overlay-renderer.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { findPathForEnemies, manhattanDist } from '../world/pathfinding.js';
 import { colonistTakeDamage } from './colonist.js';
@@ -318,6 +318,9 @@ function updateRaider(raider, game) {
             raider._lastAttackKind = 'melee';
             raider._lastAttackDir = { dx: Math.sign(nearest.x - raider.x), dy: Math.sign(nearest.y - raider.y) };
             colonistTakeDamage(nearest, raider.damage, game, raider);
+            if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) {
+                spawnImpactSpray(game, nearest.x, nearest.y, raider._lastAttackDir.dx, raider._lastAttackDir.dy);
+            }
         }
         return;
     }
@@ -431,6 +434,7 @@ export function attackStructure(game, x, y, damage) {
 
     if (tile.structureHp <= 0) {
         game.combatEffects.push({ x, y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
+        if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) spawnStructureCrumble(game, x, y);
         const oldStructure = tile.structure;
         tile.structure = null;
         tile.structureHp = undefined;

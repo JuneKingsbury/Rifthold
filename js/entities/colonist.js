@@ -1,5 +1,5 @@
 import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
-import { spawnParticle, spawnDamageText } from '../ui/overlay-renderer.js';
+import { spawnParticle, spawnDamageText, spawnImpactSpray } from '../ui/overlay-renderer.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture } from '../world/map.js';
@@ -2365,6 +2365,9 @@ function updateFighting(colonist, game) {
         spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
+        if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) {
+            spawnImpactSpray(game, target.x, target.y, colonist._lastAttackDir.dx, colonist._lastAttackDir.dy);
+        }
     }
 
     if (target.hp <= 0) {

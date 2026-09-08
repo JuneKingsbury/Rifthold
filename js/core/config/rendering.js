@@ -368,6 +368,31 @@ export const COMBAT_VISUALS = {
     xpGainColor: '#88ff88',
     xpGainTtl: 1,
     smiteChar: '✝',
+    // ── Impact particle bursts (world particles via spawnParticle) ──────────
+    // A projectile that reaches the end of its flight throws a small radial
+    // spark burst at the terminal tile, tinted by the projectile's own color so
+    // arcane shots spark red, void shots purple, etc. Gated by showCombatParticles
+    // + reduceMotion. Zero gore, pure spark.
+    projectileImpactCount: 7,
+    projectileImpactSpeed: 0.55,
+    projectileImpactDecay: 0.5,
+    projectileImpactSize: 2,
+    projectileImpactColor: '#f2f2f2',
+    // A melee attack that lands throws a short directional dust/spark spray from
+    // the target along the attack direction (attacker → target). Tuning shared by
+    // every basic-melee site via spawnImpactSpray.
+    meleeImpactCount: 6,
+    meleeImpactSpeed: 0.6,
+    meleeImpactDecay: 0.5,
+    meleeImpactSize: 2,
+    meleeImpactColor: '#f2f2f2',
+    // A structure destroyed by an attacker crumbles into a chunky debris burst
+    // (square particles that fall) plus a brief camera shake.
+    structureCrumbleCount: 16,
+    structureCrumbleSpeed: 0.9,
+    structureCrumbleDecay: 0.42,
+    structureCrumbleColor1: '#9a8a70',
+    structureCrumbleColor2: '#6f6152',
 };
 
 export const LOG_COLORS = {

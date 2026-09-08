@@ -37,6 +37,7 @@ import { MapIndex } from '../world/mapindex.js';
 import { teleportEntity, getEntityRenderPos } from '../systems/movement-lerp.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { renderGlossaryHTML, initGlossaryInteraction } from '../ui/glossary.js';
+import { spawnProjectileImpact } from '../ui/overlay-renderer.js';
 import { renderChangelogHTML, initChangelogInteraction, renderCreditsHTML } from '../ui/changelog.js';
 import { checkComplexStructures } from '../systems/complexBuildings.js';
 import { COMPLEX_STRUCTURES } from './config.js';
@@ -612,7 +613,20 @@ class Game {
 
         { let w = 0; for (let r = 0; r < this.combatEffects.length; r++) { if (this.combatEffects[r].ttl-- > 0) this.combatEffects[w++] = this.combatEffects[r]; } this.combatEffects.length = w; }
         const now = performance.now();
-        { let w = 0; for (let r = 0; r < this.projectiles.length; r++) { if (now < this.projectiles[r]._startTime + this.projectiles[r]._duration) this.projectiles[w++] = this.projectiles[r]; } this.projectiles.length = w; }
+        {
+            const impactFx = this.settings.showCombatParticles && !this.settings.reduceMotion;
+            let w = 0;
+            for (let r = 0; r < this.projectiles.length; r++) {
+                const p = this.projectiles[r];
+                if (now < p._startTime + p._duration) {
+                    this.projectiles[w++] = p;
+                } else if (impactFx) {
+                    // Projectile reached its target this tick: spark burst at the landing tile.
+                    spawnProjectileImpact(this, p.toX, p.toY, p.color);
+                }
+            }
+            this.projectiles.length = w;
+        }
         if (this.divinationModifiers) {
             let w = 0; for (let r = 0; r < this.divinationModifiers.length; r++) { if (this.divinationModifiers[r].expiresAt > this.tick) this.divinationModifiers[w++] = this.divinationModifiers[r]; } this.divinationModifiers.length = w;
         }

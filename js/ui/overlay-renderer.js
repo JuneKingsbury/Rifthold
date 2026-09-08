@@ -42,6 +42,77 @@ export function spawnDamageText(game, x, y, amount, color = '#ff4444', crit = fa
     });
 }
 
+// Radial spark burst thrown at a projectile's terminal tile when it lands. Tinted
+// by the shot's own color so each weapon's impact reads consistently with its bolt.
+// Gated by the caller on showCombatParticles + reduceMotion (ambient feedback).
+export function spawnProjectileImpact(game, x, y, color) {
+    const n = RENDER_CONFIG.projectileImpactCount || 7;
+    const spd = RENDER_CONFIG.projectileImpactSpeed || 0.55;
+    for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 * i) / n + Math.random() * 0.6;
+        const speed = spd * (0.5 + Math.random());
+        spawnParticle(game, {
+            x: x + 0.5, y: y + 0.5,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+            decay: RENDER_CONFIG.projectileImpactDecay || 0.5,
+            color: RENDER_CONFIG.projectileImpactColor || '#f2f2f2',
+            size: (RENDER_CONFIG.projectileImpactSize || 2) + Math.random(),
+            alpha: 0.9,
+            shape: 'square',
+        });
+    }
+}
+
+// Short directional dust/spark spray thrown from a struck tile along the attack
+// direction (dx,dy point from attacker toward target). Used by basic melee hits.
+// Gated by the caller on showCombatParticles + reduceMotion.
+export function spawnImpactSpray(game, x, y, dx, dy, color) {
+    const n = RENDER_CONFIG.meleeImpactCount || 6;
+    const spd = RENDER_CONFIG.meleeImpactSpeed || 0.6;
+    // Base angle points along the blow; fan the spray around it.
+    const base = (dx === 0 && dy === 0) ? -Math.PI * 0.5 : Math.atan2(dy, dx);
+    for (let i = 0; i < n; i++) {
+        const angle = base + (Math.random() - 0.5) * Math.PI * 0.9;
+        const speed = spd * (0.5 + Math.random());
+        spawnParticle(game, {
+            x: x + 0.5, y: y + 0.5,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 0.15,
+            ay: 0.35,
+            decay: RENDER_CONFIG.meleeImpactDecay || 0.5,
+            color: color || RENDER_CONFIG.meleeImpactColor || '#ddccaa',
+            size: (RENDER_CONFIG.meleeImpactSize || 2) + Math.random() * 1.5,
+            alpha: 0.9,
+            shape: 'square',
+            maxY: y + 1,
+        });
+    }
+}
+
+// Chunky falling debris burst when a structure is destroyed. Squares that arc up
+// and fall, settling near the base of the tile. Gated by the caller on
+// showCombatParticles + reduceMotion.
+export function spawnStructureCrumble(game, x, y) {
+    const n = RENDER_CONFIG.structureCrumbleCount || 16;
+    const spd = RENDER_CONFIG.structureCrumbleSpeed || 0.9;
+    const c1 = RENDER_CONFIG.structureCrumbleColor1 || '#9a8a70';
+    const c2 = RENDER_CONFIG.structureCrumbleColor2 || '#6f6152';
+    for (let i = 0; i < n; i++) {
+        const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.5;
+        const speed = spd * (0.5 + Math.random());
+        spawnParticle(game, {
+            x: x + 0.2 + Math.random() * 0.6, y: y + 0.4,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+            ay: 0.5,
+            decay: RENDER_CONFIG.structureCrumbleDecay || 0.42,
+            color: Math.random() < 0.5 ? c1 : c2,
+            size: 2 + Math.random() * 2.5,
+            alpha: 0.95,
+            shape: 'square',
+            maxY: y + 1,
+        });
+    }
+}
+
 export class OverlayRenderer {
     constructor(container) {
         this.canvas = document.createElement('canvas');

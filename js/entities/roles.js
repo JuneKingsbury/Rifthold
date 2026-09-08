@@ -3,7 +3,7 @@ import { manhattanDist, findPathForEnemies } from '../world/pathfinding.js';
 import { isPassable, isPassableForEnemies, isBreakableByEnemies, hasLineOfSight, findLineOfSightTile } from '../world/map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { colonistTakeDamage } from './colonist.js';
-import { spawnDamageText } from '../ui/overlay-renderer.js';
+import { spawnDamageText, spawnImpactSpray, spawnStructureCrumble } from '../ui/overlay-renderer.js';
 
 function canAttack(entity, game) {
     const cooldown = entity.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
@@ -70,6 +70,9 @@ export const ROLE_HANDLERS = {
                         target.hp -= damage;
                         spawnDamageText(game, target.x, target.y, damage);
                         game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
+                        if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) {
+                            spawnImpactSpray(game, target.x, target.y, Math.sign(target.x - entity.x), Math.sign(target.y - entity.y));
+                        }
                     }
                 } else {
                     moveToward(entity, target, game.map, dur, game);
@@ -255,6 +258,9 @@ export const ROLE_HANDLERS = {
                         spawnDamageText(game, target.x, target.y, dmg);
                     }
                     game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
+                    if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) {
+                        spawnImpactSpray(game, target.x, target.y, Math.sign(target.x - entity.x), Math.sign(target.y - entity.y));
+                    }
                 }
             } else {
                 // Siege: route toward the target, breaching walls/doors when the
@@ -715,6 +721,7 @@ function damageStructureTile(map, x, y, breakDmg, game) {
     tile.structureHp -= breakDmg;
     game.combatEffects.push({ x, y, char: '*', color: '#ffaa00', ttl: 2 });
     if (tile.structureHp <= 0) {
+        if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) spawnStructureCrumble(game, x, y);
         const old = tile.structure;
         tile.structure = null;
         tile.structureHp = undefined;
