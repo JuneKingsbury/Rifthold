@@ -85,7 +85,9 @@ export class TaskQueue {
 
             // Lower priority number = higher preference, multiplied to dominate over distance.
             // Urgent tasks (e.g. lead_animal) use a fixed very-low prio so they beat all others.
-            const prio = t.urgent ? 0.5 : colonist.priorities[t.skillRequired];
+            // cleanse_blight gets a 25% bonus so it beats plant/harvest at the same farming priority.
+            let prio = t.urgent ? 0.5 : colonist.priorities[t.skillRequired];
+            if (t.type === 'cleanse_blight') prio = Math.max(prio * 0.75, 0.6);
             const dist = manhattanDist(colonist.x, colonist.y, t.x, t.y);
             const score = prio * 10000 + dist;
 
