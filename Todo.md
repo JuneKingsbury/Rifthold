@@ -3,7 +3,7 @@
 ## Content
 
 ### Story Milestones
-All milestone triggers and story left to flesh out.
+Milestone triggers and story left to flesh out.
 
 **Realm exploration lore:**
 - [X] `crystal_caves`
@@ -21,6 +21,8 @@ All milestone triggers and story left to flesh out.
 - [ ] `kingdom_outskirts`
 - [ ] `crusader_barracks`
 - [ ] `palace_fortress`
+
+**Bestiary lore**
 
 ### Audio Assets
 The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest.js`). Music tracks are all present. The tables below list only the **missing** SFX files. All paths are relative to the project root. Format: `.ogg` (Vorbis).
@@ -59,6 +61,3 @@ attempt to cook food with their random 5 foodstuffs and that will be tied to a c
 From there we can do things like make colonists have food preferences and favorite dishes. Another option is to introduce boosts to the colonist that eats a particular dish for several in-game hours. These boosts could be basically any small buff from our existing effects list.
 
 Basically these are potions again but instead of being used strategically in relevant situations, it instead boosts the colonist for a longer period of time every time they eat.
-
-### Visual Effects
-I want to look into swapping several of the existing .png effect sprites with animated .gif files. This would make several of the effects, like "building complete", much more visually interesting and rewarding.

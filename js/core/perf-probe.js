@@ -1,6 +1,5 @@
 /**
- * Lightweight, opt-in tick/frame profiler used to decide whether the Phase 6
- * "risky perf" candidates are worth pursuing. It is OFF by default and costs
+ * Lightweight, opt-in tick/frame profiler. It is OFF by default and costs
  * nothing until enabled. The hot paths only run instrumentation behind a
  * truthy `game._profiler` guard.
  *

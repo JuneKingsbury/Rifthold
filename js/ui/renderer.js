@@ -1,5 +1,5 @@
 import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES } from '../core/config.js';
-import { getTileVisuals } from '../world/map.js';
+import { writeTileVisuals } from '../world/map.js';
 import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
 import { SkinManager } from './skin-manager.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
@@ -48,6 +48,39 @@ export class Renderer {
         this._attackFx = [];
         this._structureMap = new Map();
 
+        // Reused scratch object for tile visuals so the hot tile loop doesn't
+        // allocate a fresh {char,color,bg} per visible tile (~16k/frame zoomed out).
+        this._tileVisuals = { char: '', color: '', bg: '' };
+
+        // --- Static ground cache ---
+        // Offscreen full-map canvas that bakes the static ground layer (terrain /
+        // floor / snow sprite + terrain dither) for every "pure ground" tile: tiles
+        // with no structure, resource, zone, or fire. The visible sub-region is
+        // blitted in ONE drawImage per frame, replacing thousands of per-tile ground
+        // draws + up-to-4 dither composites each (measured at ~99% of frame time when
+        // zoomed out). Everything dynamic (structures, resources, trees, crops,
+        // entities, fire, effects, tints) still draws live on top, so visuals are
+        // identical. Invalidated via markTerrainDirty() on build/deconstruct, season
+        // change, snow melt, and fire changes. The buffer resolution tracks the
+        // current cell size, so it is small exactly when zoomed out (many tiles) and
+        // larger when zoomed in (few tiles). Above _terrainCacheMaxPx it disables and
+        // the loop draws ground live (that regime is already fast).
+        this._terrainCanvas = null;
+        this._terrainCtx = null;
+        this._terrainDirty = true;
+        this._terrainKey = '';
+        this._terrainCacheMaxPx = 4096;
+        // While the user is actively zooming, the cell size (and thus the bake key)
+        // changes every step, and a full-map rebuild per step would be a burst of
+        // heavy frames worse than just drawing the viewport live. So we defer baking:
+        // measureFont() stamps _lastZoomChangeMs, and the cache is only (re)built once
+        // zoom has been stable for _zoomSettleMs. During the settle window the tile
+        // loop draws ground live (the pre-cache path), which is smooth for a single
+        // viewport. Set to 0 to disable deferral. Uses performance.now() (wall clock),
+        // independent of game tick/pause.
+        this._lastZoomChangeMs = -Infinity;
+        this._zoomSettleMs = 150;
+
         // Terrain dithering
         this._ditherMasks = null;
         this._ditherTileSize = 0;
@@ -75,9 +108,16 @@ export class Renderer {
         const dpr = window.devicePixelRatio || 1;
         const logicalHeight = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
         const physHeight = Math.round(logicalHeight * dpr);  // integer physical pixels
+        const prevCharWidth = this.charWidth;
         this.charHeight = physHeight / dpr;                   // CSS pixels (possibly fractional)
         this.charWidth = this.charHeight;
         this._textOffsetX = Math.floor((this.charWidth - this._textWidth) / 2);
+        // Note when the zoom (cell size) actually changed, so the terrain cache can
+        // defer its full-map rebuild until zooming settles (see _zoomSettleMs). The
+        // initial measure (prevCharWidth === 0) is not a zoom gesture, so skip it.
+        if (prevCharWidth !== 0 && this.charWidth !== prevCharWidth) {
+            this._lastZoomChangeMs = performance.now();
+        }
         this._resizeCanvas();
     }
 
@@ -186,6 +226,97 @@ export class Renderer {
             return resourceSprite ? resourceSprite : sm.getSprite('resources', tile.resource.type);
         }
         return null;
+    }
+
+    // A tile bakes into the static ground cache only when its ground layer is
+    // fully static this frame: no structure, resource, zone, or fire. Such a tile
+    // draws exactly _resolveGroundSprite(tile) plus terrain dither, both of which
+    // depend only on terrain/floor/snow and neighbor terrain, never on time or
+    // entities. Tiles that fail this test (structures, trees/ore, farm plots,
+    // burning tiles) keep drawing live so their dynamic parts stay correct.
+    _isBakeableGround(tile) {
+        return !tile.structure && !tile.resource && !tile.zone && !tile.onFire;
+    }
+
+    // Invalidate the static ground cache so it re-bakes on the next frame. Cheap:
+    // just flips a flag. Call on any event that changes a baked tile's ground
+    // appearance: build/deconstruct a floor, season change (snow/terrain color),
+    // snow accumulate/melt. Structures/resources aren't baked, so building a wall
+    // still needs this only because deconstructing can re-expose bare ground.
+    markTerrainDirty() {
+        this._terrainDirty = true;
+    }
+
+    // Rebuilds the offscreen full-map ground buffer at the current cell size. Bakes
+    // every bakeable-ground tile's ground sprite + dither into world-space tile
+    // coordinates, so the tile loop can blit any visible sub-region in one draw.
+    // Returns false (and leaves the cache disabled) when the buffer would exceed
+    // _terrainCacheMaxPx on either axis, i.e. when zoomed in far enough that live
+    // ground drawing is already cheap. Skin mode only: ASCII ground is a single
+    // fillText/fillRect per tile, already the cheap path, so it isn't baked.
+    _rebuildTerrainCache(game, season, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize) {
+        const cw = this.charWidth;
+        const ch = this.charHeight;
+        const mapW = CONFIG.MAP_WIDTH;
+        const mapH = CONFIG.MAP_HEIGHT;
+        const bufW = mapW * cw;
+        const bufH = mapH * ch;
+        if (bufW > this._terrainCacheMaxPx || bufH > this._terrainCacheMaxPx) {
+            // Too large to be worth caching at this zoom. Disable and draw live.
+            this._terrainCanvas = null;
+            this._terrainCtx = null;
+            this._terrainDirty = false;
+            return false;
+        }
+
+        if (!this._terrainCanvas) {
+            this._terrainCanvas = document.createElement('canvas');
+        }
+        if (this._terrainCanvas.width !== bufW || this._terrainCanvas.height !== bufH) {
+            this._terrainCanvas.width = bufW;
+            this._terrainCanvas.height = bufH;
+            this._terrainCtx = null;
+        }
+        const tctx = this._terrainCtx || (this._terrainCtx = this._terrainCanvas.getContext('2d'));
+        tctx.imageSmoothingEnabled = false;
+        tctx.clearRect(0, 0, bufW, bufH);
+
+        const map = game.map;
+        for (let wy = 0; wy < mapH; wy++) {
+            const row = map[wy];
+            for (let wx = 0; wx < mapW; wx++) {
+                const tile = row[wx];
+                if (!this._isBakeableGround(tile)) continue;
+                const px = wx * cw;
+                const py = wy * ch;
+                // Bake the terrain background color under the ground sprite, exactly
+                // as the live path fills it before drawing the sprite. This keeps
+                // output pixel-identical even if a terrain sprite is semi-transparent
+                // (its gaps show the terrain bg, not the main canvas color).
+                const tv = writeTileVisuals(tile, season, this._tileVisuals);
+                if (tv.bg) {
+                    tctx.fillStyle = tv.bg;
+                    tctx.fillRect(px, py, cw, ch);
+                }
+                // The live path draws the shadow sprite under the ground sprite for
+                // every bare tile (noShadow is false without a structure). Bake it
+                // too so output matches even where the ground sprite has transparency.
+                const shadow = this.skinManager.getSprite('effects', 'shadow');
+                if (shadow) tctx.drawImage(shadow, px, py, cw, ch);
+                const ground = this._resolveGroundSprite(tile, season);
+                if (ground) tctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                // Dither only on bare terrain, matching the live path's `canDither`
+                // (no structure/resource/zone/floor). Bakeable tiles already exclude
+                // structure/resource/zone, so only the floor case must be excluded
+                // here. Dither depends solely on neighbor terrain, so it is static.
+                if (!tile.floor) {
+                    this._drawTerrainDither(tctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+                }
+            }
+        }
+
+        this._terrainDirty = false;
+        return true;
     }
 
     // Generates per-direction alpha masks for terrain edge dithering using ordered
@@ -546,6 +677,13 @@ export class Renderer {
     }
 
     render(game) {
+        // Subdivide the frame's render cost into named sub-buckets.
+        // Uses prof.add() with a local timestamp so it never touches
+        // the shared _lastMark that the outer gameLoop uses for 'frame:renderer'.
+        // Zero cost (a single branch, no allocation) unless startPerfProbe() ran.
+        const rprof = game._profiler;
+        let rmark = rprof ? performance.now() : 0;
+
         const { settings, tick, weather } = game;
         const vw = CONFIG.VIEWPORT_WIDTH;
         const vh = CONFIG.VIEWPORT_HEIGHT;
@@ -571,7 +709,13 @@ export class Renderer {
         // Tree sway: wind strength (0..1) from the active weather, resolved once
         // per frame. `showTreeSway` gates the whole effect.
         const showTreeSway = settings.showTreeSway && RENDER_CONFIG.treeSway && RENDER_CONFIG.treeSway.enabled;
-        const showTerrainDetail = settings.showTerrainDetail && RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.enabled;
+        // Automatic zoom LOD: when cells are too small for sub-pixel animated detail
+        // to be visible, skip it. Derived once per frame from the current cell size,
+        // no user setting. At normal zoom `charWidth` far exceeds the threshold so
+        // `detailLod` is always true and nothing changes.
+        const lodMinCellPx = (RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.lodMinCellPx) || 0;
+        const detailLod = this.charWidth >= lodMinCellPx;
+        const showTerrainDetail = detailLod && settings.showTerrainDetail && RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.enabled;
         // treeWind and detailWind are set below after dt is available
         let treeWind = 0;
         let detailWind = 0;
@@ -787,6 +931,57 @@ export class Renderer {
             }
         }
         
+        if (rprof) { const t = performance.now(); rprof.add('render:setup+entityMap', t - rmark); rmark = t; }
+
+        // --- Static ground cache: rebuild if needed, then blit the visible region ---
+        // The baked buffer holds the static ground layer for every bakeable-ground
+        // tile (see _isBakeableGround). When active, the tile loop skips the live
+        // ground draw + dither for those tiles and relies on this one blit instead.
+        // Only in skin mode: ASCII ground is a single fill per tile, already cheap.
+        // The key re-bakes the buffer when the cell size, season, or dither settings
+        // change (anything that alters a baked tile's appearance); markTerrainDirty()
+        // handles content changes (build, snow, fire).
+        let terrainCacheActive = false;
+        if (skinActive) {
+            const terrainKey = `${cw}x${ch}|${season}|${ditherOn}|${ditherDepthFrac}|${ditherQualSetting}|${ditherBlockSize}`;
+            if (terrainKey !== this._terrainKey) {
+                this._terrainKey = terrainKey;
+                this._terrainDirty = true;
+            }
+            // Defer the full-map rebuild while zoom is still changing: a bake per zoom
+            // step is a burst of heavy frames. Once zoom has been stable for
+            // _zoomSettleMs we bake once and blit thereafter. A dirty flag from a
+            // content change (build, season, fire) has _lastZoomChangeMs far in the
+            // past, so it rebuilds immediately (zoomSettled is true).
+            const zoomSettled = (now - this._lastZoomChangeMs) >= this._zoomSettleMs;
+            if (this._terrainDirty && zoomSettled) {
+                this._rebuildTerrainCache(game, season, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+            }
+            // Only blit when the buffer is clean (not stale): a dirty buffer is either
+            // still at the previous zoom's cell size or awaiting settle, so blitting it
+            // with the current cw/ch would scale wrong. While dirty, terrainCacheActive
+            // stays false and the tile loop draws ground live for this frame.
+            if (this._terrainCanvas && !this._terrainDirty) {
+                // Blit only the visible sub-region of the full-map buffer. Source rect
+                // is clamped to the buffer; the loop already skips out-of-bounds tiles,
+                // so off-map margins simply show the cleared background.
+                const srcX = Math.max(0, camera.x * cw);
+                const srcY = Math.max(0, camera.y * ch);
+                const dstX = camera.x < 0 ? -camera.x * cw : 0;
+                const dstY = camera.y < 0 ? -camera.y * ch : 0;
+                const availW = this._terrainCanvas.width - srcX;
+                const availH = this._terrainCanvas.height - srcY;
+                const wantW = (vw + 1) * cw - dstX;
+                const wantH = (vh + 1) * ch - dstY;
+                const w = Math.min(availW, wantW);
+                const h = Math.min(availH, wantH);
+                if (w > 0 && h > 0) {
+                    ctx.drawImage(this._terrainCanvas, srcX, srcY, w, h, dstX, dstY, w, h);
+                }
+                terrainCacheActive = true;
+            }
+        }
+
         // --- Tile rendering loop ---
         // Iterates over the visible viewport, drawing each tile as either a sprite
         // (skin active) or an ASCII character. Layering order for sprites:
@@ -807,7 +1002,8 @@ export class Renderer {
 
                 // Get ASCII info for this tile.
                 const tile = map[wy][wx];
-                let {char, color, bg} = getTileVisuals(tile, season);
+                const tv = writeTileVisuals(tile, season, this._tileVisuals);
+                let char = tv.char, color = tv.color, bg = tv.bg;
 
                 // Update tile color based on work task designation if one exists (e.g. marked for destruction).
                 if (tile.designation) {
@@ -873,7 +1069,25 @@ export class Renderer {
                     bg = RENDER_CONFIG.cursorBg;
                 }
 
-                /* 
+                // Static ground cache: this tile's ground layer (terrain bg + terrain/
+                // floor/snow sprite + dither) is already in the pre-loop blit, so the
+                // live ground draw and base bg fill can be skipped. Restricted to
+                // pristine tiles: cache active, skin mode, no entity/effect, a
+                // bakeable-ground tile with a present ground sprite, and NO dynamic bg
+                // source (portal, spell range, selection, cursor). Any tile failing
+                // this draws fully live, exactly as before, so highlighted/occupied
+                // tiles are pixel-identical. The common zoomed-out case (bare terrain)
+                // takes the blit and skips the expensive per-tile ground + dither.
+                const onCursor = !!(cursor && cursor.x === wx && cursor.y === wy);
+                const bakedGround = terrainCacheActive && !entity && !effect
+                    && this._isBakeableGround(tile)
+                    && !portalMap.has(tileKey)
+                    && !(showPortalPath && portalPathMap.has(tileKey))
+                    && !(spellRangeSet && spellRangeSet.has(tileKey))
+                    && !inSelection && !onCursor
+                    && !!this._resolveGroundSprite(tile, season);
+
+                /*
                 Each tile can contain several elements that may overlap. Most sprites will not take up the entire tile, so we
                 need to draw the other sprites underneath it to fill the space properly. We draw elements in the following order:
                     1. Background color
@@ -884,8 +1098,10 @@ export class Renderer {
                     6. Effects (e.g. Particles, arrows, turret shots)
                 */
 
-                // Draw background color if it was set.
-                if (bg) {
+                // Draw background color if it was set. Baked-ground tiles skip this:
+                // their terrain bg is already in the pre-loop blit, and bakedGround is
+                // false whenever any dynamic bg override applies, so nothing is lost.
+                if (bg && !bakedGround) {
                     ctx.fillStyle = bg;
                     ctx.fillRect(px, py, cw, ch);
                     lastColor = '';
@@ -966,7 +1182,15 @@ export class Renderer {
 
                     // Determine if we have an entity sprite to draw on this tile.
                     const hl = !!(entity && entity.type === 'colonist' && game.settings.showColonistHighlight);
-                    const sprite = this._resolveSprite(tile, entity, season, hl);
+                    // Baked-ground tiles: shadow + ground sprite + dither are all in the
+                    // pre-loop blit, and none of the sprite block's other draws apply
+                    // (all gated on entity/structure/resource/zone/effects, which a
+                    // bakeable pristine tile lacks). Skip the block and mark spriteDrawn
+                    // so downstream overlays (grass tufts, ripples) still layer on top.
+                    const sprite = bakedGround ? null : this._resolveSprite(tile, entity, season, hl);
+                    if (bakedGround) {
+                        spriteDrawn = true;
+                    }
                     if (sprite) {
                         // Draw entity shadow. Skip it for flat furniture (rugs, chalk) that
                         // sits on the ground and shouldn't cast a shadow. Only applies when the
@@ -1215,7 +1439,7 @@ export class Renderer {
                     }
 
                     // Snow shimmer: random bright flecks on blizzard snow-covered tiles
-                    if (!entity && tile.snowCovered && weather.currentWeather === 'blizzard' && Math.random() < 0.005) {
+                    if (detailLod && !entity && tile.snowCovered && weather.currentWeather === 'blizzard' && Math.random() < 0.005) {
                         ctx.save();
                         ctx.fillStyle = 'rgba(255,255,255,0.85)';
                         ctx.beginPath();
@@ -1242,7 +1466,7 @@ export class Renderer {
                     }
 
                     // Creeping miasma spore particles on blighted crop tiles
-                    if (tile.zone && tile.zone.blighted && Math.random() < 0.06) {
+                    if (detailLod && tile.zone && tile.zone.blighted && Math.random() < 0.06) {
                         spawnParticle(game, {
                             x: wx + 0.2 + Math.random() * 0.6,
                             y: wy + 0.2 + Math.random() * 0.4,
@@ -1498,6 +1722,8 @@ export class Renderer {
                 }
             }
         }
+
+        if (rprof) { const t = performance.now(); rprof.add('render:tileLoop', t - rmark); rmark = t; }
 
         // Draw water ripples on top of all tiles (rain impacts + footsteps)
         this._drawWaterRipples(ctx, camera, cw, ch);
@@ -1877,6 +2103,8 @@ export class Renderer {
             }
         }
 
+        if (rprof) { const t = performance.now(); rprof.add('render:entities+names+glow', t - rmark); rmark = t; }
+
         // --- Night overlay ---
         // Renders darkness as a per-tile alpha overlay. Uses a precomputed "light grid"
         // (Float32Array) so cost is O(viewport + sources*radius²) instead of
@@ -1995,7 +2223,11 @@ export class Renderer {
             ctx.imageSmoothingEnabled = prevSmoothing;
         }
 
+        if (rprof) { const t = performance.now(); rprof.add('render:night', t - rmark); rmark = t; }
+
         this.overlayRenderer.render(game, cw, ch, game.camera);
+
+        if (rprof) { const t = performance.now(); rprof.add('render:overlayRenderer', t - rmark); rmark = t; }
     }
 
     renderFps(fps) {

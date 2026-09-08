@@ -247,6 +247,11 @@ export function completeTask(colonist, task, game) {
                 }
             }
             tile.designation = null;
+            // The tile lost its resource (and mining reverts terrain to dirt), so it
+            // is now bakeable ground. Invalidate the static caches or the old
+            // tree/rock sprite would linger in the baked layer.
+            if (game.minimap) game.minimap.markTerrainDirty();
+            if (game.renderer) game.renderer.markTerrainDirty();
             applyThought(colonist, 'good_work', game.tick);
             if (game.tutorial) game.tutorial.flags.gathered = true;
             break;

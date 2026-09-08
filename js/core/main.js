@@ -295,6 +295,7 @@ class Game {
         this.settings.activeSkin = skinName;
         localStorage.setItem('convocation_skin', skinName);
         this.renderer._ditherCache.clear();
+        this.renderer.markTerrainDirty();
         if (this.ui) {
             this.ui._buildingSpriteCache = null;
             this.ui.forceStatusBarRefresh();
@@ -456,6 +457,7 @@ class Game {
             this.eventLog.add(this, `Season changed to ${this.weather.season} (Year ${this.weather.year})`, 'event', null);
             this.weather.applySnow(this.map);
             if (this.minimap) this.minimap.markTerrainDirty();
+            if (this.renderer) this.renderer.markTerrainDirty();
             if (this.mapIndex.findFirst('trade_rift')) {
                 this.tradeRift.regenerate(this, 'season');
                 let msg = 'The Trade Rift shimmers! New seasonal requests have arrived.';
@@ -468,6 +470,7 @@ class Game {
         } else if (this.tick % 50 === 0) {
             this.weather.applySnow(this.map);
             if (this.minimap) this.minimap.markTerrainDirty();
+            if (this.renderer) this.renderer.markTerrainDirty();
         }
 
         if (this.tick % FOOD_DECAY_CONFIG.decayInterval === 0) {
@@ -545,6 +548,7 @@ class Game {
             this.townHallQualities = qualities.townHallQualities;
             this.roomsDirty = false;
             if (this.minimap) this.minimap.markTerrainDirty();
+            if (this.renderer) this.renderer.markTerrainDirty();
         }
 
         if (prof) prof.mark('weather+decay+rooms');
@@ -650,6 +654,7 @@ class Game {
         updateFires(this);
         if (hadFiresBefore || this.mapIndex.fires.size > 0) {
             if (this.minimap) this.minimap.markTerrainDirty();
+            if (this.renderer) this.renderer.markTerrainDirty();
         }
         if (prof) prof.mark('fires');
 
@@ -1731,6 +1736,10 @@ class Game {
                         this.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellTerraformChar, color: COMBAT_VISUALS.spellTerraformColor, ttl: 4 });
                     }
                 }
+                if (changed > 0) {
+                    if (this.minimap) this.minimap.markTerrainDirty();
+                    if (this.renderer) this.renderer.markTerrainDirty();
+                }
                 window.soundManager?.playSFX('spell_terraform');
                 this.notifications.push({ text: `${colonist.name} cast ${spell.name}, transforming ${changed} tiles!`, tick: this.tick, type: 'success' });
                 break;
@@ -2048,6 +2057,10 @@ class Game {
 
     load() {
         if (loadGame(this)) {
+            // loadGame replaces this.map wholesale, so the baked ground cache is
+            // now stale (built from the pre-load map). Force a rebuild on the next
+            // frame. The minimap already gets the same treatment inside loadGame.
+            if (this.renderer) this.renderer.markTerrainDirty();
             this.notifications.push({ text: 'Game loaded!', tick: this.tick, type: 'success' });
             this.ui.updateModeDisplay(this.input);
             if (this.settings.layoutMode && this.settings.layoutMode !== 'auto') {

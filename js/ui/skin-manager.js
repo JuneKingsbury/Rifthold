@@ -168,6 +168,20 @@ export class SkinManager {
     }
 
     getColonistSprite(colonistId, drafted, race, bodyVariant, hairVariant, shirtVariant, nameColor, highlight, outline = true) {
+        // Cache the outlined result. This is the un-equipped display path (called by
+        // getCompositedColonistSprite when a colonist wears no equipment), which
+        // otherwise rebuilt a canvas and re-ran the per-pixel _addOutline loop every
+        // frame for every visible colonist. The outline=false path is skipped here:
+        // it is only used as the composite base, which caches its own final result.
+        // Shares _compositeCache (and its 200-entry cap + clear() calls); a distinct
+        // "base:" prefix keeps these keys from colliding with equipment composites.
+        let baseCacheKey = null;
+        if (outline) {
+            baseCacheKey = `base:${colonistId}:${drafted}:${race || ''}:${bodyVariant || ''}:${hairVariant || ''}:${shirtVariant || ''}:${nameColor || ''}${highlight ? ':hl' : ''}`;
+            const hit = this._compositeCache.get(baseCacheKey);
+            if (hit) return hit;
+        }
+
         let bodyCount = 0;
         if (race === 'nymph') {
             bodyCount = this._nymphBodyCount;
@@ -215,7 +229,10 @@ export class SkinManager {
         }
 
         if (outline) {
-            return this._finishColonistOutline(canvas, drafted, nameColor, highlight);
+            const result = this._finishColonistOutline(canvas, drafted, nameColor, highlight);
+            if (this._compositeCache.size > 200) this._compositeCache.clear();
+            this._compositeCache.set(baseCacheKey, result);
+            return result;
         }
         else {
             return canvas;

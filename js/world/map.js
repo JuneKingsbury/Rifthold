@@ -323,7 +323,12 @@ function clearStartingArea(map) {
 
 // Combined other get calls as we always needed to do them together. This saves us
 // from having to repeat these if-statements 3 times going through char, color, and bg.
-export function getTileVisuals(tile, season) {
+//
+// writeTileVisuals writes into a caller-owned scratch object and returns it, so the
+// hot render loop (called for every visible tile every frame, ~16k times when zoomed
+// out) can reuse one object instead of allocating a fresh {char,color,bg} per tile.
+// getTileVisuals keeps the allocating signature for one-shot/menu callers.
+export function writeTileVisuals(tile, season, out) {
     let char = '';
     let color = '';
     let bg = '';
@@ -341,7 +346,7 @@ export function getTileVisuals(tile, season) {
         if (tile.zone.state === 'ready') {
             const cropDef = tile.zone.crop && CROPS[tile.zone.crop];
             char = (cropDef && cropDef.readyChar) || TILE_CHARS.farm_ready;
-            cropDef ? color = cropDef.color : '#ffdd00';
+            color = cropDef ? cropDef.color : '#ffdd00';
         }
         else if (tile.zone.state === 'growing') {
             const cropDef = tile.zone.crop && CROPS[tile.zone.crop];
@@ -368,9 +373,12 @@ export function getTileVisuals(tile, season) {
         const rDef = RESOURCES[tile.resource.type];
         if (rDef) {
             char = rDef.char;
-            const seasonColor = rDef[season + 'Color'];
-            if (seasonColor) color = seasonColor;
-            color = rDef.color;
+            // Trees shift color with the season (ASCII glyph + minimap); other
+            // resources have no seasonal variants, so `<season>Color` is absent
+            // and we fall back to the base color. In skin mode the tree draws a
+            // sprite and this color is unused.
+            const seasonColor = season && rDef[season + 'Color'];
+            color = seasonColor || rDef.color;
         }
     }
     const tDef = TERRAIN[tile.terrain];
@@ -378,7 +386,14 @@ export function getTileVisuals(tile, season) {
     if (color === '') color = tDef ? tDef.color : '#fff';
     if (bg === '') bg = tDef ? tDef.bg : null;
 
-    return {char, color, bg};
+    out.char = char;
+    out.color = color;
+    out.bg = bg;
+    return out;
+}
+
+export function getTileVisuals(tile, season) {
+    return writeTileVisuals(tile, season, { char: '', color: '', bg: '' });
 }
 
 

@@ -84,6 +84,12 @@ export const RENDER_CONFIG = {
     // Gated by the `showTerrainDetail` setting. Composed in entity-animation.js.
     terrainDetail: {
         enabled: true,
+        // Automatic zoom LOD: below this on-screen cell size (px), the sub-pixel
+        // animated detail (grass tufts, water waves, crop sway, snow shimmer, and
+        // the per-tile particle rolls that go with them) is imperceptible, so the
+        // tile loop skips it entirely. Purely a function of zoom, no user setting:
+        // at normal zoom the cell is far larger than this and nothing changes.
+        lodMinCellPx: 9,
         // Grass tufts: side-to-side sway (rotation about the tuft base). Reuses the
         // tree wind (0..1); amplitude lerps calm->storm, cadence shortens with wind.
         grassCalmPeriodMs: 4600,
