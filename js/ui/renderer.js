@@ -204,6 +204,9 @@ export class Renderer {
         }
         if (tile.floor) return sm.getSprite('floors', tile.floor);
         if (tile.snowCovered && tile.terrain === 'grass') return sm.getSprite('effects', 'snow');
+        if (season === 'autumn' && tile.terrain === 'grass') {
+            return sm.getSprite('terrain', 'grass_autumn') || sm.getSprite('terrain', tile.terrain);
+        }
         return sm.getSprite('terrain', tile.terrain);
     }
 
@@ -215,6 +218,9 @@ export class Renderer {
         }
         if (tile.snowCovered && tile.terrain === 'grass') {
             return sm.getSprite('effects', 'snow') || sm.getSprite('terrain', tile.terrain);
+        }
+        if (season === 'autumn' && tile.terrain === 'grass') {
+            return sm.getSprite('terrain', 'grass_autumn') || sm.getSprite('terrain', tile.terrain);
         }
         return sm.getSprite('terrain', tile.terrain);
     }
@@ -432,8 +438,9 @@ export class Renderer {
     // its base) for one tile. Shared by bare-grass tiles and tree tiles (where the
     // tree sprite is later drawn on top). No-ops gracefully when the art is absent.
     // Returns true if a tuft was drawn.
-    _drawGrassTuft(ctx, now, tileKey, wind, px, py, cw, ch) {
-        const tuft = this.skinManager.getSprite('effects', 'grass_tuft');
+    _drawGrassTuft(ctx, now, tileKey, wind, px, py, cw, ch, season) {
+        const tuft = (season === 'autumn' && this.skinManager.getSprite('effects', 'grass_tuft_autumn'))
+            || this.skinManager.getSprite('effects', 'grass_tuft');
         if (!tuft) return false;
         const boostEntry = this._grassBoost.get(tileKey);
         let boostAdd = 0;
@@ -1135,7 +1142,7 @@ export class Renderer {
                         // swaying tuft here so the tree sprite (drawn below) covers it.
                         if (showTerrainDetail && tile.resource.type === 'tree'
                             && tile.terrain === 'grass' && !tile.snowCovered && !tile.onFire) {
-                            this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch);
+                            this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch, season);
                         }
                     }
                     const canDither = !tile.structure && !tile.resource && !tile.zone && !tile.floor;
@@ -1148,7 +1155,7 @@ export class Renderer {
                         if (showTerrainDetail && !tile.structure && !tile.resource
                             && !tile.zone && !tile.floor && !tile.onFire) {
                             if (tile.terrain === 'grass' && !tile.snowCovered) {
-                                this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch);
+                                this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch, season);
                             } else if (tile.terrain === 'water') {
                                 this._drawWaterWaves(ctx, now, tileKey, px, py, cw, ch);
                             }
@@ -1423,7 +1430,7 @@ export class Renderer {
                     if (showTerrainDetail && !entity && !tile.structure && !tile.resource
                         && !tile.zone && !tile.floor && !tile.onFire) {
                         if (tile.terrain === 'grass' && !tile.snowCovered) {
-                            if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch)) {
+                            if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch, season)) {
                                 spriteDrawn = true;
                             }
                         } else if (tile.terrain === 'water') {
@@ -2202,9 +2209,9 @@ export class Renderer {
             }
             const nightData = this._nightImageData.data;
             for (let sy = 0; sy < nightH; sy++) {
-                const rowOff = sy * vw;
+                const rowOff = Math.min(sy, vh - 1) * vw;
                 for (let sx = 0; sx < nightW; sx++) {
-                    const shade = Math.round((1 - lightGrid[rowOff + sx]) * steps);
+                    const shade = Math.round((1 - lightGrid[rowOff + Math.min(sx, vw - 1)]) * steps);
                     const pIdx = (sy * nightW + sx) * 4;
                     if (shade < 1) {
                         nightData[pIdx + 3] = 0;

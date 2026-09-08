@@ -382,8 +382,7 @@ export function defaultAttunedSchools(colonist) {
 export function isSpellAttuned(colonist, spell) {
     if (!spell || !spell.school) return true;
     const attuned = colonist.attunedSchools;
-    // No attunement set yet → allow everything (a not-yet-configured caster still works).
-    if (!Array.isArray(attuned) || attuned.length === 0) return true;
+    if (!Array.isArray(attuned) || attuned.length === 0) return false;
     return attuned.includes(spell.school);
 }
 

@@ -86,7 +86,10 @@ export class Weather {
     }
 
     getSeasonDisplay() {
-        return `${this.season.charAt(0).toUpperCase() + this.season.slice(1)} Y${this.year}`;
+        const daysPerSeason = Math.floor(CONFIG.TICKS_PER_SEASON / CONFIG.TICKS_PER_DAY);
+        const currentDay = Math.floor(this.seasonTick / CONFIG.TICKS_PER_DAY) + 1;
+        const seasonName = this.season.charAt(0).toUpperCase() + this.season.slice(1);
+        return `${seasonName} Y${this.year} Day ${currentDay}/${daysPerSeason}`;
     }
 
     getWeatherDisplay() {

@@ -154,6 +154,7 @@ const EFFECT_ITEMS = [
     { key: 'spell_enchantment', char: '❀', color: '#ff88dd', desc: 'Cast overlay: enchantment (charm)' },
     { key: 'spell_transmutation', char: '⟳', color: '#66ddaa', desc: 'Cast overlay: transmutation (change)' },
     { key: 'grass_tuft', char: '"', color: '#6aad44', desc: 'Grass tuft overlay (sways in wind on grass tiles)' },
+    { key: 'grass_tuft_autumn', char: '"', color: '#cc8822', desc: 'Grass tuft overlay, autumn variant (sways in wind on autumn grass tiles)' },
     { key: 'water_waves', char: '≈', color: '#55aaff', desc: 'Water wave overlay (bobs up/down on water tiles)' },
 ];
 
@@ -498,6 +499,7 @@ class SkinEditor {
                 for (const [key, def] of Object.entries(TERRAIN)) {
                     items.push({ key, char: def.char, color: def.color, desc: key, category: 'terrain' });
                 }
+                items.push({ key: 'grass_autumn', char: '.', color: '#cc8822', desc: 'Grass terrain (autumn)', category: 'terrain' });
                 break;
             case 'Resources':
                 for (const [key, def] of Object.entries(RESOURCES)) {

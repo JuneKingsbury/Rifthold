@@ -550,6 +550,7 @@ export class UI {
             (manaStr ? `<span class="res" style="color:${power.hasPower() ? '#aa44ff' : '#ff6666'}">${manaStr}</span>` : '') +
             `<span class="sep">|</span>` +
             `<span class="info">${season}</span>` +
+            `<span class="sep">|</span>` +
             `<span class="info status-extra">${this._getWeatherIcon()} ${weather} ${temp}°${tempUnit}</span>` +
             `<span class="info">${timeStr}</span>` +
             `<span class="sep status-extra">|</span>` +
@@ -1411,15 +1412,41 @@ export class UI {
             const currentTome = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : 'None';
             html += `<option value="">Tome: ${currentTome}</option>`;
             if (colonist.equippedTome) html += `<option value="unequip">Unequip</option>`;
+
+            const attuned = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
+            const attunedEntries = [];
+            const otherEntries = [];
+
             tomes.forEach((t, i) => {
                 const def = SPELL_TOMES[t.key];
                 if (!def) return;
                 const spell = SPELLS[def.spell];
-                const canStudy = (colonist.magicSkills[spell?.school] || 0) >= def.minSchoolLevel;
-                const alreadyKnown = colonist.knownSpells.includes(def.spell);
-                if (alreadyKnown) return;
-                html += `<option value="${i}" ${canStudy ? '' : 'disabled'}>${def.name}${canStudy ? '' : ` (need ${MAGIC_SKILLS[spell.school].name} ${def.minSchoolLevel})`}</option>`;
+                if (!spell) return;
+                if (colonist.knownSpells.includes(def.spell)) return;
+                const canStudy = (colonist.magicSkills[spell.school] || 0) >= def.minSchoolLevel;
+                const label = `${def.name} (Lv ${def.minSchoolLevel})${canStudy ? '' : ` - need ${MAGIC_SKILLS[spell.school].name} ${def.minSchoolLevel}`}`;
+                const entry = { i, def, spell, canStudy, label };
+                if (attuned.includes(spell.school)) attunedEntries.push(entry);
+                else otherEntries.push(entry);
             });
+
+            attunedEntries.sort((a, b) => a.def.minSchoolLevel - b.def.minSchoolLevel);
+            otherEntries.sort((a, b) => a.def.minSchoolLevel - b.def.minSchoolLevel);
+
+            if (attunedEntries.length > 0) {
+                html += `<optgroup label="Attuned Schools">`;
+                attunedEntries.forEach(({ i, canStudy, label }) => {
+                    html += `<option value="${i}"${canStudy ? '' : ' disabled'}>${label}</option>`;
+                });
+                html += `</optgroup>`;
+            }
+            if (otherEntries.length > 0) {
+                html += `<optgroup label="Other Schools">`;
+                otherEntries.forEach(({ i, canStudy, label }) => {
+                    html += `<option value="${i}"${canStudy ? '' : ' disabled'}>${label}</option>`;
+                });
+                html += `</optgroup>`;
+            }
             if (tomes.length === 0 && !colonist.equippedTome) html += `<option disabled>No tomes available</option>`;
             html += `</select>`;
             return html;
