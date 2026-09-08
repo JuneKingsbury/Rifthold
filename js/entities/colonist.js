@@ -1,5 +1,5 @@
 import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
-import { spawnParticle } from '../ui/overlay-renderer.js';
+import { spawnParticle, spawnDamageText } from '../ui/overlay-renderer.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture } from '../world/map.js';
@@ -1112,6 +1112,7 @@ function applySpellEffect(colonist, spell, game) {
             if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
             const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
             target.hp -= dmg;
+            spawnDamageText(game, target.x, target.y, dmg);
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
             const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
             game.projectiles.push({
@@ -1143,6 +1144,7 @@ function applySpellEffect(colonist, spell, game) {
                 if (h.hp <= 0) continue;
                 if (manhattanDist(target.x, target.y, h.x, h.y) <= spell.radius) {
                     h.hp -= aoeDmg;
+                    spawnDamageText(game, h.x, h.y, aoeDmg);
                     h._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
                     game.combatEffects.push({ x: h.x, y: h.y, char: spell.projectileChar || '●', color: spell.projectileColor || '#ff6600', ttl: 3 });
                 }
@@ -1156,6 +1158,7 @@ function applySpellEffect(colonist, spell, game) {
             if (dist > (spell.range || 1)) return;
             const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
             target.hp -= dmg;
+            spawnDamageText(game, target.x, target.y, dmg);
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
             colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
             game.combatEffects.push({ x: target.x, y: target.y, char: spell.projectileChar || '✝', color: spell.projectileColor || '#ffffaa', ttl: 4 });
@@ -1283,6 +1286,7 @@ function applySpellEffect(colonist, spell, game) {
                 hit.add(current);
                 const applied = Math.floor(dmg);
                 current.hp -= applied;
+                spawnDamageText(game, current.x, current.y, applied);
                 current._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
                 const projDur = (manhattanDist(fromX, fromY, current.x, current.y) / COMBAT_VISUALS.projectileSpeed) * 1000;
                 game.projectiles.push({
@@ -1315,6 +1319,7 @@ function applySpellEffect(colonist, spell, game) {
             if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
             const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
             target.hp -= dmg;
+            spawnDamageText(game, target.x, target.y, dmg);
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
             applyEnemySlow(target, spell.slowDuration || 60, spell.slowMult || 0.5, game);
             const projDur = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
@@ -2218,14 +2223,22 @@ function fightStepToward(colonist, dest, adjacent, game) {
     if (!isPassable(game.map, next.x, next.y)) { colonist._fightPath = []; return; }
     if (game.isTileOccupied(next.x, next.y)) return; // blocked by another entity, wait a tick
     colonist._fightPath.shift();
-    const dur = CONFIG.TICK_RATE / game.speed;
+    const cost = getMoveCost(game.map, next.x, next.y);
+    const moveBonus = getMoveSpeedBonus(colonist);
+    const dur = computeMoveDuration(cost, moveBonus, game.speed);
     moveEntity(colonist, next.x, next.y, dur);
+    colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
 }
 
 function updateFighting(colonist, game) {
     const target = findNearestHostile(colonist, game);
     if (!target) {
         colonist.state = 'idle';
+        return;
+    }
+
+    if (colonist.moveCooldown > 0) {
+        colonist.moveCooldown--;
         return;
     }
 
@@ -2281,13 +2294,17 @@ function updateFighting(colonist, game) {
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
         const critChance = getCritChance(colonist);
+        let isCrit = false;
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
+            isCrit = true;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
             window.soundManager?.playSFX('critical_hit');
         }
         if (target.category === 'blight_bloom' && colonist.activeEffects?.some(e => e.type === 'blightWard')) dmg *= 2;
         target.hp -= dmg;
+        target._killerColonist = colonist; // for the loot-drop effect on kill
+        spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);
         if (getEquipmentStat(colonist, 'lifeSteal')) colonist.hp = Math.min(colonist.maxHp, colonist.hp + Math.round(dmg * getEquipmentStat(colonist, 'lifeSteal')));
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
@@ -2335,13 +2352,17 @@ function updateFighting(colonist, game) {
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
         const critChance = getCritChance(colonist);
+        let isCrit = false;
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
+            isCrit = true;
             game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
             window.soundManager?.playSFX('critical_hit');
         }
         if (target.category === 'blight_bloom' && colonist.activeEffects?.some(e => e.type === 'blightWard')) dmg *= 2;
         target.hp -= dmg;
+        target._killerColonist = colonist; // for the loot-drop effect on kill
+        spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
     }
@@ -2375,13 +2396,21 @@ function updateHunting(colonist, game) {
     const attackRange = isRanged ? getRangedWeaponRange(colonist, game) : 1;
 
     if (dist > attackRange) {
+        if (colonist.moveCooldown > 0) {
+            colonist.moveCooldown--;
+            return;
+        }
         const dx = Math.sign(animal.x - colonist.x);
         const dy = Math.sign(animal.y - colonist.y);
-        const dur = CONFIG.TICK_RATE / game.speed;
+        const moveBonus = getMoveSpeedBonus(colonist);
         if (dx !== 0 && isPassable(game.map, colonist.x + dx, colonist.y)) {
-            moveEntity(colonist, colonist.x + dx, colonist.y, dur);
+            const cost = getMoveCost(game.map, colonist.x + dx, colonist.y);
+            moveEntity(colonist, colonist.x + dx, colonist.y, computeMoveDuration(cost, moveBonus, game.speed));
+            colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
         } else if (dy !== 0 && isPassable(game.map, colonist.x, colonist.y + dy)) {
-            moveEntity(colonist, colonist.x, colonist.y + dy, dur);
+            const cost = getMoveCost(game.map, colonist.x, colonist.y + dy);
+            moveEntity(colonist, colonist.x, colonist.y + dy, computeMoveDuration(cost, moveBonus, game.speed));
+            colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
         }
         return;
     }
@@ -2412,13 +2441,16 @@ function updateHunting(colonist, game) {
     if (colonist.pedestalDamageBonus > 1) huntDmg = Math.floor(huntDmg * colonist.pedestalDamageBonus);
     huntDmg = Math.floor(huntDmg * getTraitDamageMult(colonist));
     const critChance = getCritChance(colonist);
+    let isCrit = false;
     if (critChance > 0 && Math.random() < critChance) {
         huntDmg *= 2;
+        isCrit = true;
         game.combatEffects.push({ x: animal.x, y: animal.y, char: COMBAT_VISUALS.hitChar, color: COMBAT_VISUALS.hitColor, ttl: COMBAT_VISUALS.hitTtl });
         window.soundManager?.playSFX('critical_hit');
     }
 
     animal.hp -= huntDmg;
+    spawnDamageText(game, animal.x, animal.y, huntDmg, '#ff4444', isCrit);
     animal._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
     colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
 
@@ -2448,12 +2480,20 @@ function updateFleeing(colonist, game) {
         return;
     }
 
+    if (colonist.moveCooldown > 0) {
+        colonist.moveCooldown--;
+        return;
+    }
+
     const dx = Math.sign(colonist.x - threat.x);
     const dy = Math.sign(colonist.y - threat.y);
     const nx = colonist.x + dx;
     const ny = colonist.y + dy;
     if (isPassable(game.map, nx, ny)) {
-        moveEntity(colonist, nx, ny, CONFIG.TICK_RATE / game.speed);
+        const cost = getMoveCost(game.map, nx, ny);
+        const moveBonus = getMoveSpeedBonus(colonist);
+        moveEntity(colonist, nx, ny, computeMoveDuration(cost, moveBonus, game.speed));
+        colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
     }
 }
 
@@ -2600,9 +2640,9 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
     }
     colonist.hp -= actualDmg;
     colonist._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
-    if (actualDmg >= 5) {
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `-${actualDmg}`, color: '#ff4444', fontSize: 12, ttl: 15, maxTtl: 15 });
-    }
+    // Show every hit (matching enemy damage text). Previously gated at >= 5, which
+    // hid low-damage hits like raider-archer arrows (~2 dmg after rebalancing).
+    spawnDamageText(game, colonist.x, colonist.y, actualDmg);
     window.soundManager?.playSFX('colonist_damaged');
 
     const thornsDamage = getEquipmentStat(colonist, 'thornsDamage');

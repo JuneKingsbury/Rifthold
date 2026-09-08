@@ -27,6 +27,21 @@ export function spawnParticle(game, props) {
     });
 }
 
+// Floating "-N" damage number over an entity/tile that just took damage. Shared by
+// every combat damage site so enemies show the same feedback colonists already do
+// (colonist self-damage keeps its own bespoke push). Skips zero/negative amounts.
+// `color` defaults to the colonist damage red; pass a variant for structures, etc.
+// A critical hit (`crit: true`) draws in yellow and slightly larger to stand out.
+export function spawnDamageText(game, x, y, amount, color = '#ff4444', crit = false) {
+    if (!(amount > 0)) return;
+    game.overlays.push({
+        type: 'floating_text', x, y, text: `-${amount}`,
+        color: crit ? '#ffdd33' : color,
+        fontSize: crit ? 16 : 12,
+        ttl: 15, maxTtl: 15,
+    });
+}
+
 export class OverlayRenderer {
     constructor(container) {
         this.canvas = document.createElement('canvas');

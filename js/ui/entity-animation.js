@@ -391,8 +391,9 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     }
 
     // ── Tier 4: continuous work bob (blends only while the slot is free) ──
+    // Ambient loop: suppressed under reduced motion (one-shot beats still play).
     let workActive = false;
-    if (actionsOn && !oneShotActive && entity.state === 'working') {
+    if (actionsOn && !flags.reduceMotion && !oneShotActive && entity.state === 'working') {
         workActive = true;
         const task = (game.taskQueue && entity.currentTaskId != null)
             ? game.taskQueue.getById(entity.currentTaskId) : null;
@@ -422,8 +423,8 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         }
     }
 
-    // ── Tier 2c: eating animation ──
-    if (actionsOn && !oneShotActive && !workActive && entity && entity.state === 'eating') {
+    // ── Tier 2c: eating animation (ambient loop, off under reduced motion) ──
+    if (actionsOn && !flags.reduceMotion && !oneShotActive && !workActive && entity && entity.state === 'eating') {
         const phase = (now / 500) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
         const facing = (seed & 1) ? 1 : -1;
         _xf.rotation += facing * 0.08 * Math.abs(Math.sin(phase));
@@ -442,7 +443,8 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     }
 
     // ── Tier 2e: idle fidget (rare micro-gestures while truly idle) ──
-    if (actionsOn && !oneShotActive && !workActive && moveT == null
+    // Ambient loop: suppressed under reduced motion.
+    if (actionsOn && !flags.reduceMotion && !oneShotActive && !workActive && moveT == null
         && entity && entity.state !== 'sleeping' && entity.state !== 'eating') {
         const scratch = entity._wanim || (entity._wanim = {});
         if (scratch.fidgetNext == null) {

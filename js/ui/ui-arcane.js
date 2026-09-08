@@ -1211,20 +1211,23 @@ const arcaneMethods = {
         }
 
         // ── Continuous states (blend unless suppressed) ──
+        // Ambient locomotion channels are suppressed under reduced motion. The
+        // pre-computed swayAngle is already zero when reduceMotion is on.
+        const ambient = !opts.reduceMotion;
         if (!oneShotActive) {
             out.rot += swayAngle;
-            if (extras && R.expedFootstepBob && speed > 0.01) {
+            if (ambient && extras && R.expedFootstepBob && speed > 0.01) {
                 // Bob at 2× the sway cadence, peaks at footfall. Uses sway sign via phase.
                 out.dy += -Math.abs(Math.sin((opts.swayPhase || 0))) * R.footstepBobPx * speed;
             }
-            if (extras && R.expedTravelLean) out.rot += R.travelLeanRad * facing * speed;
-            if (extras && R.expedIdleShift && speed < 0.02) {
+            if (ambient && extras && R.expedTravelLean) out.rot += R.travelLeanRad * facing * speed;
+            if (ambient && extras && R.expedIdleShift && speed < 0.02) {
                 const ph = (now / R.idleShiftPeriodMs) * Math.PI * 2 + ((opts.seed || 0) % 1000) / 1000 * 6.28;
                 out.rot += Math.sin(ph) * R.idleShiftRad;
             }
         }
         // Ambient status body-language, suppressed only by dramatic one-shots.
-        if (extras && !dramatic && alive && R.expedStatusBodyLanguage && ent.statusEffects) {
+        if (ambient && extras && !dramatic && alive && R.expedStatusBodyLanguage && ent.statusEffects) {
             const active = ent.statusEffects.filter(s => s.rounds > 0);
             const hasFreeze = active.some(s => s.type === 'slow');
             const hasStun = active.some(s => s.type === 'stun');
@@ -1515,7 +1518,11 @@ const arcaneMethods = {
         const floorBottom = H - 16;
         const diagSlope = 0.4;
         const _now = performance.now();
+        // Reduced-motion umbrella (accessibility): damp ambient breathing/sway and
+        // the continuous exped channels, while one-shot combat beats still play.
+        const reduceMotion = !!this.game.settings.reduceMotion;
         const _breathe = (seed) => {
+            if (reduceMotion) return 0;
             const phase = (_now / 3200) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
             return (0.5 - 0.5 * Math.cos(phase)) * 1.4;
         };
@@ -1687,7 +1694,7 @@ const arcaneMethods = {
         // sway phase off distance actually travelled (footstep cadence that freezes
         // when stopped) and ramp amplitude with current speed, so members sway while
         // walking between nodes and ease upright when stopped at a node / in combat.
-        const swayEnabled = RENDER_CONFIG.entityWalkSway && this.game.settings.showWalkSway;
+        const swayEnabled = RENDER_CONFIG.entityWalkSway && this.game.settings.showWalkSway && !reduceMotion;
         const partySpeed = Math.abs(partyX - (this._expVisState._prevPartyX ?? partyX));
         this._expVisState._prevPartyX = partyX;
         // ~one full sway cycle per 16px travelled. Phase only advances while moving.
@@ -1748,6 +1755,7 @@ const arcaneMethods = {
                 now: _now, facing, seed, swayAngle,
                 speed: swayIntensity, swayPhase,
                 extras: extrasEnabled, swing: swingEnabled,
+                reduceMotion,
             });
         };
 

@@ -339,7 +339,17 @@ export const COMBAT_VISUALS = {
     manaRegenTtl: 2,
     deathChar: '☠',
     deathColor: '#ffffff',
-    deathTtl: 10,
+    // Death marker lingers longer and drifts upward while fading so it is clear
+    // where something died. `deathTtl` is in ticks (the marker's lifetime); the
+    // float/fade progress is driven off remaining ttl, so it is smooth at any game
+    // speed and freezes while paused. `deathFloatPx` is the total upward drift over
+    // the marker's whole life. Suppressed (static marker) under reduce-motion.
+    deathTtl: 13,
+    deathFloatPx: 16,
+    // The marker grows from `deathStartScale` (half size) up to full size over its
+    // lifetime, so it "blooms" in place as it rises and fades. Held at full size
+    // under reduce-motion.
+    deathStartScale: 0.5,
     summonArriveChar: '◊',
     summonArriveColor: '#cc44ff',
     summonArriveTtl: 5,

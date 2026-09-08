@@ -187,19 +187,32 @@ export class CombatSystem {
             if (raider.hp <= 0) {
                 game.combatEffects.push({ x: raider.x, y: raider.y, char: COMBAT_VISUALS.deathChar, color: COMBAT_VISUALS.deathColor, ttl: COMBAT_VISUALS.deathTtl });
                 window.soundManager?.playSFX('enemy_death');
+                // Roll loot. Only surface the loot effect if something actually
+                // dropped: most raiders carry `loot: []` (an empty array is truthy,
+                // so a bare `if (raider.loot)` fired the effect on nearly every kill).
+                let gotLoot = false;
                 if (raider.loot) {
                     for (const drop of raider.loot) {
                         if (Math.random() < (drop.chance || 1)) {
                             game.resources.add({ [drop.item]: drop.amount || 1 });
+                            gotLoot = true;
                         }
                     }
-                    game.combatEffects.push({ x: raider.x, y: raider.y, char: COMBAT_VISUALS.lootDropChar, color: COMBAT_VISUALS.lootDropColor, ttl: COMBAT_VISUALS.lootDropTtl });
+                }
+                if (gotLoot) {
+                    // Show the loot pickup above the colonist who scored the kill
+                    // (falls back to the raider's tile if the killer is unknown), using
+                    // the existing loot_drop sprite. Placing it on the killer keeps it
+                    // clear of the death skull that lingers on the corpse tile.
+                    const killer = raider._killerColonist;
+                    const fx = (killer && killer.hp > 0) ? killer : raider;
+                    game.combatEffects.push({ x: fx.x, y: fx.y - 1, char: COMBAT_VISUALS.lootDropChar, color: COMBAT_VISUALS.lootDropColor, ttl: COMBAT_VISUALS.lootDropTtl });
                     // Loot arc particles: golden particles arc upward then fall
                     const numLootParticles = 2 + Math.floor(Math.random() * 2);
                     for (let lp = 0; lp < numLootParticles; lp++) {
                         spawnParticle(game, {
-                            x: raider.x + 0.5 + (Math.random() - 0.5) * 0.3,
-                            y: raider.y + 0.5,
+                            x: fx.x + 0.5 + (Math.random() - 0.5) * 0.3,
+                            y: fx.y + 0.5,
                             vx: (Math.random() - 0.5) * 0.3,
                             vy: -0.6 - Math.random() * 0.3,
                             ay: 0.8,

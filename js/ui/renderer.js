@@ -704,8 +704,14 @@ export class Renderer {
         const showDamageFlash = settings.showDamageFlash;
         const enableScreenShake = settings.enableScreenShake;
         const showPortalPath = settings.showPortalPath;
-        const showBreathing = settings.showBreathing;
-        const showWalkSway = settings.showWalkSway;
+        // Reduced-motion umbrella (accessibility): when on, ambient/idle channels
+        // (breathing, walk/idle sway, tree/grass/crop sway, work bob, fidget,
+        // building pulses) are damped or disabled, while essential gameplay
+        // feedback (damage flash, projectiles, floaters, one-shot action beats)
+        // still plays. Folds into the per-effect toggles rather than replacing them.
+        const reduceMotion = !!settings.reduceMotion;
+        const showBreathing = settings.showBreathing && !reduceMotion;
+        const showWalkSway = settings.showWalkSway && !reduceMotion;
         const showActionAnimations = settings.showActionAnimations;
         // Reused per-frame flag bundle for the action-animation composer, so it
         // never touches game.settings in the hot loop. Mutated (not realloc'd).
@@ -713,16 +719,17 @@ export class Renderer {
         animFlags.showBreathing = showBreathing;
         animFlags.showWalkSway = showWalkSway;
         animFlags.showActionAnimations = showActionAnimations;
+        animFlags.reduceMotion = reduceMotion;
         // Tree sway: wind strength (0..1) from the active weather, resolved once
         // per frame. `showTreeSway` gates the whole effect.
-        const showTreeSway = settings.showTreeSway && RENDER_CONFIG.treeSway && RENDER_CONFIG.treeSway.enabled;
+        const showTreeSway = settings.showTreeSway && !reduceMotion && RENDER_CONFIG.treeSway && RENDER_CONFIG.treeSway.enabled;
         // Automatic zoom LOD: when cells are too small for sub-pixel animated detail
         // to be visible, skip it. Derived once per frame from the current cell size,
         // no user setting. At normal zoom `charWidth` far exceeds the threshold so
         // `detailLod` is always true and nothing changes.
         const lodMinCellPx = (RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.lodMinCellPx) || 0;
         const detailLod = this.charWidth >= lodMinCellPx;
-        const showTerrainDetail = detailLod && settings.showTerrainDetail && RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.enabled;
+        const showTerrainDetail = detailLod && settings.showTerrainDetail && !reduceMotion && RENDER_CONFIG.terrainDetail && RENDER_CONFIG.terrainDetail.enabled;
         // treeWind and detailWind are set below after dt is available
         let treeWind = 0;
         let detailWind = 0;
@@ -926,14 +933,30 @@ export class Renderer {
 
         const effectMap = this._effectMap;
 
-        if (this._lastSettingsKey === settingsKey && this._lastEntityMapKey === camKey) {
+        // effectMap needs its own cache key: `_lastEntityMapKey` is already set to
+        // `camKey` by the entity-map rebuild above, so comparing against it here is
+        // always true and the effect layer would never refresh. Key off settings +
+        // camKey (which includes game.tick) in a dedicated field instead.
+        const effectMapKey = `${settingsKey}|${camKey}`;
+        if (this._lastEffectMapKey === effectMapKey) {
             // effectMap still valid, skip that loop.
         } else {
-            this._lastSettingsKey = settingsKey;
+            this._lastEffectMapKey = effectMapKey;
             effectMap.clear();
             if (game.combatEffects && showOverlays && game.settings.showCombatParticles) {
                 for (const e of game.combatEffects) {
-                    effectMap.set(e.y * mapW + e.x, e);
+                    const key = e.y * mapW + e.x;
+                    // Death markers win their tile: an entity that dies while dropping
+                    // loot pushes both a death and a loot-drop effect at the same tile.
+                    // effectMap is one-per-tile, so without this the later loot star
+                    // would mask the skull. The loot arc particles already show the
+                    // drop, so the skull is what should linger on the corpse tile.
+                    const existing = effectMap.get(key);
+                    if (existing && existing.char === COMBAT_VISUALS.deathChar &&
+                        existing.color === COMBAT_VISUALS.deathColor) {
+                        continue;
+                    }
+                    effectMap.set(key, e);
                 }
             }
         }
@@ -1049,6 +1072,30 @@ export class Renderer {
                 if (effect) {
                     char = effect.char;
                     color = effect.color;
+                }
+                // Death marker: drifts upward and fades over its lifetime so it is
+                // clear where something died (colonists and raiders both push this
+                // same char+color effect). Progress runs 0 (just died) → 1 (expiring),
+                // driven off remaining ttl plus the intra-tick accumulator fraction so
+                // it is smooth at any game speed and freezes while paused. Under
+                // reduce-motion the marker holds still (no float) but still fades out.
+                let deathFloatY = 0;
+                let deathAlpha = 1;
+                let deathScale = 1;
+                const isDeathFx = effect && effect.char === COMBAT_VISUALS.deathChar && effect.color === COMBAT_VISUALS.deathColor;
+                if (isDeathFx) {
+                    const deathTtl = COMBAT_VISUALS.deathTtl || 1;
+                    const accFrac = Math.min(1, (game.accumulator || 0) / CONFIG.TICK_RATE);
+                    const prog = Math.min(1, Math.max(0, ((deathTtl - effect.ttl) + accFrac) / deathTtl));
+                    if (!reduceMotion) deathFloatY = -prog * (COMBAT_VISUALS.deathFloatPx || 0);
+                    // Ease the fade toward the end (stays legible for the first half).
+                    deathAlpha = prog < 0.5 ? 1 : 1 - (prog - 0.5) / 0.5;
+                    // Grow from half size to full size over the lifetime (reduce-motion
+                    // holds it at full size, no growth).
+                    if (!reduceMotion) {
+                        const startScale = COMBAT_VISUALS.deathStartScale != null ? COMBAT_VISUALS.deathStartScale : 0.5;
+                        deathScale = startScale + (1 - startScale) * prog;
+                    }
                 }
 
                 if (spellRangeSet && spellRangeSet.has(tileKey)) {
@@ -1568,7 +1615,8 @@ export class Renderer {
                         // Working building pulse glow
                         if (this._workingBuildingSet.has(`${wx},${wy}`)) {
                             const bDef = BUILDINGS[tile.structure];
-                            const pulse = 0.6 + 0.4 * Math.sin(now * 0.004);
+                            // Reduced motion: hold the glow steady instead of pulsing.
+                            const pulse = reduceMotion ? 0.8 : 0.6 + 0.4 * Math.sin(now * 0.004);
                             const glowColor = bDef?.workGlowColor || (tile.structure.includes('forge') || tile.structure.includes('smelter') ? '#ff8833' : tile.structure.includes('lab') || tile.structure.includes('library') ? '#4488ff' : tile.structure.includes('kitchen') || tile.structure.includes('cook') ? '#ffcc22' : '#88ff88');
                             const radius = cw * 0.9 * pulse;
                             ctx.save();
@@ -1590,9 +1638,9 @@ export class Renderer {
                         if (tile.designation && tile.designation.type === 'build') {
                             const structSprite = this.skinManager.getSprite('buildings', tile.designation.buildType);
                             if (structSprite) {
-                                const shakeAmt = 0.5;
+                                const shakeAmt = reduceMotion ? 0 : 0.5;
                                 const shakeX = Math.sin(now * 0.05) * shakeAmt;
-                                const shakeY = Math.abs(Math.sin(now * 0.05)) * 0.3;
+                                const shakeY = reduceMotion ? 0 : Math.abs(Math.sin(now * 0.05)) * 0.3;
                                 ctx.globalAlpha = 0.4;
                                 ctx.drawImage(structSprite, px + shakeX, py + shakeY, cw, ch);
                                 ctx.globalAlpha = 1;
@@ -1619,7 +1667,18 @@ export class Renderer {
                     }
                     if (effectSprite) {
                         // Finally draw the overlay effect on top of all other sprites.
-                        ctx.drawImage(effectSprite, px, py, cw, ch);
+                        // Death markers float up and fade (deathFloatY/deathAlpha above).
+                        if (isDeathFx) {
+                            const prevA = ctx.globalAlpha;
+                            ctx.globalAlpha = prevA * deathAlpha;
+                            // Scale about the tile center so the skull grows in place.
+                            const dw = cw * deathScale;
+                            const dh = ch * deathScale;
+                            ctx.drawImage(effectSprite, px + (cw - dw) / 2, py + deathFloatY + (ch - dh) / 2, dw, dh);
+                            ctx.globalAlpha = prevA;
+                        } else {
+                            ctx.drawImage(effectSprite, px, py, cw, ch);
+                        }
                         spriteDrawn = true;
                     }
 
@@ -1677,8 +1736,22 @@ export class Renderer {
                         ctx.fillText(char, px + this._textOffsetX + asx, py + asy);
                     }
                     if (effect) {
-                        ctx.fillStyle = effect.color;
-                        ctx.fillText(effect.char, px + this._textOffsetX, py);
+                        // Death markers float up and fade; other effects draw flat.
+                        if (isDeathFx) {
+                            const prevA = ctx.globalAlpha;
+                            ctx.globalAlpha = prevA * deathAlpha;
+                            ctx.fillStyle = effect.color;
+                            // Grow in place: scale the glyph font and recenter it.
+                            const scaledFont = Math.max(1, this.fontSize * deathScale);
+                            ctx.font = `${scaledFont}px 'Courier New', monospace`;
+                            const growY = (this.fontSize - scaledFont) / 2;
+                            ctx.fillText(effect.char, px + this._textOffsetX, py + deathFloatY + growY);
+                            ctx.font = `${this.fontSize}px 'Courier New', monospace`;
+                            ctx.globalAlpha = prevA;
+                        } else {
+                            ctx.fillStyle = effect.color;
+                            ctx.fillText(effect.char, px + this._textOffsetX, py);
+                        }
                         lastColor = '';
                     }
                 }

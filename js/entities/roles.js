@@ -3,6 +3,7 @@ import { manhattanDist, findPathForEnemies } from '../world/pathfinding.js';
 import { isPassable, isPassableForEnemies, isBreakableByEnemies, hasLineOfSight, findLineOfSightTile } from '../world/map.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { colonistTakeDamage } from './colonist.js';
+import { spawnDamageText } from '../ui/overlay-renderer.js';
 
 function canAttack(entity, game) {
     const cooldown = entity.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
@@ -67,6 +68,7 @@ export const ROLE_HANDLERS = {
                 if (dist <= 1) {
                     if (canAttack(entity, game)) {
                         target.hp -= damage;
+                        spawnDamageText(game, target.x, target.y, damage);
                         game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
                     }
                 } else {
@@ -182,7 +184,10 @@ export const ROLE_HANDLERS = {
                     if (entity.hostile) {
                         colonistTakeDamage(target, entity.damage, game, entity);
                     } else {
+                        // Friendly ranged (e.g. tamed/guard): colonistTakeDamage already
+                        // shows a floater for the hostile branch, so only add one here.
                         target.hp -= entity.damage;
+                        spawnDamageText(game, target.x, target.y, entity.damage);
                     }
                     target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
                     const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
@@ -244,7 +249,10 @@ export const ROLE_HANDLERS = {
                     if (entity.hostile) {
                         colonistTakeDamage(target, dmg, game, entity);
                     } else {
+                        // Friendly melee (e.g. tamed/guard): colonistTakeDamage already
+                        // shows a floater for the hostile branch, so only add one here.
                         target.hp -= dmg;
+                        spawnDamageText(game, target.x, target.y, dmg);
                     }
                     game.combatEffects.push({ x: target.x, y: target.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
                 }
@@ -864,12 +872,11 @@ function fleeFrom(entity, threat, map, dur, game) {
     const dx = Math.sign(entity.x - threat.x);
     const dy = Math.sign(entity.y - threat.y);
     const passCheck = entity.hostile ? isPassableForEnemies : isPassable;
+    // Cardinal moves only: entities never step diagonally. Build one candidate per
+    // axis that points away from the threat (a diagonal retreat would combine both).
     const candidates = [];
-    const nx = entity.x + dx;
-    const ny = entity.y + dy;
-    if (passCheck(map, nx, ny)) candidates.push([nx, ny]);
-    if (dx !== 0 && passCheck(map, entity.x + dx, entity.y) && !(entity.x + dx === nx && entity.y === ny)) candidates.push([entity.x + dx, entity.y]);
-    if (dy !== 0 && passCheck(map, entity.x, entity.y + dy) && !(entity.x === nx && entity.y + dy === ny)) candidates.push([entity.x, entity.y + dy]);
+    if (dx !== 0 && passCheck(map, entity.x + dx, entity.y)) candidates.push([entity.x + dx, entity.y]);
+    if (dy !== 0 && passCheck(map, entity.x, entity.y + dy)) candidates.push([entity.x, entity.y + dy]);
     if (candidates.length === 0) return;
     if (game) {
         const unoccupied = candidates.filter(([cx, cy]) => !game.isTileOccupied(cx, cy));

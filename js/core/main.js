@@ -92,6 +92,7 @@ class Game {
             showTreeSway: true,
             showTerrainDetail: true,
             showExpeditionExtras: true,
+            reduceMotion: false,
             showWarmthOverlay: false,
             showDefenseOverlay: false,
             showRoomOverlay: false,
@@ -2011,7 +2012,7 @@ class Game {
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
             largeClickTargets: false, pauseOnFocusLoss: true, enableScreenShake: true, colorblindMode: 'none',
             notificationDuration: 100, showDamageFlash: true, showCombatParticles: true, showProjectiles: true,
-            showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, showActionAnimations: true, showTreeSway: true, showTerrainDetail: true, showExpeditionExtras: true, layoutMode: 'auto',
+            showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, showActionAnimations: true, showTreeSway: true, showTerrainDetail: true, showExpeditionExtras: true, reduceMotion: false, layoutMode: 'auto',
             musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
             ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true,
         });
@@ -3636,6 +3637,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.showTreeSway = document.getElementById('start-tree-sway').checked;
             s.showTerrainDetail = document.getElementById('start-terrain-detail').checked;
             s.showExpeditionExtras = document.getElementById('start-expedition-extras').checked;
+            s.reduceMotion = document.getElementById('start-reduce-motion').checked;
             s.showNightLighting = document.getElementById('start-night').checked;
             s.showWeatherParticles = document.getElementById('start-weather').checked;
             s.particleDensity = parseInt(document.getElementById('start-particle-density').value) || 100;
@@ -3700,6 +3702,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showTreeSway != null) document.getElementById('start-tree-sway').checked = s.showTreeSway;
             if (s.showTerrainDetail != null) document.getElementById('start-terrain-detail').checked = s.showTerrainDetail;
             if (s.showExpeditionExtras != null) document.getElementById('start-expedition-extras').checked = s.showExpeditionExtras;
+            if (s.reduceMotion != null) document.getElementById('start-reduce-motion').checked = s.reduceMotion;
             if (s.showNightLighting != null) document.getElementById('start-night').checked = s.showNightLighting;
             if (s.showWeatherParticles != null) document.getElementById('start-weather').checked = s.showWeatherParticles;
             if (s.particleDensity != null) { document.getElementById('start-particle-density').value = s.particleDensity; document.getElementById('start-particle-density-val').textContent = s.particleDensity + '%'; }
@@ -3800,6 +3803,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-walk-sway').checked = true;
         document.getElementById('start-attack-swing').checked = true;
         document.getElementById('start-expedition-extras').checked = true;
+        document.getElementById('start-reduce-motion').checked = false;
         document.getElementById('start-night').checked = true;
         document.getElementById('start-weather').checked = true;
         document.getElementById('start-particle-density').value = 100;
@@ -3938,6 +3942,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showTreeSway: document.getElementById('start-tree-sway').checked,
             showTerrainDetail: document.getElementById('start-terrain-detail').checked,
             showExpeditionExtras: document.getElementById('start-expedition-extras').checked,
+            reduceMotion: document.getElementById('start-reduce-motion').checked,
             showNightLighting: document.getElementById('start-night').checked,
             showWeatherParticles: document.getElementById('start-weather').checked,
             particleDensity: parseInt(document.getElementById('start-particle-density').value) || 100,

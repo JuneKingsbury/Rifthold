@@ -6,6 +6,7 @@
  */
 import { BUILDINGS, COMBAT_VISUALS, ALL_ITEMS } from '../core/config.js';
 import { manhattanDist } from '../world/pathfinding.js';
+import { spawnDamageText } from '../ui/overlay-renderer.js';
 
 export class PowerSystem {
     constructor() {
@@ -162,6 +163,7 @@ export class PowerSystem {
             }
             for (const e of enemies) {
                 e.hp -= ward.damage;
+                spawnDamageText(game, e.x, e.y, ward.damage);
                 e._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
             }
         }
@@ -217,6 +219,7 @@ export class PowerSystem {
             if (target && manhattanDist(t.x, t.y, target.x, target.y) <= range) {
                 tile._turretLastAttackTick = game.tick;
                 target.hp -= damage;
+                spawnDamageText(game, target.x, target.y, damage);
                 target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
                 window.soundManager?.playSFX('turret_fire');
                 const color = t.type === 'void_turret' ? COMBAT_VISUALS.shotColorVoid : COMBAT_VISUALS.shotColorArcane;

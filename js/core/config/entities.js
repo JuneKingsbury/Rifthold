@@ -27,9 +27,9 @@ export const ENTITIES = {
 
     // === Enemies ===
     raider_brute:    { name: 'Raider', char: 'R', color: '#ff3333', hp: 50, speed: 0.28, category: 'enemy', hostile: true, damage: 5, aggroRange: 30, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', loot: [], lore: '' },
-    raider_archer:   { name: 'Raider Archer', char: 'R', color: '#ff6633', hp: 35, speed: 0.30, category: 'enemy', hostile: true, damage: 4, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', attackAnim: 'DrawAndShoot', loot: [], lore: '' },
+    raider_archer:   { name: 'Raider Archer', char: 'R', color: '#ff6633', hp: 35, speed: 0.18, category: 'enemy', hostile: true, damage:2, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 5, preferDistance: 4 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', attackAnim: 'DrawAndShoot', loot: [], lore: '' },
     crusader:        { name: 'Crusader', char: 'C', color: '#d6d216', hp: 80, speed: 0.32, category: 'enemy', hostile: true, damage: 10, aggroRange: 40, noFlee: true, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', loot: [], lore: '' },
-    crusader_archer: { name: 'Crusader Archer', char: 'C', color: '#d6a816', hp: 50, speed: 0.34, category: 'enemy', hostile: true, damage: 8, aggroRange: 40, noFlee: true, roles: [{ type: 'ranged_attacker', range: 8, preferDistance: 6 }], ranged: true, projectileChar: '-', projectileColor: '#d6d216', attackAnim: 'DrawAndShoot', loot: [], lore: '' },
+    crusader_archer: { name: 'Crusader Archer', char: 'C', color: '#d6a816', hp: 50, speed: 0.24, category: 'enemy', hostile: true, damage: 4, aggroRange: 40, noFlee: true, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#d6d216', attackAnim: 'DrawAndShoot', loot: [], lore: '' },
     void_walker:     { name: 'Void Walker', char: 'V', color: '#aa33ff', hp: 30, speed: 0.21, category: 'enemy', hostile: true, damage: 4, roles: [{ type: 'nexus_target' }], attackAnim: 'Swing', loot: [], lore: '' },
     void_brute:      { name: 'Void Brute', char: 'V', color: '#7722cc', hp: 80, speed: 0.14, category: 'enemy', hostile: true, damage: 10, roles: [{ type: 'nexus_target' }, { type: 'structure_breaker', breakSpeed: 2 }], attackAnim: 'Swing', loot: [], lore: '' },
 
@@ -91,7 +91,7 @@ export const RAID_TYPES = {
         name: 'Bandit Raid',
         composition: [
             { entity: 'raider_brute', count: [2, 4] },
-            { entity: 'raider_archer', count: [0, 2], minRaidLevel: 3 },
+            { entity: 'raider_archer', count: [0, 2], minRaidLevel: 4 },
         ],
         scaling: { hpMult: 0.1, damageMult: 0.05 },
     },

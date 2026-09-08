@@ -108,8 +108,10 @@ export class WaveSystem {
             const enemy = this.enemies[i];
             if (enemy.hp <= 0) {
                 game.combatEffects.push({ x: enemy.x, y: enemy.y, char: COMBAT_VISUALS.deathChar, color: COMBAT_VISUALS.deathColor, ttl: COMBAT_VISUALS.deathTtl });
-                game.combatEffects.push({ x: enemy.x, y: enemy.y, char: COMBAT_VISUALS.lootDropChar, color: COMBAT_VISUALS.lootDropColor, ttl: COMBAT_VISUALS.lootDropTtl });
                 window.soundManager?.playSFX('enemy_death');
+                // Nexus enemies always yield void essence, so the loot effect always
+                // applies. Show it above the killer (fallback: the enemy tile) so it
+                // stays clear of the death skull that lingers on the corpse tile.
                 game.resources.add({ void_essence: WAVE_CONFIG.essencePerKill });
                 if (enemy.loot) {
                     for (const drop of enemy.loot) {
@@ -118,6 +120,9 @@ export class WaveSystem {
                         }
                     }
                 }
+                const killer = enemy._killerColonist;
+                const fx = (killer && killer.hp > 0) ? killer : enemy;
+                game.combatEffects.push({ x: fx.x, y: fx.y - 1, char: COMBAT_VISUALS.lootDropChar, color: COMBAT_VISUALS.lootDropColor, ttl: COMBAT_VISUALS.lootDropTtl });
                 this.enemies.splice(i, 1);
                 continue;
             }

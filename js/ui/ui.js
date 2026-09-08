@@ -2869,6 +2869,7 @@ export class UI {
         graphics += this._settingsCheck('set-tree-sway', s.showTreeSway, 'window.game.settings.showTreeSway=this.checked', 'Tree sway (wind, stronger in storms)');
         graphics += this._settingsCheck('set-terrain-detail', s.showTerrainDetail, 'window.game.settings.showTerrainDetail=this.checked', 'Terrain detail (grass tufts, water waves)');
         graphics += this._settingsCheck('set-expedition-extras', s.showExpeditionExtras, 'window.game.settings.showExpeditionExtras=this.checked', 'Expedition extra animations');
+        graphics += this._settingsCheck('set-reduce-motion', s.reduceMotion, 'window.game.settings.reduceMotion=this.checked', 'Reduce motion (damps ambient sway/breathing/pulses)');
         graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
         graphics += `<div class="settings-row"><label for="set-dither-dist">Dithering Distance:</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['none','Off'],['minimal','Minimal'],['light','Light (default)'],['normal','Normal'],['heavy','Heavy'],['extreme','Extreme']]) {
@@ -3104,9 +3105,24 @@ export class UI {
         const duration = this.game.settings.notificationDuration || 100;
         const recent = this.game.notifications.filter(n => this.game.tick - n.tick < duration);
         this.game.notifications = recent;
-        this.elements.notifications.innerHTML = recent.slice(-4).map(n =>
-            `<div class="notif notif-${n.type}">${n.text}</div>`
-        ).join('');
+        const shown = recent.slice(-4);
+        // `update()` runs every frame, so rebuild the notification DOM only when the
+        // visible set actually changes. Otherwise the CSS enter animation would
+        // restart every frame and the whole stack would flicker. Each notif has a
+        // stable key (tick + text). A signature of the visible keys detects change.
+        const sig = shown.map(n => `${n.tick}${n.text}`).join('');
+        if (sig === this._notifSig) return;
+        const prevKeys = this._notifKeys || (this._notifKeys = new Set());
+        // Reduced motion (item 24): skip the slide-in, render statically.
+        const reduceMotion = !!this.game.settings.reduceMotion;
+        this.elements.notifications.innerHTML = shown.map(n => {
+            const key = `${n.tick}${n.text}`;
+            // Only notifs that weren't shown last render get the enter animation.
+            const enter = (!reduceMotion && !prevKeys.has(key)) ? ' notif-enter' : '';
+            return `<div class="notif notif-${n.type}${enter}">${n.text}</div>`;
+        }).join('');
+        this._notifKeys = new Set(shown.map(n => `${n.tick}${n.text}`));
+        this._notifSig = sig;
     }
 
     updateEventPanel() {

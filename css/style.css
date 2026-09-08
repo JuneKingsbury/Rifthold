@@ -593,6 +593,15 @@ img.pixel-art {
 .notif-success { background: #224422; color: #66ff66; border: 1px solid #336633; }
 .notif-event { background: #333322; color: #ffcc44; border: 1px solid #665533; }
 
+/* Newly-arrived notifications slide in from the right and fade up. Applied only
+   to freshly-added notifs (see updateNotifications) so the stack doesn't
+   re-animate each frame; suppressed under the reduce-motion setting. */
+@keyframes notif-enter {
+    from { transform: translateX(24px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 0.9; }
+}
+.notif-enter { animation: notif-enter 0.28s ease-out; }
+
 /* === INFO PANEL === */
 
 .info-header {
