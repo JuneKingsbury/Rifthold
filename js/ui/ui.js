@@ -3202,8 +3202,8 @@ export class UI {
         html += `</div>`;
         html += `<div class="trade-item-value" style="color:#ffdd00;">1.0g</div>`;
         html += `<div class="trade-item-buttons">`;
-        html += `<button class="trade-btn" onclick="window.game.tradeRequestGold(-${step})">−</button>`;
-        html += `<button class="trade-btn" onclick="window.game.tradeRequestGold(${step})">+</button>`;
+        html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRequestGold(-${step})">−</button>`;
+        html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequestGold(${step})">+</button>`;
         html += `</div></div>`;
         for (const [res, amt] of Object.entries(data.traderResources)) {
             const val = ((TRADE_VALUES[res] || 1) * effectiveMarkup).toFixed(1);
@@ -3215,8 +3215,8 @@ export class UI {
             html += `</div>`;
             html += `<div class="trade-item-value">${val}g</div>`;
             html += `<div class="trade-item-buttons">`;
-            html += `<button class="trade-btn" onclick="window.game.tradeRemoveRequest('${res}',${step})">−</button>`;
-            html += `<button class="trade-btn" onclick="window.game.tradeRequest('${res}',${step})">+</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest('${res}',${step})">−</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest('${res}',${step})">+</button>`;
             html += `</div></div>`;
         }
         if (data.exclusiveItems?.length > 0) {
@@ -3229,10 +3229,11 @@ export class UI {
                 const exIcon = this._itemIcon(item.key, item.type);
                 // Priced at face value to match computeTradeValues' exclusive-slot cost.
                 const price = getItemTradeValue(item);
+                const exPitch = request[slotKey] ? -3 : 3;
                 html += `<div class="trade-exclusive-row skill-tip" data-tip="${tip.replace(/"/g, '&quot;')}">`;
                 html += `<div class="trade-item-name">${exIcon}${item.name || item.key}</div>`;
                 html += `<div class="trade-item-value">${price}g</div>`;
-                html += `<button class="trade-exclusive-toggle${isSelected}" onclick="window.game.${request[slotKey] ? 'tradeRemoveRequest' : 'tradeRequest'}('${slotKey}',1)">${request[slotKey] ? 'Remove' : 'Buy'}</button>`;
+                html += `<button class="trade-exclusive-toggle${isSelected}" onclick="window.soundManager?.playSFXPitched('button_click',${exPitch});window.game.${request[slotKey] ? 'tradeRemoveRequest' : 'tradeRequest'}('${slotKey}',1)">${request[slotKey] ? 'Remove' : 'Buy'}</button>`;
                 html += `</div>`;
             }
         }
@@ -3251,8 +3252,8 @@ export class UI {
                 html += `</div>`;
                 html += `<div class="trade-item-value">${val}g</div>`;
                 html += `<div class="trade-item-buttons">`;
-                html += `<button class="trade-btn" onclick="window.game.tradeRemoveRequest('${reqKey}',${step})">−</button>`;
-                html += `<button class="trade-btn" onclick="window.game.tradeRequest('${reqKey}',${step})">+</button>`;
+                html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest('${reqKey}',${step})">−</button>`;
+                html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest('${reqKey}',${step})">+</button>`;
                 html += `</div></div>`;
             }
         }
@@ -3290,8 +3291,8 @@ export class UI {
             html += `</div>`;
             html += `<div class="trade-item-value" style="color:#ffdd00;">1.0g</div>`;
             html += `<div class="trade-item-buttons">`;
-            html += `<button class="trade-btn" onclick="window.game.tradeGold(-${step})">−</button>`;
-            html += `<button class="trade-btn" onclick="window.game.tradeGold(${step})">+</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeGold(-${step})">−</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeGold(${step})">+</button>`;
             html += `</div></div>`;
         }
 
@@ -3305,8 +3306,8 @@ export class UI {
             html += `</div>`;
             html += `<div class="trade-item-value">${val}g</div>`;
             html += `<div class="trade-item-buttons">`;
-            html += `<button class="trade-btn" onclick="window.game.tradeRemoveOffer('${res}',${step})">−</button>`;
-            html += `<button class="trade-btn" onclick="window.game.tradeOffer('${res}',${step})">+</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer('${res}',${step})">−</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer('${res}',${step})">+</button>`;
             html += `</div></div>`;
         }
 
@@ -3325,9 +3326,9 @@ export class UI {
                 html += `<div class="trade-item-value">${val}g</div>`;
                 html += `<div class="trade-item-buttons">`;
                 if (isOffered) {
-                    html += `<button class="trade-btn" onclick="window.game.tradeRemoveOffer('${key}',1)">−</button>`;
+                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer('${key}',1)">−</button>`;
                 } else {
-                    html += `<button class="trade-btn" onclick="window.game.tradeOffer('${key}',1)">+</button>`;
+                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer('${key}',1)">+</button>`;
                 }
                 html += `</div></div>`;
             }
@@ -3355,8 +3356,8 @@ export class UI {
                     html += `</div>`;
                     html += `<div class="trade-item-value">${val}g</div>`;
                     html += `<div class="trade-item-buttons">`;
-                    html += `<button class="trade-btn" onclick="window.game.tradeRemoveOffer('${offKey}',${step})">−</button>`;
-                    html += `<button class="trade-btn" onclick="window.game.tradeOffer('${offKey}',${step})">+</button>`;
+                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer('${offKey}',${step})">−</button>`;
+                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer('${offKey}',${step})">+</button>`;
                     html += `</div></div>`;
                 }
             }
@@ -3404,20 +3405,22 @@ export class UI {
         else if (canBalanceSurplus) balanceLabel = `Balance (get ${Math.min(resourceSurplus, traderGoldAvailable).toFixed(1)}g)`;
         html += `<div class="trade-actions">`;
         if (overpay > 0) {
-            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.game.confirmTrade()" style="border-color:#aa4400;color:#ffaa66;">Confirm (lose ${overpay.toFixed(1)}g)</button>`;
+            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.confirmTrade()" style="border-color:#aa4400;color:#ffaa66;">Confirm (lose ${overpay.toFixed(1)}g)</button>`;
         } else {
-            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.game.confirmTrade()">Confirm Trade</button>`;
+            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.confirmTrade()">Confirm Trade</button>`;
         }
-        html += `<button ${canBalance ? '' : 'disabled'} onclick="window.game.balanceTradeWithGold()" style="border-color:#aa8800;color:#ffdd88;">${balanceLabel}</button>`;
-        html += `<button onclick="window.game.clearTradeSelection()">Clear</button>`;
-        html += `<button onclick="window.game.dismissTrader()">Done</button>`;
+        html += `<button ${canBalance ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.balanceTradeWithGold()" style="border-color:#aa8800;color:#ffdd88;">${balanceLabel}</button>`;
+        html += `<button onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.clearTradeSelection()">Clear</button>`;
+        html += `<button onclick="window.soundManager?.playSFXPitched('open_close_click',-3);window.game.dismissTrader()">Done</button>`;
         html += `</div>`;
 
+        const panelScrollTop = this.elements.eventPanel.scrollTop;
         const scrollEl = this.elements.eventPanel.querySelector('.trade-grid');
-        const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
+        const gridScrollTop = scrollEl ? scrollEl.scrollTop : 0;
         this.elements.eventPanel.innerHTML = html;
+        this.elements.eventPanel.scrollTop = panelScrollTop;
         const newScrollEl = this.elements.eventPanel.querySelector('.trade-grid');
-        if (newScrollEl) newScrollEl.scrollTop = scrollTop;
+        if (newScrollEl) newScrollEl.scrollTop = gridScrollTop;
     }
 
 

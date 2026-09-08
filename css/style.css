@@ -1869,7 +1869,7 @@ img.pixel-art {
 
 .trade-column {
     flex: 1;
-    min-width: 260px;
+    min-width: 0;
 }
 
 .trade-column-header {
