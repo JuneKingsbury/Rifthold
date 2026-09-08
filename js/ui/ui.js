@@ -1760,14 +1760,14 @@ export class UI {
             html += this._buildGolemForgeHtml();
         }
 
-        if (tile.structure === 'forge_core' || tile.structure === 'ritual_core') {
+        if (tile.structure === 'arcane_core') {
             const cs = getComplexStructureAt(this.game, x, y);
             if (cs) {
                 html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
                 const def = COMPLEX_STRUCTURES[cs.key];
                 if (def) html += `<div class="info-row" style="color:#88ff88;">${def.description}</div>`;
             } else {
-                html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete — surround with the required layout to activate</div>`;
+                html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete. Surround with the required chalk layout to activate.</div>`;
             }
         }
 
@@ -1905,15 +1905,14 @@ export class UI {
                 html += `<div class="info-row" style="color:${hpColor}">HP: ${currentHp} / ${maxHp}</div>`;
             }
             html += this.getStructureDescription(tile.structure);
-            if (tile.structure === 'forge_core' || tile.structure === 'ritual_core') {
+            if (tile.structure === 'arcane_core') {
                 const cs = getComplexStructureAt(this.game, x, y);
                 if (cs) {
                     html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
                     const def = COMPLEX_STRUCTURES[cs.key];
-                    if (def && tile.structure === 'forge_core')  html += `<div class="info-row" style="color:#88ff88;">x2.5 equipment craft speed, +2 equipment quality bonus</div>`;
-                    if (def && tile.structure === 'ritual_core') html += `<div class="info-row" style="color:#88ff88;">30% spell cooldown reduction</div>`;
+                    if (def) html += `<div class="info-row" style="color:#88ff88;">${def.description}</div>`;
                 } else {
-                    html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete, surround with the required layout to activate</div>`;
+                    html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete. Surround with the required chalk layout to activate.</div>`;
                 }
             }
         }

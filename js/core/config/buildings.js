@@ -57,9 +57,8 @@ export const BUILDINGS = {
     artifact_pedestal: { char: '◆', color: '#ccaa44', cost: { stone: 8, runite: 2 }, work: 35, structureType: 'furniture', category: 'Arcane', research: 'arcane_infusion', description: 'Place an item to project its effect in a radius. Mana cost varies by item.' },
     trade_rift:        { char: '⇄', color: '#66ccaa', cost: { runite: 3, stone: 6, planks: 4 }, work: 45, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'trade_rifts', maxCount: 1, power: { consumes: 3 }, description: 'A rift-linked request board. Far-off traders post barters for mystery goods, with new offers each season. Consumes 3 mana.' },
     beacon:            { char: '☀', color: '#ffffaa', cost: { stone: 4, runite: 3, planks: 2 }, work: 35, structureType: 'furniture', category: 'Arcane', lightRadius: 15, research: 'brilliance', power: { consumes: 4, radius: 10 }, description: 'Radiant beacon. Massive light radius 15. Consumes 4 mana.' },
-    ritual_chalk:      { char: '◌', color: '#cc99ff', bg: '#2a1a3a', cost: { void_essence: 1 }, work: 8, structureType: 'furniture', category: 'Arcane', dragPlace: true, noShadow: true, research: 'arcane_infusion', description: 'Arcane chalk markings. Lay it around a Forge Core or Ritual Core to activate the Great Forge or Ritual Circle. Walkable.' },
-    ritual_core:       { char: '◎', color: '#aa44ff', cost: { runite: 5, void_essence: 3, planks: 4 }, work: 50, structureType: 'furniture', category: 'Arcane', research: 'advanced_arcana', description: 'Core of the Ritual Circle. Lay Ritual Chalk in a diamond pattern around it to activate (-30% spell cooldowns colony-wide).' },
-    forge_core:        { char: '⚒', color: '#ff8844', cost: { stone: 6, runite: 3, planks: 3 }, work: 40, structureType: 'furniture', category: 'Arcane', research: 'masterwork', smokeEmitter: true, workGlowColor: '#ff8833', description: 'Core of the Great Forge. Surround with Ritual Chalk on all sides to activate (2.5x crafting speed & +2 quality bonus colony-wide).' },
+    ritual_chalk:      { char: '◌', color: '#cc99ff', bg: '#2a1a3a', cost: { void_essence: 1 }, work: 8, structureType: 'furniture', category: 'Arcane', dragPlace: true, noShadow: true, research: 'arcane_infusion', description: 'Arcane chalk markings. Lay around an Arcane Core in the correct shape to activate a complex structure. Walkable.' },
+    arcane_core:       { char: '◎', color: '#aa66ff', cost: { runite: 4, void_essence: 2, planks: 3 }, work: 45, structureType: 'furniture', category: 'Arcane', research: 'arcane_infusion', description: 'Arcane focus point. Draw Ritual Chalk in the correct pattern around it to activate a complex structure. See the Glossary for patterns.' },
     rift_gate:         { char: 'Ω', color: '#33ccff', cost: { runite: 4, stone: 6, planks: 4, void_essence: 8 }, work: 60, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'planar_rift', maxCount: 1, power: { consumes: 6 }, description: 'Send exploration parties to other realms. Consumes 6 mana.' },
 };
 
@@ -104,7 +103,7 @@ export const COMPLEX_STRUCTURES = {
     great_forge: {
         name: 'Great Forge',
         research: 'masterwork',
-        coreBuild: 'forge_core',
+        coreBuild: 'arcane_core',
         layout: [
             { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 0, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
             { dx: -1, dy: 0, req: 'ritual_chalk' },  { dx: 1, dy: 0, req: 'ritual_chalk' },
@@ -112,12 +111,12 @@ export const COMPLEX_STRUCTURES = {
         ],
         effect: { craftSpeedMult: 2.5, qualityBonus: 2 },
         activeLightRadius: 4,
-        description: '3x3 with Forge Core at center, surrounded by Ritual Chalk on all sides. 2.5x crafting speed & +2 quality bonus colony-wide.',
+        description: 'Arcane Core surrounded by Ritual Chalk on all 8 adjacent tiles (3x3). 2.5x crafting speed & +2 quality bonus colony-wide.',
     },
     ritual_circle: {
         name: 'Ritual Circle',
         research: 'advanced_arcana',
-        coreBuild: 'ritual_core',
+        coreBuild: 'arcane_core',
         layout: [
             { dx: 0, dy: -2, req: 'ritual_chalk' },
             { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
@@ -127,6 +126,69 @@ export const COMPLEX_STRUCTURES = {
         ],
         effect: { spellCooldownMult: 0.7 },
         activeLightRadius: 4,
-        description: 'Diamond pattern (5x5) with Ritual Core at center. Ritual Chalk at cardinal + diagonal positions. Reduces spell cooldowns by 30% colony-wide.',
+        description: 'Arcane Core with Ritual Chalk in a diamond pattern (5x5). Reduces spell cooldowns by 30% colony-wide.',
+    },
+    anvil_shrine: {
+        name: 'Anvil Shrine',
+        research: 'irrigation',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 0, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
+            { dx: 0, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { gatherSpeedMult: 1.5 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk in an anvil shape (3 above, 1 below). +50% gathering speed for chopping and mining colony-wide.',
+    },
+    star_ward: {
+        name: 'Star Ward',
+        research: 'fortification',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 0, dy: -2, req: 'ritual_chalk' },
+            { dx: -2, dy: 0, req: 'ritual_chalk' }, { dx: 2, dy: 0, req: 'ritual_chalk' },
+            { dx: 0, dy: 2, req: 'ritual_chalk' },
+        ],
+        effect: { defenseBonusMult: 1.3 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk in a cardinal cross (4 tiles at distance 2). +30% colonist outgoing damage colony-wide.',
+    },
+    harvest_sigil: {
+        name: 'Harvest Sigil',
+        research: 'verdant_growth',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 1, dy: 0, req: 'ritual_chalk' }, { dx: 2, dy: 0, req: 'ritual_chalk' }, { dx: 3, dy: 0, req: 'ritual_chalk' },
+            { dx: 3, dy: -1, req: 'ritual_chalk' },
+            { dx: 3, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { foodProductionMult: 1.5 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk in a plough shape (3 to the right, 2 branching at the end). +50% farm harvest yield colony-wide.',
+    },
+    watchers_eye: {
+        name: "Watcher's Eye",
+        research: 'planar_rift',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 0, dy: -1, req: 'ritual_chalk' },
+            { dx: 0, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { expeditionLuckMult: 1.4 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk directly above and below (vertical line of 3). +40% expedition loot quantity colony-wide.',
+    },
+    scholars_ring: {
+        name: "Scholar's Ring",
+        research: 'arcane_studies',
+        coreBuild: 'arcane_core',
+        layout: [
+            { dx: 0, dy: -1, req: 'ritual_chalk' },
+            { dx: -1, dy: 0, req: 'ritual_chalk' }, { dx: 1, dy: 0, req: 'ritual_chalk' },
+            { dx: 0, dy: 1, req: 'ritual_chalk' },
+        ],
+        effect: { researchSpeedMult: 1.5 },
+        activeLightRadius: 3,
+        description: 'Arcane Core with Ritual Chalk on the 4 cardinal adjacent tiles (no corners). +50% research point generation colony-wide.',
     },
 };

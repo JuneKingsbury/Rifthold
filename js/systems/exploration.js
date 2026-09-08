@@ -47,7 +47,7 @@ function expeditionCooldownFactor(member, spell) {
 }
 import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
-import { getSpellCooldownMult } from './complexBuildings.js';
+import { getSpellCooldownMult, getExpeditionLuckBonus } from './complexBuildings.js';
 
 let nextExpeditionId = 1;
 
@@ -1949,7 +1949,7 @@ export class ExplorationSystem {
             // Passing exp.realm lets realmBonus traits (e.g. Green Thumb) contribute
             // their realm-specific lootMult. Items + flat traits + realmBonus, once.
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm)
-                * streakMult * (exp.potionLootBoosts?.lootMult || 1);
+                * streakMult * (exp.potionLootBoosts?.lootMult || 1) * getExpeditionLuckBonus(game);
             const lootBonusFlat = this._getMutatorEffect(exp, 'lootBonusFlat');
             const lootAmountMutMult = this._getMutatorEffect(exp, 'lootAmountMult')
                 * this._getRealmEventEffect(exp, 'lootAmountMult');

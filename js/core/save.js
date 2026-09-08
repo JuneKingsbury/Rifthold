@@ -347,6 +347,14 @@ export function loadGame(game) {
             }
         }
 
+        for (const row of game.map) {
+            for (const tile of row) {
+                if (tile.structure === 'forge_core' || tile.structure === 'ritual_core') {
+                    tile.structure = 'arcane_core';
+                }
+            }
+        }
+
         game.roomsDirty = true;
         game._complexStructuresInitialized = false;
 

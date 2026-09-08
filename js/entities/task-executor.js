@@ -5,7 +5,7 @@ import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache, getRaceModifier } from './colonist.js';
 import { getHarvestYield } from '../systems/farming.js';
 import { manhattanDist } from '../world/pathfinding.js';
-import { getCraftQualityBonus } from '../systems/complexBuildings.js';
+import { getCraftQualityBonus, getResearchSpeedMult } from '../systems/complexBuildings.js';
 import { applySpecificQuality, applyEnchantmentEffect } from './item-roll.js';
 
 // Scavenger trait: small chance to double the amount of one resource in a
@@ -405,6 +405,7 @@ export function completeTask(colonist, task, game) {
             const researchMult = getEquipmentStat(colonist, 'researchSpeed');
             if (researchMult > 0) researchPts = Math.floor(researchPts * researchMult);
             if (task.diminished) researchPts = Math.max(1, Math.floor(researchPts * 0.5));
+            researchPts = Math.floor(researchPts * getResearchSpeedMult(game));
             const completedKey = game.research.addProgress(researchPts);
             if (completedKey) {
                 const tech = RESEARCH[completedKey];

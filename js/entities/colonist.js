@@ -8,7 +8,7 @@ import { FOODSTUFFS } from '../systems/resources.js';
 import { spawnSummon } from './summons.js';
 import { getNextId } from './entity-factory.js';
 import { completeTask } from './task-executor.js';
-import { getCraftSpeedBonus, getSpellCooldownMult } from '../systems/complexBuildings.js';
+import { getCraftSpeedBonus, getSpellCooldownMult, getGatherSpeedBonus, getDefenseBonusMult } from '../systems/complexBuildings.js';
 
 function hslToHex(h, s, l) {
     s /= 100; l /= 100;
@@ -2073,6 +2073,9 @@ function updateWorking(colonist, game) {
     if (task.type === 'craft' || task.type === 'cook') {
         speed *= getCraftSpeedBonus(game);
     }
+    if (task.type === 'chop' || task.type === 'mine') {
+        speed *= getGatherSpeedBonus(game);
+    }
 
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
@@ -2276,6 +2279,7 @@ function updateFighting(colonist, game) {
         let dmg = weaponDmg + Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
+        dmg = Math.floor(dmg * getDefenseBonusMult(game));
         const critChance = getCritChance(colonist);
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;
@@ -2329,6 +2333,7 @@ function updateFighting(colonist, game) {
         let dmg = weaponDmg + Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
+        dmg = Math.floor(dmg * getDefenseBonusMult(game));
         const critChance = getCritChance(colonist);
         if (critChance > 0 && Math.random() < critChance) {
             dmg *= 2;

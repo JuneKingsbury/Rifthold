@@ -4,6 +4,7 @@
  * tick; ready crops become harvest tasks for colonists.
  */
 import { CONFIG, CROPS, TERRAIN, WORK_CONFIG, BLIGHT_CONFIG } from '../core/config.js';
+import { getFoodProductionMult } from './complexBuildings.js';
 
 // Derived from the 'research' field on each crop entry
 export const CROP_RESEARCH_REQS = Object.fromEntries(
@@ -201,5 +202,6 @@ export function getHarvestYield(game, cropType) {
     if (!crop) return 0;
     let yield_ = crop.harvestYield;
     if (game.research.isResearched('verdant_growth')) yield_ += 1;
+    yield_ = Math.round(yield_ * getFoodProductionMult(game));
     return yield_;
 }
