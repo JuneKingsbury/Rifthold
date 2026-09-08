@@ -222,7 +222,7 @@ export const RENDER_CONFIG = {
     // One-shot priorities (higher wins). A new one-shot replaces the active one
     // only if its priority >= the active one's. Death suppresses everything and
     // enrage/stomp suppresses ambient shivers too):
-    expedAnimPriority: { death: 100, enrage: 60, crit: 50, attack: 40, cast: 40, dodge: 30, recoil: 20 },
+    expedAnimPriority: { death: 100, enrage: 60, crit: 50, attack: 40, cast: 40, dodge: 30, block: 25, recoil: 20 },
     // Reactions to being hit
     expedHitRecoil: true,
     hitRecoilDurationMs: 260,
@@ -264,6 +264,26 @@ export const RENDER_CONFIG = {
     expedVictoryFlourish: true,
     victoryFlourishRad: 0.5,     // per-entity weapon-raise tilt during celebration
     expedLootArc: true,          // loot effect arcs toward the party instead of dropping in place
+    // Status-application pop: when a status effect first appears on an entity, its
+    // glyph pops (scales up then settles) with a quick alpha flash above the entity.
+    expedStatusPop: true,
+    statusPopDurationMs: 340,
+    statusPopScale: 1.8,         // peak glyph scale at the start of the pop
+    statusPopRisePx: 6,          // how far the glyph rises during the pop
+    // Parry/block spark: when incoming damage is heavily mitigated (armor / shield),
+    // the defender braces (a short shrink-and-lean) and a metallic spark flashes at
+    // the point of impact, distinct from the dodge hop (which avoids the blow).
+    expedBlockSpark: true,
+    blockBraceDurationMs: 300,
+    blockBracePx: 3,             // brace lean toward the attacker
+    blockBraceScale: 0.12,       // slight squash on impact
+    blockSparkColor: '#ffe08a',
+    // Environmental hazard telegraph: a pulsing warning ring over the party zone
+    // when a boss unleashes an area attack (an AoE spell / party-wide CC). Purely
+    // cosmetic, it plays alongside the hit (combat auto-resolves, so there is no
+    // reaction window), reading as a "danger bloom" that frames the blow.
+    expedHazardTelegraph: true,
+    hazardTelegraphColor: '#ff5533',
     // ── Chimney smoke intensity by building activity ──────────────────────
     // Smoke-emitting buildings (bDef.smokeEmitter) puff faint gray wisps when idle
     // and thicker, warmer, faster smoke while a colonist is actively working there
@@ -309,6 +329,46 @@ export const RENDER_CONFIG = {
     // feel; values mirror expedCritEmphasis above.
     mainCritSwingAmplitudeRad: 0.6,
     mainCritPunchScale: 0.15,
+    // ── Impact particle bursts (world particles via spawnParticle) ──────────
+    // A projectile that reaches the end of its flight throws a small radial
+    // spark burst at the terminal tile. Gated by showCombatParticles +
+    // reduceMotion. Zero gore, pure spark.
+    projectileImpactCount: 7,
+    projectileImpactSpeed: 0.55,
+    projectileImpactDecay: 0.5,
+    projectileImpactSize: 2,
+    projectileImpactColor: '#f2f2f2',
+    // A melee attack that lands throws a short directional dust/spark spray from
+    // the target along the attack direction (attacker to target). Tuning shared by
+    // every basic-melee site via spawnImpactSpray.
+    meleeImpactCount: 6,
+    meleeImpactSpeed: 0.6,
+    meleeImpactDecay: 0.5,
+    meleeImpactSize: 2,
+    meleeImpactColor: '#f2f2f2',
+    // A structure destroyed by an attacker crumbles into a chunky debris burst
+    // (square particles that fall).
+    structureCrumbleCount: 16,
+    structureCrumbleSpeed: 0.9,
+    structureCrumbleDecay: 0.42,
+    structureCrumbleColor1: '#9a8a70',
+    structureCrumbleColor2: '#6f6152',
+    // Danger vignette: a pulsing red radial gradient at the screen edges while the
+    // colony is under threat. `raidIntensity` is the base opacity during an active
+    // wave; it ramps toward `maxIntensity` as the Void Nexus loses health.
+    // `hostileIntensity` is the (lower) level for off-wave raider attacks. The edge
+    // opacity breathes between `pulseMin` and full via a sine of period
+    // `pulsePeriodMs`. `innerRadiusFrac` (of min screen dimension) sets how large
+    // the clear center is before the red begins. Rides showDamageFlash + reduceMotion.
+    dangerVignette: {
+        enabled: true,
+        raidIntensity: 0.28,
+        hostileIntensity: 0.16,
+        maxIntensity: 0.5,
+        pulsePeriodMs: 1600,
+        pulseMin: 0.45,
+        innerRadiusFrac: 0.35,
+    },
     healthBarGreenThreshold: 0.5,
     healthBarYellowThreshold: 0.25,
     healthBarColors: { green: '#00ff00', yellow: '#ffaa00', red: '#ff3333' },
@@ -425,31 +485,6 @@ export const COMBAT_VISUALS = {
     xpGainColor: '#88ff88',
     xpGainTtl: 1,
     smiteChar: '✝',
-    // ── Impact particle bursts (world particles via spawnParticle) ──────────
-    // A projectile that reaches the end of its flight throws a small radial
-    // spark burst at the terminal tile, tinted by the projectile's own color so
-    // arcane shots spark red, void shots purple, etc. Gated by showCombatParticles
-    // + reduceMotion. Zero gore, pure spark.
-    projectileImpactCount: 7,
-    projectileImpactSpeed: 0.55,
-    projectileImpactDecay: 0.5,
-    projectileImpactSize: 2,
-    projectileImpactColor: '#f2f2f2',
-    // A melee attack that lands throws a short directional dust/spark spray from
-    // the target along the attack direction (attacker → target). Tuning shared by
-    // every basic-melee site via spawnImpactSpray.
-    meleeImpactCount: 6,
-    meleeImpactSpeed: 0.6,
-    meleeImpactDecay: 0.5,
-    meleeImpactSize: 2,
-    meleeImpactColor: '#f2f2f2',
-    // A structure destroyed by an attacker crumbles into a chunky debris burst
-    // (square particles that fall) plus a brief camera shake.
-    structureCrumbleCount: 16,
-    structureCrumbleSpeed: 0.9,
-    structureCrumbleDecay: 0.42,
-    structureCrumbleColor1: '#9a8a70',
-    structureCrumbleColor2: '#6f6152',
 };
 
 export const LOG_COLORS = {

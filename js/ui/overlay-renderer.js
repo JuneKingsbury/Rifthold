@@ -6,6 +6,26 @@ const ROOM_TIER_INDEX = new Map(ROOM_QUALITY_TIERS.map((t, i) => [t.key, i]));
 const WORKSHOP_TIER_INDEX = new Map(WORKSHOP_QUALITY_TIERS.map((t, i) => [t.key, i]));
 const TOWN_HALL_TIER_INDEX = new Map(TOWN_HALL_QUALITY_TIERS.map((t, i) => [t.key, i]));
 
+// ASCII-mode fallbacks for yield floaties (skin packs draw the item sprite
+// instead). Colors mirror the resource palette used in the top-bar counter; the
+// label is a short readable name. Unknown keys fall back to the raw key + white.
+const YIELD_COLORS = {
+    wood: '#c49a6c', stone: '#bbb', food: '#88cc44', planks: '#c89648',
+    bricks: '#cc7744', iron_ore: '#b98', iron: '#ccc', runite: '#44ccff',
+    leather: '#b8875a', hides: '#b8875a', wool: '#eee', cloth: '#ddd',
+    void_essence: '#bb66ff', gold: '#ffdd44', meat: '#e08888', wheat: '#e0c060',
+    berries: '#d05070', corn: '#f0d040', potatoes: '#c9a06a', moonbloom: '#aaccff',
+    eggs: '#f0e8d0', milk: '#f8f8f0',
+};
+const YIELD_LABELS = {
+    wood: 'Wood', stone: 'Stone', food: 'Food', planks: 'Planks',
+    bricks: 'Bricks', iron_ore: 'Ore', iron: 'Iron', runite: 'Runite',
+    leather: 'Leather', hides: 'Hides', wool: 'Wool', cloth: 'Cloth',
+    void_essence: 'Void', gold: 'Gold', meat: 'Meat', wheat: 'Wheat',
+    berries: 'Berries', corn: 'Corn', potatoes: 'Potatoes', moonbloom: 'Moonbloom',
+    eggs: 'Eggs', milk: 'Milk',
+};
+
 export function spawnParticle(game, props) {
     if (!game.worldParticles) game.worldParticles = [];
     game.worldParticles.push({
@@ -39,6 +59,20 @@ export function spawnDamageText(game, x, y, amount, color = '#ff4444', crit = fa
         color: crit ? '#ffdd33' : color,
         fontSize: crit ? 16 : 12,
         ttl: 15, maxTtl: 15,
+    });
+}
+
+// Floating "+N" yield popup over a tile that just produced a resource (a gathered
+// node, a harvested crop, a crafted output). Draws the amount next to the item's
+// sprite (falling back to a colored resource label when no sprite exists), so the
+// player sees what was gained and where. Skips zero/negative amounts. Gated by the
+// caller on showOverlays + reduceMotion. `key` is the resource/item key.
+export function spawnYieldFloaty(game, x, y, key, amount) {
+    if (!(amount > 0) || !game.overlays) return;
+    game.overlays.push({
+        type: 'yield_floaty', x, y,
+        key, amount: Math.round(amount),
+        ttl: 24, maxTtl: 24,
     });
 }
 
@@ -212,6 +246,13 @@ export class OverlayRenderer {
             this._renderAlertRipple(ctx, game.alertRipple, cw, ch, camera);
         }
 
+        // Danger vignette: a pulsing red edge glow while the colony is under
+        // threat (a wave/raid is active) or badly wounded. Rides the existing
+        // damage-flash setting and is suppressed under reduced motion.
+        if (game.settings.showDamageFlash && !game.settings.reduceMotion) {
+            this._renderDangerVignette(ctx, game, now);
+        }
+
         if (!game.settings.showOverlays || !game.overlays || game.overlays.length === 0) return;
 
         const s = game.settings;
@@ -234,6 +275,9 @@ export class OverlayRenderer {
                     break;
                 case 'floating_text':
                     this._renderFloatingText(ctx, overlay, cw, ch, camera);
+                    break;
+                case 'yield_floaty':
+                    this._renderYieldFloaty(ctx, overlay, cw, ch, camera, game);
                     break;
                 case 'chat_bubble':
                     this._renderChatBubble(ctx, overlay, cw, ch, camera);
@@ -497,6 +541,63 @@ export class OverlayRenderer {
 
         ctx.fillStyle = overlay.color || '#ffffff';
         ctx.fillText(overlay.text, sx, sy);
+        ctx.restore();
+    }
+
+    // "+N [sprite]" yield popup. Floats up and fades like floating text, but pairs
+    // the amount with the item's sprite (from the active skin) when one exists,
+    // else with a short colored resource label. The sprite is cached as a decoded
+    // <img>/canvas by the skin manager, so drawImage is cheap here.
+    _renderYieldFloaty(ctx, overlay, cw, ch, camera, game) {
+        const progress = 1 - (overlay.ttl / overlay.maxTtl);
+        const floatOffset = progress * 26;
+        const alpha = 1 - progress;
+
+        const sx = (overlay.x - camera.x) * cw + cw / 2;
+        const sy = (overlay.y - camera.y) * ch - floatOffset;
+        if (sx < -100 || sx > this.canvas.width + 100 || sy < -50 || sy > this.canvas.height + 50) return;
+
+        const fontSize = Math.round(12 * (this._uiFontScale || 1));
+        const text = `+${overlay.amount}`;
+
+        // Resolve a sprite for the produced item/material (skin packs only).
+        const mgr = game.skinManager;
+        let sprite = null;
+        if (mgr && mgr.isActive) {
+            sprite = mgr.getItemSprite(overlay.key) || mgr.getMaterialSprite(overlay.key);
+        }
+        const iconSize = fontSize + 2;
+        const gap = 2;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, alpha);
+        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.textBaseline = 'middle';
+
+        if (sprite) {
+            // Center the "+N sprite" pair on the tile.
+            const textW = ctx.measureText(text).width;
+            const totalW = textW + gap + iconSize;
+            const startX = sx - totalW / 2;
+            ctx.textAlign = 'left';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeText(text, startX, sy);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(text, startX, sy);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(sprite, startX + textW + gap, sy - iconSize / 2, iconSize, iconSize);
+        } else {
+            // No sprite: draw "+N label" with a color hint from the resource palette.
+            const label = YIELD_LABELS[overlay.key] || overlay.key;
+            const full = `${text} ${label}`;
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeText(full, sx, sy);
+            ctx.fillStyle = YIELD_COLORS[overlay.key] || '#ffffff';
+            ctx.fillText(full, sx, sy);
+        }
         ctx.restore();
     }
 
@@ -863,6 +964,53 @@ export class OverlayRenderer {
             ctx.stroke();
         }
         ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    // Pulsing red edge vignette drawn when the colony is in danger. Two triggers,
+    // whichever is stronger sets the intensity (0..1):
+    //   * an active wave/raid (steady base intensity), and
+    //   * a live hostile presence (raiders or wave enemies on the map).
+    // A slow sine pulse modulates the opacity so the edge "breathes". The gradient
+    // is only opaque near the screen edges, leaving the center clear. Zero-alloc
+    // hot path aside from the per-frame gradient (unavoidable for radial fills).
+    _renderDangerVignette(ctx, game, now) {
+        const cfg = RENDER_CONFIG.dangerVignette;
+        if (!cfg || !cfg.enabled) return;
+
+        let intensity = 0;
+        const waves = game.waves;
+        if (waves && waves.active) {
+            intensity = cfg.raidIntensity;
+            // Ramp up as the Void Nexus loses health during the wave.
+            if (waves.nexusMaxHp > 0 && waves.nexusHp != null) {
+                const nexusFrac = Math.max(0, Math.min(1, waves.nexusHp / waves.nexusMaxHp));
+                intensity = Math.max(intensity, cfg.raidIntensity + (1 - nexusFrac) * (cfg.maxIntensity - cfg.raidIntensity));
+            }
+        }
+        // Any live hostiles on the map (covers off-wave raider attacks too).
+        if (intensity < cfg.hostileIntensity && game.raiders) {
+            for (const r of game.raiders) {
+                if (r.hp > 0) { intensity = Math.max(intensity, cfg.hostileIntensity); break; }
+            }
+        }
+        if (intensity <= 0) return;
+
+        // Slow breathing pulse on the opacity.
+        const pulse = 0.5 + 0.5 * Math.sin(now / cfg.pulsePeriodMs * Math.PI * 2);
+        const alpha = intensity * (cfg.pulseMin + (1 - cfg.pulseMin) * pulse);
+
+        const w = this.canvas.width, h = this.canvas.height;
+        const cx = w / 2, cy = h / 2;
+        const inner = Math.min(w, h) * cfg.innerRadiusFrac;
+        const outer = Math.max(w, h) * 0.75;
+        const grad = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+        grad.addColorStop(0, 'rgba(180,0,0,0)');
+        grad.addColorStop(1, `rgba(180,0,0,${alpha.toFixed(3)})`);
+
+        ctx.save();
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
         ctx.restore();
     }
 

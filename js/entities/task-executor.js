@@ -1,5 +1,5 @@
 import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
-import { spawnParticle } from '../ui/overlay-renderer.js';
+import { spawnParticle, spawnYieldFloaty } from '../ui/overlay-renderer.js';
 import { completeTame, finalizeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalidateEquipStatCache, getRaceModifier } from './colonist.js';
@@ -20,6 +20,21 @@ function applyScavenger(colonist, output, game) {
     const bonus = output[key];
     output[key] += bonus;
     game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Scavenged +${bonus} ${key.replace(/_/g, ' ')}`, color: '#ffdd44', fontSize: 10, ttl: 18, maxTtl: 18 });
+}
+
+// Emit a "+N [sprite]" yield floaty for each resource in a gather/harvest output
+// map ({ resourceKey: amount }). Gated by showOverlays + reduceMotion (it is
+// ambient feedback, not gameplay-critical). Stacks multiple resources vertically
+// so a mixed yield (e.g. wood + a rare drop) reads as separate popups.
+function emitYieldFloaties(game, x, y, output) {
+    if (!game.settings?.showOverlays || game.settings?.reduceMotion) return;
+    let row = 0;
+    for (const key of Object.keys(output)) {
+        const amt = output[key];
+        if (!(amt > 0)) continue;
+        spawnYieldFloaty(game, x, y - row * 0.5, key, amt);
+        row++;
+    }
 }
 
 function applyQuality(item, colonist, game, ...statKeys) {
@@ -204,6 +219,7 @@ export function completeTask(colonist, task, game) {
                     }
                     applyScavenger(colonist, output, game);
                     game.resources.add(output);
+                    emitYieldFloaties(game, task.x, task.y, output);
                 }
                 tile.resource = null;
                 if (task.type === 'mine') {
@@ -272,6 +288,7 @@ export function completeTask(colonist, task, game) {
                 yields[crop] = getHarvestYield(game, crop);
                 applyScavenger(colonist, yields, game);
                 game.resources.add(yields);
+                emitYieldFloaties(game, task.x, task.y, yields);
                 tile.zone.state = 'empty';
                 tile.zone.growth = 0;
                 applyThought(colonist, 'harvested', game.tick);

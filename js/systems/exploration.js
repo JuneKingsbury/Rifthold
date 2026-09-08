@@ -1604,10 +1604,14 @@ export class ExplorationSystem {
 
                 let dmg = enemy.damage + randInt(0, 2);
                 if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
+                // Track the damage before armor/shield mitigation so the visual layer
+                // can tell a fully-absorbed "block" from a clean hit (see _lastBlockTick).
+                const preMitigationDmg = dmg;
+                let didMitigate = false;
                 for (const item of targetItems) {
-                    if (item.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - item.damageReduction)));
+                    if (item.damageReduction) { dmg = Math.max(1, Math.floor(dmg * (1 - item.damageReduction))); didMitigate = true; }
                 }
-                if (target.shieldActive) dmg = Math.max(1, Math.floor(dmg * (1 - target.shieldReduction)));
+                if (target.shieldActive) { dmg = Math.max(1, Math.floor(dmg * (1 - target.shieldReduction))); didMitigate = true; }
                 const formDmgTaken = this._applyFormationModifier(exp, target.id, 'damageTakenMult');
                 dmg = Math.max(1, Math.floor(dmg * formDmgTaken));
 
@@ -1620,6 +1624,10 @@ export class ExplorationSystem {
                     const msg = pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', attackerLabel).replace('{target}', target.name).replace('{dmg}', dmg);
                     this._addLog(exp, game, msg, 'combat');
                     window.soundManager?.playExpSFX('colonist_damaged');
+                    // Flag a "block" for the visual layer when armor/shield absorbed a
+                    // meaningful chunk (>=25%) of the blow. This drives the brace-and-spark
+                    // one-shot, distinct from a dodge (which avoids the hit entirely).
+                    if (didMitigate && dmg <= preMitigationDmg * 0.75) target._lastBlockTick = game.tick;
 
                     // Thorns from equipment + mutators
                     let thorns = targetItems.reduce((sum, it) => sum + (it.thornsDamage || 0), 0) + globalThorns;

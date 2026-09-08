@@ -929,9 +929,13 @@ const arcaneMethods = {
         return html;
     },
 
-    _buildSummaryHtml(exp) {
+    // `reveal` is an optional () => attrString supplier that stamps each row with a
+    // staggered exp-reveal class+delay (see _buildExpeditionSummaryScreen). Omitted
+    // (the in-progress expeditions list) means rows render statically.
+    _buildSummaryHtml(exp, reveal) {
         const s = exp.summary;
         if (!s) return '';
+        const _row = reveal || (() => '');
         let html = `<div style="margin:6px 0;padding:6px;background:#1a1a2e;border-radius:4px;font-size:0.8em;">`;
         html += `<div style="color:#ffcc44;font-weight:bold;margin-bottom:3px;">Expedition Summary</div>`;
 
@@ -945,14 +949,12 @@ const arcaneMethods = {
             const kills = s.killCount[p.id] || 0;
             const healed = s.healingDone[p.id] || 0;
             if (dealt === 0 && taken === 0 && kills === 0 && healed === 0) continue;
-            html += `<div style="color:#ccc;margin:1px 0;">${p.name}: `;
             const parts = [];
             if (dealt > 0) parts.push(`${dealt} dmg dealt`);
             if (kills > 0) parts.push(`${kills} kills`);
             if (healed > 0) parts.push(`${healed} healed`);
             if (taken > 0) parts.push(`<span style="color:#ff8844;">${taken} dmg taken</span>`);
-            html += parts.join(' | ');
-            html += `</div>`;
+            html += `<div${_row()}><span style="color:#ccc;margin:1px 0;">${p.name}: ${parts.join(' | ')}</span></div>`;
         }
 
         // Aggregate stats
@@ -961,7 +963,7 @@ const arcaneMethods = {
         if (s.decisionsCount > 0) parts.push(`Decisions: ${s.decisionsCount}`);
         if (s.puzzlesSolved > 0) parts.push(`Puzzles: ${s.puzzlesSolved}`);
         if (exp.eliteKills > 0) parts.push(`Elites slain: ${exp.eliteKills}`);
-        if (parts.length > 0) html += `<div style="color:#888;margin-top:3px;">${parts.join(' | ')}</div>`;
+        if (parts.length > 0) html += `<div${_row()}><span style="color:#888;margin-top:3px;">${parts.join(' | ')}</span></div>`;
 
         // MVP
         let mvpId = null, mvpScore = 0;
@@ -971,7 +973,7 @@ const arcaneMethods = {
             if (score > mvpScore) { mvpScore = score; mvpId = id; }
         }
         if (mvpId && partyNames[mvpId]) {
-            html += `<div style="color:#ffcc44;margin-top:3px;">MVP: ${partyNames[mvpId]}</div>`;
+            html += `<div${_row()}><span style="color:#ffcc44;margin-top:3px;">MVP: ${partyNames[mvpId]}</span></div>`;
         }
 
         html += `</div>`;
@@ -982,6 +984,18 @@ const arcaneMethods = {
         const allDefeated = exp.partySnapshot.every(p => p.hp <= 0);
         const titleColor = allDefeated ? '#ff4444' : '#44cc44';
         const titleText = allDefeated ? 'Expedition Failed' : 'Expedition Complete';
+        // Staggered reveal: each loot row fades/rises in a beat after the previous
+        // one, so the loot list "counts up" on arrival. `_reveal()` returns the
+        // class+inline-delay for the next row (skipped under reduce-motion, where
+        // rows render statically). The summary HTML is injected once, so it plays once.
+        const reduceMotion = !!this.game.settings.reduceMotion;
+        let revealStep = 0;
+        const revealStagger = 0.06; // seconds between successive rows
+        const _reveal = () => {
+            if (reduceMotion) return '';
+            const delay = (revealStep++ * revealStagger).toFixed(2);
+            return ` class="exp-reveal" style="--reveal-delay:${delay}s;"`;
+        };
         let html = `<div class="arcane-section" style="text-align:center;">`;
         html += `<div style="font-size:1.4em;color:${titleColor};font-weight:bold;margin:12px 0 4px;">${titleText}</div>`;
         html += `<div style="color:#88ccff;font-size:1.1em;margin-bottom:10px;">${exp.realmName}</div>`;
@@ -994,7 +1008,7 @@ const arcaneMethods = {
             html += `<div style="color:#44cc44;font-weight:bold;margin-bottom:4px;">Loot</div>`;
             for (const [res, amt] of lootEntries) {
                 const resIcon = this._resourceIcon(res);
-                html += `<div style="color:#ccc;">${resIcon}${res.replace(/_/g, ' ')}: <span style="color:#ffcc44;">${amt}</span></div>`;
+                html += `<div${_reveal()}><span style="color:#ccc;">${resIcon}${res.replace(/_/g, ' ')}: <span style="color:#ffcc44;">${amt}</span></span></div>`;
             }
             for (const itemKey of items) {
                 const itemDef = ALL_ITEMS[itemKey];
@@ -1008,13 +1022,13 @@ const arcaneMethods = {
                     if (statLines.length > 0) parts.push(statLines.join(', '));
                     if (parts.length > 0) tooltip = ` title="${parts.join(' — ').replace(/"/g, '&quot;')}"`;
                 }
-                html += `<div style="color:#aa88ff;cursor:default;"${tooltip}>${icon}${itemName}</div>`;
+                html += `<div${_reveal()}><span style="color:#aa88ff;cursor:default;"${tooltip}>${icon}${itemName}</span></div>`;
             }
             html += `</div>`;
         }
 
-        // Per-member summary
-        html += this._buildSummaryHtml(exp);
+        // Per-member summary (continues the staggered reveal after the loot rows)
+        html += this._buildSummaryHtml(exp, _reveal);
 
         // Full log (collapsible)
         html += `<details style="margin:8px 0;text-align:left;"><summary style="color:#88ccff;cursor:pointer;">Expedition Log (${exp.log.length} entries)</summary>`;
@@ -1081,13 +1095,50 @@ const arcaneMethods = {
         ent._prevEnraged = enr;
     },
 
+    // Track which status types are currently active on an entity and stamp the
+    // wall-clock moment each one first appears, so a freshly-applied affliction can
+    // "pop" its glyph in. State rides on the entity (`_statusAnim`) so it survives
+    // across frames. A type that expires is cleared so re-applying it pops again.
+    // Returns the per-type start-time map for the caller to read during draw.
+    _statusPopState(ent, activeTypes, now) {
+        let sa = ent._statusAnim;
+        if (!sa) sa = ent._statusAnim = { start: {}, active: new Set() };
+        const prev = sa.active;
+        const next = new Set(activeTypes);
+        for (const t of activeTypes) {
+            if (!prev.has(t)) sa.start[t] = now;   // newly applied this frame
+        }
+        for (const t of prev) {
+            if (!next.has(t)) delete sa.start[t];  // wore off, allow a future re-pop
+        }
+        sa.active = next;
+        return sa.start;
+    },
+
+    // Compute the pop transform for a single status glyph given its latched start.
+    // Scale eases from statusPopScale down to 1 (ease-out square), the glyph rises
+    // on a sine arc and flashes brighter. Returns null once the pop has finished or
+    // when the feature/reduce-motion gate is off.
+    _statusGlyphPop(startMs, now, enabled) {
+        if (!enabled || startMs == null) return null;
+        const R = RENDER_CONFIG;
+        const pt = (now - startMs) / R.statusPopDurationMs;
+        if (pt >= 1 || pt < 0) return null;
+        const inv = 1 - pt;
+        return {
+            scale: 1 + (R.statusPopScale - 1) * inv * inv,
+            rise: R.statusPopRisePx * Math.sin(pt * Math.PI),
+            alpha: 0.6 + 0.4 * Math.sin(pt * Math.PI),
+        };
+    },
+
     _composeEntityAnim(ent, opts) {
         const R = RENDER_CONFIG;
         const now = opts.now;
         const facing = opts.facing;
         const swayAngle = opts.swayAngle || 0;      // pre-computed walk sway (already gated)
         const speed = opts.speed || 0;              // 0..1 travel intensity
-        const out = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1, alpha: 1, projectile: null, meleeFx: null };
+        const out = { rot: 0, dx: 0, dy: 0, sx: 1, sy: 1, alpha: 1, projectile: null, meleeFx: null, blockSpark: false };
         const extras = !!opts.extras;   // showExpeditionExtras, the 14 new effects
         const swing = !!opts.swing;     // showAttackSwing, attack motion (pre-existing)
         const alive = ent.hp == null || ent.hp > 0;
@@ -1122,6 +1173,7 @@ const arcaneMethods = {
             if (swing) consider('attack', this._animShotT(ent, ent._lastAttackTick, 'attack', atkDur, now), P.attack);
             if (extras && R.expedCastWindup) consider('cast', this._animShotT(ent, ent._lastCastTick, 'cast', R.castWindupDurationMs, now), P.cast);
             if (extras && R.expedDodgeHop) consider('dodge', this._animShotT(ent, ent._lastDodgeTick, 'dodge', R.dodgeHopDurationMs, now), P.dodge);
+            if (extras && R.expedBlockSpark) consider('block', this._animShotT(ent, ent._lastBlockTick, 'block', R.blockBraceDurationMs, now), P.block);
             if (extras && R.expedHitRecoil) consider('recoil', this._animShotT(ent, ent._lastHitTick, 'recoil', R.hitRecoilDurationMs, now), P.recoil);
         }
 
@@ -1202,6 +1254,18 @@ const arcaneMethods = {
                     out.dy += -R.dodgeHopPx * arc;             // quick vertical juke
                     out.dx += -R.hitRecoilPx * 0.5 * facing * arc;
                     break;
+                case 'block':
+                    // Brace into the blow: a small lean toward the attacker plus a
+                    // downward squash (planted stance), unlike the dodge's hop away.
+                    // A spark flashes once at the moment of impact (start of the pose).
+                    out.dx += R.blockBracePx * facing * arc;
+                    out.sy *= 1 - R.blockBraceScale * arc;
+                    out.sx *= 1 + R.blockBraceScale * 0.5 * arc;
+                    if (ent._anim.blockSparkSeen !== ent._lastBlockTick) {
+                        ent._anim.blockSparkSeen = ent._lastBlockTick;
+                        out.blockSpark = true;
+                    }
+                    break;
                 case 'recoil':
                     // Knock away from the attacker (opposite the entity's facing).
                     out.dx += -R.hitRecoilPx * facing * arc;
@@ -1279,6 +1343,14 @@ const arcaneMethods = {
         this._expVisState.effects.push({
             type: 'melee_fx', kind,
             x: fx, y: fy, tx, ty, frame: 0, maxFrames: 8,
+        });
+    },
+
+    // A metallic parry spark at (x,y): a starburst of short lines that fades quickly,
+    // marking a blow that armor/shield absorbed rather than one that was dodged.
+    _spawnBlockSpark(x, y) {
+        this._expVisState.effects.push({
+            type: 'block_spark', x, y, frame: 0, maxFrames: 12,
         });
     },
 
@@ -1521,13 +1593,13 @@ const arcaneMethods = {
         // Reduced-motion umbrella (accessibility): damp ambient breathing/sway and
         // the continuous exped channels, while one-shot combat beats still play.
         const reduceMotion = !!this.game.settings.reduceMotion;
+        const roomCount = 8;
         const _breathe = (seed) => {
             if (reduceMotion) return 0;
             const phase = (_now / 3200) * Math.PI * 2 + (seed % 1000) / 1000 * 6.28;
             return (0.5 - 0.5 * Math.cos(phase)) * 1.4;
         };
 
-        const roomCount = 8;
         ctx.strokeStyle = '#111';
         ctx.lineWidth = 1;
         const firstRx = (W / roomCount) - tileSize * 3;
@@ -1828,6 +1900,9 @@ const arcaneMethods = {
                 if (anim.meleeFx) {
                     this._spawnExpedMelee(anim.meleeFx, px + 8, py + bounceY, partyX + 70, H / 2 - 5 + Math.random() * 12);
                 }
+                if (anim.blockSpark) {
+                    this._spawnBlockSpark(px + 6, py + bounceY - 2);
+                }
                 if (sprite) {
                     this._drawEntityWithAnim(ctx, sprite, px - 16, py + bounceY - 16 - grow, 32, 32 + grow, px, py + bounceY + 16, anim);
                 } else {
@@ -1871,14 +1946,27 @@ const arcaneMethods = {
                 if (p.statusEffects && p.statusEffects.length > 0) {
                     const active = p.statusEffects.filter(s => s.rounds > 0);
                     if (active.length > 0) {
+                        const popEnabled = RENDER_CONFIG.expedStatusPop && extrasEnabled && !reduceMotion;
+                        const popStart = this._statusPopState(p, active.map(s => s.type), _now);
                         ctx.font = '9px monospace';
                         ctx.textAlign = 'center';
                         const spacing = 9;
                         const startX = px - ((active.length - 1) * spacing) / 2;
                         for (let gi = 0; gi < active.length; gi++) {
                             const sdef = _COMBAT_STATUS_ICONS[active[gi].type] || {};
+                            const gx = startX + gi * spacing;
+                            const pop = this._statusGlyphPop(popStart[active[gi].type], _now, popEnabled);
                             ctx.fillStyle = sdef.color || '#aaa';
-                            ctx.fillText(sdef.char || '?', startX + gi * spacing, barY - 4);
+                            if (pop) {
+                                ctx.save();
+                                ctx.globalAlpha = pop.alpha;
+                                ctx.translate(gx, barY - 4 - pop.rise);
+                                ctx.scale(pop.scale, pop.scale);
+                                ctx.fillText(sdef.char || '?', 0, 0);
+                                ctx.restore();
+                            } else {
+                                ctx.fillText(sdef.char || '?', gx, barY - 4);
+                            }
                         }
                     }
                 }
@@ -2095,14 +2183,27 @@ const arcaneMethods = {
                     if (enemy.statusEffects && enemy.statusEffects.length > 0) {
                         const active = enemy.statusEffects.filter(s => s.rounds > 0);
                         if (active.length > 0) {
+                            const popEnabled = RENDER_CONFIG.expedStatusPop && extrasEnabled && !reduceMotion;
+                            const popStart = this._statusPopState(enemy, active.map(s => s.type), _now);
                             ctx.font = '9px monospace';
                             ctx.textAlign = 'center';
                             const glyphs = active.map(s => (_COMBAT_STATUS_ICONS[s.type] || {}).char || '?');
                             const spacing = 9;
                             const startX = ex - ((active.length - 1) * spacing) / 2;
                             for (let gi = 0; gi < active.length; gi++) {
+                                const gx = startX + gi * spacing;
+                                const pop = this._statusGlyphPop(popStart[active[gi].type], _now, popEnabled);
                                 ctx.fillStyle = (_COMBAT_STATUS_ICONS[active[gi].type] || {}).color || '#aaa';
-                                ctx.fillText(glyphs[gi], startX + gi * spacing, eBarY - 3);
+                                if (pop) {
+                                    ctx.save();
+                                    ctx.globalAlpha = pop.alpha;
+                                    ctx.translate(gx, eBarY - 3 - pop.rise);
+                                    ctx.scale(pop.scale, pop.scale);
+                                    ctx.fillText(glyphs[gi], 0, 0);
+                                    ctx.restore();
+                                } else {
+                                    ctx.fillText(glyphs[gi], gx, eBarY - 3);
+                                }
                             }
                         }
                     }
@@ -2134,6 +2235,12 @@ const arcaneMethods = {
                 const isCast = text.includes('casts');
                 const casterName = isCast ? _findCaster(text) : null;
                 const cp = casterName ? _casterPos(casterName) : { x: partyX, y: H / 2 };
+                // Boss area attack: a spell that hits the whole party (AoE damage) or
+                // CCs the party. Bloom a hazard telegraph ring over the party zone.
+                const isAreaAttack = isCast && (text.includes('hitting all') || text.includes('the party'));
+                if (isAreaAttack && RENDER_CONFIG.expedHazardTelegraph && extrasEnabled && !reduceMotion) {
+                    this._expVisState.effects.push({ type: 'hazard_telegraph', x: partyX + 45, y: H / 2, frame: 0, maxFrames: 32 });
+                }
                 if (isCast && text.includes('heals')) {
                     this._expVisState.effects.push({ type: 'spell_heal', x: cp.x, y: cp.y - 5, frame: 0, maxFrames: 30 });
                     const healMatch = text.match(/(\d+) HP/);
@@ -2330,6 +2437,51 @@ const arcaneMethods = {
                     ctx.fillStyle = '#ff2222';
                     ctx.globalAlpha = alpha * 0.4;
                     ctx.fillRect(eff.x - 15, eff.y - 15, 30, 30);
+                }
+            } else if (eff.type === 'block_spark') {
+                // A quick metallic starburst: short radial lines that lengthen and
+                // fade, plus a brief bright core. Reads as a parry/deflection.
+                const p = eff.frame / eff.maxFrames;
+                const len = 4 + p * 7;
+                ctx.strokeStyle = RENDER_CONFIG.blockSparkColor;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = alpha;
+                for (let s = 0; s < 6; s++) {
+                    const angle = (s / 6) * Math.PI * 2 + 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(eff.x + Math.cos(angle) * len * 0.4, eff.y + Math.sin(angle) * len * 0.4);
+                    ctx.lineTo(eff.x + Math.cos(angle) * len, eff.y + Math.sin(angle) * len);
+                    ctx.stroke();
+                }
+                if (p < 0.4) {
+                    ctx.globalAlpha = (0.4 - p) * 2.5;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(eff.x, eff.y, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (eff.type === 'hazard_telegraph') {
+                // A danger bloom framing the party: an expanding ground ellipse plus a
+                // couple of concentric warning rings that pulse and fade. Sits under
+                // the hit_flash/damage numbers so those still read on top.
+                const p = eff.frame / eff.maxFrames;
+                const col = RENDER_CONFIG.hazardTelegraphColor;
+                const baseR = 34 + p * 20;
+                // Filled danger zone on the ground, brightest at the start.
+                ctx.globalAlpha = alpha * 0.28;
+                ctx.fillStyle = col;
+                ctx.beginPath();
+                ctx.ellipse(eff.x, eff.y + 6, baseR, baseR * 0.42, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Two expanding warning rings.
+                ctx.strokeStyle = col;
+                ctx.lineWidth = 2;
+                for (let s = 0; s < 2; s++) {
+                    const rp = (p + s * 0.4) % 1;
+                    ctx.globalAlpha = alpha * (1 - rp) * 0.8;
+                    ctx.beginPath();
+                    ctx.ellipse(eff.x, eff.y + 6, 20 + rp * 34, (20 + rp * 34) * 0.42, 0, 0, Math.PI * 2);
+                    ctx.stroke();
                 }
             } else if (eff.type === 'spell_heal') {
                 const healSprite = useSkins ? skinMgr.getSprite('effects', 'spell_heal') : null;

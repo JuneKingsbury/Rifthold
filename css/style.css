@@ -617,6 +617,23 @@ img.pixel-art {
 }
 .notif-enter { animation: notif-enter 0.28s ease-out; }
 
+/* Expedition-summary staggered reveal: each loot/stat row rises and fades in,
+   delayed a little more than the one before, so the summary "counts up" on
+   arrival instead of appearing all at once. Per-row delay is set inline
+   (--reveal-delay) in _buildExpeditionSummaryScreen. The summary HTML is injected
+   once (guarded by _lastArcaneHtml), so this plays exactly once. The class is only
+   applied when reduce-motion is off (see _buildExpeditionSummaryScreen), matching
+   the notif-enter pattern, so under reduce-motion rows render statically. */
+@keyframes exp-reveal {
+    from { transform: translateY(8px); opacity: 0; }
+    to   { transform: translateY(0);   opacity: 1; }
+}
+.exp-reveal {
+    opacity: 0;
+    animation: exp-reveal 0.34s ease-out forwards;
+    animation-delay: var(--reveal-delay, 0s);
+}
+
 /* === INFO PANEL === */
 
 .info-header {
