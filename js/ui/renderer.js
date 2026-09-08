@@ -683,6 +683,24 @@ export class Renderer {
         return maxDark;
     }
 
+    // "Golden hour" warmth factor (0..1) for the darkness overlay tint. Nonzero
+    // only inside the twilight ramp windows (dusk→duskEnd, dawnStart→dawn), peaking
+    // in the middle of each ramp (sun at the horizon) and fading to 0 at full day
+    // and at deep night, via sin(π·rampProgress). Mirrors getNightDarkness's window
+    // math so the warmth and the darkening stay phase-aligned.
+    getDawnDuskWarmth(timeOfDay, season) {
+        const t = timeOfDay / CONFIG.TICKS_PER_DAY;
+        const daylight = RENDER_CONFIG.seasonDaylight[season] || RENDER_CONFIG.seasonDaylight.default;
+        const { dawn, dusk } = daylight;
+        const duskEnd = dusk + RENDER_CONFIG.nightDawnDuskOffset.duskEnd;
+        const dawnStart = dawn - RENDER_CONFIG.nightDawnDuskOffset.dawnStart;
+        let ramp = 0;
+        if (t > dusk && t <= duskEnd) ramp = (t - dusk) / (duskEnd - dusk);
+        else if (t >= dawnStart && t < dawn) ramp = (dawn - t) / (dawn - dawnStart);
+        else return 0;
+        return Math.sin(ramp * Math.PI);
+    }
+
     render(game) {
         // Subdivide the frame's render cost into named sub-buckets.
         // Uses prof.add() with a local timestamp so it never touches
@@ -1539,22 +1557,30 @@ export class Renderer {
                         });
                     }
 
-                    // Smoke emission from active buildings
+                    // Smoke emission from buildings: thin/gray while idle, thicker
+                    // and warmer while a colonist is actively working here.
                     if (tile.structure && !entity) {
                         const bDef = BUILDINGS[tile.structure];
-                        if (bDef && bDef.smokeEmitter && Math.random() < 0.05) {
-                            const windDrift = (detailWind - 0.5) * 0.3;
-                            spawnParticle(game, {
-                                x: wx + 0.5 + (Math.random() - 0.5) * 0.3,
-                                y: wy - 0.1,
-                                vx: windDrift / cw * 40,
-                                vy: -0.35 - Math.random() * 0.2,
-                                decay: 0.05 + Math.random() * 0.03,
-                                color: `rgba(${140 + Math.floor(Math.random()*40)},${140 + Math.floor(Math.random()*40)},${140 + Math.floor(Math.random()*40)},1)`,
-                                size: 3 + Math.random() * 2,
-                                alpha: 0.45,
-                                shape: 'square',
-                            });
+                        if (bDef && bDef.smokeEmitter) {
+                            const smokeCfg = RENDER_CONFIG.chimneySmoke;
+                            const active = this._workingBuildingSet.has(`${wx},${wy}`);
+                            const sp = active ? smokeCfg.active : smokeCfg.idle;
+                            if (Math.random() < sp.spawnChance) {
+                                const windDrift = (detailWind - 0.5) * 0.3;
+                                const [tr, tg, tb] = sp.tint;
+                                const jit = () => Math.floor((Math.random() - 0.5) * 30);
+                                spawnParticle(game, {
+                                    x: wx + 0.5 + (Math.random() - 0.5) * 0.3,
+                                    y: wy - 0.1,
+                                    vx: windDrift / cw * 40,
+                                    vy: -sp.rise - Math.random() * 0.2,
+                                    decay: 0.05 + Math.random() * 0.03,
+                                    color: `rgba(${tr + jit()},${tg + jit()},${tb + jit()},1)`,
+                                    size: sp.size + Math.random() * 2,
+                                    alpha: sp.alpha,
+                                    shape: 'square',
+                                });
+                            }
                         }
                     }
 
@@ -2199,7 +2225,20 @@ export class Renderer {
         if (darkness > 0) {
             const { sources, mobileSources } = this._getLightSources(game, camera);
             const steps = RENDER_CONFIG.nightGradientSteps;
-            const [nr, ng, nb] = RENDER_CONFIG.nightOverlayColor;
+            let [nr, ng, nb] = RENDER_CONFIG.nightOverlayColor;
+            // Dawn/dusk warmth: blend the cold night-blue overlay toward a warm
+            // orange during the twilight ramp so the shadows read golden at sunrise
+            // and sunset. Fades to the plain night color by deep night / full day.
+            const warmthCfg = RENDER_CONFIG.dawnDuskWarmth;
+            if (warmthCfg && warmthCfg.enabled) {
+                const warmth = this.getDawnDuskWarmth(game.timeOfDay, season) * (warmthCfg.warmthPeak || 0);
+                if (warmth > 0.001) {
+                    const [wr, wg, wb] = warmthCfg.warmthTintColor;
+                    nr = Math.round(nr + (wr - nr) * warmth);
+                    ng = Math.round(ng + (wg - ng) * warmth);
+                    nb = Math.round(nb + (wb - nb) * warmth);
+                }
+            }
             // Pre-build the style strings for each quantized darkness level
             const darkStyles = [];
             for (let i = 1; i <= steps; i++) {

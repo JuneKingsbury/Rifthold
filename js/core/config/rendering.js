@@ -9,6 +9,18 @@ export const RENDER_CONFIG = {
     nightDawnDuskOffset: { duskEnd: 0.12, dawnStart: 0.10 },
     nightGradientSteps: 8,
     nightOverlayColor: [0, 0, 20],
+    // Dawn/dusk warmth tint: during the twilight ramp windows the darkness overlay
+    // is tinted toward a warm orange (golden hour) instead of the cold night blue,
+    // fading back to neutral by full day and to the blue night color at deep night.
+    // `warmthTintColor` is the RGB the overlay blends toward at the peak of the ramp.
+    // `warmthPeak` (0..1) is how strongly it blends in (1 = fully the warm color).
+    // Gated by showNightLighting (rides the existing night overlay) and skipped
+    // entirely when the tint would be imperceptible.
+    dawnDuskWarmth: {
+        enabled: true,
+        warmthTintColor: [70, 35, 10],
+        warmthPeak: 1.0,
+    },
     lightSourceMargin: 8,
     fireLightRadius: 2,
     seasonDaylight: {
@@ -252,6 +264,16 @@ export const RENDER_CONFIG = {
     expedVictoryFlourish: true,
     victoryFlourishRad: 0.5,     // per-entity weapon-raise tilt during celebration
     expedLootArc: true,          // loot effect arcs toward the party instead of dropping in place
+    // ── Chimney smoke intensity by building activity ──────────────────────
+    // Smoke-emitting buildings (bDef.smokeEmitter) puff faint gray wisps when idle
+    // and thicker, warmer, faster smoke while a colonist is actively working there
+    // (tracked by the renderer's _workingBuildingSet). `spawnChance` is the
+    // per-frame emission probability; `rise` is the base upward speed; `size` the
+    // puff size; `tint` the RGB the gray smoke is nudged toward (warm for active).
+    chimneySmoke: {
+        idle:   { spawnChance: 0.04, rise: 0.30, size: 3.0, alpha: 0.35, tint: [150, 150, 150] },
+        active: { spawnChance: 0.11, rise: 0.45, size: 4.0, alpha: 0.5,  tint: [170, 140, 110] },
+    },
     // ── Main-game weather body-language (getEntityTransform tier) ──────────
     // In cold/wet weather, an entity caught outdoors (no roof over its tile)
     // hunches (shrinks a little, shoulders drawn in) and shivers (fast tiny
