@@ -1,5 +1,11 @@
 import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, BUILDINGS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS, STATION_GROUPS, FLOOR_QUALITY_VALUES } from '../core/config.js';
 
+export const ROOM_SCORE_CAPS = {
+    bedroom:  { size: 20, floor: 25, light: 20, decor: 25, coherence: 10 },
+    townhall: { size: 20, floor: 25, light: 20, decor: 25, coherence: 10 },
+    workshop: { size: 15, floor: 20, light: 15, focus: 25, support: 25 },
+};
+
 export function detectRooms(map) {
     for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
         for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
@@ -259,11 +265,11 @@ function computeBedroomQuality(a) {
             totalTiles += count;
         }
         const avgValue = totalTiles > 0 ? totalValue / totalTiles : 0;
-        floorScore = Math.min(25, Math.round(a.floorCoverage * avgValue));
+        floorScore = Math.min(ROOM_SCORE_CAPS.bedroom.floor, Math.round(a.floorCoverage * avgValue));
     }
 
     let lightScore = 0;
-    if (a.litRatio >= 0.8) lightScore = 20;
+    if (a.litRatio >= 0.8) lightScore = ROOM_SCORE_CAPS.bedroom.light;
     else if (a.litRatio >= 0.5) lightScore = 15;
     else if (a.litRatio >= 0.3) lightScore = 10;
     else if (a.litRatio > 0) lightScore = 5;
@@ -281,7 +287,7 @@ function computeBedroomQuality(a) {
             decorScore += Math.floor(firstValue * 0.5) * (count - 1);
         }
     }
-    decorScore = Math.min(25, decorScore);
+    decorScore = Math.min(ROOM_SCORE_CAPS.bedroom.decor, decorScore);
 
     let coherenceScore = 0;
     if (a.uniformFloor && a.floorCoverage >= 0.8) coherenceScore += 5;
@@ -323,11 +329,11 @@ function computeTownHallQuality(a) {
             totalTiles += count;
         }
         const avgValue = totalTiles > 0 ? totalValue / totalTiles : 0;
-        floorScore = Math.min(25, Math.round(a.floorCoverage * avgValue));
+        floorScore = Math.min(ROOM_SCORE_CAPS.townhall.floor, Math.round(a.floorCoverage * avgValue));
     }
 
     let lightScore = 0;
-    if (a.litRatio >= 0.8) lightScore = 20;
+    if (a.litRatio >= 0.8) lightScore = ROOM_SCORE_CAPS.townhall.light;
     else if (a.litRatio >= 0.5) lightScore = 15;
     else if (a.litRatio >= 0.3) lightScore = 10;
     else if (a.litRatio > 0) lightScore = 5;
@@ -343,7 +349,7 @@ function computeTownHallQuality(a) {
             decorScore += Math.floor(firstValue * 0.5) * (count - 1);
         }
     }
-    decorScore = Math.min(25, decorScore);
+    decorScore = Math.min(ROOM_SCORE_CAPS.townhall.decor, decorScore);
 
     let coherenceScore = 0;
     if (a.uniformFloor && a.floorCoverage >= 0.8) coherenceScore += 5;
@@ -386,11 +392,11 @@ function computeWorkshopQuality(a) {
             totalTiles += count;
         }
         const avgValue = totalTiles > 0 ? totalValue / totalTiles : 0;
-        floorScore = Math.min(20, Math.round(a.floorCoverage * avgValue));
+        floorScore = Math.min(ROOM_SCORE_CAPS.workshop.floor, Math.round(a.floorCoverage * avgValue));
     }
 
     let lightScore = 0;
-    if (a.litRatio >= 0.8) lightScore = 15;
+    if (a.litRatio >= 0.8) lightScore = ROOM_SCORE_CAPS.workshop.light;
     else if (a.litRatio >= 0.5) lightScore = 10;
     else if (a.litRatio >= 0.3) lightScore = 7;
     else if (a.litRatio > 0) lightScore = 3;
@@ -401,7 +407,7 @@ function computeWorkshopQuality(a) {
     }
     let focusScore = 0;
     let focusGroup = null;
-    if (groups.size === 1) { focusScore = 25; focusGroup = [...groups][0]; }
+    if (groups.size === 1) { focusScore = ROOM_SCORE_CAPS.workshop.focus; focusGroup = [...groups][0]; }
     else if (groups.size === 2) { focusScore = 12; focusGroup = [...groups].join('/'); }
 
     let supportScore = 0;
@@ -415,7 +421,7 @@ function computeWorkshopQuality(a) {
             supportScore += Math.floor(bDef.workshopBonus * 0.5) * (count - 1);
         }
     }
-    supportScore = Math.min(25, supportScore);
+    supportScore = Math.min(ROOM_SCORE_CAPS.workshop.support, supportScore);
 
     const total = Math.min(100, sizeScore + floorScore + lightScore + focusScore + supportScore);
 

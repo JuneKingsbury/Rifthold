@@ -12,7 +12,12 @@ export function updateWildlife(game) {
     for (let i = game.entities.length - 1; i >= 0; i--) {
         const animal = game.entities[i];
         if (animal.category !== 'animal') continue;
-        if (animal.tamed) continue;
+        if (animal.tamed) {
+            if (animal.hp <= 0) {
+                game.entities.splice(i, 1);
+            }
+            continue;
+        }
 
         // Animal being led to pen: follow the colonist each tick.
         if (animal.pendingTame) {

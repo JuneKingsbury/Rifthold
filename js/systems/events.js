@@ -251,6 +251,10 @@ export class EventSystem {
                 if (tile.zone && tile.zone.state === 'growing' && Math.random() < def.chance) {
                     tile.zone.state = 'empty';
                     tile.zone.growth = 0;
+                    tile.zone.blighted = false;
+                    delete tile.zone.blightSpreadCount;
+                    const staleTask = game.taskQueue._byPosition.get(game.taskQueue._posKey(x, y));
+                    if (staleTask) game.taskQueue.remove(staleTask.id);
                     count++;
                 }
             }
@@ -347,6 +351,8 @@ export class EventSystem {
             const tile = game.map[y][x];
             tile.zone.state = 'empty';
             tile.zone.growth = 0;
+            const staleTask = game.taskQueue._byPosition.get(game.taskQueue._posKey(x, y));
+            if (staleTask) game.taskQueue.remove(staleTask.id);
             game.entities.push({
                 type: 'blight_bloom', category: 'blight_bloom',
                 id: getNextId(),

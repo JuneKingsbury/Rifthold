@@ -112,7 +112,7 @@ function updateFarmTile(game, x, y, season, growthMult) {
         }
 
         let effectiveGrowthMult = growthMult;
-        if (effectiveGrowthMult === 0 && game.research.isResearched('irrigation') && crop.seasons.includes !== undefined) {
+        if (effectiveGrowthMult === 0 && game.research.isResearched('irrigation') && crop.seasons.includes(game.weather.season)) {
             effectiveGrowthMult = 0.5;
         }
         if (effectiveGrowthMult > 0) {

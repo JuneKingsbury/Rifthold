@@ -680,6 +680,7 @@ export class ExplorationSystem {
     }
 
     _applyTrapDamage(exp, game, trapDef, alive, ds) {
+        if (!alive.length) return;
         const member = alive[randInt(0, alive.length - 1)];
         const trapMult = getPartyExpeditionEffect(exp.partySnapshot, 'trapDamageMult', exp.realm);
         const xpTrapMult = this._getXpLevelBonus(member.id, 'trapDamageMult');
@@ -818,7 +819,7 @@ export class ExplorationSystem {
 
         for (const id of exp.partyIds) {
             const c = game.getColonist(id);
-            if (!c || c.onExpedition) continue;
+            if (!c || c.onExpedition || c.hp <= 0) continue;
 
             const dist = manhattanDist(c.x, c.y, gx, gy);
             if (dist <= 1) {

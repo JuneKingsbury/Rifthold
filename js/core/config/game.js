@@ -103,7 +103,7 @@ export const EVENTS = {
         logMessage: '{name} saw a shooting star', logType: 'success',
     },
     found_trinket: {
-        weight: 6, minTick: 320, cooldown: 960,
+        weight: 1, minTick: 1600, cooldown: 4800,
         effect: 'trinket_find',
         trinketKey: 'rabbits_paw',
         thought: 'Found a lucky trinket', moodChange: 5, moodDuration: 350,

@@ -1,4 +1,5 @@
 import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER } from '../core/config.js';
+import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getItemTradeValue } from '../entities/item-roll.js';
@@ -1451,31 +1452,34 @@ export class UI {
             html += `<div class="info-row" style="color:#ffdd66;font-weight:bold;">Town Hall — ${th.tierName} (${th.total}/100)</div>`;
             html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → Mood +${th.moodEffect} for ${th.duration} ticks when relaxing here</div>`;
             const b = th.breakdown;
-            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size}</div>`;
-            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor}</div>`;
-            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light}</div>`;
-            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} (${th.decorList.map(d => d.replace(/_/g, ' ')).join(', ')})</div>`;
-            if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence}</div>`;
+            const thCaps = ROOM_SCORE_CAPS.townhall;
+            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${thCaps.size}</div>`;
+            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${thCaps.floor}</div>`;
+            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${thCaps.light}</div>`;
+            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${thCaps.decor} (${th.decorList.map(d => d.replace(/_/g, ' ')).join(', ')})</div>`;
+            if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence} / ${thCaps.coherence}</div>`;
         }
         if (rq) {
             html += `<div class="info-row" style="color:#aaccff;font-weight:bold;">${rq.tierName} (${rq.total}/100)</div>`;
             html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → Mood +${rq.moodEffect} for ${rq.duration} ticks when sleeping here</div>`;
             const b = rq.breakdown;
-            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size}</div>`;
-            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor}</div>`;
-            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light}</div>`;
-            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} (${rq.decorList.map(d => d.replace(/_/g, ' ')).join(', ')})</div>`;
-            if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence}</div>`;
+            const rqCaps = ROOM_SCORE_CAPS.bedroom;
+            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${rqCaps.size}</div>`;
+            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${rqCaps.floor}</div>`;
+            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${rqCaps.light}</div>`;
+            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${rqCaps.decor} (${rq.decorList.map(d => d.replace(/_/g, ' ')).join(', ')})</div>`;
+            if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence} / ${rqCaps.coherence}</div>`;
         }
         if (wq) {
             const label = wq.focusGroup ? `${wq.tierName} ${wq.focusGroup}` : wq.tierName;
             html += `<div class="info-row" style="color:#ffcc44;font-weight:bold;">Workshop — ${label} (${wq.total}/100)</div>`;
             const b = wq.breakdown;
-            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size}</div>`;
-            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor}</div>`;
-            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light}</div>`;
-            if (b.focus > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Focus: +${b.focus}${wq.focusGroup ? ` (${wq.focusGroup})` : ''}</div>`;
-            if (b.support > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Support: +${b.support} (${wq.supportList.map(s => s.replace(/_/g, ' ')).join(', ')})</div>`;
+            const wqCaps = ROOM_SCORE_CAPS.workshop;
+            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${wqCaps.size}</div>`;
+            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${wqCaps.floor}</div>`;
+            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${wqCaps.light}</div>`;
+            if (b.focus > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Focus: +${b.focus} / ${wqCaps.focus}${wq.focusGroup ? ` (${wq.focusGroup})` : ''}</div>`;
+            if (b.support > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Support: +${b.support} / ${wqCaps.support} (${wq.supportList.map(s => s.replace(/_/g, ' ')).join(', ')})</div>`;
             if (wq.speedMult > 1 || wq.qualityBonus > 0) {
                 let bonusText = '';
                 if (wq.speedMult > 1) bonusText += `Speed: +${Math.round((wq.speedMult - 1) * 100)}%`;

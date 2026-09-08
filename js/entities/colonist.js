@@ -1578,34 +1578,36 @@ function updateIdle(colonist, game) {
     if (task) {
         game.taskQueue.claim(task.id, colonist.id);
         colonist.currentTaskId = task.id;
-        const path = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y, game._occupiedTiles);
-        if (path && path.length > 0) {
-            colonist.path = path;
-            colonist.state = 'moving';
-        } else if (manhattanDist(colonist.x, colonist.y, task.x, task.y) <= 1) {
+        if (manhattanDist(colonist.x, colonist.y, task.x, task.y) <= 1) {
             colonist.state = 'working';
             colonist.workProgress = 0;
         } else {
-            game.taskQueue.release(task.id);
-            colonist.currentTaskId = null;
-            if (!colonist._failedTasks) colonist._failedTasks = {};
-            colonist._failedTasks[task.id] = game.tick;
+            const path = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y, game._occupiedTiles);
+            if (path && path.length > 0) {
+                colonist.path = path;
+                colonist.state = 'moving';
+            } else {
+                game.taskQueue.release(task.id);
+                colonist.currentTaskId = null;
+                if (!colonist._failedTasks) colonist._failedTasks = {};
+                colonist._failedTasks[task.id] = game.tick;
 
-            if (!task._unreachableFailers) task._unreachableFailers = {};
-            task._unreachableFailers[colonist.id] = true;
+                if (!task._unreachableFailers) task._unreachableFailers = {};
+                task._unreachableFailers[colonist.id] = true;
 
-            const failCount = Object.keys(task._unreachableFailers).length;
-            if (failCount >= TASK_CONFIG.unreachableFailThreshold) {
-                game.taskQueue.remove(task.id);
-                const tile = game.map[task.y] && game.map[task.y][task.x];
-                if (tile) {
-                    tile.designation = null;
-                    game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.needCriticalChar, color: COMBAT_VISUALS.needCriticalColor, ttl: COMBAT_VISUALS.needCriticalTtl });
+                const failCount = Object.keys(task._unreachableFailers).length;
+                if (failCount >= TASK_CONFIG.unreachableFailThreshold) {
+                    game.taskQueue.remove(task.id);
+                    const tile = game.map[task.y] && game.map[task.y][task.x];
+                    if (tile) {
+                        tile.designation = null;
+                        game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.needCriticalChar, color: COMBAT_VISUALS.needCriticalColor, ttl: COMBAT_VISUALS.needCriticalTtl });
+                    }
+                    game.notifications.push({ text: `Cancelled unreachable ${task.type} task`, tick: game.tick, type: 'warning' });
+                } else if (!colonist._lastPathFailNotify || game.tick - colonist._lastPathFailNotify > TASK_CONFIG.unreachableCheckInterval) {
+                    colonist._lastPathFailNotify = game.tick;
+                    game.notifications.push({ text: `${colonist.name} can't reach ${task.type} task`, tick: game.tick, type: 'danger' });
                 }
-                game.notifications.push({ text: `Cancelled unreachable ${task.type} task`, tick: game.tick, type: 'warning' });
-            } else if (!colonist._lastPathFailNotify || game.tick - colonist._lastPathFailNotify > TASK_CONFIG.unreachableCheckInterval) {
-                colonist._lastPathFailNotify = game.tick;
-                game.notifications.push({ text: `${colonist.name} can't reach ${task.type} task`, tick: game.tick, type: 'danger' });
             }
         }
         return;

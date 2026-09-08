@@ -20,6 +20,7 @@ export class SpatialHash {
     }
 
     insert(entity) {
+        if (this.entityCell.has(entity)) this.remove(entity);
         const { cx, cy } = this._cellCoords(entity.x, entity.y);
         const k = this._key(cx, cy);
         let cell = this.cells.get(k);

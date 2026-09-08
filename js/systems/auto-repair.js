@@ -32,10 +32,10 @@ export function updateAutoRepair(game, structurePositions = game.mapIndex.getAll
     if (anvils.length === 0) return;
     for (const c of game.colonists) {
         if (c.hp <= 0 || !c.trinketBroken || !c.trinket) continue;
-        if (c._repairQueued) continue;
         const anvil = anvils[0];
         const existing = game.taskQueue.getAll().find(t => t.type === 'repair_trinket' && t.colonistId === c.id);
-        if (existing) continue;
+        if (existing) { c._repairQueued = true; continue; }
+        c._repairQueued = false;
         game.taskQueue.add({
             type: 'repair_trinket',
             skillRequired: 'crafting',

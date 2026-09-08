@@ -76,7 +76,7 @@ export class ResourceManager {
             if (resource === 'foodstuffs') {
                 this.deductFoodstuffs(amount);
             } else {
-                this.stockpile[resource] = (this.stockpile[resource] || 0) - amount;
+                this.stockpile[resource] = Math.max(0, (this.stockpile[resource] || 0) - amount);
             }
         }
     }
