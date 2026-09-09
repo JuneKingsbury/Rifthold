@@ -962,6 +962,7 @@ export class ExplorationSystem {
                     ranged: eDef?.attackAnim === 'DrawAndShoot' || !!eDef?.ranged,
                     projectileChar: eDef?.projectileChar || null,
                     projectileColor: eDef?.projectileColor || null,
+                    damageReduction: eDef?.damageReduction || 0,
                 };
                 enemy.maxHp = enemy.hp;
                 this._rollEliteModifier(enemy, diffSettings);
@@ -1262,19 +1263,17 @@ export class ExplorationSystem {
 
         exp.combat = {
             enemies,
-            roundTick: game.tick + EXPLORATION_CONFIG.combatRoundTicks,
             round: 0,
             encounterIndex: exp.currentEncounter,
             isBoss: encounter.isBoss || false,
+            ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)),
         };
+        exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
+        enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
     }
 
     _updateCombat(exp, game) {
         const combat = exp.combat;
-        if (game.tick < combat.roundTick) return;
-
-        combat.roundTick = game.tick + EXPLORATION_CONFIG.combatRoundTicks;
-        combat.round++;
 
         const alive = exp.partySnapshot.filter(p => p.hp > 0);
         const enemiesAlive = combat.enemies.filter(e => e.hp > 0);
@@ -1329,81 +1328,66 @@ export class ExplorationSystem {
             for (const item of memberItems) { if (item !== member.weapon && item.damage) weaponDmg += item.damage; }
             let critChance = memberItems.reduce((sum, it) => sum + (it.critChance || 0), 0);
             critChance += this._combatStatusValue(member, 'buff_critChance', 'value', 0);
-            // Attacks-per-round scales with weapon speed: combatRoundTicks is the
-            // round's real-time span, so a fast weapon (low effective cooldown)
-            // swings more times within it than a slow one. Per-hit damage is
-            // weaponDmg/hitsPerRound, so total per-round output stays weaponDmg
-            // (DPS-neutral). The only edge extra swings grant is more independent
-            // crit rolls, which is exactly the payoff for a high-crit build.
             const atkSpeedBuff = 1 + this._combatStatusValue(member, 'buff_attackSpeed', 'value', 0);
-            const hitsPerRound = Math.max(1, Math.round(EXPLORATION_CONFIG.combatRoundTicks / (member.effectiveCooldown / atkSpeedBuff)));
-            const perHitDmg = weaponDmg / hitsPerRound;
-            const formDmgMult = this._applyFormationModifier(exp, member.id, 'meleeDamageMult');
+            const effCd = Math.max(1, Math.round(member.effectiveCooldown / atkSpeedBuff));
+            if (game.tick < (member._nextAttackTick || 0)) continue;
+            member._nextAttackTick = game.tick + effCd;
+            const isRanged = member.weapon && member.weapon.ranged;
+            const formDmgMult = isRanged ? 1.0 : this._applyFormationModifier(exp, member.id, 'meleeDamageMult');
             const xpDmgMult = this._getXpLevelBonus(member.id, 'expeditionDamageMult');
 
-            for (let hit = 0; hit < hitsPerRound; hit++) {
-                const target = combat.enemies.find(e => e.hp > 0);
-                if (!target) break;
-                // Stamp the basic-attack tick so the expedition visual can play an
-                // attack animation. Set only on basic attacks, never spells. Kind
-                // drives the motion class: melee = swing (rotation), ranged =
-                // draw/thrust + projectile.
-                member._lastAttackTick = game.tick;
-                // Motion class comes straight from the weapon's attackAnim
-                // ('Swing' | 'Stab' | 'DrawAndShoot'). `member.attackAnim` was
-                // resolved (with a ranged fallback) in the party snapshot.
-                member._lastAttackKind = member.attackAnim
-                    || (member.weapon && member.weapon.attackAnim)
-                    || (member.weapon && member.weapon.ranged ? 'DrawAndShoot' : 'Swing');
-                const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
+            const target = combat.enemies.find(e => e.hp > 0);
+            if (!target) continue;
+            // Stamp the basic-attack tick so the expedition visual can play an
+            // attack animation. Set only on basic attacks, never spells. Kind
+            // drives the motion class: melee = swing (rotation), ranged =
+            // draw/thrust + projectile.
+            member._lastAttackTick = game.tick;
+            member._lastAttackKind = member.attackAnim
+                || (member.weapon && member.weapon.attackAnim)
+                || (member.weapon && member.weapon.ranged ? 'DrawAndShoot' : 'Swing');
+            const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
 
-                if (target.eliteDodge && Math.random() < target.eliteDodge) {
-                    target._lastDodgeTick = game.tick;
-                    this._addLog(exp, game, `${targetLabel} dodges ${member.name}'s attack!`, 'combat');
-                    continue;
+            if (target.eliteDodge && Math.random() < target.eliteDodge) {
+                target._lastDodgeTick = game.tick;
+                this._addLog(exp, game, `${targetLabel} dodges ${member.name}'s attack!`, 'combat');
+                continue;
+            }
+
+            const armoredBonus = (target.armored && member.weapon && member.weapon.armoredDamageBonus) ? (1 + member.weapon.armoredDamageBonus) : 1;
+            let dmg = Math.max(1, Math.round((weaponDmg + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * memberWeaken * armoredBonus * (1 - physResist)));
+            let critHit = false;
+            if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
+            if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
+            if (target.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - target.damageReduction)));
+
+            if (Math.random() < baseMissChance) {
+                const msg = pickRandom(EXPLORATION_EVENTS.combatMiss).replace('{attacker}', member.name).replace('{target}', targetLabel);
+                this._addLog(exp, game, msg, 'combat');
+            } else {
+                target.hp -= dmg;
+                if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
+                if (critHit) member._lastCritTick = game.tick;
+                const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
+                const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', member.name).replace('{target}', targetLabel).replace('{dmg}', dmg);
+                this._addLog(exp, game, msg, 'combat');
+                const isRangedAttack = member.weapon && member.weapon.ranged;
+                const rangedSfx = (member.weapon && member.weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
+                window.soundManager?.playExpSFX(critHit ? 'critical_hit' : (isRangedAttack ? rangedSfx : 'colonist_damaged'));
+                const lifeSteal = memberItems.reduce((sum, it) => sum + (it.lifeSteal || 0), 0);
+                if (lifeSteal > 0) {
+                    const healed = Math.floor(dmg * lifeSteal);
+                    if (healed > 0) { member.hp = Math.min(member.maxHp, member.hp + healed); if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed; }
                 }
-
-                // perHitDmg (= weaponDmg/hitsPerRound) keeps per-round output constant.
-                // variance is likewise divided so a fast weapon's many swings don't
-                // accumulate more bonus roll than a slow one. Round (not floor) the
-                // per-hit value so splitting into more hits doesn't shave damage.
-                let dmg = Math.max(1, Math.round((perHitDmg + randInt(0, 3) / hitsPerRound) * partyDmgMult * formDmgMult * xpDmgMult * memberWeaken * (1 - physResist)));
-                let critHit = false;
-                if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
-                if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
-
-                if (Math.random() < baseMissChance) {
-                    const msg = pickRandom(EXPLORATION_EVENTS.combatMiss).replace('{attacker}', member.name).replace('{target}', targetLabel);
-                    this._addLog(exp, game, msg, 'combat');
-                } else {
-                    target.hp -= dmg;
-                    if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
-                    // Stamp crit tick so the visual can play a stronger swing + punch.
-                    if (critHit) member._lastCritTick = game.tick;
-                    const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
-                    const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', member.name).replace('{target}', targetLabel).replace('{dmg}', dmg);
-                    this._addLog(exp, game, msg, 'combat');
-                    const isRangedAttack = member.weapon && member.weapon.ranged;
-                    const rangedSfx = (member.weapon && member.weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
-                    window.soundManager?.playExpSFX(critHit ? 'critical_hit' : (isRangedAttack ? rangedSfx : 'colonist_damaged'));
-                    const lifeSteal = memberItems.reduce((sum, it) => sum + (it.lifeSteal || 0), 0);
-                    if (target.eliteLifeSteal && target.eliteLifeSteal > 0) {
-                        // Vampiric enemies steal from the attacker
-                    }
-                    if (lifeSteal > 0) {
-                        const healed = Math.floor(dmg * lifeSteal);
-                        if (healed > 0) { member.hp = Math.min(member.maxHp, member.hp + healed); if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed; }
-                    }
-                    if (target.hp <= 0) {
-                        const slayLabel = target.isBoss ? target.name : 'a foe';
-                        this._addLog(exp, game, `${member.name} slays ${slayLabel}!`, 'success');
-                        window.soundManager?.playExpSFX('enemy_death');
-                        if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
-                        const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0)
-                            + this._combatStatusValue(member, 'buff_hpOnKill', 'value', 0);
-                        if (hpOnKill > 0) member.hp = Math.min(member.maxHp, member.hp + hpOnKill);
-                        if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
-                    }
+                if (target.hp <= 0) {
+                    const slayLabel = target.isBoss ? target.name : 'a foe';
+                    this._addLog(exp, game, `${member.name} slays ${slayLabel}!`, 'success');
+                    window.soundManager?.playExpSFX('enemy_death');
+                    if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
+                    const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0)
+                        + this._combatStatusValue(member, 'buff_hpOnKill', 'value', 0);
+                    if (hpOnKill > 0) member.hp = Math.min(member.maxHp, member.hp + hpOnKill);
+                    if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
                 }
             }
         }
@@ -1415,7 +1399,7 @@ export class ExplorationSystem {
         if (exp.summons && exp.summons.length > 0) {
             for (let si = exp.summons.length - 1; si >= 0; si--) {
                 const summon = exp.summons[si];
-                summon.ticksRemaining -= EXPLORATION_CONFIG.combatRoundTicks;
+                summon.ticksRemaining -= 1;
                 if (summon.ticksRemaining <= 0 || summon.hp <= 0) {
                     this._addLog(exp, game, `The ${summon.name} fades away.`, 'info');
                     exp.summons.splice(si, 1);
@@ -1452,15 +1436,16 @@ export class ExplorationSystem {
         }
 
         // ── Enemy attack phase ──
-        // Ambush (Adventurer Lv8): any member with this ability grants a free first
-        // round of combat; enemies skip their attacks on round 1.
-        const hasAmbush = combat.round === 1 && exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 8);
-        if (hasAmbush) {
-            this._addLog(exp, game, 'The party ambushes their foes! Enemies cannot act this round.', 'success');
+        // Ambush (Adventurer Lv8): enemies cannot act until ambushEndTick has passed,
+        // giving the party a free attack window at the start of combat.
+        const inAmbush = game.tick <= (combat.ambushEndTick || 0) && exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 8);
+        if (inAmbush && !combat._ambushLogged) {
+            combat._ambushLogged = true;
+            this._addLog(exp, game, 'The party ambushes their foes! Enemies cannot act yet.', 'success');
         }
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
-            if (hasAmbush) { enemy._lastAttackKind = enemy.attackAnim || 'Swing'; continue; }
+            if (inAmbush) { enemy._lastAttackKind = enemy.attackAnim || 'Swing'; continue; }
             const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
             // Crowd control from party spells: a stunned enemy forfeits its turn. A
             // slowed one has a (1 - mult) chance to lose it. Weaken (below) scales the
@@ -1481,11 +1466,14 @@ export class ExplorationSystem {
             // Attack-animation speed (see party snapshot): <1 fast, >1 slow. The
             // visual clamps it. Here it's just the raw cooldown-to-baseline ratio.
             enemy._atkAnimMult = enemyCd / COLONIST_CONFIG.baseAttackCooldown;
-            let enemyHits = Math.max(1, Math.round(COLONIST_CONFIG.baseAttackCooldown / enemyCd));
-            if (enemy.eliteExtraAttacks) enemyHits += enemy.eliteExtraAttacks;
+            // Elite extra attacks reduce the effective cooldown proportionally.
+            const eliteSpeedMult = enemy.eliteExtraAttacks ? 1 / (1 + enemy.eliteExtraAttacks) : 1;
+            const effEnemyCd = Math.max(1, Math.floor(enemyCd * eliteSpeedMult));
+            if (game.tick < (enemy._nextAttackTick || 0)) continue;
+            enemy._nextAttackTick = game.tick + effEnemyCd;
 
-            for (let hit = 0; hit < enemyHits; hit++) {
-                if (enemy.spells && hit === 0) {
+            {
+                if (enemy.spells) {
                     let castSpell = false;
                     for (const sp of enemy.spells) {
                         if (Math.random() < sp.chance) {
@@ -1666,7 +1654,7 @@ export class ExplorationSystem {
                         this._checkExpeditionRevive(exp, target, game);
                     }
                 }
-            }
+            } // end single-attack block
         }
 
         // ── Boss phase check ──
@@ -2665,9 +2653,11 @@ export class ExplorationSystem {
             }
             this._addLog(exp, game, `Enemies emerge! (${count} foes)`, 'combat');
             exp.combat = {
-                enemies, roundTick: game.tick + EXPLORATION_CONFIG.combatRoundTicks,
-                round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
+                enemies, round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
+                ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)),
             };
+            exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
+            enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
         }
         if (effects.nextLootRareMult) {
             exp._nextRareMult = effects.nextLootRareMult;
@@ -2729,9 +2719,11 @@ export class ExplorationSystem {
             }
             this._addLog(exp, game, `Enemies alerted! (${count} foes)`, 'combat');
             exp.combat = {
-                enemies, roundTick: game.tick + EXPLORATION_CONFIG.combatRoundTicks,
-                round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
+                enemies, round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
+                ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)),
             };
+            exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
+            enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
         }
     }
 

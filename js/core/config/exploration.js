@@ -33,12 +33,12 @@ export const EXPEDITION_ENEMIES = {
     void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: '', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
     oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: '', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
 
-    // Kingdom chain
-    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', lore: '' },
-    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', lore: '' },
-    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', lore: '' },
+    // Kingdom chain (armored: true enables armoredDamageBonus on Runic Greatsword)
+    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: '' },
+    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: '' },
+    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: '' },
     royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: '', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
-    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', lore: '' },
+    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: '' },
 };
 
 // Realm chains a demo-mode player may explore. All other chains stay locked
@@ -2109,7 +2109,7 @@ export const WAVE_CONFIG = {
     nexusHp: 200,                // starting HP of the void nexus
     nexusHpPerWave: 0,           // additional nexus HP per wave (0 = static)
     colonistCapBase: 3,          // starting colonist cap before any waves
-    colonistCapScale: 2.5,       // scaling factor for cap increase per wave completed
+    colonistCapScale: 0,          // waves no longer directly grant cap (use hearth shrines)
     colonistCapMax: 12,          // maximum colonist cap
     enemySpeed: 0.45,            // wave enemy movement speed (lower = slower)
     enemyChar: 'E',              // character displayed for wave enemies

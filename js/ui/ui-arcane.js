@@ -504,7 +504,7 @@ const arcaneMethods = {
         html += `<div class="info-row" style="margin-top:10px;color:#6688ff;font-weight:bold;">Formation</div>`;
         html += `<div style="display:flex;gap:12px;margin:4px 0;font-size:0.85em;">`;
         html += `<div style="flex:1;border:1px solid #333;border-radius:3px;padding:4px;background:#111;">`;
-        html += `<div style="color:#ff8844;font-weight:bold;font-size:0.85em;margin-bottom:2px;">Front Row <span style="color:#666;font-weight:normal;">+${Math.round((FORMATION_CONFIG.rows.front.meleeDamageMult - 1) * 100)}% melee, +${Math.round((FORMATION_CONFIG.rows.front.damageTakenMult - 1) * 100)}% dmg taken</span></div>`;
+        html += `<div style="color:#ff8844;font-weight:bold;font-size:0.85em;margin-bottom:2px;">Front Row <span style="color:#666;font-weight:normal;">+${Math.round((FORMATION_CONFIG.rows.front.meleeDamageMult - 1) * 100)}% melee dmg, +${Math.round((FORMATION_CONFIG.rows.front.damageTakenMult - 1) * 100)}% dmg taken</span></div>`;
         html += `<div id="exp-front-row">`;
         for (const c of available) {
             if (this._expBackRowIds.has(c.id)) continue;
@@ -512,7 +512,7 @@ const arcaneMethods = {
         }
         html += `</div></div>`;
         html += `<div style="flex:1;border:1px solid #333;border-radius:3px;padding:4px;background:#111;">`;
-        html += `<div style="color:#6688ff;font-weight:bold;font-size:0.85em;margin-bottom:2px;">Back Row <span style="color:#666;font-weight:normal;">-${Math.round((1 - FORMATION_CONFIG.rows.back.damageTakenMult) * 100)}% dmg taken, +${Math.round((FORMATION_CONFIG.rows.back.spellDamageMult - 1) * 100)}% spell</span></div>`;
+        html += `<div style="color:#6688ff;font-weight:bold;font-size:0.85em;margin-bottom:2px;">Back Row <span style="color:#666;font-weight:normal;">-${Math.round((1 - FORMATION_CONFIG.rows.back.damageTakenMult) * 100)}% dmg taken, -${Math.round((1 - FORMATION_CONFIG.rows.back.meleeDamageMult) * 100)}% melee dmg, +${Math.round((FORMATION_CONFIG.rows.back.spellDamageMult - 1) * 100)}% spell dmg</span></div>`;
         html += `<div id="exp-back-row">`;
         for (const c of available) {
             if (!this._expBackRowIds.has(c.id)) continue;

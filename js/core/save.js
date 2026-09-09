@@ -110,6 +110,7 @@ export function saveGame(game) {
 
         stats: game.stats,
         manaCrystalBonus: game.manaCrystalBonus || 0,
+        hearthShrineBonus: game.hearthShrineBonus || 0,
         discoveredLoot: [...(game.discoveredLoot || [])],
 
         story: {
@@ -326,6 +327,7 @@ export function loadGame(game) {
             Object.assign(game.stats, data.stats);
         }
         game.manaCrystalBonus = data.manaCrystalBonus || 0;
+        game.hearthShrineBonus = data.hearthShrineBonus || 0;
         game.discoveredLoot = new Set(data.discoveredLoot || []);
 
         if (data.story) {

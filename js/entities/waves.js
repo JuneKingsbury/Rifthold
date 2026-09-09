@@ -35,10 +35,8 @@ export class WaveSystem {
                 }
             }
         }
-        if (this.highestWaveCompleted === 0) return base;
-        const bonus = Math.floor(this.highestWaveCompleted / 2);
         const max = game?.settings?.demoMode ? 8 : WAVE_CONFIG.colonistCapMax;
-        return Math.min(max, base + bonus);
+        return Math.min(max, base);
     }
 
     canStartWave(game) {
@@ -286,8 +284,12 @@ export class WaveSystem {
             this.highestWaveCompleted = this.currentWave;
             const bonusEssence = this.currentWave * WAVE_CONFIG.bonusEssencePerWave;
             game.resources.add({ void_essence: bonusEssence });
-            game.notifications.push({ text: `Wave ${this.currentWave} complete! +${bonusEssence} bonus void essence. Colony cap: ${this.getColonistCap(game)}`, tick: game.tick, type: 'success' });
-            game.eventLog.add(game, `Wave ${this.currentWave} defeated! Colony can now support ${this.getColonistCap(game)} colonists.`, 'success', null);
+            // Each completed wave unlocks one additional Hearth Shrine slot.
+            // Players must still build and power each shrine to grow their colony cap.
+            if (!game.hearthShrineBonus) game.hearthShrineBonus = 0;
+            game.hearthShrineBonus++;
+            game.notifications.push({ text: `Wave ${this.currentWave} complete! +${bonusEssence} bonus void essence. A new Hearth Shrine slot is available!`, tick: game.tick, type: 'success' });
+            game.eventLog.add(game, `Wave ${this.currentWave} defeated! You may now build another Hearth Shrine to expand your colony.`, 'success', null);
             game.story.checkMilestone('first_wave_completed', game);
             if (game.stats) game.stats.wavesCompleted++;
         } else {

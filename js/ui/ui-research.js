@@ -422,7 +422,7 @@ const researchMethods = {
             const current = game.stats?.[stat] || 0;
             const labels = {
                 raidsDefeated: 'Survive a raid',
-                wavesCompleted: 'Complete a void wave',
+                wavesCompleted: 'Complete 3 void waves',
                 expeditionsCompleted: 'Complete an expedition',
                 superiorItemsCrafted: 'Craft a Superior item',
                 itemsEnchanted: `Enchant ${min} items (${current}/${min})`,

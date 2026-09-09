@@ -1,9 +1,9 @@
 export const SKILLS = {
-    building: { name: 'Building', baseLevel: [2, 4], biasBonus: 3, description: 'Construction, mining, chopping, and repairs' },
-    farming:  { name: 'Farming', baseLevel: [2, 4], biasBonus: 3, description: 'Planting and harvesting crops' },
-    crafting: { name: 'Crafting', baseLevel: [2, 4], biasBonus: 3, description: 'Crafting items at workbenches' },
-    cooking:  { name: 'Cooking', baseLevel: [2, 4], biasBonus: 3, description: 'Cooking meals at cauldrons' },
-    animals:  { name: 'Animals', baseLevel: [1, 3], biasBonus: 3, description: 'Taming and handling animals' },
+    building: { name: 'Building', baseLevel: [1, 3], biasBonus: 3, description: 'Construction, mining, chopping, and repairs' },
+    farming:  { name: 'Farming', baseLevel: [1, 3], biasBonus: 3, description: 'Planting and harvesting crops' },
+    crafting: { name: 'Crafting', baseLevel: [1, 3], biasBonus: 3, description: 'Crafting items at workbenches' },
+    cooking:  { name: 'Cooking', baseLevel: [1, 3], biasBonus: 3, description: 'Cooking meals at cauldrons' },
+    animals:  { name: 'Animals', baseLevel: [1, 2], biasBonus: 3, description: 'Taming and handling animals' },
     research: { name: 'Research', baseLevel: [1, 2], biasBonus: 3, description: 'Studying and discovering new knowledge' },
 };
 

@@ -137,6 +137,7 @@ class Game {
         this.tutorial = new TutorialSystem();
 
         this.manaCrystalBonus = 0;
+        this.hearthShrineBonus = 0;
         this.discoveredLoot = new Set();
         this.stats = { raidsDefeated: 0, wavesCompleted: 0, expeditionsCompleted: 0, superiorItemsCrafted: 0, itemsEnchanted: 0 };
 

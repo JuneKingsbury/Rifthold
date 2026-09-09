@@ -1095,6 +1095,12 @@ function getColonyHostiles(game) {
     ].filter(h => h.hp > 0);
 }
 
+// Applies a target's innate DR (damageReduction on its entity def) to a damage value.
+function applyEnemyDR(target, dmg) {
+    const dr = target.damageReduction || 0;
+    return dr > 0 ? Math.max(1, Math.floor(dmg * (1 - dr))) : dmg;
+}
+
 // Applies a movement/attack "slow" to a hostile entity for `ticks`, stored as a
 // tick deadline the enemy AI (roles.js/combat.js) reads. slowMult<1 scales its
 // effective speed. Extends rather than stacks: keeps the later expiry.
@@ -1121,7 +1127,7 @@ function applySpellEffect(colonist, spell, game) {
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > spell.range) return;
             if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
-            const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
+            const dmg = applyEnemyDR(target, Math.floor(spell.damage * getSpellDamageMult(colonist, spell)));
             target.hp -= dmg;
             spawnDamageText(game, target.x, target.y, dmg);
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
@@ -1154,8 +1160,9 @@ function applySpellEffect(colonist, spell, game) {
             for (const h of allHostiles) {
                 if (h.hp <= 0) continue;
                 if (manhattanDist(target.x, target.y, h.x, h.y) <= spell.radius) {
-                    h.hp -= aoeDmg;
-                    spawnDamageText(game, h.x, h.y, aoeDmg);
+                    const hDmg = applyEnemyDR(h, aoeDmg);
+                    h.hp -= hDmg;
+                    spawnDamageText(game, h.x, h.y, hDmg);
                     h._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
                     game.combatEffects.push({ x: h.x, y: h.y, char: spell.projectileChar || '●', color: spell.projectileColor || '#ff6600', ttl: 3 });
                 }
@@ -1167,7 +1174,7 @@ function applySpellEffect(colonist, spell, game) {
             if (!target) return;
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > (spell.range || 1)) return;
-            const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
+            const dmg = applyEnemyDR(target, Math.floor(spell.damage * getSpellDamageMult(colonist, spell)));
             target.hp -= dmg;
             spawnDamageText(game, target.x, target.y, dmg);
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
@@ -1328,7 +1335,7 @@ function applySpellEffect(colonist, spell, game) {
             const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
             if (dist > spell.range) return;
             if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
-            const dmg = Math.floor(spell.damage * getSpellDamageMult(colonist, spell));
+            const dmg = applyEnemyDR(target, Math.floor(spell.damage * getSpellDamageMult(colonist, spell)));
             target.hp -= dmg;
             spawnDamageText(game, target.x, target.y, dmg);
             target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
@@ -2353,6 +2360,7 @@ function updateFighting(colonist, game) {
             window.soundManager?.playSFX('critical_hit');
         }
         if (target.category === 'blight_bloom' && colonist.activeEffects?.some(e => e.type === 'blightWard')) dmg *= 2;
+        dmg = applyEnemyDR(target, dmg);
         target.hp -= dmg;
         target._killerColonist = colonist; // for the loot-drop effect on kill
         spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);
@@ -2413,6 +2421,7 @@ function updateFighting(colonist, game) {
             window.soundManager?.playSFX('critical_hit');
         }
         if (target.category === 'blight_bloom' && colonist.activeEffects?.some(e => e.type === 'blightWard')) dmg *= 2;
+        dmg = applyEnemyDR(target, dmg);
         target.hp -= dmg;
         target._killerColonist = colonist; // for the loot-drop effect on kill
         spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);

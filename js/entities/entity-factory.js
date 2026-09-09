@@ -42,6 +42,7 @@ export function createEntity(type, x, y, options = {}) {
 
     if (def.noFlee) entity.noFlee = true;
     if (def.aggroRange) entity.aggroRange = def.aggroRange;
+    if (def.damageReduction) entity.damageReduction = def.damageReduction;
     if (def.ranged) {
         entity.ranged = true;
         entity.projectileChar = def.projectileChar;

@@ -934,7 +934,7 @@ export class UI {
                     }
 
                     html += `<div class="exp-log-container">`;
-                    const logSlice = exp.log.slice(-15);
+                    const logSlice = exp.log.slice(-25);
                     for (const entry of logSlice) {
                         const color = this._expLogColor(entry.type);
                         html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
@@ -1810,6 +1810,7 @@ export class UI {
             html += `<div class="info-header" style="color:${color};">${label}</div>`;
             html += `<div class="info-row">HP: ${r.hp}/${r.maxHp}</div>`;
             html += `<div class="info-row">Damage: ${r.weapon?.name ? r.weapon.name + ' ' : ''}${r.damage}d (${(r.damage / (r.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1)} dps)</div>`;
+            if (r.damageReduction) html += `<div class="info-row" style="color:#aaddff;">DR: ${Math.round(r.damageReduction * 100)}%</div>`;
             html += `<div class="info-row">State: ${r.fleeing ? 'Fleeing' : 'Attacking'}</div>`;
             if (r.roles && r.roles.length > 0) html += getRoleInfoHtml(r);
             html += `</div>`;
@@ -3774,9 +3775,9 @@ function statColor(value) {
 }
 
 function weaponSpeedLabel(cd) {
-    if (cd <= 2) return 'Fast';
-    if (cd >= 5) return 'Slow';
-    return 'Normal';
+    if (cd <= 2) return 'fast';
+    if (cd >= 5) return 'slow';
+    return 'normal';
 }
 
 function getWeaponTooltip(colonist) {
