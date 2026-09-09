@@ -54,7 +54,7 @@ export function queueEnchantingOrder(game, itemKey, itemQuality, itemType, itemT
     if (!game.resources.has({ [cost.resource]: cost.amount })) return `Not enough ${cost.resource.replace(/_/g, ' ')} (need ${cost.amount}).`;
     game.resources.deduct({ [cost.resource]: cost.amount });
 
-    let workAmount = 100; // Base work amount for enchanting, can be adjusted as needed.
+    let workAmount = 100; // Base work amount for enchanting.
 
     game.taskQueue.add({
         type: 'enchant',

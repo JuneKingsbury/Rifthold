@@ -991,7 +991,7 @@ export const EXPLORATION_EVENTS = {
         'Hostile creatures emerge from the darkness!',
         'The party is ambushed!',
         'Enemies block the path ahead!',
-        'Shadows coalesce into hostile forms!',
+        'Enemies close in from around the corner!',
     ],
     combatHit: [
         '{attacker} strikes {target} for {dmg} damage.',

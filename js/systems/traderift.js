@@ -124,7 +124,7 @@ export class TradeRiftSystem {
             cadence,
             cost: this._rollCost(targetGold, cfg),
             reward: { kind: 'artifact' },
-            vagueText: 'a far-off relic of great power',
+            vagueText: 'an unknown relic of great power',
             fulfilled: false,
         };
     }
