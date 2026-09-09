@@ -1,4 +1,5 @@
 import { SOUND_MANIFEST } from './sound-manifest.js';
+import { CONFIG, DAY_NIGHT } from './config.js';
 
 const CROSSFADE_MS = 2000;
 const SFX_COOLDOWN_MS = 200;
@@ -209,25 +210,64 @@ class SoundManagerClass {
         } catch (e) { /* silent */ }
     }
 
-    updateMusicState(game) {
+    // Returns the first candidate music name whose file is actually available,
+    // skipping names already known-missing. Missing candidates are checked
+    // against the in-memory `unavailable` set, so this is cheap on the steady
+    // path (the winning track is cached after first play). ambient_day/night
+    // act as the guaranteed final fallback, so a valid name is essentially
+    // always returned when they are passed last.
+    async _firstAvailableMusic(candidates) {
+        for (const name of candidates) {
+            if (this.unavailable.has('music_' + name)) continue;
+            const buffer = await this._getBuffer(name, 'music');
+            if (buffer) return name;
+        }
+        return null;
+    }
+
+    // Layered music selection, highest priority first:
+    //   expedition > combat > weather_<type> > season_<name> > ambient_day/night
+    // Each specialized layer falls through to the next if its track file is
+    // missing (404) or absent from the manifest.
+    async updateMusicState(game) {
         try {
             if (!this.ctx) return;
-            let desired = null;
+
+            // Expedition active? Any expedition not yet complete (gathering /
+            // exploring / returning) pauses colony music in favor of the
+            // expedition track. Handles concurrent expeditions: colony music
+            // only resumes once the last one completes.
+            const expActive = game.exploration && game.exploration.expeditions
+                && game.exploration.expeditions.some(e => e.status !== 'complete');
+            if (expActive) {
+                const name = await this._firstAvailableMusic(['expedition']);
+                if (name) {
+                    if (name !== this.currentMusicName) this.playMusic(name);
+                } else if (this.currentMusicName !== null) {
+                    // No expedition track present: go silent while the party is out.
+                    this.stopMusic();
+                }
+                return;
+            }
 
             const hasEnemies = (game.waves && game.waves.active && game.waves.enemies && game.waves.enemies.length > 0)
                 || (game.raiders && game.raiders.length > 0);
 
+            const candidates = [];
             if (hasEnemies) {
-                desired = 'combat';
+                candidates.push('combat');
             } else {
-                const dayProgress = game.timeOfDay / 300;
-                if (dayProgress >= 0.7 || dayProgress < 0.2) {
-                    desired = 'ambient_night';
-                } else {
-                    desired = 'ambient_day';
+                const w = game.weather;
+                if (w && w.currentWeather && w.currentWeather !== 'clear') {
+                    candidates.push('weather_' + w.currentWeather);
                 }
+                if (w && w.season) candidates.push('season_' + w.season);
+                const t = game.timeOfDay / CONFIG.TICKS_PER_DAY;
+                const isNight = t >= DAY_NIGHT.nightStart || t < DAY_NIGHT.dayStart;
+                candidates.push(isNight ? 'ambient_night' : 'ambient_day');
             }
 
+            const desired = await this._firstAvailableMusic(candidates);
             if (desired && desired !== this.currentMusicName) {
                 this.playMusic(desired);
             }

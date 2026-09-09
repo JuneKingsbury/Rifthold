@@ -53,5 +53,24 @@ export const SOUND_MANIFEST = {
         combat: 'audio/music/combat.ogg',
         menu_theme: 'audio/music/menu_theme.ogg',
         credits: 'audio/music/credits.ogg',
+
+        // Expedition: plays while a party is exploring a realm
+        expedition: 'audio/music/expedition.ogg',
+
+        // Optional weather tracks. Fall back to season/day-night if the file is absent.
+        // Keys are 'weather_' + Weather.currentWeather (see WEATHER_TYPES in config/world.js).
+        // No weather_clear: "clear" uses the season/day-night fallback.
+        weather_rain: 'audio/music/weather_rain.ogg',
+        weather_thunderstorm: 'audio/music/weather_thunderstorm.ogg',
+        weather_snow: 'audio/music/weather_snow.ogg',
+        weather_blizzard: 'audio/music/weather_blizzard.ogg',
+        weather_heatwave: 'audio/music/weather_heatwave.ogg',
+
+        // Optional season tracks. Fall back to day/night if the file is absent.
+        // Keys are 'season_' + Weather.season (see SEASONS in config/world.js).
+        season_spring: 'audio/music/season_spring.ogg',
+        season_summer: 'audio/music/season_summer.ogg',
+        season_autumn: 'audio/music/season_autumn.ogg',
+        season_winter: 'audio/music/season_winter.ogg',
     },
 };

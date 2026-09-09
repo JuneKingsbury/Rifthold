@@ -13,6 +13,7 @@ import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
 import { getRoleInfoHtml, getEffectInfoHtml } from '../entities/roles.js';
 import { keybindingRowsHtml, beginRebindCapture, formatKeyLabel } from './keybindings-ui.js';
+import { statBarHtml, runStatBarPass, statBarFactors } from './stat-bar.js';
 import { installArcanePanel } from './ui-arcane.js';
 import { installResearchPanel } from './ui-research.js';
 import { installTutorialPanel } from './ui-tutorial.js';
@@ -52,7 +53,7 @@ export class UI {
         this._arcaneTab = 'nexus';
         this._arcaneExpSetup = null;
         this._lastArcaneHtml = '';
-        this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0 };
+        this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, _prevExpStatus: null, _arriveFrame: 0, _seenDiscoveryTick: 0, _seenResolutionTick: 0, _seenFatigueTick: 0, _seenRallyTick: 0 };
         this.storyPanelVisible = false;
         this._storyTab = 'colony';
         this._collapsedRealmGroups = new Set();
@@ -60,6 +61,9 @@ export class UI {
         this._lastStoryHtml = '';
         this._lastStoryHasNew = false;
         this._lastResearchNeedsAttention = false;
+        // Persistent per-bar animation state for live stat bars (see stat-bar.js),
+        // keyed by globally-unique bar key. Survives the per-frame innerHTML swaps.
+        this._statBarState = new Map();
         this.elements = {};
         this.initElements();
     }
@@ -80,6 +84,9 @@ export class UI {
             if (this._pendingColonistInfoHtml) {
                 this.elements.infoPanel.innerHTML = this._pendingColonistInfoHtml;
                 this._pendingColonistInfoHtml = null;
+                // Set bar widths on the freshly-swapped elements right away so
+                // they don't paint one static frame before the next pass.
+                this.animateStatBars(0);
             }
         });
         this.elements.modeBar = document.getElementById('mode-bar');
@@ -96,6 +103,7 @@ export class UI {
             if (this._pendingHudHtml) {
                 this.elements.colonistHud.innerHTML = this._pendingHudHtml;
                 this._pendingHudHtml = null;
+                this.animateStatBars(0);
             }
         });
         this.elements.researchPanel = document.getElementById('research-panel');
@@ -473,6 +481,26 @@ export class UI {
     forceStatusBarRefresh() {
         this._lastStatusTick = -1;
         this.updateStatusBar();
+    }
+
+    // Advance every live stat bar one frame. Called unconditionally from the
+    // game loop after all panel innerHTML swaps and before paint, so the
+    // white-ghost recede keeps playing on frames with no value change and
+    // freshly recreated bar elements are corrected from persisted state without
+    // flashing. dt is the frame delta in ms (keeps 30/60fps durations equal).
+    animateStatBars(dt) {
+        const { fillK, leadK } = statBarFactors(dt);
+        const seen = new Set();
+        runStatBarPass(this.elements.infoPanel, this._statBarState, fillK, leadK, seen);
+        runStatBarPass(this.elements.colonistHud, this._statBarState, fillK, leadK, seen);
+        if (this.arcanePanelVisible) {
+            runStatBarPass(this.elements.arcanePanel, this._statBarState, fillK, leadK, seen);
+        }
+        // Prune state for bars that no longer exist in the DOM (entity died,
+        // left the party, panel closed) so the Map can't grow without bound.
+        for (const key of this._statBarState.keys()) {
+            if (!seen.has(key)) this._statBarState.delete(key);
+        }
     }
 
     updateStatusBar() {
@@ -1146,8 +1174,12 @@ export class UI {
 
         // --- Status ---
         html += `<div style="${sectionHdr}">Status</div>`;
-        html += `<div class="info-row">HP: ${Math.round(colonist.hp)}/${colonist.maxHp} | Mood: <span class="mood-${moodLevel}">${colonist.mood.toFixed(0)} (${moodLevel})</span></div>`;
-        html += `<div class="info-row">Hunger: ${bar(colonist.needs.hunger)} Rest: ${bar(colonist.needs.rest)}</div>`;
+        const hpPct = colonist.maxHp > 0 ? (colonist.hp / colonist.maxHp) * 100 : 100;
+        const hpBar = statBarHtml({ key: `info:hp:${colonist.id}`, pct: hpPct, color: statColor(hpPct), max: colonist.maxHp, width: 90 });
+        html += `<div class="info-row">HP: ${Math.round(colonist.hp)}/${colonist.maxHp} ${hpBar} | Mood: <span class="mood-${moodLevel}">${colonist.mood.toFixed(0)} (${moodLevel})</span></div>`;
+        const hungerBar = statBarHtml({ key: `info:hunger:${colonist.id}`, pct: colonist.needs.hunger, color: statColor(colonist.needs.hunger), max: 100, width: 90 });
+        const restBar = statBarHtml({ key: `info:rest:${colonist.id}`, pct: colonist.needs.rest, color: statColor(colonist.needs.rest), max: 100, width: 90 });
+        html += `<div class="info-row">Hunger: ${colonist.needs.hunger.toFixed(0)} ${hungerBar} Rest: ${colonist.needs.rest.toFixed(0)} ${restBar}</div>`;
         html += `<div class="info-row">State: ${colonist.state} | Task: ${this.getColonistTaskDescription(colonist)}</div>`;
         const allTraits = traitSpanArr.filter(Boolean).join(', ');
         if (allTraits) html += `<div class="info-row">Traits: ${allTraits}</div>`;
@@ -1181,7 +1213,9 @@ export class UI {
         }).join(' ')}</div>`;
         const hasMagic = colonist.magicSkills && Object.values(colonist.magicSkills).some(v => v > 0);
         if (hasMagic) {
-            html += `<div class="info-row"><span style="color:#aa88ff">Mana: ${bar(colonist.mana / colonist.maxMana * 100)} ${Math.floor(colonist.mana)}/${colonist.maxMana}</span></div>`;
+            const manaPct = colonist.maxMana > 0 ? (colonist.mana / colonist.maxMana) * 100 : 0;
+            const manaBar = statBarHtml({ key: `info:mana:${colonist.id}`, pct: manaPct, color: '#aa88ff', max: colonist.maxMana, width: 90 });
+            html += `<div class="info-row"><span style="color:#aa88ff">Mana: ${manaBar} ${Math.floor(colonist.mana)}/${colonist.maxMana}</span></div>`;
             const attunedSchools = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
             html += `<div class="info-row">Magic: ${Object.entries(MAGIC_SKILLS).filter(([k]) => colonist.magicSkills[k] > 0).map(([k, def]) => {
                 const level = colonist.magicSkills[k];
@@ -2340,7 +2374,13 @@ export class UI {
             const needsDots = `<span class="hud-dots"><span style="color:${moodColor}">●</span><span style="color:${hungerColor}">●</span><span style="color:${restColor}">●</span><span style="color:${hpColor}">●</span></span>`;
             const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ' <span style="color:#ff6644">[Fatigued]</span>' : '';
             html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> ${needsDots} <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
-            html += `<div class="hud-bars">Mood: <span style="color:${moodColor}">${c.mood.toFixed(0)} (${moodLevel})</span> | Hunger: <span style="color:${hungerColor}">${c.needs.hunger.toFixed(0)}</span> | Rest: <span style="color:${restColor}">${c.needs.rest.toFixed(0)}</span> | HP: <span style="color:${hpColor}">${Math.round(c.hp)}/${c.maxHp}</span></div>`;
+            const cHpPct = c.maxHp > 0 ? (c.hp / c.maxHp) * 100 : 100;
+            const hpBar = statBarHtml({ key: `hud:hp:${c.id}`, pct: cHpPct, color: hpColor, max: c.maxHp, width: 60 });
+            const cManaPct = c.maxMana > 0 ? (c.mana / c.maxMana) * 100 : 0;
+            const manaBar = c.maxMana > 0
+                ? ` | <span style="color:#4488ff">Mana: ${Math.floor(c.mana)}/${c.maxMana}</span>${statBarHtml({ key: `hud:mana:${c.id}`, pct: cManaPct, color: '#4488ff', max: c.maxMana, width: 60 })}`
+                : '';
+            html += `<div class="hud-bars">Mood: <span style="color:${moodColor}">${c.mood.toFixed(0)} (${moodLevel})</span> | Hunger: <span style="color:${hungerColor}">${c.needs.hunger.toFixed(0)}</span> | Rest: <span style="color:${restColor}">${c.needs.rest.toFixed(0)}</span> | HP: <span style="color:${hpColor}">${Math.round(c.hp)}/${c.maxHp}</span>${hpBar}${manaBar}</div>`;
             html += `</div>`;
         }
 
@@ -2361,7 +2401,9 @@ export class UI {
                 const weapon = g.weapon?.name || 'None';
                 html += `<div class="hud-colonist" data-colonist-id="${g.id}">`;
                 html += `<span class="hud-name" style="color:${g.nameColor || '#ffff00'}">${g.name}</span> <span class="hud-dots"><span style="color:${hpColor}">●</span></span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${g.state}${g.drafted ? ' [D]' : ''}</span>`;
-                html += `<div class="hud-bars">HP: <span style="color:${hpColor}">${Math.round(g.hp)}/${g.maxHp}</span></div>`;
+                const gHpPct = g.maxHp > 0 ? (g.hp / g.maxHp) * 100 : 100;
+                const gHpBar = statBarHtml({ key: `hud:hp:${g.id}`, pct: gHpPct, color: hpColor, max: g.maxHp, width: 60 });
+                html += `<div class="hud-bars">HP: <span style="color:${hpColor}">${Math.round(g.hp)}/${g.maxHp}</span>${gHpBar}</div>`;
                 html += `</div>`;
             }
         }
@@ -3770,11 +3812,6 @@ export class UI {
             this.elements.storyPanel.innerHTML = html;
         }
     }
-}
-
-function bar(value) {
-    const filled = Math.round(value / 10);
-    return `[${'█'.repeat(filled)}${'░'.repeat(10 - filled)}]`;
 }
 
 function getMoodLabel(mood) {

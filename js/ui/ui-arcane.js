@@ -5,6 +5,7 @@ import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CL
 } from '../core/config.js';
 import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
+import { statBarHtml } from './stat-bar.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
 import { adventurerLevelTooltip } from './ui-utils.js';
 
@@ -325,14 +326,16 @@ const arcaneMethods = {
                         const hpPct = Math.max(0, Math.round((p.hp / p.maxHp) * 100));
                         const color = p.hp <= 0 ? '#664444' : hpPct < 30 ? '#ff4444' : hpPct < 60 ? '#ffaa44' : '#88cc88';
                         const status = p.hp <= 0 ? ' [DOWN]' : '';
-                        const manaStr = p.maxMana > 0 ? ` | ${Math.round(p.mana)}/${p.maxMana} MP` : '';
+                        const hpBar = statBarHtml({ key: `exp:hp:${p.id}`, pct: hpPct, color, max: p.maxHp, width: 100 });
+                        const manaBar = p.maxMana > 0 ? statBarHtml({ key: `exp:mana:${p.id}`, pct: (p.mana / p.maxMana) * 100, color: '#aa88ff', max: p.maxMana, width: 100 }) : '';
+                        const manaStr = p.maxMana > 0 ? ` | ${Math.round(p.mana)}/${p.maxMana} MP${manaBar}` : '';
                         const threatStr = getThreatDisplayHtml(getTargetPriority(p));
                         const rowLabel = exp.formation?.back?.includes(p.id) ? ' <span style="color:#6688ff;font-size:0.8em;">[Back]</span>' : (exp.formation?.front?.includes(p.id) ? ' <span style="color:#ff8844;font-size:0.8em;">[Front]</span>' : '');
                         let buffs = '';
                         if (p.shieldActive) buffs += ' <span style="color:#4488ff;font-size:0.85em;">Shield</span>';
                         if (p.dodgeCharges > 0) buffs += ` <span style="color:#aa44ff;font-size:0.85em;">Phase: ${p.dodgeCharges}</span>`;
                         buffs += _combatStatusIcons(p.statusEffects);
-                        html += `<div class="info-row" style="color:${color}; padding-left:8px;">${p.name}${rowLabel} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${manaStr}${buffs}${status}${threatStr}</div>`;
+                        html += `<div class="info-row" style="color:${color}; padding-left:8px;">${p.name}${rowLabel} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${hpBar}${manaStr}${buffs}${status}${threatStr}</div>`;
                     }
 
                     if (exp.combat) {
@@ -1095,7 +1098,27 @@ const arcaneMethods = {
     // `_enrageTick` (enraged flipped on) using `now` as a monotonic latch key.
     _stampEntityStateChanges(ent, now) {
         if (ent._prevHp != null && ent.hp < ent._prevHp) ent._lastHitTick = now;
+        // Gains: accumulate the crossing amount and only stamp once it clears a
+        // min-delta, so `_regenMana`'s frequent +1s coalesce into one mote instead
+        // of a flicker. The stored amount scales the burst count at spawn time.
+        if (ent._prevHp != null && ent.hp > ent._prevHp) {
+            ent._healGainAccum = (ent._healGainAccum || 0) + (ent.hp - ent._prevHp);
+            if (ent._healGainAccum >= RENDER_CONFIG.expedGainHpMinDelta) {
+                ent._lastHealTick = now;
+                ent._lastHealAmount = ent._healGainAccum;
+                ent._healGainAccum = 0;
+            }
+        }
         ent._prevHp = ent.hp;
+        if (ent._prevMana != null && ent.mana != null && ent.mana > ent._prevMana) {
+            ent._manaGainAccum = (ent._manaGainAccum || 0) + (ent.mana - ent._prevMana);
+            if (ent._manaGainAccum >= RENDER_CONFIG.expedGainManaMinDelta) {
+                ent._lastManaGainTick = now;
+                ent._lastManaAmount = ent._manaGainAccum;
+                ent._manaGainAccum = 0;
+            }
+        }
+        ent._prevMana = ent.mana;
         const enr = !!ent.enraged;
         if (enr && !ent._prevEnraged) ent._enrageTick = now;
         ent._prevEnraged = enr;
@@ -1360,6 +1383,78 @@ const arcaneMethods = {
         });
     },
 
+    // Queue a small rising burst marking an HP/mana/potion gain at (x,y). `kind` is
+    // 'hp' | 'mana' | 'potion' (color/glyph resolved in the render case). `count`
+    // scales the burst with the amount gained, clamped to expedGainMaxParticles.
+    // Each mote gets a horizontal jitter and its own sine phase so a burst reads as
+    // a rising cluster rather than one stacked glyph.
+    _spawnExpedGain(kind, x, y, count) {
+        const n = Math.max(1, Math.min(RENDER_CONFIG.expedGainMaxParticles, count || 1));
+        for (let i = 0; i < n; i++) {
+            this._expVisState.effects.push({
+                type: 'gain_particle', kind, x, y,
+                ox: (Math.random() * 2 - 1) * RENDER_CONFIG.expedGainSpreadPx,
+                seed: Math.random() * Math.PI * 2,
+                frame: 0, maxFrames: 22,
+            });
+        }
+    },
+
+    // Spawn a gain burst once per stamp for an entity in a draw loop, at its known
+    // screen position (x,y). `_stampEntityStateChanges` (called via `_animFor`) sets
+    // `_lastHealTick`/`_lastManaGainTick` with the accumulated magnitude; a potion
+    // stamp (`_lastPotionTick`) is set model-side for buff-only potions. Each is
+    // latched off `_anim.<key>Seen` (the `_animShotT` convention) so a burst fires
+    // exactly once. Fully gated here so callers stay trivial.
+    _maybeSpawnGain(ent, x, y, extras, reduceMotion) {
+        if (!extras || reduceMotion || !RENDER_CONFIG.expedGainParticles) return;
+        const a = ent._anim || (ent._anim = {});
+        if (ent._lastHealTick != null && a.healGainSeen !== ent._lastHealTick) {
+            a.healGainSeen = ent._lastHealTick;
+            const cnt = Math.round((ent._lastHealAmount || 0) / RENDER_CONFIG.expedGainHpPerParticle);
+            this._spawnExpedGain('hp', x, y - 6, cnt);
+        }
+        if (ent._lastManaGainTick != null && a.manaGainSeen !== ent._lastManaGainTick) {
+            a.manaGainSeen = ent._lastManaGainTick;
+            const cnt = Math.round((ent._lastManaAmount || 0) / RENDER_CONFIG.expedGainManaPerParticle);
+            this._spawnExpedGain('mana', x, y - 6, cnt);
+        }
+        if (ent._lastPotionTick != null && a.potionSeen !== ent._lastPotionTick) {
+            a.potionSeen = ent._lastPotionTick;
+            this._spawnExpedGain('potion', x, y - 6, 3);
+        }
+    },
+
+    // Spawn a DoT mote and/or a cleanse puff once per model stamp for an entity at
+    // its known screen position (x,y). Model-side stamps: `_lastDotTick`/`_lastDotType`
+    // (poison/burn tick) and `_lastCleanseTick` (afflictions stripped). Each latches
+    // off `_anim.<key>Seen` so the burst fires exactly once. Gated here for trivial callers.
+    _maybeSpawnDotCleanse(ent, x, y, extras, reduceMotion) {
+        if (!extras || reduceMotion) return;
+        const a = ent._anim || (ent._anim = {});
+        if (RENDER_CONFIG.expedDotTicks && ent._lastDotTick != null && a.dotSeen !== ent._lastDotTick) {
+            a.dotSeen = ent._lastDotTick;
+            this._expVisState.effects.push({ type: 'dot_tick', dotType: ent._lastDotType || 'poison', x, y: y - 4, frame: 0, maxFrames: 16 });
+        }
+        if (RENDER_CONFIG.expedCleansePuff && ent._lastCleanseTick != null && a.cleanseSeen !== ent._lastCleanseTick) {
+            a.cleanseSeen = ent._lastCleanseTick;
+            this._expVisState.effects.push({ type: 'cleanse_puff', x, y: y - 4, frame: 0, maxFrames: 26 });
+        }
+    },
+
+    // Droop a weariness glyph over a living member once, when the expedition stamps
+    // `_fatigueAppliedTick` at completion. Latched per member off `_anim.fatigueSeen`
+    // so the return sequence shows it a single time. Gated for trivial callers.
+    _maybeSpawnFatigue(ent, x, y, exp, extras, reduceMotion) {
+        if (!extras || reduceMotion || !RENDER_CONFIG.expedFatigueCue) return;
+        if (!exp || exp._fatigueAppliedTick == null || ent.hp <= 0) return;
+        const a = ent._anim || (ent._anim = {});
+        if (a.fatigueSeen !== exp._fatigueAppliedTick) {
+            a.fatigueSeen = exp._fatigueAppliedTick;
+            this._expVisState.effects.push({ type: 'fatigue_sigh', x, y: y - 10, frame: 0, maxFrames: 40 });
+        }
+    },
+
     _renderExpeditionVis() {
         const canvas = this.elements.arcanePanel.querySelector('.exp-vis-canvas');
         if (!canvas) return;
@@ -1392,6 +1487,18 @@ const arcaneMethods = {
 
         const activeExp = exp || this._expVisState.finishExp;
         if (!activeExp || !activeExp.partySnapshot) { ctx.clearRect(0, 0, W, H); return; }
+
+        // F10: arrival fade-in. On the transition INTO 'exploring', reset the ramp so
+        // the scene fades up from black over expedSceneFadeFrames. Opacity-only, so it
+        // survives reduceMotion; still gated on the extras setting below at draw time.
+        const _curStatus = exp ? exp.status : null;
+        if (_curStatus === 'exploring' && this._expVisState._prevExpStatus !== 'exploring') {
+            this._expVisState._arriveFrame = 0;
+        }
+        this._expVisState._prevExpStatus = _curStatus;
+        if (this._expVisState._arriveFrame < RENDER_CONFIG.expedSceneFadeFrames) {
+            this._expVisState._arriveFrame++;
+        }
 
         const elapsed = this.game.tick - activeExp.startTick;
         let progress;
@@ -1920,6 +2027,9 @@ const arcaneMethods = {
                     ctx.fillText('@', px, py + bounceY - grow);
                 }
             } else {
+                // The skin path stamps gains via _animFor; the ASCII path doesn't call
+                // it, so stamp here to keep heal/mana particles working in both modes.
+                this._stampEntityStateChanges(p, _now);
                 const grow = p.hp > 0 ? _breathe(p.id || i) : 0;
                 ctx.font = 'bold 18px monospace';
                 ctx.textAlign = 'center';
@@ -1933,6 +2043,9 @@ const arcaneMethods = {
                 }
                 ctx.fillText(p.golem ? 'G' : '@', px, py + bounceY - grow);
             }
+            this._maybeSpawnGain(p, px, py + bounceY, extrasEnabled, reduceMotion);
+            this._maybeSpawnDotCleanse(p, px, py + bounceY, extrasEnabled, reduceMotion);
+            this._maybeSpawnFatigue(p, px, py + bounceY, activeExp, extrasEnabled, reduceMotion);
             ctx.globalAlpha = 1;
             if (p.hp > 0) {
                 const barW = 16, barH = 2;
@@ -2049,6 +2162,7 @@ const arcaneMethods = {
             if (sumAnim.meleeFx) {
                 this._spawnExpedMelee(sumAnim.meleeFx, sx + 8, sy, partyX + 70, H / 2 - 5 + Math.random() * 12);
             }
+            this._maybeSpawnGain(summon, sx, sy, extrasEnabled, reduceMotion);
             if (useSkins) {
                 const sumSprite = skinMgr.getSprite('entities', summon.type);
                 if (sumSprite) {
@@ -2111,6 +2225,10 @@ const arcaneMethods = {
                 if (enemyAnim.meleeFx) {
                     this._spawnExpedMelee(enemyAnim.meleeFx, ex - 8, ey, partyX + 30, H / 2 - 5 + Math.random() * 12);
                 }
+                // Enemy self-heals (elite regen) surface here as green motes.
+                this._maybeSpawnGain(enemy, ex, ey, extrasEnabled, reduceMotion);
+                // Enemy poison/burn ticks surface as small tinted motes.
+                this._maybeSpawnDotCleanse(enemy, ex, ey, extrasEnabled, reduceMotion);
                 if (enemy.isBoss) {
                     const bGrow = _breathe(400 + i) * _lowHpBreathMult(enemy);
                     const bossSpriteKey = enemy.enraged && enemy.enragedSprite ? enemy.enragedSprite : enemy.sprite;
@@ -2291,6 +2409,9 @@ const arcaneMethods = {
                     this._expVisState.effects.push({ type: 'danger', x: partyX - 5 + Math.random() * 30, y: H / 2, frame: 0, maxFrames: 20 });
                     this._expVisState.shakeFrames = 6;
                     this._expVisState.flashFrames = 3;
+                } else if (entry.type === 'ambient' && RENDER_CONFIG.expedAmbientNote && extrasEnabled && !reduceMotion) {
+                    // Flavour-only micro-event: a faint drifting glyph over the party.
+                    this._expVisState.effects.push({ type: 'ambient_note', x: partyX + 20 + Math.random() * 40, y: H / 2 - 5 + Math.random() * 10, frame: 0, maxFrames: 34 });
                 }
                 if (entry.type === 'combat') {
                     const isHit = text.includes('for ');
@@ -2320,6 +2441,35 @@ const arcaneMethods = {
                 }
             }
             this._expVisState.lastLogLen = logLen;
+        }
+
+        // F2: bestiary discovery flourish, latched off the model stamp so a foe's
+        // first sighting pops an expanding ring plus its name over the enemy zone.
+        if (RENDER_CONFIG.expedDiscoveryFlourish && extrasEnabled && !reduceMotion
+            && activeExp._lastDiscoveryTick != null
+            && this._expVisState._seenDiscoveryTick !== activeExp._lastDiscoveryTick) {
+            this._expVisState._seenDiscoveryTick = activeExp._lastDiscoveryTick;
+            this._expVisState.effects.push({ type: 'discovery_flourish', x: partyX + 80, y: H / 2, label: activeExp._lastDiscoveryName || '', frame: 0, maxFrames: 50 });
+        }
+
+        // F4: rally group beat, latched off the model stamp. Reuses the spell_heal
+        // effect centered over the party zone (per-member heal motes come from F1).
+        if (RENDER_CONFIG.expedRallyFlourish && extrasEnabled && !reduceMotion
+            && activeExp._rallyTick != null
+            && this._expVisState._seenRallyTick !== activeExp._rallyTick) {
+            this._expVisState._seenRallyTick = activeExp._rallyTick;
+            this._expVisState.effects.push({ type: 'spell_heal', x: partyX + 45, y: H / 2, frame: 0, maxFrames: 30 });
+        }
+
+        // F9: dedicated encounter-resolution burst, latched off the model stamp so a
+        // solved puzzle / good parley / avoided trap reads distinctly from loot.
+        if (RENDER_CONFIG.expedResolutionBurst && extrasEnabled
+            && activeExp._lastResolutionTick != null
+            && this._expVisState._seenResolutionTick !== activeExp._lastResolutionTick) {
+            this._expVisState._seenResolutionTick = activeExp._lastResolutionTick;
+            const ok = activeExp._lastResolutionOutcome !== 'failure';
+            this._expVisState.effects.push({ type: 'resolution_burst', ok, x: partyX + 45, y: H / 2, frame: 0, maxFrames: 36 });
+            if (!ok && !reduceMotion) this._expVisState.shakeFrames = Math.max(this._expVisState.shakeFrames, 8);
         }
 
         if (this._expVisState.flashFrames > 0) {
@@ -2503,6 +2653,91 @@ const arcaneMethods = {
                         ctx.fillRect(eff.x - 4 + Math.sin(eff.frame * 0.3 + s * 2) * 6, eff.y - eff.frame * 0.6 - s * 3, 2, 2);
                     }
                 }
+            } else if (eff.type === 'gain_particle') {
+                // A small rising mote for an HP/mana/potion gain. Smaller and shorter
+                // than spell_heal; ox jitters the origin and seed phases the drift so a
+                // burst reads as a cluster. Color/glyph by kind.
+                let col, glyph;
+                if (eff.kind === 'mana') { col = RENDER_CONFIG.expedGainManaColor; glyph = '•'; }
+                else if (eff.kind === 'potion') { col = RENDER_CONFIG.expedGainPotionColor; glyph = '○'; }
+                else { col = RENDER_CONFIG.expedGainHpColor; glyph = '+'; }
+                const gx = eff.x + eff.ox + Math.sin(eff.frame * 0.25 + eff.seed) * 2;
+                const gy = eff.y - eff.frame * RENDER_CONFIG.expedGainRisePx;
+                ctx.fillStyle = col;
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(glyph, gx, gy);
+            } else if (eff.type === 'fatigue_sigh') {
+                // A muted glyph drooping DOWN over a returning member (weariness cue).
+                ctx.fillStyle = RENDER_CONFIG.fatigueCueColor;
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = alpha * 0.8;
+                ctx.fillText('z', eff.x + Math.sin(eff.frame * 0.2) * 2, eff.y + eff.frame * 0.35);
+            } else if (eff.type === 'ambient_note') {
+                // A faint drifting glyph for flavour-only micro-events.
+                ctx.fillStyle = RENDER_CONFIG.ambientNoteColor;
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = alpha * 0.6;
+                ctx.fillText('✧', eff.x + Math.sin(eff.frame * 0.15) * 3, eff.y - eff.frame * 0.3);
+            } else if (eff.type === 'dot_tick') {
+                // A small tinted mote each round a combatant burns/poisons. Poison
+                // drifts straight down; burn flickers slightly as it rises.
+                const isBurn = eff.dotType === 'burn';
+                ctx.fillStyle = isBurn ? RENDER_CONFIG.dotBurnColor : RENDER_CONFIG.dotPoisonColor;
+                ctx.globalAlpha = alpha * 0.85;
+                const dx = eff.x + (isBurn ? Math.sin(eff.frame * 0.6) * 2 : 0);
+                const dy = eff.y + (isBurn ? -eff.frame * 0.4 : eff.frame * 0.5);
+                ctx.beginPath();
+                ctx.arc(dx, dy, 2, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (eff.type === 'cleanse_puff') {
+                // Pale motes lifting up and outward as afflictions are stripped.
+                ctx.fillStyle = RENDER_CONFIG.cleansePuffColor;
+                const cp = eff.frame / eff.maxFrames;
+                for (let s = 0; s < 4; s++) {
+                    const ang = (s / 4) * Math.PI * 2;
+                    const dist = cp * 8;
+                    ctx.globalAlpha = alpha * 0.7;
+                    ctx.beginPath();
+                    ctx.arc(eff.x + Math.cos(ang) * dist, eff.y - cp * 8 + Math.sin(ang) * dist, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (eff.type === 'discovery_flourish') {
+                // Expanding thin ring + rising entry name when a foe is first sighted.
+                const dp = eff.frame / eff.maxFrames;
+                ctx.strokeStyle = RENDER_CONFIG.discoveryFlourishColor;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = alpha * 0.8;
+                ctx.beginPath();
+                ctx.arc(eff.x, eff.y, 6 + dp * 22, 0, Math.PI * 2);
+                ctx.stroke();
+                if (eff.label) {
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = RENDER_CONFIG.discoveryFlourishColor;
+                    ctx.font = 'bold 10px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(eff.label, eff.x, eff.y - 18 - eff.frame * 0.4);
+                }
+            } else if (eff.type === 'resolution_burst') {
+                // A dedicated success (check) / fail (cross) beat over the party, so a
+                // solved puzzle or good parley no longer reads as generic loot.
+                const rp = eff.frame / eff.maxFrames;
+                const col = eff.ok ? RENDER_CONFIG.resolutionSuccessColor : RENDER_CONFIG.resolutionFailColor;
+                ctx.strokeStyle = col;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = alpha * 0.85;
+                ctx.beginPath();
+                ctx.arc(eff.x, eff.y, 8 + rp * 18, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = col;
+                ctx.font = 'bold 16px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(eff.ok ? '✓' : '✗', eff.x, eff.y);
+                ctx.textBaseline = 'alphabetic';
             } else if (eff.type === 'spell_shield') {
                 const shieldSprite = useSkins ? skinMgr.getSprite('effects', 'spell_shield') : null;
                 if (shieldSprite) {
@@ -2744,6 +2979,25 @@ const arcaneMethods = {
         }
 
         if (shakeApplied) ctx.restore();
+
+        // F10: scene fade overlay (opacity-only, drawn untransformed over everything).
+        // Arrival ramps black -> clear via _arriveFrame; return ramps clear -> black via
+        // the finishing scaffold's finishFrame. Gated on the extras setting.
+        if (RENDER_CONFIG.expedSceneFade && extrasEnabled) {
+            const fadeFrames = RENDER_CONFIG.expedSceneFadeFrames;
+            let overlayAlpha = 0;
+            if (this._expVisState.finishing) {
+                overlayAlpha = Math.min(1, (this._expVisState.finishFrame || 0) / 60);
+            } else if (this._expVisState._arriveFrame < fadeFrames) {
+                overlayAlpha = 1 - this._expVisState._arriveFrame / fadeFrames;
+            }
+            if (overlayAlpha > 0) {
+                ctx.fillStyle = RENDER_CONFIG.sceneFadeColor;
+                ctx.globalAlpha = overlayAlpha;
+                ctx.fillRect(0, 0, W, H);
+                ctx.globalAlpha = 1;
+            }
+        }
     },
 
     _detectSpellSchool(text) {

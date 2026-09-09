@@ -284,6 +284,53 @@ export const RENDER_CONFIG = {
     // reaction window), reading as a "danger bloom" that frames the blow.
     expedHazardTelegraph: true,
     hazardTelegraphColor: '#ff5533',
+    // ── Gain particles (HP / mana / potion restore) ───────────────────────
+    // A small rising mote burst whenever any expedition entity (party OR enemy)
+    // gains health or mana. Detected purely by frame-diffing hp/mana on the
+    // entity (see `_stampEntityStateChanges`), so it needs no per-source hook and
+    // covers heals, chain-heals, regen, rally, potions and enemy self-heals alike.
+    // A per-gain accumulator + min-delta throttles the frequent tiny regen ticks
+    // (a small trickle spawns 1 mote), while the crossing magnitude scales the
+    // burst count so a big heal reads as a satisfying cluster, capped so a full
+    // heal never floods the canvas.
+    expedGainParticles: true,
+    expedGainHpColor: '#66ff88',
+    expedGainManaColor: '#5599ff',
+    expedGainPotionColor: '#ffcc66',
+    expedGainHpMinDelta: 3,        // hp must accumulate this much before a burst
+    expedGainManaMinDelta: 3,      // mana threshold (throttles +1/interval regen)
+    expedGainRisePx: 0.6,          // per-frame rise of each mote
+    expedGainHpPerParticle: 6,     // ~1 mote per this much hp healed
+    expedGainManaPerParticle: 6,
+    expedGainMaxParticles: 8,      // cap so a full heal doesn't flood the canvas
+    expedGainSpreadPx: 5,          // horizontal jitter of a burst
+    // ── Discrete event flourishes ─────────────────────────────────────────
+    // Bestiary discovery: an expanding ring + rising entry name when a foe is
+    // first sighted. Fatigue: a drooping cue over each member as they return.
+    expedDiscoveryFlourish: true,
+    discoveryFlourishColor: '#88ddff',
+    expedFatigueCue: true,
+    fatigueCueColor: '#99aabb',
+    expedRallyFlourish: true,      // group heal ring on a trait rally (F1 covers the motes)
+    // Cleanse: pale motes lifting off as afflictions are stripped (no hp change).
+    expedCleansePuff: true,
+    cleansePuffColor: '#bbffdd',
+    // DoT ticks: small tinted falling motes each round a combatant burns/poisons.
+    expedDotTicks: true,
+    dotPoisonColor: '#66cc44',
+    dotBurnColor: '#ff7733',
+    // Ambient micro-event: a faint drifting glyph for flavour-only events.
+    expedAmbientNote: true,
+    ambientNoteColor: '#aabbcc',
+    // Encounter resolution: a dedicated success (check) / fail (cross) burst so a
+    // solved puzzle or good parley no longer reads as generic loot.
+    expedResolutionBurst: true,
+    resolutionSuccessColor: '#66ff88',
+    resolutionFailColor: '#ff5555',
+    // Scene fade: a full-canvas opacity ramp on entering a realm and on return.
+    expedSceneFade: true,
+    expedSceneFadeFrames: 45,
+    sceneFadeColor: '#000000',
     // ── Chimney smoke intensity by building activity ──────────────────────
     // Smoke-emitting buildings (bDef.smokeEmitter) puff faint gray wisps when idle
     // and thicker, warmer, faster smoke while a colonist is actively working there

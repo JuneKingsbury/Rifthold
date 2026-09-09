@@ -17,10 +17,15 @@ Both the start screen and the in-game settings panel have Music and SFX volume s
 
 ## Music Behavior
 
-Background music picks itself based on what's happening:
-- **Day** (no enemies around): `music/ambient_day.ogg`
-- **Night** (no enemies around): `music/ambient_night.ogg`
-- **Combat** (raid or wave active): `music/combat.ogg`
+Background music is layered. Each tick the game picks the most specific track that has a file present, and falls back to a more general one when a specialized track is missing. Priority, highest first:
+
+1. **Expedition** (a party is out exploring a realm): `music/expedition.ogg`. If this file is missing, colony music simply goes silent for the duration of the expedition.
+2. **Combat** (raid or wave active): `music/combat.ogg`
+3. **Weather** (current weather is not clear): `music/weather_<type>.ogg`, e.g. `music/weather_rain.ogg`
+4. **Season**: `music/season_<name>.ogg`, e.g. `music/season_winter.ogg`
+5. **Day / Night** (the always-present base): `music/ambient_day.ogg` or `music/ambient_night.ogg`
+
+So on a rainy winter night with no enemies, the game plays `weather_rain.ogg` if it exists, else `season_winter.ogg` if it exists, else `ambient_night.ogg`. Weather takes precedence over season. The weather and season tracks are entirely optional: add only the ones you want, and the rest fall through to day/night automatically.
 
 When the music changes, it crossfades over 2 seconds so you don't get a jarring cut. All tracks loop.
 
@@ -34,12 +39,25 @@ When the music changes, it crossfades over 2 seconds so you don't get a jarring 
 
 ### Music
 
+Listed highest priority first. Weather and season tracks are optional, and missing ones fall through to the day/night base.
+
 | File | Trigger |
 |------|---------|
-| `music/ambient_day.ogg` | Daytime, no enemies present |
-| `music/ambient_night.ogg` | Nighttime, no enemies present |
+| `music/expedition.ogg` | A party is out exploring a realm (pauses colony music) |
 | `music/combat.ogg` | Raid or wave enemies active |
-| `music/menu_theme.ogg` | Not yet wired up (future menu music) |
+| `music/weather_rain.ogg` | Current weather is rain (no enemies) |
+| `music/weather_thunderstorm.ogg` | Current weather is thunderstorm (no enemies) |
+| `music/weather_snow.ogg` | Current weather is snow (no enemies) |
+| `music/weather_blizzard.ogg` | Current weather is blizzard (no enemies) |
+| `music/weather_heatwave.ogg` | Current weather is heat wave (no enemies) |
+| `music/season_spring.ogg` | Season is spring (no enemies, weather clear or no weather track) |
+| `music/season_summer.ogg` | Season is summer (no enemies, weather clear or no weather track) |
+| `music/season_autumn.ogg` | Season is autumn (no enemies, weather clear or no weather track) |
+| `music/season_winter.ogg` | Season is winter (no enemies, weather clear or no weather track) |
+| `music/ambient_day.ogg` | Daytime base (no enemies, no more specific track) |
+| `music/ambient_night.ogg` | Nighttime base (no enemies, no more specific track), also the track a new game starts on |
+| `music/menu_theme.ogg` | Start menu / main menu |
+| `music/credits.ogg` | Credits screen |
 
 ### SFX: Combat
 

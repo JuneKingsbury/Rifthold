@@ -398,6 +398,10 @@ class Game {
         }
         this._arcaneUpdatedThisFrame = false;
         if (prof) prof.mark('frame:ui.update');
+        // Advance live stat bars every rendered frame, after all panel innerHTML
+        // swaps and before paint, so the white-ghost recede keeps playing and
+        // recreated bar elements are corrected from persisted state (no flash).
+        this.ui.animateStatBars(dt);
         requestAnimationFrame(this.gameLoop);
     }
 
@@ -2226,7 +2230,7 @@ class Game {
         this.notifications.push({ text: '[DEBUG] All story milestones unlocked', tick: this.tick, type: 'success' });
     }
 
-    // Phase 6 perf investigation: attach an opt-in profiler and auto-report every
+    // Attach an opt-in profiler and auto-report every
     // `reportEvery` ticks. Zero cost until this is called (hot paths guard on
     // this._profiler). See js/core/perf-probe.js for the console usage.
     startPerfProbe(reportEvery = 200) {
@@ -3884,7 +3888,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const game = new Game();
             setup(game);
             window.soundManager.stopMusic();
-            window.soundManager.playMusic('ambient_day');
+            // New games start at timeOfDay 75 (~0.16 of the day), which is night
+            // per DAY_NIGHT.dayStart. Start on the night track so it matches what
+            // updateMusicState will settle on (and the visual darkness at start).
+            window.soundManager.playMusic('ambient_night');
             SoundManager.setMusicVolume(game.settings.musicVolume);
             SoundManager.setSFXVolume(game.settings.sfxVolume);
             const tm = game.settings.toolbarMode || (game.settings.alwaysShowToolbar ? 'always' : 'auto');

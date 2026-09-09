@@ -383,6 +383,15 @@ export class ExplorationSystem {
         }
     }
 
+    // Stamp an encounter-resolution outcome so the visualizer can pop a dedicated
+    // success/fail burst over the party (distinct from generic loot). `ok` is the
+    // pass/fail of a puzzle, parley, trap, or decision. Also fires a matching SFX.
+    _stampResolution(exp, game, ok) {
+        exp._lastResolutionTick = game.tick;
+        exp._lastResolutionOutcome = ok ? 'success' : 'failure';
+        window.soundManager?.playExpSFX(ok ? 'spell_divination' : 'wave_alert');
+    }
+
     resolveDecision(game, expId, choiceIndex) {
         const exp = this.expeditions.find(e => e.id === expId);
         if (!exp || !exp.pendingDecision) return false;
@@ -478,10 +487,12 @@ export class ExplorationSystem {
             if (check.success.penalty) this._applyPuzzlePenalty(exp, game, check.success.penalty, bestMember, puzzle.encounterIndex);
             exp.summary.puzzlesSolved++;
             this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerPuzzleSolved);
+            this._stampResolution(exp, game, true);
         } else if (check.failure) {
             const text = check.failure.text.replace('{name}', bestMember?.name || 'The party');
             this._addLog(exp, game, text, 'danger');
             if (check.failure.penalty) this._applyPuzzlePenalty(exp, game, check.failure.penalty, bestMember, puzzle.encounterIndex);
+            this._stampResolution(exp, game, false);
         }
 
         exp.pendingDecision = null;
@@ -570,6 +581,9 @@ export class ExplorationSystem {
             this._addLog(exp, game, text, choice.result.reward ? 'success' : 'info');
             if (choice.result.reward) this._applyNpcReward(exp, game, choice.result.reward);
             if (choice.result.penalty) this._applyPuzzlePenalty(exp, game, choice.result.penalty, member, npc.encounterIndex);
+            // A rewarding parley reads as success; a penalty-only outcome as failure.
+            if (choice.result.reward) this._stampResolution(exp, game, true);
+            else if (choice.result.penalty) this._stampResolution(exp, game, false);
         }
 
         exp.pendingDecision = null;
@@ -650,10 +664,12 @@ export class ExplorationSystem {
         if (success) {
             const text = (check.successText || 'Trap avoided!').replace('{name}', bestMember?.name || 'The party');
             this._addLog(exp, game, text, 'success');
+            this._stampResolution(exp, game, true);
         } else {
             const text = (check.failText || 'The trap triggers!').replace('{name}', bestMember?.name || 'The party');
             this._addLog(exp, game, text, 'danger');
             this._applyTrapDamage(exp, game, trapDef, alive, ds);
+            this._stampResolution(exp, game, false);
         }
 
         const remaining = trap.remainingTicks;
@@ -1194,7 +1210,7 @@ export class ExplorationSystem {
                 encounterIndex: exp.currentEncounter,
             };
             this._addLog(exp, game, encounter.text, 'info');
-            this._updateBestiary(exp, 'npc', encounter.npcKey, { name: encounter.name || encounter.text.slice(0, 40), lore: encounter.lore || '', sprite: encounter.sprite || null });
+            this._updateBestiary(exp, 'npc', encounter.npcKey, { name: encounter.name || encounter.text.slice(0, 40), lore: encounter.lore || '', sprite: encounter.sprite || null }, game);
             return;
         }
 
@@ -1231,7 +1247,7 @@ export class ExplorationSystem {
             const approachMsg = dim.boss?.approachText || `A powerful foe blocks the path: ${bossEnemy.name}!`;
             this._addLog(exp, game, approachMsg, 'danger');
             window.soundManager?.playExpSFX('wave_alert');
-            this._updateBestiary(exp, 'boss', bossEnemy.name, { name: bossEnemy.name, sprite: bossEnemy.sprite || dim.boss?.sprite, color: bossEnemy.color || dim.boss?.color, lore: dim.boss?.lore || '' });
+            this._updateBestiary(exp, 'boss', bossEnemy.name, { name: bossEnemy.name, sprite: bossEnemy.sprite || dim.boss?.sprite, color: bossEnemy.color || dim.boss?.color, lore: dim.boss?.lore || '' }, game);
 
             if (encounter.bossPhases) {
                 exp.bossPhaseData = {
@@ -1257,7 +1273,7 @@ export class ExplorationSystem {
                     lore: catalogEntry?.lore || '',
                     eliteModifier: e.elite || null,
                     eliteName: e.eliteName || null,
-                });
+                }, game);
             }
         }
 
@@ -1927,8 +1943,10 @@ export class ExplorationSystem {
                     member.spellCooldowns[spellKey] = game.tick;
                     member._lastCastTick = game.tick;
                     exp.activeEffects = (exp.activeEffects || []).filter(e => !(e.targetId === afflicted.p.id && e.type === 'dot'));
+                    afflicted.p._lastCleanseTick = game.tick;
                     this._addLog(exp, game, `${member.name} casts ${spell.name}, cleansing ${afflicted.p.name} of afflictions!`, 'success');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_buff');
                     break;
                 }
             }
@@ -2051,6 +2069,9 @@ export class ExplorationSystem {
 
     _completeExpedition(exp, game) {
         exp.status = 'complete';
+        // Stamp so the visualizer can droop a brief weariness glyph over survivors as
+        // the party returns (fatigue cooldowns are assigned just below).
+        exp._fatigueAppliedTick = game.tick;
 
         const allDefeated = exp.partySnapshot.every(p => p.hp <= 0);
         if (!allDefeated && !exp.manualRetreat) {
@@ -2258,6 +2279,10 @@ export class ExplorationSystem {
                     const dmg = s.damageRange ? randInt(s.damageRange[0], s.damageRange[1]) : (s.damage || 0);
                     if (dmg > 0) {
                         combatant.hp -= dmg;
+                        // Stamp the DoT tick so the visualizer can spawn a small mote on
+                        // this combatant; frame-diff would misread the hp drop as recoil.
+                        combatant._lastDotTick = game.tick;
+                        combatant._lastDotType = s.type;
                         const label = s.type === 'poison' ? 'poison' : 'burning';
                         if (isParty) {
                             if (exp.summary) exp.summary.damageTaken[combatant.id] = (exp.summary.damageTaken[combatant.id] || 0) + dmg;
@@ -2287,6 +2312,9 @@ export class ExplorationSystem {
                     const dmg = randInt(effect.damageRange[0], effect.damageRange[1]);
                     member.hp -= dmg;
                     effect.lastTick = game.tick;
+                    // Out-of-combat DoT (trap/enemy residue): stamp for a visual mote.
+                    member._lastDotTick = game.tick;
+                    member._lastDotType = effect.dotType || 'poison';
                     effect.ticksRemaining--;
                     if (member.hp <= 0) this._checkExpeditionRevive(exp, member, game);
                 }
@@ -2323,6 +2351,10 @@ export class ExplorationSystem {
                 }
                 this._addLog(exp, game, `${member.name} rallies the party! (+${healAmt} HP each)`, 'success');
                 if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healAmt * alive.length;
+                // Distinct group beat over the whole party (F1 particles cover the
+                // per-member heals; this adds a single uplifting flourish + SFX).
+                exp._rallyTick = game.tick;
+                window.soundManager?.playExpSFX('spell_buff');
                 return;
             }
         }
@@ -2523,6 +2555,13 @@ export class ExplorationSystem {
                         const rounds = b.duration || 3;
                         if (b.dodgeChance) this._applyCombatStatus(member, 'buff_dodgeChance', rounds, { value: b.dodgeChance });
                     }
+                    // Buff/utility potions don't move hp/mana, so F1's frame-diff can't
+                    // see them; stamp a potion tick for a flask mote. HP/MP potions are
+                    // already covered by the heal/mana gain particles.
+                    if (!def.effect.healTarget && !def.effect.restoreMana) {
+                        member._lastPotionTick = game.tick;
+                        window.soundManager?.playExpSFX('spell_buff');
+                    }
                     this._addLog(exp, game, def.logText.replace('{name}', member.name), 'success');
                     if (exp.summary) exp.summary.potionsUsed++;
                     break;
@@ -2564,9 +2603,13 @@ export class ExplorationSystem {
         return diminishing * varietyMult;
     }
 
-    _updateBestiary(exp, category, key, data) {
+    _updateBestiary(exp, category, key, data, game) {
+        const fullKey = `${category}:${key}`;
+        // First sighting: the key is new to the persistent bestiary AND not already
+        // queued this run. Stamp it so the visualizer pops a discovery flourish once.
+        const already = this.bestiary.has(fullKey) || exp.discoveredEntries.some(e => e.key === fullKey);
         exp.discoveredEntries.push({
-            key: `${category}:${key}`,
+            key: fullKey,
             category,
             name: data.name || key,
             realm: exp.realm,
@@ -2576,6 +2619,11 @@ export class ExplorationSystem {
             eliteModifier: data.eliteModifier || null,
             eliteName: data.eliteName || null,
         });
+        if (!already && game) {
+            exp._lastDiscoveryTick = game.tick;
+            exp._lastDiscoveryName = data.name || key;
+            window.soundManager?.playExpSFX('spell_divination');
+        }
     }
 
     _awardExpeditionXP(exp, game, amount) {
@@ -2599,6 +2647,7 @@ export class ExplorationSystem {
             const heal = Math.floor(alive[0].maxHp * effects.healParty);
             for (const m of alive) m.hp = Math.min(m.maxHp, m.hp + heal);
             this._addLog(exp, game, `Party healed for ${heal} HP each.`, 'success');
+            this._stampResolution(exp, game, true);
         }
         if (effects.restoreMana) {
             for (const m of alive) {
@@ -2611,6 +2660,7 @@ export class ExplorationSystem {
             member.hp -= dmg;
             this._addLog(exp, game, `A trap springs! ${member.name} takes ${dmg} damage!`, 'danger');
             if (member.hp <= 0) this._checkExpeditionRevive(exp, member, game);
+            this._stampResolution(exp, game, false);
         }
         if (effects.npcChance && exp.partySnapshot.some(p => p.hp > 0) && Math.random() < effects.npcChance) {
             const npcKeys = Object.keys(NPC_ENCOUNTERS).filter(k => {
