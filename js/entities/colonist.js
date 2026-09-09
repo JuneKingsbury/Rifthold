@@ -158,6 +158,7 @@ export function createColonist(x, y, skillBias, existingNames = []) {
         tool: null,
         trinket: null,
         boots: null,
+        hiddenEquipmentSlots: {},
         drafted: false,
         draftTarget: null,
         guardMode: false,

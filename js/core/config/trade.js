@@ -35,8 +35,8 @@ export const MERCHANTS = [
     {
         name: 'Traveling Merchant',        // generalist: cheap everyday gear, common charms
         resourcePool: null,
-        lowTierItems: ['cotton_shirt', 'wool_cap', 'leather_boots', 'stone_pickaxe', 'stone_axe', 'wooden_club', 'short_bow'],
-        highTierItems: ['amulet_of_fortune', 'merchants_ring', 'hagglers_coin', 'seedkeepers_locket'],
+        lowTierItems: ['cotton_shirt', 'wool_cap', 'leather_boots', 'stone_pickaxe', 'stone_axe', 'wooden_club', 'short_bow', 'iron_clad_effigy'],
+        highTierItems: ['amulet_of_fortune', 'merchants_ring', 'hagglers_coin', 'seedkeepers_locket', 'emberstep_anklet'],
         lowDrawCount: [1, 0.7, 0.4],       // 1 guaranteed low + up to 2 more (70%, 40%)
         highDrawChances: [0.4],            // 1 guaranteed premium + up to 1 more (40%)
         qualityWeights: { poor: 2, normal: 5, fine: 2, superior: 1 },

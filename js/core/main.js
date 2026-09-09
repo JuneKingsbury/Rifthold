@@ -1628,6 +1628,18 @@ class Game {
         }
     }
 
+    toggleEquipmentSlotVisibility(colonistId, slot) {
+        const c = this.colonists.find(x => x.id === colonistId);
+        if (!c) return;
+        c.hiddenEquipmentSlots = c.hiddenEquipmentSlots || {};
+        if (c.hiddenEquipmentSlots[slot]) {
+            delete c.hiddenEquipmentSlots[slot];
+        } else {
+            c.hiddenEquipmentSlots[slot] = true;
+        }
+        this.skinManager.invalidateComposite(colonistId);
+    }
+
     equipArmor(colonistId, index) { this._equipItem(colonistId, index, 'armor', 'armors', 'addArmor'); }
     unequipArmor(colonistId) { this._unequipItem(colonistId, 'armor', 'addArmor', 'armor'); }
     equipHelmet(colonistId, index) { this._equipItem(colonistId, index, 'helmet', 'helmets', 'addHelmet'); }

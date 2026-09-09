@@ -1255,6 +1255,23 @@ export class UI {
             html += `<div style="margin:2px 0;padding:3px 6px;background:#111;border-radius:3px;font-size:11px;color:#aaa;line-height:1.5">${eqEffects}</div>`;
         }
 
+        // --- Sprite Layer Visibility Toggles ---
+        {
+            const VISUAL_SLOTS = [
+                { key: 'armor',   label: 'Armor'   },
+                { key: 'helmet',  label: 'Helmet'  },
+                { key: 'clothes', label: 'Clothes' },
+                { key: 'weapon',  label: 'Weapon'  },
+                { key: 'tool',    label: 'Tool'    },
+            ];
+            const hiddenSlots = colonist.hiddenEquipmentSlots || {};
+            const togglesHtml = VISUAL_SLOTS.map(s => {
+                const checked = !hiddenSlots[s.key] ? 'checked' : '';
+                return `<label class="eq-vis-toggle"><input type="checkbox" ${checked} onchange="window.game.toggleEquipmentSlotVisibility(${colonist.id},'${s.key}');window.ui.showColonistInfo(window.game.colonists.find(c=>c.id===${colonist.id}))">${s.label}</label>`;
+            }).join('');
+            html += `<div class="eq-vis-row"><span class="eq-vis-label">Show:</span>${togglesHtml}</div>`;
+        }
+
         // --- Spells ---
         const hasSpells = (colonist.knownSpells && colonist.knownSpells.length > 0) || colonist.equippedTome;
         if (hasSpells || hasMagic) {

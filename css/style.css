@@ -4754,3 +4754,24 @@ details.settings-debug > summary::marker {
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+.eq-vis-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 3px 6px;
+    font-size: 0.85em;
+}
+.eq-vis-label {
+    opacity: 0.5;
+    margin-right: 2px;
+}
+.eq-vis-toggle {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    user-select: none;
+}

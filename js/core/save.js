@@ -226,6 +226,7 @@ export function loadGame(game) {
                 delete c.artifactBroken;
             }
             c.boots = c.boots || null;
+            c.hiddenEquipmentSlots = c.hiddenEquipmentSlots || {};
         }
 
         // Migration: flatten item.combat stats to top-level
