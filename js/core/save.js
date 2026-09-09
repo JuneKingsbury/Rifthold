@@ -143,6 +143,18 @@ export function loadGame(game) {
         // caller falls back to starting a fresh game.
         if (data.version !== SAVE_VERSION) {
             console.warn(`Incompatible save version ${data.version}, expected ${SAVE_VERSION}. Starting fresh.`);
+            const wantExport = window.confirm(
+                `Your save was made with an older game version (v${data.version}) and cannot be loaded.\n\nWould you like to export a backup of your save file before starting a new game?`
+            );
+            if (wantExport) {
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `rifthold_backup_v${data.version}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
             localStorage.removeItem(SAVE_KEY);
             return false;
         }

@@ -2153,6 +2153,16 @@ class Game {
         this.notifications.push({ text: `[DEBUG] ${count} colonists granted ${allSpells.length} starter spells + magic skills set to 8`, tick: this.tick, type: 'success' });
     }
 
+    cheatGrantAdventurerLv10() {
+        if (!this.exploration) return;
+        for (const c of this.colonists) {
+            if (c.golem || c.hp <= 0) continue;
+            this.exploration.expeditionXP[c.id] = { xp: 0, level: 10 };
+        }
+        const count = this.colonists.filter(c => !c.golem && c.hp > 0).length;
+        this.notifications.push({ text: `[DEBUG] ${count} colonists set to Adventurer Lv10`, tick: this.tick, type: 'success' });
+    }
+
     cheatSpawnItem(category, key) {
         const def = ALL_ITEMS[key];
         if (!def || def.type !== category) return;

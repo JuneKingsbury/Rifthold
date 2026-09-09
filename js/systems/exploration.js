@@ -1078,7 +1078,8 @@ export class ExplorationSystem {
 
         const ds = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
         if (dimEvents && dimEvents.rare) {
-            const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult', exp.realm) * (exp.potionLootBoosts?.rareEncounterMult || 1);
+            const xpRareMult = exp.partySnapshot.reduce((best, m) => Math.max(best, this._getXpLevelBonus(m.id, 'rareEncounterMult')), 1);
+            const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult', exp.realm) * (exp.potionLootBoosts?.rareEncounterMult || 1) * xpRareMult;
             for (const rare of dimEvents.rare) {
                 if (Math.random() < rare.chance * rareEncounterMult * ds.rareLootMult) {
                     const msg = rare.text.replace('{name}', member.name);
@@ -1150,6 +1151,14 @@ export class ExplorationSystem {
         }
 
         this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerEncounter);
+
+        // Scout (Adventurer Lv3): any member with this ability previews what lies ahead.
+        const hasScout = exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 3);
+        if (hasScout) {
+            const typeLabel = { combat: 'a combat encounter', decision: 'a choice', puzzle: 'a puzzle', npc: 'a stranger', loot: 'a cache of loot' }[encounter.type] || 'an unknown encounter';
+            const isBoss = encounter.isBoss;
+            this._addLog(exp, game, `[Scout] ${isBoss ? 'Boss ahead!' : `Coming up: ${typeLabel}.`}`, 'info');
+        }
 
         if (encounter.type === 'decision') {
             exp.pendingDecision = {
@@ -1443,8 +1452,15 @@ export class ExplorationSystem {
         }
 
         // ── Enemy attack phase ──
+        // Ambush (Adventurer Lv8): any member with this ability grants a free first
+        // round of combat; enemies skip their attacks on round 1.
+        const hasAmbush = combat.round === 1 && exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 8);
+        if (hasAmbush) {
+            this._addLog(exp, game, 'The party ambushes their foes! Enemies cannot act this round.', 'success');
+        }
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
+            if (hasAmbush) { enemy._lastAttackKind = enemy.attackAnim || 'Swing'; continue; }
             const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
             // Crowd control from party spells: a stunned enemy forfeits its turn. A
             // slowed one has a (1 - mult) chance to lose it. Weaken (below) scales the
@@ -2079,6 +2095,8 @@ export class ExplorationSystem {
                     if (t?.expedition?.fatigueMult) personalFatigue = Math.floor(personalFatigue * t.expedition.fatigueMult);
                 }
             }
+            const xpFatigueMult = this._getXpLevelBonus(snapshot.id, 'fatigueMult');
+            if (xpFatigueMult !== 1) personalFatigue = Math.floor(personalFatigue * xpFatigueMult);
             if (snapshot.hp <= 0) personalFatigue = Math.floor(personalFatigue * FATIGUE_CONFIG.defeatPenalty);
             this.fatigueCooldowns[snapshot.id] = game.tick + Math.min(personalFatigue, FATIGUE_CONFIG.maxCooldownTicks);
 
@@ -2307,6 +2325,8 @@ export class ExplorationSystem {
                     if (t?.expedition?.rallyHeal) rallyHeal += t.expedition.rallyHeal;
                 }
             }
+            const lvl = this.getExpeditionLevel(member.id);
+            if (lvl >= 5) { rallyChance += 0.08; rallyHeal += 0.04; }
             if (Math.random() < rallyChance) {
                 const healAmt = Math.floor(member.maxHp * rallyHeal);
                 for (const m of alive) {

@@ -3,7 +3,7 @@ import { spawnParticle, spawnDamageText, spawnImpactSpray } from '../ui/overlay-
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
 import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture } from '../world/map.js';
-import { moveEntity, computeMoveDuration, computeMoveCooldown } from '../systems/movement-lerp.js';
+import { moveEntity, computeMoveDuration, computeMoveCooldown, teleportEntity } from '../systems/movement-lerp.js';
 import { FOODSTUFFS } from '../systems/resources.js';
 import { spawnSummon } from './summons.js';
 import { getNextId } from './entity-factory.js';
@@ -248,6 +248,7 @@ export function updateColonist(colonist, game) {
 
     tryUsePotions(colonist, game);
     tickPotionEffects(colonist, game);
+    tickDotEffects(colonist, game);
     updateHealth(colonist);
     updateMana(colonist);
     tryAutocastSpells(colonist, game);
@@ -662,7 +663,7 @@ function getMoveSpeedBonus(colonist) {
     }
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
-            if (e.type === 'speed' && e.moveSpeedBonus) bonus += e.moveSpeedBonus;
+            if ((e.type === 'speed' || e.type === 'slow') && e.moveSpeedBonus) bonus += e.moveSpeedBonus;
         }
     }
     if (colonist.traits.includes('quick')) bonus += TRAITS.quick.moveSpeedBonus;
@@ -877,6 +878,16 @@ function tryUsePotions(colonist, game) {
 function tickPotionEffects(colonist, game) {
     if (!colonist.activeEffects) return;
     colonist.activeEffects = colonist.activeEffects.filter(e => game.tick < e.expiresAt);
+}
+
+function tickDotEffects(colonist, game) {
+    if (!colonist.activeEffects) return;
+    for (const e of colonist.activeEffects) {
+        if (e.type === 'dot' && e.nextTick <= game.tick) {
+            colonistTakeDamage(colonist, e.damagePerTick, null, game);
+            e.nextTick += e.tickInterval;
+        }
+    }
 }
 
 export function grantCastXp(colonist, spell, game) {
@@ -1462,6 +1473,43 @@ function applySpellEffect(colonist, spell, game) {
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellGrowthChar, color: '#ffdd44', ttl: 4 });
             const fromStr = from ? `${inAmt} ${from.replace(/_/g, ' ')} → ` : '';
             game.notifications.push({ text: `${colonist.name} transmuted ${fromStr}${outAmt} ${to.replace(/_/g, ' ')}`, tick: game.tick, type: 'success' });
+            break;
+        }
+        case 'teleport': {
+            // Auto-cast teleport: blink toward the nearest hostile, picking the
+            // closest passable unoccupied tile within range that reduces distance.
+            const teleTarget = findNearestHostile(colonist, game);
+            const teleRange = spell.range || 5;
+            let bestTx = -1, bestTy = -1, bestDist = Infinity;
+            const curDist = teleTarget
+                ? manhattanDist(colonist.x, colonist.y, teleTarget.x, teleTarget.y)
+                : Infinity;
+            for (let dy = -teleRange; dy <= teleRange; dy++) {
+                for (let dx = -teleRange; dx <= teleRange; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    if (Math.abs(dx) + Math.abs(dy) > teleRange) continue;
+                    const tx = colonist.x + dx;
+                    const ty = colonist.y + dy;
+                    const tile = game.map[ty]?.[tx];
+                    if (!tile || !tile.passable) continue;
+                    if (game._occupiedTiles?.has(`${tx},${ty}`)) continue;
+                    const dToTarget = teleTarget
+                        ? manhattanDist(tx, ty, teleTarget.x, teleTarget.y)
+                        : manhattanDist(tx, ty, colonist.x, colonist.y);
+                    // Prefer tiles that bring us closer to the target.
+                    if (dToTarget < curDist && dToTarget < bestDist) {
+                        bestDist = dToTarget;
+                        bestTx = tx;
+                        bestTy = ty;
+                    }
+                }
+            }
+            if (bestTx !== -1) {
+                teleportEntity(colonist, bestTx, bestTy);
+                colonist.path = [];
+                game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '⟳', color: '#cc88ff', ttl: 4 });
+                window.soundManager?.playSFX('spell_cast');
+            }
             break;
         }
     }
@@ -2652,6 +2700,27 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
     // hid low-damage hits like raider-archer arrows (~2 dmg after rebalancing).
     spawnDamageText(game, colonist.x, colonist.y, actualDmg);
     window.soundManager?.playSFX('colonist_damaged');
+
+    // Apply attacker on-hit debuffs (slow, dot) if the attack landed.
+    if (attacker?.onHit && actualDmg > 0) {
+        const oh = attacker.onHit;
+        if (!colonist.activeEffects) colonist.activeEffects = [];
+        if (oh.effect === 'slow') {
+            colonist.activeEffects.push({
+                type: 'slow', harmful: true,
+                moveSpeedBonus: oh.moveSpeedMalus,
+                expiresAt: game.tick + oh.duration,
+            });
+        } else if (oh.effect === 'dot') {
+            colonist.activeEffects.push({
+                type: 'dot', harmful: true,
+                damagePerTick: oh.tickDamage,
+                tickInterval: oh.tickInterval,
+                nextTick: game.tick + oh.tickInterval,
+                expiresAt: game.tick + oh.duration,
+            });
+        }
+    }
 
     const thornsDamage = getEquipmentStat(colonist, 'thornsDamage');
     if (thornsDamage > 0 && attacker && attacker.hp > 0) {

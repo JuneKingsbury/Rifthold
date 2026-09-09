@@ -117,6 +117,9 @@ export function applySpecificQuality(item, qualityTier, ...statKeys) {
     const tier = QUALITY_TIERS.find(t => t.key === qualityTier);
     if (!tier) return;
     if (tier.key === 'normal') return;
+    // Skip quality prefix when no stats are scaled by it (e.g. trinkets).
+    // Showing "Superior" on an item where it changes nothing is misleading.
+    if (statKeys.length === 0) return;
     item.quality = tier.key;
     item.name = `${tier.prefix} ${item.name}`;
     for (const stat of statKeys) {
@@ -184,7 +187,7 @@ export function applyEnchantmentEffect(item, type, enchantTier) {
         item.lifeSteal = round2((item.lifeSteal || 0) + effect.lifeSteal * mult);
     // armor / clothes effects
     } else if (effect.defenseMultiplier) {
-        item.damageReduction = round2((item.damageReduction || 0) * (effect.defenseMultiplier * mult));
+        item.damageReduction = Math.min(0.95, round2((item.damageReduction || 0) * (effect.defenseMultiplier * mult)));
     } else if (effect.manaRegenBonus) {
         // Additive % boost consumed at runtime as ×(1 + Σbonus). Stored as a plain
         // bonus (not a live multiplier field) so getEquipmentStat's summing is correct.

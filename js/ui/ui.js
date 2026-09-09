@@ -7,7 +7,7 @@ import { getComplexStructureAt, getSpellCooldownMult } from '../systems/complexB
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
-import { getTargetPriority, getThreatDisplayHtml, countByKey } from './ui-utils.js';
+import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
@@ -35,7 +35,7 @@ function magicXpTip(def, level, acc) {
     const pct = Math.floor((acc / maxXp) * 100);
     return level >= 10
         ? `${def.description} (MAX)`
-        : `${def.description} — XP: ${pct}/100 (${pct}%)`;
+        : `${def.description} (${pct}% to next level)`;
 }
 
 export class UI {
@@ -724,7 +724,7 @@ export class UI {
             html += `<div class="build-card${active}${stateClass}" data-build-opt="${opt}">`;
             html += `<div class="build-card-key">${keyLabel}</div>`;
             html += `<div class="build-card-icon-wrap">${bldIcon}</div>`;
-            html += `<div class="build-card-name">${opt.replace(/_/g, ' ')}</div>`;
+            html += `<div class="build-card-name">${opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>`;
             html += `<div class="build-card-cost">${costHtml}</div>`;
             html += overlayHtml;
             html += `</div>`;
@@ -1167,7 +1167,8 @@ export class UI {
                 const xp = xpData?.xp || 0;
                 const level = xpData?.level || 0;
                 const needed = 10 + level * 5;
-                html += `<div class="info-row">Adventurer Lv${level} <span style="color:#888;">(${xp}/${needed} XP)</span></div>`;
+                const tip = adventurerLevelTooltip(level).replace(/"/g, '&quot;');
+                html += `<div class="info-row"><span class="skill-tip" data-tip="${tip}" style="color:#ffcc44;cursor:help;">Adventurer Lv${level}</span> <span style="color:#888;">(${xp}/${needed} XP)</span></div>`;
             }
         }
 
@@ -1406,7 +1407,7 @@ export class UI {
     _buildSlotSelect(colonist, slot) {
         const overlayStyle = 'position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;';
         const SLOT_CONFIG = {
-            weapon: { listName: 'weapons', label: 'Weapon', fallback: 'Fists', equipFn: 'equipWeapon', unequipFn: 'unequipWeapon', statRenderer: w => { const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown; return `${w.damage}d (${(w.damage / cd).toFixed(1)} dps)`; } },
+            weapon: { listName: 'weapons', label: 'Weapon', fallback: 'Fists', equipFn: 'equipWeapon', unequipFn: 'unequipWeapon', statRenderer: w => { const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown; return `${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`; } },
             armor: { listName: 'armors', label: 'Armor', fallback: 'None', equipFn: 'equipArmor', unequipFn: 'unequipArmor', statRenderer: a => getItemStatLines(a).join(', ') },
             helmet: { listName: 'helmets', label: 'Helmet', fallback: 'None', equipFn: 'equipHelmet', unequipFn: 'unequipHelmet', statRenderer: h => getItemStatLines(h).join(', ') },
             clothes: { listName: 'clothes', label: 'Clothes', fallback: 'None', equipFn: 'equipClothes', unequipFn: 'unequipClothes', statRenderer: c => getItemStatLines(c).join(', ') },
@@ -1644,7 +1645,7 @@ export class UI {
             const baseCd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             const dpt = (w.damage / baseCd).toFixed(1);
             let tip = w.description ? `${w.description} ` : '';
-            tip += `${w.damage}d (${dpt} dps)`;
+            tip += `${w.damage}d (${dpt} dps, ${weaponSpeedLabel(baseCd)})`;
             if (w.ranged) tip += `, range ${w.range}`;
             const extras = getItemStatLines({ ...w, damage: undefined, ranged: undefined, range: undefined });
             if (extras.length) tip += `, ${extras.join(', ')}`;
@@ -2358,7 +2359,12 @@ export class UI {
         }
     }
 
-    toggleEventLog() {}
+    toggleEventLog() {
+        const el = this.elements.eventLog;
+        if (!el) return;
+        const hidden = el.style.display === 'none';
+        el.style.display = hidden ? '' : 'none';
+    }
 
     updateEventLog() {
         const entries = this.game.eventLog.getRecent(10);
@@ -2584,7 +2590,7 @@ export class UI {
             weapons.forEach((w, i) => {
                 const extras = getItemStatLines({ ...w, damage: undefined });
                 const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
-                let stats = `${w.damage}d (${(w.damage / cd).toFixed(1)} dps)`;
+                let stats = `${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`;
                 if (extras.length) stats += `, ${extras.join(', ')}`;
                 const tip = w.description || '';
                 const wec = ENCHANT_COST_BY_TIER[w.tier] ?? { resource: 'runite', amount: 5 };
@@ -2914,6 +2920,7 @@ export class UI {
         general += `<button onclick="if(confirm('Complete all research?'))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">Grant All Research</button>`;
         general += `<button onclick="if(confirm('Grant all starter spells (level 0) to every colonist and set magic skills to 1?'))window.game.cheatGrantStarterSpells()" class="settings-btn settings-btn-danger">Grant All Starter Spells + Magic Lvl 1</button>`;
         general += `<button onclick="if(confirm('Grant all spells to every colonist and set magic skills to 8?'))window.game.cheatGrantAllSpells()" class="settings-btn settings-btn-danger">Grant All Spells + Magic Lvl 8</button>`;
+        general += `<button onclick="if(confirm('Set all colonists to Adventurer Lv10?'))window.game.cheatGrantAdventurerLv10()" class="settings-btn settings-btn-danger">Set Adventurer Lv10</button>`;
         general += `<button onclick="window.game.cheatSpawnColonist()" class="settings-btn settings-btn-danger">Grant New Colonist</button>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-trinket-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -3209,14 +3216,27 @@ export class UI {
         return `<span style="color:${color};font-weight:bold;margin-right:3px;font-size:0.9em;">${ch}</span>`;
     }
 
-    _getExclusiveItemTooltip(item) {
+    _getEquipmentTooltip(item) {
         if (!item) return '';
         if (item.type === 'trinket') return this._getTrinketTooltip(item);
         const lines = [];
         if (item.description) lines.push(item.description);
-        const stats = getItemStatLines(item);
-        if (stats.length) lines.push(stats.join(', '));
+        if (item.type === 'weapon') {
+            const cd = item.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
+            let statStr = `${item.damage}d (${(item.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`;
+            if (item.ranged) statStr += `, range ${item.range}`;
+            const extras = getItemStatLines({ ...item, damage: undefined, ranged: undefined, range: undefined });
+            if (extras.length) statStr += `, ${extras.join(', ')}`;
+            lines.push(statStr);
+        } else {
+            const stats = getItemStatLines(item);
+            if (stats.length) lines.push(stats.join(', '));
+        }
         return lines.join(' | ') || item.name;
+    }
+
+    _getExclusiveItemTooltip(item) {
+        return this._getEquipmentTooltip(item);
     }
 
     _updateTradePanel(evt) {
@@ -3385,8 +3405,9 @@ export class UI {
                 const isOffered = !!offer[key];
                 const selected = isOffered ? ' selected' : '';
                 const icon = this._itemIcon(item.key || key, type);
+                const tip = this._getEquipmentTooltip(item).replace(/"/g, '&quot;');
                 html += `<div class="trade-item-row${selected}">`;
-                html += `<div class="trade-item-name">${icon}${item.name}`;
+                html += `<div class="trade-item-name skill-tip" data-tip="${tip}">${icon}${item.name}`;
                 if (isOffered) html += `<span class="trade-item-badge">1</span>`;
                 html += `</div>`;
                 html += `<div class="trade-item-value">${val}g</div>`;
@@ -3752,6 +3773,12 @@ function statColor(value) {
     return '#cc4444';
 }
 
+function weaponSpeedLabel(cd) {
+    if (cd <= 2) return 'Fast';
+    if (cd >= 5) return 'Slow';
+    return 'Normal';
+}
+
 function getWeaponTooltip(colonist) {
     const w = colonist.weapon;
     const baseCd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
@@ -3764,7 +3791,7 @@ function getWeaponTooltip(colonist) {
         const effDpt = (w.damage / effCd).toFixed(1);
         tip += `, ${baseDpt} dps → ${effDpt} dps`;
     } else {
-        tip += ` (${baseDpt} dps)`;
+        tip += ` (${baseDpt} dps, ${weaponSpeedLabel(baseCd)})`;
     }
     if (w.ranged) tip += `, range ${w.range}`;
     const extras = getItemStatLines({ ...w, damage: undefined, ranged: undefined, range: undefined });

@@ -62,7 +62,7 @@ export const TRAITS = {
     green_thumb:   { name: 'Green Thumb',   weight: 7,  value:  2, farmingSpeedMult: 1.3, description: '+30% farming speed', expedition: { realmBonus: { verdant_depths: { lootMult: 1.2 }, fungal_hollows: { lootMult: 1.15 }, primeval_canopy: { lootMult: 1.1 } } } },
     iron_stomach:  { name: 'Iron Stomach',  weight: 7,  value:  2, hungerDecayMult: 0.5,  description: 'Gets hungry half as fast' },
     tough:         { name: 'Tough',         weight: 7,  value:  3, damageReduction: 0.3,  description: 'Takes 30% less damage', expedition: { trapDamageMult: 0.7, fatigueMult: 0.8 } },
-    brave:         { name: 'Brave',         weight: 6,  value:  2, fleeHpMult: 0.3,       description: 'Only flees at very low HP', expedition: { rallyChance: 0.1, rallyHeal: 0.05 } },
+    brave:         { name: 'Brave',         weight: 6,  value:  2, fleeHpMult: 0.10,      description: 'Only flees at very low HP', expedition: { rallyChance: 0.1, rallyHeal: 0.05 } },
     quick:         { name: 'Quick',         weight: 7,  value:  2, moveSpeedBonus: 0.25,  description: 'Moves 25% faster', expedition: { durationMult: 0.95, dodgeChanceMod: 0.05 } },
     sturdy:        { name: 'Sturdy',        weight: 6,  value:  1, damageReduction: 0.15, workSpeedBonus: -0.1, description: 'Takes 15% less damage, -10% work speed' },
     light_sleeper: { name: 'Light Sleeper', weight: 7,  value:  0, restDecayMult: 1.4, sleepRestMult: 1.5, description: 'Gets tired faster, but recovers faster while sleeping' },

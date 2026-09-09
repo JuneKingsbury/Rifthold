@@ -17,7 +17,7 @@ export const ENCHANTMENT_TIERS = [
     { key: 'I',   multiplier: 1, baseChance: 0.60, perSkill: -0.05 },
     { key: 'II',  multiplier: 2, baseChance: 0.25, perSkill: 0 },
     { key: 'III', multiplier: 3, baseChance: 0.10, perSkill: 0.02 },
-    { key: 'VI',  multiplier: 4, baseChance: 0.05, perSkill: 0.01 },
+    { key: 'IV',  multiplier: 4, baseChance: 0.05, perSkill: 0.01 },
 ];
 
 export const QUALITY_TIERS = [

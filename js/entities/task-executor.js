@@ -308,7 +308,6 @@ export function completeTask(colonist, task, game) {
                     else if (def.type === 'tool') applySpecificQuality(item, task.itemQuality, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
                     // Apply enchantment based on item type
                     applyEnchantment(item, colonist, game, task.itemType);
-                    // Add item to inventory. TODO: Make sure we also remove the original item or replace it in-place.
                     game.resources.addItem(item);
                     applyThought(colonist, 'enchanted an item', game.tick);
                     game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Enchanted ${item.name}`, color: '#ff00f7', fontSize: 10, ttl: 20, maxTtl: 20 });

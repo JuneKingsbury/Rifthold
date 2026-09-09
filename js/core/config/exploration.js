@@ -1999,7 +1999,7 @@ export const EXPEDITION_XP_CONFIG = {
         7:  { expeditionDamageMult: 1.15 },
         8:  { ability: 'ambush' },
         9:  { trapDamageMult: 0.8 },
-        10: { ability: 'veteran' },
+        10: { ability: 'veteran', fatigueMult: 0.5 },
     },
 };
 

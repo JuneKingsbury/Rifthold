@@ -6,6 +6,7 @@ import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CL
 import { estimatePartyStrength } from '../systems/exploration.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
+import { adventurerLevelTooltip } from './ui-utils.js';
 
 // Visual glyph + color for an expedition combat status effect. Poison ticks
 // damage, stun skips a turn, slow may cost a turn, weaken reduces output, burn
@@ -479,7 +480,8 @@ const arcaneMethods = {
             const priorityStr = priority !== 0 ? ` <span style="color:${priority > 0 ? '#ff6644' : '#66aaff'}">${priority > 0 ? '▲' : '▼'}Thr</span>` : '';
             const defStr = def > 0 ? ` Def:${def}%` : '';
             const expLvl = expl.getExpeditionLevel(c.id);
-            const lvlStr = expLvl > 0 ? ` <span style="color:#ffcc44;font-size:0.8em;">Lv${expLvl}</span>` : '';
+            const lvlTip = expLvl > 0 ? adventurerLevelTooltip(expLvl).replace(/"/g, '&quot;') : '';
+            const lvlStr = expLvl > 0 ? ` <span class="skill-tip" data-tip="${lvlTip}" style="color:#ffcc44;font-size:0.8em;cursor:help;">Lv${expLvl}</span>` : '';
             const fatigued = expl.isFatigued(c.id, this.game.tick);
             const fatigueStr = fatigued ? ` <span style="color:#ff6644;font-size:0.8em;">[Fatigued]</span>` : '';
             const disabledAttr = fatigued ? ' disabled' : '';
@@ -708,11 +710,15 @@ const arcaneMethods = {
         html += `<div style="color:#aaa;font-size:0.85em;margin-top:2px;">Dmg/round: ${result.totalDmg} | HP: ${result.totalHp} | DR: ${result.avgDR}%</div>`;
 
         html += '<div style="margin-top:6px;border-top:1px solid #333;padding-top:4px;">';
+        const expl = this.game.exploration;
         for (const m of result.members) {
             const traitStr = m.traits.length > 0 ? ` <span style="color:#88cc88;">[${m.traits.map(t => t.name).join(', ')}]</span>` : '';
             const manaStr = m.maxMana > 0 ? ` | <span style="color:#6688ff;">${m.maxMana} MP</span>` : '';
+            const expLvl = expl ? expl.getExpeditionLevel(m.id) : 0;
+            const lvlTip = expLvl > 0 ? adventurerLevelTooltip(expLvl).replace(/"/g, '&quot;') : '';
+            const lvlStr = expLvl > 0 ? ` <span class="skill-tip" data-tip="${lvlTip}" style="color:#ffcc44;cursor:help;">Lv${expLvl}</span>` : '';
             html += `<div style="font-size:0.8em;color:#ccc;margin:1px 0;">`
-                + `<span style="color:#eee;">${m.name}</span>: ${m.dmgPerRound} dmg x${m.hitsPerRound}/rnd | ${m.hp} HP | ${m.dr}% DR${manaStr}${traitStr}</div>`;
+                + `<span style="color:#eee;">${m.name}</span>${lvlStr}: ${m.dmgPerRound} dmg x${m.hitsPerRound}/rnd | ${m.hp} HP | ${m.dr}% DR${manaStr}${traitStr}</div>`;
         }
         html += '</div>';
 

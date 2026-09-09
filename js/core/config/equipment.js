@@ -50,8 +50,8 @@ const BASE_RECIPES = {
     craft_tome_of_summon_familiar: { input: { planks: 2, wheat: 2 }, output: { tome_of_summon_familiar: 1 }, skill: 'crafting', ticks: 55, station: 'workbench', category: 'Tomes' },
     craft_tome_of_warp: { input: { planks: 4, runite: 2, void_essence: 1 }, output: { tome_of_warp: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_summon_ghost: { input: { planks: 4, runite: 2, void_essence: 1 }, output: { tome_of_summon_ghost: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
-    craft_tome_of_gate: { input: { planks: 6, runite: 4, void_essence: 4 }, output: { tome_of_warp: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
-    craft_tome_of_summon_monster: { input: { planks: 6, runite: 4, void_essence: 4 }, output: { tome_of_summon_ghost: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_gate: { input: { planks: 6, runite: 4, void_essence: 4 }, output: { tome_of_gate: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_summon_monster: { input: { planks: 6, runite: 4, void_essence: 4 }, output: { tome_of_summon_monster: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
 
     // Transmutation
     craft_tome_of_nurture: { input: { planks: 2, wheat: 2 }, output: { tome_of_nurture: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },

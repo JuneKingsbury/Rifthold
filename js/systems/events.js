@@ -504,7 +504,7 @@ export class EventSystem {
 
         this.pendingEvent = {
             type: 'trade',
-            text: `A ${merchant.name} arrives! Barter resources with the merchant.`,
+            text: `${'aeiouAEIOU'.includes(merchant.name[0]) ? 'An' : 'A'} ${merchant.name} arrives! Barter resources with the merchant.`,
             choices: ['Open Trade', 'Dismiss'],
             data: { traderResources, exclusiveItems, traderPotions, traderGold, merchantName: merchant.name, buyCategories: merchant.buyCategories || null, merchantResourcePool: merchant.resourcePool || null },
         };
