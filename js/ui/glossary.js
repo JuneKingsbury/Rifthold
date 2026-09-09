@@ -6,11 +6,11 @@ export const GLOSSARY = [
                 subtitle: 'Races',
                 entries: [
                     ['Races Overview', 'Five playable races, each with a unique racial trait that provides passive bonuses. Colonists of all races work together and can fill any role.'],
-                    ['Human', 'Versatile generalists who gain non-magic skill experience faster than other races.'],
-                    ['Nymph', 'Magically attuned beings who gain magic skill experience faster and need slightly less sleep.'],
-                    ['Ferin', 'Joyful farmers with a bonus to farming speed and amplified positive thoughts.'],
-                    ['Kobalos', 'Energetic workers with faster movement, faster work speed, and no mood penalty from eating raw food.'],
-                    ['Bufos', 'Daylight-adapted creatures with modified rest patterns.'],
+                    ['Human', 'Versatile generalists who learn all skills, both mundane and magical, faster than other races.'],
+                    ['Nymph', 'Magically attuned beings who gain magic skill experience much faster than other races, but are physically frail and work more slowly.'],
+                    ['Ferin', 'Nature-bonded beings with a bonus to farming speed and exceptional skill with animals. They tend to get restless when stuck indoors for too long.'],
+                    ['Kobalos', 'Pack-minded workers who move faster and grow tougher when surrounded by allies, but they become rattled when alone. Additionally, they suffer no mood penalty from eating raw food.'],
+                    ['Bufos', 'Cold-blooded creatures who work faster during the day and slower at night. They also tend to tire more slowly than other races.'],
                 ]
             },
             {
@@ -29,10 +29,16 @@ export const GLOSSARY = [
                 subtitle: 'Traits',
                 entries: [
                     ['Traits Overview', 'Permanent modifiers assigned when a colonist is created. Each colonist gets one to three traits. Some trait pairs are mutually exclusive.'],
-                    ['Work Traits', 'Hard Worker, Lazy, Night Owl, Early Bird, Creative, Scholar, Prodigy. These affect work speed, skill growth rate, or time-of-day performance.'],
-                    ['Survival Traits', 'Iron Stomach, Gluttonous, Tough, Brave, Quick, Sturdy, Light Sleeper, Deep Sleeper. These modify hunger/rest decay, damage resistance, movement speed, or combat behavior.'],
-                    ['Social Traits', 'Socialite, Loner, Optimist, Pessimist, Gourmand. These affect mood from social interactions, thought intensity, or meal satisfaction.'],
-                    ['Rare Traits', 'Lucky (better crafting quality), Pyromaniac (may start fires), Pacifist (refuses combat), Magically Gifted (starts with a magic school level and starter spell).'],
+                    ['Work Traits', 'Hard Worker, Lazy, Night Owl, Early Bird, Creative, Scholar, Workaholic, Insomniac. These affect work speed, skill growth rate, or time-of-day performance.'],
+                    ['Survival Traits', 'Iron Stomach, Gluttonous, Tough, Brave, Quick, Sturdy, Light Sleeper, Deep Sleeper, Steadfast, Volatile. These modify hunger/rest decay, damage resistance, movement speed, or mental resilience.'],
+                    ['Combat Traits', 'Duelist (dodge chance), Deadeye (critical hit chance), Berserker (stronger at low health), Coward (flees early), Pacifist (refuses combat). These traits directly affect performance in battle.'],
+                    ['Social Traits', 'Socialite, Loner, Optimist, Pessimist, Charismatic, Abrasive, Loyal. These affect mood from social interactions, thought intensity, and how quickly relationships form or sour.'],
+                    ['Food Traits', 'Gourmand (strong reaction to meal quality), Foraging Gut (no penalty from raw food), Chef (better cooking output), Comfort Eater (eating restores extra mood). These affect how colonists interact with food and hunger.'],
+                    ['Animal Traits', 'Beast Whisperer (better taming and animal handling), Menagerist (cheered by nearby tamed animals), Skittish (worse at taming). These affect interactions with wildlife and tamed creatures.'],
+                    ['Magic Traits', 'Attuned (bonus mana regen and max mana), Spellsword (bonus spell damage), Magically Inept (much slower magic XP but slightly faster mundane XP). These affect a colonist\'s relationship with spellcasting.'],
+                    ['Expedition Traits', 'Trailblazer, Treasure Hunter, Trapsmith, Inspiring, Void-Touched, Night Owl, Green Thumb (certain traits can also have realm-specific bonuses on expeditions). These traits give bonuses during expeditions such as reduced duration, better loot, or party-wide buffs.'],
+                    ['Trade Traits', 'Silver Tongue (better trade prices), Merchant\'s Eye (Trade Rift rewards arrive at higher quality), Scavenger (chance to find bonus materials while gathering).'],
+                    ['Rare Traits', 'Lucky (better crafting quality on all items), Pyromaniac (rare chance to start fires), Prodigy (gains all XP faster), Magically Gifted (starts with experience in a random magic school and its starter spell). These are uncommon to very rare and have powerful effects.'],
                 ]
             },
             {
@@ -162,7 +168,7 @@ export const GLOSSARY = [
                 entries: [
                     ['Learning Spells', 'Colonists learn spells by studying Spell Tomes at a Research Desk, prioritized by the Research skill. Each tome teaches one spell. Progress persists per-colonist, and completing a tome permanently grants that spell, destroying the tome in the process. Colonists will slowly study their tome while contributing to research topic progress. Additionally, colonists will study their tome at a faster pace if there\'s no research topic to contribute to.'],
                     ['Colonist Mana', 'Each colonist has a personal mana pool that grows as they level magic skills. Spells consume mana and go on cooldown. Mana regenerates passively over time or can be restored instantly via potions.'],
-                    ['Auto-Cast', 'Colonists auto-cast known spells when appropriate conditions are met (healing when allies are hurt, buffing speed when working). Disable specific spells to conserve mana for higher-priority casts.'],
+                    ['Auto-Cast', 'Colonists auto-cast known spells when appropriate conditions are met (healing when allies are hurt, buffing speed when working). Each colonist can attune to two magic schools at a time and will be able to auto-cast spells from those schools. Disable specific spells to conserve mana for higher-priority casts.'],
                     ['Magic Schools', 'Six schools of magic, each with a distinct role: Evocation (damage), Enchantment (work/movement buffs), Abjuration (healing and shields), Conjuration (summons and teleportation), Transmutation (crop growth and terrain manipulation), Divination (influencing fate and events).'],
                     ['Evocation', 'Offensive combat spells that damage enemies at range. Scales with the caster\'s Evocation skill level.'],
                     ['Enchantment', 'Buff spells that increase movement and work speed for everyday productivity. Helps colonists complete tasks faster. This skill is also used when determining equipment enchantment tiers.'],
@@ -194,13 +200,13 @@ export const GLOSSARY = [
                 entries: [
                     ['Pattern Activation', 'Certain multi-tile building patterns activate powerful colony-wide bonuses when completed. Place an Arcane Core, then lay Ritual Chalk around it in the required shape. Every structure uses the same core: the chalk pattern alone determines which structure activates. Destroying or removing any part of the pattern deactivates the bonus.'],
                     ['Arcane Core', 'The universal anchor for all complex structures. Place one, then surround it with Ritual Chalk in the correct shape to activate a structure. Both Arcane Core and Ritual Chalk are unlocked with Arcane Infusion research. Check the individual structure entries below for each pattern.'],
-                    ['Great Forge', 'All 8 adjacent tiles around the Arcane Core filled with Ritual Chalk (3x3 ring). Grants 2.5x crafting speed and +2 crafting quality colony-wide. Requires Masterwork research.\n  C C C\n  C * C\n  C C C\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ['Ritual Circle', 'Ritual Chalk in a diamond pattern around the Arcane Core: cardinal distance 2 (up/down/left/right) and diagonal distance 1 (all four corners). Reduces spell cooldowns by 30% colony-wide. Requires Advanced Arcana research.\n  . . C . .\n  . C . C .\n  C . * . C\n  . C . C .\n  . . C . .\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
-                    ['Anvil Shrine', 'Ritual Chalk in an anvil shape: 3 chalk above the Arcane Core, 1 chalk below. +50% gathering speed for chopping and mining colony-wide. Requires Irrigation research.\n  C C C\n  . * .\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ['Star Ward', 'Ritual Chalk in a cardinal cross: one chalk tile directly above, below, left, and right at distance 2. +30% colonist outgoing damage colony-wide. Requires Fortification research.\n  . . C . .\n  . . . . .\n  C . * . C\n  . . . . .\n  . . C . .\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
-                    ['Harvest Sigil', 'Ritual Chalk in a plough shape: 3 chalk extending right from the Arcane Core, with 1 chalk branching up and 1 branching down at the far end. +50% farm harvest yield colony-wide. Requires Verdant Growth research.\n  . . . C\n  * C C C\n  . . . C\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ["Watcher's Eye", 'Ritual Chalk directly above and below the Arcane Core (vertical line of 3). +40% expedition loot quantity colony-wide. Requires Planar Rifts research.\n  C\n  *\n  C\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ["Scholar's Ring", 'Ritual Chalk on the 4 cardinal adjacent tiles only (no corners). +50% research point generation colony-wide. Requires Arcane Studies research.\n  . C .\n  C * C\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
+                    ['Great Forge', 'All 8 adjacent tiles around the Arcane Core filled with Ritual Chalk (3x3 ring). Greatly increases crafting speed and crafting quality colony-wide. Requires Masterwork research.\n  C C C\n  C * C\n  C C C\n\n  * = Arcane Core    C = Ritual Chalk'],
+                    ['Ritual Circle', 'Ritual Chalk in a diamond pattern around the Arcane Core: cardinal distance 2 (up/down/left/right) and diagonal distance 1 (all four corners). Significantly reduces spell cooldowns colony-wide. Requires Advanced Arcana research.\n  . . C . .\n  . C . C .\n  C . * . C\n  . C . C .\n  . . C . .\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
+                    ['Anvil Shrine', 'Ritual Chalk in an anvil shape: 3 chalk above the Arcane Core, 1 chalk below. Greatly increases gathering speed for chopping and mining colony-wide. Requires Irrigation research.\n  C C C\n  . * .\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
+                    ['Star Ward', 'Ritual Chalk in a cardinal cross: one chalk tile directly above, below, left, and right at distance 2. Increases colonist outgoing damage colony-wide. Requires Fortification research.\n  . . C . .\n  . . . . .\n  C . * . C\n  . . . . .\n  . . C . .\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
+                    ['Harvest Sigil', 'Ritual Chalk in a plough shape: 3 chalk extending right from the Arcane Core, with 1 chalk branching up and 1 branching down at the far end. Greatly increases farm harvest yield colony-wide. Requires Verdant Growth research.\n  . . . C\n  * C C C\n  . . . C\n\n  * = Arcane Core    C = Ritual Chalk'],
+                    ["Watcher's Eye", 'Ritual Chalk directly above and below the Arcane Core (vertical line of 3). Increases expedition loot quantity colony-wide. Requires Planar Rifts research.\n  C\n  *\n  C\n\n  * = Arcane Core    C = Ritual Chalk'],
+                    ["Scholar's Ring", 'Ritual Chalk on the 4 cardinal adjacent tiles only (no corners). Greatly increases research point generation colony-wide. Requires Arcane Studies research.\n  . C .\n  C * C\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
                 ]
             },
         ]

@@ -195,8 +195,8 @@ export const COLONIST_CONFIG = {
     healthRegenWhileSleeping: 3.0,
     skillMaxLevel: 10,
     skillXpPerTask: 1,
-    skillXpToLevel: 8,
-    skillXpScalePerLevel: 4,
+    skillXpToLevel: 15,
+    skillXpScalePerLevel: 8,
 };
 
 export const HUMAN_NAMES = [

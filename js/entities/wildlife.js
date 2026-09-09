@@ -312,6 +312,7 @@ export function designateHunt(game, animalId) {
         x: animal.x,
         y: animal.y,
         workAmount: 1,
+        skillXpGain: 1,
         targetAnimalId: animalId,
     });
     return true;

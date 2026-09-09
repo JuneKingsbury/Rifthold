@@ -662,7 +662,7 @@ export function completeTask(colonist, task, game) {
         if (colonist.skills[task.skillRequired] < maxLevel) {
             if (!colonist.skillXp) colonist.skillXp = {};
             if (!colonist.skillXp[task.skillRequired]) colonist.skillXp[task.skillRequired] = 0;
-            let xpGain = COLONIST_CONFIG.skillXpPerTask;
+            let xpGain = task.skillXpGain ?? Math.max(0.5, Math.round(task.workAmount / 10 * 2) / 2);
             if (colonist.pedestalSkillBonus) xpGain *= (1 + colonist.pedestalSkillBonus);
             if (colonist.activeEffects) {
                 for (const e of colonist.activeEffects) {
