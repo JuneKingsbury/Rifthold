@@ -282,6 +282,7 @@ export class UI {
         this._buildTooltip.style.display = 'none';
         document.body.appendChild(this._buildTooltip);
         this._buildTooltipTarget = null;
+        this._buildTooltipTimer = null;
 
         const buildOptClick = (e) => {
             const closeBtn = e.target.closest('[data-mode-action="back"]');
@@ -312,16 +313,16 @@ export class UI {
             const opt = e.target.closest('[data-build-opt]');
             if (!opt) return;
             const buildType = opt.dataset.buildOpt;
-            if ('ontouchstart' in window && this._buildTooltipTarget !== buildType) {
-                this._buildTooltipTarget = buildType;
-                this._showBuildTooltip(opt);
-                return;
-            }
             this._buildTooltipTarget = null;
             this._hideBuildTooltip();
             this.game.input.buildType = buildType;
             this.updateModeDisplay(this.game.input);
             window.soundManager?.playSFXPitched('button_click', 0);
+            if ('ontouchstart' in window) {
+                clearTimeout(this._buildTooltipTimer);
+                this._showBuildTooltip(opt);
+                this._buildTooltipTimer = setTimeout(() => this._hideBuildTooltip(), 2000);
+            }
         };
         const buildOptHover = (e) => {
             const card = e.target.closest('[data-build-opt]');
@@ -2646,6 +2647,8 @@ export class UI {
 
     _hideBuildTooltip() {
         if (this._buildTooltip) this._buildTooltip.style.display = 'none';
+        clearTimeout(this._buildTooltipTimer);
+        this._buildTooltipTimer = null;
     }
 
     _positionBuildTooltip(e) {
