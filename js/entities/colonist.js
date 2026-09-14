@@ -20,13 +20,12 @@ function hslToHex(h, s, l) {
     return '#' + [f(0), f(8), f(4)].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
 }
 
-export function createColonist(x, y, skillBias, existingNames = []) {
+export function createColonist(x, y, skillBias, existingNames = [], forcedRace = null) {
     const id = getNextId();
     const usedNames = new Set(existingNames);
 
-    // Randomly roll for colonist race.
     const raceKeys = Object.keys(RACES);
-    const race = raceKeys[Math.floor(Math.random() * raceKeys.length)];
+    const race = forcedRace ?? raceKeys[Math.floor(Math.random() * raceKeys.length)];
 
     let available;
     if (race === 'nymph') {

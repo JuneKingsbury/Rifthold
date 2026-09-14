@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -223,15 +223,21 @@ class Game {
         const cx = Math.floor(CONFIG.MAP_WIDTH / 2);
         const cy = Math.floor(CONFIG.MAP_HEIGHT / 2);
         const biases = ['building', 'farming', 'crafting'];
+        const racePool = Object.keys(RACES);
+        for (let i = racePool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [racePool[i], racePool[j]] = [racePool[j], racePool[i]];
+        }
+        const startingRaces = racePool.slice(0, 3);
         for (let i = 0; i < 3; i++) {
             const existingNames = this.colonists.map(c => c.name);
             const custom = customDefs?.[i];
-            const c = createColonist(cx + i - 1, cy, biases[i], existingNames);
+            const forcedRace = custom?.race ?? startingRaces[i];
+            const c = createColonist(cx + i - 1, cy, biases[i], existingNames, forcedRace);
             if (custom) {
                 if (custom.name) c.name = custom.name;
                 if (custom.skills) Object.assign(c.skills, custom.skills);
                 if (custom.traits) c.traits = [custom.race, ...custom.traits];
-                if (custom.race) c.race = custom.race;
                 if (custom.bodyVariant != null) c.bodyVariant = custom.bodyVariant;
                 if (custom.hairVariant != null) c.hairVariant = custom.hairVariant;
                 if (custom.shirtVariant != null) c.shirtVariant = custom.shirtVariant;
