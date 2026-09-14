@@ -265,8 +265,8 @@ export class Renderer {
         const ch = this.charHeight;
         const mapW = CONFIG.MAP_WIDTH;
         const mapH = CONFIG.MAP_HEIGHT;
-        const bufW = mapW * cw;
-        const bufH = mapH * ch;
+        const bufW = Math.round(mapW * cw);
+        const bufH = Math.round(mapH * ch);
         if (bufW > this._terrainCacheMaxPx || bufH > this._terrainCacheMaxPx) {
             // Too large to be worth caching at this zoom. Disable and draw live.
             this._terrainCanvas = null;
@@ -293,8 +293,14 @@ export class Renderer {
             for (let wx = 0; wx < mapW; wx++) {
                 const tile = row[wx];
                 if (!this._isBakeableGround(tile)) continue;
-                const px = wx * cw;
-                const py = wy * ch;
+                // Round to integer pixels using the shared-edge pattern so adjacent
+                // tiles always meet exactly with no sub-pixel gap. On mobile, cw/ch are
+                // often fractional (physHeight/dpr with non-integer DPR), and accumulated
+                // fractional positions produce visible seams after the cache blit.
+                const px = Math.round(wx * cw);
+                const py = Math.round(wy * ch);
+                const tw = Math.round((wx + 1) * cw) - px;
+                const th = Math.round((wy + 1) * ch) - py;
                 // Bake the terrain background color under the ground sprite, exactly
                 // as the live path fills it before drawing the sprite. This keeps
                 // output pixel-identical even if a terrain sprite is semi-transparent
@@ -302,21 +308,21 @@ export class Renderer {
                 const tv = writeTileVisuals(tile, season, this._tileVisuals);
                 if (tv.bg) {
                     tctx.fillStyle = tv.bg;
-                    tctx.fillRect(px, py, cw, ch);
+                    tctx.fillRect(px, py, tw, th);
                 }
                 // The live path draws the shadow sprite under the ground sprite for
                 // every bare tile (noShadow is false without a structure). Bake it
                 // too so output matches even where the ground sprite has transparency.
                 const shadow = this.skinManager.getSprite('effects', 'shadow');
-                if (shadow) tctx.drawImage(shadow, px, py, cw, ch);
+                if (shadow) tctx.drawImage(shadow, px, py, tw, th);
                 const ground = this._resolveGroundSprite(tile, season);
-                if (ground) tctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                if (ground) tctx.drawImage(ground, px, py, tw, th);
                 // Dither only on bare terrain, matching the live path's `canDither`
                 // (no structure/resource/zone/floor). Bakeable tiles already exclude
                 // structure/resource/zone, so only the floor case must be excluded
                 // here. Dither depends solely on neighbor terrain, so it is static.
                 if (!tile.floor) {
-                    this._drawTerrainDither(tctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+                    this._drawTerrainDither(tctx, tile, wx, wy, px, py, tw, th, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                 }
             }
         }
@@ -1018,10 +1024,10 @@ export class Renderer {
                 // Blit only the visible sub-region of the full-map buffer. Source rect
                 // is clamped to the buffer; the loop already skips out-of-bounds tiles,
                 // so off-map margins simply show the cleared background.
-                const srcX = Math.max(0, camera.x * cw);
-                const srcY = Math.max(0, camera.y * ch);
-                const dstX = camera.x < 0 ? -camera.x * cw : 0;
-                const dstY = camera.y < 0 ? -camera.y * ch : 0;
+                const srcX = Math.round(Math.max(0, camera.x * cw));
+                const srcY = Math.round(Math.max(0, camera.y * ch));
+                const dstX = camera.x < 0 ? Math.round(-camera.x * cw) : 0;
+                const dstY = camera.y < 0 ? Math.round(-camera.y * ch) : 0;
                 const availW = this._terrainCanvas.width - srcX;
                 const availH = this._terrainCanvas.height - srcY;
                 const wantW = (vw + 1) * cw - dstX;

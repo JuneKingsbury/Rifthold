@@ -17,6 +17,9 @@ export class InputHandler {
         this.dragging = false;
         this.keysDown = new Set();
         this.touchPanMode = false;
+        this._gesturePanning = false;
+        this._gesturePanLast = null;
+        this._gestureDecided = false;
 
         this.buildCategories = BUILD_CATEGORIES;
         this.buildCategory = BUILD_CATEGORIES[0];
@@ -386,6 +389,8 @@ export class InputHandler {
         this.dragStart = null;
         this.dragEnd = null;
         this.dragging = false;
+        this._gesturePanning = false;
+        this._gestureDecided = false;
         this.game.ui.updateModeDisplay(this);
         window.soundManager?.playSFXPitched('open_close_click', mode === 'normal' ? -3 : 3);
     }
@@ -568,9 +573,14 @@ export class InputHandler {
         if (pos.x < 0 || pos.x >= CONFIG.MAP_WIDTH || pos.y < 0 || pos.y >= CONFIG.MAP_HEIGHT) return;
 
         this.game.cursor = pos;
+        if (this.mode === 'normal') {
+            this._gesturePanning = false;
+            this._gestureDecided = false;
+            this._clickPos = pos;
+            return;
+        }
         if (this.destroyMode || this.mode === 'zone' || this.mode === 'designate' ||
-            (this.mode === 'build' && (this.deconstructMode || this.dragBuildTypes.has(this.buildType))) ||
-            this.mode === 'normal') {
+            (this.mode === 'build' && (this.deconstructMode || this.dragBuildTypes.has(this.buildType)))) {
             this.dragStart = pos;
             this.dragEnd = pos;
             this.dragging = true;
@@ -615,6 +625,30 @@ export class InputHandler {
             return;
         }
 
+        if (this.mode === 'normal') {
+            if (!this._gestureDecided) {
+                const dx = e.touches[0].clientX - this._touchStartPos.x;
+                const dy = e.touches[0].clientY - this._touchStartPos.y;
+                if (Math.hypot(dx, dy) > 8) {
+                    this._gestureDecided = true;
+                    this._gesturePanning = true;
+                    this._gesturePanLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+            }
+            if (this._gesturePanning) {
+                const dx = e.touches[0].clientX - this._gesturePanLast.x;
+                const dy = e.touches[0].clientY - this._gesturePanLast.y;
+                const tilesX = Math.round(dx / this.charWidth);
+                const tilesY = Math.round(dy / this.charHeight);
+                if (tilesX !== 0 || tilesY !== 0) {
+                    this.game.camera.pan(-tilesX, -tilesY);
+                    this._gesturePanLast.x += tilesX * this.charWidth;
+                    this._gesturePanLast.y += tilesY * this.charHeight;
+                }
+            }
+            return;
+        }
+
         const pos = this.getTouchTile(e.touches[0]);
         if (pos.x >= 0 && pos.x < CONFIG.MAP_WIDTH && pos.y >= 0 && pos.y < CONFIG.MAP_HEIGHT) {
             this.game.cursor = pos;
@@ -636,6 +670,18 @@ export class InputHandler {
 
         if (this._touchPanning) {
             this._touchPanning = false;
+            return;
+        }
+
+        if (this.mode === 'normal') {
+            if (this._gesturePanning) {
+                this._gesturePanning = false;
+                this._gestureDecided = false;
+                return;
+            }
+            this.handleLeftClick(this._clickPos || this.game.cursor);
+            this._gestureDecided = false;
+            this._clickPos = null;
             return;
         }
 
