@@ -677,10 +677,12 @@ export class InputHandler {
             if (this._gesturePanning) {
                 this._gesturePanning = false;
                 this._gestureDecided = false;
+                this._touchMoved = false;
                 return;
             }
             this.handleLeftClick(this._clickPos || this.game.cursor);
             this._gestureDecided = false;
+            this._touchMoved = false;
             this._clickPos = null;
             return;
         }

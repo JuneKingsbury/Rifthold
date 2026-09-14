@@ -796,7 +796,11 @@ export class UI {
             const seasons = crop.seasons.map(s => s.charAt(0).toUpperCase()).join('');
             html += `<div class="build-card${active}${stateClass}" data-crop-opt="${opt}">`;
             html += `<div class="build-card-key">${keyLabel}</div>`;
-            html += `<div class="build-card-icon-wrap"><span style="color:${crop.color}">${crop.readyChar}</span></div>`;
+            const cropSpriteURL = this.game.skinManager?.isActive && this._getCropSpriteURL(opt + '_ready');
+            const cropIcon = cropSpriteURL
+                ? `<img src="${cropSpriteURL}" class="build-card-icon--sprite">`
+                : `<span style="color:${crop.color}">${crop.readyChar}</span>`;
+            html += `<div class="build-card-icon-wrap">${cropIcon}</div>`;
             html += `<div class="build-card-name">${opt}</div>`;
             html += `<div class="build-card-cost"><span class="cost-chip" style="color:#88cc44">${crop.harvestYield}x</span><span class="cost-chip" style="color:#aaa">${seasons}</span></div>`;
             html += overlayHtml;
@@ -821,15 +825,23 @@ export class UI {
         html += '<div class="build-grid">';
         const chopActive = input.designateMode === 'chop' ? ' active' : '';
         const mineActive = input.designateMode === 'mine' ? ' active' : '';
+        const axeURL = this.game.skinManager?.isActive && this.game.skinManager.getItemSpriteDataURL('iron_axe');
+        const chopIcon = axeURL
+            ? `<img src="${axeURL}" class="build-card-icon--sprite">`
+            : `<span style="color:#44aa22">♣</span>`;
         html += `<div class="build-card${chopActive}" data-designate-mode="chop">`;
         html += `<div class="build-card-key">1</div>`;
-        html += `<div class="build-card-icon-wrap"><span style="color:#44aa22">♣</span></div>`;
+        html += `<div class="build-card-icon-wrap">${chopIcon}</div>`;
         html += `<div class="build-card-name">Chop</div>`;
         html += `<div class="build-card-cost"><span class="cost-chip" style="color:#8b6b3a">Wood</span></div>`;
         html += `</div>`;
+        const pickURL = this.game.skinManager?.isActive && this.game.skinManager.getItemSpriteDataURL('iron_pickaxe');
+        const mineIcon = pickURL
+            ? `<img src="${pickURL}" class="build-card-icon--sprite">`
+            : `<span style="color:#999">▲</span>`;
         html += `<div class="build-card${mineActive}" data-designate-mode="mine">`;
         html += `<div class="build-card-key">2</div>`;
-        html += `<div class="build-card-icon-wrap"><span style="color:#999">▲</span></div>`;
+        html += `<div class="build-card-icon-wrap">${mineIcon}</div>`;
         html += `<div class="build-card-name">Mine</div>`;
         html += `<div class="build-card-cost"><span class="cost-chip" style="color:#999">Stone</span></div>`;
         html += `</div>`;
@@ -2622,6 +2634,22 @@ export class UI {
         ctx.drawImage(sprite, 0, 0);
         const url = c.toDataURL('image/png');
         this._buildingSpriteCache.set(buildingKey, url);
+        return url;
+    }
+
+    _getCropSpriteURL(cropKey) {
+        if (!this._cropSpriteCache) this._cropSpriteCache = new Map();
+        if (this._cropSpriteCache.has(cropKey)) return this._cropSpriteCache.get(cropKey);
+        const sprite = this.game.skinManager.getSprite('farms', cropKey)
+                    || this.game.skinManager.getSprite('farms', 'farm_ready');
+        if (!sprite) { this._cropSpriteCache.set(cropKey, null); return null; }
+        const c = document.createElement('canvas');
+        c.width = sprite.width || sprite.naturalWidth || 16;
+        c.height = sprite.height || sprite.naturalHeight || 16;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(sprite, 0, 0);
+        const url = c.toDataURL('image/png');
+        this._cropSpriteCache.set(cropKey, url);
         return url;
     }
 

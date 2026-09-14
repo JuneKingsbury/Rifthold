@@ -45,8 +45,8 @@ function applyQuality(item, colonist, game, ...statKeys) {
             skill += game.workshopQualities[roomId].qualityBonus;
         }
     }
-    if (colonist.traits.includes('creative')) skill += TRAITS.creative.qualityBonus;
-    if (colonist.traits.includes('lucky')) skill += TRAITS.lucky.qualityBonus;
+    if (colonist.traits?.includes('creative')) skill += TRAITS.creative.qualityBonus;
+    if (colonist.traits?.includes('lucky')) skill += TRAITS.lucky.qualityBonus;
     if (game && game.research.isResearched('artisans_touch')) skill += WORK_CONFIG.artisanQualityBonus;
     if (game) skill += getCraftQualityBonus(game);
     const chances = QUALITY_TIERS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
@@ -307,9 +307,11 @@ export function completeTask(colonist, task, game) {
                 if (def) {
                     const item = { ...def, key: task.itemKey };
                     // Re-apply original item quality
-                    if (def.type === 'weapon') applySpecificQuality(item, task.itemQuality, 'damage'); // TODO: Re-apply original item quality
+                    if (def.type === 'weapon') applySpecificQuality(item, task.itemQuality, 'damage');
                     else if (def.type === 'armor' || def.type === 'helmet') applySpecificQuality(item, task.itemQuality, 'damageReduction');
                     else if (def.type === 'tool') applySpecificQuality(item, task.itemQuality, 'miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed');
+                    else if (def.type === 'clothes') applySpecificQuality(item, task.itemQuality, 'workSpeedBonus', 'moodBonus', 'coldResistance', 'heatResistance');
+                    else if (def.type === 'boots') applySpecificQuality(item, task.itemQuality, 'moveSpeedBonus', 'damageReduction');
                     // Apply enchantment based on item type
                     applyEnchantment(item, colonist, game, task.itemType);
                     game.resources.addItem(item);

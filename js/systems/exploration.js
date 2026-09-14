@@ -314,7 +314,7 @@ export class ExplorationSystem {
                     this._autoResolvePendingDecision(exp, game);
                     // fall through, pendingDecision is now null
                 } else {
-                    exp.startTick++;
+                    if (exp.startTick !== undefined) exp.startTick++;
                     if (!exp._wasPaused) {
                         exp._wasPaused = true;
                         if (!game.paused) game.togglePause();
@@ -890,7 +890,13 @@ export class ExplorationSystem {
 
         for (const id of exp.partyIds) {
             const c = game.getColonist(id);
-            if (!c || c.onExpedition || c.hp <= 0) continue;
+            if (!c || c.hp <= 0) {
+                // Colonist died or was removed during gathering. Clear the pending flag
+                // so they aren't permanently locked out of future tasks.
+                if (c) { delete c.expeditionPending; delete c._expeditionMove; }
+                continue;
+            }
+            if (c.onExpedition) continue;
 
             const dist = manhattanDist(c.x, c.y, gx, gy);
             if (dist <= 1) {
@@ -2256,11 +2262,11 @@ export class ExplorationSystem {
         for (const itemKey of items) {
             game.resources.addItem({ ...ALL_ITEMS[itemKey], key: itemKey });
         }
-        for (const [res, amt] of Object.entries(exp.loot)) {
+        for (const [res, amt] of Object.entries(lootResources)) {
             game.overlays.push({ type: 'floating_text', x: exp.gatePos.x, y: exp.gatePos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
         }
         if (game.discoveredLoot) {
-            for (const res of Object.keys(exp.loot)) {
+            for (const res of Object.keys(lootResources)) {
                 game.discoveredLoot.add(`${exp.realm}:${res}`);
             }
             for (const itemKey of items) {
@@ -2271,7 +2277,7 @@ export class ExplorationSystem {
         for (const itemKey of items) {
             parts.push(ALL_ITEMS[itemKey]?.name || itemKey);
         }
-        for (const [res, amt] of Object.entries(exp.loot)) {
+        for (const [res, amt] of Object.entries(lootResources)) {
             parts.push(`${amt}x ${ALL_ITEMS[res]?.name || res}`);
         }
         const lootSummary = parts.join(', ');
