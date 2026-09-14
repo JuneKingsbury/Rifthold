@@ -582,6 +582,9 @@ class Game {
                 c.pedestalDamageBonus = 1;
                 c.pedestalSkillBonus = 0;
                 c.pedestalHealthRegen = 0;
+                c.pedestalHarvestBonus = 0;
+                c.pedestalCraftOutputBonus = 0;
+                c.pedestalArmoredDamageBonus = 0;
                 c.activeAuras = [];
             }
             for (const e of this.entities) {
@@ -2271,6 +2274,9 @@ function applyAuraToColonists(game, pedestal, radius, centerX, centerY, auraLabe
         if (pedestal.damageBonusMult) c.pedestalDamageBonus *= pedestal.damageBonusMult;
         if (pedestal.skillGrowthBonus) c.pedestalSkillBonus += pedestal.skillGrowthBonus;
         if (pedestal.healthRegen) c.pedestalHealthRegen += pedestal.healthRegen;
+        if (pedestal.harvestYieldBonus) c.pedestalHarvestBonus += pedestal.harvestYieldBonus;
+        if (pedestal.craftOutputBonus) c.pedestalCraftOutputBonus += pedestal.craftOutputBonus;
+        if (pedestal.armoredDamageBonus) c.pedestalArmoredDamageBonus = (c.pedestalArmoredDamageBonus || 0) + pedestal.armoredDamageBonus;
         c.activeAuras.push(auraLabel);
     }
 }

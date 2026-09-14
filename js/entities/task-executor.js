@@ -217,6 +217,9 @@ export function completeTask(colonist, task, game) {
                     for (const [res, amt] of Object.entries(rDef.yield)) {
                         output[res] = rDef.perAmount ? tile.resource.amount * amt : amt;
                     }
+                    if (colonist.pedestalHarvestBonus > 0) {
+                        for (const k of Object.keys(output)) output[k] += colonist.pedestalHarvestBonus;
+                    }
                     applyScavenger(colonist, output, game);
                     game.resources.add(output);
                     emitYieldFloaties(game, task.x, task.y, output);
@@ -286,6 +289,7 @@ export function completeTask(colonist, task, game) {
                 const crop = tile.zone.crop;
                 const yields = {};
                 yields[crop] = getHarvestYield(game, crop);
+                if (colonist.pedestalHarvestBonus > 0) yields[crop] += colonist.pedestalHarvestBonus;
                 applyScavenger(colonist, yields, game);
                 game.resources.add(yields);
                 emitYieldFloaties(game, task.x, task.y, yields);
@@ -338,6 +342,11 @@ export function completeTask(colonist, task, game) {
                     }
                 }
                 if (!handled) {
+                    if (colonist.pedestalCraftOutputBonus > 0) {
+                        const bonus = {};
+                        for (const [k, v] of Object.entries(output)) bonus[k] = colonist.pedestalCraftOutputBonus;
+                        game.resources.add(bonus);
+                    }
                     game.resources.add(output);
                 }
                 const tile = game.map[colonist.y]?.[colonist.x];

@@ -2,13 +2,17 @@ import { ENTITIES, SUMMON_TYPES, COMBAT_VISUALS } from '../core/config.js';
 import { createEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 
-export function spawnSummon(summonType, x, y, ownerId, game) {
+export function spawnSummon(summonType, x, y, ownerId, game, hpMult = 1, damageMult = 1) {
     const def = SUMMON_TYPES[summonType];
     if (!def) return null;
     const summon = createEntity(summonType, x, y, {
         ownerId,
         expiresAt: game.tick + def.duration,
     });
+    if (summon && (hpMult !== 1 || damageMult !== 1)) {
+        if (hpMult !== 1) { summon.hp = Math.round(summon.hp * hpMult); summon.maxHp = summon.hp; }
+        if (damageMult !== 1) { summon.damage = Math.round(summon.damage * damageMult); }
+    }
     if (!summon) return null;
     emitSparkles(game, x, y, def.color);
     game.combatEffects.push({ x, y, char: COMBAT_VISUALS.summonArriveChar, color: COMBAT_VISUALS.summonArriveColor, ttl: COMBAT_VISUALS.summonArriveTtl });

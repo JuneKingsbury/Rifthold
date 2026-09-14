@@ -2231,12 +2231,12 @@ export class UI {
             html += `<button class="craft-tab${active}" data-craft-tab="${cat}">${cat}</button>`;
         }
         html += '</div>';
-        const hasEquipTiers = ['Weapons', 'Armor', 'Clothing', 'Tools'].includes(this._craftTab);
+        const hasEquipTiers = ['Weapons', 'Armor', 'Clothing', 'Tools', 'Trinkets'].includes(this._craftTab);
         const hasTomeFilter = this._craftTab === 'Tomes';
         if (hasEquipTiers) {
             if (this._craftHiddenTiers === undefined) this._craftHiddenTiers = new Set();
             const tiers = [1, 2, 3, 4];
-            html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
+            html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;flex-wrap:wrap;">';
             html += '<span style="color:#888;font-size:0.82em;">Show tiers:</span>';
             for (const t of tiers) {
                 const hidden = this._craftHiddenTiers.has(t);
@@ -2268,7 +2268,7 @@ export class UI {
         if (hasEquipTiers && this._craftHiddenTiers && this._craftHiddenTiers.size > 0) {
             filtered = filtered.filter(r => {
                 const outputKey = Object.keys(r.recipe.output)[0];
-                const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || BOOTS[outputKey] || TOOLS[outputKey];
+                const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || BOOTS[outputKey] || TOOLS[outputKey] || TRINKETS[outputKey];
                 if (!def || def.tier === undefined) return true;
                 return !this._craftHiddenTiers.has(def.tier);
             });
@@ -2296,8 +2296,8 @@ export class UI {
             filtered.sort((a, b) => {
                 const aKey = Object.keys(a.recipe.output)[0];
                 const bKey = Object.keys(b.recipe.output)[0];
-                const aDef = WEAPONS[aKey] || ARMORS[aKey] || HELMETS[aKey] || CLOTHES[aKey] || BOOTS[aKey] || TOOLS[aKey];
-                const bDef = WEAPONS[bKey] || ARMORS[bKey] || HELMETS[bKey] || CLOTHES[bKey] || BOOTS[bKey] || TOOLS[bKey];
+                const aDef = WEAPONS[aKey] || ARMORS[aKey] || HELMETS[aKey] || CLOTHES[aKey] || BOOTS[aKey] || TOOLS[aKey] || TRINKETS[aKey];
+                const bDef = WEAPONS[bKey] || ARMORS[bKey] || HELMETS[bKey] || CLOTHES[bKey] || BOOTS[bKey] || TOOLS[bKey] || TRINKETS[bKey];
                 // Tier is the primary grouping; `order` arranges set pieces within
                 // a tier (e.g. a helmet next to its matching body armor). Items
                 // without `order` sort last within their tier but keep insertion
@@ -2307,7 +2307,32 @@ export class UI {
                 return (aDef?.order ?? Infinity) - (bDef?.order ?? Infinity);
             });
         }
+        const EQUIP_TIER_NAMES = ['', 'Primitive', 'Iron', 'Runic', 'Void'];
+        const MATERIALS_GROUPS = {
+            craft_planks: 'Carpentry', craft_bricks: 'Carpentry', smelt_iron: 'Carpentry',
+            tan_leather: 'Textiles', weave_cloth: 'Textiles',
+            repair_trinket: 'Repair',
+        };
+        let lastTier = null;
+        let lastMaterialsGroup = null;
         for (const { key, recipe, canCraft, hasStation } of filtered) {
+            if (hasEquipTiers) {
+                const outputKey = Object.keys(recipe.output)[0];
+                const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || BOOTS[outputKey] || TOOLS[outputKey] || TRINKETS[outputKey];
+                const tier = def?.tier;
+                if (tier !== undefined && tier !== lastTier) {
+                    const label = EQUIP_TIER_NAMES[tier] || `Tier ${tier}`;
+                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;color:#888;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;">Tier ${tier} — ${label}</div>`;
+                    lastTier = tier;
+                }
+            }
+            if (this._craftTab === 'Materials') {
+                const group = MATERIALS_GROUPS[key];
+                if (group && group !== lastMaterialsGroup) {
+                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;color:#888;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;">${group}</div>`;
+                    lastMaterialsGroup = group;
+                }
+            }
             const inputStr = Object.entries(recipe.input).map(([k, v]) => {
                 if (k === 'foodstuffs') return `${v} foodstuffs (have ${this.game.resources.getFoodstuffTotal()})`;
                 return `${k}:${v}`;

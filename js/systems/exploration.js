@@ -5,7 +5,7 @@ import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFI
     FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG,
     REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG,
 } from '../core/config.js';
-import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned } from '../entities/colonist.js';
+import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit } from '../entities/colonist.js';
 
 // Precomputes a per-school equipment bonus map for a colonist so expedition combat can
 // scale spell damage by school without live equipment access. Mirrors the in-world
@@ -761,12 +761,16 @@ export class ExplorationSystem {
         }
 
         if (trapDef.damageType === 'dot' && trapDef.dotDamage) {
-            exp.activeEffects.push({
-                type: 'dot', targetId: member.id,
-                damageRange: trapDef.dotDamage, ticksRemaining: trapDef.dotTicks,
-                interval: trapDef.dotInterval, lastTick: game.tick,
-            });
-            this._addLog(exp, game, `${member.name} is poisoned!`, 'danger');
+            if (this._memberHasPoisonImmunity(member)) {
+                this._addLog(exp, game, `${member.name} resists the poison!`, 'combat');
+            } else {
+                exp.activeEffects.push({
+                    type: 'dot', targetId: member.id,
+                    damageRange: trapDef.dotDamage, ticksRemaining: trapDef.dotTicks,
+                    interval: trapDef.dotInterval, lastTick: game.tick,
+                });
+                this._addLog(exp, game, `${member.name} is poisoned!`, 'danger');
+            }
         }
         if (trapDef.damageType === 'mana' && trapDef.manaDrain) {
             const drain = randInt(trapDef.manaDrain[0], trapDef.manaDrain[1]);
@@ -1421,7 +1425,8 @@ export class ExplorationSystem {
                 continue;
             }
 
-            const armoredBonus = (target.armored && member.weapon && member.weapon.armoredDamageBonus) ? (1 + member.weapon.armoredDamageBonus) : 1;
+            const totalArmoredBonus = target.armored ? memberItems.reduce((sum, it) => sum + (it.armoredDamageBonus || 0), 0) : 0;
+            const armoredBonus = 1 + totalArmoredBonus;
             let dmg = Math.max(1, Math.round((weaponDmg + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * memberWeaken * armoredBonus * (1 - physResist)));
             let critHit = false;
             if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
@@ -1433,6 +1438,22 @@ export class ExplorationSystem {
                 this._addLog(exp, game, msg, 'combat');
             } else {
                 target.hp -= dmg;
+                const attackWeapon = member.weapon && !disabled.weapon ? member.weapon : null;
+                applyWeaponOnHit(attackWeapon, target, game);
+                if (attackWeapon?.onHit?.effect === 'slow') {
+                    this._applyCombatStatus(target, 'slow', attackWeapon.onHit.rounds || 1, { mult: attackWeapon.onHit.attackSlowMult ?? 0.6 });
+                }
+                // Cleave: deal 50% splash to all other living enemies this round.
+                if (attackWeapon?.cleave) {
+                    const cleaveDmg = Math.max(1, Math.floor(dmg * 0.5));
+                    for (const e of combat.enemies) {
+                        if (e === target || e.hp <= 0) continue;
+                        e.hp -= cleaveDmg;
+                        if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + cleaveDmg;
+                        if (e.hp <= 0) { this._addLog(exp, game, 'A foe falls to the sweep!', 'success'); if (e.elite) { exp.eliteKills++; this._processEliteOnDeath(e, exp, game); } }
+                    }
+                    if (combat.enemies.filter(e => e.hp > 0).length < combat.enemies.length) this._addLog(exp, game, `${member.name}'s sweeping strike cleaves through the pack!`, 'combat');
+                }
                 if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
                 if (critHit) member._lastCritTick = game.tick;
                 const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
@@ -1585,8 +1606,13 @@ export class ExplorationSystem {
                                     // Rounds default from the legacy tick count so existing
                                     // enemy configs keep their intended duration.
                                     const rounds = sp.dot.rounds || sp.dot.ticks || 3;
-                                    this._applyCombatStatus(spTarget, sp.dot.status || 'poison', rounds, { damageRange: sp.dot.damage });
-                                    this._addLog(exp, game, `${spTarget.name} is poisoned!`, 'danger');
+                                    const statusType = sp.dot.status || 'poison';
+                                    if (statusType === 'poison' && this._memberHasPoisonImmunity(spTarget)) {
+                                        this._addLog(exp, game, `${spTarget.name} resists the poison!`, 'combat');
+                                    } else {
+                                        this._applyCombatStatus(spTarget, statusType, rounds, { damageRange: sp.dot.damage });
+                                        this._addLog(exp, game, `${spTarget.name} is poisoned!`, 'danger');
+                                    }
                                 }
                             }
                             // Framework: data-driven enemy crowd control. An enemy/boss
@@ -1847,12 +1873,16 @@ export class ExplorationSystem {
                     member.mana -= this._spellManaCost(member, spell);
                     member.spellCooldowns[spellKey] = game.tick;
                     member._lastCastTick = game.tick;
+                    const summonItems = [member.weapon, member.armor, member.helmet, member.clothes, member.boots, member.tool, member.trinket].filter(Boolean);
+                    const summonHpMult = 1 + summonItems.reduce((s, it) => s + (it.summonHpBonus || 0), 0);
+                    const summonDmgMult = 1 + summonItems.reduce((s, it) => s + (it.summonDamageBonus || 0), 0);
+                    const boostedHp = Math.round(summonDef.hp * summonHpMult);
                     exp.summons.push({
                         type: spell.summonType,
                         name: summonDef.name,
-                        hp: summonDef.hp,
-                        maxHp: summonDef.hp,
-                        damage: summonDef.damage,
+                        hp: boostedHp,
+                        maxHp: boostedHp,
+                        damage: Math.round(summonDef.damage * summonDmgMult),
                         char: summonDef.char,
                         color: summonDef.color,
                         ownerId: member.id,
@@ -2320,6 +2350,11 @@ export class ExplorationSystem {
         return !!(target.statusEffects && target.statusEffects.some(s => s.type === type && s.rounds > 0));
     }
 
+    _memberHasPoisonImmunity(member) {
+        const slots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+        return slots.some(s => member[s]?.poisonImmunity);
+    }
+
     // Magnitude field (e.g. 'mult') of an active status, or `def` when absent.
     _combatStatusValue(target, type, field, def) {
         const s = target.statusEffects && target.statusEffects.find(x => x.type === type && x.rounds > 0);
@@ -2359,6 +2394,18 @@ export class ExplorationSystem {
         };
         for (const enemy of combat.enemies) tick(enemy, false);
         for (const member of exp.partySnapshot) tick(member, true);
+
+        // Tick weapon on-hit DoT effects (poison/bleed/burn) on expedition enemies.
+        for (const enemy of combat.enemies) {
+            if (!enemy._dotEffects || enemy.hp <= 0) continue;
+            enemy._dotEffects = enemy._dotEffects.filter(d => d.rounds > 0);
+            for (const d of enemy._dotEffects) {
+                enemy.hp -= d.damage;
+                this._addLog(exp, game, `An enemy takes ${d.damage} ${d.type} damage!`, 'combat');
+                if (enemy.hp <= 0) this._addLog(exp, game, `A foe succumbs to ${d.type}!`, 'success');
+                d.rounds--;
+            }
+        }
     }
 
     _updateActiveEffects(exp, game) {

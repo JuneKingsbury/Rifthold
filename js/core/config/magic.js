@@ -184,7 +184,7 @@ export const RESEARCH = {
     verdant_growth: { name: 'Verdant Growth', cost: 500, requires: ['herbalism'], tab: 'nature', description: 'All crops gain +1 harvest yield; moonbloom grows 30% faster' },
 
     // Crafting
-    marksmanship: { name: 'Marksmanship', cost: 250, requires: ['runecraft'], tab: 'crafting', description: 'Crossbow crafting and +1 range to all ranged weapons' },
+    marksmanship: { name: 'Marksmanship', cost: 250, requires: ['runecraft', 'metalworking'], tab: 'crafting', description: 'Crossbow crafting and +1 range to all ranged weapons' },
     arcane_implements: { name: 'Arcane Implements', cost: 250, requires: ['runecraft', 'ley_channeling'], tab: 'crafting', description: 'Craft wands and staves for spellcasters' },
     artisans_touch: { name: "Artisan's Touch", cost: 450, requires: ['arcane_implements'], tab: 'crafting', description: 'Better crafting quality odds; salvage returns 75%' },
     runeforging: { name: 'Runeforging', cost: 350, requires: ['arcane_implements'], tab: 'crafting', description: 'Forge runic weapons' },

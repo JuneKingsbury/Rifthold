@@ -2476,7 +2476,7 @@ const arcaneMethods = {
                     this._expVisState.effects.push({ type: 'phase_transition', x: partyX + 80, y: H / 2, phaseName, frame: 0, maxFrames: 60 });
                     this._expVisState.shakeFrames = 15;
                     this._expVisState.flashFrames = 8;
-                } else if (text.includes('powerful foe') || text.includes('blocks the path')) {
+                } else if ((text.includes('powerful foe') || text.includes('blocks the path')) && activeExp.combat?.isBoss) {
                     const bossEnemy = activeExp.combat?.enemies?.find(e => e.isBoss);
                     this._expVisState.effects.push({
                         type: 'boss_entrance', x: partyX + 80, y: H / 2,

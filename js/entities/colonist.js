@@ -739,9 +739,17 @@ function getCritChance(colonist) {
 // once the colonist drops below its HP threshold.
 function getTraitDamageMult(colonist) {
     let mult = 1;
-    if (colonist.traits.includes('berserker') &&
-        colonist.hp < colonist.maxHp * TRAITS.berserker.lowHpThreshold) {
+    const isLowHp = colonist.hp < colonist.maxHp * TRAITS.berserker.lowHpThreshold;
+    if (colonist.traits.includes('berserker') && isLowHp) {
         mult *= TRAITS.berserker.lowHpDamageMult;
+    }
+    if (isLowHp) {
+        const equipBonus = getEquipmentStat(colonist, 'lowHpDamageBonus');
+        if (equipBonus > 0) mult *= (1 + equipBonus);
+    }
+    const postMoveBonus = getEquipmentStat(colonist, 'postMoveAttackBonus');
+    if (postMoveBonus > 0 && colonist._lastMoveTick && (colonist._lastMoveTick >= (colonist._lastAttackTick || 0) - 2)) {
+        mult *= (1 + postMoveBonus);
     }
     return mult;
 }
@@ -1117,11 +1125,12 @@ function applyEnemyDR(target, dmg) {
 // Applies a movement/attack "slow" to a hostile entity for `ticks`, stored as a
 // tick deadline the enemy AI (roles.js/combat.js) reads. slowMult<1 scales its
 // effective speed. Extends rather than stacks: keeps the later expiry.
-function applyEnemySlow(entity, ticks, slowMult, game) {
+function applyEnemySlow(entity, ticks, slowMult, game, attackSlowMult) {
     const until = game.tick + ticks;
     if (!entity._slowUntil || until > entity._slowUntil) {
         entity._slowUntil = until;
         entity._slowMult = slowMult;
+        entity._attackSlowMult = attackSlowMult ?? slowMult;
     }
 }
 
@@ -1130,6 +1139,35 @@ function applyEnemySlow(entity, ticks, slowMult, game) {
 function applyEnemyStun(entity, ticks, game) {
     const until = game.tick + ticks;
     if (!entity._stunnedUntil || until > entity._stunnedUntil) entity._stunnedUntil = until;
+}
+
+// Applies weapon on-hit effects (slow, DoT via poisonOnHit/bleedOnHit/burnOnHit)
+// to an enemy entity after a colonist's hit lands. Called from both the ranged
+// and melee attack branches so all weapon types benefit equally.
+export function applyWeaponOnHit(weapon, target, game) {
+    if (!weapon) return;
+    // Generic onHit block (used by Frostfang Wand etc.)
+    if (weapon.onHit) {
+        const oh = weapon.onHit;
+        if (oh.effect === 'slow') {
+            applyEnemySlow(target, oh.duration || 40, oh.moveSpeedMalus != null ? (1 + oh.moveSpeedMalus) : 0.7, game, oh.attackSlowMult ?? null);
+        }
+    }
+    // Shorthand DoT properties: poisonOnHit, bleedOnHit, burnOnHit
+    for (const [prop, dotType] of [['poisonOnHit', 'poison'], ['bleedOnHit', 'bleed'], ['burnOnHit', 'burn']]) {
+        const dot = weapon[prop];
+        if (!dot) continue;
+        if (!target._dotEffects) target._dotEffects = [];
+        const existing = target._dotEffects.find(d => d.type === dotType);
+        const expiresAt = game.tick + (dot.ticks * dot.interval);
+        if (existing) {
+            existing.expiresAt = Math.max(existing.expiresAt, expiresAt);
+            existing.rounds = Math.max(existing.rounds || 0, dot.ticks);
+            existing.damage = dot.damage;
+        } else {
+            target._dotEffects.push({ type: dotType, damage: dot.damage, interval: dot.interval, nextTick: game.tick + dot.interval, expiresAt, rounds: dot.ticks });
+        }
+    }
 }
 
 function applySpellEffect(colonist, spell, game) {
@@ -1277,7 +1315,9 @@ function applySpellEffect(colonist, spell, game) {
             if (!summonDef) break;
             const sx = colonist.x + (Math.random() > 0.5 ? 1 : -1);
             const sy = colonist.y + (Math.random() > 0.5 ? 1 : -1);
-            spawnSummon(spell.summonType, sx, sy, colonist.id, game);
+            const sumHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
+            const sumDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
+            spawnSummon(spell.summonType, sx, sy, colonist.id, game, sumHpMult, sumDmgMult);
             break;
         }
         case 'divination_modifier': {
@@ -1468,9 +1508,11 @@ function applySpellEffect(colonist, spell, game) {
             if (!summonDef) break;
             const count = spell.swarmCount || 3;
             const ring = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+            const swarmHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
+            const swarmDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
             for (let i = 0; i < count; i++) {
                 const [ox, oy] = ring[i % ring.length];
-                spawnSummon(spell.summonType, colonist.x + ox, colonist.y + oy, colonist.id, game);
+                spawnSummon(spell.summonType, colonist.x + ox, colonist.y + oy, colonist.id, game, swarmHpMult, swarmDmgMult);
             }
             window.soundManager?.playSFX('spell_cast');
             break;
@@ -2296,6 +2338,7 @@ function fightStepToward(colonist, dest, adjacent, game) {
     const dur = computeMoveDuration(cost, moveBonus, game.speed);
     moveEntity(colonist, next.x, next.y, dur);
     colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
+    colonist._lastMoveTick = game.tick;
 }
 
 function updateFighting(colonist, game) {
@@ -2339,12 +2382,14 @@ function updateFighting(colonist, game) {
 
     const baseCooldown = (weapon && weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
     let atkSpeed = 1 + getEquipmentStat(colonist, 'attackSpeed');
+    let atkSlowDiv = 1;
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
             if (e.type === 'attackSpeed' && e.attackSpeed) atkSpeed += e.attackSpeed;
+            if (e.type === 'slow' && e.attackSlowMult) atkSlowDiv = Math.min(atkSlowDiv, e.attackSlowMult);
         }
     }
-    const effectiveCooldown = Math.max(1, Math.round(baseCooldown / atkSpeed));
+    const effectiveCooldown = Math.max(1, Math.round((baseCooldown / atkSpeed) / atkSlowDiv));
 
     if (isRanged && dist <= weaponRange && dist >= 2 && hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) {
         if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
@@ -2361,6 +2406,10 @@ function updateFighting(colonist, game) {
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
+        if (target.armored) {
+            const armoredBonus = getEquippedItems(colonist).reduce((sum, it) => sum + (it.armoredDamageBonus || 0), 0);
+            if (armoredBonus > 0) dmg = Math.floor(dmg * (1 + armoredBonus));
+        }
         const critChance = getCritChance(colonist);
         let isCrit = false;
         if (critChance > 0 && Math.random() < critChance) {
@@ -2376,6 +2425,7 @@ function updateFighting(colonist, game) {
         dmg = applyEnemyDR(target, dmg);
         target.hp -= dmg;
         target._killerColonist = colonist; // for the loot-drop effect on kill
+        applyWeaponOnHit(weapon, target, game);
         spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);
         if (getEquipmentStat(colonist, 'lifeSteal')) colonist.hp = Math.min(colonist.maxHp, colonist.hp + Math.round(dmg * getEquipmentStat(colonist, 'lifeSteal')));
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
@@ -2423,6 +2473,10 @@ function updateFighting(colonist, game) {
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
+        if (target.armored) {
+            const armoredBonus = getEquippedItems(colonist).reduce((sum, it) => sum + (it.armoredDamageBonus || 0), 0);
+            if (armoredBonus > 0) dmg = Math.floor(dmg * (1 + armoredBonus));
+        }
         const critChance = getCritChance(colonist);
         let isCrit = false;
         if (critChance > 0 && Math.random() < critChance) {
@@ -2437,11 +2491,24 @@ function updateFighting(colonist, game) {
         dmg = applyEnemyDR(target, dmg);
         target.hp -= dmg;
         target._killerColonist = colonist; // for the loot-drop effect on kill
+        applyWeaponOnHit(weapon, target, game);
         spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
         if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) {
             spawnImpactSpray(game, target.x, target.y, colonist._lastAttackDir.dx, colonist._lastAttackDir.dy);
+        }
+        // Cleave: hit all other adjacent hostiles for 50% of the main attack's damage.
+        if (weapon && weapon.cleave) {
+            const cleaveDmg = Math.max(1, Math.floor(dmg * 0.5));
+            for (const raider of game.raiders) {
+                if (raider === target || raider.hp <= 0) continue;
+                if (Math.abs(raider.x - colonist.x) <= 1 && Math.abs(raider.y - colonist.y) <= 1) {
+                    raider.hp -= cleaveDmg;
+                    raider._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
+                    spawnDamageText(game, raider.x, raider.y, cleaveDmg, '#ff8844', false);
+                }
+            }
         }
     }
 
@@ -2495,12 +2562,14 @@ function updateHunting(colonist, game) {
 
     const baseCooldown = (weapon && weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
     let atkSpeed = 1 + getEquipmentStat(colonist, 'attackSpeed');
+    let atkSlowDiv = 1;
     if (colonist.activeEffects) {
         for (const e of colonist.activeEffects) {
             if (e.type === 'attackSpeed' && e.attackSpeed) atkSpeed += e.attackSpeed;
+            if (e.type === 'slow' && e.attackSlowMult) atkSlowDiv = Math.min(atkSlowDiv, e.attackSlowMult);
         }
     }
-    const effectiveCooldown = Math.max(1, Math.round(baseCooldown / atkSpeed));
+    const effectiveCooldown = Math.max(1, Math.round((baseCooldown / atkSpeed) / atkSlowDiv));
 
     if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
     colonist._lastAttackTick = game.tick;
@@ -2731,6 +2800,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
             colonist.activeEffects.push({
                 type: 'slow', harmful: true,
                 moveSpeedBonus: oh.moveSpeedMalus,
+                attackSlowMult: oh.attackSlowMult ?? null,
                 expiresAt: game.tick + oh.duration,
             });
         } else if (oh.effect === 'dot') {

@@ -246,6 +246,17 @@ export class CombatSystem {
                 game.raiders.splice(i, 1);
                 continue;
             }
+            // Tick weapon DoT effects applied by colonist weapons (poison/bleed/burn).
+            if (raider._dotEffects && raider._dotEffects.length > 0) {
+                raider._dotEffects = raider._dotEffects.filter(d => game.tick < d.expiresAt);
+                for (const d of raider._dotEffects) {
+                    if (game.tick >= d.nextTick) {
+                        d.nextTick = game.tick + d.interval;
+                        raider.hp -= d.damage;
+                        game.combatEffects.push({ x: raider.x, y: raider.y, char: '·', color: d.type === 'burn' ? '#ff6622' : '#66cc44', ttl: 3 });
+                    }
+                }
+            }
             updateRaider(raider, game);
             // Cull raiders that have left the map, and fleeing raiders that have reached a
             // border tile. moveToEdge parks a fleer on the edge (dx/dy become 0 there), so it
@@ -285,8 +296,11 @@ function updateRaider(raider, game) {
         if (game.tick % 6 === 0) game.combatEffects.push({ x: raider.x, y: raider.y, char: '✦', color: '#ffccff', ttl: 4 });
         return;
     }
-    // Slow scales the effective speed used for both the cooldown gate and movement.
-    const slowMult = (raider._slowUntil && game.tick < raider._slowUntil) ? (raider._slowMult || 0.5) : 1;
+    // Slow scales the effective speed used for movement and also inflates the attack
+    // cooldown gate (attackSlowMult defaults to the same mult as movement).
+    const isSlowed = raider._slowUntil && game.tick < raider._slowUntil;
+    const slowMult = isSlowed ? (raider._slowMult || 0.5) : 1;
+    const attackSlowMult = isSlowed ? (raider._attackSlowMult ?? raider._slowMult ?? 0.5) : 1;
     const effSpeed = raider.speed * slowMult;
     raider.moveCooldown -= effSpeed;
     if (raider.moveCooldown > 0) return;
@@ -312,7 +326,7 @@ function updateRaider(raider, game) {
 
     const dist = manhattanDist(raider.x, raider.y, nearest.x, nearest.y);
     if (dist <= 1) {
-        const cooldown = raider.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
+        const cooldown = Math.round((raider.attackCooldown || COLONIST_CONFIG.baseAttackCooldown) / attackSlowMult);
         if (game.tick - (raider._lastAttackTick || 0) >= cooldown) {
             raider._lastAttackTick = game.tick;
             raider._lastAttackKind = 'melee';
