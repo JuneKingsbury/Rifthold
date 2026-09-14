@@ -280,174 +280,253 @@ const arcaneMethods = {
 
         html += `<div class="arcane-section">`;
 
-        if (expl.expeditions.length > 0) {
-            for (const exp of expl.expeditions) {
-                if (exp.status === 'gathering') {
-                    const names = exp.partyIds.map(id => {
-                        const c = this.game.getColonist(id);
-                        return c ? c.name : '?';
-                    }).join(', ');
-                    html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — Assembling</div>`;
-                    html += `<div class="info-row" style="color:#888;">Party: ${names}</div>`;
-                } else {
-                    const elapsed = this.game.tick - exp.startTick;
-                    const totalDur = Math.floor(exp.duration * 1.2);
-                    let pct = Math.min(100, Math.floor((elapsed / totalDur) * 100));
-                    if (exp.status === 'returning' && !exp.retreatTick) pct = 100;
-                    const statusLabel = exp.pendingDecision ? 'AWAITING CHOICE' : exp.combat ? 'COMBAT' : exp.status;
-                    html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — ${statusLabel}</div>`;
+        const watchedExp = expl.expeditions.find(e => !e.autoMode);
+        const autoExps = expl.expeditions.filter(e => e.autoMode);
 
-                    // Mutator badges
-                    if (exp.mutators && exp.mutators.length > 0) {
-                        html += `<div class="info-row" style="font-size:0.8em;color:#cc88ff;">`;
-                        for (const mk of exp.mutators) {
-                            const mut = EXPEDITION_MUTATORS[mk];
-                            html += `<span style="background:#2a1a3e;padding:1px 4px;border-radius:2px;margin-right:3px;">${mut?.name || mk}</span>`;
-                        }
-                        html += `</div>`;
-                    }
+        // Show the watched expedition view unless the player toggled to overview
+        const showWatchedView = watchedExp && !this._arcaneShowOverview;
 
-                    // Node map
-                    if (exp.nodeMap && exp.nodeMap.length > 0) {
-                        html += this._buildNodeMapHtml(exp);
-                    }
+        if (showWatchedView) {
+            // Navigation: link back to overview
+            html += `<div style="margin-bottom:6px;">`;
+            html += `<button onclick="window.game.ui._arcaneShowOverview=true;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#222;color:#888;padding:3px 10px;border:1px solid #444;border-radius:3px;cursor:pointer;font-size:0.8em;">&#8592; Overview</button>`;
+            if (autoExps.length > 0 || (expl.pendingAutoSummaries && expl.pendingAutoSummaries.length > 0)) {
+                const pendingCount = expl.pendingAutoSummaries?.length || 0;
+                const badge = pendingCount > 0 ? ` <span style="background:#44ff88;color:#000;border-radius:8px;padding:0 5px;font-size:0.8em;">${pendingCount}</span>` : '';
+                html += ` <span style="color:#66ccaa;font-size:0.8em;margin-left:8px;">${autoExps.length} auto running${badge}</span>`;
+            }
+            html += `</div>`;
 
-                    html += `<canvas class="exp-vis-canvas" width="768" height="192"></canvas>`;
+            const exp = watchedExp;
+            if (exp.status === 'gathering') {
+                const names = exp.partyIds.map(id => {
+                    const c = this.game.getColonist(id);
+                    return c ? c.name : '?';
+                }).join(', ');
+                html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — Assembling</div>`;
+                html += `<div class="info-row" style="color:#888;">Party: ${names}</div>`;
+            } else {
+                const elapsed = this.game.tick - exp.startTick;
+                const totalDur = Math.floor(exp.duration * 1.2);
+                let pct = Math.min(100, Math.floor((elapsed / totalDur) * 100));
+                if (exp.status === 'returning' && !exp.retreatTick) pct = 100;
+                const statusLabel = exp.pendingDecision ? 'AWAITING CHOICE' : exp.combat ? 'COMBAT' : exp.status;
+                html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — ${statusLabel}</div>`;
 
-                    // Pending decision/puzzle/NPC prompt
-                    if (exp.pendingDecision) {
-                        html += this._buildDecisionPromptHtml(exp);
-                    }
-
-                    const snapshot = exp.partySnapshot || [];
-                    const aliveParty = snapshot.filter(p => p.hp > 0);
-                    html += `<div class="info-row" style="color:#888;">Party (${aliveParty.length}/${snapshot.length} alive):</div>`;
-                    for (const p of snapshot) {
-                        const hpPct = Math.max(0, Math.round((p.hp / p.maxHp) * 100));
-                        const color = p.hp <= 0 ? '#664444' : hpPct < 30 ? '#ff4444' : hpPct < 60 ? '#ffaa44' : '#88cc88';
-                        const status = p.hp <= 0 ? ' [DOWN]' : '';
-                        const hpBar = statBarHtml({ key: `exp:hp:${p.id}`, pct: hpPct, color, max: p.maxHp, width: 100 });
-                        const manaBar = p.maxMana > 0 ? statBarHtml({ key: `exp:mana:${p.id}`, pct: (p.mana / p.maxMana) * 100, color: '#aa88ff', max: p.maxMana, width: 100 }) : '';
-                        const manaStr = p.maxMana > 0 ? ` | ${Math.round(p.mana)}/${p.maxMana} MP${manaBar}` : '';
-                        const threatStr = getThreatDisplayHtml(getTargetPriority(p));
-                        const rowLabel = exp.formation?.back?.includes(p.id) ? ' <span style="color:#6688ff;font-size:0.8em;">[Back]</span>' : (exp.formation?.front?.includes(p.id) ? ' <span style="color:#ff8844;font-size:0.8em;">[Front]</span>' : '');
-                        let buffs = '';
-                        if (p.shieldActive) buffs += ' <span style="color:#4488ff;font-size:0.85em;">Shield</span>';
-                        if (p.dodgeCharges > 0) buffs += ` <span style="color:#aa44ff;font-size:0.85em;">Phase: ${p.dodgeCharges}</span>`;
-                        buffs += _combatStatusIcons(p.statusEffects);
-                        html += `<div class="info-row" style="color:${color}; padding-left:8px;">${p.name}${rowLabel} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${hpBar}${manaStr}${buffs}${status}${threatStr}</div>`;
-                    }
-
-                    if (exp.combat) {
-                        const enemiesAlive = exp.combat.enemies.filter(e => e.hp > 0);
-                        html += `<div class="info-row" style="color:#ff8844;margin-top:4px;">Enemies: ${enemiesAlive.length}/${exp.combat.enemies.length}`;
-                        const elites = enemiesAlive.filter(e => e.elite);
-                        if (elites.length > 0) html += ` (<span style="color:${elites[0].eliteColor}">${elites.length} elite</span>)`;
-                        // Aggregate afflictions across living enemies so the player sees
-                        // poison/stun/slow/weaken landing without a per-enemy row.
-                        const statusCounts = {};
-                        for (const e of enemiesAlive) {
-                            if (!e.statusEffects) continue;
-                            for (const s of e.statusEffects) {
-                                if (s.rounds > 0) statusCounts[s.type] = (statusCounts[s.type] || 0) + 1;
-                            }
-                        }
-                        const statusStr = Object.entries(statusCounts)
-                            .map(([type, n]) => `${_combatStatusIcon(type)}${n > 1 ? '×' + n : ''}`).join(' ');
-                        if (statusStr) html += ` <span style="font-size:0.9em;">${statusStr}</span>`;
-                        html += `</div>`;
-                    }
-
-                    // Potion supply
-                    if (exp.potionSupply && Object.keys(exp.potionSupply).length > 0) {
-                        html += `<div class="info-row" style="color:#44cc88;font-size:0.85em;">Potions: `;
-                        html += Object.entries(exp.potionSupply).map(([k, n]) => `${EXPEDITION_POTIONS[k]?.name || k} x${n}`).join(', ');
-                        html += `</div>`;
-                    }
-
-                    // Retreat button (only during exploring, not already returning)
-                    if (exp.status === 'exploring' && !exp.pendingDecision) {
-                        html += `<div class="info-actions" style="margin-top:4px;">`;
-                        html += `<button onclick="window.game.retreatExpedition(${exp.id})" style="background:#663322;color:#ffaa88;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Retreat (keep loot)</button>`;
-                        html += `</div>`;
-                    }
-
-                    html += `<div class="exp-log-container" style="max-height:200px;overflow-y:auto;" id="exp-log-active">`;
-                    for (let li = exp.log.length - 1; li >= 0; li--) {
-                        const entry = exp.log[li];
-                        const color = this._expLogColor(entry.type);
-                        html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
+                // Mutator badges
+                if (exp.mutators && exp.mutators.length > 0) {
+                    html += `<div class="info-row" style="font-size:0.8em;color:#cc88ff;">`;
+                    for (const mk of exp.mutators) {
+                        const mut = EXPEDITION_MUTATORS[mk];
+                        html += `<span style="background:#2a1a3e;padding:1px 4px;border-radius:2px;margin-right:3px;">${mut?.name || mk}</span>`;
                     }
                     html += `</div>`;
                 }
-            }
-        }
 
-        const dims = expl.getAvailableRealms(this.game);
-        if (expl.expeditions.length === 0) {
-            if (dims.length > 0 && this.game.power.powered) {
-                html += `<div class="info-row" style="margin-top:8px;font-weight:bold;color:#33ccff;">Send Expedition:</div>`;
-                const allRealms = Object.entries(REALMS).map(([k, r]) => ({ key: k, ...r }));
-                const chains = [...new Set(allRealms.map(r => r.chain))];
-                for (const chain of chains) {
-                    const chainRealms = allRealms.filter(r => r.chain === chain).sort((a, b) => a.chainOrder - b.chainOrder);
-                    const completedCount = chainRealms.filter(r => expl.completedRealms.has(r.key)).length;
-                    const anyVisible = chainRealms.some(r => dims.find(d => d.key === r.key) || expl.completedRealms.has(r.key));
-                    const anyDemoLocked = chainRealms.some(r => expl.isRealmDemoLocked(this.game, r.key));
-                    if (!anyVisible && !anyDemoLocked && !chainRealms.some(r => !r.research || this.game.research.isResearched(r.research))) continue;
-                    html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
-                    for (const realm of chainRealms) {
-                        const available = dims.find(d => d.key === realm.key);
-                        const completed = expl.completedRealms.has(realm.key);
-                        const badge = completed ? `<span style="color:#44cc44;font-size:0.8em;"> ✓</span>` : '';
-                        const indentPx = (realm.chainOrder - 1) * 16;
-                        const indent = indentPx > 0 ? `margin-left:${indentPx}px;border-left:2px solid #446;padding-left:8px;` : '';
-                        if (available) {
-                            html += `<div class="info-actions" style="${indent}"><button onclick="window.game.showExpeditionSetupInPanel('${realm.key}')" style="background:#1a4466;color:#88ddff;padding:6px 12px;border:none;border-radius:3px;cursor:pointer;margin:2px 0;">${realm.name} (Difficulty ${realm.difficulty})${badge}</button></div>`;
-                        } else if (expl.isRealmDemoLocked(this.game, realm.key)) {
-                            html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
-                        } else if (realm.requiresEvent && !expl._checkEvent(this.game, realm.requiresEvent)) {
-                            html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — locked</span></div>`;
-                        } else if (realm.requiresRealm && !expl.completedRealms.has(realm.requiresRealm) && (!realm.research || this.game.research.isResearched(realm.research))) {
-                            const reqName = REALMS[realm.requiresRealm]?.name || realm.requiresRealm;
-                            html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — complete ${reqName} to unlock</span></div>`;
+                // Node map
+                if (exp.nodeMap && exp.nodeMap.length > 0) {
+                    html += this._buildNodeMapHtml(exp);
+                }
+
+                html += `<canvas class="exp-vis-canvas" width="768" height="192"></canvas>`;
+
+                // Pending decision/puzzle/NPC prompt
+                if (exp.pendingDecision) {
+                    html += this._buildDecisionPromptHtml(exp);
+                }
+
+                const snapshot = exp.partySnapshot || [];
+                const aliveParty = snapshot.filter(p => p.hp > 0);
+                html += `<div class="info-row" style="color:#888;">Party (${aliveParty.length}/${snapshot.length} alive):</div>`;
+                for (const p of snapshot) {
+                    const hpPct = Math.max(0, Math.round((p.hp / p.maxHp) * 100));
+                    const color = p.hp <= 0 ? '#664444' : hpPct < 30 ? '#ff4444' : hpPct < 60 ? '#ffaa44' : '#88cc88';
+                    const status = p.hp <= 0 ? ' [DOWN]' : '';
+                    const hpBar = statBarHtml({ key: `exp:hp:${p.id}`, pct: hpPct, color, max: p.maxHp, width: 100 });
+                    const manaBar = p.maxMana > 0 ? statBarHtml({ key: `exp:mana:${p.id}`, pct: (p.mana / p.maxMana) * 100, color: '#aa88ff', max: p.maxMana, width: 100 }) : '';
+                    const manaStr = p.maxMana > 0 ? ` | ${Math.round(p.mana)}/${p.maxMana} MP${manaBar}` : '';
+                    const threatStr = getThreatDisplayHtml(getTargetPriority(p));
+                    const rowLabel = exp.formation?.back?.includes(p.id) ? ' <span style="color:#6688ff;font-size:0.8em;">[Back]</span>' : (exp.formation?.front?.includes(p.id) ? ' <span style="color:#ff8844;font-size:0.8em;">[Front]</span>' : '');
+                    let buffs = '';
+                    if (p.shieldActive) buffs += ' <span style="color:#4488ff;font-size:0.85em;">Shield</span>';
+                    if (p.dodgeCharges > 0) buffs += ` <span style="color:#aa44ff;font-size:0.85em;">Phase: ${p.dodgeCharges}</span>`;
+                    buffs += _combatStatusIcons(p.statusEffects);
+                    html += `<div class="info-row" style="color:${color}; padding-left:8px;">${p.name}${rowLabel} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${hpBar}${manaStr}${buffs}${status}${threatStr}</div>`;
+                }
+
+                if (exp.combat) {
+                    const enemiesAlive = exp.combat.enemies.filter(e => e.hp > 0);
+                    html += `<div class="info-row" style="color:#ff8844;margin-top:4px;">Enemies: ${enemiesAlive.length}/${exp.combat.enemies.length}`;
+                    const elites = enemiesAlive.filter(e => e.elite);
+                    if (elites.length > 0) html += ` (<span style="color:${elites[0].eliteColor}">${elites.length} elite</span>)`;
+                    const statusCounts = {};
+                    for (const e of enemiesAlive) {
+                        if (!e.statusEffects) continue;
+                        for (const s of e.statusEffects) {
+                            if (s.rounds > 0) statusCounts[s.type] = (statusCounts[s.type] || 0) + 1;
                         }
                     }
-                }
-            } else if (!this.game.power.powered) {
-                html += `<div class="info-row" style="color:#ff4444;margin-top:8px;">No mana — cannot send expeditions</div>`;
-            } else {
-                html += `<div class="info-row" style="color:#888;margin-top:8px;">No realms available yet</div>`;
-            }
-
-            // Active realm events
-            const realmEvents = expl.getActiveRealmEvents();
-            if (realmEvents.length > 0) {
-                html += `<div style="margin-top:8px;padding:4px 6px;background:#1a1a2e;border-radius:3px;border-left:2px solid #cc88ff;">`;
-                html += `<div style="color:#cc88ff;font-size:0.85em;font-weight:bold;">Active Realm Events</div>`;
-                for (const evt of realmEvents) {
-                    html += `<div style="color:#aaa;font-size:0.8em;margin:2px 0;"><span style="color:#ffcc44;">${evt.name}</span> — ${evt.description} <span style="color:#666;">(${evt.realms.join(', ')})</span></div>`;
-                }
-                html += `</div>`;
-            }
-
-            if (expl.completedExpeditions.length > 0) {
-                const last = expl.completedExpeditions[expl.completedExpeditions.length - 1];
-                html += `<div class="info-row" style="margin-top:10px;color:#88ccff;font-weight:bold;">Last: ${last.realmName}</div>`;
-
-                // Summary stats for the last expedition
-                if (last.summary) {
-                    html += this._buildSummaryHtml(last);
+                    const statusStr = Object.entries(statusCounts)
+                        .map(([type, n]) => `${_combatStatusIcon(type)}${n > 1 ? '×' + n : ''}`).join(' ');
+                    if (statusStr) html += ` <span style="font-size:0.9em;">${statusStr}</span>`;
+                    html += `</div>`;
                 }
 
-                html += `<div class="exp-log-container" style="max-height:200px;overflow-y:auto;" id="exp-log-last">`;
-                for (let li = last.log.length - 1; li >= 0; li--) {
-                    const entry = last.log[li];
+                // Potion supply
+                if (exp.potionSupply && Object.keys(exp.potionSupply).length > 0) {
+                    html += `<div class="info-row" style="color:#44cc88;font-size:0.85em;">Potions: `;
+                    html += Object.entries(exp.potionSupply).map(([k, n]) => `${EXPEDITION_POTIONS[k]?.name || k} x${n}`).join(', ');
+                    html += `</div>`;
+                }
+
+                // Retreat button (only during exploring, not already returning)
+                if (exp.status === 'exploring' && !exp.pendingDecision) {
+                    html += `<div class="info-actions" style="margin-top:4px;">`;
+                    html += `<button onclick="window.game.retreatExpedition(${exp.id})" style="background:#663322;color:#ffaa88;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Retreat (keep loot)</button>`;
+                    html += `</div>`;
+                }
+
+                html += `<div class="exp-log-container" style="max-height:200px;overflow-y:auto;" id="exp-log-active">`;
+                for (let li = exp.log.length - 1; li >= 0; li--) {
+                    const entry = exp.log[li];
                     const color = this._expLogColor(entry.type);
                     html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
                 }
                 html += `</div>`;
             }
+
+            html += `</div>`;
+            return html;
+        }
+
+        // === OVERVIEW MODE ===
+
+        // Return-to-watched button
+        if (watchedExp) {
+            const statusLabel = watchedExp.pendingDecision ? 'AWAITING CHOICE' : watchedExp.combat ? 'IN COMBAT' : watchedExp.status.toUpperCase();
+            const needsAttention = !!watchedExp.pendingDecision;
+            const btnColor = needsAttention ? '#ff8844' : '#33aaff';
+            html += `<div style="margin-bottom:8px;">`;
+            html += `<button onclick="window.game.ui._arcaneShowOverview=false;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#112233;color:${btnColor};padding:5px 14px;border:1px solid ${btnColor};border-radius:3px;cursor:pointer;font-size:0.9em;">&#9654; Watch Expedition — ${watchedExp.realmName} (${statusLabel})</button>`;
+            html += `</div>`;
+        }
+
+        // Collect section for all finished expeditions
+        if (expl.pendingAutoSummaries && expl.pendingAutoSummaries.length > 0) {
+            html += `<div style="margin-bottom:10px;padding:6px 8px;background:#112211;border-radius:4px;border-left:3px solid #44ff88;">`;
+            html += `<div style="color:#44ff88;font-weight:bold;margin-bottom:4px;">Expeditions Returned</div>`;
+            for (const aExp of expl.pendingAutoSummaries) {
+                const lootParts = [];
+                for (const itemKey of (aExp.loot?._items || [])) {
+                    lootParts.push(ALL_ITEMS[itemKey]?.name || itemKey);
+                }
+                for (const [res, amt] of Object.entries(aExp.loot || {})) {
+                    if (res === '_items') continue;
+                    lootParts.push(`${amt}× ${ALL_ITEMS[res]?.name || res}`);
+                }
+                const lootStr = lootParts.length > 0 ? lootParts.slice(0, 4).join(', ') + (lootParts.length > 4 ? '…' : '') : 'nothing';
+                const modeTag = aExp.autoMode ? `<span style="color:#66ccaa;font-size:0.75em;margin-right:4px;">[auto]</span>` : '';
+                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;border-top:1px solid #1a3322;">`;
+                html += `<span style="color:#aaa;font-size:0.85em;">${modeTag}${aExp.realmName}: ${lootStr}</span>`;
+                html += `<button onclick="window.game.collectAutoExpedition(${aExp.id})" style="background:#225533;color:#88ff88;padding:2px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;white-space:nowrap;margin-left:8px;">Collect</button>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Active auto expeditions (compact rows)
+        if (autoExps.length > 0) {
+            html += `<div style="margin-bottom:8px;padding:4px 8px;background:#0d1a1a;border-radius:4px;border-left:3px solid #33ccaa;">`;
+            html += `<div style="color:#33ccaa;font-size:0.85em;font-weight:bold;margin-bottom:3px;">Auto Expeditions Running</div>`;
+            for (const aExp of autoExps) {
+                const elapsed = this.game.tick - aExp.startTick;
+                const totalDur = Math.floor(aExp.duration * 1.2);
+                let pct = Math.min(100, Math.floor((elapsed / totalDur) * 100));
+                if (aExp.status === 'returning' && !aExp.retreatTick) pct = 100;
+                const aStatusLabel = aExp.status === 'gathering' ? 'Assembling' : aExp.combat ? 'Combat' : aExp.status;
+                html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;font-size:0.85em;">`;
+                html += `<span style="color:#88ddcc;">${aExp.realmName}</span>`;
+                html += `<span style="color:#666;">${aStatusLabel} ${pct}%</span>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
+
+        const dims = expl.getAvailableRealms(this.game);
+        const canSendAuto = expl.canSendAuto(this.game);
+        const canSendWatched = !watchedExp;
+
+        if (dims.length > 0 && this.game.power.powered) {
+            html += `<div class="info-row" style="margin-top:8px;font-weight:bold;color:#33ccff;">Send Expedition:</div>`;
+            const allRealms = Object.entries(REALMS).map(([k, r]) => ({ key: k, ...r }));
+            const chains = [...new Set(allRealms.map(r => r.chain))];
+            for (const chain of chains) {
+                const chainRealms = allRealms.filter(r => r.chain === chain).sort((a, b) => a.chainOrder - b.chainOrder);
+                const completedCount = chainRealms.filter(r => expl.completedRealms.has(r.key)).length;
+                const anyVisible = chainRealms.some(r => dims.find(d => d.key === r.key) || expl.completedRealms.has(r.key));
+                const anyDemoLocked = chainRealms.some(r => expl.isRealmDemoLocked(this.game, r.key));
+                if (!anyVisible && !anyDemoLocked && !chainRealms.some(r => !r.research || this.game.research.isResearched(r.research))) continue;
+                html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
+                for (const realm of chainRealms) {
+                    const available = dims.find(d => d.key === realm.key);
+                    const completed = expl.completedRealms.has(realm.key);
+                    const badge = completed ? `<span style="color:#44cc44;font-size:0.8em;"> ✓</span>` : '';
+                    const indentPx = (realm.chainOrder - 1) * 16;
+                    const indent = indentPx > 0 ? `margin-left:${indentPx}px;border-left:2px solid #446;padding-left:8px;` : '';
+                    if (available) {
+                        html += `<div class="info-actions" style="${indent}display:flex;align-items:center;gap:4px;">`;
+                        if (canSendWatched) {
+                            html += `<button onclick="window.game.showExpeditionSetupInPanel('${realm.key}')" style="background:#1a4466;color:#88ddff;padding:6px 12px;border:none;border-radius:3px;cursor:pointer;margin:2px 0;">${realm.name} (Difficulty ${realm.difficulty})${badge}</button>`;
+                        } else {
+                            html += `<span style="color:#556677;padding:6px 12px;display:inline-block;">${realm.name} (Difficulty ${realm.difficulty})${badge}</span>`;
+                        }
+                        if (canSendAuto && completed) {
+                            html += `<button onclick="window.game.showExpeditionSetupInPanel('${realm.key}', true)" style="background:#1a3322;color:#66dd99;padding:6px 10px;border:1px solid #336644;border-radius:3px;cursor:pointer;margin:2px 0;font-size:0.85em;">Auto</button>`;
+                        }
+                        html += `</div>`;
+                    } else if (expl.isRealmDemoLocked(this.game, realm.key)) {
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
+                    } else if (realm.requiresEvent && !expl._checkEvent(this.game, realm.requiresEvent)) {
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — locked</span></div>`;
+                    } else if (realm.requiresRealm && !expl.completedRealms.has(realm.requiresRealm) && (!realm.research || this.game.research.isResearched(realm.research))) {
+                        const reqName = REALMS[realm.requiresRealm]?.name || realm.requiresRealm;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — complete ${reqName} to unlock</span></div>`;
+                    }
+                }
+            }
+        } else if (!this.game.power.powered) {
+            html += `<div class="info-row" style="color:#ff4444;margin-top:8px;">No mana — cannot send expeditions</div>`;
+        } else {
+            html += `<div class="info-row" style="color:#888;margin-top:8px;">No realms available yet</div>`;
+        }
+
+        // Active realm events
+        const realmEvents = expl.getActiveRealmEvents();
+        if (realmEvents.length > 0) {
+            html += `<div style="margin-top:8px;padding:4px 6px;background:#1a1a2e;border-radius:3px;border-left:2px solid #cc88ff;">`;
+            html += `<div style="color:#cc88ff;font-size:0.85em;font-weight:bold;">Active Realm Events</div>`;
+            for (const evt of realmEvents) {
+                html += `<div style="color:#aaa;font-size:0.8em;margin:2px 0;"><span style="color:#ffcc44;">${evt.name}</span> — ${evt.description} <span style="color:#666;">(${evt.realms.join(', ')})</span></div>`;
+            }
+            html += `</div>`;
+        }
+
+        if (expl.expeditions.length === 0 && expl.completedExpeditions.length > 0) {
+            const last = expl.completedExpeditions[expl.completedExpeditions.length - 1];
+            html += `<div class="info-row" style="margin-top:10px;color:#88ccff;font-weight:bold;">Last: ${last.realmName}</div>`;
+
+            // Summary stats for the last expedition
+            if (last.summary) {
+                html += this._buildSummaryHtml(last);
+            }
+
+            html += `<div class="exp-log-container" style="max-height:200px;overflow-y:auto;" id="exp-log-last">`;
+            for (let li = last.log.length - 1; li >= 0; li--) {
+                const entry = last.log[li];
+                const color = this._expLogColor(entry.type);
+                html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
+            }
+            html += `</div>`;
         }
 
         html += `</div>`;
@@ -456,7 +535,7 @@ const arcaneMethods = {
 
     _buildExpeditionSetupHtml(realmKey) {
         const expl = this.game.exploration;
-        const available = this.game.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.drafted && !(c.traits && c.traits.includes('pacifist')));
+        const available = this.game.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.expeditionPending && !c.drafted && !(c.traits && c.traits.includes('pacifist')));
         let html = `<div class="arcane-section">`;
 
         // Party presets
@@ -470,6 +549,12 @@ const arcaneMethods = {
                 html += `<button onclick="window.game.deleteExpeditionPreset('${safeName}')" style="background:none;color:#ff6644;padding:0 4px;border:none;border-left:1px solid #333;cursor:pointer;font-size:0.8em;" title="Delete preset">&times;</button>`;
                 html += `</span>`;
             }
+            html += `</div>`;
+        }
+
+        if (this._arcaneExpIsAuto) {
+            html += `<div style="margin-bottom:8px;padding:4px 10px;background:#112211;border-radius:4px;border-left:3px solid #44ff88;display:inline-block;">`;
+            html += `<span style="color:#44ff88;font-weight:bold;font-size:0.9em;">AUTO MODE</span> <span style="color:#88aa88;font-size:0.8em;">— decisions skipped automatically</span>`;
             html += `</div>`;
         }
 
@@ -551,10 +636,13 @@ const arcaneMethods = {
         html += `<div id="exp-strength-preview" style="margin-top:8px;padding:6px 8px;background:#1a1a2e;border-radius:4px;font-size:0.9em;color:#666;">Select colonists to see party strength</div>`;
         html += this._buildRealmDropsHtml(realmKey);
         html += `<div class="info-actions" style="margin-top:8px;">`;
-        html += `<button onclick="window.game.launchExpeditionFromPanel('${realmKey}')" style="background:#1a4466;color:#88ddff;padding:8px 16px;border:none;border-radius:4px;cursor:pointer;font-size:1em;">Launch Expedition</button>`;
+        const launchLabel = this._arcaneExpIsAuto ? 'Launch Auto Expedition' : 'Launch Expedition';
+        const launchBg = this._arcaneExpIsAuto ? '#1a3322' : '#1a4466';
+        const launchColor = this._arcaneExpIsAuto ? '#66dd99' : '#88ddff';
+        html += `<button onclick="window.game.launchExpeditionFromPanel('${realmKey}')" style="background:${launchBg};color:${launchColor};padding:8px 16px;border:none;border-radius:4px;cursor:pointer;font-size:1em;">${launchLabel}</button>`;
         html += `<input id="exp-preset-name" type="text" placeholder="Preset name" maxlength="20" style="margin-left:8px;width:100px;background:#1a1a2e;color:#ccc;border:1px solid #333;border-radius:3px;padding:4px 6px;font-size:0.85em;">`;
         html += `<button onclick="window.game.saveExpeditionPreset()" style="background:#1a2e1a;color:#88cc88;padding:8px 8px;border:none;border-radius:4px;cursor:pointer;margin-left:4px;font-size:0.9em;">Save Preset</button>`;
-        html += `<button onclick="window.game.ui._arcaneExpSetup=null;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#333;color:#aaa;padding:8px 12px;border:none;border-radius:4px;cursor:pointer;margin-left:8px;">Cancel</button>`;
+        html += `<button onclick="window.game.ui._arcaneExpSetup=null;window.game.ui._arcaneExpIsAuto=false;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#333;color:#aaa;padding:8px 12px;border:none;border-radius:4px;cursor:pointer;margin-left:8px;">Cancel</button>`;
         html += `</div></div>`;
         return html;
     },
@@ -1462,7 +1550,7 @@ const arcaneMethods = {
         ctx.imageSmoothingEnabled = false;
         const W = canvas.width, H = canvas.height;
         const expl = this.game.exploration;
-        const exp = expl.expeditions.find(e => e.status === 'exploring' || e.status === 'returning');
+        const exp = expl.expeditions.find(e => !e.autoMode && (e.status === 'exploring' || e.status === 'returning'));
         if (!exp) {
             if (this._expVisState.finishing) {
                 this._expVisState.finishFrame = (this._expVisState.finishFrame || 0) + 1;

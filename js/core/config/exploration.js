@@ -1205,6 +1205,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.35,
         realmFilter: null,
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Left tunnel, narrow and dark',
@@ -1225,6 +1226,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.2,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         minDifficulty: 1,
+        safeIndex: 2,
         choices: [
             {
                 label: 'Pray at the shrine',
@@ -1251,6 +1253,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.25,
         realmFilter: null,
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Open it carefully',
@@ -1271,6 +1274,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.2,
         realmFilter: null,
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Investigate',
@@ -1291,6 +1295,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.3,
         realmFilter: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
         minDifficulty: 1,
+        safeIndex: 2,
         choices: [
             {
                 label: 'Free the prisoners',
@@ -1317,6 +1322,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.3,
         realmFilter: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Torch the cache',
@@ -1337,6 +1343,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.3,
         realmFilter: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
         minDifficulty: 1,
+        safeIndex: 2,
         choices: [
             {
                 label: 'Attune to the vein',
@@ -1363,6 +1370,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.3,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Harvest aggressively',
@@ -1383,6 +1391,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.25,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Drink it',
@@ -1403,6 +1412,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.25,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Listen to the whispers',
@@ -1423,6 +1433,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.25,
         realmFilter: null,
         minDifficulty: 1,
+        safeIndex: 1,
         choices: [
             {
                 label: 'Rest a while',
@@ -1443,6 +1454,7 @@ export const EXPEDITION_DECISIONS = {
         triggerChance: 0.2,
         realmFilter: null,
         minDifficulty: 1,
+        safeIndex: 2,
         choices: [
             {
                 label: 'Trade with them',

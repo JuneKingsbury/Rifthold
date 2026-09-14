@@ -17,6 +17,7 @@ export const THOUGHTS = {
     repaired:          { text: 'Repaired a structure', moodEffect: 3, duration: 100 },
     deconstructed:     { text: 'Tore something down', moodEffect: 2, duration: 80 },
     new_colonist:      { text: 'New colonist arrived', moodEffect: 5, duration: 200 },
+    unwanted:          { text: 'Feeling unwanted', moodEffect: -10, duration: 20 },
     freezing:          { text: 'Freezing outside', moodEffect: -8, duration: 50 },
     overheating:       { text: 'Overheating outside', moodEffect: -6, duration: 80 },
     fire_panic:        { text: 'Colony on fire!', moodEffect: -20, duration: 200 },

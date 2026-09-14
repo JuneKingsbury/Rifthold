@@ -66,6 +66,7 @@ export class ExplorationSystem {
         this.partyPresets = [];
         this.activeRealmEvents = [];
         this.pendingSummary = null;
+        this.pendingAutoSummaries = [];
     }
 
     syncIdCounter() {
@@ -116,9 +117,30 @@ export class ExplorationSystem {
         return false;
     }
 
+    _getMaxAutoExpeditions(game) {
+        if (!game.research.isResearched('auto_expedition')) return 0;
+        if (game.research.isResearched('auto_expedition_iii')) return 3;
+        if (game.research.isResearched('auto_expedition_ii')) return 2;
+        return 1;
+    }
+
+    canSendAuto(game) {
+        const max = this._getMaxAutoExpeditions(game);
+        return max > 0 && this.expeditions.filter(e => e.autoMode).length < max;
+    }
+
     sendExpedition(game, realmKey, colonistIds, packAnimalIds = [], difficulty = 1, options = {}) {
         if (!this.canSend(game, realmKey)) return null;
         if (colonistIds.length === 0) return null;
+
+        const autoMode = !!options.autoMode;
+        if (autoMode) {
+            const max = this._getMaxAutoExpeditions(game);
+            if (max === 0) return null;
+            if (this.expeditions.filter(e => e.autoMode).length >= max) return null;
+        } else {
+            if (this.expeditions.filter(e => !e.autoMode).length >= 1) return null;
+        }
 
         const dim = REALMS[realmKey];
         const party = [];
@@ -128,7 +150,7 @@ export class ExplorationSystem {
 
         for (const id of cappedColonists) {
             const c = game.getColonist(id);
-            if (!c || c.hp <= 0 || c.onExpedition || c.drafted) continue;
+            if (!c || c.hp <= 0 || c.onExpedition || c.expeditionPending || c.drafted) continue;
             if (c.traits && c.traits.includes('pacifist')) continue;
             if (this.fatigueCooldowns[id] && game.tick < this.fatigueCooldowns[id]) continue;
             party.push(c);
@@ -254,6 +276,7 @@ export class ExplorationSystem {
             discoveredEntries: [],
             xpEarned: {},
             nodeMap,
+            autoMode,
             summary: {
                 damageDealt: {}, damageTaken: {}, spellsCast: {},
                 killCount: {}, healingDone: {},
@@ -287,12 +310,17 @@ export class ExplorationSystem {
             }
 
             if (exp.pendingDecision) {
-                exp.startTick++;
-                if (!exp._wasPaused) {
-                    exp._wasPaused = true;
-                    if (!game.paused) game.togglePause();
+                if (exp.autoMode) {
+                    this._autoResolvePendingDecision(exp, game);
+                    // fall through, pendingDecision is now null
+                } else {
+                    exp.startTick++;
+                    if (!exp._wasPaused) {
+                        exp._wasPaused = true;
+                        if (!game.paused) game.togglePause();
+                    }
+                    continue;
                 }
-                continue;
             }
             if (exp._wasPaused) exp._wasPaused = false;
 
@@ -390,6 +418,29 @@ export class ExplorationSystem {
         exp._lastResolutionTick = game.tick;
         exp._lastResolutionOutcome = ok ? 'success' : 'failure';
         window.soundManager?.playExpSFX(ok ? 'spell_divination' : 'wave_alert');
+    }
+
+    _autoResolvePendingDecision(exp, game) {
+        const pd = exp.pendingDecision;
+        if (!pd) return;
+        if (pd.type === 'decision') {
+            const decDef = EXPEDITION_DECISIONS[pd.decisionKey];
+            let idx = decDef?.safeIndex ?? -1;
+            if (idx < 0) {
+                for (let i = pd.choices.length - 1; i >= 0; i--) {
+                    const fx = pd.choices[i].effects;
+                    if (!fx || Object.keys(fx).length === 0) { idx = i; break; }
+                }
+            }
+            if (idx < 0) idx = pd.choices.length - 1;
+            this.resolveDecision(game, exp.id, idx);
+        } else if (pd.type === 'puzzle') {
+            this.resolvePuzzle(game, exp.id, -1);
+        } else if (pd.type === 'npc') {
+            this.resolveNpc(game, exp.id, -1);
+        } else if (pd.type === 'trap') {
+            this.resolveTrap(game, exp.id, -1);
+        }
     }
 
     resolveDecision(game, expId, choiceIndex) {
@@ -2206,11 +2257,19 @@ export class ExplorationSystem {
         if (this.completedExpeditions.length > 10) {
             this.completedExpeditions.shift();
         }
-        this.pendingSummary = exp;
+        this.pendingAutoSummaries.push(exp);
     }
 
     dismissSummary() {
         this.pendingSummary = null;
+    }
+
+    collectAutoExpedition(expId) {
+        const idx = this.pendingAutoSummaries.findIndex(e => e.id === expId);
+        if (idx < 0) return null;
+        const [exp] = this.pendingAutoSummaries.splice(idx, 1);
+        this.pendingSummary = exp;
+        return exp;
     }
 
 

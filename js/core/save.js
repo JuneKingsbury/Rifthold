@@ -4,7 +4,7 @@ import { ensureEntityRoles } from '../entities/roles.js';
 import { recalcMaxMana, invalidateEquipStatCache, defaultAttunedSchools } from '../entities/colonist.js';
 
 const SAVE_KEY = 'colony_save';
-const SAVE_VERSION = 9;
+const SAVE_VERSION = 10;
 
 export function saveGame(game) {
     const layout = captureLayout();
@@ -93,6 +93,7 @@ export function saveGame(game) {
             realmHistory: game.exploration.realmHistory || [],
             partyPresets: game.exploration.partyPresets || [],
             activeRealmEvents: game.exploration.activeRealmEvents || [],
+            pendingAutoSummaries: game.exploration.pendingAutoSummaries || [],
         },
 
         research: {
@@ -314,6 +315,7 @@ export function loadGame(game) {
             game.exploration.realmHistory = data.exploration.realmHistory || [];
             game.exploration.partyPresets = data.exploration.partyPresets || [];
             game.exploration.activeRealmEvents = data.exploration.activeRealmEvents || [];
+            game.exploration.pendingAutoSummaries = data.exploration.pendingAutoSummaries || [];
             game.exploration.syncIdCounter();
         }
 

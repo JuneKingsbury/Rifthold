@@ -1481,13 +1481,14 @@ class Game {
         this.ui.elements.infoPanel.innerHTML = html;
     }
 
-    showExpeditionSetupInPanel(realmKey) {
+    showExpeditionSetupInPanel(realmKey, autoMode = false) {
         const available = this.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.drafted);
         if (available.length === 0) {
             this.notifications.push({ text: 'No colonists available for expedition', tick: this.tick, type: 'danger' });
             return;
         }
         this.ui._arcaneExpSetup = realmKey;
+        this.ui._arcaneExpIsAuto = autoMode;
         this.ui._lastArcaneHtml = '';
         this.ui.updateArcanePanel();
     }
@@ -1519,11 +1520,13 @@ class Game {
         const frontRowIds = ids.filter(id => !backRowSet.has(id));
         const formation = { front: frontRowIds, back: backRowIds };
 
-        const options = { mutators, potions, formation };
+        const options = { mutators, potions, formation, autoMode: this.ui._arcaneExpIsAuto || false };
         const result = this.exploration.sendExpedition(this, realmKey, ids, packIds, difficulty, options);
         if (result) {
-            this.notifications.push({ text: `Expedition launched to ${result.realmName}!`, tick: this.tick, type: 'success' });
+            const autoLabel = result.autoMode ? ' (auto)' : '';
+            this.notifications.push({ text: `Expedition launched to ${result.realmName}${autoLabel}!`, tick: this.tick, type: 'success' });
             this.ui._arcaneExpSetup = null;
+            this.ui._arcaneExpIsAuto = false;
             this.ui._lastArcaneHtml = '';
             this.ui._expBackRowIds = new Set();
             this.ui._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0 };
@@ -1537,6 +1540,14 @@ class Game {
         const result = this.exploration.retreatExpedition(this, expId);
         if (result) {
             this.notifications.push({ text: 'Retreat ordered!', tick: this.tick, type: 'info' });
+            this.ui._lastArcaneHtml = '';
+            this.ui.updateArcanePanel();
+        }
+    }
+
+    collectAutoExpedition(expId) {
+        const exp = this.exploration.collectAutoExpedition(expId);
+        if (exp) {
             this.ui._lastArcaneHtml = '';
             this.ui.updateArcanePanel();
         }

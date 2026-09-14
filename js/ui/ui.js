@@ -467,7 +467,7 @@ export class UI {
         const hasNew = this.game.story.hasUnviewed();
         const researchNeedsAtt = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
         const currentManaCrystalBonus = this.game.manaCrystalBonus || 0;
-        const expPending = !!this.game.exploration?.expeditions?.some(e => e.pendingDecision);
+        const expPending = !!this.game.exploration?.expeditions?.some(e => !e.autoMode && e.pendingDecision);
         const modeBarChanged = hasNew !== this._lastStoryHasNew || researchNeedsAtt !== this._lastResearchNeedsAttention || currentManaCrystalBonus !== this._lastManaCrystalBonus || expPending !== this._lastExpPending;
         if (modeBarChanged) {
             this._lastStoryHasNew = hasNew;
@@ -699,7 +699,10 @@ export class UI {
             const researchStyle = researchNeedsAttention ? ' style="color:#ffcc44"' : '';
             html += `<span class="mode-opt" data-mode-action="research"${researchStyle}>[R]Research${researchNeedsAttention ? ' •' : ''}</span>`;
             html += `<span class="mode-opt" data-mode-action="inventory">[I]Inventory</span>`;
-            html += `<span class="mode-opt" data-mode-action="arcane">[V]Rifts</span>`;
+            const pendingAutoCount = this.game.exploration?.pendingAutoSummaries?.length || 0;
+            const arcaneStyle = pendingAutoCount > 0 ? ' style="color:#44ff88"' : '';
+            const arcaneBadge = pendingAutoCount > 0 ? ` <span style="background:#44ff88;color:#000;border-radius:8px;padding:0 4px;font-size:0.75em;">${pendingAutoCount}</span>` : '';
+            html += `<span class="mode-opt" data-mode-action="arcane"${arcaneStyle}>[V]Rifts${arcaneBadge}</span>`;
             const storyNew = this.game.story.hasUnviewed() ? ' style="color:#ffcc44"' : '';
             html += `<span class="mode-opt" data-mode-action="story"${storyNew}>[J]Story${this.game.story.hasUnviewed() ? ' •' : ''}</span>`;
             html += '</span>';
@@ -714,7 +717,7 @@ export class UI {
                 if (btn) btn.classList.add('tutorial-highlight');
             }
         }
-        if (this.game.exploration?.expeditions?.some(e => e.pendingDecision)) {
+        if (this.game.exploration?.expeditions?.some(e => !e.autoMode && e.pendingDecision)) {
             const btn = this.elements.modeBar.querySelector('[data-mode-action="arcane"]');
             if (btn) btn.classList.add('tutorial-highlight');
         }
@@ -929,8 +932,10 @@ export class UI {
         const expl = this.game.exploration;
         let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">Rift Gate</div>`;
 
-        if (expl.expeditions.length > 0) {
-            for (const exp of expl.expeditions) {
+        const watchedExps = expl.expeditions.filter(e => !e.autoMode);
+        const autoRunning = expl.expeditions.filter(e => e.autoMode).length;
+        if (watchedExps.length > 0) {
+            for (const exp of watchedExps) {
                 if (exp.status === 'gathering') {
                     const names = exp.partyIds.map(id => {
                         const c = this.game.getColonist(id);
@@ -970,6 +975,10 @@ export class UI {
                     html += `</div>`;
                 }
             }
+        }
+        if (autoRunning > 0) {
+            const pendingCollect = expl.pendingAutoSummaries?.length || 0;
+            html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${autoRunning} auto expedition${autoRunning > 1 ? 's' : ''} running${pendingCollect > 0 ? ` — <span style="color:#44ff88">${pendingCollect} ready to collect</span>` : ''}</div>`;
         }
 
         const dims = expl.getAvailableRealms(this.game);
@@ -1665,12 +1674,16 @@ export class UI {
         let html = '';
         html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">Rift Gate</div>`;
         const expl = this.game.exploration;
-        if (expl.expeditions.length > 0) {
-            const exp = expl.expeditions[0];
-            const elapsed = this.game.tick - (exp.startTick || this.game.tick);
-            const totalDur = Math.floor((exp.duration || 1) * 1.2);
-            const pct = exp.status === 'gathering' ? 0 : Math.min(100, Math.floor((elapsed / totalDur) * 100));
-            html += `<div class="info-row" style="color:#aaddff;">${exp.realmName} — ${exp.status} (${pct}%)</div>`;
+        const watchedExp = expl.expeditions.find(e => !e.autoMode);
+        const autoCount = expl.expeditions.filter(e => e.autoMode).length;
+        if (watchedExp) {
+            const elapsed = this.game.tick - (watchedExp.startTick || this.game.tick);
+            const totalDur = Math.floor((watchedExp.duration || 1) * 1.2);
+            const pct = watchedExp.status === 'gathering' ? 0 : Math.min(100, Math.floor((elapsed / totalDur) * 100));
+            html += `<div class="info-row" style="color:#aaddff;">${watchedExp.realmName} — ${watchedExp.status} (${pct}%)</div>`;
+        }
+        if (autoCount > 0) {
+            html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${autoCount} auto running</div>`;
         }
         html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('expeditions')" style="background:#1a4466;color:#88ddff;">Open Rifts Panel</button></div>`;
         return html;

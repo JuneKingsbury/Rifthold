@@ -30,7 +30,13 @@ export class WaveSystem {
         if (game && game.mapIndex) {
             for (const [key, def] of Object.entries(BUILDINGS)) {
                 if (def.colonistCapBonus) {
-                    const count = game.mapIndex.getStructurePositions(key).size;
+                    let count = game.mapIndex.getStructurePositions(key).size;
+                    if (def.power?.consumes && game.power) {
+                        const shrineManaTotal = count * def.power.consumes;
+                        const otherConsumption = game.power.totalConsumed - shrineManaTotal;
+                        const manaAvailableForShrines = Math.max(0, game.power.totalGenerated - otherConsumption);
+                        count = Math.min(count, Math.floor(manaAvailableForShrines / def.power.consumes));
+                    }
                     base += def.colonistCapBonus * count;
                 }
             }

@@ -509,6 +509,18 @@ function updateThoughts(colonist, game) {
             manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.socialRange);
         if (!nearOthers) addThought(colonist, 'Rattled alone', isoPenalty, 20, game.tick);
     }
+
+    if (game.waves) {
+        const aliveColonists = game.colonists.filter(c => c.hp > 0 && !c.golem);
+        const cap = game.waves.getColonistCap(game);
+        if (aliveColonists.length > cap) {
+            const sorted = aliveColonists.slice().sort((a, b) => a.id - b.id);
+            const myRank = sorted.indexOf(colonist);
+            if (myRank >= cap) {
+                addThought(colonist, THOUGHTS.unwanted.text, THOUGHTS.unwanted.moodEffect, 20, game.tick);
+            }
+        }
+    }
 }
 
 function checkCriticalAlerts(colonist, game) {
