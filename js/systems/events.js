@@ -437,7 +437,7 @@ export class EventSystem {
      * @param {object}   merchant    The merchant (for qualityWeights).
      * @return {object[]} Rolled item instances (may be shorter than drawChances).
      */
-    _drawMerchantStock(keys, drawChances, merchant) {
+    _drawMerchantStock(keys, drawChances, merchant, game) {
         const pool = [...(keys || [])];
         const chances = drawChances || [];
         const out = [];
@@ -446,7 +446,7 @@ export class EventSystem {
             if (i > 0 && Math.random() >= chances[i]) continue;   // first slot guaranteed
             const idx = Math.floor(Math.random() * pool.length);
             const key = pool.splice(idx, 1)[0];
-            out.push(this._rollMerchantItem(key, merchant));
+            out.push(this._rollMerchantItem(key, merchant, game));
         }
         return out;
     }
@@ -454,13 +454,17 @@ export class EventSystem {
     // Roll a concrete merchant item. Gear takes a per-merchant quality roll. Item
     // types with no quality-scaled stats (trinket/tome/potion/consumable) stay
     // 'normal' so the prefix isn't a name-only lie (mirrors the Trade Rift rule).
-    _rollMerchantItem(key, merchant) {
+    _rollMerchantItem(key, merchant, game) {
         const def = ALL_ITEMS[key];
         const QUALITY_SCALED = new Set(['weapon', 'armor', 'helmet', 'tool', 'clothes', 'boots']);
         const quality = (def && QUALITY_SCALED.has(def.type))
             ? weightedQuality(merchant.qualityWeights)
             : 'normal';
-        return rollItem(key, quality);
+        const item = rollItem(key, quality);
+        if (key === 'crystal_capacitor' && game) {
+            item.tradeValue = 65 + (game.manaCrystalBonus || 0) * 20;
+        }
+        return item;
     }
 
     /**
@@ -487,8 +491,8 @@ export class EventSystem {
         // the rolled quality. (pendingEvent isn't serialized so
         // storing instances here needs no save-format change.)
         const exclusiveItems = [
-            ...this._drawMerchantStock(merchant.lowTierItems, merchant.lowDrawCount, merchant),
-            ...this._drawMerchantStock(merchant.highTierItems, merchant.highDrawChances, merchant),
+            ...this._drawMerchantStock(merchant.lowTierItems, merchant.lowDrawCount, merchant, game),
+            ...this._drawMerchantStock(merchant.highTierItems, merchant.highDrawChances, merchant, game),
         ];
 
         // Stackable potion stock, rolled per-visit from the merchant's potionStock

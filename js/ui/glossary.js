@@ -124,7 +124,7 @@ export const GLOSSARY = [
             {
                 subtitle: 'Crafting System',
                 entries: [
-                    ['Crafting Stations', 'Different items require different stations: A Workbench for basic goods, an Anvil for metalwork, a Cauldron for cooking, an Alchemy Table for potions, an Enchanting Table for enchantments. Build the right station, then queue recipes. Building multiple of the same workstation will allow more colonists to take on crafting tasks at the unoccupied stations.'],
+                    ['Crafting Stations', 'Different items require different stations: A Workbench for basic goods, an Anvil for metalwork, a Cooking Pot for cooking, an Alchemy Table for potions, an Enchanting Table for enchantments. Build the right station, then queue recipes. Building multiple of the same workstation will allow more colonists to take on crafting tasks at the unoccupied stations.'],
                     ['How Crafting Works', 'Open the Craft panel (C) and queue recipes. Colonists with Crafting or Cooking skill will work queued recipes at the appropriate station. Mana-powered stations (Enchanting Tables) work faster than their unpowered counterparts (Workbenches).'],
                     ['Quality Tiers', 'Crafted equipment rolls a quality level from Crude to Superior. Higher Crafting skill gives that colonist better odds of higher quality crafts. Quality multiplies the item\'s effectiveness signifigantly, with high-quality equipment from lower tiers outpacing low-quality equipment from higher tiers.'],
                     ['Enchantment Effects', 'Similar to equipment Quality, you can choose to enchant any non-trinket equipment from the inventory for a small cost. This will queue an enchantment task that is prioritized as a crafting task but distinctly uses the Enchantment skill level from the working colonist. These enchantments vary widely, applying some new effect to the equipment with a power level based on the enchantment\'s tier (I, II, III, or IV). The higher the Enchantment skill, the better odds of higher enchantment tiers. Enchanted equipment can also be queued for enchantment multiple times, replacing the previous effect with a newly rolled one, allowing you to re-enchant your best equipment until you find an effect that you\'re satisfied with.'],
@@ -135,7 +135,7 @@ export const GLOSSARY = [
             {
                 subtitle: 'Cooking & Potions',
                 entries: [
-                    ['Cooking', 'Convert raw crops and meat into cooked meals at the Cauldron. Cooked food fully restores hunger and provides a mood bonus. Eating raw food gives a mood penalty instead.'],
+                    ['Cooking', 'Convert raw crops and meat into cooked meals at the Cooking Pot. Cooked food fully restores hunger and provides a mood bonus. Eating raw food gives a mood penalty instead.'],
                     ['Food Sources', 'Crops from farming, meat from hunting animals, and products from tamed creatures (eggs, milk) all serve as cooking ingredients.'],
                     ['Potions', 'Brewed at the Alchemy Table after researching Alchemy. Potions provide temporary buffs like healing, speed, mana restoration, or damage resistance. They are auto-consumed when trigger conditions are met.'],
                 ]

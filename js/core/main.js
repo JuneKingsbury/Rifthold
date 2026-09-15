@@ -37,7 +37,7 @@ import { MapIndex } from '../world/mapindex.js';
 import { teleportEntity, getEntityRenderPos } from '../systems/movement-lerp.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { renderGlossaryHTML, initGlossaryInteraction } from '../ui/glossary.js';
-import { spawnProjectileImpact } from '../ui/overlay-renderer.js';
+import { spawnProjectileImpact, spawnParticle } from '../ui/overlay-renderer.js';
 import { renderChangelogHTML, initChangelogInteraction, renderCreditsHTML } from '../ui/changelog.js';
 import { checkComplexStructures } from '../systems/complexBuildings.js';
 import { COMPLEX_STRUCTURES } from './config.js';
@@ -59,7 +59,8 @@ class Game {
         this.settings = {
             autoPauseHostile: true,
             autoPauseEvent: true,
-            pauseOnDeath: false,
+            pauseOnDeath: true,
+            pauseOnLowHealth: true,
             pauseOnResearch: true,
             uiFontScale: 1,
             autoCookTarget: 0,
@@ -1765,6 +1766,19 @@ class Game {
                             boosted++;
                         }
                         this.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: COMBAT_VISUALS.spellGrowthColor, ttl: 4 });
+                        if (Math.random() < 0.5) {
+                            spawnParticle(this, {
+                                x: tx + 0.3 + Math.random() * 0.4,
+                                y: ty + 0.3 + Math.random() * 0.4,
+                                vx: (Math.random() - 0.5) * 0.08,
+                                vy: -0.1 - Math.random() * 0.1,
+                                decay: 0.04,
+                                color: Math.random() < 0.5 ? '#44ff44' : '#88ff88',
+                                size: 2 + Math.random() * 2,
+                                alpha: 0.8,
+                                shape: 'square',
+                            });
+                        }
                     }
                 }
                 window.soundManager?.playSFX('spell_growth');
@@ -1844,6 +1858,19 @@ class Game {
                                 ripened++;
                             }
                             this.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: COMBAT_VISUALS.spellGrowthColor, ttl: 4 });
+                            if (Math.random() < 0.5) {
+                                spawnParticle(this, {
+                                    x: tx + 0.3 + Math.random() * 0.4,
+                                    y: ty + 0.3 + Math.random() * 0.4,
+                                    vx: (Math.random() - 0.5) * 0.08,
+                                    vy: -0.1 - Math.random() * 0.1,
+                                    decay: 0.04,
+                                    color: Math.random() < 0.5 ? '#44ff44' : '#88ff88',
+                                    size: 2 + Math.random() * 2,
+                                    alpha: 0.8,
+                                    shape: 'square',
+                                });
+                            }
                         }
                     }
                 }
@@ -2057,7 +2084,7 @@ class Game {
         const craftTargets = this.settings.craftTargets || {};
         const potionAutoUse = this.settings.potionAutoUse || {};
         Object.assign(this.settings, {
-            autoPauseHostile: true, autoPauseEvent: true, pauseOnDeath: false, pauseOnResearch: true,
+            autoPauseHostile: true, autoPauseEvent: true, pauseOnDeath: true, pauseOnLowHealth: true, pauseOnResearch: true,
             uiFontScale: 1, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
             showWeatherParticles: true, particleDensity: 100, showColonistNames: 'selected', showMinimap: true, showFps: false,
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
@@ -3681,6 +3708,7 @@ document.addEventListener('DOMContentLoaded', () => {
             s.autoPauseHostile = document.getElementById('start-autopause-hostile').checked;
             s.autoPauseEvent = document.getElementById('start-autopause-event').checked;
             s.pauseOnDeath = document.getElementById('start-pause-death').checked;
+            s.pauseOnLowHealth = document.getElementById('start-pause-low-health').checked;
             s.pauseOnResearch = document.getElementById('start-pause-research').checked;
             s.demoMode = document.getElementById('start-demo-mode').checked;
             s.autoCookTarget = parseInt(document.getElementById('start-autocook').value) || 0;
@@ -3746,6 +3774,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.autoPauseHostile != null) document.getElementById('start-autopause-hostile').checked = s.autoPauseHostile;
             if (s.autoPauseEvent != null) document.getElementById('start-autopause-event').checked = s.autoPauseEvent;
             if (s.pauseOnDeath != null) document.getElementById('start-pause-death').checked = s.pauseOnDeath;
+            if (s.pauseOnLowHealth != null) document.getElementById('start-pause-low-health').checked = s.pauseOnLowHealth;
             if (s.pauseOnResearch != null) document.getElementById('start-pause-research').checked = s.pauseOnResearch;
             if (s.demoMode != null) document.getElementById('start-demo-mode').checked = s.demoMode;
             if (s.autoCookTarget != null) document.getElementById('start-autocook').value = s.autoCookTarget;
@@ -3851,6 +3880,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-autopause-hostile').checked = true;
         document.getElementById('start-autopause-event').checked = true;
         document.getElementById('start-pause-death').checked = true;
+        document.getElementById('start-pause-low-health').checked = true;
         document.getElementById('start-pause-research').checked = true;
         document.getElementById('start-peaceful-check').checked = false;
         document.getElementById('start-demo-mode').checked = false;
@@ -3991,6 +4021,7 @@ document.addEventListener('DOMContentLoaded', () => {
             autoPauseHostile: document.getElementById('start-autopause-hostile').checked,
             autoPauseEvent: document.getElementById('start-autopause-event').checked,
             pauseOnDeath: document.getElementById('start-pause-death').checked,
+            pauseOnLowHealth: document.getElementById('start-pause-low-health').checked,
             pauseOnResearch: document.getElementById('start-pause-research').checked,
             autoCookTarget: parseInt(document.getElementById('start-autocook').value) || 0,
             autoSaveInterval: parseInt(document.getElementById('start-autosave').value) || 0,

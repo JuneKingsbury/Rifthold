@@ -110,7 +110,7 @@ export function getRoomContents(map, roomId) {
             contents.size++;
             if (map[y][x].structure === 'bed') contents.beds.push({ x, y });
             if (map[y][x].structure === 'workbench') contents.stations.push({ x, y, type: 'workbench' });
-            if (map[y][x].structure === 'cauldron') contents.stations.push({ x, y, type: 'cauldron' });
+            if (map[y][x].structure === 'cooking_pot') contents.stations.push({ x, y, type: 'cooking_pot' });
             if (map[y][x].structure === 'anvil') contents.stations.push({ x, y, type: 'anvil' });
             if (map[y][x].structure === 'alchemy_table') contents.stations.push({ x, y, type: 'alchemy_table' });
             if (map[y][x].structure === 'scriptorium') contents.stations.push({ x, y, type: 'scriptorium' });
@@ -190,6 +190,9 @@ function analyzeRoom(map, tiles, lightSources) {
                 flooredTiles++;
                 floorTypes['rug'] = (floorTypes['rug'] || 0) + 1;
             }
+        } else if (tile.structure === 'rug') {
+            flooredTiles++;
+            floorTypes['rug'] = (floorTypes['rug'] || 0) + 1;
         }
 
         if (tile.structure && STATION_GROUPS[tile.structure]) {

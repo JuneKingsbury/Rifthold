@@ -756,13 +756,16 @@ export class UI {
             html += `<div class="build-card${active}${stateClass}" data-build-opt="${opt}">`;
             html += `<div class="build-card-key">${keyLabel}</div>`;
             html += `<div class="build-card-icon-wrap">${bldIcon}</div>`;
-            html += `<div class="build-card-name">${opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>`;
+            html += `<div class="build-card-name">${BUILDINGS[opt]?.name || opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>`;
             html += `<div class="build-card-cost">${costHtml}</div>`;
             html += overlayHtml;
             html += `</div>`;
         });
         html += '</div>';
+        const savedBuildScroll = panel.querySelector('.build-grid')?.scrollTop ?? 0;
         panel.innerHTML = html;
+        const buildGrid = panel.querySelector('.build-grid');
+        if (buildGrid) buildGrid.scrollTop = savedBuildScroll;
         panel.style.display = 'block';
         const toolbar = document.getElementById('touch-toolbar');
         if (toolbar && toolbar.offsetHeight > 0 && getComputedStyle(toolbar).display !== 'none') {
@@ -1808,7 +1811,7 @@ export class UI {
         let html = `<div class="info-header">Tile (${x},${y})</div>`;
         html += `<div class="info-row">Terrain: ${tile.terrain}</div>`;
         if (tile.structure) {
-            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${tile.structure.replace(/_/g,' ')}</div>`;
+            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' ')}</div>`;
             const maxHp = BUILDINGS[tile.structure]?.hp;
             if (maxHp) {
                 const currentHp = tile.structureHp !== undefined ? tile.structureHp : maxHp;
@@ -1996,7 +1999,7 @@ export class UI {
         html += `<div class="info-header" style="font-size:11px;color:#aaa;">Tile (${x},${y})</div>`;
         if (tile.onFire) html += `<div class="info-row fire">ON FIRE!</div>`;
         if (tile.structure) {
-            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${tile.structure.replace(/_/g,' ')}</div>`;
+            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' ')}</div>`;
             const maxHp = BUILDINGS[tile.structure]?.hp;
             if (maxHp) {
                 const currentHp = tile.structureHp !== undefined ? tile.structureHp : maxHp;
@@ -2973,6 +2976,7 @@ export class UI {
         general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', 'Auto-pause on hostile event (raids)');
         general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, caravans)');
         general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', 'Auto-pause on colonist death');
+        general += this._settingsCheck('set-pause-low-health', s.pauseOnLowHealth, 'window.game.settings.pauseOnLowHealth=this.checked', 'Auto-pause on critically low health');
         general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
         general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', 'Peaceful mode (no raids/hostile animals)');
         general += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', 'Show tutorial hints');

@@ -15,13 +15,21 @@ export class CombatSystem {
         this.activeRaidType = null;
         this.crusaderRaidTriggered = false;
         this.crusaderRaidDefeated = false;
+        this.crusaderRaidWarned = false;
     }
 
     update(game) {
         if (CONFIG.PEACEFUL_MODE) return;
 
+        if (!this.crusaderRaidWarned && !this.crusaderRaidDefeated &&
+            game.weather.year === 9 && game.weather.season === 'spring') {
+            this.crusaderRaidWarned = true;
+            game.notifications.push({ text: '⚠ Crusader scouts have been spotted in the region. Prepare your defenses.', color: '#ffaa44', duration: 300 });
+            game.eventLog?.add(game, 'Crusader scouts spotted! A full raid force may arrive next year.', 'danger');
+        }
+
         if (!this.raidActive && !this.crusaderRaidTriggered && !this.crusaderRaidDefeated &&
-            game.weather.year === 8 && game.weather.season === 'spring') {
+            game.weather.year === 10 && game.weather.season === 'spring') {
             this.startScriptedRaid(game, 'crusader_raid');
         }
 
@@ -71,6 +79,11 @@ export class CombatSystem {
         game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
         game.notifications.push({ text: `${raidType.name}! ${spawned} ${raidType.name === 'Crusader Raid' ? 'crusaders' : 'enemies'} approaching!`, tick: game.tick, type: 'danger' });
         game.eventLog.add(game, `${raidType.name}! ${spawned} enemies attacking!`, 'danger', { type: 'position', ...raidPos });
+
+        if (raidTypeKey === 'crusader_raid') {
+            game.notifications.push({ text: 'The Crusader army has arrived. They seek to wipe out the colony!', color: '#ff6644', duration: 400 });
+            game.eventLog.add(game, 'The Crusader army has arrived in force. Defend the colony!', 'danger', { type: 'position', ...raidPos });
+        }
 
         game.events.pendingEvent = {
             type: 'raid',

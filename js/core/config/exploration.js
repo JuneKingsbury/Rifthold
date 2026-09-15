@@ -6,18 +6,18 @@ export const EXPEDITION_ENEMIES = {
     // 'Stab' (fang/thorn/spear thrust), or 'DrawAndShoot' (fling a projectile).
     // DrawAndShoot enemies carry projectileChar/projectileColor so their shot
     // renders themed (the composer styles it as a mote when the enemy has spells).
-    crystal_bat:      { name: 'Crystal Bat',       hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', attackAnim: 'Swing', lore: 'TODO' },
-    crystal_beast:    { name: 'Crystal Beast',     hp: [30, 45],  damage: [4, 7],  sprite: 'crystal_beast', color: '#4368ec', attackAnim: 'Swing', lore: 'TODO' },
-    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', attackAnim: 'Swing', lore: 'TODO' },
-    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', attackAnim: 'Stab', lore: 'TODO' },
-    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#44ccff', lore: 'TODO', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
-    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa', attackAnim: 'Swing', lore: 'TODO' },
+    crystal_bat:      { name: 'Crystal Bat',       hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', attackAnim: 'Swing', lore: 'An impossible creature made of solid crystal. Somehow it flies with ease throughout the caverns.' },
+    crystal_beast:    { name: 'Crystal Beast',     hp: [30, 45],  damage: [4, 7],  sprite: 'crystal_beast', color: '#4368ec', attackAnim: 'Swing', lore: 'A cat-like beast that grows horns made of illuminated crystal.' },
+    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', attackAnim: 'Swing', lore: 'The remains of an ancient crystalline mining construct. It can still throw a mean punch.' },
+    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', attackAnim: 'Stab', lore: 'A giant spider covered in scales of crystal. These are often seen skittering on the ceiling of the caverns.' },
+    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#44ccff', lore: 'An elemental bound to the caverns. They greatly resemble the mining golems, making you wonder if the miners based their designs on these denizens.', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
+    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa', attackAnim: 'Swing', lore: 'A large wurm that inhabits the deepest parts of the caverns. It tunnels through the crystal walls with ease.' },
 
     // Verdant chain
-    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44', attackAnim: 'Swing', lore: 'TODO' },
-    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab', lore: 'TODO' },
-    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
-    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
+    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44', attackAnim: 'Swing', lore: 'A slow-moving plant creature that creeps along the canopy above.' },
+    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab', lore: 'A jungle predator covered in sharp thorns. Its teeth are even sharper.' },
+    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', lore: 'A plant creature infected by blight. It moves much faster than its creeping kin.', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
+    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', lore: 'A creature made almost entirely of blight fungus. Far more dangerous than the average blight bloom seen in the Frontier.', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
     canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: 'TODO' },
 
     // Arcane chain
@@ -136,7 +136,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} finds an untouched runite motherload!', loot: { resource: 'runite', amount: [6, 12] } },
                 { chance: 0.03, text: '{name} discovers a crystallized void pocket deep underground!', loot: { resource: 'void_essence', amount: [4, 8] } },
-                { chance: 0.015, text: '{name} unearths an ancient mining golem core, still humming with power!', loot: { item: 'boots_of_haste' } }, //TODO: change out this item reward to something more thematically appropriate
+                { chance: 0.015, text: '{name} unearths an ancient mining golem battery that still hums with power!', loot: { item: 'ley_battery' } },
                 { chance: 0.015, text: '{name} pries a ward stone from a sealed vault door!', loot: { item: 'ward_of_the_sentinel' } },
             ],
         },

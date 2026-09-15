@@ -560,6 +560,18 @@ function checkCriticalAlerts(colonist, game) {
     } else if (!overheating) {
         flags.overheating = false;
     }
+
+    // Low health pause
+    if (colonist.hp < colonist.maxHp * 0.25 && !flags.lowHealthPaused) {
+        flags.lowHealthPaused = true;
+        if (game.settings.pauseOnLowHealth && !game.paused) {
+            game.paused = true;
+            game.camera.centerOn(colonist.x, colonist.y);
+            game.notifications.push({ text: `${colonist.name} is critically wounded! (auto-paused)`, color: '#ff4444', duration: 180 });
+        }
+    } else if (colonist.hp > colonist.maxHp * 0.35) {
+        flags.lowHealthPaused = false;
+    }
 }
 
 export function addThought(colonist, text, moodEffect, duration, tick) {
@@ -1254,6 +1266,19 @@ function applySpellEffect(colonist, spell, game) {
                         tile.zone._growthBoost.expiresAt = game.tick + boostedDuration;
                     }
                     game.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: COMBAT_VISUALS.spellGrowthColor, ttl: 4 });
+                    if (Math.random() < 0.5) {
+                        spawnParticle(game, {
+                            x: tx + 0.3 + Math.random() * 0.4,
+                            y: ty + 0.3 + Math.random() * 0.4,
+                            vx: (Math.random() - 0.5) * 0.08,
+                            vy: -0.1 - Math.random() * 0.1,
+                            decay: 0.04,
+                            color: Math.random() < 0.5 ? '#44ff44' : '#88ff88',
+                            size: 2 + Math.random() * 2,
+                            alpha: 0.8,
+                            shape: 'square',
+                        });
+                    }
                 }
             }
             window.soundManager?.playSFX('spell_growth');
@@ -2852,6 +2877,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
             game.story.checkMilestone('first_colonist_death', game);
             if (game.settings.pauseOnDeath && !game.paused) {
                 game.paused = true;
+                game.camera.centerOn(colonist.x, colonist.y);
                 game.notifications.push({ text: `${colonist.name} has died! (auto-paused)`, tick: game.tick, type: 'danger' });
             }
             for (const other of game.colonists) {

@@ -102,6 +102,10 @@ export function getAvailableRecipes(game) {
     const available = [];
     for (const [key, recipe] of Object.entries(RECIPES)) {
         if (recipe.research && !game.research.isResearched(recipe.research)) continue;
+        if (recipe.station && recipe.station !== 'workbench') {
+            const stationPositions = game.mapIndex?.getStructurePositions(recipe.station);
+            if (!stationPositions || stationPositions.size === 0) continue;
+        }
         const hasResources = game.resources.has(recipe.input);
         const hasStation = findAvailableStation(game, recipe.station) !== null;
         available.push({ key, recipe, hasResources, hasStation, canCraft: hasResources && hasStation });

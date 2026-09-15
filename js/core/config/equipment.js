@@ -28,7 +28,7 @@ export const MATERIALS = {
 
 const BASE_RECIPES = {
     repair_trinket: { input: { runite: 1 }, output: {}, skill: 'crafting', ticks: 40, station: 'anvil', category: 'Materials', special: 'repair' },
-    cook_meal: { input: { foodstuffs: 5 }, output: { food: 4 }, skill: 'cooking', ticks: 8, station: 'cauldron', category: 'Food & Potions' },
+    cook_meal: { input: { foodstuffs: 5 }, output: { food: 4 }, skill: 'cooking', ticks: 8, station: 'cooking_pot', category: 'Food & Potions' },
 
     // Evocation
     craft_tome_of_spark: { input: { planks: 2, stone: 1 }, output: { tome_of_spark: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
@@ -258,7 +258,7 @@ export const TRINKETS = {
     jesters_bauble: { name: "Jester's Bauble", textColor:'#44cc44', tradeValue: 40, tier: 2, order: 17, description: 'A shiny, ridiculous trinket that somehow lifts the spirits of everyone nearby.', moodBonus: 8, pedestal: { radius: 5, manaCost: 1, moodBonus: 4 }, recipe: { input: { planks: 2, cloth: 1, iron: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
     hagglers_coin: { name: "Haggler's Coin", textColor:'#44cc44', tradeValue: 48, tier: 2, order: 18, description: 'A lucky coin that improves trade deals.', pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.85 } },
     merchants_ring: { name: "Merchant's Ring", textColor:'#44cc44', tradeValue: 40, tier: 2, order: 19, description: 'A ring favored by traders. Slightly improves deals.', pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.9 } },
-    cornucopia_charm: { name: 'Cornucopia Charm', textColor:'#44cc44', tradeValue: 48, tier: 2, order: 20, description: 'A charm of abundance. Cooking yields extra food.', pedestal: { radius: 'global', manaCost: 1, cookingBonusFood: 1 }, recipe: { input: { wheat: 3, berries: 2, planks: 2 }, ticks: 28, research: 'alchemy', station: 'cauldron' } },
+    cornucopia_charm: { name: 'Cornucopia Charm', textColor:'#44cc44', tradeValue: 48, tier: 2, order: 20, description: 'A charm of abundance. Cooking yields extra food.', pedestal: { radius: 'global', manaCost: 1, cookingBonusFood: 1 }, recipe: { input: { wheat: 3, berries: 2, planks: 2 }, ticks: 28, research: 'alchemy', station: 'cooking_pot' } },
     amulet_of_fortune: { name: 'Amulet of Fortune', textColor:'#44cc44', tradeValue: 50, tier: 2, order: 21, description: 'A lucky amulet that accelerates learning.', pedestal: { radius: 'global', manaCost: 1, skillGrowthBonus: 0.2 } },
     // ── Tier 3: combat ──
     ghost_step_charm: { name: 'Ghost-Step Charm', textColor:'#4488ff', tradeValue: 65, tier: 3, order: 31, description: 'A charm carved with the rune of evasion. The bearer seems to flicker out of the way at the last moment.', dodgeChance: 0.12, expedition: { dodgeChanceMod: 0.15 } },

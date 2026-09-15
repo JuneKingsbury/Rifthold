@@ -58,6 +58,7 @@ export function saveGame(game) {
             activeRaidType: game.combat.activeRaidType,
             crusaderRaidTriggered: game.combat.crusaderRaidTriggered,
             crusaderRaidDefeated: game.combat.crusaderRaidDefeated,
+            crusaderRaidWarned: game.combat.crusaderRaidWarned,
         },
 
         divinationModifiers: game.divinationModifiers || [],
@@ -280,6 +281,7 @@ export function loadGame(game) {
         game.combat.activeRaidType = data.combat.activeRaidType || null;
         game.combat.crusaderRaidTriggered = data.combat.crusaderRaidTriggered || false;
         game.combat.crusaderRaidDefeated = data.combat.crusaderRaidDefeated || false;
+        game.combat.crusaderRaidWarned = data.combat.crusaderRaidWarned || false;
         game.divinationModifiers = data.divinationModifiers || [];
 
         game.events.cooldowns = data.events.cooldowns;

@@ -53,8 +53,8 @@ export const WORKSHOP_QUALITY_TIERS = [
 
 export const STATION_GROUPS = {
     anvil: 'Smithy',
-    cauldron: 'Kitchen',
-    alchemy_table: 'Kitchen',
+    cooking_pot: 'Kitchen',
+    alchemy_table: 'Apothecary',
     workbench: 'Workshop',
     enchanting_table: 'Workshop',
     scriptorium: 'Scriptorium',

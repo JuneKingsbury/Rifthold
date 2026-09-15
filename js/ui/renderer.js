@@ -1195,7 +1195,9 @@ export class Renderer {
                 let spriteDrawn = false;
                 if (skinActive) {
                     // Draw ground sprite (terrain, floor, or furniture) so it will appear underneath the colonist sprite.
-                    const needsGround = tile.structure && BUILDINGS[tile.structure] && BUILDINGS[tile.structure].structureType === 'furniture';
+                    const needsGround = tile.structure && BUILDINGS[tile.structure] &&
+                        (BUILDINGS[tile.structure].structureType === 'furniture' ||
+                         BUILDINGS[tile.structure].showGround === true);
                     if (needsGround || entity) {
                         const ground = this._resolveGroundSprite(tile, season);
                         if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);

@@ -14,7 +14,7 @@ const CATEGORIES = {
     trinket: { label: 'Trinkets', config: TRINKETS, headerColor: '#ccaa44' },
 };
 
-const STATIONS = ['workbench', 'anvil', 'cauldron', 'enchanting_table'];
+const STATIONS = ['workbench', 'anvil', 'cooking_pot', 'enchanting_table'];
 const RESOURCES = ['wood', 'stone', 'planks', 'bricks', 'iron_ore', 'iron', 'leather', 'hides', 'runite', 'void_essence', 'wool', 'berries', 'wheat', 'corn', 'potatoes', 'moonbloom'];
 const TIER_COLORS = ['#666', '#88cc88', '#4488ff', '#cc88ff', '#ffaa33'];
 const QUALITY_MAP = { 0: null, 1: null, 2: 'fine', 3: 'superior', 4: 'superior' };
@@ -761,7 +761,7 @@ class EquipmentEditorPro {
         out += `    { items: ARMORS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
         out += `    { items: TOOLS, category: 'Tools', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
         out += `    { items: TRINKETS, category: 'Trinkets', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: POTIONS, category: 'Food & Potions', prefix: 'brew_', defaults: { skill: 'cooking', station: 'cauldron' } },\n`;
+        out += `    { items: POTIONS, category: 'Food & Potions', prefix: 'brew_', defaults: { skill: 'cooking', station: 'cooking_pot' } },\n`;
         out += `];\n\n`;
 
         out += `export const RECIPES = {};\n\n`;

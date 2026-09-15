@@ -39,15 +39,15 @@ const TUTORIAL_STEPS = [
         goTo(game) { game.ui.toggleCraftPanel(); },
     },
     {
-        id: 'cauldron',
-        title: 'Build a Cauldron',
-        description: `Now that you've had some time to grow your crops, it's time to turn them into cooked meals. A Cauldron (3 stone, 1 wood) lets colonists cook food that is more filling and gives a mood bonus.`,
+        id: 'cooking_pot',
+        title: 'Build a Cooking Pot',
+        description: `Now that you've had some time to grow your crops, it's time to turn them into cooked meals. A Cooking Pot (3 stone, 1 wood) lets colonists cook food that is more filling and gives a mood bonus.`,
         highlight: 'build',
-        isComplete(game) { return game.mapIndex.getStructurePositions('cauldron').size > 0; },
+        isComplete(game) { return game.mapIndex.getStructurePositions('cooking_pot').size > 0; },
         goTo(game) {
             game.input.buildCategory = 'Production';
             game.input.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === 'Production');
-            game.input.buildType = 'cauldron';
+            game.input.buildType = 'cooking_pot';
             game.input.setMode('build');
         },
     },

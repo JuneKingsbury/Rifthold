@@ -294,6 +294,7 @@ export class WaveSystem {
             // Players must still build and power each shrine to grow their colony cap.
             if (!game.hearthShrineBonus) game.hearthShrineBonus = 0;
             game.hearthShrineBonus++;
+            game.ui?.updateBuildPanel?.(game.input);
             game.notifications.push({ text: `Wave ${this.currentWave} complete! +${bonusEssence} bonus void essence. A new Hearth Shrine slot is available!`, tick: game.tick, type: 'success' });
             game.eventLog.add(game, `Wave ${this.currentWave} defeated! You may now build another Hearth Shrine to expand your colony.`, 'success', null);
             game.story.checkMilestone('first_wave_completed', game);
