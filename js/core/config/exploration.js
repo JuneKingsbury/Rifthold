@@ -6,39 +6,39 @@ export const EXPEDITION_ENEMIES = {
     // 'Stab' (fang/thorn/spear thrust), or 'DrawAndShoot' (fling a projectile).
     // DrawAndShoot enemies carry projectileChar/projectileColor so their shot
     // renders themed (the composer styles it as a mote when the enemy has spells).
-    crystal_bat:      { name: 'Crystal Bat',      hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', attackAnim: 'Swing', lore: '' },
-    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', attackAnim: 'Swing', lore: '' },
-    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', attackAnim: 'Stab', lore: '' },
-    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#44ccff', lore: '', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
-    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa', attackAnim: 'Swing', lore: '' },
+    crystal_bat:      { name: 'Crystal Bat',       hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', attackAnim: 'Swing', lore: 'TODO' },
+    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', attackAnim: 'Swing', lore: 'TODO' },
+    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', attackAnim: 'Stab', lore: 'TODO' },
+    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#44ccff', lore: 'TODO', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
+    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa', attackAnim: 'Swing', lore: 'TODO' },
 
     // Verdant chain
-    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44', attackAnim: 'Swing', lore: '' },
-    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab', lore: '' },
-    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', lore: '', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
-    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', lore: '', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
-    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: '' },
+    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44', attackAnim: 'Swing', lore: 'TODO' },
+    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab', lore: 'TODO' },
+    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
+    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
+    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: 'TODO' },
 
     // Arcane chain
-    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: '', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
-    tome_guardian:     { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', attackAnim: 'Swing', lore: '' },
-    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#bb88ff', lore: '', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
-    construct:        { name: 'Arcane Construct',   hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', attackAnim: 'Swing', lore: '', spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
-    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', attackAnim: 'Swing', lore: '', spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
+    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: 'TODO', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
+    tome_guardian:    { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', attackAnim: 'Swing', lore: 'TODO' },
+    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#bb88ff', lore: 'TODO', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
+    construct:        { name: 'Arcane Construct',  hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
+    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
 
     // Shadow chain
-    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing', lore: '' },
-    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: '', spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
-    shade:            { name: 'Shade',              hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', lore: '', spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
-    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: '', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
-    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: '', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
+    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing', lore: 'TODO' },
+    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
+    shade:            { name: 'Shade',             hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', lore: 'TODO', spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
+    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
+    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
 
     // Kingdom chain (armored: true enables armoredDamageBonus on Runic Greatsword)
-    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: '' },
-    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: '' },
-    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: '' },
-    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: '', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
-    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: '' },
+    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: 'TODO' },
+    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: 'TODO' },
+    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: 'TODO' },
+    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: 'TODO', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
+    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: 'TODO' },
 };
 
 // Realm chains a demo-mode player may explore. All other chains stay locked
@@ -158,7 +158,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Crystal Colossus',
-            lore: '',
+            lore: 'TODO',
             attackAnim: 'Swing',
             approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
             defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
@@ -329,7 +329,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Ancient Treant',
-            lore: '',
+            lore: 'TODO',
             attackAnim: 'Swing',
             approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
             defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
@@ -513,7 +513,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Arcane Construct',
-            lore: '',
+            lore: 'TODO',
             attackAnim: 'Swing',
             approachText: 'A half-finished golem lurches to life, crackling with unstable magic!',
             defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
@@ -692,7 +692,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Void Sovereign',
-            lore: '',
+            lore: 'TODO',
             attackAnim: 'Swing',
             approachText: 'A being of pure void materializes, its gaze alone warping the air!',
             defeatText: 'The Void Sovereign collapses into nothingness, leaving only silence!',
@@ -878,7 +878,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The High King',
-            lore: '',
+            lore: 'TODO',
             attackAnim: 'Swing',
             approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
             defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
@@ -1650,7 +1650,7 @@ export const PUZZLE_ENCOUNTERS = {
 export const NPC_ENCOUNTERS = {
     wounded_traveler: {
         name: 'Wounded Traveler',
-        lore: '',
+        lore: 'TODO',
         text: 'A wounded traveler lies beside the path.',
         triggerWeight: 6,
         realmFilter: null,
@@ -1674,7 +1674,7 @@ export const NPC_ENCOUNTERS = {
     },
     mercenary: {
         name: 'Mercenary',
-        lore: '',
+        lore: 'TODO',
         sprite: 'npc_ally',
         text: 'A sellsword offers their blade, for a price.',
         triggerWeight: 4,
@@ -1696,7 +1696,7 @@ export const NPC_ENCOUNTERS = {
     },
     lost_scholar: {
         name: 'Lost Scholar',
-        lore: '',
+        lore: 'TODO',
         text: 'A disoriented scholar clutches a bundle of notes.',
         triggerWeight: 5,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -1721,7 +1721,7 @@ export const NPC_ENCOUNTERS = {
     },
     shadow_merchant: {
         name: 'Shadow Merchant',
-        lore: '',
+        lore: 'TODO',
         text: 'A cloaked figure materializes from the darkness, wares floating around them.',
         triggerWeight: 3,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
@@ -1744,7 +1744,7 @@ export const NPC_ENCOUNTERS = {
     },
     defecting_soldier: {
         name: 'Defecting Soldier',
-        lore: '',
+        lore: 'TODO',
         sprite: 'npc_ally',
         text: 'A young crusader lowers their blade. "I never wanted this war," they whisper.',
         triggerWeight: 5,
@@ -1773,7 +1773,7 @@ export const NPC_ENCOUNTERS = {
     },
     trapped_miner: {
         name: 'Trapped Miner',
-        lore: '',
+        lore: 'TODO',
         sprite: 'npc_ally',
         text: 'A muffled voice calls from behind a cave-in. A miner, pinned but alive.',
         triggerWeight: 5,
@@ -1801,7 +1801,7 @@ export const NPC_ENCOUNTERS = {
     },
     wandering_druid: {
         name: 'Wandering Druid',
-        lore: '',
+        lore: 'TODO',
         text: 'A druid sits cross-legged among the roots, offering to share the forest\'s gifts.',
         triggerWeight: 5,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
@@ -1824,7 +1824,7 @@ export const NPC_ENCOUNTERS = {
     },
     spectral_professor: {
         name: 'Spectral Professor',
-        lore: '',
+        lore: 'TODO',
         text: 'A translucent scholar hovers by a lectern. "A riddle for a reward, if you please."',
         triggerWeight: 4,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -1847,7 +1847,7 @@ export const NPC_ENCOUNTERS = {
     },
     strange_totem: {
         name: 'Strange Totem',
-        lore: '',
+        lore: 'TODO',
         text: 'A weathered totem stands at a crossroads, a hollow at its base worn smooth by offerings.',
         triggerWeight: 4,
         realmFilter: null,
@@ -2204,7 +2204,7 @@ export const STORY_MILESTONES = {
     },
     first_crusader_raid_survived: {
         tab: 'colony',
-        title: 'Closing In',
+        title: 'Fie on Goodness',
         trigger: 'first_crusader_raid_survived',
         text: `
         You hadn't anticipated crusaders making it this deep into the frontier. 
