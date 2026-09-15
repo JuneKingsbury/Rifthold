@@ -7,6 +7,7 @@ export const EXPEDITION_ENEMIES = {
     // DrawAndShoot enemies carry projectileChar/projectileColor so their shot
     // renders themed (the composer styles it as a mote when the enemy has spells).
     crystal_bat:      { name: 'Crystal Bat',       hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', attackAnim: 'Swing', lore: 'TODO' },
+    crystal_beast:    { name: 'Crystal Beast',     hp: [30, 45],  damage: [4, 7],  sprite: 'crystal_beast', color: '#4368ec', attackAnim: 'Swing', lore: 'TODO' },
     crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', attackAnim: 'Swing', lore: 'TODO' },
     shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', attackAnim: 'Stab', lore: 'TODO' },
     runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#44ccff', lore: 'TODO', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
@@ -62,7 +63,8 @@ export const REALMS = {
             { item: 'jewelers_loupe', weight: 2 },
         ],
         enemies: { count: [2, 4], types: [
-            { key: 'crystal_bat', weight: 50 },
+            { key: 'crystal_bat', weight: 30 },
+            { key: 'crystal_beast', weight: 20 },
             { key: 'shard_spider', weight: 30 },
             { key: 'crystal_golem', weight: 20 },
         ] },
@@ -105,8 +107,9 @@ export const REALMS = {
             { item: 'drum_of_rallying', weight: 3 },
         ],
         enemies: { count: [3, 5], types: [
-            { key: 'crystal_bat', weight: 20 },
-            { key: 'shard_spider', weight: 35 },
+            { key: 'crystal_bat', weight: 10 },
+            { key: 'crystal_beast', weight: 15 },
+            { key: 'shard_spider', weight: 30 },
             { key: 'crystal_golem', weight: 35 },
             { key: 'runite_elemental', weight: 10 },
         ] },
