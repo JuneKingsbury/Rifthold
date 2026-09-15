@@ -1974,7 +1974,21 @@ export class UI {
             }
             html += getEffectInfoHtml(a);
             if (a.onExpedition) html += `<div class="info-row" style="color:#33ccff">On expedition</div>`;
-            html += `<button onclick="window.game.reassignAnimalPen(${a.id})">Reassign pen</button>`;
+            const isGuardAnimal = a.roles?.some(r => r.type === 'guard') || def?.guardAnimal;
+            if (isGuardAnimal && !a.isPet) {
+                const aliveColonists = this.game.colonists.filter(c => c.hp > 0);
+                if (aliveColonists.length > 0) {
+                    const opts = aliveColonists.map(c =>
+                        `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                    ).join('');
+                    html += `<div class="info-row" style="margin-top:4px;">`;
+                    html += `<label style="color:#aaaaaa;font-size:0.85em;">Defends: </label>`;
+                    html += `<select onchange="window.game.rebondAnimal(${a.id}, parseInt(this.value))" style="background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;">${opts}</select>`;
+                    html += `</div>`;
+                }
+            } else {
+                html += `<button onclick="window.game.reassignAnimalPen(${a.id})">Reassign pen</button>`;
+            }
             html += `</div>`;
         }
 

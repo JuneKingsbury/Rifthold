@@ -629,6 +629,10 @@ function findAnchor(entity, game) {
         const owner = game.colonists.find(c => c.id === entity.ownerId && c.hp > 0);
         if (owner) return owner;
     }
+    if (entity.bondedColonistId) {
+        const bonded = game.colonists?.find(c => c.id === entity.bondedColonistId && c.hp > 0);
+        if (bonded) return bonded;
+    }
     if (entity.penX !== undefined) return { x: entity.penX, y: entity.penY };
     const nearest = game.colonists.find(c => c.hp > 0);
     return nearest || null;

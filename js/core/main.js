@@ -2021,6 +2021,17 @@ class Game {
         this.input.startPenReassignTargeting(animalId);
     }
 
+    rebondAnimal(animalId, colonistId) {
+        const animal = this.entities.find(e => e.id === animalId && e.tamed);
+        if (!animal) return;
+        const colonist = this.colonists.find(c => c.id === colonistId && c.hp > 0);
+        if (!colonist) return;
+        animal.bondedColonistId = colonistId;
+        if (animal._path) animal._path = null;
+        if (animal._pathTarget) animal._pathTarget = null;
+        this.notifications.push({ text: `${animal.type} now defends ${colonist.name}`, tick: this.tick, type: 'success' });
+    }
+
     craftGolem(golemType) {
         if (!this.research.isResearched('golem_craft')) return;
         const def = GOLEM_TYPES[golemType];
