@@ -1,11 +1,12 @@
-import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS,
+import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS, ANIMALS,
     FORMATION_CONFIG, EXPEDITION_TRAPS, EXPEDITION_ENEMIES, ELITE_MODIFIERS, ELITE_CONFIG,
     EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
     EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
     FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG,
-    REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG,
+    REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS,
 } from '../core/config.js';
-import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit } from '../entities/colonist.js';
+import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit, addThought } from '../entities/colonist.js';
+import { getBestDivinationLevel, generateRealmScry } from './omens.js';
 
 // Precomputes a per-school equipment bonus map for a colonist so expedition combat can
 // scale spell damage by school without live equipment access. Mirrors the in-world
@@ -67,6 +68,10 @@ export class ExplorationSystem {
         this.activeRealmEvents = [];
         this.pendingSummary = null;
         this.pendingAutoSummaries = [];
+        // Scry hints keyed by realm key: { icon, title, text, tone } revealed by a
+        // diviner before an expedition. Persist until that realm is next explored,
+        // so a scried hint stays consistent while the player assembles a party.
+        this.realmScries = {};
     }
 
     syncIdCounter() {
@@ -115,6 +120,26 @@ export class ExplorationSystem {
     _checkEvent(game, eventKey) {
         if (eventKey === 'crusader_raid_defeated') return game.combat.crusaderRaidDefeated;
         return false;
+    }
+
+    // Whether the colony currently has a diviner able to scry a rift.
+    canScry(game) {
+        return getBestDivinationLevel(game) >= 1;
+    }
+
+    // Scry a realm: reveal one persistent hint about what it holds. Requires a
+    // diviner (level >= 1). Higher divination reveals finer detail. Returns the
+    // hint object (also cached on realmScries[realmKey]) or null if unavailable.
+    scryRealm(game, realmKey) {
+        const dim = REALMS[realmKey];
+        if (!dim) return null;
+        const level = getBestDivinationLevel(game);
+        if (level < 1) return null;
+        const hint = generateRealmScry(dim, level);
+        if (!hint) return null;
+        this.realmScries[realmKey] = hint;
+        game.eventLog.add(game, `A diviner scries ${dim.name}: ${hint.title}`, 'event', null);
+        return hint;
     }
 
     _getMaxAutoExpeditions(game) {
@@ -168,6 +193,28 @@ export class ExplorationSystem {
             const packRole = a.roles && a.roles.find(r => r.type === 'pack');
             if (packRole) {
                 packAnimals.push({ id: a.id, type: a.type, speedBonus: packRole.expeditionSpeedBonus || 0.25 });
+                a.onExpedition = true;
+            }
+        }
+
+        // War beasts: tamed animals with a `war` role that fight alongside the party
+        // as persistent combatants (they occupy a party slot, not a pack slot). Up to
+        // two, mirroring the pack cap. Each becomes an entry in exp.warBeasts and is
+        // spawned into combat as a party-side summon on each encounter.
+        const cappedBeasts = (options.warBeastIds || []).slice(0, 2);
+        const warBeasts = [];
+        for (const id of cappedBeasts) {
+            const a = game.entities.find(e => e.id === id && e.tamed);
+            if (!a || a.hp <= 0 || a.onExpedition) continue;
+            const warRole = a.roles && a.roles.find(r => r.type === 'war');
+            if (warRole) {
+                warBeasts.push({
+                    id: a.id, type: a.type,
+                    name: ANIMALS[a.type]?.name || a.type,
+                    hp: warRole.beastHp || a.hp,
+                    damage: warRole.beastDamage || a.damage || 8,
+                    char: a.char, color: a.color,
+                });
                 a.onExpedition = true;
             }
         }
@@ -244,6 +291,7 @@ export class ExplorationSystem {
             realmName: dim.name,
             partyIds: party.map(c => c.id),
             packAnimals,
+            warBeasts,
             partySnapshot: [],
             gatePos,
             startTick: null,
@@ -285,6 +333,9 @@ export class ExplorationSystem {
         };
 
         this.expeditions.push(expedition);
+        // A launched expedition consumes any scry hint for that realm: the next
+        // rift is freshly random, so the reveal shouldn't linger.
+        delete this.realmScries[realmKey];
         const diffLabel = diffSettings.name !== 'Normal' ? ` (${diffSettings.name})` : '';
         const mutLabel = mutators.length > 0 ? ` [${mutators.map(k => EXPEDITION_MUTATORS[k]?.name || k).join(', ')}]` : '';
         game.eventLog.add(game, `Expedition assembling for ${dim.name}${diffLabel}${mutLabel}`, 'event', null);
@@ -933,6 +984,11 @@ export class ExplorationSystem {
                 const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
                 return {
                     id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp, raceKey: c.race,
+                    // Snapshot this colonist's opinions of the others so party
+                    // synergies (friend/lover boost, rival penalty) can be computed
+                    // during combat without live colonist access. Shallow copy so a
+                    // mid-expedition opinion shift doesn't retroactively change it.
+                    opinions: { ...(c.opinions || {}) },
                     bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor,
                     golem: c.golem, golemType: c.golemType,
                     weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
@@ -1347,6 +1403,93 @@ export class ExplorationSystem {
         };
         exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
         enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
+        this._attachWarBeasts(exp);
+        this._logSynergies(exp, game);
+        this._rangedFirstStrike(exp, game, enemies);
+    }
+
+    // Party synergy notice: at combat start, tell the player which relationships
+    // are shaping this fight (friends embolden, rivals bicker). One line per fight,
+    // only when at least one synergy is actually in play.
+    _logSynergies(exp, game) {
+        const cfg = EXPLORATION_CONFIG.synergy;
+        if (!cfg) return;
+        let allies = 0;
+        let rivals = 0;
+        const party = exp.partySnapshot;
+        for (let i = 0; i < party.length; i++) {
+            for (let j = i + 1; j < party.length; j++) {
+                const a = party[i], b = party[j];
+                // Use the stronger of the two directional opinions for the pair.
+                const opinion = Math.max(a.opinions?.[b.id] ?? 0, b.opinions?.[a.id] ?? 0);
+                const worst = Math.min(a.opinions?.[b.id] ?? 0, b.opinions?.[a.id] ?? 0);
+                if (opinion >= cfg.allyOpinion) allies++;
+                else if (worst <= cfg.rivalOpinion) rivals++;
+            }
+        }
+        if (allies > 0 && rivals > 0) {
+            this._addLog(exp, game, 'Bonds and grudges alike stir in the party as battle begins.', 'combat');
+        } else if (allies > 0) {
+            this._addLog(exp, game, 'Fighting alongside friends, the party takes heart!', 'success');
+        } else if (rivals > 0) {
+            this._addLog(exp, game, 'Old rivalries flare as the party is forced to fight together.', 'combat');
+        }
+    }
+
+    // Attach living war beasts to a freshly-started combat. combat.beasts holds
+    // live references straight into exp.warBeasts, so damage taken during the fight
+    // persists to the next encounter and a beast that dies stays dead. A beast at
+    // 0 hp is skipped (it fell in an earlier encounter).
+    _attachWarBeasts(exp) {
+        if (!exp.warBeasts || exp.warBeasts.length === 0) return;
+        exp.combat.beasts = exp.warBeasts.filter(b => b.hp > 0);
+    }
+
+    // Ranged first-strike: before the normal attack phase, every party member with
+    // a ranged weapon fires one free opening shot at the nearest living enemy.
+    // Gives bows/crossbows an identity in expeditions (skirmish before melee closes)
+    // without changing their sustained dps. Enemies do not retaliate during this
+    // window; it resolves entirely within combat setup.
+    _rangedFirstStrike(exp, game, enemies) {
+        const dmgMult = EXPLORATION_CONFIG.rangedFirstStrikeDamageMult ?? 1.0;
+        const partyDmgMult = getPartyExpeditionEffect(exp.partySnapshot, 'partyDamageMult', exp.realm)
+            * getPartyExpeditionEffect(exp.partySnapshot, 'expeditionDamageMult', exp.realm)
+            * (exp._tempDamageMult || 1.0);
+        for (const member of exp.partySnapshot) {
+            if (member.hp <= 0) continue;
+            const disabled = member._disabledSlots || {};
+            if (!member.weapon || disabled.weapon || !member.weapon.ranged) continue;
+            const target = enemies.find(e => e.hp > 0);
+            if (!target) break;
+
+            const slotNames = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
+            const memberItems = slotNames.filter(s => member[s] && !disabled[s]).map(s => member[s]);
+            let weaponDmg = member.weapon.damage;
+            for (const item of memberItems) { if (item !== member.weapon && item.damage) weaponDmg += item.damage; }
+            const synergyDmgMult = getSynergyDamageMult(member, exp.partySnapshot);
+            const xpDmgMult = this._getXpLevelBonus(member.id, 'expeditionDamageMult');
+            let dmg = Math.max(1, Math.round((weaponDmg + randInt(0, 3)) * partyDmgMult * xpDmgMult * synergyDmgMult * dmgMult));
+            if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
+            if (target.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - target.damageReduction)));
+
+            // Drive the ranged attack visual + sfx, just like a normal ranged hit.
+            member._lastAttackTick = game.tick;
+            member._lastAttackKind = member.weapon.attackAnim || 'DrawAndShoot';
+            target.hp -= dmg;
+            applyWeaponOnHit(member.weapon, target, game);
+            if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
+            const rangedSfx = member.weapon.skinKey === 'projectile_bolt' ? 'bolt_fire' : 'arrow_fire';
+            window.soundManager?.playExpSFX(rangedSfx);
+            const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
+            this._addLog(exp, game, `${member.name} looses an opening shot at ${targetLabel} for ${dmg} damage!`, 'combat');
+            if (target.hp <= 0) {
+                const slayLabel = target.isBoss ? target.name : 'a foe';
+                this._addLog(exp, game, `${member.name}'s opening shot fells ${slayLabel}!`, 'success');
+                window.soundManager?.playExpSFX('enemy_death');
+                if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
+                if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
+            }
+        }
     }
 
     _updateCombat(exp, game) {
@@ -1380,7 +1523,7 @@ export class ExplorationSystem {
         const physResist = this._getMutatorEffect(exp, 'enemyPhysicalResist');
         const globalThorns = this._getMutatorEffect(exp, 'globalThorns');
 
-        // ── Party attack phase ──
+        // -- Party attack phase --
         for (const member of alive) {
             if (member.hp <= 0) continue;
             // Enemy-applied crowd control on the party (framework): a stunned member
@@ -1412,6 +1555,7 @@ export class ExplorationSystem {
             const isRanged = member.weapon && member.weapon.ranged;
             const formDmgMult = isRanged ? 1.0 : this._applyFormationModifier(exp, member.id, 'meleeDamageMult');
             const xpDmgMult = this._getXpLevelBonus(member.id, 'expeditionDamageMult');
+            const synergyDmgMult = getSynergyDamageMult(member, exp.partySnapshot);
 
             const target = combat.enemies.find(e => e.hp > 0);
             if (!target) continue;
@@ -1433,7 +1577,7 @@ export class ExplorationSystem {
 
             const totalArmoredBonus = target.armored ? memberItems.reduce((sum, it) => sum + (it.armoredDamageBonus || 0), 0) : 0;
             const armoredBonus = 1 + totalArmoredBonus;
-            let dmg = Math.max(1, Math.round((weaponDmg + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * memberWeaken * armoredBonus * (1 - physResist)));
+            let dmg = Math.max(1, Math.round((weaponDmg + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist)));
             let critHit = false;
             if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
             if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
@@ -1486,10 +1630,10 @@ export class ExplorationSystem {
             }
         }
 
-        // ── Party spell phase ──
+        // -- Party spell phase --
         this._tryCombatSpells(exp, game, alive, combat);
 
-        // ── Summons phase ──
+        // -- Summons phase --
         if (exp.summons && exp.summons.length > 0) {
             for (let si = exp.summons.length - 1; si >= 0; si--) {
                 const summon = exp.summons[si];
@@ -1518,18 +1662,44 @@ export class ExplorationSystem {
             }
         }
 
-        // ── Elite abilities phase (regen etc) ──
+        // -- War beast phase --
+        // Tamed war beasts fight each round like party members. Their HP persists on
+        // exp.warBeasts across encounters (unlike round-scoped summons), and combat.beasts
+        // is the live per-encounter view that the enemy phase can target.
+        if (combat.beasts && combat.beasts.length > 0) {
+            for (const beast of combat.beasts) {
+                if (beast.hp <= 0) continue;
+                const beastTarget = combat.enemies.find(e => e.hp > 0);
+                if (!beastTarget) break;
+                beast._lastAttackTick = game.tick;
+                beast._lastAttackKind = 'Swing';
+                const bDmg = Math.max(1, beast.damage + randInt(0, 2));
+                if (Math.random() < 0.1) {
+                    this._addLog(exp, game, `The ${beast.name} snaps and misses!`, 'combat');
+                } else {
+                    beastTarget.hp -= bDmg;
+                    this._addLog(exp, game, `The ${beast.name} mauls a foe for ${bDmg}!`, 'combat');
+                    if (beastTarget.hp <= 0) {
+                        this._addLog(exp, game, `The ${beast.name} brings down a foe!`, 'success');
+                        window.soundManager?.playExpSFX('enemy_death');
+                        if (beastTarget.elite) { exp.eliteKills++; this._processEliteOnDeath(beastTarget, exp, game); }
+                    }
+                }
+            }
+        }
+
+        // -- Elite abilities phase (regen etc) --
         for (const enemy of combat.enemies) {
             if (enemy.hp > 0) this._processEliteAbilities(enemy, exp, game);
         }
 
-        // ── Boss abilities phase ──
+        // -- Boss abilities phase --
         const bossEnemy = combat.enemies.find(e => e.isBoss && e.hp > 0);
         if (bossEnemy) {
             this._executeBossAbilities(bossEnemy, exp, game);
         }
 
-        // ── Enemy attack phase ──
+        // -- Enemy attack phase --
         // Ambush (Adventurer Lv8): enemies cannot act until ambushEndTick has passed,
         // giving the party a free attack window at the start of combat.
         const inAmbush = game.tick <= (combat.ambushEndTick || 0) && exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 8);
@@ -1662,6 +1832,25 @@ export class ExplorationSystem {
                     continue;
                 }
 
+                // War beasts draw some enemy fire away from the colonists (a defensive
+                // perk of bringing one). Same 50% diversion chance as summons.
+                const aliveBeasts = combat.beasts ? combat.beasts.filter(b => b.hp > 0) : [];
+                if (aliveBeasts.length > 0 && Math.random() < 0.5) {
+                    const targetBeast = aliveBeasts[randInt(0, aliveBeasts.length - 1)];
+                    let dmg = enemy.damage + randInt(0, 2);
+                    if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
+                    if (Math.random() < baseMissChance) {
+                        this._addLog(exp, game, `${attackerLabel} misses the ${targetBeast.name}!`, 'combat');
+                    } else {
+                        targetBeast.hp -= dmg;
+                        this._addLog(exp, game, `${attackerLabel} strikes the ${targetBeast.name} for ${dmg}!`, 'combat');
+                        if (targetBeast.hp <= 0) {
+                            this._addLog(exp, game, `The ${targetBeast.name} falls in battle!`, 'danger');
+                        }
+                    }
+                    continue;
+                }
+
                 // Softmax-weighted target selection: enemies strongly favor the
                 // highest-priority member but can occasionally strike lower-priority
                 // ones. Priority = equipment targetPriority + formation modifier.
@@ -1756,7 +1945,7 @@ export class ExplorationSystem {
             } // end single-attack block
         }
 
-        // ── Boss phase check ──
+        // -- Boss phase check --
         this._updateBossPhase(exp, game);
 
         if (combat.enemies.every(e => e.hp <= 0) || alive.every(p => p.hp <= 0)) {
@@ -2217,6 +2406,17 @@ export class ExplorationSystem {
             }
         }
 
+        // Survivors return home and are freed for future expeditions.
+        if (exp.warBeasts) {
+            for (const beast of exp.warBeasts) {
+                const idx = game.entities.findIndex(a => a.id === beast.id);
+                if (idx < 0) continue;
+                const animal = game.entities[idx];
+                animal.onExpedition = false;
+                animal.hp = Math.max(1, beast.hp); // carry battle wounds home
+            }
+        }
+
         this.realmHistory.push(exp.realm);
         if (this.realmHistory.length > STREAK_CONFIG.historyLength) this.realmHistory.shift();
 
@@ -2327,7 +2527,7 @@ export class ExplorationSystem {
         return rowConfig?.[stat] || 1.0;
     }
 
-    // ── Combat status effects (round-scoped) ──────────────────────────────
+    // -- Combat status effects (round-scoped) ------------------------------
     // A unified, visible status layer shared by both sides of expedition combat.
     // Player spells inflict slow/stun on enemies (Frost Lance, Mesmerize). Enemy
     // spells can inflict poison/stun/slow/weaken on the party (poison live today,
@@ -2820,6 +3020,9 @@ export class ExplorationSystem {
             };
             exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
             enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
+            this._attachWarBeasts(exp);
+            this._logSynergies(exp, game);
+            this._rangedFirstStrike(exp, game, enemies);
         }
         if (effects.nextLootRareMult) {
             exp._nextRareMult = effects.nextLootRareMult;
@@ -2886,6 +3089,9 @@ export class ExplorationSystem {
             };
             exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
             enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
+            this._attachWarBeasts(exp);
+            this._logSynergies(exp, game);
+            this._rangedFirstStrike(exp, game, enemies);
         }
     }
 
@@ -3012,6 +3218,28 @@ function getPartyExpeditionEffect(partySnapshot, effectKey, realm) {
         }
     }
     return value;
+}
+
+// Party synergy: a per-member outgoing-damage multiplier driven by how the member
+// feels about the other living party members. Fighting beside friends/lovers (high
+// opinion) emboldens them; fighting beside rivals (low opinion) makes them bicker.
+// Bonuses and penalties stack across companions but each side is capped, and they
+// net against each other, so a member with both a friend and a rival present ends
+// up near neutral. Returns 1.0 when there is no one to synergize with.
+function getSynergyDamageMult(member, partySnapshot) {
+    const cfg = EXPLORATION_CONFIG.synergy;
+    if (!cfg || !member.opinions) return 1.0;
+    let bonus = 0;
+    let penalty = 0;
+    for (const other of partySnapshot) {
+        if (other.id === member.id || other.hp <= 0) continue;
+        const opinion = member.opinions[other.id] ?? 0;
+        if (opinion >= cfg.allyOpinion) bonus += cfg.allyDamageBonus;
+        else if (opinion <= cfg.rivalOpinion) penalty += cfg.rivalDamagePenalty;
+    }
+    bonus = Math.min(bonus, cfg.maxAllyBonus);
+    penalty = Math.min(penalty, cfg.maxRivalPenalty);
+    return Math.max(0.1, 1 + bonus - penalty);
 }
 
 function randInt(min, max) {

@@ -1,9 +1,9 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS } from '../core/config.js';
 import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getItemTradeValue } from '../entities/item-roll.js';
-import { getComplexStructureAt, getSpellCooldownMult } from '../systems/complexBuildings.js';
+import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../systems/complexBuildings.js';
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
@@ -465,6 +465,7 @@ export class UI {
         if (this.storyPanelVisible) this.updateStoryPanel();
         if (this._viewingRiftGate) this._refreshRiftGateInfo();
         if (this._viewingColonistId != null) this._refreshColonistInfo();
+        if (this._viewingRitualAltar) this._refreshRitualAltarInfo();
         const hasNew = this.game.story.hasUnviewed();
         const researchNeedsAtt = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
         const currentManaCrystalBonus = this.game.manaCrystalBonus || 0;
@@ -619,12 +620,11 @@ export class UI {
     }
 
     _updateSpeedButtons() {
-        const speedButtons = [
-            { id: 'btn-pause', active: this.game.paused },
-            { id: 'btn-speed-1', active: !this.game.paused && this.game.speed === 1 },
-            { id: 'btn-speed-2', active: !this.game.paused && this.game.speed === 2 },
-            { id: 'btn-speed-3', active: !this.game.paused && this.game.speed === 3 },
-        ];
+        const max = this.game.debugMaxSpeed || 3;
+        const speedButtons = [{ id: 'btn-pause', active: this.game.paused }];
+        for (let i = 1; i <= max; i++) {
+            speedButtons.push({ id: `btn-speed-${i}`, active: !this.game.paused && this.game.speed === i });
+        }
         for (const { id, active } of speedButtons) {
             const el = document.getElementById(id);
             if (el) el.classList.toggle('speed-active', active);
@@ -1804,8 +1804,49 @@ export class UI {
         this.elements.infoPanel.innerHTML = html;
     }
 
+    refreshInfoPanel() {
+        const last = this._lastTileInfo;
+        if (last && last.tile) this.showTileInfo(last.tile, last.x, last.y);
+    }
+
+    _refreshRitualAltarInfo() {
+        const el = this.elements.infoPanel.querySelector('#ritual-altar-section');
+        if (!el) { this._viewingRitualAltar = false; return; }
+        el.innerHTML = this._buildRitualHtml(true);
+    }
+
+    _buildRitualHtml(inner = false) {
+        const RES_LABEL = { void_essence: 'Void Essence', runite: 'Runite', moonbloom: 'Moonbloom' };
+        let html = inner ? '' : `<div id="ritual-altar-section">`;
+        html += `<div class="info-row" style="color:#cc99ff;font-weight:bold;margin-top:6px;">Rituals</div>`;
+        for (const [key, ritual] of Object.entries(RITUALS)) {
+            const readyAt = this.game.ritualCooldowns[key] || 0;
+            const onCooldown = this.game.tick < readyAt;
+            const canAfford = this.game.resources.has(ritual.cost);
+            const costStr = Object.entries(ritual.cost).map(([r, n]) => `${n} ${RES_LABEL[r] || r}`).join(', ');
+            const disabled = onCooldown || !canAfford ? 'disabled' : '';
+            let note = '';
+            if (onCooldown) {
+                const ticksPerSec = (1000 / CONFIG.TICK_RATE) * this.game.speed;
+                const remaining = Math.ceil((readyAt - this.game.tick) / ticksPerSec);
+                note = `<span style="color:#cc7744;font-size:0.85em"> recovering ${remaining}s</span>`;
+            } else if (!canAfford) {
+                note = `<span style="color:#cc7744;font-size:0.85em"> need ${costStr}</span>`;
+            }
+            html += `<div class="info-row" style="border-top:1px solid #333;padding-top:4px;">`;
+            html += `<div style="color:${ritual.color};font-weight:bold;">${ritual.icon} ${ritual.name}</div>`;
+            html += `<div style="color:#aaa;font-size:0.85em">${ritual.description}</div>`;
+            html += `<div style="color:#999;font-size:0.8em">Cost: ${costStr}</div>`;
+            html += `<div class="info-actions"><button ${disabled} onclick="window.game.triggerRitual('${key}')" style="background:#3a2a55;color:#cc99ff;">Perform</button>${note}</div>`;
+            html += `</div>`;
+        }
+        if (!inner) html += `</div>`;
+        return html;
+    }
+
     showTileInfo(tile, x, y) {
         this._switchToInfoTab();
+        this._lastTileInfo = { tile, x, y };
         this._viewingColonistId = null;
         this._viewingRiftGate = (tile.structure === 'rift_gate');
         let html = `<div class="info-header">Tile (${x},${y})</div>`;
@@ -1867,9 +1908,13 @@ export class UI {
                 html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
                 const def = COMPLEX_STRUCTURES[cs.key];
                 if (def) html += `<div class="info-row" style="color:#88ff88;">${def.description}</div>`;
+                if (cs.effect.ritualAltar) { html += this._buildRitualHtml(); this._viewingRitualAltar = true; }
             } else {
+                this._viewingRitualAltar = false;
                 html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete. Surround with the required chalk layout to activate.</div>`;
             }
+        } else {
+            this._viewingRitualAltar = false;
         }
 
         this.elements.infoPanel.innerHTML = html;
@@ -2027,7 +2072,9 @@ export class UI {
                     html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
                     const def = COMPLEX_STRUCTURES[cs.key];
                     if (def) html += `<div class="info-row" style="color:#88ff88;">${def.description}</div>`;
+                    if (cs.effect.ritualAltar) { html += this._buildRitualHtml(); this._viewingRitualAltar = true; }
                 } else {
+                    this._viewingRitualAltar = false;
                     html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete. Surround with the required chalk layout to activate.</div>`;
                 }
             }
@@ -2630,7 +2677,7 @@ export class UI {
 
     _qualityColor(item) {
         if (!item.quality) return '#cccccc';
-        const colors = { poor: '#888888', fine: '#44cc44', superior: '#4488ff' };
+        const colors = { poor: '#888888', fine: '#44cc44', superior: '#4488ff', masterwork: '#ffcc44' };
         return colors[item.quality] || '#cccccc';
     }
 
@@ -3157,6 +3204,13 @@ export class UI {
         general += `<span style="color:#666;font-size:10px;">(300=1 day)</span>`;
         general += `</div>`;
         general += `<button onclick="window.game.cheatUnlockAllStory()" class="settings-btn settings-btn-danger">Unlock All Story Milestones</button>`;
+        const curMax = this.game.debugMaxSpeed || 3;
+        general += `<div class="settings-row" style="margin-top:8px;gap:4px;align-items:center;">`;
+        general += `<label for="debug-max-speed">Max speed:</label>`;
+        general += `<input id="debug-max-speed" type="number" min="1" max="10" value="${curMax}" style="width:42px;background:#1a1a2e;color:#ffaaaa;border:1px solid #555;border-radius:3px;padding:1px;text-align:center;">`;
+        general += `<button onclick="window.game.setDebugMaxSpeed(parseInt(document.getElementById('debug-max-speed').value)||3)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Set Max Speed</button>`;
+        general += `<span style="color:#666;font-size:10px;">(default 3)</span>`;
+        general += `</div>`;
         general += `</details>`;
         }
 

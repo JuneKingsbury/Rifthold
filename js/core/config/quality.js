@@ -20,11 +20,23 @@ export const ENCHANTMENT_TIERS = [
     { key: 'IV',  multiplier: 4, baseChance: 0.05, perSkill: 0.01 },
 ];
 
+// Crafted-item quality bands, ascending. `baseChance + perSkill * skill` is the
+// (clamped-at-zero) weight each tier contributes to the quality roll; the tier is
+// then picked in proportion to its weight (see applyQuality in task-executor.js).
+//
+// Masterwork is the rare peak tier and behaves differently from the rest:
+//   - `requiresResearch` gates it out of the roll entirely until that research is
+//     unlocked, so it is unreachable in the early/mid game.
+//   - `baseChance` is 0 and `perSkill` is tiny, so even once unlocked it only
+//     starts appearing at high effective crafting skill and stays a low-single-
+//     digit-percent event. It is craft-only (the trade/merchant tables in
+//     trade.js have their own quality lists and never include it).
 export const QUALITY_TIERS = [
     { key: 'poor', prefix: 'Crude', multiplier: 0.85, color: '#888888', baseChance: 0.20, perSkill: -0.03 },
     { key: 'normal', prefix: '', multiplier: 1.00, color: '#cccccc', baseChance: 0.60, perSkill: 0 },
     { key: 'fine', prefix: 'Fine', multiplier: 1.10, color: '#44cc44', baseChance: 0.15, perSkill: 0.02 },
     { key: 'superior', prefix: 'Superior', multiplier: 1.20, color: '#4488ff', baseChance: 0.05, perSkill: 0.01 },
+    { key: 'masterwork', prefix: 'Masterwork', multiplier: 1.40, color: '#ffcc44', baseChance: 0, perSkill: 0.005, requiresResearch: 'masterwork' },
 ];
 
 export const ROOM_QUALITY_TIERS = [

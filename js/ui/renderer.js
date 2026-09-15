@@ -1295,7 +1295,7 @@ export class Renderer {
                         const shakeX = shakeActive ? ((game.tick * 7) % (shakePx * 2 + 1)) - shakePx : 0;
                         const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
                         const hlOff = hl ? 1 : 0;
-                        const bleed = entity ? 0 : 1;
+                        const bleed = (!entity && !tile.structure) ? 1 : 0;
                         // Composed action-animation transform (breathe grow + one-shot
                         // lunge/recoil/cast/hit + work bob). Scratch/stamps live on the
                         // persistent sim entity (`_sim`). The per-tile map object is

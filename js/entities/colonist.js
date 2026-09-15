@@ -680,7 +680,7 @@ export function getEquippedItems(colonist) {
     return items;
 }
 
-function getMoveSpeedBonus(colonist) {
+export function getMoveSpeedBonus(colonist) {
     let bonus = 0;
     for (const item of getEquippedItems(colonist)) {
         if (item.moveSpeedBonus) bonus += item.moveSpeedBonus;

@@ -47,6 +47,9 @@ export const THOUGHTS = {
     enjoyed_weather:   { text: 'Enjoyed the weather',      moodEffect: 6, duration: 400 },
     saw_shooting_star: { text: 'Saw a shooting star',      moodEffect: 8, duration: 400 },
     found_trinket:     { text: 'Found a lucky trinket',    moodEffect: 5, duration: 350 },
+    // Arrival-bond thoughts (a wanderer arrives already knowing someone here)
+    reunited_friend:   { text: 'Reunited with an old friend', moodEffect: 10, duration: 300 },
+    reunited_rival:    { text: 'An old rival turned up here', moodEffect: -8, duration: 250 },
     // Social thoughts
     made_friend:       { text: 'Made a new friend!', moodEffect: 12, duration: 300 },
     became_adversaries:{ text: 'Made an adversary', moodEffect: -5, duration: 150 },
@@ -72,6 +75,16 @@ export const RELATIONSHIP_TIERS = [
     { key: 'lovers',       minOpinion: 85,   name: 'Lovers',       color: '#ff88cc' },
 ];
 
+// Two-colonist activities that run when both are hanging out together at the
+// Town Hall. Larger opinion deltas than passive interactions make the hall a
+// relationship engine, not just a mood pad. Consumed by social.js (SocialSystem).
+export const GROUP_ACTIVITIES = [
+    { key: 'played_game',   text: '{a} and {b} played a game in the hall.',        weight: 30, opinionDelta: 14, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'told_stories',  text: '{a} and {b} traded stories in the hall.',     weight: 28, opinionDelta: 12, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'shared_drink',  text: '{a} and {b} shared a drink in the hall.',       weight: 22, opinionDelta: 16, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+    { key: 'sang_together', text: '{a} and {b} sang together in the hall.',        weight: 20, opinionDelta: 13, thoughtKey: 'good_conversation', type: 'success', valence: 1 },
+];
+
 export const SOCIAL_INTERACTIONS = [
     { key: 'pleasant_chat',   text: '{a} and {b} had a pleasant chat.',       weight: 40, opinionDelta: 5,  thoughtKey: 'good_conversation', type: 'info',    valence: 1 },
     { key: 'shared_meal',     text: '{a} and {b} shared a meal together.',    weight: 30, opinionDelta: 8,  thoughtKey: 'good_conversation', type: 'info',    valence: 1 },
@@ -93,4 +106,23 @@ export const SOCIAL_CONFIG = {
     interactionCooldown: 200,
     opinionDecayInterval: 500,
     opinionDecayAmount: 1,
+    // Group activities: when both colonists of a pair are hanging out at the Town
+    // Hall, they run a GROUP_ACTIVITIES interaction at this (higher) chance instead
+    // of a normal one, building bonds faster. Shorter cooldown so the hall stays lively.
+    groupActivityChance: 0.5,
+    groupActivityCooldown: 120,
+};
+
+// A newly-arrived wanderer has a chance to already know one existing colonist,
+// arriving with a pre-set mutual opinion. Adds instant social texture at zero
+// ongoing cost. Consumed by events.js resolveWanderer. `chance` gates whether a
+// bond forms at all; when it does, one of `bonds` is picked by weight.
+export const ARRIVAL_BONDS = {
+    chance: 0.4,
+    bonds: [
+        { key: 'old_friend',      weight: 5, opinion: 55,  thoughtKey: 'reunited_friend', arrivalText: '{a} and {b} are old friends.' },
+        { key: 'close_friend',    weight: 2, opinion: 70,  thoughtKey: 'reunited_friend', arrivalText: '{a} and {b} were close friends in the past!' },
+        { key: 'estranged',       weight: 3, opinion: -55, thoughtKey: 'reunited_rival',  arrivalText: '{a} and {b} have bad blood between them.' },
+        { key: 'bitter_rival',    weight: 1, opinion: -70, thoughtKey: 'reunited_rival',  arrivalText: '{a} and {b} are bitter rivals!' },
+    ],
 };

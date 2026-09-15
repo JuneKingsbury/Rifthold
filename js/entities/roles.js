@@ -1,8 +1,8 @@
 import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG, TAMED_ANIMALS } from '../core/config.js';
 import { manhattanDist, findPathForEnemies } from '../world/pathfinding.js';
 import { isPassable, isPassableForEnemies, isBreakableByEnemies, hasLineOfSight, findLineOfSightTile } from '../world/map.js';
-import { moveEntity } from '../systems/movement-lerp.js';
-import { colonistTakeDamage } from './colonist.js';
+import { moveEntity, computeMoveDuration, computeMoveCooldown } from '../systems/movement-lerp.js';
+import { colonistTakeDamage, getMoveSpeedBonus } from './colonist.js';
 import { spawnDamageText, spawnImpactSpray, spawnStructureCrumble } from '../ui/overlay-renderer.js';
 
 function canAttack(entity, game) {
@@ -28,12 +28,10 @@ export const ROLE_HANDLERS = {
             const dur = CONFIG.TICK_RATE / (entity.speed * game.speed);
             const radius = role.guardRadius || 8;
             let damage = role.guardDamage || entity.damage || 8;
-            if (entity.tamed && entity.type === 'wolf' && game.research.isResearched('wolf_mastery')) {
-                damage += 4;
-            }
+            let bondedColonist = null;
             if (entity.bondedColonistId) {
-                const bonded = game.colonists?.find(c => c.id === entity.bondedColonistId && c.hp > 0);
-                if (bonded) damage += 1;
+                bondedColonist = game.colonists?.find(c => c.id === entity.bondedColonistId && c.hp > 0);
+                if (bondedColonist) damage += 1;
             }
 
             if (rs.state === 'retreating') {
@@ -43,8 +41,13 @@ export const ROLE_HANDLERS = {
                     rs.state = 'patrolling';
                     return;
                 }
-                moveToward(entity, anchor, game.map, dur, game);
+                const retreatDur = bondedColonist ? _colonistFollowDur(bondedColonist, game) : dur;
+                moveToward(entity, anchor, game.map, retreatDur, game);
                 return;
+            }
+
+            if (entity.tamed && entity.type === 'wolf' && game.research.isResearched('wolf_mastery')) {
+                damage += 4;
             }
 
             if (entity.hp < entity.maxHp * 0.2) {
@@ -85,7 +88,8 @@ export const ROLE_HANDLERS = {
                     const dist = manhattanDist(entity.x, entity.y, anchor.x, anchor.y);
                     const patrolRadius = role.patrolRadius || 3;
                     if (dist > patrolRadius) {
-                        moveToward(entity, anchor, game.map, dur, game);
+                        const patrolDur = bondedColonist ? _colonistFollowDur(bondedColonist, game) : dur;
+                        moveToward(entity, anchor, game.map, patrolDur, game);
                     } else if (Math.random() < 0.1) {
                         randomMoveNear(entity, anchor, game.map, dur, patrolRadius, game);
                     }
@@ -418,7 +422,10 @@ export const ROLE_HANDLERS = {
 
             const dist = manhattanDist(entity.x, entity.y, owner.x, owner.y);
             if (dist > FOLLOW_RANGE) return;
-            if (dist > 2) moveToward(entity, owner, game.map, dur, game);
+            if (dist > 2) {
+                const followDur = _colonistFollowDur(owner, game);
+                moveToward(entity, owner, game.map, followDur, game);
+            }
         },
     },
 
@@ -622,6 +629,13 @@ function getTargets(entity, game) {
         return game.colonists.filter(c => c.hp > 0);
     }
     return getHostiles(game, entity);
+}
+
+// Compute the move animation duration that matches a colonist's current effective
+// speed, so following animals keep up visually when their owner has speed boosts.
+function _colonistFollowDur(colonist, game) {
+    const moveBonus = getMoveSpeedBonus(colonist);
+    return computeMoveDuration(1, moveBonus, game.speed);
 }
 
 function findAnchor(entity, game) {

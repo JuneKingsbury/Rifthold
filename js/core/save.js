@@ -63,6 +63,9 @@ export function saveGame(game) {
 
         divinationModifiers: game.divinationModifiers || [],
 
+        ritualCooldowns: game.ritualCooldowns || {},
+        lastFeastYear: game.lastFeastYear || 0,
+
         waves: {
             highestWaveCompleted: game.waves.highestWaveCompleted,
             active: game.waves.active,
@@ -95,6 +98,7 @@ export function saveGame(game) {
             partyPresets: game.exploration.partyPresets || [],
             activeRealmEvents: game.exploration.activeRealmEvents || [],
             pendingAutoSummaries: game.exploration.pendingAutoSummaries || [],
+            realmScries: game.exploration.realmScries || {},
         },
 
         research: {
@@ -283,6 +287,8 @@ export function loadGame(game) {
         game.combat.crusaderRaidDefeated = data.combat.crusaderRaidDefeated || false;
         game.combat.crusaderRaidWarned = data.combat.crusaderRaidWarned || false;
         game.divinationModifiers = data.divinationModifiers || [];
+        game.ritualCooldowns = data.ritualCooldowns || {};
+        game.lastFeastYear = data.lastFeastYear || 0;
 
         game.events.cooldowns = data.events.cooldowns;
 
@@ -318,6 +324,7 @@ export function loadGame(game) {
             game.exploration.partyPresets = data.exploration.partyPresets || [];
             game.exploration.activeRealmEvents = data.exploration.activeRealmEvents || [];
             game.exploration.pendingAutoSummaries = data.exploration.pendingAutoSummaries || [];
+            game.exploration.realmScries = data.exploration.realmScries || {};
             game.exploration.syncIdCounter();
         }
 

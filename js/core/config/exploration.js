@@ -960,6 +960,23 @@ export const EXPLORATION_CONFIG = {
     // Enemy melee target selection: softmax-weighted by target priority.
     // Lower temperature = enemies focus the highest-priority target more strongly.
     targetingTemperature: 8,
+    // Ranged first-strike: at the start of each combat, before either side's
+    // normal attack phase, every party member wielding a ranged weapon fires one
+    // free opening shot. Makes bows/crossbows feel distinct from melee in
+    // expeditions. Damage is scaled by this multiplier (1.0 = a normal hit).
+    rangedFirstStrikeDamageMult: 1.0,
+    // Party synergies: relationship-driven combat modifiers applied per member
+    // based on who else is in the party. A member fighting alongside a friend or
+    // lover gains a small outgoing-damage bonus; fighting alongside a rival takes
+    // a small penalty. Opinion thresholds mirror the colony relationship tiers.
+    synergy: {
+        allyOpinion: 40,   // opinion at/above this = friend/lover boost
+        rivalOpinion: -40, // opinion at/below this = rival penalty
+        allyDamageBonus: 0.10,
+        rivalDamagePenalty: 0.10,
+        maxAllyBonus: 0.20,   // cap even with several friends present
+        maxRivalPenalty: 0.20,
+    },
 };
 
 export const EXPEDITION_DIFFICULTY = {

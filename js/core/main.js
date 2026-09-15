@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -22,7 +22,7 @@ import { ResearchSystem, updateResearch } from '../systems/research.js';
 import { updateTamedAnimals, designateTame } from '../entities/taming.js';
 import { updateSummons } from '../entities/summons.js';
 import { completeTask } from '../entities/task-executor.js';
-import { CROPS } from './config.js';
+import { CROPS, WINTER_FEAST_CONFIG } from './config.js';
 import { syncEntityIdCounter, createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { PowerSystem } from '../systems/power.js';
 import { ExplorationSystem } from '../systems/exploration.js';
@@ -39,7 +39,7 @@ import { manhattanDist } from '../world/pathfinding.js';
 import { renderGlossaryHTML, initGlossaryInteraction } from '../ui/glossary.js';
 import { spawnProjectileImpact, spawnParticle } from '../ui/overlay-renderer.js';
 import { renderChangelogHTML, initChangelogInteraction, renderCreditsHTML } from '../ui/changelog.js';
-import { checkComplexStructures } from '../systems/complexBuildings.js';
+import { checkComplexStructures, hasRitualAltar } from '../systems/complexBuildings.js';
 import { COMPLEX_STRUCTURES } from './config.js';
 import { updateAutoRepair } from '../systems/auto-repair.js';
 import { StorySystem } from '../systems/story.js';
@@ -140,7 +140,7 @@ class Game {
         this.manaCrystalBonus = 0;
         this.hearthShrineBonus = 0;
         this.discoveredLoot = new Set();
-        this.stats = { raidsDefeated: 0, wavesCompleted: 0, expeditionsCompleted: 0, superiorItemsCrafted: 0, itemsEnchanted: 0 };
+        this.stats = { raidsDefeated: 0, wavesCompleted: 0, expeditionsCompleted: 0, superiorItemsCrafted: 0, masterworkItemsCrafted: 0, itemsEnchanted: 0 };
 
         this.colonists = [];
         this._colonistById = new Map();
@@ -150,6 +150,11 @@ class Game {
         this.projectiles = [];
         this.divinationModifiers = [];
         this.activeComplexStructures = [];
+        // Per-ritual next-available tick, keyed by RITUALS key. Populated by
+        // triggerRitual; a ritual is on cooldown while game.tick < its value.
+        this.ritualCooldowns = {};
+        // Year of the most recent winter feast, so it fires at most once per year.
+        this.lastFeastYear = 0;
         this.overlays = [];
         this.worldParticles = [];
         this.alertRipple = null;
@@ -481,6 +486,7 @@ class Game {
                 }
                 this.notifications.push({ text: msg, tick: this.tick, type: 'success' });
             }
+            if (this.weather.season === 'winter') this.tryWinterFeast();
         } else if (this.tick % 50 === 0) {
             this.weather.applySnow(this.map);
             if (this.minimap) this.minimap.markTerrainDirty();
@@ -743,7 +749,7 @@ class Game {
     }
 
     speedUp() {
-        this.speed = Math.min(3, this.speed + 1);
+        this.speed = Math.min(this.debugMaxSpeed || 3, this.speed + 1);
     }
 
     speedDown() {
@@ -751,8 +757,34 @@ class Game {
     }
 
     setSpeed(val) {
-        this.speed = Math.max(1, Math.min(3, val));
+        const max = this.debugMaxSpeed || 3;
+        this.speed = Math.max(1, Math.min(max, val));
         if (this.paused) this.togglePause();
+    }
+
+    setDebugMaxSpeed(n) {
+        n = Math.max(1, Math.min(10, Math.round(n)));
+        this.debugMaxSpeed = n;
+        // Clamp current speed to new max
+        if (this.speed > n) this.speed = n;
+        // Sync speed buttons in the DOM
+        if (!document.getElementById('btn-speed-3')) return;
+        // Remove any existing extra speed buttons
+        for (let i = 4; i <= 10; i++) {
+            document.getElementById(`btn-speed-${i}`)?.remove();
+        }
+        // Add buttons for speeds 4..n in order
+        let insertAfter = document.getElementById('btn-speed-3');
+        for (let i = 4; i <= n; i++) {
+            const btn = document.createElement('button');
+            btn.id = `btn-speed-${i}`;
+            btn.title = `${i}x Speed`;
+            btn.textContent = `${i}x`;
+            btn.addEventListener('click', () => this.setSpeed(i));
+            insertAfter.after(btn);
+            insertAfter = btn;
+        }
+        this.ui?._updateSpeedButtons();
     }
 
     setMobileMode(mode) {
@@ -1503,6 +1535,108 @@ class Game {
         this.ui.updateArcanePanel();
     }
 
+    scryRealmFromPanel(realmKey) {
+        const hint = this.exploration.scryRealm(this, realmKey);
+        if (!hint) {
+            this.notifications.push({ text: 'No diviner is able to scry that rift', tick: this.tick, type: 'danger' });
+            return;
+        }
+        this.notifications.push({ text: `Scried the rift: ${hint.title}`, tick: this.tick, type: 'info' });
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
+    }
+
+    triggerRitual(ritualKey) {
+        const ritual = RITUALS[ritualKey];
+        if (!ritual) return;
+        if (!hasRitualAltar(this)) {
+            this.notifications.push({ text: 'You need an active Grand Altar to perform rituals', tick: this.tick, type: 'danger' });
+            return;
+        }
+        const readyAt = this.ritualCooldowns[ritualKey] || 0;
+        if (this.tick < readyAt) {
+            const ticksPerSec = (1000 / CONFIG.TICK_RATE) * this.speed;
+            const remaining = Math.ceil((readyAt - this.tick) / ticksPerSec);
+            this.notifications.push({ text: `${ritual.name} is still recovering (${remaining}s)`, tick: this.tick, type: 'warning' });
+            return;
+        }
+        if (!this.resources.has(ritual.cost)) {
+            this.notifications.push({ text: `Not enough reagents for ${ritual.name}`, tick: this.tick, type: 'danger' });
+            return;
+        }
+
+        this.resources.deduct(ritual.cost);
+        this.ritualCooldowns[ritualKey] = this.tick + ritual.cooldown;
+
+        let resultText = '';
+        switch (ritual.effect) {
+            case 'mass_heal': {
+                let healed = 0;
+                for (const c of this.colonists) {
+                    if (c.hp > 0 && c.hp < c.maxHp) { c.hp = c.maxHp; healed++; }
+                }
+                resultText = `Restorative energy sweeps the colony. ${healed} colonist${healed === 1 ? '' : 's'} healed.`;
+                break;
+            }
+            case 'weather_bias': {
+                this.divinationModifiers.push({ weatherBias: ritual.weatherBias, expiresAt: this.tick + ritual.duration, casterName: 'Grand Altar' });
+                resultText = 'The skies bend toward calm.';
+                break;
+            }
+            case 'raid_ward': {
+                if (this.combat) {
+                    this.combat.nextRaidTick = Math.max(this.combat.nextRaidTick || this.tick, this.tick) + ritual.raidDelay;
+                }
+                resultText = 'A great ward turns back the gathering raid.';
+                break;
+            }
+            case 'ripen_crops': {
+                let ripened = 0;
+                for (let y = 0; y < this.map.length; y++) {
+                    for (let x = 0; x < this.map[y].length; x++) {
+                        const zone = this.map[y][x].zone;
+                        if (zone && zone.crop && zone.state === 'growing') {
+                            const crop = CROPS[zone.crop];
+                            if (crop) {
+                                zone.growth = Math.min(crop.growthTicks, (zone.growth || 0) + crop.growthTicks * ritual.growthGain);
+                                ripened++;
+                            }
+                        }
+                    }
+                }
+                resultText = `Verdant growth surges through ${ripened} crop${ripened === 1 ? '' : 's'}.`;
+                break;
+            }
+            default:
+                resultText = 'The ritual is performed.';
+        }
+
+        this.eventLog.add(this, `${ritual.icon} ${ritual.name}: ${resultText}`, 'event', null);
+        this.notifications.push({ text: `${ritual.name} performed`, tick: this.tick, type: 'success' });
+        window.soundManager?.playSFXPitched('button_click', 4);
+        this.ui.refreshInfoPanel?.();
+    }
+
+    // Once per year, when winter arrives, hold a feast if the colony has stored a
+    // comfortable food surplus. Consumes some foodstuffs and grants every living
+    // colonist a lasting mood buff. Fires at most once per year (guarded by
+    // lastFeastYear).
+    tryWinterFeast() {
+        const year = this.weather.year;
+        if (this.lastFeastYear >= year) return;
+        const cfg = WINTER_FEAST_CONFIG;
+        if (this.resources.getFoodstuffTotal() < cfg.foodThreshold) return;
+
+        this.lastFeastYear = year;
+        this.resources.deductFoodstuffs(cfg.foodConsumed);
+        let fed = 0;
+        for (const c of this.colonists) {
+            if (c.hp > 0) { addThought(c, cfg.thoughtText, cfg.moodBonus, cfg.moodDuration, this.tick); fed++; }
+        }
+        this.eventLog.add(this, `The colony gathers for a winter feast. ${fed} colonist${fed === 1 ? '' : 's'} share a warm meal.`, 'event', null);
+        this.notifications.push({ text: 'A winter feast lifts everyone\'s spirits!', tick: this.tick, type: 'success' });
+    }
+
     launchExpeditionFromPanel(realmKey) {
         const panel = this.ui.elements.arcanePanel;
         const checks = panel.querySelectorAll('.exp-check:checked');
@@ -1513,6 +1647,8 @@ class Game {
         }
         const packChecks = panel.querySelectorAll('.exp-pack-check:checked');
         const packIds = Array.from(packChecks).map(cb => parseInt(cb.value));
+        const warChecks = panel.querySelectorAll('.exp-war-check:checked');
+        const warBeastIds = Array.from(warChecks).map(cb => parseInt(cb.value));
         const difficulty = this.ui._expDifficulty || 1;
 
         const mutatorChecks = panel.querySelectorAll('.exp-mutator:checked');
@@ -1530,7 +1666,7 @@ class Game {
         const frontRowIds = ids.filter(id => !backRowSet.has(id));
         const formation = { front: frontRowIds, back: backRowIds };
 
-        const options = { mutators, potions, formation, autoMode: this.ui._arcaneExpIsAuto || false };
+        const options = { mutators, potions, formation, warBeastIds, autoMode: this.ui._arcaneExpIsAuto || false };
         const result = this.exploration.sendExpedition(this, realmKey, ids, packIds, difficulty, options);
         if (result) {
             const autoLabel = result.autoMode ? ' (auto)' : '';

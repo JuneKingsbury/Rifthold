@@ -49,7 +49,13 @@ function applyQuality(item, colonist, game, ...statKeys) {
     if (colonist.traits?.includes('lucky')) skill += TRAITS.lucky.qualityBonus;
     if (game && game.research.isResearched('artisans_touch')) skill += WORK_CONFIG.artisanQualityBonus;
     if (game) skill += getCraftQualityBonus(game);
-    const chances = QUALITY_TIERS.map(t => Math.max(0, t.baseChance + t.perSkill * skill));
+    // A tier with `requiresResearch` is excluded from the roll (weight forced to 0)
+    // until that research is unlocked. Masterwork uses this so it is unreachable
+    // until the deep `masterwork` node is researched, and rare even after.
+    const chances = QUALITY_TIERS.map(t => {
+        if (t.requiresResearch && !(game && game.research.isResearched(t.requiresResearch))) return 0;
+        return Math.max(0, t.baseChance + t.perSkill * skill);
+    });
     const total = chances.reduce((s, c) => s + c, 0);
     let roll = Math.random() * total;
     let tier = QUALITY_TIERS[1];
@@ -65,6 +71,17 @@ function applyQuality(item, colonist, game, ...statKeys) {
     }
     if (tier.key === 'superior' && window.game?.stats) {
         window.game.stats.superiorItemsCrafted++;
+    }
+    // Masterwork is the rare peak tier: stamp the crafting colonist onto the
+    // instance and name them in the tooltip so a masterwork reads as a prized,
+    // owned piece rather than just a higher multiplier.
+    if (tier.key === 'masterwork') {
+        item.craftedBy = colonist.name;
+        const flavour = `A masterwork of ${colonist.name}'s hand.`;
+        item.description = item.description ? `${item.description} ${flavour}` : flavour;
+        if (window.game?.stats) {
+            window.game.stats.masterworkItemsCrafted = (window.game.stats.masterworkItemsCrafted || 0) + 1;
+        }
     }
 }
 

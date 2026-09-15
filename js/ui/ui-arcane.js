@@ -4,6 +4,7 @@ import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CL
     getItemStatLines, RENDER_CONFIG,
 } from '../core/config.js';
 import { estimatePartyStrength } from '../systems/exploration.js';
+import { getOmens } from '../systems/omens.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
@@ -70,12 +71,15 @@ const arcaneMethods = {
         html += `<button class="arcane-tab${tab === 'nexus' ? ' active' : ''}" data-arcane-tab="nexus">Nexus</button>`;
         html += `<button class="arcane-tab${tab === 'requests' ? ' active' : ''}" data-arcane-tab="requests">Requests</button>`;
         html += `<button class="arcane-tab${tab === 'expeditions' ? ' active' : ''}" data-arcane-tab="expeditions">Expeditions</button>`;
+        html += `<button class="arcane-tab${tab === 'omens' ? ' active' : ''}" data-arcane-tab="omens">Omens</button>`;
         html += '</div>';
 
         if (tab === 'nexus') {
             html += this._buildNexusTabHtml();
         } else if (tab === 'requests') {
             html += this._buildRequestsTabHtml();
+        } else if (tab === 'omens') {
+            html += this._buildOmensTabHtml();
         } else {
             html += this._buildExpeditionsTabHtml();
         }
@@ -83,9 +87,11 @@ const arcaneMethods = {
         if (html !== this._lastArcaneHtml) {
             let savedChecks = null;
             let savedPacks = null;
+            let savedWar = null;
             if (tab === 'expeditions' && this._arcaneExpSetup) {
                 savedChecks = [...this.elements.arcanePanel.querySelectorAll('.exp-check:checked')].map(cb => cb.value);
                 savedPacks = [...this.elements.arcanePanel.querySelectorAll('.exp-pack-check:checked')].map(cb => cb.value);
+                savedWar = [...this.elements.arcanePanel.querySelectorAll('.exp-war-check:checked')].map(cb => cb.value);
                 this._savedMutators = [...this.elements.arcanePanel.querySelectorAll('.exp-mutator:checked')].map(cb => cb.value);
                 this._savedPotions = {};
                 this.elements.arcanePanel.querySelectorAll('.exp-potion').forEach(input => {
@@ -104,6 +110,12 @@ const arcaneMethods = {
                     for (const val of savedPacks) {
                         const cb = this.elements.arcanePanel.querySelector(`.exp-pack-check[value="${val}"]`);
                         if (cb) cb.checked = true;
+                    }
+                    if (savedWar) {
+                        for (const val of savedWar) {
+                            const cb = this.elements.arcanePanel.querySelector(`.exp-war-check[value="${val}"]`);
+                            if (cb) cb.checked = true;
+                        }
                     }
                 }
                 if (this._savedMutators) {
@@ -235,6 +247,38 @@ const arcaneMethods = {
                 html += `<div class="info-actions"><button onclick="window.game.fulfillTradeRiftRequest(${x},${y},${req.id})"${disabled}>Fulfill${reason}</button></div>`;
                 html += `</div>`;
             }
+        }
+        html += `</div>`;
+        return html;
+    },
+
+    // Omens tab: divination-driven previews of the near future. What shows depends
+    // on the colony's best Divination level (see getOmens / omens.js).
+    _buildOmensTabHtml() {
+        let html = '';
+        const { level, tier, omens } = getOmens(this.game);
+        html += `<div class="arcane-section">`;
+        html += `<div class="info-row" style="color:#ccaaff;font-weight:bold;font-size:1.1em;">The Diviner's Sight</div>`;
+        if (!tier) {
+            html += `<div class="info-row" style="color:#888;padding:12px 0;text-align:center;">`;
+            html += `<div style="font-size:1.1em;color:#a988cc;margin-bottom:6px;">The threads of fate are dark.</div>`;
+            html += `<div>No colonist yet commands Divination. Raise a diviner's skill to glimpse what is to come.</div>`;
+            html += `</div></div>`;
+            return html;
+        }
+        html += `<div class="info-row" style="color:#aa88cc;font-size:0.85em;">Sight clarity: <b>${tier.label}</b> (Divination Lv${level})</div>`;
+        if (omens.length === 0) {
+            html += `<div class="info-row" style="color:#888;margin-top:8px;">The near future is calm. No omens stir.</div>`;
+            html += `</div>`;
+            return html;
+        }
+        const toneColor = { good: '#66cc88', bad: '#ff7755', neutral: '#aaaacc' };
+        for (const o of omens) {
+            const col = toneColor[o.tone] || '#aaaacc';
+            html += `<div class="info-row" style="border-left:3px solid ${col};padding:6px 8px;margin-top:6px;background:#161622;border-radius:3px;">`;
+            html += `<div style="color:${col};font-weight:bold;"><span style="font-size:1.1em;">${o.icon}</span> ${o.title}</div>`;
+            html += `<div style="color:#ccc;font-size:0.9em;margin-top:2px;">${o.text}</div>`;
+            html += `</div>`;
         }
         html += `</div>`;
         return html;
@@ -587,6 +631,18 @@ const arcaneMethods = {
                 html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${a.id}" data-max="3"> ${a.type} (+${Math.round(def.expeditionSpeedBonus * 100)}% speed)</label></div>`;
             }
         }
+        const warBeasts = this.game.entities.filter(a => {
+            if (!a.tamed || a.hp <= 0 || a.onExpedition) return false;
+            const def = TAMED_ANIMALS[a.type];
+            return def && def.warBeast;
+        });
+        if (warBeasts.length > 0) {
+            html += `<div class="info-row" style="color:#cc5544;margin-top:6px;"><b>War Beasts (max 2):</b></div>`;
+            for (const a of warBeasts) {
+                const def = TAMED_ANIMALS[a.type];
+                html += `<div class="info-row"><label><input type="checkbox" class="exp-war-check" value="${a.id}" data-max="2"> ${a.type} <span style="color:#888;font-size:0.85em;">HP:${def.beastHp} Dmg:${def.beastDamage}</span></label></div>`;
+            }
+        }
 
         // Formation display
         html += `<div class="info-row" style="margin-top:10px;color:#6688ff;font-weight:bold;">Formation</div>`;
@@ -634,6 +690,7 @@ const arcaneMethods = {
         html += `</div>`;
         html += `<div id="exp-diff-desc" style="color:#888;font-size:0.8em;padding:2px 4px;"></div>`;
         html += `<div id="exp-strength-preview" style="margin-top:8px;padding:6px 8px;background:#1a1a2e;border-radius:4px;font-size:0.9em;color:#666;">Select colonists to see party strength</div>`;
+        html += this._buildScryHtml(realmKey);
         html += this._buildRealmDropsHtml(realmKey);
         html += `<div class="info-actions" style="margin-top:8px;">`;
         const launchLabel = this._arcaneExpIsAuto ? 'Launch Auto Expedition' : 'Launch Expedition';
@@ -644,6 +701,30 @@ const arcaneMethods = {
         html += `<button onclick="window.game.saveExpeditionPreset()" style="background:#1a2e1a;color:#88cc88;padding:8px 8px;border:none;border-radius:4px;cursor:pointer;margin-left:4px;font-size:0.9em;">Save Preset</button>`;
         html += `<button onclick="window.game.ui._arcaneExpSetup=null;window.game.ui._arcaneExpIsAuto=false;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#333;color:#aaa;padding:8px 12px;border:none;border-radius:4px;cursor:pointer;margin-left:8px;">Cancel</button>`;
         html += `</div></div>`;
+        return html;
+    },
+
+    // Divination scrying: a diviner reveals one hint about the target rift
+    // (rich vein, lurking guardian, elite presence, etc.) before the party
+    // commits. Gated on the colony's best Divination level; the revealed hint
+    // persists on the exploration system until the expedition launches.
+    _buildScryHtml(realmKey) {
+        const expl = this.game.exploration;
+        const canScry = expl.canScry(this.game);
+        const existing = expl.realmScries?.[realmKey];
+        let html = `<div style="margin-top:10px;color:#aa88ff;font-weight:bold;font-size:0.9em;">Divination</div>`;
+        html += `<div style="margin-top:4px;padding:6px 8px;background:#1a1630;border-radius:4px;font-size:0.85em;">`;
+        if (existing) {
+            const tone = existing.tone === 'good' ? '#66cc88' : existing.tone === 'bad' ? '#ff7755' : '#aaaacc';
+            html += `<div style="color:${tone};"><span style="margin-right:4px;">${existing.icon}</span><b>${existing.title}</b></div>`;
+            html += `<div style="color:#bbb;margin-top:2px;">${existing.text}</div>`;
+        } else if (canScry) {
+            html += `<div style="color:#888;margin-bottom:4px;">A diviner can peer into this rift and reveal one of its secrets.</div>`;
+            html += `<button onclick="window.game.scryRealmFromPanel('${realmKey}')" style="background:#2a1f45;color:#bb99ff;padding:5px 12px;border:1px solid #55408a;border-radius:4px;cursor:pointer;font-size:0.85em;">Scry the Rift</button>`;
+        } else {
+            html += `<div style="color:#777;">No colonist has the Divination skill to scry this rift.</div>`;
+        }
+        html += `</div>`;
         return html;
     },
 
@@ -715,6 +796,7 @@ const arcaneMethods = {
         };
         enforce('exp-check', 5);
         enforce('exp-pack-check', 3);
+        enforce('exp-war-check', 2);
 
         const syncFormation = () => {
             const checkedIds = new Set([...panel.querySelectorAll('.exp-check:checked')].map(cb => parseInt(cb.value)));

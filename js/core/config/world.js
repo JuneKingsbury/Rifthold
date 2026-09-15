@@ -7,6 +7,18 @@ export const SEASON_EFFECTS = {
     winter: { cropGrowthMult: 0, animalSpawnRate: 0.01, tempRange: [-10, 5] },
 };
 
+// Winter feast: once per year, when winter arrives, if the colony has stored up
+// a comfortable surplus of food it holds a feast that consumes some of that food
+// and grants everyone a lasting mood buff. A small warm beat in the coldest
+// season. moodDuration is in ticks (TICKS_PER_DAY = 480, so this is ~2 days).
+export const WINTER_FEAST_CONFIG = {
+    foodThreshold: 80,   // minimum stored foodstuffs required to trigger a feast
+    foodConsumed: 40,    // foodstuffs eaten by the feast
+    moodBonus: 12,       // mood effect of the "Winter feast" thought
+    moodDuration: 960,   // how long the thought lasts, in ticks
+    thoughtText: 'Warmed by the winter feast',
+};
+
 export const TERRAIN = {
     grass:  { char: '.', color: '#6aad44', bg: '#1a2a12', moveCost: 8, passable: { colonist: true, animal: true, enemy: true } },
     dirt:   { char: ',', color: '#bb8850', bg: '#2a1e14', moveCost: 8, passable: { colonist: true, animal: true, enemy: true } },

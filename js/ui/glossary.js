@@ -207,6 +207,7 @@ export const GLOSSARY = [
                     ['Harvest Sigil', 'Ritual Chalk in a plough shape: 3 chalk extending right from the Arcane Core, with 1 chalk branching up and 1 branching down at the far end. Greatly increases farm harvest yield colony-wide. Requires Verdant Growth research.\n  . . . C\n  * C C C\n  . . . C\n\n  * = Arcane Core    C = Ritual Chalk'],
                     ["Watcher's Eye", 'Ritual Chalk directly above and below the Arcane Core (vertical line of 3). Increases expedition loot quantity colony-wide. Requires Planar Rifts research.\n  C\n  *\n  C\n\n  * = Arcane Core    C = Ritual Chalk'],
                     ["Scholar's Ring", 'Ritual Chalk on the 4 cardinal adjacent tiles only (no corners). Greatly increases research point generation colony-wide. Requires Arcane Studies research.\n  . C .\n  C * C\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
+                    ['Grand Altar', 'Ritual Chalk in a great X: corners at diagonal distance 2 and the inner diagonals at distance 1. Unlike the other structures it has no passive bonus. Instead it lets you perform powerful on-demand rituals from the tile info panel, each for a reagent cost and a long cooldown: Rite of Mending (heal all colonists), Rite of Calm Skies (force clear weather), Rite of Warding (delay the next raid), and Rite of Abundance (surge crop growth). Requires Advanced Arcana research.\n  C . . . C\n  . C . C .\n  . . * . .\n  . C . C .\n  C . . . C\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
                 ]
             },
         ]
@@ -277,6 +278,7 @@ export const GLOSSARY = [
                     ['Autumn', 'Cooling temperatures with slightly slower crop growth. Animal migrations commonly pass through, providing hunting opportunities.'],
                     ['Winter', 'Cold temperatures halt most outdoor crop growth. Snow covers the ground. Colonists need warmth from Campfires, Ember Heaters, or Inferno Wards to avoid freezing. Freezing colonists will seek out nearby heat sources on their own. Press H to toggle the warmth overlay and see each source\'s coverage.'],
                     ['Weather Effects', 'Rain boosts crop growth and extinguishes fires. Thunderstorms can start fires via lightning. Blizzards halt all crop growth entirely. Weather varies by season.'],
+                    ['Winter Feast', 'Once each year, when winter arrives, the colony holds a feast if it has stored a comfortable surplus of food. The feast eats into that stockpile and grants every colonist a lasting mood buff, a warm beat in the coldest season. A lean winter with too little food stored simply passes without one, so keep a cushion of food heading into the cold.'],
                 ]
             },
             {

@@ -131,3 +131,11 @@ export function getResearchSpeedMult(game) {
     }
     return 1;
 }
+
+// True when a Grand Altar pattern is currently active, enabling on-demand
+// rituals. Unlike the other complex structures, the altar has no passive effect
+// bonus; its presence gates the player-triggered rituals (see main.js).
+export function hasRitualAltar(game) {
+    if (!game.activeComplexStructures) return false;
+    return game.activeComplexStructures.some(s => s.effect.ritualAltar);
+}

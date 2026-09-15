@@ -1,4 +1,4 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS } from '../core/config.js';
+import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
@@ -422,8 +422,45 @@ export class EventSystem {
                     addThought(c, t.text, t.moodEffect, t.duration, game.tick);
                 }
             }
+            this._rollArrivalBond(game, this.pendingEvent.data);
         }
         this.pendingEvent = null;
+    }
+
+    /**
+     * Gives a newly-arrived wanderer a chance to already know one existing
+     * colonist, seeding a mutual opinion and a fitting mood thought for both.
+     * Purely a social-texture flourish (see ARRIVAL_BONDS in social.js).
+     *
+     * @param {object} game     Game instance.
+     * @param {object} newcomer The wanderer that just joined.
+     */
+    _rollArrivalBond(game, newcomer) {
+        if (Math.random() >= ARRIVAL_BONDS.chance) return;
+        const candidates = game.colonists.filter(c => c.hp > 0 && !c.golem && c.id !== newcomer.id);
+        if (candidates.length === 0) return;
+        const other = candidates[Math.floor(Math.random() * candidates.length)];
+
+        const bonds = ARRIVAL_BONDS.bonds;
+        const totalWeight = bonds.reduce((s, b) => s + b.weight, 0);
+        let roll = Math.random() * totalWeight;
+        let bond = bonds[bonds.length - 1];
+        for (const b of bonds) { roll -= b.weight; if (roll < 0) { bond = b; break; } }
+
+        newcomer.opinions = newcomer.opinions || {};
+        other.opinions = other.opinions || {};
+        newcomer.opinions[other.id] = bond.opinion;
+        other.opinions[newcomer.id] = bond.opinion;
+
+        const th = THOUGHTS[bond.thoughtKey];
+        if (th) {
+            addThought(newcomer, th.text, th.moodEffect, th.duration, game.tick);
+            addThought(other, th.text, th.moodEffect, th.duration, game.tick);
+        }
+        const text = bond.arrivalText.replace('{a}', newcomer.name).replace('{b}', other.name);
+        const type = bond.opinion >= 0 ? 'success' : 'warning';
+        game.eventLog.add(game, text, type, { type: 'colonist', id: newcomer.id });
+        game.notifications.push({ text, tick: game.tick, type: type === 'success' ? 'success' : 'event' });
     }
 
     /**

@@ -5,7 +5,7 @@
  * tick but self-throttles: opinion decay and the interaction scan are gated on
  * SOCIAL_CONFIG intervals, and each colonist pair has an interaction cooldown.
  */
-import { SOCIAL_INTERACTIONS, SOCIAL_CONFIG, THOUGHTS, TRAITS } from '../core/config.js';
+import { SOCIAL_INTERACTIONS, SOCIAL_CONFIG, THOUGHTS, TRAITS, GROUP_ACTIVITIES } from '../core/config.js';
 import { getRelationshipTier } from './social-utils.js';
 import { addThought } from '../entities/colonist.js';
 import { manhattanDist } from '../world/pathfinding.js';
@@ -152,6 +152,18 @@ export class SocialSystem {
                 if (game._socialCooldowns[cooldownKey] && game.tick < game._socialCooldowns[cooldownKey]) continue;
 
                 if (manhattanDist(a.x, a.y, b.x, b.y) > SOCIAL_CONFIG.interactionRange) continue;
+
+                // Group activity: both are hanging out together at the Town Hall.
+                // Runs a stronger bonding interaction at an elevated chance with a
+                // shorter cooldown, turning the hall into a relationship engine.
+                const bothHangingOut = a._relaxActivity === 'hang_out' && b._relaxActivity === 'hang_out';
+                if (bothHangingOut) {
+                    if (Math.random() > SOCIAL_CONFIG.groupActivityChance) continue;
+                    const activity = weightedRandom(GROUP_ACTIVITIES);
+                    applyInteraction(a, b, activity, game);
+                    game._socialCooldowns[cooldownKey] = game.tick + SOCIAL_CONFIG.groupActivityCooldown;
+                    continue;
+                }
 
                 // Compute chance with trait modifiers
                 let chanceA = SOCIAL_CONFIG.baseInteractionChance;

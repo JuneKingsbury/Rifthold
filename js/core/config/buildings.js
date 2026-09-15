@@ -191,4 +191,20 @@ export const COMPLEX_STRUCTURES = {
         activeLightRadius: 3,
         description: 'Arcane Core with Ritual Chalk on the 4 cardinal adjacent tiles (no corners). +50% research point generation colony-wide.',
     },
+    grand_ritual: {
+        name: 'Grand Altar',
+        research: 'advanced_arcana',
+        coreBuild: 'arcane_core',
+        // Diagonal X at distance 2 (the four far corners of a 5x5). Distinct from
+        // every passive pattern so it can't collide with them.
+        layout: [
+            { dx: -2, dy: -2, req: 'ritual_chalk' }, { dx: 2, dy: -2, req: 'ritual_chalk' },
+            { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
+            { dx: -1, dy: 1, req: 'ritual_chalk' }, { dx: 1, dy: 1, req: 'ritual_chalk' },
+            { dx: -2, dy: 2, req: 'ritual_chalk' }, { dx: 2, dy: 2, req: 'ritual_chalk' },
+        ],
+        effect: { ritualAltar: true },
+        activeLightRadius: 4,
+        description: 'Arcane Core with Ritual Chalk in a great X (both diagonals, corners at distance 2). Lets you perform powerful on-demand rituals for a reagent cost. Requires Advanced Arcana research.',
+    },
 };

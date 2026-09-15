@@ -102,6 +102,48 @@ export const SPELLS = {
     fortunate_discovery: { name: 'Fortunate Discovery', school: 'divination', minLevel: 5, manaCost: 25, cooldown: 1000, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'meteorite', eventMult: 5.0 }, duration: 600 },
 };
 
+// Player-triggered rituals: on-demand invocations performed at a Grand Ritual
+// altar (a complex structure). Unlike passive complex structures and auto-cast
+// spells, the player fires these directly for a reagent cost to get a big
+// one-shot effect, then waits out a long cooldown (in ticks). Each entry:
+//   name/description  - UI copy.
+//   icon/color        - UI glyph and tone.
+//   cost              - reagents deducted from the stockpile on cast.
+//   cooldown          - ticks before this ritual can be cast again.
+//   effect            - dispatch key handled in main.js triggerRitual.
+//   ...params         - effect-specific tuning consumed by that handler.
+// Consumed by complexBuildings.js (altar detection) and main.js (triggerRitual).
+export const RITUALS = {
+    rite_of_mending: {
+        name: 'Rite of Mending', icon: '✚', color: '#66dd88',
+        description: 'Channel energy to rejuvenate every colonist currently in the colony.',
+        cost: { void_essence: 3, moonbloom: 4 },
+        cooldown: 3000,
+        effect: 'mass_heal',
+    },
+    rite_of_calm_skies: {
+        name: 'Rite of Calm Skies', icon: '☀', color: '#ffdd66',
+        description: 'Bend the heavens toward clear weather.',
+        cost: { void_essence: 2, runite: 2 },
+        cooldown: 2400,
+        effect: 'weather_bias', weatherBias: 'clear', duration: 600,
+    },
+    rite_of_warding: {
+        name: 'Rite of Warding', icon: '⛨', color: '#88bbff',
+        description: 'Raise a great ward that delays gathering raids.',
+        cost: { void_essence: 4, runite: 3 },
+        cooldown: 3600,
+        effect: 'raid_ward', raidDelay: 1200,
+    },
+    rite_of_abundance: {
+        name: 'Rite of Abundance', icon: '❀', color: '#88ff88',
+        description: 'Surge the growth of every planted crop across the colony.',
+        cost: { void_essence: 3, moonbloom: 3 },
+        cooldown: 3000,
+        effect: 'ripen_crops', growthGain: 0.5,
+    },
+};
+
 export const SPELL_TOMES = {
     // Evocation
     tome_of_spark: { name: 'Tome of Spark', tradeValue: 12, spell: 'spark', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a basic bolt of fire at nearby foes.' },
@@ -186,14 +228,14 @@ export const RESEARCH = {
     // Crafting
     marksmanship: { name: 'Marksmanship', cost: 250, requires: ['runecraft', 'metalworking'], tab: 'crafting', description: 'Crossbow crafting and +1 range to all ranged weapons' },
     arcane_implements: { name: 'Arcane Implements', cost: 250, requires: ['runecraft', 'ley_channeling'], tab: 'crafting', description: 'Craft wands and staves for spellcasters' },
-    artisans_touch: { name: "Artisan's Touch", cost: 450, requires: ['arcane_implements'], tab: 'crafting', description: 'Better crafting quality odds; salvage returns 75%' },
-    runeforging: { name: 'Runeforging', cost: 350, requires: ['arcane_implements'], tab: 'crafting', description: 'Forge runic weapons' },
-    masterwork: { name: 'Masterwork', cost: 800, requires: ['runeforging', 'arcane_infusion', 'artisans_touch'], tab: 'crafting', description: 'Forge legendary enchanted weapons', requiresBuildings: { enchanting_table: 1 }, requiresMilestone: { stat: 'superiorItemsCrafted', min: 1 }, requiresTabCount: 3 },
-    golem_craft: { name: 'Golem Craft', cost: 1000, requires: ['arcane_infusion', 'void_forging', 'mana_reservoir', 'runeforging'], tab: 'crafting', description: 'Animate stone golems to serve as tireless workers', requiresBuildings: { enchanting_table: 1 }, requiresTabCount: 3 },
+    artisans_touch: { name: "Artisan's Touch", cost: 450, requires: ['marksmanship'], tab: 'crafting', description: 'Better crafting quality odds; salvage returns 75%' },
+    runeforging: { name: 'Runic Forging', cost: 350, requires: ['arcane_implements', 'arcane_infusion'], tab: 'crafting', description: 'Forge weapons using runite at an enchanting table' },
+    masterwork: { name: 'Masterwork', cost: 800, requires: ['runeforging', 'arcane_infusion', 'artisans_touch'], tab: 'crafting', description: 'Forge legendary enchanted weapons, and let master crafters rarely produce Masterwork-quality gear', requiresBuildings: { enchanting_table: 1 }, requiresMilestone: { stat: 'superiorItemsCrafted', min: 1 }, requiresTabCount: 3 },
+    golem_craft: { name: 'Golem Craft', cost: 1000, requires: ['arcane_infusion', 'void_forging', 'mana_reservoir'], tab: 'crafting', description: 'Animate stone golems to serve as tireless workers', requiresBuildings: { enchanting_table: 1 }, requiresTabCount: 3 },
 
     // Spells
     arcane_studies: { name: 'Arcane Studies', cost: 180, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
-    arcane_infusion: { name: 'Arcane Infusion', cost: 450, requires: ['ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
+    arcane_infusion: { name: 'Arcane Infusion', cost: 400, requires: ['ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
     advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_studies', 'arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
     ritual_magic: { name: 'Ritual Magic', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Unlock complex arcane rituals patterns for powerful colony-wide effects' },
     void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands and void staves', requiresTabCount: 3 },
@@ -210,13 +252,13 @@ export const RESEARCH = {
     // Rifts
     warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards and build tougher structures using bricks' },
     fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
-    void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling', 'warding'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
-    void_architecture: { name: 'Void Architecture', cost: 400, requires: ['void_summoning'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
-    void_forging: { name: 'Void Forging', cost: 750, requires: ['void_architecture', 'runeforging'], tab: 'rifts', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
+    void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
+    void_architecture: { name: 'Void Architecture', cost: 400, requires: ['fortification'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
+    void_forging: { name: 'Void Shaping', cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
     planar_rift: { name: 'Planar Rifts', cost: 800, requires: ['void_summoning', 'arcane_infusion'], tab: 'rifts', description: 'Open stable rifts for exploration expeditions', requiresMilestone: { stat: 'wavesCompleted', min: 3 } },
-    deep_delving: { name: 'Deep Delving', cost: 1200, requires: ['planar_rift'], tab: 'rifts', description: 'Access deeper, more dangerous realms', requiresBuildings: { rift_gate: 1 }, requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, requiresTabCount: 3 },
-    auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually.' },
-    auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['auto_expedition', 'deep_delving'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
+    deep_delving: { name: 'Deep Delving', cost: 1200, requires: ['auto_expedition'], tab: 'rifts', description: 'Access deeper, more dangerous realms', requiresBuildings: { rift_gate: 1 }, requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, requiresTabCount: 3 },
+    auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually' },
+    auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['deep_delving'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
     auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions', requiresTabCount: 3 },
 };
 
