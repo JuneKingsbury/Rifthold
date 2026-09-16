@@ -237,10 +237,16 @@ class SoundManagerClass {
             // exploring / returning) pauses colony music in favor of the
             // expedition track. Handles concurrent expeditions: colony music
             // only resumes once the last one completes.
-            const expActive = game.exploration && game.exploration.expeditions
-                && game.exploration.expeditions.some(e => e.status !== 'complete');
-            if (expActive) {
-                const name = await this._firstAvailableMusic(['expedition']);
+            const activeExps = game.exploration && game.exploration.expeditions
+                && game.exploration.expeditions.filter(e => e.status !== 'complete');
+            if (activeExps && activeExps.length > 0) {
+                // Prefer a realm-specific track for the most recent active expedition,
+                // then fall back to the generic expedition track.
+                const realmKey = activeExps[activeExps.length - 1].realm;
+                const candidates = realmKey
+                    ? ['expedition_' + realmKey, 'expedition']
+                    : ['expedition'];
+                const name = await this._firstAvailableMusic(candidates);
                 if (name) {
                     if (name !== this.currentMusicName) this.playMusic(name);
                 } else if (this.currentMusicName !== null) {

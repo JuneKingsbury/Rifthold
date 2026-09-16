@@ -19,7 +19,7 @@ Both the start screen and the in-game settings panel have Music and SFX volume s
 
 Background music is layered. Each tick the game picks the most specific track that has a file present, and falls back to a more general one when a specialized track is missing. Priority, highest first:
 
-1. **Expedition** (a party is out exploring a realm): `music/expedition.ogg`. If this file is missing, colony music simply goes silent for the duration of the expedition.
+1. **Expedition** (a party is out exploring a realm): first tries `music/expedition_<realmKey>.ogg` (e.g. `expedition_crystal_caves.ogg`), then falls back to `music/expedition.ogg`. If neither file is present, colony music goes silent for the duration of the expedition.
 2. **Combat** (raid or wave active): `music/combat.ogg`
 3. **Weather** (current weather is not clear): `music/weather_<type>.ogg`, e.g. `music/weather_rain.ogg`
 4. **Season**: `music/season_<name>.ogg`, e.g. `music/season_winter.ogg`
@@ -43,7 +43,22 @@ Listed highest priority first. Weather and season tracks are optional, and missi
 
 | File | Trigger |
 |------|---------|
-| `music/expedition.ogg` | A party is out exploring a realm (pauses colony music) |
+| `music/expedition.ogg` | A party is out exploring any realm. Generic fallback used when no realm-specific track is present. |
+| `music/expedition_crystal_caves.ogg` | *(optional)* Crystal Caves expedition. Overrides generic expedition track if present. |
+| `music/expedition_crystal_mines.ogg` | *(optional)* Crystal Mines expedition |
+| `music/expedition_crystal_depths.ogg` | *(optional)* Crystal Depths expedition |
+| `music/expedition_verdant_depths.ogg` | *(optional)* Verdant Depths expedition |
+| `music/expedition_fungal_hollows.ogg` | *(optional)* Fungal Hollows expedition |
+| `music/expedition_primeval_canopy.ogg` | *(optional)* Primeval Canopy expedition |
+| `music/expedition_arcane_library.ogg` | *(optional)* Arcane Library expedition |
+| `music/expedition_ancient_university.ogg` | *(optional)* Ancient University expedition |
+| `music/expedition_abandoned_laboratory.ogg` | *(optional)* Abandoned Laboratory expedition |
+| `music/expedition_shadow_realm.ogg` | *(optional)* Shadow Realm expedition |
+| `music/expedition_void_abyss.ogg` | *(optional)* Void Abyss expedition |
+| `music/expedition_oblivion_rift.ogg` | *(optional)* Oblivion Rift expedition |
+| `music/expedition_kingdom_outskirts.ogg` | *(optional)* Kingdom Outskirts expedition |
+| `music/expedition_crusader_barracks.ogg` | *(optional)* Crusader Barracks expedition |
+| `music/expedition_palace_fortress.ogg` | *(optional)* Palace Fortress expedition |
 | `music/combat.ogg` | Raid or wave enemies active |
 | `music/weather_rain.ogg` | Current weather is rain (no enemies) |
 | `music/weather_thunderstorm.ogg` | Current weather is thunderstorm (no enemies) |

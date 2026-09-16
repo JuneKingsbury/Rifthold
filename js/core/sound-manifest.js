@@ -54,8 +54,32 @@ export const SOUND_MANIFEST = {
         menu_theme: 'audio/music/menu_theme.ogg',
         credits: 'audio/music/credits.ogg',
 
-        // Expedition: plays while a party is exploring a realm
+        // Expedition: plays while a party is exploring a realm.
+        // expedition.ogg is the generic fallback used when no realm-specific track is present.
         expedition: 'audio/music/expedition.ogg',
+
+        // Optional per-realm tracks. Each key is 'expedition_' + realmKey.
+        // If the file is absent the game falls back to expedition.ogg automatically.
+        // Crystal chain
+        expedition_crystal_caves:   'audio/music/expedition_crystal_caves.ogg',
+        expedition_crystal_mines:   'audio/music/expedition_crystal_mines.ogg',
+        expedition_crystal_depths:  'audio/music/expedition_crystal_depths.ogg',
+        // Verdant chain
+        expedition_verdant_depths:  'audio/music/expedition_verdant_depths.ogg',
+        expedition_fungal_hollows:  'audio/music/expedition_fungal_hollows.ogg',
+        expedition_primeval_canopy: 'audio/music/expedition_primeval_canopy.ogg',
+        // Arcane chain
+        expedition_arcane_library:       'audio/music/expedition_arcane_library.ogg',
+        expedition_ancient_university:   'audio/music/expedition_ancient_university.ogg',
+        expedition_abandoned_laboratory: 'audio/music/expedition_abandoned_laboratory.ogg',
+        // Shadow chain
+        expedition_shadow_realm:   'audio/music/expedition_shadow_realm.ogg',
+        expedition_void_abyss:     'audio/music/expedition_void_abyss.ogg',
+        expedition_oblivion_rift:  'audio/music/expedition_oblivion_rift.ogg',
+        // Kingdom chain
+        expedition_kingdom_outskirts: 'audio/music/expedition_kingdom_outskirts.ogg',
+        expedition_crusader_barracks: 'audio/music/expedition_crusader_barracks.ogg',
+        expedition_palace_fortress:   'audio/music/expedition_palace_fortress.ogg',
 
         // Optional weather tracks. Fall back to season/day-night if the file is absent.
         // Keys are 'weather_' + Weather.currentWeather (see WEATHER_TYPES in config/world.js).
