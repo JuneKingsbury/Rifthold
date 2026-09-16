@@ -31,9 +31,13 @@ export const CARAVAN_TRADES = [
 // quality prefix on them would be name-only and misleading (mirrors the Trade Rift).
 //
 // buyCategories: item types this merchant will purchase from the player (null = anything).
+// weight: relative spawn frequency. Higher = more common. Sum across all merchants sets the
+//   denominator. E.g. weights 10/7/7/7/3/4/5 → Traveling Merchant appears ~23% of the time,
+//   Rare Goods Broker ~7%.
 export const MERCHANTS = [
     {
         name: 'Traveling Merchant',        // generalist: cheap everyday gear, common charms
+        weight: 10,
         resourcePool: null,
         lowTierItems: ['cotton_shirt', 'wool_cap', 'leather_boots', 'stone_pickaxe', 'stone_axe', 'wooden_club', 'short_bow', 'iron_clad_effigy'],
         highTierItems: ['amulet_of_fortune', 'merchants_ring', 'hagglers_coin', 'seedkeepers_locket', 'emberstep_anklet'],
@@ -47,6 +51,7 @@ export const MERCHANTS = [
     },
     {
         name: 'Arms Dealer',               // weapons/armor specialist: better quality odds
+        weight: 7,
         resourcePool: ['iron', 'planks', 'leather', 'iron_ore', 'runite'],
         lowTierItems: ['iron_sword', 'stone_spear', 'etched_axe', 'etched_mace', 'iron_helmet', 'iron_chainmail', 'iron_greaves', 'hunting_bow'],
         highTierItems: ['aegis_of_the_vanguard', 'runic_blade', 'iron_crossbow', 'runic_plate', 'runic_helm'],
@@ -58,6 +63,7 @@ export const MERCHANTS = [
     },
     {
         name: 'Tome Peddler',              // magic focus: wands, circlets, spell tomes
+        weight: 7,
         resourcePool: ['planks', 'runite', 'wood'],
         lowTierItems: ['wooden_wand', 'crystal_staff', 'mages_circlet', 'lantern'],
         highTierItems: ['tome_of_spark', 'tome_of_mend', 'tome_of_smite', 'tome_of_magic_missile', 'tome_of_renewal'],
@@ -69,6 +75,7 @@ export const MERCHANTS = [
     },
     {
         name: 'Wandering Alchemist',       // nature/utility: farm tools, warm clothing, relics
+        weight: 7,
         resourcePool: ['berries', 'wheat', 'moonbloom', 'corn', 'potatoes', 'food'],
         lowTierItems: ['stone_sickle', 'stone_mattock', 'wool_parka', 'leather_vest', 'wool_tunic'],
         highTierItems: ['hourglass_of_diligence', 'lodestone_of_prosperity', 'crystal_capacitor'],
@@ -80,6 +87,45 @@ export const MERCHANTS = [
         goldRange: [20, 45],
         buyCategories: ['weapon', 'armor', 'helmet', 'tool', 'tome', 'potion'],
     },
+    {
+        name: 'Rare Goods Broker',         // late-game specialist: runic and void-tier gear
+        weight: 3,
+        resourcePool: ['runite', 'void_essence', 'planks'],
+        lowTierItems: ['runic_blade', 'runic_crossbow', 'runic_plate', 'runic_helm', 'runic_wand', 'runic_striders', 'runic_buckler'],
+        highTierItems: ['void_blade', 'void_dagger', 'void_staff', 'void_armor', 'void_crown', 'void_hunters_cowl'],
+        lowDrawCount: [1, 0.6, 0.4],       // moderate low-tier stock
+        highDrawChances: [0.7, 0.4],       // 1 guaranteed void item + up to 2 more (70%, 40%)
+        qualityWeights: { poor: 0, normal: 2, fine: 4, superior: 3 },  // heavily skewed toward fine/superior
+        goldRange: [50, 100],
+        buyCategories: ['material', 'tome', 'consumable', 'trinket'],
+    },
+    {
+        name: 'Expedition Outfitter',      // exploration focus: expedition trinkets and field consumables
+        weight: 4,
+        resourcePool: null,
+        lowTierItems: ['compass_of_greed', 'venom_vial', 'rallying_standard', 'jewelers_loupe', 'ghost_step_charm', 'strikers_band'],
+        highTierItems: ['warlords_banner', 'dimensional_orb', 'voidwalkers_lantern', 'shard_of_oblivion', 'expedition_spellbook'],
+        lowDrawCount: [1, 0.65, 0.35],
+        highDrawChances: [0.5, 0.25],
+        qualityWeights: { poor: 1, normal: 4, fine: 3, superior: 1 },
+        // Sells expedition-only brews that are hard to research early.
+        potionStock: { antidote: [1, 3], battle_tonic: [1, 3], smoke_draught: [1, 2], loot_elixir: [1, 2] },
+        goldRange: [25, 55],
+        buyCategories: ['weapon', 'armor', 'helmet', 'boots', 'potion'],
+    },
+    {
+        name: 'Clothier',                  // clothing and boots: comfort, warmth, and utility wear
+        weight: 5,
+        resourcePool: ['wool', 'cotton', 'cloth', 'hides', 'leather', 'food'],
+        lowTierItems: ['cotton_shirt', 'wool_tunic', 'leather_jerkin', 'leather_boots', 'enchanted_sandals', 'wool_cap'],
+        highTierItems: ['mana_silk_vestments', 'ashwalkers_cloak', 'cloak_of_shadows', 'berserkers_wraps', 'boots_of_haste', 'runic_striders'],
+        lowDrawCount: [1, 0.7, 0.5, 0.3],  // tends to carry a good spread of everyday wear
+        highDrawChances: [0.5, 0.25],
+        qualityWeights: { poor: 1, normal: 4, fine: 3, superior: 1 },
+        potionStock: { morale_tonic: [1, 4], warmth_elixir: [1, 4] },
+        goldRange: [15, 40],
+        buyCategories: ['weapon', 'armor', 'helmet', 'trinket'],
+    },
 ];
 
 // Base gold value per unit. Used by both buy and sell calculations.
@@ -90,7 +136,7 @@ export const TRADE_VALUES = {
     hides: 1.5, leather: 3, iron_ore: 2, iron: 4,
     runite: 6, void_essence: 10, meat: 1, wheat: 0.7, berries: 0.6,
     corn: 0.8, potatoes: 0.7, moonbloom: 3, eggs: 1.5, milk: 2, wool: 2.5,
-    cotton: 1, cloth: 2.5,
+    cotton: 0.8, cloth: 2,
 };
 
 // TRADER_MARKUP: multiplier on base value when buying FROM the trader (higher = more expensive).

@@ -193,6 +193,7 @@ export const COLONIST_CONFIG = {
     baseHealthRegen: 0.03,
     healthRegenWhileIdle: 2.0,
     healthRegenWhileSleeping: 3.0,
+    seekRestHpThreshold: 0.4,    // seek bed to heal when HP drops below this fraction of maxHp
     skillMaxLevel: 10,
     skillXpPerTask: 1,
     skillXpToLevel: 15,

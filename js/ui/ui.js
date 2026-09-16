@@ -804,7 +804,7 @@ export class UI {
                 ? `<img src="${cropSpriteURL}" class="build-card-icon--sprite">`
                 : `<span style="color:${crop.color}">${crop.readyChar}</span>`;
             html += `<div class="build-card-icon-wrap">${cropIcon}</div>`;
-            html += `<div class="build-card-name">${opt}</div>`;
+            html += `<div class="build-card-name">${opt.charAt(0).toUpperCase() + opt.slice(1)}</div>`;
             html += `<div class="build-card-cost"><span class="cost-chip" style="color:#88cc44">${crop.harvestYield}x</span><span class="cost-chip" style="color:#aaa">${seasons}</span></div>`;
             html += overlayHtml;
             html += `</div>`;

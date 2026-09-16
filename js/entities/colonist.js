@@ -1676,6 +1676,15 @@ function updateIdle(colonist, game) {
         return;
     }
 
+    // Seek bed to recover when significantly injured and no combat is active.
+    const combatActive = (game.waves && game.waves.active && game.waves.enemies.length > 0) ||
+        (game.raiders && game.raiders.length > 0);
+    if (!combatActive && colonist.hp < colonist.maxHp * COLONIST_CONFIG.seekRestHpThreshold) {
+        colonist._injuryRest = true;
+        startSleeping(colonist, game);
+        return;
+    }
+
     if (colonist.needs.rest < COLONIST_CONFIG.restMoodThreshold) {
         startSleeping(colonist, game);
         return;
@@ -2074,6 +2083,19 @@ function tryCombatInterrupt(colonist, game) {
 function updateMoving(colonist, game) {
     if (tryCombatInterrupt(colonist, game)) return;
 
+    // Abort a bed-bound injury-rest walk when combat starts.
+    if (colonist._injuryRest && colonist._sleepAfterMove) {
+        const combatActive = (game.waves && game.waves.active && game.waves.enemies.length > 0) ||
+            (game.raiders && game.raiders.length > 0);
+        if (combatActive) {
+            delete colonist._injuryRest;
+            delete colonist._sleepAfterMove;
+            colonist.path = [];
+            colonist.state = 'idle';
+            return;
+        }
+    }
+
     // If moving toward a hunt target and already within weapon range, start
     // hunting immediately instead of walking all the way to the adjacent tile.
     if (colonist.currentTaskId) {
@@ -2106,6 +2128,15 @@ function updateMoving(colonist, game) {
         }
         if (colonist._sleepAfterMove) {
             delete colonist._sleepAfterMove;
+            if (colonist._injuryRest) {
+                const combatActive = (game.waves && game.waves.active && game.waves.enemies.length > 0) ||
+                    (game.raiders && game.raiders.length > 0);
+                if (combatActive) {
+                    delete colonist._injuryRest;
+                    colonist.state = 'idle';
+                    return;
+                }
+            }
             colonist.state = 'sleeping';
             colonist.stateTimer = COLONIST_CONFIG.sleepAfterMoveDuration;
             return;
@@ -2310,6 +2341,27 @@ function updateSleeping(colonist, game) {
     if (game.tick % 12 === 0) {
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Zzz', color: '#8888ff', fontSize: 10, ttl: 11, maxTtl: 11 });
     }
+
+    // If resting to recover from injury, wake immediately when combat starts,
+    // and keep sleeping until HP recovers above the seek threshold.
+    if (colonist._injuryRest) {
+        const combatActive = (game.waves && game.waves.active && game.waves.enemies.length > 0) ||
+            (game.raiders && game.raiders.length > 0);
+        if (combatActive) {
+            delete colonist._injuryRest;
+            colonist.state = 'idle';
+            return;
+        }
+        if (colonist.hp >= colonist.maxHp * COLONIST_CONFIG.seekRestHpThreshold) {
+            delete colonist._injuryRest;
+            // fall through to normal wake logic below
+        } else {
+            // Reset timer so the colonist keeps sleeping until healed.
+            if (colonist.stateTimer <= 0) colonist.stateTimer = COLONIST_CONFIG.sleepDuration;
+            return;
+        }
+    }
+
     if (colonist.stateTimer <= 0 || colonist.needs.rest >= 100) {
         colonist.state = 'idle';
         const inBed = colonist.assignedBed &&

@@ -513,7 +513,9 @@ export class EventSystem {
      *   - traderGold: goldRange per merchant (change for economy pacing)
      */
     eventCaravan(game) {
-        const merchant = MERCHANTS[Math.floor(Math.random() * MERCHANTS.length)];
+        const totalWeight = MERCHANTS.reduce((s, m) => s + (m.weight ?? 1), 0);
+        let roll = Math.random() * totalWeight;
+        const merchant = MERCHANTS.find(m => (roll -= (m.weight ?? 1)) < 0) ?? MERCHANTS[MERCHANTS.length - 1];
         const available = merchant.resourcePool ?? Object.keys(TRADE_VALUES);
         const traderResources = {};
         const numItems = 3 + Math.floor(Math.random() * 4);
