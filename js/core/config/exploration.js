@@ -2305,6 +2305,26 @@ export const STORY_MILESTONES = {
         think that they're able to find love so far from home. You can only hope that 
         this relationship helps these two weather the tribulations of The Frontier.`,
     },
+    first_winter_feast: {
+        tab: 'colony',
+        title: 'Winter Celebration',
+        trigger: 'first_winter_feast',
+        text: `
+        Winter has arrived and the colony is feeling optimistic. By the first frost 
+        we were able to secure plenty of food to last through the season. In their 
+        excitement, the colonists proposed a feast to celebrate their hard work.
+        <br><br>
+        The Winter Feast is a common tradition throughout the world, though everyone 
+        celebrates it differently. What all could agree on was coming together in the 
+        warmth of the town hall, fires stoked high.
+        <br><br>
+        For one night the harsh winter chill was felt by no one. In lieu of traditional 
+        foods, the colonists shared a meal of roasted vegetables, fresh bread, and a 
+        hearty stew. The meal was simple and made with care.
+        <br><br>
+        The whole feast was over in a matter of hours, but the memories will last a 
+        lifetime. This group of strangers will continue to weather the cold together.`,
+    },
     first_wave_complete: {
         tab: 'colony',
         title: 'Horrors from the Void',

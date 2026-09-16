@@ -1635,6 +1635,7 @@ class Game {
         }
         this.eventLog.add(this, `The colony gathers for a winter feast. ${fed} colonist${fed === 1 ? '' : 's'} share a warm meal.`, 'event', null);
         this.notifications.push({ text: 'A winter feast lifts everyone\'s spirits!', tick: this.tick, type: 'success' });
+        this.story.checkMilestone('first_winter_feast', this);
     }
 
     launchExpeditionFromPanel(realmKey) {
