@@ -108,7 +108,6 @@ export const WEAPONS = {
 // order values interleave to keep matching sets adjacent.
 export const ARMORS = {
     // ── Tier 1 ──
-    wool_parka: { name: 'Wool Parka', damageReduction: 0.04, tier: 1, order: 2, coldResistance: 0.7, hungerReduction: 0.1, description: 'Warm wool parka. Resists cold and reduces hunger.', recipe: { input: { wool: 4, leather: 1 }, ticks: 16 } },
     leather_vest: { name: 'Leather Vest', damageReduction: 0.10, tier: 1, order: 4, description: 'A sturdy leather vest.', recipe: { input: { leather: 3 }, ticks: 18 } },
     iron_brigandine: { name: 'Iron Brigandine', damageReduction: 0.12, tier: 1, order: 6, description: 'Light iron armor offering basic protection.', recipe: { input: { iron: 2 }, ticks: 14, research: 'metalworking', station: 'anvil' } },
     // ── Tier 2 ──
