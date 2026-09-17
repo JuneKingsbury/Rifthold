@@ -18,7 +18,7 @@ export const EXPEDITION_ENEMIES = {
     thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab', lore: 'A jungle predator covered in sharp thorns. Its teeth are even sharper.' },
     spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', lore: 'A plant creature infected by blight. It moves much faster than its creeping kin.', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
     fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', lore: 'A creature made almost entirely of blight fungus. Far more dangerous than the average blight bloom seen in the Frontier.', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
-    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: 'TODO' },
+    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: `A gigantic snake that glides through the treetops. Thankfully it isn't venomous, but it's bite is still quite painful.` },
 
     // Arcane chain
     arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: 'TODO', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
