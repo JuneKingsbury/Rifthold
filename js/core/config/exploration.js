@@ -21,25 +21,25 @@ export const EXPEDITION_ENEMIES = {
     canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: `A gigantic snake that glides through the treetops. Thankfully it isn't venomous, but it's bite is still quite painful.` },
 
     // Arcane chain
-    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: 'TODO', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
-    tome_guardian:    { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', attackAnim: 'Swing', lore: 'TODO' },
-    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#bb88ff', lore: 'TODO', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
-    construct:        { name: 'Arcane Construct',  hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
-    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
+    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: `Small wisps of magical energy that's been allowed to roam freely throughout the university. They seem to enjoy pulling pranks on our explorers.`, spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
+    tome_guardian:    { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', attackAnim: 'Swing', lore: `A floating eyeball that diligently guards the quiet library's books. It is unclear just how long these beings have served as protectors.` },
+    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#bb88ff', lore: 'A creature made from the remnants of a spell cast a long time ago. It seems to haunt the space it once supported as a magical helper.', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
+    construct:        { name: 'Arcane Construct',  hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', attackAnim: 'Swing', lore: `A golem built to guard the university halls. It has an extremely tough outer shell and has been given a set of magical cannons to fend off attackers, almost like a mobile version of the colony's own Arcane Sentinels.`, spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
+    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', attackAnim: 'Swing', lore: `Similar to the spell wraith, this monster is what remains of some long forgotten research project. Something must have gone terribly wrong with it.`, spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
 
     // Shadow chain
-    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing', lore: 'TODO' },
-    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
-    shade:            { name: 'Shade',             hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', lore: 'TODO', spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
-    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
-    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: 'TODO', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
+    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing', lore: `An impish creature that may be mistaken for a Kobaloi at a distance. Up close it becomes far more obvious that this thing is made entirely of some dark substance that completely absorbs the light.` },
+    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: `A strange eyeball with a piercing stare. It stands tall on a pitch black eyestalk, much like that of a crab. Despite all of the oddities, the eyeball itself looks far too human.`, spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
+    shade:            { name: 'Shade',             hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', lore: `A ghostly presence that haunts the explorers of the void. It leeches energy from living things and should be dealt with quickly whenever encountered.`, spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
+    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: `An impossible monster that seems to swim through the air like a deep-water fish. Its teeth are long and sharp and its eyes shine brightly in the dark of the void. Our explorers must take precautions as they are its prey.`, spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
+    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: `A giant bipedal roach that creeps through the deepest parts of the void. They seem to share a close connection to the void and show their cunning through ambush tactics.`, spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
 
     // Kingdom chain (armored: true enables armoredDamageBonus on Runic Greatsword)
-    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: 'TODO' },
-    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: 'TODO' },
-    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: 'TODO' },
-    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: 'TODO', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
-    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: 'TODO' },
+    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: `TODO` },
+    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: `TODO` },
+    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: `TODO` },
+    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: `TODO`, spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
+    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: `TODO` },
 };
 
 // Realm chains a demo-mode player may explore. All other chains stay locked
@@ -161,7 +161,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Crystal Colossus',
-            lore: 'TODO',
+            lore: `TODO`,
             attackAnim: 'Swing',
             approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
             defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
@@ -332,7 +332,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Ancient Treant',
-            lore: 'TODO',
+            lore: `TODO`,
             attackAnim: 'Swing',
             approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
             defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
@@ -516,7 +516,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Arcane Construct',
-            lore: 'TODO',
+            lore: `TODO`,
             attackAnim: 'Swing',
             approachText: 'A half-finished golem lurches to life, crackling with unstable magic!',
             defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
@@ -695,7 +695,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Void Sovereign',
-            lore: 'TODO',
+            lore: `TODO`,
             attackAnim: 'Swing',
             approachText: 'A being of pure void materializes, its gaze alone warping the air!',
             defeatText: 'The Void Sovereign collapses into nothingness, leaving only silence!',
@@ -881,7 +881,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The High King',
-            lore: 'TODO',
+            lore: `TODO`,
             attackAnim: 'Swing',
             approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
             defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
@@ -1670,7 +1670,7 @@ export const PUZZLE_ENCOUNTERS = {
 export const NPC_ENCOUNTERS = {
     wounded_traveler: {
         name: 'Wounded Traveler',
-        lore: 'TODO',
+        lore: `TODO`,
         text: 'A wounded traveler lies beside the path.',
         triggerWeight: 6,
         realmFilter: null,
@@ -1694,7 +1694,7 @@ export const NPC_ENCOUNTERS = {
     },
     mercenary: {
         name: 'Mercenary',
-        lore: 'TODO',
+        lore: `TODO`,
         sprite: 'npc_ally',
         text: 'A sellsword offers their blade, for a price.',
         triggerWeight: 4,
@@ -1716,7 +1716,7 @@ export const NPC_ENCOUNTERS = {
     },
     lost_scholar: {
         name: 'Lost Scholar',
-        lore: 'TODO',
+        lore: `TODO`,
         text: 'A disoriented scholar clutches a bundle of notes.',
         triggerWeight: 5,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -1741,7 +1741,7 @@ export const NPC_ENCOUNTERS = {
     },
     shadow_merchant: {
         name: 'Shadow Merchant',
-        lore: 'TODO',
+        lore: `TODO`,
         text: 'A cloaked figure materializes from the darkness, wares floating around them.',
         triggerWeight: 3,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
@@ -1764,7 +1764,7 @@ export const NPC_ENCOUNTERS = {
     },
     defecting_soldier: {
         name: 'Defecting Soldier',
-        lore: 'TODO',
+        lore: `TODO`,
         sprite: 'npc_ally',
         text: 'A young crusader lowers their blade. "I never wanted this war," they whisper.',
         triggerWeight: 5,
@@ -1793,7 +1793,7 @@ export const NPC_ENCOUNTERS = {
     },
     trapped_miner: {
         name: 'Trapped Miner',
-        lore: 'TODO',
+        lore: `TODO`,
         sprite: 'npc_ally',
         text: 'A muffled voice calls from behind a cave-in. A miner, pinned but alive.',
         triggerWeight: 5,
@@ -1821,7 +1821,7 @@ export const NPC_ENCOUNTERS = {
     },
     wandering_druid: {
         name: 'Wandering Druid',
-        lore: 'TODO',
+        lore: `TODO`,
         text: 'A druid sits cross-legged among the roots, offering to share the forest\'s gifts.',
         triggerWeight: 5,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
@@ -1844,7 +1844,7 @@ export const NPC_ENCOUNTERS = {
     },
     spectral_professor: {
         name: 'Spectral Professor',
-        lore: 'TODO',
+        lore: `TODO`,
         text: 'A translucent scholar hovers by a lectern. "A riddle for a reward, if you please."',
         triggerWeight: 4,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -1867,7 +1867,7 @@ export const NPC_ENCOUNTERS = {
     },
     strange_totem: {
         name: 'Strange Totem',
-        lore: 'TODO',
+        lore: `TODO`,
         text: 'A weathered totem stands at a crossroads, a hollow at its base worn smooth by offerings.',
         triggerWeight: 4,
         realmFilter: null,
