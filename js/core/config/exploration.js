@@ -161,7 +161,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Crystal Colossus',
-            lore: `TODO`,
+            lore: `The heart of the Crystal Caverns. All crystal formations seem to originate from its core, vibrating in sync with its constant, overwhelming, hum. It is unclear how long this entity has ruled these caves, but it seems to have held a grudge against the ancient miners that once ransaked its home. To the colossus, we are just more of those miners.`,
             attackAnim: 'Swing',
             approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
             defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
@@ -1670,7 +1670,7 @@ export const PUZZLE_ENCOUNTERS = {
 export const NPC_ENCOUNTERS = {
     wounded_traveler: {
         name: 'Wounded Traveler',
-        lore: `TODO`,
+        lore: `A common traveler found in all parts of the world. They're always willing to chat with our explorers after getting offered a helping hand.`,
         text: 'A wounded traveler lies beside the path.',
         triggerWeight: 6,
         realmFilter: null,
@@ -1694,7 +1694,7 @@ export const NPC_ENCOUNTERS = {
     },
     mercenary: {
         name: 'Mercenary',
-        lore: `TODO`,
+        lore: `A hardened sellsword found throughout the world. They are willing to fight in even the most dangerous places, for the right price.`,
         sprite: 'npc_ally',
         text: 'A sellsword offers their blade, for a price.',
         triggerWeight: 4,
@@ -1716,7 +1716,7 @@ export const NPC_ENCOUNTERS = {
     },
     lost_scholar: {
         name: 'Lost Scholar',
-        lore: `TODO`,
+        lore: `A scholar seemingly trapped in a haze within the university. His research is highly valuable for our community, but he never seems to remember our explorers when encountered and always insists on staying at the university despite its dangers.`,
         text: 'A disoriented scholar clutches a bundle of notes.',
         triggerWeight: 5,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -1741,7 +1741,7 @@ export const NPC_ENCOUNTERS = {
     },
     shadow_merchant: {
         name: 'Shadow Merchant',
-        lore: `TODO`,
+        lore: `A mysterious figure that appears in the shadows, offering deals that seem too good to be true.`,
         text: 'A cloaked figure materializes from the darkness, wares floating around them.',
         triggerWeight: 3,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
@@ -1764,7 +1764,7 @@ export const NPC_ENCOUNTERS = {
     },
     defecting_soldier: {
         name: 'Defecting Soldier',
-        lore: `TODO`,
+        lore: `A young soldier who has grown disillusioned with the war and seeks refuge with the party. They're never able to find the courage to leave their home and truly join the colony, though no one can blame them for it.`,
         sprite: 'npc_ally',
         text: 'A young crusader lowers their blade. "I never wanted this war," they whisper.',
         triggerWeight: 5,
