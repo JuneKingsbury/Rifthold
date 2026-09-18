@@ -332,7 +332,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Ancient Treant',
-            lore: `TODO`,
+            lore: `A massive, sentient tree that has stood in the canopy for centuries. It is said to be the guardian of the forest, and it will not tolerate intruders in its domain.`,
             attackAnim: 'Swing',
             approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
             defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
@@ -516,9 +516,9 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Arcane Construct',
-            lore: `TODO`,
+            lore: `A sentient construct born through magical experimentation. One of the few surviving research notes make mention of the being's peaceful nature and gentleness. It is of little surprise that all of these years alone would send it into madness.`,
             attackAnim: 'Swing',
-            approachText: 'A half-finished golem lurches to life, crackling with unstable magic!',
+            approachText: 'A half-finished golem whirrs to life, crackling with unstable magic!',
             defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
             guaranteedLoot: [
                 { item: 'arcane_amplifier', chance: 0.5 },
@@ -529,7 +529,7 @@ export const REALMS = {
                 {
                     name: 'Awakened', hp: 290, damage: 20,
                     color: '#ff8844', sprite: 'boss_arcane_construct',
-                    transitionText: 'The Arcane Construct overclocks! Sparks fly wildly!',
+                    transitionText: 'The Arcane Construct accelerates! Sparks fly wildly!',
                 },
                 {
                     name: 'Enraged', hp: 240, damage: 30,
