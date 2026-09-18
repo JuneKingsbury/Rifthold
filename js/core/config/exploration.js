@@ -376,7 +376,7 @@ export const REALMS = {
                 '{name} feels the forest watching them with a patient intelligence.',
             ],
             discoveries: [
-                '{name} finds a treehouse larder still stocked with preserved fruit.',
+                '{name} finds a tree house larder still stocked with preserved fruit.',
                 'A massive seed pod cracks open, revealing usable materials.',
                 '{name} discovers a natural spring with restorative waters.',
             ],
@@ -785,8 +785,8 @@ export const REALMS = {
             ambient: [
                 '{name} keeps to the treeline as a crusader patrol marches past on the road.',
                 'Banners of the High King snap in the wind above a fortified checkpoint.',
-                'A muster camp sprawls across the valley, cookfires and drilling recruits.',
-                '{name} passes a wayshrine defaced with anti-magic scripture.',
+                'A temporary encampment sprawls across the valley. {name} can hear orders being barked all throughout.',
+                '{name} passes a shrine defaced with anti-magic scripture.',
                 'The distant toll of a war-bell rolls across the farmland.',
                 '{name} finds a refugee trail, cold and long abandoned.',
             ],
