@@ -35,11 +35,11 @@ export const EXPEDITION_ENEMIES = {
     oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: `A giant bipedal roach that creeps through the deepest parts of the void. They seem to share a close connection to the void and show their cunning through ambush tactics.`, spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
 
     // Kingdom chain (armored: true enables armoredDamageBonus on Runic Greatsword)
-    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: `TODO` },
-    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: `TODO` },
-    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: `TODO` },
-    royal_mage:       { name: 'Royal Mage',        hp: [50, 75],  damage: [10, 16],sprite: 'royal_mage', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: `TODO`, spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
-    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: `TODO` },
+    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: `A common soldier of the kingdom, armed with a simple spear. These soldiers seem under trained and poorly equipped, as if the kingdom had no foresight that battles would be fought on this side of their borders.` },
+    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: `A seasoned warrior of the kingdom, clad in heavy armor. Their heavy swords easily cleave through the armor of our explorers.` },
+    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: `A devoted warrior dedicated to the cause of the kingdom. Great care should be taken when fighting these heavily armed fanatics.` },
+    high_priest:      { name: 'High Priest',       hp: [50, 75],  damage: [10, 16],sprite: 'high_priest', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: `A high ranking member of the royal clergy. Their divine magic is the only kind permissible in the kingdom, though they are extremely limited in their use. The Crusaders see them as a necessary evil, barely tolerating their presence.`, spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
+    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: `A skilled member of the palace guard, loyal only to the king himself. The best of the best in terms of martial prowess.` },
 };
 
 // Realm chains a demo-mode player may explore. All other chains stay locked
@@ -779,7 +779,7 @@ export const REALMS = {
         enemies: { count: [2, 4], types: [
             { key: 'kingdom_guard', weight: 50 },
             { key: 'knight', weight: 35 },
-            { key: 'royal_mage', weight: 15 },
+            { key: 'high_priest', weight: 15 },
         ] },
         events: {
             ambient: [
@@ -828,7 +828,7 @@ export const REALMS = {
             { key: 'kingdom_guard', weight: 15 },
             { key: 'knight', weight: 30 },
             { key: 'crusader', weight: 35 },
-            { key: 'royal_mage', weight: 20 },
+            { key: 'high_priest', weight: 20 },
         ] },
         events: {
             ambient: [
@@ -876,7 +876,7 @@ export const REALMS = {
         enemies: { count: [3, 6], types: [
             { key: 'knight', weight: 15 },
             { key: 'crusader', weight: 30 },
-            { key: 'royal_mage', weight: 25 },
+            { key: 'high_priest', weight: 25 },
             { key: 'palace_champion', weight: 30 },
         ] },
         boss: {
