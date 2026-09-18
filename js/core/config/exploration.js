@@ -18,10 +18,10 @@ export const EXPEDITION_ENEMIES = {
     thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab', lore: 'A jungle predator covered in sharp thorns. Its teeth are even sharper.' },
     spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', lore: 'A plant creature infected by blight. It moves much faster than its creeping kin.', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
     fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', lore: 'A creature made almost entirely of blight fungus. Far more dangerous than the average blight bloom seen in the Frontier.', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
-    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: `A gigantic snake that glides through the treetops. Thankfully it isn't venomous, but it's bite is still quite painful.` },
+    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: `A gigantic snake that glides through the treetops. Thankfully it isn't venomous, but its bite is still quite painful.` },
 
     // Arcane chain
-    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: `Small wisps of magical energy that's been allowed to roam freely throughout the university. They seem to enjoy pulling pranks on our explorers.`, spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
+    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: `Small wisps of magical energy that have been allowed to roam freely throughout the university. They seem to enjoy pulling pranks on our explorers.`, spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
     tome_guardian:    { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', attackAnim: 'Swing', lore: `A floating eyeball that diligently guards the quiet library's books. It is unclear just how long these beings have served as protectors.` },
     spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#bb88ff', lore: 'A creature made from the remnants of a spell cast a long time ago. It seems to haunt the space it once supported as a magical helper.', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
     construct:        { name: 'Arcane Construct',  hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', attackAnim: 'Swing', lore: `A golem built to guard the university halls. It has an extremely tough outer shell and has been given a set of magical cannons to fend off attackers, almost like a mobile version of the colony's own Arcane Sentinels.`, spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
@@ -29,13 +29,13 @@ export const EXPEDITION_ENEMIES = {
 
     // Shadow chain
     shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing', lore: `An impish creature that may be mistaken for a Kobaloi at a distance. Up close it becomes far more obvious that this thing is made entirely of some dark substance that completely absorbs the light.` },
-    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: `A strange eyeball with a piercing stare. It stands tall on a pitch black eyestalk, much like that of a crab. Despite all of the oddities, the eyeball itself looks far too human.`, spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
+    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: `A strange eyeball with a piercing stare. It stands tall on a pitch-black eyestalk, much like that of a crab. Despite all of the oddities, the eyeball itself looks far too human.`, spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
     shade:            { name: 'Shade',             hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', lore: `A ghostly presence that haunts the explorers of the void. It leeches energy from living things and should be dealt with quickly whenever encountered.`, spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
     void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: `An impossible monster that seems to swim through the air like a deep-water fish. Its teeth are long and sharp and its eyes shine brightly in the dark of the void. Our explorers must take precautions as they are its prey.`, spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
     oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: `A giant bipedal roach that creeps through the deepest parts of the void. They seem to share a close connection to the void and show their cunning through ambush tactics.`, spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
 
     // Kingdom chain (armored: true enables armoredDamageBonus on Runic Greatsword)
-    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: `A common soldier of the kingdom, armed with a simple spear. These soldiers seem under trained and poorly equipped, as if the kingdom had no foresight that battles would be fought on this side of their borders.` },
+    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: `A common soldier of the kingdom, armed with a simple spear. These soldiers seem undertrained and poorly equipped, as if the kingdom had no foresight that battles would be fought on this side of their borders.` },
     knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: `A seasoned warrior of the kingdom, clad in heavy armor. Their heavy swords easily cleave through the armor of our explorers.` },
     crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: `A devoted warrior dedicated to the cause of the kingdom. Great care should be taken when fighting these heavily armed fanatics.` },
     high_priest:      { name: 'High Priest',       hp: [50, 75],  damage: [10, 16],sprite: 'high_priest', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: `A high ranking member of the royal clergy. Their divine magic is the only kind permissible in the kingdom, though they are extremely limited in their use. The Crusaders see them as a necessary evil, barely tolerating their presence.`, spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
@@ -134,7 +134,7 @@ export const REALMS = {
                 'A pressurized gas pocket bursts near {name}!',
             ],
             rare: [
-                { chance: 0.04, text: '{name} finds an untouched runite motherload!', loot: { resource: 'runite', amount: [6, 12] } },
+                { chance: 0.04, text: '{name} finds an untouched runite motherlode!', loot: { resource: 'runite', amount: [6, 12] } },
                 { chance: 0.03, text: '{name} discovers a crystallized void pocket deep underground!', loot: { resource: 'void_essence', amount: [4, 8] } },
                 { chance: 0.015, text: '{name} unearths an ancient mining golem battery that still hums with power!', loot: { item: 'ley_battery' } },
                 { chance: 0.015, text: '{name} pries a ward stone from a sealed vault door!', loot: { item: 'ward_of_the_sentinel' } },
@@ -161,7 +161,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Crystal Colossus',
-            lore: `The heart of the Crystal Caverns. All crystal formations seem to originate from its core, vibrating in sync with its constant, overwhelming, hum. It is unclear how long this entity has ruled these caves, but it seems to have held a grudge against the ancient miners that once ransaked its home. To the colossus, we are just more of those miners.`,
+            lore: `The heart of the Crystal Caverns. All crystal formations seem to originate from its core, vibrating in sync with its constant, overwhelming hum. It is unclear how long this entity has ruled these caves, but it seems to have held a grudge against the ancient miners that once ransacked its home. To the colossus, we are just more of those miners.`,
             attackAnim: 'Swing',
             approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
             defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
@@ -212,7 +212,7 @@ export const REALMS = {
             ],
             traps: [
                 'A crystal stalactite shatters and rains razor shards on {name}!',
-                '{name} triggers a pressure plate, detonating long forgotten explosives!',
+                '{name} triggers a pressure plate, detonating long-forgotten explosives!',
                 'Superheated steam vents from a crack, scalding {name}!',
                 'The floor collapses into a crystal-lined sinkhole beneath {name}!',
             ],
@@ -2181,8 +2181,8 @@ export const STORY_MILESTONES = {
         these parts, but you'll keep your doors open for traders and wanderers who 
         stumble past.
         <br><br>
-        With this seclusion you hope to build a thriving community while you wait out 
-        the growing crusade in your home lands. Here we will be able to practice magic 
+        With this seclusion you hope to build a thriving community while you wait out
+        the growing crusade in your homelands. Here we will be able to practice magic
         freely and attempt to reclaim knowledge that's been lost to time.`,
     },
     colony_5: {
@@ -2203,8 +2203,8 @@ export const STORY_MILESTONES = {
         title: 'A Thriving Community',
         trigger: 'colonist_count_10',
         text: `
-        You think back to how this community began. We were small and scared, nearly 
-        starving through our first winter. You've all grown much stronger, in body, 
+        You think back to how this community began. We were small and scared, nearly
+        starving through our first winter. You've all grown much stronger, in body,
         mind, and spirit. Your efforts to lead this community are paying off in spades.
         <br><br>
         You still have to keep pushing. The Crusade is looming on the horizon and your
@@ -2227,15 +2227,15 @@ export const STORY_MILESTONES = {
         title: 'Fie on Goodness',
         trigger: 'first_crusader_raid_survived',
         text: `
-        You hadn't anticipated crusaders making it this deep into the frontier. 
+        You hadn't anticipated crusaders making it this deep into the frontier.
         Thankfully you were prepared, pushing back the invaders for the time being.
         <br><br>
-        Their presence shakes the whole colony. Rumors spread that greater forces will 
+        Their presence shakes the whole colony. Rumors spread that greater forces will
         be sent our way in the near future. We'll need to be prepared for anything.
         <br><br>
-        It may even be time to use our progress to slow down the crusade. Perhaps we 
-        could open a rift right into the heart of the kingdom and cut off their supplies 
-        from there? The dangers will be colossal, but we'll do what we must to keep our 
+        It may even be time to use our progress to slow down the crusade. Perhaps we
+        could open a rift right into the heart of the kingdom and cut off their supplies
+        from there? The dangers will be colossal, but we'll do what we must to keep our
         frontier safe.`,
     },
     first_mental_break: {
@@ -2243,10 +2243,10 @@ export const STORY_MILESTONES = {
         title: 'The Breaking Point',
         trigger: 'first_mental_break',
         text: `
-        Today a colonist has lost control of themselves. We all knew that life on the 
+        Today a colonist has lost control of themselves. We all knew that life on the
         frontier would be difficult, but the constant toil is often too much to bear.
         <br><br>
-        Perhaps we can find ways to keep everyone happy? Better sleeping quarters 
+        Perhaps we can find ways to keep everyone happy? Better sleeping quarters
         and consistent access to cooked food is a good starting point.`,
     },
     first_death: {
@@ -2254,11 +2254,11 @@ export const STORY_MILESTONES = {
         title: 'The First Marker',
         trigger: 'first_colonist_death',
         text: `
-        Today a colonist has died. This will take a major toll on the friends they've 
-        made over their time here. Another may one day take their place in the colony, 
+        Today a colonist has died. This will take a major toll on the friends they've
+        made over their time here. Another may one day take their place in the colony,
         but this loss will be felt for a very long time.
         <br><br>
-        We'll do what we can to keep the remaining colonists safe. Fight in groups, always 
+        We'll do what we can to keep the remaining colonists safe. Fight in groups, always
         wear armor, try out ranged weapons, and keep an abundant supply of healing potions.`,
     },
     first_tame: {
@@ -2266,8 +2266,8 @@ export const STORY_MILESTONES = {
         title: 'Kindred Spirits',
         trigger: 'first_animal_tamed',
         text: `
-        The Binding Circle was a huge success! Your colony's first animal companion 
-        has joined the flock and now lives among us. This animal will provide a lot 
+        The Binding Circle was a huge success! Your colony's first animal companion
+        has joined the flock and now lives among us. This animal will provide a lot
         to our community as long as we care for it properly.`,
     },
     first_trade: {
@@ -2310,8 +2310,8 @@ export const STORY_MILESTONES = {
         title: 'Winter Celebration',
         trigger: 'first_winter_feast',
         text: `
-        Winter has arrived and the colony is feeling optimistic. By the first frost 
-        we were able to secure plenty of food to last through the season. In their 
+        Winter has arrived and the colony is feeling optimistic. By the first frost
+        we were able to secure plenty of food to last through the season. In their
         excitement, the colonists proposed a feast to celebrate their hard work.
         <br><br>
         The Winter Feast is a common tradition throughout the world, though everyone 
@@ -2395,8 +2395,8 @@ export const STORY_MILESTONES = {
         title: 'Arcane Studies',
         trigger: 'research_arcane_studies',
         text: `
-        You find that your colonists are quickly out growing the simple tomes 
-        they create in the workshop. Perhaps this knowledge will satisfy their desire 
+        You find that your colonists are quickly outgrowing the simple tomes
+        they create in the workshop. Perhaps this knowledge will satisfy their desire
         to learn.`,
     },
     research_void_summoning: {
@@ -2424,8 +2424,8 @@ export const STORY_MILESTONES = {
         title: 'Deep Delving',
         trigger: 'research_deep_delving',
         text: `
-        In spite of the dangers you find yourself sending colonists deeper into 
-        these hostile realms. The deeper they go the greater the rewards become, but 
+        In spite of the dangers you find yourself sending colonists deeper into
+        these hostile realms. The deeper they go the greater the rewards become, but
         how will we keep up with the dangers ahead?`,
     },
     research_golem_craft: {
@@ -2433,37 +2433,38 @@ export const STORY_MILESTONES = {
         title: 'Golem Craft',
         trigger: 'research_golem_craft',
         text: `
-        With the creative use of runes and void essence, you find ways to 
-        automate the tasks your colonists have been stuck doing for all this time. 
-        These golems are great at each task you built them for, but after construction 
-        you find yourself unable to change their objectives.`,
+        Soon your first golem will be up and running, but what do you want them to
+        do? Maybe it can act as a beast of burden, taking on the menial labor your
+        colonists have been putting in for all these years. It's really too bad a
+        single golem can't do everything.`,
     },
     research_herbalism: {
         tab: 'research',
         title: 'Herbalism',
         trigger: 'research_herbalism',
         text: `
-        With some effort you find yourself not only able to work with the magic 
-        in nature, but strengthen it. Your crops are hardier and somehow grow even 
-        faster than they did before!`,
+        You're quickly feeling more in-tune with the plants of the Frontier. With
+        the right care you think your crops will be able to handle much harsher
+        conditions going forward.`,
     },
     research_void_architecture: {
         tab: 'research',
         title: 'Void Architecture',
         trigger: 'research_void_architecture',
         text: `
-        You find more and more uses for void essence every day. Ignoring their 
-        magical potential, they make for an amazing building material, creating 
-        walls and doors that are much more difficult to break during battle.`,
+        Your colony has found even more uses for the void essence you collect. By
+        hardening our walls and doors with the stuff we'll be able to hold off large
+        groups of enemies with ease.`,
     },
     research_mana_reservoir: {
         tab: 'research',
         title: 'Mana Reservoir',
         trigger: 'research_mana_reservoir',
         text: `
-        With new buildings that use up your colony's mana reserves, you find 
-        innovative ways to stretch the mana even further. You're now able to 
-        maintain more generating crystals and get more energy out of each one.`,
+        Your mana reserves have been stretched thin, so it's time to innovate.
+        With some runic tinkering you're able to get more juice out of each mana
+        crystal. Your colonists will be pleased to know that the energy problem
+        is solved for now.`,
     },
     research_alchemy: {
         tab: 'research',
@@ -2489,8 +2490,8 @@ export const STORY_MILESTONES = {
         title: 'Arcane Infusion',
         trigger: 'research_arcane_infusion',
         text: `
-        You colony can now create their first Enchanting Table. You're excited 
-        about the possibilities this brings, letting you start enchanting your 
+        Your colony can now create their first Enchanting Table. You're excited
+        about the possibilities this brings, letting you start enchanting your
         existing equipment to further boost your colonists.`,
     },
     research_warding: {
@@ -2511,7 +2512,7 @@ export const STORY_MILESTONES = {
         text: `
         Harnessing void essence to its full potential, you can now create equipment 
         to rival the weaponry of the far off crusaders. It'll be difficult to find 
-        enough of this material to supply your entire colony, but its not impossible.`,
+        enough of this material to supply your entire colony, but it's not impossible.`,
     },
     research_masterwork: {
         tab: 'research',
@@ -2629,7 +2630,7 @@ export const STORY_MILESTONES = {
         A people with a strong connection to the wilderness. The ferini have always found 
         themselves on the outskirts of society, living among themselves and the animals they 
         befriend in far off lands. The Frontier is comfortable for the ferini, acting as many 
-        community's home for years already.
+        communities' home for years already.
         <br><br>
         The ferini largely live their lives unseen by other groups of people, content to 
         live among their own and let the land provide for them all that they need. Ferini 
