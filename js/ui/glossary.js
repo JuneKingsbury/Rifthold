@@ -16,8 +16,8 @@ export const GLOSSARY = [
             {
                 subtitle: 'Needs & Mood',
                 entries: [
-                    ['Hunger', 'Decays over time. Colonists interrupt work to eat when critically hungry. Cooked food fully restores hunger; raw food only partially restores it.'],
-                    ['Rest', 'Decays over time. Colonists seek sleep when exhausted. Sleeping in an assigned bed gives a mood bonus; sleeping on the ground does not.'],
+                    ['Hunger', 'Decays over time. Colonists interrupt work to eat when critically hungry. Cooked food fully restores hunger whereas raw food only partially restores it.'],
+                    ['Rest', 'Decays over time. Colonists seek sleep when exhausted. Sleeping in an assigned bed gives a mood bonus while sleeping on the ground does not.'],
                     ['Mood', 'A colonist\'s mood is their base value modified by active thoughts. Mood level directly determines work speed and willingness to work.'],
                     ['Mood Levels', 'Four tiers from best to worst: Inspired (fastest work), Content (normal speed), Stressed (slow), and Breaking (refuses all work). Keep colonists above the stress threshold for productive labor.'],
                     ['Thoughts', 'Temporary mood modifiers gained from events, meal quality, weather, social interactions, achievements, and room quality. Each thought fades after a duration.'],
@@ -47,7 +47,7 @@ export const GLOSSARY = [
                     ['Skills', 'Six work skills (Building, Farming, Crafting, Cooking, Animals, Research) plus six magic schools. Higher skill levels mean faster task completion and better outcomes.'],
                     ['Skill Leveling', 'Skills improve through use, with completing related tasks granting experience. Each level requires progressively more experience than the last.'],
                     ['Health', 'Colonists have hit points that regenerate slowly when idle and faster when sleeping. If a colonist dies, surviving colonists suffer severe mood penalties based on their relationship.'],
-                    ['Equipment Slots', 'Each colonist has Weapon, Armor, Helmet, Boots, Tool, and Trinket slots. Use Auto-equip to quickly assign the best available gear, or manually equip from the inventory.'],
+                    ['Equipment Slots', 'Each colonist has Weapon, Armor, Helmet, Clothes, Boots, Tool, and Trinket slots. Use Auto-equip to quickly assign the best available gear, or manually equip from the inventory.'],
                     ['Active Effects', 'Temporary buffs from potions and spells appear in the colonist info panel with remaining duration. Effects include speed boosts, damage shields, and healing. Buffed colonists pulse on the map.'],
                 ]
             },
@@ -78,7 +78,7 @@ export const GLOSSARY = [
                     ['How Tasks Work', 'When you designate work (building, gathering, farming, etc.), tasks enter a queue. Colonists pick tasks based on their priority settings for the relevant skill.'],
                     ['Priorities', 'Set each skill from 1 (highest priority) to 5 (lowest), or disable it entirely. Colonists always attempt the lowest-numbered available task they have skill for.'],
                     ['Work Speed', 'How fast a colonist completes tasks is determined by their skill level, mood, traits, equipped tool, active spell or trinket effects, and workshop quality. All bonuses multiply together.'],
-                    ['Tool Bonuses', 'Equipping the right tool type (Pickaxe, Axe, Sickle, Hammer, Mattock) speeds up matching tasks. Higher-tier tools provide bigger bonuses. Mattocks cover multiple tasks but are weaker than specialists.'],
+                    ['Tool Bonuses', 'Equipping the right tool type (Pickaxe, Axe, Sickle, Hammer, Mattock) speeds up matching tasks. Higher-tier tools provide bigger bonuses. Mattocks cover multiple tasks but are weaker than specialists. The Tool slot also accepts off-hand combat items like shields and quivers, as well as utility items like lanterns and war drums.'],
                     ['Mood & Work Speed', 'Inspired colonists work noticeably faster. Stressed colonists work significantly slower. Breaking colonists stop working entirely until their mood recovers.'],
                     ['Idle Behavior', 'Colonists with no tasks may wander, stargaze, skip stones, or socialize. If a Town Hall exists, idle colonists will gather there for mood-boosting relaxation activities.'],
                 ]
@@ -124,7 +124,7 @@ export const GLOSSARY = [
             {
                 subtitle: 'Crafting System',
                 entries: [
-                    ['Crafting Stations', 'Different items require different stations: A Workbench for basic goods, an Anvil for metalwork, a Cooking Pot for cooking, an Alchemy Table for potions, an Enchanting Table for enchantments. Build the right station, then queue recipes. Building multiple of the same workstation will allow more colonists to take on crafting tasks at the unoccupied stations.'],
+                    ['Crafting Stations', 'Different items require different stations: A Workbench for basic goods, an Anvil for metalwork, a Cooking Pot for cooking, an Alchemy Table for potions, an Enchanting Table for enchantments and runic gear, a Loom for clothing, and a Scriptorium for crafting spell tomes. Build the right station, then queue recipes. Building multiple of the same workstation will allow more colonists to take on crafting tasks at the unoccupied stations.'],
                     ['How Crafting Works', 'Open the Craft panel (C) and queue recipes. Colonists with Crafting or Cooking skill will work queued recipes at the appropriate station. Mana-powered stations (Enchanting Tables) work faster than their unpowered counterparts (Workbenches).'],
                     ['Quality Tiers', 'Crafted equipment rolls a quality level from Crude to Superior. Higher Crafting skill gives that colonist better odds of higher quality crafts. Quality multiplies the item\'s effectiveness signifigantly, with high-quality equipment from lower tiers outpacing low-quality equipment from higher tiers.'],
                     ['Enchantment Effects', 'Similar to equipment Quality, you can choose to enchant any non-trinket equipment from the inventory for a small cost. This will queue an enchantment task that is prioritized as a crafting task but distinctly uses the Enchantment skill level from the working colonist. These enchantments vary widely, applying some new effect to the equipment with a power level based on the enchantment\'s tier (I, II, III, or IV). The higher the Enchantment skill, the better odds of higher enchantment tiers. Enchanted equipment can also be queued for enchantment multiple times, replacing the previous effect with a newly rolled one, allowing you to re-enchant your best equipment until you find an effect that you\'re satisfied with.'],
@@ -144,9 +144,10 @@ export const GLOSSARY = [
                 subtitle: 'Trading',
                 entries: [
                     ['Trade Caravans', 'Merchants arrive as random events. Open the barter panel to exchange resources and items. You sell at a discount and buy at a markup compared to base values.'],
-                    ['Merchant Types', 'Different merchants carry different goods. Arms Dealers sell weapons and armor, Tome Peddlers sell spell tomes, and Wandering Alchemists sell potions and rare ingredients.'],
                     ['Exclusive Items', 'Some powerful items cannot be crafted and are only available from traders or as expedition loot. Watch for rare offerings when caravans arrive.'],
                     ['Trade Research', 'Research Trade Routes to improve your buy and sell rates colony-wide, making trading significantly more efficient.'],
+                    ['Trade Rift', 'An advanced building unlocked with Trade Rifts research. It presents periodic supply contracts: fulfill the requested goods within the season (or year, for larger contracts) to earn high-quality equipment, spell tomes, or rare artifacts. Seasonal contracts refresh each season while yearly contracts refresh once per year and carry bigger rewards. The quality floor on received gear is higher than what you tend to see when crafting, making the Trade Rift one of the best sources of top-tier equipment.'],
+                    ['Merchant Types', 'Different merchants carry different goods. Arms Dealers sell weapons and armor. Tome Peddlers sell spell tomes. Wandering Alchemists sell potions and rare ingredients. Clothiers sell clothing and boots. Expedition Outfitters carry expedition supplies and pack-animal gear. Rare Goods Brokers stock late-game trinkets and exotic materials. Watch for rare offerings when caravans arrive.'],
                 ]
             },
         ]
@@ -175,7 +176,7 @@ export const GLOSSARY = [
                     ['Abjuration', 'Healing and defensive spells that keep colonists alive during raids and combat encounters.'],
                     ['Conjuration', 'Summon familiars, spirits, and golems to fight alongside your colonists or teleport them to safety.'],
                     ['Transmutation', 'Accelerate crop growth and reshape terrain. Powerful for farming-focused colonies.'],
-                    ['Divination', 'Influence fate itself to delay incoming raids, attract trade caravans, suppress disasters, or shift the weather in your favor.'],
+                    ['Divination', 'Influence fate itself to delay incoming raids, attract trade caravans, suppress disasters, or shift the weather in your favor. Colonists with Divination skill also generate Omens: prophecies visible in the Arcane panel (V) that give advance warning of incoming raids, weather shifts, and events. Higher Divination skill reveals finer timing and unlocks more omen categories, including hints about what lurks in expedition realms.'],
                 ]
             },
             {
@@ -248,7 +249,14 @@ export const GLOSSARY = [
                 subtitle: 'Exploration',
                 entries: [
                     ['Rift Gate', 'Build after researching Planar Rift. Click to open the expedition panel and send parties to other realms for loot. The gate consumes mana while active.'],
-                    ['Expedition Parties', 'Select up to five colonists and two pack animals. Choose a realm and difficulty level. Higher difficulty means tougher enemies but significantly better loot and rare item chances.'],
+                    ['Expedition Parties', 'Select up to five colonists, two pack animals, and two war beasts. Choose a realm and difficulty level. Higher difficulty means tougher enemies but significantly better loot and rare item chances.'],
+                    ['Formation', 'When building an expedition party, assign colonists to the front or back row. Front-row fighters absorb more incoming attacks while back-row members benefit from cover. Placing your toughest warriors up front and your spellcasters or archers in the back is generally the most effective approach.'],
+                    ['Party Synergy', 'Colonists who share a strong relationship fight better together. Friends, close friends, and lovers in the same expedition party gain a damage bonus, while rivals and adversaries in the party can undercut each other. The relationship thoughts you invest in at home carry real weight in the field.'],
+                    ['Expedition Fatigue', 'After returning from an expedition, colonists enter a rest period before they can embark again. Longer or harder expeditions impose longer fatigue. The Trailblazer trait and certain expedition XP level bonuses reduce fatigue duration.'],
+                    ['Expedition XP', 'Colonists earn expedition experience each time they complete a run. As they level up they unlock passive bonuses: increased damage, better loot, reduced fatigue, and higher rare encounter rates. Expedition level is tracked per-colonist and persists across all realms.'],
+                    ['War Beasts', 'Tamed wolves and boars can join expeditions as war beasts, fighting alongside your party in combat encounters. Unlike pack animals, war beasts actively participate in battle and can take damage. They always return home safely even if the party is defeated.'],
+                    ['Party Presets', 'Save your favorite party configurations as named presets from the expedition panel. Presets store the colonist lineup, formation, and carried potions, letting you quickly re-field a proven team without rebuilding it each time.'],
+                    ['Auto-Expedition', 'Research the Auto-Expedition tech chain to allow saved party presets to embark automatically when all members are rested and ready. Higher tiers of the research allow more presets to run simultaneously, enabling hands-off farming of multiple realms at once.'],
                     ['Realms', 'Multiple expedition chains, each with increasing depth. Deeper realms require completing the previous one first. Later chains require additional research to unlock.'],
                     ['Encounters', 'During expeditions, your party faces combat encounters, traps, and discoveries. Combat resolves in real-time rounds. Even on defeat, you keep items found before the loss. Colonists defeated during an expedition will always survive their retreat, re-joining the colony at extremely low health.'],
                     ['Pack Animals', 'Tamed okapi can join expeditions as pack animals, reducing expedition duration. Bring them for faster completion and more efficient loot runs. Pack animals do not participate in combat and always return home safely.'],
