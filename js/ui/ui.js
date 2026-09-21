@@ -469,7 +469,7 @@ export class UI {
         const hasNew = this.game.story.hasUnviewed();
         const researchNeedsAtt = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
         const currentManaCrystalBonus = this.game.manaCrystalBonus || 0;
-        const expPending = !!this.game.exploration?.expeditions?.some(e => !e.autoMode && e.pendingDecision);
+        const expPending = !!this.game.exploration?.expeditions?.some(e => !e.autoMode && (e.pendingDecision || e.pendingVoidPactChoice));
         const modeBarChanged = hasNew !== this._lastStoryHasNew || researchNeedsAtt !== this._lastResearchNeedsAttention || currentManaCrystalBonus !== this._lastManaCrystalBonus || expPending !== this._lastExpPending;
         if (modeBarChanged) {
             this._lastStoryHasNew = hasNew;
@@ -718,7 +718,7 @@ export class UI {
                 if (btn) btn.classList.add('tutorial-highlight');
             }
         }
-        if (this.game.exploration?.expeditions?.some(e => !e.autoMode && e.pendingDecision)) {
+        if (this.game.exploration?.expeditions?.some(e => !e.autoMode && (e.pendingDecision || e.pendingVoidPactChoice))) {
             const btn = this.elements.modeBar.querySelector('[data-mode-action="arcane"]');
             if (btn) btn.classList.add('tutorial-highlight');
         }
@@ -3380,7 +3380,14 @@ export class UI {
         this.elements.eventPanel.style.display = 'block';
         window.soundManager?.playSFXPitched('open_close_click', 3);
         this.elements.eventPanel.className = evt.type === 'raid' ? 'event-panel-raid' : '';
-        let html = `<div class="event-text">${evt.text}</div><div class="event-choices">`;
+        let html = `<div class="event-text">${evt.text}</div>`;
+        if (evt.type === 'void_whisper') {
+            html += `<div style="margin:6px 0;padding:6px;background:#0d0d1a;border-radius:3px;">`;
+            html += `<div style="color:#cc66ff;font-size:0.85em;margin-bottom:3px;"><b>It asks:</b> ${evt.askText}</div>`;
+            html += `<div style="color:#88ddaa;font-size:0.85em;"><b>It offers:</b> ${evt.rewardText}</div>`;
+            html += `</div>`;
+        }
+        html += `<div class="event-choices">`;
         if (evt.type === 'trade') {
             html += `<button onclick="window.game.openTradePanel()">Open Trade</button>`;
             html += `<button onclick="window.game.dismissTrader()">Dismiss</button>`;

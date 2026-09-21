@@ -373,6 +373,20 @@ export class ExplorationSystem {
                     continue;
                 }
             }
+            // Void pact mid-boss deal: pause combat until the player resolves the choice.
+            // Auto-mode skips it (no choice possible) and just refuses.
+            if (exp.pendingVoidPactChoice) {
+                if (exp.autoMode) {
+                    this.resolveVoidPactChoice(game, exp.id, false);
+                } else {
+                    if (exp.startTick !== undefined) exp.startTick++;
+                    if (!exp._wasPaused) {
+                        exp._wasPaused = true;
+                        if (!game.paused) game.togglePause();
+                    }
+                    continue;
+                }
+            }
             if (exp._wasPaused) exp._wasPaused = false;
 
             const elapsed = game.tick - exp.startTick;
@@ -1022,11 +1036,18 @@ export class ExplorationSystem {
                     shieldActive: false,
                     shieldReduction: 0,
                     dodgeCharges: 0,
+                    chaosResistance: getEquipmentStat(c, 'chaosResistance'),
                 };
             });
             this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
             game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
             exp.lastMicroEventTick = game.tick;
+            // Consume void whisper rare loot bonus if one was promised.
+            if (game._voidWhisperNextExpRareMult) {
+                if (!exp.potionLootBoosts) exp.potionLootBoosts = { lootMult: 1, rareEncounterMult: 1 };
+                exp.potionLootBoosts.rareEncounterMult = (exp.potionLootBoosts.rareEncounterMult || 1) * game._voidWhisperNextExpRareMult;
+                game._voidWhisperNextExpRareMult = null;
+            }
         }
     }
 
@@ -1156,6 +1177,26 @@ export class ExplorationSystem {
             [encounters[i], encounters[j]] = [encounters[j], encounters[i]];
         }
 
+        // Chaos realms: stamp each encounter with a randomized vis and occasionally
+        // inject decisions/events from entirely different realms to break expectations.
+        if (dim.chain === 'chaos') {
+            const allVisPairs = Object.values(REALMS)
+                .filter(r => r.vis)
+                .map(r => r.vis);
+            const otherRealms = Object.entries(REALMS).filter(([k, r]) => r.chain !== 'chaos' && !r.boss);
+            for (const enc of encounters) {
+                enc.chaosVis = allVisPairs[Math.floor(Math.random() * allVisPairs.length)];
+                // 20% chance: replace ambient/decision flavor with content from a random other realm
+                if (enc.type !== 'combat' && Math.random() < 0.20 && otherRealms.length > 0) {
+                    const [crossKey, crossDim] = otherRealms[Math.floor(Math.random() * otherRealms.length)];
+                    enc._crossRealmKey = crossKey;
+                    if (crossDim.events?.ambient?.length > 0) {
+                        enc._crossRealmAmbient = crossDim.events.ambient;
+                    }
+                }
+            }
+        }
+
         let bossEncounter = null;
         if (dim.boss) {
             const boss = dim.boss;
@@ -1266,8 +1307,14 @@ export class ExplorationSystem {
             }
             window.soundManager?.playExpSFX('loot_drop');
         } else {
-            const ambientPool = (dimEvents && dimEvents.ambient) || EXPLORATION_EVENTS.ambient;
-            const msg = pickRandom(ambientPool).replace('{name}', member.name);
+            const currentEnc = exp.encounters[exp.currentEncounter];
+            const crossAmbient = currentEnc?._crossRealmAmbient;
+            const ambientPool = crossAmbient || (dimEvents && dimEvents.ambient) || EXPLORATION_EVENTS.ambient;
+            let msg = pickRandom(ambientPool).replace('{name}', member.name);
+            if (crossAmbient && currentEnc?._crossRealmKey) {
+                const crossName = REALMS[currentEnc._crossRealmKey]?.name || 'another realm';
+                msg = `[Echoing from ${crossName}] ${msg}`;
+            }
             this._addLog(exp, game, msg, 'ambient');
         }
     }
@@ -1406,6 +1453,9 @@ export class ExplorationSystem {
         this._attachWarBeasts(exp);
         this._logSynergies(exp, game);
         this._rangedFirstStrike(exp, game, enemies);
+        if (this._shouldApplyChaosEffect(exp)) {
+            this._applyRandomChaosEffect(exp, game, exp.combat);
+        }
     }
 
     // Party synergy notice: at combat start, tell the player which relationships
@@ -1577,13 +1627,16 @@ export class ExplorationSystem {
 
             const totalArmoredBonus = target.armored ? memberItems.reduce((sum, it) => sum + (it.armoredDamageBonus || 0), 0) : 0;
             const armoredBonus = 1 + totalArmoredBonus;
-            let dmg = Math.max(1, Math.round((weaponDmg + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist)));
+            const chaosSurgeMult = this._combatStatusValue(member, 'chaos_surge', 'dmgMult', 1);
+            const voidBlessedBonus = this._combatStatusValue(member, 'void_blessed', 'dmgBonus', 0);
+            let dmg = Math.max(1, Math.round((weaponDmg + voidBlessedBonus + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist) * chaosSurgeMult));
             let critHit = false;
             if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
             if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
             if (target.damageReduction) dmg = Math.max(1, Math.floor(dmg * (1 - target.damageReduction)));
 
-            if (Math.random() < baseMissChance) {
+            const memberBlindChance = this._combatStatusValue(member, 'blind', 'missChance', 0);
+            if (Math.random() < baseMissChance + memberBlindChance) {
                 const msg = pickRandom(EXPLORATION_EVENTS.combatMiss).replace('{attacker}', member.name).replace('{target}', targetLabel);
                 this._addLog(exp, game, msg, 'combat');
             } else {
@@ -1896,6 +1949,7 @@ export class ExplorationSystem {
 
                 let dmg = enemy.damage + randInt(0, 2);
                 if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
+                if (enemy.isBoss && exp._voidPactBossDmgMult) dmg = Math.max(1, Math.floor(dmg * exp._voidPactBossDmgMult));
                 // Track the damage before armor/shield mitigation so the visual layer
                 // can tell a fully-absorbed "block" from a clean hit (see _lastBlockTick).
                 const preMitigationDmg = dmg;
@@ -2552,6 +2606,87 @@ export class ExplorationSystem {
         }
     }
 
+    // ── Chaos effect system ───────────────────────────────────────────────
+    // Triggered at the start of combat encounters in chaos-chain realms,
+    // and on every phase transition / per-round tick for The Unraveler boss.
+    // All effects apply equally to enemies and party members.
+    _applyRandomChaosEffect(exp, game, combat, targetOverride = null) {
+        const CHAOS_POOL = ['surge', 'drain', 'frenzy', 'restoration', 'blindness', 'duplication'];
+        const effectKey = CHAOS_POOL[randInt(0, CHAOS_POOL.length - 1)];
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+        const enemies = (combat?.enemies || []).filter(e => e.hp > 0);
+        const allCombatants = [...alive, ...enemies];
+        const chaosResistance = alive.reduce((sum, m) => sum + (m.chaosResistance || 0), 0) / Math.max(1, alive.length);
+
+        switch (effectKey) {
+            case 'surge': {
+                this._addLog(exp, game, '⚡ CHAOS: Reality surges — all damage doubled for 2 rounds!', 'combat');
+                for (const c of allCombatants) this._applyCombatStatus(c, 'chaos_surge', 2, { dmgMult: 2.0 });
+                break;
+            }
+            case 'drain': {
+                const lossPct = Math.max(0.05, 0.20 - chaosResistance * 0.20);
+                this._addLog(exp, game, `⚡ CHAOS: Everything loses ${Math.round(lossPct * 100)}% current HP!`, 'danger');
+                for (const c of allCombatants) {
+                    const loss = Math.floor(c.hp * lossPct);
+                    c.hp = Math.max(1, c.hp - loss);
+                }
+                for (const m of alive) {
+                    if (m.hp <= 0) this._checkExpeditionRevive(exp, m, game);
+                }
+                break;
+            }
+            case 'frenzy': {
+                this._addLog(exp, game, '⚡ CHAOS: Frenzy seizes all combatants — everyone strikes twice this round!', 'combat');
+                for (const c of allCombatants) this._applyCombatStatus(c, 'chaos_frenzy', 1, { extraAttack: true });
+                break;
+            }
+            case 'restoration': {
+                this._addLog(exp, game, '⚡ CHAOS: A surge of wild energy heals everyone — friend and foe alike!', 'success');
+                for (const c of allCombatants) c.hp = Math.min(c.maxHp, c.hp + Math.floor(c.maxHp * 0.25));
+                break;
+            }
+            case 'blindness': {
+                const rounds = 2;
+                this._addLog(exp, game, `⚡ CHAOS: Everything goes temporarily blind — 50% chance to miss for ${rounds} rounds!`, 'combat');
+                for (const c of allCombatants) this._applyCombatStatus(c, 'blind', rounds, { missChance: Math.max(0.1, 0.5 - chaosResistance * 0.3) });
+                break;
+            }
+            case 'duplication': {
+                if (enemies.length > 0) {
+                    const source = enemies[randInt(0, enemies.length - 1)];
+                    const clone = {
+                        hp: Math.floor(source.maxHp * 0.5),
+                        maxHp: Math.floor(source.maxHp * 0.5),
+                        damage: source.damage,
+                        name: source.name ? `Echo of ${source.name}` : 'Echo',
+                        sprite: source.sprite,
+                        color: source.color || '#cc88ff',
+                        typeKey: source.typeKey,
+                        spells: null,
+                        attackAnim: source.attackAnim || 'Swing',
+                        ranged: source.ranged || false,
+                        projectileChar: source.projectileChar || null,
+                        projectileColor: source.projectileColor || null,
+                        damageReduction: 0,
+                        statusEffects: [],
+                    };
+                    clone._nextAttackTick = game.tick + 3;
+                    if (combat) combat.enemies.push(clone);
+                    this._addLog(exp, game, `⚡ CHAOS: ${source.name || 'An enemy'} fractures — a duplicate emerges!`, 'danger');
+                }
+                break;
+            }
+        }
+        return effectKey;
+    }
+
+    _shouldApplyChaosEffect(exp) {
+        const dim = REALMS[exp.realm];
+        if (!dim || dim.chain !== 'chaos') return false;
+        return Math.random() < (dim.chaosEncounterChance || 0.30);
+    }
+
     _hasCombatStatus(target, type) {
         return !!(target.statusEffects && target.statusEffects.some(s => s.type === type && s.rounds > 0));
     }
@@ -2600,6 +2735,15 @@ export class ExplorationSystem {
         };
         for (const enemy of combat.enemies) tick(enemy, false);
         for (const member of exp.partySnapshot) tick(member, true);
+
+        // Enforce void_drained: cap HP to maxHpMult fraction of max HP.
+        for (const member of exp.partySnapshot) {
+            const drainStatus = member.statusEffects?.find(s => s.type === 'void_drained');
+            if (drainStatus) {
+                const cap = Math.floor(member.maxHp * (drainStatus.maxHpMult ?? 0.75));
+                if (member.hp > cap) member.hp = cap;
+            }
+        }
 
         // Tick weapon on-hit DoT effects (poison/bleed/burn) on expedition enemies.
         for (const enemy of combat.enemies) {
@@ -2731,15 +2875,40 @@ export class ExplorationSystem {
         bossEnemy.hp = Math.round(nextPhase.hp * (exp.diffSettings?.enemyHpMult || 1));
         bossEnemy.maxHp = bossEnemy.hp;
         bossEnemy.damage = Math.round(nextPhase.damage * (exp.diffSettings?.enemyDmgMult || 1));
+        // Void pact damage reduction expires when the protected phase ends.
+        exp._voidPactBossDmgMult = null;
         if (nextPhase.color) bossEnemy.color = nextPhase.color;
         if (nextPhase.sprite) bossEnemy.sprite = nextPhase.sprite;
         bossEnemy.abilities = nextPhase.abilities || [];
         bossEnemy.enraged = false;
 
         this._addLog(exp, game, `${bossEnemy.name} enters phase: ${nextPhase.name}!`, 'danger');
+
+        // Chaos phase transition: apply a random chaos effect when entering new phase
+        const dim = REALMS[exp.realm];
+        if (dim?.boss?.chaosPhaseTransition) {
+            this._applyRandomChaosEffect(exp, game, exp.combat);
+        }
+
+        // Void pact choice: pause combat with a deal prompt
+        if (oldPhase.voidPactChoice && exp.partySnapshot.some(p => p.hp > 0)) {
+            const pact = oldPhase.voidPactChoice;
+            exp.pendingVoidPactChoice = {
+                text: pact.promptText,
+                acceptEffect: pact.acceptEffect,
+                logAccept: pact.logAccept,
+                logRefuse: pact.logRefuse,
+                bossEnemy,
+            };
+        }
     }
 
     _executeBossAbilities(bossEnemy, exp, game) {
+        // Auto-chaos tick: phases marked autoChaosTick trigger chaos every round
+        const currentPhase = exp.bossPhaseData?.phases?.[exp.bossPhaseData?.currentPhaseIndex];
+        if (currentPhase?.autoChaosTick && exp.combat) {
+            this._applyRandomChaosEffect(exp, game, exp.combat);
+        }
         if (!bossEnemy.abilities) return;
         for (const ability of bossEnemy.abilities) {
             if (ability.type === 'aoe' && Math.random() < (ability.chance || 0)) {
@@ -2955,6 +3124,80 @@ export class ExplorationSystem {
 
     _applyDecisionEffects(exp, game, effects, sourceEncounterIndex) {
         const alive = exp.partySnapshot.filter(p => p.hp > 0);
+
+        if (effects.sacrificeLootForAltarBless && alive.length > 0) {
+            // Remove a random already-collected item from the loot pool (the offering).
+            const lootItems = exp.loot._items;
+            if (lootItems && lootItems.length > 0) {
+                const sacrificedIdx = randInt(0, lootItems.length - 1);
+                const sacrificed = lootItems.splice(sacrificedIdx, 1)[0];
+                this._addLog(exp, game, `The offering is accepted. ${ALL_ITEMS[sacrificed]?.name || sacrificed} is consumed by the altar.`, 'event');
+            } else {
+                this._addLog(exp, game, 'The altar accepts nothing. Its patience is noted.', 'event');
+            }
+            // All living members receive void_blessed: +20% max HP and +1 dmg for 4 rounds.
+            for (const m of alive) this._applyCombatStatus(m, 'void_blessed', 4, { maxHpMult: 1.20, dmgBonus: 1 });
+            this._stampResolution(exp, game, true);
+            return;
+        }
+
+        if (effects.voidDrainedSacrifice && alive.length > 0) {
+            const weakest = alive.reduce((w, m) => m.hp < w.hp ? m : w, alive[0]);
+            weakest.hp = Math.max(1, weakest.hp - effects.voidDrainedSacrifice);
+            this._applyCombatStatus(weakest, 'void_drained', 99, { maxHpMult: 0.75, expiresWithExpedition: true });
+            weakest._voidDrainedUntil = Infinity;
+            this._addLog(exp, game, `${weakest.name} bleeds on the altar. They feel weakened for the rest of the expedition.`, 'danger');
+            if (weakest.hp <= 0) this._checkExpeditionRevive(exp, weakest, game);
+            this._stampResolution(exp, game, false);
+        }
+
+        if (effects.partyDamagePercent && alive.length > 0) {
+            const pct = effects.partyDamagePercent;
+            for (const m of alive) {
+                const loss = Math.floor(m.hp * pct);
+                m.hp = Math.max(1, m.hp - loss);
+            }
+            this._addLog(exp, game, `The party pays ${Math.round(pct * 100)}% of their current HP.`, 'danger');
+            this._stampResolution(exp, game, false);
+        }
+
+        if (effects.expeditionWeaponBuff && alive.length > 0) {
+            const buffTarget = alive[Math.floor(Math.random() * alive.length)];
+            if (buffTarget.weapon) {
+                buffTarget.weapon = { ...buffTarget.weapon, damage: (buffTarget.weapon.damage || 0) + effects.expeditionWeaponBuff };
+                this._addLog(exp, game, `${buffTarget.name}'s weapon gains +${effects.expeditionWeaponBuff} damage for this expedition.`, 'success');
+            }
+        }
+
+        if (effects.randomPortal) {
+            const roll = Math.random();
+            if (roll < 0.33) {
+                this._addLog(exp, game, 'The portal leads forward. A fortunate guess.', 'success');
+                // No extra effect — just progress normally
+            } else if (roll < 0.66) {
+                this._addLog(exp, game, 'The portal loops back to the start of this encounter. Wasted time.', 'danger');
+                if (exp.currentEncounter > 0) exp.currentEncounter--;
+            } else {
+                this._addLog(exp, game, 'The portal opens onto a bonus cache! Enemies guard it.', 'event');
+                if (effects.spawnCombat === undefined) {
+                    const dim = REALMS[exp.realm];
+                    const baseCount = randInt(dim.enemies.count[0], dim.enemies.count[1]);
+                    const enemies = [];
+                    for (let j = 0; j < baseCount; j++) {
+                        const eDef = this._pickEnemyFromRealm(dim);
+                        const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
+                        const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
+                        enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name, sprite: eDef.sprite, color: eDef.color, typeKey: eDef.typeKey, spells: eDef.spells, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot', projectileChar: eDef.projectileChar, projectileColor: eDef.projectileColor, damageReduction: eDef.damageReduction || 0 });
+                    }
+                    exp.combat = { enemies, round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false, ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)) };
+                    exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
+                    enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
+                    exp._nextRareMult = 2.0;
+                }
+            }
+            return;
+        }
+
         if (effects.healParty && alive.length > 0) {
             const heal = Math.floor(alive[0].maxHp * effects.healParty);
             for (const m of alive) m.hp = Math.min(m.maxHp, m.hp + heal);
@@ -3038,6 +3281,46 @@ export class ExplorationSystem {
                     }
                 }
             }
+        }
+    }
+
+    resolveVoidPactChoice(game, expId, accept) {
+        const exp = this.expeditions.find(e => e.id === expId);
+        if (!exp || !exp.pendingVoidPactChoice) return;
+        const pact = exp.pendingVoidPactChoice;
+        exp.pendingVoidPactChoice = null;
+
+        const alive = exp.partySnapshot.filter(p => p.hp > 0);
+
+        if (accept) {
+            this._addLog(exp, game, pact.logAccept, 'event');
+            const fx = pact.acceptEffect;
+            if (fx.partyDamage && alive.length > 0) {
+                for (const m of alive) {
+                    m.hp = Math.max(1, m.hp - fx.partyDamage);
+                }
+                this._addLog(exp, game, `The party pays ${fx.partyDamage} HP as part of the agreement.`, 'danger');
+            }
+            if (fx.nextPhaseDmgMult && exp.bossPhaseData) {
+                exp._voidPactBossDmgMult = fx.nextPhaseDmgMult;
+            }
+            if (fx.weakestMemberDamage && alive.length > 0) {
+                const weakest = alive.reduce((w, m) => m.hp < w.hp ? m : w, alive[0]);
+                weakest.hp = Math.max(1, weakest.hp - fx.weakestMemberDamage);
+                if (fx.applyVoidDrained) {
+                    this._applyCombatStatus(weakest, 'void_drained', 3, { maxHpMult: 0.75 });
+                }
+                this._addLog(exp, game, `${weakest.name} bears the greater cost.`, 'danger');
+            }
+            if (fx.bossDamage && pact.bossEnemy) {
+                pact.bossEnemy.hp = Math.max(1, pact.bossEnemy.hp - fx.bossDamage);
+                this._addLog(exp, game, `The Arbiter's HP is reduced by ${fx.bossDamage} as part of the terms.`, 'success');
+            }
+            if (fx.bossStun && pact.bossEnemy) {
+                this._applyCombatStatus(pact.bossEnemy, 'stun', fx.bossStun);
+            }
+        } else {
+            this._addLog(exp, game, pact.logRefuse, 'event');
         }
     }
 

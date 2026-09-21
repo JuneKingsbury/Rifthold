@@ -69,11 +69,19 @@ export function getComplexStructureAt(game, x, y) {
 }
 
 export function getCraftSpeedBonus(game) {
-    if (!game.activeComplexStructures) return 1;
-    for (const s of game.activeComplexStructures) {
-        if (s.effect.craftSpeedMult) return s.effect.craftSpeedMult;
+    let mult = 1;
+    if (game.activeComplexStructures) {
+        for (const s of game.activeComplexStructures) {
+            if (s.effect.craftSpeedMult) { mult *= s.effect.craftSpeedMult; break; }
+        }
     }
-    return 1;
+    if (game.activeColonyBuffs) {
+        game.activeColonyBuffs = game.activeColonyBuffs.filter(b => b.expiresAt > game.tick);
+        for (const b of game.activeColonyBuffs) {
+            if (b.type === 'crafting_speed') mult *= b.mult;
+        }
+    }
+    return mult;
 }
 
 export function getCraftQualityBonus(game) {

@@ -1,7 +1,7 @@
 import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS } from '../core/config.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
-import { colonistTakeDamage } from './colonist.js';
+import { colonistTakeDamage, getEquipmentStat } from './colonist.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { createWaveEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
@@ -74,7 +74,9 @@ export class WaveSystem {
         this.nexusMaxHp = WAVE_CONFIG.nexusHp + WAVE_CONFIG.nexusHpPerWave * this.currentWave;
         this.nexusHp = this.nexusMaxHp;
         this.enemies = [];
-        this.enemiesToSpawn = WAVE_CONFIG.baseEnemies + WAVE_CONFIG.enemiesPerWave * (this.currentWave - 1);
+        const waveEnemyMult = game._voidWhisperWaveEnemyMult || 1;
+        if (game._voidWhisperWaveEnemyMult) game._voidWhisperWaveEnemyMult = null;
+        this.enemiesToSpawn = Math.max(1, Math.round((WAVE_CONFIG.baseEnemies + WAVE_CONFIG.enemiesPerWave * (this.currentWave - 1)) * waveEnemyMult));
         this.enemiesSpawned = 0;
         this.spawnTimer = 0;
         this.waveStartTick = game.tick;
@@ -116,7 +118,9 @@ export class WaveSystem {
                 // Nexus enemies always yield void essence, so the loot effect always
                 // applies. Show it above the killer (fallback: the enemy tile) so it
                 // stays clear of the death skull that lingers on the corpse tile.
-                game.resources.add({ void_essence: WAVE_CONFIG.essencePerKill });
+                const voidMult = game.colonists.filter(c => c.hp > 0 && !c.golem && !c.onExpedition)
+                    .reduce((best, c) => Math.max(best, getEquipmentStat(c, 'voidEssenceGainMult') || 1), 1);
+                game.resources.add({ void_essence: Math.round(WAVE_CONFIG.essencePerKill * voidMult) });
                 if (enemy.loot) {
                     for (const drop of enemy.loot) {
                         if (Math.random() < (drop.chance || 1)) {
@@ -288,7 +292,9 @@ export class WaveSystem {
     endWave(game, victory) {
         if (victory) {
             this.highestWaveCompleted = this.currentWave;
-            const bonusEssence = this.currentWave * WAVE_CONFIG.bonusEssencePerWave;
+            const voidMult = game.colonists.filter(c => c.hp > 0 && !c.golem && !c.onExpedition)
+                .reduce((best, c) => Math.max(best, getEquipmentStat(c, 'voidEssenceGainMult') || 1), 1);
+            const bonusEssence = Math.round(this.currentWave * WAVE_CONFIG.bonusEssencePerWave * voidMult);
             game.resources.add({ void_essence: bonusEssence });
             // Each completed wave unlocks one additional Hearth Shrine slot.
             // Players must still build and power each shrine to grow their colony cap.
@@ -299,6 +305,7 @@ export class WaveSystem {
             game.eventLog.add(game, `Wave ${this.currentWave} defeated! You may now build another Hearth Shrine to expand your colony.`, 'success', null);
             game.story.checkMilestone('first_wave_completed', game);
             if (game.stats) game.stats.wavesCompleted++;
+            if (game.stats?.wavesCompleted >= 10) game.story.checkMilestone('waves_10_complete', game);
         } else {
             game.notifications.push({ text: `Wave ${this.currentWave} failed! The Void Nexus was destroyed!`, tick: game.tick, type: 'danger' });
             game.eventLog.add(game, `The Void Nexus was destroyed during wave ${this.currentWave}!`, 'danger', { type: 'position', ...this.nexusPosition });

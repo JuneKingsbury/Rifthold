@@ -29,10 +29,28 @@ export const EXPEDITION_ENEMIES = {
 
     // Shadow chain
     shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing', lore: `An impish creature that may be mistaken for a Kobaloi at a distance. Up close it becomes far more obvious that this thing is made entirely of some dark substance that completely absorbs the light.` },
-    void_stalker:     { name: 'Void Stalker',      hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: `A strange eyeball with a piercing stare. It stands tall on a pitch-black eyestalk, much like that of a crab. Despite all of the oddities, the eyeball itself looks far too human.`, spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
+    void_stalker:     { name: 'Abyss Stalker',     hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: `A strange eyeball with a piercing stare. It stands tall on a pitch-black eyestalk, much like that of a crab. Despite all of the oddities, the eyeball itself looks far too human.`, spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
     shade:            { name: 'Shade',             hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', lore: `A ghostly presence that haunts the explorers of the void. It leeches energy from living things and should be dealt with quickly whenever encountered.`, spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
-    void_horror:      { name: 'Void Horror',       hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: `An impossible monster that seems to swim through the air like a deep-water fish. Its teeth are long and sharp and its eyes shine brightly in the dark of the void. Our explorers must take precautions as they are its prey.`, spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
+    void_horror:      { name: 'Abyss Horror',      hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: `An impossible monster that seems to swim through the air like a deep-water fish. Its teeth are long and sharp and its eyes shine brightly in the dark of the abyss.`, spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
     oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: `A giant bipedal roach that creeps through the deepest parts of the void. They seem to share a close connection to the void and show their cunning through ambush tactics.`, spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
+
+    // Void Pact chain
+    shade_wraith:       { name: 'Shade Wraith',      hp: [45, 70],  damage: [8, 13],  sprite: 'shade_wraith', color: '#7733aa', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9955cc', lore: `TODO`, spells: [{ spell: 'soul_drain', chance: 0.25, damage: [5, 10], lifesteal: 0.3 }] },
+    void_penitent:      { name: 'Void Penitent',     hp: [35, 55],  damage: [7, 11],  sprite: 'void_penitent', color: '#553388', attackAnim: 'Stab', lore: `TODO` },
+    hollow_sentinel:    { name: 'Hollow Sentinel',   hp: [75, 110], damage: [11, 16], sprite: 'hollow_sentinel', color: '#442266', attackAnim: 'Swing', damageReduction: 0.25, lore: `TODO` },
+    void_broker:        { name: 'Void Broker',       hp: [40, 65],  damage: [8, 12],  sprite: 'void_broker', color: '#8844bb', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#aa66dd', lore: `TODO`, spells: [{ spell: 'soul_drain', chance: 0.3, damage: [3, 6], manaDrain: 0.12 }] },
+    penitent_guardian:  { name: 'Penitent Guardian', hp: [60, 90],  damage: [13, 18], sprite: 'penitent_guardian', color: '#6633aa', attackAnim: 'Swing', lore: `TODO` },
+    echo_beast:         { name: 'Echo Beast',        hp: [50, 80],  damage: [10, 15], sprite: 'echo_beast', color: '#773399', attackAnim: 'Swing', lore: `TODO`, onDeath: { applyVoidDrained: true, rounds: 2 } },
+    void_herald:        { name: 'Void Herald',       hp: [70, 110], damage: [14, 20], sprite: 'void_herald', color: '#993dcc', attackAnim: 'Swing', lore: `TODO`, spells: [{ spell: 'summon_penitent', chance: 0.25, summonKey: 'void_penitent' }] },
+
+    // Chaos chain
+    fracture_imp:       { name: 'Fracture Imp',      hp: [25, 40],  damage: [6, 10],  sprite: 'fracture_imp', color: '#ff66cc', attackAnim: 'Swing', lore: `TODO`, chaosOnDeath: true },
+    glitch_beast:       { name: 'Glitch Beast',      hp: [40, 65],  damage: [9, 14],  sprite: 'phase_beast', color: '#cc44ff', attackAnim: 'Swing', lore: `TODO`, spells: [{ spell: 'phase_dodge', chance: 0.3, dodgeRounds: 1 }] },
+    mirror_shade:       { name: 'Mirror Shade',      hp: [35, 55],  damage: [8, 12],  sprite: 'mirror_shade', color: '#ff88ff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ff88ff', lore: `TODO` },
+    shifting_horror:    { name: 'Shifting Horror',   hp: [55, 85],  damage: [11, 17], sprite: 'shifting_horror', color: '#ff44aa', attackAnim: 'Swing', lore: `TODO` },
+    chaos_hound:        { name: 'Chaos Hound',       hp: [30, 50],  damage: [10, 15], sprite: 'chaos_hound', color: '#ff6633', attackAnim: 'Stab', lore: `TODO`, spells: [{ spell: 'frenzy_bite', chance: 0.2, extraAttack: true }] },
+    mirror_twin:        { name: 'Mirror Twin',       hp: [30, 50],  damage: [8, 13],  sprite: 'mirror_twin', color: '#ee88ff', attackAnim: 'Swing', lore: `TODO` },
+    reality_shred:      { name: 'Reality Shred',     hp: [65, 100], damage: [13, 19], sprite: 'reality_shred', color: '#cc33cc', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#cc33cc', lore: `TODO`, spells: [{ spell: 'chaos_bolt', chance: 0.2, damage: [8, 14], appliesChaos: true }] },
 
     // Kingdom chain (armored: true enables armoredDamageBonus on Runic Greatsword)
     kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: `A common soldier of the kingdom, armed with a simple spear. These soldiers seem undertrained and poorly equipped, as if the kingdom had no foresight that battles would be fought on this side of their borders.` },
@@ -580,7 +598,7 @@ export const REALMS = {
         },
     },
     shadow_realm: {
-        name: 'Shadow Realm', difficulty: 3,
+        name: 'Abyss Gate', difficulty: 3,
         chain: 'shadow', chainOrder: 1,
         duration: [400, 650], encounters: 7, combatEncounters: [2, 3],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -600,10 +618,10 @@ export const REALMS = {
             ambient: [
                 'Reality flickers. {name} sees double for a moment.',
                 'Whispers from nowhere fill {name}\'s ears.',
-                'The shadows themselves seem to breathe.',
-                '{name} feels the void pulling at their mana.',
-                'A rift in space opens briefly, showing another world.',
-                'The ground shifts underfoot. Nothing is solid here.',
+                'The shadows here seem to breathe. Slowly. Deliberately.',
+                '{name} feels something pulling at their mana from below.',
+                'A rift in space opens briefly, showing another world. The whole other world stands eerily still.',
+                'The ground shifts underfoot. Nothing is solid here. Nothing is trying to be.',
             ],
             discoveries: [
                 '{name} finds crystallized void essence on a dead creature.',
@@ -621,13 +639,13 @@ export const REALMS = {
                 { chance: 0.02, text: '{name} finds a sealed void reliquary!', loot: { resource: 'void_essence', amount: [6, 10] } },
                 { chance: 0.015, text: '{name} pulls a glowing lantern from the void, it never goes dark!', loot: { item: 'voidwalkers_lantern' } },
                 { chance: 0.015, text: '{name} wraps themselves in living shadow, a cloak of concealment!', loot: { item: 'cloak_of_shadows' } },
-                { chance: 0.02, text: '{name} snatches a charm from a void stalker\'s fading corpse, carved with the rune of evasion!', loot: { item: 'ghost_step_charm' } },
+                { chance: 0.02, text: '{name} snatches a charm from an abyss stalker\'s fading corpse, carved with the rune of evasion!', loot: { item: 'ghost_step_charm' } },
                 { chance: 0.02, text: '{name} finds a pulsing crystal device that hums with containment magic!', loot: { item: 'crystal_capacitor' } },
             ],
         },
     },
     void_abyss: {
-        name: 'Void Abyss', difficulty: 4,
+        name: 'Sunken Abyss', difficulty: 4,
         chain: 'shadow', chainOrder: 2,
         duration: [550, 800], encounters: 7, combatEncounters: [3, 5],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -667,12 +685,12 @@ export const REALMS = {
                 'An anti-magic pulse hits {name}, disrupting their defenses!',
             ],
             rare: [
-                { chance: 0.04, text: '{name} finds a concentrated void crystal radiating pure primordial essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
-                { chance: 0.03, text: '{name} collects runite that has been void-tempered for aeons!', loot: { resource: 'runite', amount: [6, 12] } },
-                { chance: 0.015, text: '{name} wrests a blade from the void itself. It seems to cut through reality!', loot: { item: 'void_blade' } },
-                { chance: 0.02, text: '{name} pries a gem-encrusted gauntlet from a void creature\'s withered hand. It pulses with stolen life!', loot: { item: 'bloodstone_gauntlet' } },
+                { chance: 0.04, text: '{name} finds an abyss crystal radiating pure primordial essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
+                { chance: 0.03, text: '{name} collects runite that has spent aeons in the abyss. It\'s changed.', loot: { resource: 'runite', amount: [6, 12] } },
+                { chance: 0.015, text: '{name} wrests a blade from the deep dark. It seems to cut through reality!', loot: { item: 'void_blade' } },
+                { chance: 0.02, text: '{name} pries a gem-encrusted gauntlet from an abyss creature\'s withered hand. It pulses with stolen life!', loot: { item: 'bloodstone_gauntlet' } },
                 { chance: 0.01, text: '{name} discovers an orb containing a trapped dimension, incredible power!', loot: { item: 'dimensional_orb' } },
-                { chance: 0.01, text: '{name} finds a charm pulsing with raw void energy, its power barely contained!', loot: { item: 'void_charm' } },
+                { chance: 0.01, text: '{name} finds a charm pulsing with abyss energy, its power barely contained!', loot: { item: 'void_charm' } },
             ],
         },
     },
@@ -694,11 +712,11 @@ export const REALMS = {
             { key: 'oblivion_spawn', weight: 50 },
         ] },
         boss: {
-            name: 'The Void Sovereign',
+            name: 'The Oblivion Sovereign',
             lore: `TODO`,
             attackAnim: 'Swing',
-            approachText: 'A being of pure void materializes, its gaze alone warping the air!',
-            defeatText: 'The Void Sovereign collapses into nothingness, leaving only silence!',
+            approachText: 'The darkness at the center of the chamber condenses. Something that has been here longer than light regards your party.',
+            defeatText: 'The Sovereign does not scream. It simply becomes less. The abyss is quieter without it. Somewhat.',
             guaranteedLoot: [
                 { item: 'shard_of_oblivion', chance: 0.4 },
                 { item: 'voidheart', chance: 0.3 },
@@ -709,24 +727,24 @@ export const REALMS = {
                 {
                     name: 'Manifest', hp: 350, damage: 25,
                     color: '#7722cc', sprite: 'boss_void_sovereign',
-                    transitionText: 'The Void Sovereign tears reality apart around it!',
+                    transitionText: 'The Sovereign\'s accumulated mass begins to churn. It is becoming more.',
                 },
                 {
-                    name: 'Enraged', hp: 300, damage: 38,
+                    name: 'Surging', hp: 300, damage: 38,
                     color: '#ff0000', sprite: 'boss_void_sovereign_enraged',
-                    abilities: [{ type: 'aoe', chance: 0.15, damage: [6, 12], text: 'Reality tears open! Void energy rips through the party!' }],
-                    transitionText: 'The Sovereign phases between dimensions, becoming unstable!',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [6, 12], text: 'The Sovereign exhales abyss-dark across the chamber!' }],
+                    transitionText: 'Something ancient and heavy shifts at its core. It stops holding back.',
                 },
                 {
                     name: 'Unbound', hp: 250, damage: 48,
                     color: '#aa00ff', sprite: 'boss_void_sovereign_unbound',
-                    abilities: [{ type: 'aoe', chance: 0.25, damage: [10, 18], text: 'Void tendrils lash out from every shadow!' }],
-                    transitionText: 'Reality shatters! The Sovereign reveals its true form!',
+                    abilities: [{ type: 'aoe', chance: 0.25, damage: [10, 18], text: 'The abyss presses inward from all directions!' }],
+                    transitionText: 'The Sovereign sheds its shape. What remains beneath is older.',
                 },
                 {
-                    name: 'True Form', hp: 200, damage: 58,
+                    name: 'The Deep', hp: 200, damage: 58,
                     color: '#ff00ff', sprite: 'boss_void_sovereign_true',
-                    abilities: [{ type: 'aoe', chance: 0.35, damage: [15, 25], text: 'The void itself screams, tearing at the party!' }],
+                    abilities: [{ type: 'aoe', chance: 0.35, damage: [15, 25], text: 'Everything the abyss ever swallowed pours out at once!' }],
                 },
             ],
         },
@@ -740,14 +758,14 @@ export const REALMS = {
                 '{name} feels time flowing backwards, forwards, and sideways simultaneously.',
             ],
             discoveries: [
-                '{name} gathers void essence that has crystallized into impossible geometries.',
+                '{name} gathers essence that has crystallized into impossible geometries.',
                 'A fragment of a destroyed world drifts by, {name} salvages from it.',
-                '{name} absorbs raw creation energy from the space between realities.',
+                '{name} absorbs raw oblivion energy from the space between realities.',
             ],
             traps: [
                 'An oblivion wave washes over {name}, they briefly cease to exist!',
                 '{name} is caught between colliding reality fragments, crushed!',
-                'A void lord notices {name}, its gaze alone causes agony!',
+                'The Sovereign\'s attention turns briefly to {name}. Even partial focus is agony.',
                 'The ground unmakes itself beneath {name}!',
                 'A paradox storm engulfs {name}, existing and not existing hurts!',
                 '{name} is struck by a shard of broken time!',
@@ -755,12 +773,380 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} finds a tear in reality leading to a void essence wellspring!', loot: { resource: 'void_essence', amount: [10, 18] } },
                 { chance: 0.02, text: '{name} claims a fragment of pure oblivion, it annihilates anything it touches!', loot: { item: 'shard_of_oblivion' } },
-                { chance: 0.01, text: '{name} binds a fraction of the void\'s power into their very soul!', loot: { item: 'voidheart' } },
+                { chance: 0.01, text: '{name} binds a fraction of the abyss\'s accumulated weight into their very soul!', loot: { item: 'voidheart' } },
                 { chance: 0.01, text: '{name} finds armor forged from the boundary between existence and nothing!', loot: { item: 'armor_of_the_abyss' } },
-                { chance: 0.008, text: '{name} plucks a charm from the void itself, it warps the air around it!', loot: { item: 'void_charm' } },
+                { chance: 0.008, text: '{name} plucks a charm from the deep dark. It warps the air around it.', loot: { item: 'void_charm' } },
             ],
         },
     },
+    // ── Void Pact chain ──────────────────────────────────────────────────────
+    void_hollow: {
+        name: 'Void Hollow', difficulty: 3,
+        chain: 'void_pact', chainOrder: 1,
+        duration: [400, 620], encounters: 6, combatEncounters: [2, 3],
+        vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
+        research: 'void_pact',
+        loot: [
+            { resource: 'void_essence', weight: 45, amount: [4, 9] },
+            { resource: 'runite', weight: 30, amount: [2, 5] },
+            { item: 'ward_of_the_sentinel', weight: 2 },
+            { item: 'void_contract', weight: 1 },
+        ],
+        enemies: { count: [2, 4], types: [
+            { key: 'shade_wraith', weight: 35 },
+            { key: 'void_penitent', weight: 35 },
+            { key: 'hollow_sentinel', weight: 30 },
+        ] },
+        events: {
+            ambient: [
+                'The walls here lean inward, as if the space is slowly collapsing toward a point.',
+                '{name} passes a row of altars, each still wet.',
+                'The floor is etched with names in a language no one recognizes.',
+                'Something watches from the dark. It does not approach. It is patient.',
+                '{name} finds footprints leading toward the center. None lead back.',
+                'The air here has a taste to it. Like metal and old promises.',
+            ],
+            discoveries: [
+                '{name} pries loose a cache of void essence from a cracked altar.',
+                'A ledger of transactions lies open on a stone table. The entries are all prices.',
+                '{name} finds a vial of something thick and dark. It pulses.',
+            ],
+            traps: [
+                'Void energy surges through the floor, scorching {name}!',
+                '{name} brushes against a wall and is briefly drained.',
+                'A dark tendril whips from the shadow and strikes {name}!',
+            ],
+            rare: [
+                { chance: 0.04, text: '{name} discovers an untapped void essence wellspring!', loot: { resource: 'void_essence', amount: [6, 12] } },
+                { chance: 0.02, text: '{name} finds a ward still charged with defensive power!', loot: { item: 'ward_of_the_sentinel' } },
+            ],
+        },
+    },
+    void_sanctum: {
+        name: 'Void Sanctum', difficulty: 4,
+        chain: 'void_pact', chainOrder: 2,
+        duration: [500, 750], encounters: 7, combatEncounters: [2, 4],
+        vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
+        research: 'void_pact',
+        requiresRealm: 'void_hollow',
+        loot: [
+            { resource: 'void_essence', weight: 40, amount: [5, 12] },
+            { resource: 'runite', weight: 25, amount: [3, 7] },
+            { item: 'void_contract', weight: 2 },
+            { item: 'arbiters_ledger', weight: 1 },
+        ],
+        enemies: { count: [2, 4], types: [
+            { key: 'void_broker', weight: 25 },
+            { key: 'penitent_guardian', weight: 35 },
+            { key: 'echo_beast', weight: 30 },
+            { key: 'hollow_sentinel', weight: 10 },
+        ] },
+        events: {
+            ambient: [
+                'Void entities drift through the chamber, ignoring the party.',
+                '{name} watches two void entities make an exchange. Neither looks pleased.',
+                'Candles float at head height, burning with black flame.',
+                'A queue forms at a door. The things in line do not have faces.',
+                'Every surface here is inscribed with terms and conditions in fine script.',
+                '{name} is offered something by a passing figure. They wisely refuse.',
+            ],
+            discoveries: [
+                'An unclaimed payment sits on a stone counter. {name} takes it.',
+                '{name} finds a chest whose lock is a contract. The terms are reasonable.',
+                'A broker left its ledger unattended. {name} extracts useful materials.',
+            ],
+            traps: [
+                '{name} triggers a binding ward and is briefly paralyzed!',
+                'A mana-hungry rune activates under {name}\'s feet!',
+                'An incomplete transaction animates and strikes at {name}!',
+            ],
+            rare: [
+                { chance: 0.04, text: '{name} steals an unclaimed prize from a void broker\'s table!', loot: { resource: 'void_essence', amount: [8, 14] } },
+                { chance: 0.025, text: '{name} finds a ledger detailing a forgotten trade. The rewards are theirs.', loot: { item: 'arbiters_ledger' } },
+            ],
+        },
+    },
+    void_heart: {
+        name: 'Void Heart', difficulty: 5,
+        chain: 'void_pact', chainOrder: 3,
+        duration: [600, 900], encounters: 8, combatEncounters: [3, 5],
+        vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
+        research: 'void_pact',
+        requiresRealm: 'void_sanctum',
+        loot: [
+            { resource: 'void_essence', weight: 40, amount: [6, 14] },
+            { resource: 'runite', weight: 25, amount: [4, 8] },
+            { item: 'void_contract', weight: 2 },
+            { item: 'arbiters_ledger', weight: 2 },
+        ],
+        enemies: { count: [2, 5], types: [
+            { key: 'void_broker', weight: 15 },
+            { key: 'penitent_guardian', weight: 25 },
+            { key: 'echo_beast', weight: 30 },
+            { key: 'void_herald', weight: 20 },
+            { key: 'hollow_sentinel', weight: 10 },
+        ] },
+        events: {
+            ambient: [
+                'The chamber is perfectly silent except for the sound of a quill scratching somewhere.',
+                'The Arbiter\'s chamber lies ahead. {name} can already feel its attention.',
+                'Old debts hang in the air here like fog.',
+                '{name} reads inscriptions on the walls: terms, conditions, consequences.',
+                'The gravity here pulls slightly sideways. Nothing falls straight.',
+                'The air smells of finality.',
+            ],
+            discoveries: [
+                '{name} finds a sealed container of void essence, unclaimed for ages.',
+                'A cache of runite sits behind a door that has no lock. Strange.',
+                '{name} finds a tribute that was never collected. They collect it.',
+            ],
+            traps: [
+                'A binding agreement activates, draining {name} of energy!',
+                '{name} breaks a deal-seal on the floor, releasing a void burst!',
+                'An echo of an old fight replays suddenly, striking {name}!',
+            ],
+            rare: [
+                { chance: 0.04, text: '{name} discovers a pre-paid reward awaiting collection!', loot: { resource: 'void_essence', amount: [10, 18] } },
+                { chance: 0.015, text: '{name} finds a signed contract granting extraordinary boons!', loot: { item: 'void_contract' } },
+            ],
+        },
+        boss: {
+            name: 'The Void Arbiter',
+            lore: 'Neither god nor beast. It has mediated the terms of a thousand bargains and held each one to account. It regards your party with the detached interest of an accountant reviewing figures.',
+            attackAnim: 'Swing',
+            approachText: 'A tall, featureless figure rises from the center of the chamber. It opens a ledger and begins to write.',
+            defeatText: 'The Arbiter closes its ledger. "Agreement terminated." It does not bleed. It simply... concludes.',
+            guaranteedLoot: [
+                { item: 'void_contract', chance: 1.0 },
+                { item: 'arbiters_ledger', chance: 0.7 },
+            ],
+            bonusResources: { void_essence: 20, runite: 5 },
+            phases: [
+                {
+                    name: 'Opening Terms', hp: 320, damage: 20,
+                    color: '#8844bb', sprite: 'boss_void_arbiter',
+                    transitionText: 'The Arbiter pauses. "An adjustment to the terms. Accept, and the cost of Phase Two is halved. Refuse, and we continue at full price."',
+                    voidPactChoice: {
+                        promptText: 'The Arbiter offers adjusted terms: the whole party takes 20 HP damage, but Phase Two deals half damage. Accept or refuse?',
+                        acceptEffect: { partyDamage: 20, nextPhaseDmgMult: 0.5 },
+                        logAccept: 'The party accepts the adjusted terms. The Arbiter nods and notes it down.',
+                        logRefuse: 'The party refuses. The Arbiter notes that too.',
+                    },
+                },
+                {
+                    name: 'Amended Contract', hp: 260, damage: 26,
+                    color: '#6622aa', sprite: 'boss_void_arbiter',
+                    transitionText: 'The Arbiter sets down its quill. "Final offer. One of you accepts significant personal cost. The proceedings end more quickly."',
+                    voidPactChoice: {
+                        promptText: 'The Arbiter\'s final offer: the weakest party member takes 40 HP damage and becomes Void-Drained, but the Arbiter loses 60 HP and is stunned for 2 rounds. Accept or refuse?',
+                        acceptEffect: { weakestMemberDamage: 40, applyVoidDrained: true, bossDamage: 60, bossStun: 2 },
+                        logAccept: 'The terms are accepted. The Arbiter tilts its head, satisfied.',
+                        logRefuse: 'Refused. The Arbiter makes a note in its ledger. The column for "unnecessary expenses" grows.',
+                    },
+                },
+                {
+                    name: 'Breach of Contract', hp: 220, damage: 32,
+                    color: '#440088', sprite: 'boss_void_arbiter_enraged',
+                    transitionText: 'The Arbiter closes its ledger with finality. There are no more offers.',
+                    abilities: [
+                        { type: 'aoe', chance: 0.2, damage: [12, 20], text: 'The Arbiter stamps its seal. Void energy erupts outward!' },
+                    ],
+                },
+            ],
+        },
+    },
+
+    // ── Chaos chain ──────────────────────────────────────────────────────────
+    fracture_gate: {
+        name: 'Fracture Gate', difficulty: 3,
+        chain: 'chaos', chainOrder: 1,
+        duration: [420, 650], encounters: 6, combatEncounters: [2, 3],
+        vis: { wall: 'crystal_wall', floor: 'shadow_floor' },
+        research: 'unraveling',
+        chaosEncounterChance: 0.30,
+        loot: [
+            { resource: 'void_essence', weight: 30, amount: [3, 7] },
+            { resource: 'runite', weight: 25, amount: [2, 5] },
+            { resource: 'gold', weight: 20, amount: [4, 10] },
+            { item: 'chaos_shard', weight: 2 },
+        ],
+        enemies: { count: [2, 4], types: [
+            { key: 'fracture_imp', weight: 40 },
+            { key: 'glitch_beast', weight: 35 },
+            { key: 'mirror_shade', weight: 25 },
+        ] },
+        events: {
+            ambient: [
+                'The floor is stone. Then it is not. Then it is stone again.',
+                '{name} looks left and sees the room they came from. But they came from the right.',
+                'Something laughs. There is no one there to laugh.',
+                'The walls are crystal, then shadow, then crystal. It hurts to watch.',
+                '{name} notes that their footprints lead away from where they are standing.',
+                'A door opens onto a wall. A wall opens onto a door.',
+            ],
+            discoveries: [
+                '{name} reaches through a fracture in space and pulls out loot.',
+                'A chest exists in two places at once. {name} opens the more valuable one.',
+                '{name} finds resources that may or may not be from this realm.',
+            ],
+            traps: [
+                'The floor inverts briefly, slamming {name} against the ceiling!',
+                'A spatial fracture slices across {name}!',
+                '{name} walks through a door and exits through a different one moving fast!',
+            ],
+            rare: [
+                { chance: 0.05, text: '{name} finds a pocket of stable space with unclaimed loot inside!', loot: { resource: 'void_essence', amount: [5, 10] } },
+                { chance: 0.02, text: 'A crack in reality reveals a pristine chaos shard!', loot: { item: 'chaos_shard' } },
+            ],
+        },
+    },
+    shifting_labyrinth: {
+        name: 'Shifting Labyrinth', difficulty: 4,
+        chain: 'chaos', chainOrder: 2,
+        duration: [550, 820], encounters: 8, combatEncounters: [3, 5],
+        vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
+        research: 'unraveling',
+        requiresRealm: 'fracture_gate',
+        chaosEncounterChance: 0.50,
+        loot: [
+            { resource: 'void_essence', weight: 30, amount: [4, 9] },
+            { resource: 'runite', weight: 25, amount: [3, 7] },
+            { resource: 'gold', weight: 20, amount: [6, 14] },
+            { item: 'chaos_shard', weight: 3 },
+            { item: 'unravelers_eye', weight: 1 },
+        ],
+        enemies: { count: [2, 4], types: [
+            { key: 'shifting_horror', weight: 30 },
+            { key: 'chaos_hound', weight: 30 },
+            { key: 'mirror_twin', weight: 25 },
+            { key: 'glitch_beast', weight: 15 },
+        ] },
+        events: {
+            ambient: [
+                'Every chamber looks exactly like the last one.',
+                '{name} marks a wall. Two turns later it is unmarked. Two turns after that it is somewhere else.',
+                'The labyrinth is not trying to trap the party. It simply does not remember what it looked like.',
+                '{name} hears their own footsteps coming from the other direction.',
+                'A sign on the wall reads "EXIT." It has been wrong twice already.',
+                'The ceiling is further away than it was. Or nearer. It is difficult to say.',
+            ],
+            discoveries: [
+                '{name} finds a room that wasn\'t here a moment ago. It has loot in it.',
+                'A cache tucked in a corner that the labyrinth has been carrying around.',
+                '{name} backtracks and finds something that was not there on the way out.',
+            ],
+            traps: [
+                'The floor dissolves briefly under {name}\'s feet!',
+                'A wall closes faster than expected, striking {name}!',
+                'A corridor shortens suddenly, hurling {name} against its end!',
+            ],
+            rare: [
+                { chance: 0.04, text: '{name} finds a still point in the chaos, a perfectly calm room with valuable loot.', loot: { resource: 'gold', amount: [10, 18] } },
+                { chance: 0.015, text: '{name} spots an unraveler\'s eye embedded in a wall, watching nothing in particular.', loot: { item: 'unravelers_eye' } },
+            ],
+        },
+    },
+    unraveling_core: {
+        name: 'Unraveling Core', difficulty: 5,
+        chain: 'chaos', chainOrder: 3,
+        duration: [650, 950], encounters: 9, combatEncounters: [4, 6],
+        vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
+        research: 'unraveling',
+        requiresRealm: 'shifting_labyrinth',
+        chaosEncounterChance: 0.70,
+        loot: [
+            { resource: 'void_essence', weight: 30, amount: [5, 12] },
+            { resource: 'runite', weight: 25, amount: [4, 9] },
+            { resource: 'gold', weight: 20, amount: [8, 16] },
+            { item: 'chaos_shard', weight: 3 },
+            { item: 'unravelers_eye', weight: 2 },
+        ],
+        enemies: { count: [3, 5], types: [
+            { key: 'shifting_horror', weight: 20 },
+            { key: 'chaos_hound', weight: 20 },
+            { key: 'mirror_twin', weight: 20 },
+            { key: 'reality_shred', weight: 25 },
+            { key: 'fracture_imp', weight: 15 },
+        ] },
+        events: {
+            ambient: [
+                'Reality is decorative here.',
+                '{name} exists. Then more than one of them exists. Then just one again.',
+                'The center of the labyrinth is visible in every direction at once.',
+                'Gravity apologizes and returns.',
+                'A thought {name} had yesterday plays out on the wall in front of them.',
+                'Everything is fine. Everything has never been fine.',
+            ],
+            discoveries: [
+                '{name} reaches into an unraveled fold of space and pulls out materials.',
+                'Loot from a different expedition entirely is sitting here. {name} takes it.',
+                '{name} finds resources in a configuration that should not exist.',
+            ],
+            traps: [
+                'A reality tear cuts across the party!',
+                '{name} is briefly inverted and falls upward, hard!',
+                'A paradox catches {name} mid-step. They arrive back before they leave!',
+            ],
+            rare: [
+                { chance: 0.04, text: '{name} locates the one stable point in the entire realm. It has a lot of void essence.', loot: { resource: 'void_essence', amount: [12, 20] } },
+                { chance: 0.015, text: '{name} pulls a chaos shard directly out of unraveling space.', loot: { item: 'chaos_shard' } },
+            ],
+        },
+        boss: {
+            name: 'The Unraveler',
+            lore: `TODO`,
+            attackAnim: 'Swing',
+            approachText: 'Something at the center of the core shifts. Parts of it are in different places than other parts. It has too many edges. It turns toward the party, and the turning takes longer than it should.',
+            defeatText: 'The Unraveler disperses. Each thread of it unwinds back into the labyrinth it came from. Somewhere, something subtle changes.',
+            guaranteedLoot: [
+                { item: 'chaos_shard', chance: 1.0 },
+                { item: 'unravelers_eye', chance: 0.8 },
+            ],
+            bonusResources: { void_essence: 15, runite: 6 },
+            isChaosEncounter: true,
+            chaosPhaseTransition: true,
+            phases: [
+                {
+                    name: 'Incoherent', hp: 280, damage: 18,
+                    color: '#cc33cc', sprite: 'boss_unraveler',
+                    transitionText: 'The Unraveler fractures into shards then snaps back together. It looks a little different.',
+                    abilities: [
+                        { type: 'aoe', chance: 0.25, damage: [8, 14], text: 'A chaos pulse detonates outward from the Unraveler!' },
+                    ],
+                },
+                {
+                    name: 'Fracturing', hp: 240, damage: 24,
+                    color: '#ff33aa', sprite: 'boss_unraveler',
+                    transitionText: 'The Unraveler sheds one version of itself. What remains is faster and angrier.',
+                    abilities: [
+                        { type: 'aoe', chance: 0.30, damage: [10, 18], text: 'A chaos pulse detonates outward from the Unraveler!' },
+                        { type: 'summon_adds', chance: 0.2, hp: 30, damage: 8, count: 1, text: 'A fragment splits off and takes shape!' },
+                    ],
+                },
+                {
+                    name: 'Unbound', hp: 200, damage: 30,
+                    color: '#ff6600', sprite: 'boss_unraveler',
+                    transitionText: 'The Unraveler stops pretending to have a stable form. Every round from here is different.',
+                    autoChaosTick: true,
+                    abilities: [
+                        { type: 'aoe', chance: 0.25, damage: [12, 20], text: 'Chaos erupts from the Unraveler!' },
+                    ],
+                },
+                {
+                    name: 'The Last Thread', hp: 150, damage: 35,
+                    color: '#ff0066', sprite: 'boss_unraveler',
+                    transitionText: null,
+                    autoChaosTick: true,
+                    abilities: [
+                        { type: 'aoe', chance: 0.3, damage: [14, 22], text: 'The Unraveler tears reality apart around the party!' },
+                        { type: 'random_status', chance: 0.15, text: 'An unraveling force seizes the party!' },
+                    ],
+                },
+            ],
+        },
+    },
+
+    // ── Kingdom chain ────────────────────────────────────────────────────────
     kingdom_outskirts: {
         name: 'Kingdom Outskirts', difficulty: 5,
         chain: 'kingdom', chainOrder: 1,
@@ -1496,6 +1882,75 @@ export const EXPEDITION_DECISIONS = {
             },
         ],
     },
+    bleeding_altar: {
+        text: 'An altar sits in the center of the chamber, still wet. It expects something.',
+        triggerChance: 0.45,
+        realmFilter: ['void_hollow', 'void_sanctum', 'void_heart'],
+        minDifficulty: 1,
+        safeIndex: 1,
+        choices: [
+            {
+                label: 'Bleed on the altar',
+                description: 'One colonist takes 25 HP damage and becomes Void-Drained. Loot doubled.',
+                effects: { voidDrainedSacrifice: 25, nextLootRareMult: 2.0 },
+                logText: '{name} cuts their palm and bleeds onto the altar. It drinks deeply.',
+            },
+            {
+                label: 'Pass it by',
+                description: 'Leave the altar alone',
+                effects: {},
+                logText: 'The party avoids the altar\'s gaze and moves on.',
+            },
+            {
+                label: 'Leave an offering instead',
+                description: 'Crafting skill: sacrifice carried loot instead of HP',
+                effects: { sacrificeLootForAltarBless: true },
+                logText: '{name} reads the altar\'s runes carefully and makes a substitution.',
+            },
+        ],
+    },
+    brokers_table: {
+        text: 'A void entity leans over a stone table, studying you. It taps the table once.',
+        triggerChance: 0.35,
+        realmFilter: ['void_sanctum', 'void_heart'],
+        minDifficulty: 1,
+        safeIndex: 1,
+        choices: [
+            {
+                label: 'Accept the broker\'s offer',
+                description: 'Whole party takes 15% HP damage. One colonist\'s weapon gains +8 damage for this expedition.',
+                effects: { partyDamagePercent: 0.15, expeditionWeaponBuff: 8 },
+                logText: 'The broker reaches across the table. The exchange is brief and costs everyone something.',
+            },
+            {
+                label: 'Decline and fight',
+                description: 'Fight the broker as a combat encounter',
+                effects: { spawnCombat: { countMult: 1.0 } },
+                logText: 'The party refuses. The broker sighs and produces a weapon from somewhere.',
+            },
+        ],
+    },
+    fractured_portal: {
+        text: 'Three identical portals face the party. One leads forward, one loops back, one holds a cache.',
+        triggerChance: 0.40,
+        realmFilter: ['fracture_gate', 'shifting_labyrinth', 'unraveling_core'],
+        minDifficulty: 1,
+        safeIndex: 0,
+        choices: [
+            {
+                label: 'Read the patterns carefully',
+                description: 'Divination skill: correctly identify the forward portal',
+                effects: { healParty: 0.05, nextLootRareMult: 1.5 },
+                logText: '{name} reads the fracture patterns and leads the party through the right portal.',
+            },
+            {
+                label: 'Take the middle portal',
+                description: 'Guess — 33% chance of each outcome',
+                effects: { randomPortal: true },
+                logText: 'The party picks the middle portal and hopes for the best.',
+            },
+        ],
+    },
 };
 
 // Puzzle encounters.
@@ -1661,6 +2116,54 @@ export const PUZZLE_ENCOUNTERS = {
                 requirement: null,
                 success: { text: 'The party finds a longer way around.', reward: null },
                 failure: null,
+            },
+        ],
+    },
+    price_ledger: {
+        name: 'The Price Ledger',
+        text: 'A ledger lies open on a stone counter. It lists what was taken from previous expeditions and the prices paid.',
+        triggerWeight: 8,
+        realmFilter: ['void_sanctum', 'void_heart'],
+        checks: [
+            {
+                label: 'Study the ledger entries',
+                description: 'Research skill reveals profitable patterns',
+                skill: 'research', minLevel: 5,
+                traitBonus: ['scholar'],
+                successText: '{name} reads the ledger and identifies unclaimed rewards!',
+                failText: '{name} triggers a binding ward in the ledger!',
+            },
+            {
+                label: 'Copy down the terms',
+                description: 'Crafting skill lets you document the agreements for advantage',
+                skill: 'crafting', minLevel: 4,
+                traitBonus: ['studious'],
+                successText: '{name} carefully copies the terms and extracts useful information!',
+                failText: '{name} misreads the ledger and triggers a void burst!',
+            },
+        ],
+    },
+    shifting_map: {
+        name: 'The Shifting Map',
+        text: 'A map on the wall shows the labyrinth, but it keeps changing while you look at it.',
+        triggerWeight: 10,
+        realmFilter: ['shifting_labyrinth', 'unraveling_core'],
+        checks: [
+            {
+                label: 'Read the underlying pattern',
+                description: 'Research skill sees past the changes',
+                skill: 'research', minLevel: 6,
+                traitBonus: ['scholar'],
+                successText: '{name} finds the constant beneath the change. The route ahead is clear!',
+                failText: '{name} tries to follow the map and becomes briefly turned around. Enemies ambush!',
+            },
+            {
+                label: 'Mark the walls physically',
+                description: 'Building skill lets you anchor stable reference points',
+                skill: 'building', minLevel: 5,
+                traitBonus: ['sturdy'],
+                successText: '{name} marks reference points throughout. Navigation improves for the rest of the expedition!',
+                failText: '{name} marks a wall, but the wall moves. The marks are useless.',
             },
         ],
     },
@@ -2897,24 +3400,24 @@ export const STORY_MILESTONES = {
     },
     realm_shadow_realm: {
         tab: 'realms',
-        realmGroup: 'The Void',
-        title: 'Shadow Realm',
+        realmGroup: 'The Abyss',
+        title: 'Abyss Gate',
         trigger: 'realm_shadow_realm',
-        text: 'TODO: Write lore text for exploring the Shadow Realm.',
+        text: `TODO`,
     },
     realm_void_abyss: {
         tab: 'realms',
-        realmGroup: 'The Void',
-        title: 'Void Abyss',
+        realmGroup: 'The Abyss',
+        title: 'Sunken Abyss',
         trigger: 'realm_void_abyss',
-        text: 'TODO: Write lore text for exploring the Void Abyss.',
+        text: `TODO`,
     },
     realm_oblivion_rift: {
         tab: 'realms',
-        realmGroup: 'The Void',
+        realmGroup: 'The Abyss',
         title: 'Oblivion Rift',
         trigger: 'realm_oblivion_rift',
-        text: 'TODO: Write lore text for exploring the Oblivion Rift.',
+        text: `TODO`,
     },
     realm_kingdom_outskirts: {
         tab: 'realms',
@@ -2941,5 +3444,89 @@ export const STORY_MILESTONES = {
         <div style="text-align:center;margin-top:12px;">
             <button onclick="window.game.startOutro()" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">Return Home (Epilogue)</button>
         </div>`,
+    },
+
+    // ── Void Nexus / Void Whispers ───────────────────────────────────────────
+    void_nexus_built: {
+        tab: 'colony',
+        title: 'The Nexus Stirs',
+        trigger: 'void_nexus_placed',
+        text: `TODO`,
+    },
+    void_whisper_first_accepted: {
+        tab: 'colony',
+        title: 'The First Exchange',
+        trigger: 'void_whisper_first_accepted',
+        text: `TODO`,
+    },
+    void_whisper_refused_3: {
+        tab: 'colony',
+        title: 'Displeasure',
+        trigger: 'void_whisper_refused_3',
+        text: `TODO`,
+    },
+    void_whisper_accepted_5: {
+        tab: 'colony',
+        title: 'The Fluent Colony',
+        trigger: 'void_whisper_accepted_5',
+        text: `TODO`,
+    },
+    void_whisper_veil_parted: {
+        tab: 'colony',
+        title: 'A Glimpse',
+        trigger: 'void_whisper_veil_parted',
+        text: `TODO`,
+    },
+    waves_10_complete: {
+        tab: 'combat',
+        title: 'The Entity Watches',
+        trigger: 'waves_10_complete',
+        text: `TODO`,
+    },
+
+    // ── Void Pact realms ────────────────────────────────────────────────────
+    realm_void_hollow: {
+        tab: 'realms',
+        realmGroup: 'The Void Pact',
+        title: 'Void Hollow',
+        trigger: 'realm_void_hollow',
+        text: `TODO`,
+    },
+    realm_void_sanctum: {
+        tab: 'realms',
+        realmGroup: 'The Void Pact',
+        title: 'Void Sanctum',
+        trigger: 'realm_void_sanctum',
+        text: `TODO`,
+    },
+    realm_void_heart: {
+        tab: 'realms',
+        realmGroup: 'The Void Pact',
+        title: 'Void Heart',
+        trigger: 'realm_void_heart',
+        text: `TODO`,
+    },
+
+    // ── Chaos realms ────────────────────────────────────────────────────────
+    realm_fracture_gate: {
+        tab: 'realms',
+        realmGroup: 'The Unraveling',
+        title: 'Fracture Gate',
+        trigger: 'realm_fracture_gate',
+        text: `TODO`,
+    },
+    realm_shifting_labyrinth: {
+        tab: 'realms',
+        realmGroup: 'The Unraveling',
+        title: 'Shifting Labyrinth',
+        trigger: 'realm_shifting_labyrinth',
+        text: `TODO`,
+    },
+    realm_unraveling_core: {
+        tab: 'realms',
+        realmGroup: 'The Unraveling',
+        title: 'Unraveling Core',
+        trigger: 'realm_unraveling_core',
+        text: `TODO`,
     },
 };

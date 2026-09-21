@@ -143,6 +143,7 @@ export const HELMETS = {
     // ── Tier 4 ──
     void_crown: { name: 'Void Crown', damageReduction: 0.18, tier: 4, order: 26, spellDamageBonus: 0.15, description: 'A crown of void energy. Boosts spells and protection.', recipe: { input: { void_essence: 4, runite: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
     void_hunters_cowl: { name: "Void Hunter's Cowl", damageReduction: 0.12, critChance: 0.18, tier: 4, order: 29, description: 'A void-stitched cowl that locks in on targets, massively boosting critical strike chance.', recipe: { input: { void_essence: 3, runite: 2, leather: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
+    unravelers_eye: { name: "Unraveler's Eye", textColor: '#ff4444', damageReduction: 0.15, critChance: 0.12, tier: 4, order: 30, tradeValue: 90, description: "A helm shaped from the shattered mind of the Unraveler. The wearer perceives all chaos clearly.", expedition: { partyDamageMult: 1.15, trapDamageMult: 0.8 } },
 };
 
 export const CLOTHES = {
@@ -299,6 +300,9 @@ export const TRINKETS = {
     shard_of_oblivion: { name: 'Shard of Oblivion', textColor:'#ff4444', tradeValue: 95, tier: 4, order: 72, description: 'A shard of pure destruction. Devastating but dangerous.', targetPriority: 5, expedition: { partyDamageMult: 1.4, trapDamageMult: 1.5 } },
     dimensional_orb: { name: 'Dimensional Orb', textColor:'#ff4444', tradeValue: 105, tier: 4, order: 73, description: 'An orb that bends space. Shortens journeys dramatically.', expedition: { durationMult: 0.6, rareEncounterMult: 2.5 }, pedestal: { radius: 'global', manaCost: 3, wandererChanceMult: 1.3 } },
     voidheart: { name: 'Voidheart', textColor:'#ff4444', tradeValue: 120, tier: 4, order: 74, description: 'The heart of the void itself. Ultimate arcane power.', spellDamageBonus: 0.5, moveSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 4, damageBonusMult: 1.2 } },
+    void_contract: { name: 'Void Contract', textColor:'#ff4444', tradeValue: 100, tier: 4, order: 77, description: 'A signed agreement with an entity that does not forget. Increases all void essence gained by 15%.', voidEssenceGainMult: 1.15, expedition: { partyDamageMult: 1.05 } },
+    arbiters_ledger: { name: "Arbiter's Ledger", textColor:'#f944ff', tradeValue: 85, tier: 4, order: 78, description: 'A ledger of every transaction ever made in the void. Sharpens judgment on expeditions.', expedition: { puzzleSuccessBonus: 0.4, lootMult: 1.1 } },
+    chaos_shard: { name: 'Chaos Shard', textColor:'#ff4444', tradeValue: 95, tier: 4, order: 79, description: 'A crystallized fragment of unraveled reality. Negative chaos effects are less punishing.', chaosResistance: 0.3, expedition: { partyDamageMult: 1.1 } },
 };
 
 export const POTIONS = {

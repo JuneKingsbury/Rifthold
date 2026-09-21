@@ -1264,8 +1264,16 @@ class Game {
                 this.ui.toggleResearchPanel();
                 return;
             }
+        } else if (evt.type === 'void_whisper') {
+            this.events.resolveVoidWhisper(this, choice === 0);
         }
         this._unpauseFromEvent();
+    }
+
+    resolveVoidPactChoice(expId, accept) {
+        this.exploration.resolveVoidPactChoice(this, expId, accept);
+        this.ui._lastArcaneHtml = '';
+        this.ui.updateArcanePanel();
     }
 
     _unpauseFromEvent() {

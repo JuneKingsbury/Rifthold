@@ -354,7 +354,7 @@ const arcaneMethods = {
                 const totalDur = Math.floor(exp.duration * 1.2);
                 let pct = Math.min(100, Math.floor((elapsed / totalDur) * 100));
                 if (exp.status === 'returning' && !exp.retreatTick) pct = 100;
-                const statusLabel = exp.pendingDecision ? 'AWAITING CHOICE' : exp.combat ? 'COMBAT' : exp.status;
+                const statusLabel = exp.pendingVoidPactChoice ? 'VOID PACT' : exp.pendingDecision ? 'AWAITING CHOICE' : exp.combat ? 'COMBAT' : exp.status;
                 html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — ${statusLabel}</div>`;
 
                 // Mutator badges
@@ -377,6 +377,11 @@ const arcaneMethods = {
                 // Pending decision/puzzle/NPC prompt
                 if (exp.pendingDecision) {
                     html += this._buildDecisionPromptHtml(exp);
+                }
+
+                // Void Pact mid-boss deal prompt
+                if (exp.pendingVoidPactChoice) {
+                    html += this._buildVoidPactChoiceHtml(exp);
                 }
 
                 const snapshot = exp.partySnapshot || [];
@@ -447,8 +452,8 @@ const arcaneMethods = {
 
         // Return-to-watched button
         if (watchedExp) {
-            const statusLabel = watchedExp.pendingDecision ? 'AWAITING CHOICE' : watchedExp.combat ? 'IN COMBAT' : watchedExp.status.toUpperCase();
-            const needsAttention = !!watchedExp.pendingDecision;
+            const statusLabel = watchedExp.pendingVoidPactChoice ? 'VOID PACT' : watchedExp.pendingDecision ? 'AWAITING CHOICE' : watchedExp.combat ? 'IN COMBAT' : watchedExp.status.toUpperCase();
+            const needsAttention = !!(watchedExp.pendingDecision || watchedExp.pendingVoidPactChoice);
             const btnColor = needsAttention ? '#ff8844' : '#33aaff';
             html += `<div style="margin-bottom:8px;">`;
             html += `<button onclick="window.game.ui._arcaneShowOverview=false;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#112233;color:${btnColor};padding:5px 14px;border:1px solid ${btnColor};border-radius:3px;cursor:pointer;font-size:0.9em;">&#9654; Watch Expedition — ${watchedExp.realmName} (${statusLabel})</button>`;
@@ -1104,6 +1109,24 @@ const arcaneMethods = {
             html += ` <span style="color:#666;font-size:0.8em;">Take the hit</span>`;
             html += `</div>`;
         }
+        html += `</div>`;
+        return html;
+    },
+
+    _buildVoidPactChoiceHtml(exp) {
+        const pact = exp.pendingVoidPactChoice;
+        if (!pact) return '';
+        let html = `<div style="margin:8px 0;padding:8px;background:#0d0d1a;border-radius:4px;border-left:3px solid #aa44ff;">`;
+        html += `<div style="color:#cc88ff;font-weight:bold;margin-bottom:6px;">The Void Arbiter extends its terms.</div>`;
+        html += `<div style="color:#aaaacc;margin-bottom:8px;font-size:0.9em;">${pact.text}</div>`;
+        html += `<div style="margin:4px 0;">`;
+        html += `<button onclick="window.game.resolveVoidPactChoice(${exp.id}, true)" style="background:#2a1a44;color:#cc88ff;padding:4px 12px;border:1px solid #6633aa;border-radius:3px;cursor:pointer;font-size:0.9em;">Accept</button>`;
+        html += ` <span style="color:#8866aa;font-size:0.8em;">${pact.acceptLabel || 'Accept the terms'}</span>`;
+        html += `</div>`;
+        html += `<div style="margin:4px 0;">`;
+        html += `<button onclick="window.game.resolveVoidPactChoice(${exp.id}, false)" style="background:#1a1a1a;color:#888;padding:4px 12px;border:1px solid #444;border-radius:3px;cursor:pointer;font-size:0.9em;">Refuse</button>`;
+        html += ` <span style="color:#666;font-size:0.8em;">${pact.refuseLabel || 'Refuse. Fight on.'}</span>`;
+        html += `</div>`;
         html += `</div>`;
         return html;
     },
@@ -1790,7 +1813,12 @@ const arcaneMethods = {
         }
 
         const realmDef = REALMS[activeExp.realm];
-        const vis = realmDef?.vis || { wall: 'stone_wall', floor: 'stone_floor' };
+        // Chaos realms: use per-encounter randomized vis so the visual appearance
+        // shifts unpredictably as the party moves through the realm.
+        const currentEncChaosVis = (realmDef?.chain === 'chaos')
+            ? activeExp.encounters?.[activeExp.currentEncounter]?.chaosVis
+            : null;
+        const vis = currentEncChaosVis || realmDef?.vis || { wall: 'stone_wall', floor: 'stone_floor' };
         const realmColors = {
             crystal_caves: { accent: '#4488ff' },
             crystal_mines: { accent: '#3366dd' },

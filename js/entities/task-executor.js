@@ -205,6 +205,7 @@ export function completeTask(colonist, task, game) {
             if (game.waves && game.waves.active) game.waves.invalidatePathPreview();
             applyThought(colonist, 'built_something', game.tick);
             game.story.checkMilestone('first_building_placed', game);
+            if (task.buildType === 'void_nexus') game.story.checkMilestone('void_nexus_placed', game);
             game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.buildCompleteChar, color: COMBAT_VISUALS.buildCompleteColor, ttl: COMBAT_VISUALS.buildCompleteTtl });
             // Build-complete particle burst: starburst of white/yellow particles
             for (let i = 0; i < 10; i++) {
@@ -445,6 +446,7 @@ export function completeTask(colonist, task, game) {
             break;
         }
         case 'research': {
+            if (game._voidWhisperResearchPauseUntil && game.tick < game._voidWhisperResearchPauseUntil) break;
             let researchPts = Math.ceil((colonist.skills.research + 2) * 0.6);
             const researchMult = getEquipmentStat(colonist, 'researchSpeed');
             if (researchMult > 0) researchPts = Math.floor(researchPts * researchMult);

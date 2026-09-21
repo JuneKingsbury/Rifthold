@@ -110,6 +110,10 @@ export const EVENTS = {
         notification: "{name} found a Rabbit's Paw!",
         logMessage: "{name} found a Rabbit's Paw", logType: 'success',
     },
+    void_whisper: {
+        weight: 4, minTick: 2400, cooldown: 2400,
+        effect: 'custom',
+    },
 };
 
 export const FIRE_CONFIG = {

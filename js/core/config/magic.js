@@ -256,10 +256,12 @@ export const RESEARCH = {
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['fortification'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
     void_forging: { name: 'Void Shaping', cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
     planar_rift: { name: 'Planar Rifts', cost: 800, requires: ['void_summoning', 'arcane_infusion'], tab: 'rifts', description: 'Open stable rifts for exploration expeditions', requiresMilestone: { stat: 'wavesCompleted', min: 3 } },
-    deep_delving: { name: 'Deep Delving', cost: 1200, requires: ['auto_expedition'], tab: 'rifts', description: 'Access deeper, more dangerous realms', requiresBuildings: { rift_gate: 1 }, requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, requiresTabCount: 3 },
-    auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually' },
+    deep_delving: { name: 'Deep Delving', cost: 1200, requires: ['auto_expedition'], tab: 'rifts', description: 'Access deeper, more dangerous realms' },
+    auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually', requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, },
     auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['deep_delving'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
-    auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions', requiresTabCount: 3 },
+    auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions' },
+    void_pact: { name: 'Void Pact', cost: 900, requires: ['deep_delving', 'void_forging', 'void_sorcery', 'auto_expedition'], tab: 'rifts', description: 'Broker passage through the deepest void. Those who enter must be willing to pay its price.' },
+    unraveling: { name: 'Unraveling Threads', cost: 1100, requires: ['void_pact'], tab: 'rifts', description: 'Some rifts do not lead anywhere stable. The brave, or the foolish, enter anyway.' },
 };
 
 export const DEMO_LOCKED_RESEARCH = new Set([

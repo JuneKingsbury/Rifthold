@@ -110,6 +110,7 @@ export class EventSystem {
 
     update(game) {
         if (this.pendingEvent) return;
+        if (!game.voidWhisperStats) game.voidWhisperStats = { accepted: 0, refused: 0 };
 
         const mods = game.divinationModifiers || [];
 
@@ -123,6 +124,19 @@ export class EventSystem {
             if (eventKey === 'fire') {
                 const wDef = WEATHER_TYPES[game.weather.currentWeather];
                 if (!(wDef && wDef.fireChance) && Math.random() > 0.01) continue;
+            }
+            if (eventKey === 'void_whisper') {
+                const hasNexus = game.mapIndex
+                    ? game.mapIndex.getStructurePositions('void_nexus').size > 0
+                    : (() => {
+                        for (let y = 0; y < game.map.length; y++) {
+                            for (let x = 0; x < game.map[y].length; x++) {
+                                if (game.map[y][x].structure === 'void_nexus') return true;
+                            }
+                        }
+                        return false;
+                    })();
+                if (!hasNexus) continue;
             }
 
             let chance = eventDef.weight / 5000;
@@ -165,6 +179,7 @@ export class EventSystem {
                     case 'wanderer': this.eventWanderer(game); break;
                     case 'caravan': this.eventCaravan(game); break;
                     case 'fire': this.eventFire(game); break;
+                    case 'void_whisper': this.eventVoidWhisper(game); break;
                 }
                 break;
         }
@@ -686,6 +701,169 @@ export class EventSystem {
         if (this.pendingEvent?.type === 'trade') {
             this.pendingEvent = null;
         }
+    }
+
+    eventVoidWhisper(game) {
+        if (!game.voidWhisperStats) game.voidWhisperStats = { accepted: 0, refused: 0 };
+
+        const WHISPERS = [
+            {
+                key: 'blood_tithe',
+                title: 'Blood Tithe',
+                text: 'A voice from the Nexus: "Pay with flesh and I shall reward you."',
+                ask: 'Your strongest colonist takes a wound (30% of max HP).',
+                reward: '+8 void essence',
+                condition: (g) => g.colonists.some(c => c.hp > 0 && !c.golem),
+                apply: (g) => {
+                    const alive = g.colonists.filter(c => c.hp > 0 && !c.golem);
+                    const strongest = alive.reduce((best, c) => (c.maxHp > best.maxHp ? c : best), alive[0]);
+                    strongest.hp = Math.max(1, strongest.hp - Math.floor(strongest.maxHp * 0.30));
+                    g.resources.add({ void_essence: 8 });
+                    g.eventLog.add(g, `${strongest.name} bleeds for the Nexus. +8 void essence.`, 'danger', { type: 'colonist', id: strongest.id });
+                },
+            },
+            {
+                key: 'dream_tax',
+                title: 'Dream Tax',
+                text: 'A voice from the Nexus: "Your sleep belongs to me tonight. Give it freely."',
+                ask: 'All colonists lose rest (fatigue increases).',
+                reward: '+1 rare item drop from next expedition',
+                apply: (g) => {
+                    for (const c of g.colonists.filter(c => c.hp > 0)) {
+                        c.rest = Math.max(0, (c.rest || 0) - 30);
+                    }
+                    g._voidWhisperNextExpRareMult = (g._voidWhisperNextExpRareMult || 1) * 2.0;
+                    g.eventLog.add(g, `The colonists sleep fitfully. Next expedition has doubled rare loot chance.`, 'event', null);
+                },
+            },
+            {
+                key: 'name_price',
+                title: 'The Price of a Name',
+                text: 'A voice from the Nexus: "Give me a name. Let me carry it for a while."',
+                ask: 'A random colonist gains "Void-Marked" thought (-10 mood, 2 days).',
+                reward: 'Next raid timing revealed precisely',
+                condition: (g) => g.colonists.some(c => c.hp > 0),
+                apply: (g) => {
+                    const alive = g.colonists.filter(c => c.hp > 0);
+                    const target = alive[Math.floor(Math.random() * alive.length)];
+                    addThought(target, 'The void knows my name', -10, 960, g.tick);
+                    const nextRaid = g.combat?.nextRaidTick;
+                    const raidMsg = nextRaid
+                        ? `Next raid in approximately ${Math.max(0, Math.round((nextRaid - g.tick) / 600))} seasons.`
+                        : 'No raid is currently scheduled.';
+                    g.notifications.push({ text: `The Void reveals: ${raidMsg}`, tick: g.tick, type: 'event' });
+                    g.eventLog.add(g, `${target.name} feels watched by something vast. ${raidMsg}`, 'event', { type: 'colonist', id: target.id });
+                },
+            },
+            {
+                key: 'hunger_rite',
+                title: 'Hunger Rite',
+                text: 'A voice from the Nexus: "Feed the hunger between worlds. A small tithe."',
+                ask: 'Consume 15 food from stockpile.',
+                reward: '+25% crafting speed for 1 season (2400 ticks)',
+                condition: (g) => (g.resources.stockpile.food || 0) >= 15,
+                apply: (g) => {
+                    g.resources.deduct({ food: 15 });
+                    if (!g.activeColonyBuffs) g.activeColonyBuffs = [];
+                    g.activeColonyBuffs.push({ type: 'crafting_speed', mult: 1.25, expiresAt: g.tick + 2400 });
+                    g.eventLog.add(g, `15 food offered. Colony gains +25% crafting speed for a season.`, 'success', null);
+                },
+            },
+            {
+                key: 'silence_gift',
+                title: 'Gift of Silence',
+                text: 'A voice from the Nexus: "Still the world. Let me think. You will be compensated."',
+                ask: 'Research pauses for 600 ticks.',
+                reward: '+12 void essence',
+                condition: (g) => g.research && !g.research.paused,
+                apply: (g) => {
+                    g._voidWhisperResearchPauseUntil = g.tick + 600;
+                    g.resources.add({ void_essence: 12 });
+                    g.eventLog.add(g, `Research quieted for the void. +12 void essence.`, 'event', null);
+                },
+            },
+            {
+                key: 'shaken_veil',
+                title: 'The Veil Parts',
+                text: 'A voice from the Nexus: "Look. I will show you what I am. Do not look away."',
+                ask: 'A colonist gets "Shaken" (-15 mood, 3 days).',
+                reward: 'Unlock a void story entry',
+                condition: (g) => g.colonists.some(c => c.hp > 0),
+                apply: (g) => {
+                    const alive = g.colonists.filter(c => c.hp > 0);
+                    const target = alive[Math.floor(Math.random() * alive.length)];
+                    addThought(target, 'Saw beyond the veil', -15, 1440, g.tick);
+                    g.story.checkMilestone('void_whisper_veil_parted', g);
+                    g.eventLog.add(g, `${target.name} glimpsed beyond the Nexus. They are shaken.`, 'danger', { type: 'colonist', id: target.id });
+                },
+            },
+            {
+                key: 'offering_stone',
+                title: 'Offering in Stone',
+                text: 'A voice from the Nexus: "Unmake something. Show me you understand that things can end."',
+                ask: 'A void wall is consumed (if present). Otherwise a stone wall.',
+                reward: 'Next wave spawns 20% fewer enemies',
+                apply: (g) => {
+                    let found = false;
+                    outer: for (let y = 0; y < g.map.length; y++) {
+                        for (let x = 0; x < g.map[y].length; x++) {
+                            const s = g.map[y][x].structure;
+                            if (s === 'void_wall' || (s === 'wall' && !found)) {
+                                g.map[y][x].structure = null;
+                                if (g.mapIndex) g.mapIndex.removeStructure(x, y, s);
+                                found = true;
+                                if (s === 'void_wall') break outer;
+                            }
+                        }
+                    }
+                    g._voidWhisperWaveEnemyMult = (g._voidWhisperWaveEnemyMult || 1) * 0.80;
+                    g.eventLog.add(g, `A wall crumbles as tribute. Next wave: -20% enemies.`, 'event', null);
+                },
+            },
+        ];
+
+        const eligible = WHISPERS.filter(w => !w.condition || w.condition(game));
+        if (eligible.length === 0) return;
+
+        if (!game._voidWhisperLastKey) game._voidWhisperLastKey = null;
+        const filtered = eligible.filter(w => w.key !== game._voidWhisperLastKey);
+        const pool = filtered.length > 0 ? filtered : eligible;
+        const whisper = pool[Math.floor(Math.random() * pool.length)];
+        game._voidWhisperLastKey = whisper.key;
+
+        this.pendingEvent = {
+            type: 'void_whisper',
+            title: whisper.title,
+            text: whisper.text,
+            askText: whisper.ask,
+            rewardText: whisper.reward,
+            choices: ['Accept', 'Refuse'],
+            data: { whisperKey: whisper.key, applyFn: whisper.apply },
+        };
+        game.notifications.push({ text: 'The Void Nexus stirs...', tick: game.tick, type: 'event' });
+        game.eventLog.add(game, 'The Void Nexus pulsed with intent.', 'event', null);
+        if (game.settings?.autoPauseEvent && !game.paused) {
+            game.togglePause();
+            game._eventPaused = true;
+        }
+    }
+
+    resolveVoidWhisper(game, accept) {
+        if (!this.pendingEvent || this.pendingEvent.type !== 'void_whisper') return;
+        if (!game.voidWhisperStats) game.voidWhisperStats = { accepted: 0, refused: 0 };
+
+        if (accept) {
+            this.pendingEvent.data.applyFn(game);
+            game.voidWhisperStats.accepted++;
+            game.story.checkMilestone('void_whisper_first_accepted', game);
+            if (game.voidWhisperStats.accepted >= 5) game.story.checkMilestone('void_whisper_accepted_5', game);
+        } else {
+            game.voidWhisperStats.refused++;
+            if (game.voidWhisperStats.refused >= 3) game.story.checkMilestone('void_whisper_refused_3', game);
+            game.eventLog.add(game, 'The Nexus falls silent. For now.', 'event', null);
+        }
+
+        this.pendingEvent = null;
     }
 
     eventFire(game) {
