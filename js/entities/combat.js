@@ -16,6 +16,8 @@ export class CombatSystem {
         this.crusaderRaidTriggered = false;
         this.crusaderRaidDefeated = false;
         this.crusaderRaidWarned = false;
+        this.raidMarchSpeed = null;
+        this.raidEngaged = false;
     }
 
     update(game) {
@@ -99,6 +101,7 @@ export class CombatSystem {
 
         this.nextRaidTick = game.tick + RAID_CONFIG.minInterval +
             Math.floor(Math.random() * (RAID_CONFIG.maxInterval - RAID_CONFIG.minInterval));
+        this._initMarch(game);
     }
 
     startRaid(game) {
@@ -161,6 +164,14 @@ export class CombatSystem {
 
         this.nextRaidTick = game.tick + RAID_CONFIG.minInterval +
             Math.floor(Math.random() * (RAID_CONFIG.maxInterval - RAID_CONFIG.minInterval));
+        this._initMarch(game);
+    }
+
+    _initMarch(game) {
+        this.raidEngaged = false;
+        this.raidMarchSpeed = game.raiders.length > 0
+            ? Math.min(...game.raiders.map(r => r.speed))
+            : null;
     }
 
     updateRaid(game) {
@@ -270,7 +281,7 @@ export class CombatSystem {
                     }
                 }
             }
-            updateRaider(raider, game);
+            updateRaider(raider, game, this);
             // Cull raiders that have left the map, and fleeing raiders that have reached a
             // border tile. moveToEdge parks a fleer on the edge (dx/dy become 0 there), so it
             // never crosses the < 0 bound. Without this an escaped fleer lingers forever and
@@ -301,7 +312,7 @@ export class CombatSystem {
     }
 }
 
-function updateRaider(raider, game) {
+function updateRaider(raider, game, combatSystem) {
     // Stun (colonist CC): skip the entire turn while the deadline holds. The
     // visual pip is emitted by updateEntityRoles for role-based raiders. Emit one
     // here too so role-less raiders still show the stun.
@@ -314,7 +325,12 @@ function updateRaider(raider, game) {
     const isSlowed = raider._slowUntil && game.tick < raider._slowUntil;
     const slowMult = isSlowed ? (raider._slowMult || 0.5) : 1;
     const attackSlowMult = isSlowed ? (raider._attackSlowMult ?? raider._slowMult ?? 0.5) : 1;
-    const effSpeed = raider.speed * slowMult;
+    // While the group is still marching, cap every raider to the slowest member's
+    // speed so the formation stays intact during the approach.
+    const marchSpeed = (combatSystem && !combatSystem.raidEngaged && combatSystem.raidMarchSpeed)
+        ? combatSystem.raidMarchSpeed
+        : raider.speed;
+    const effSpeed = Math.min(raider.speed, marchSpeed) * slowMult;
     raider.moveCooldown -= effSpeed;
     if (raider.moveCooldown > 0) return;
     raider.moveCooldown = 1;
@@ -326,7 +342,7 @@ function updateRaider(raider, game) {
     }
 
     if (raider.roles && raider.roles.length > 0) {
-        updateEntityRoles(raider, game);
+        updateEntityRoles(raider, game, combatSystem);
     }
 
     if (raider.roles && raider.roles.some(r => r.type === 'ranged_attacker' || r.type === 'melee_charger')) return;
@@ -339,6 +355,7 @@ function updateRaider(raider, game) {
 
     const dist = manhattanDist(raider.x, raider.y, nearest.x, nearest.y);
     if (dist <= 1) {
+        if (combatSystem) combatSystem.raidEngaged = true;
         const cooldown = Math.round((raider.attackCooldown || COLONIST_CONFIG.baseAttackCooldown) / attackSlowMult);
         if (game.tick - (raider._lastAttackTick || 0) >= cooldown) {
             raider._lastAttackTick = game.tick;

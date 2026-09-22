@@ -151,9 +151,11 @@ export const ROLE_HANDLERS = {
         info(entity, role) {
             return `<div class="info-row" style="color:#ffaa33">Ranged Attacker (range ${role.range || 6}, prefers distance ${role.preferDistance || 4})</div>`;
         },
-        update(entity, role, game) {
+        update(entity, role, game, combatSystem) {
             const rs = entity.roleState.ranged_attacker;
-            const dur = CONFIG.TICK_RATE / (entity.speed * game.speed);
+            const marchSpeed = (combatSystem && !combatSystem.raidEngaged && combatSystem.raidMarchSpeed)
+                ? combatSystem.raidMarchSpeed : entity.speed;
+            const dur = CONFIG.TICK_RATE / (Math.min(entity.speed, marchSpeed) * game.speed);
             const range = role.range || 6;
             const preferDist = role.preferDistance || 4;
 
@@ -185,6 +187,7 @@ export const ROLE_HANDLERS = {
                     siegeMoveToward(entity, target, role, game.map, dur, game);
                 }
             } else if (dist <= range && dist >= 2) {
+                if (combatSystem) combatSystem.raidEngaged = true;
                 if (canAttack(entity, game)) {
                     // A hostile entity's targets are colonists (see getTargets); they must take
                     // damage through colonistTakeDamage so armor/dodge/shield and the death path
@@ -228,9 +231,11 @@ export const ROLE_HANDLERS = {
             const status = rs.charged ? 'Engaged' : 'Charging';
             return `<div class="info-row" style="color:#ff6644">Melee Charger: ${status} (+${role.chargeBonus || 5} first hit bonus)</div>`;
         },
-        update(entity, role, game) {
+        update(entity, role, game, combatSystem) {
             const rs = entity.roleState.melee_charger;
-            const dur = CONFIG.TICK_RATE / (entity.speed * game.speed);
+            const marchSpeed = (combatSystem && !combatSystem.raidEngaged && combatSystem.raidMarchSpeed)
+                ? combatSystem.raidMarchSpeed : entity.speed;
+            const dur = CONFIG.TICK_RATE / (Math.min(entity.speed, marchSpeed) * game.speed);
 
             const targets = getTargets(entity, game);
             let target = null;
@@ -247,6 +252,7 @@ export const ROLE_HANDLERS = {
 
             const dist = manhattanDist(entity.x, entity.y, target.x, target.y);
             if (dist <= 1) {
+                if (combatSystem) combatSystem.raidEngaged = true;
                 if (canAttack(entity, game)) {
                     const bonus = !rs.charged ? (role.chargeBonus || 5) : 0;
                     rs.charged = true;
@@ -475,7 +481,7 @@ export const ROLE_HANDLERS = {
     },
 };
 
-export function updateEntityRoles(entity, game) {
+export function updateEntityRoles(entity, game, combatSystem) {
     // Crowd control (from colonist spells like Mesmerize): a stunned entity skips
     // its whole turn (no move, no attack). This is the single chokepoint shared
     // by raiders, void waves, and summons, so the stun-skip here covers every
@@ -494,7 +500,7 @@ export function updateEntityRoles(entity, game) {
     for (const role of entity.roles) {
         const handler = ROLE_HANDLERS[role.type];
         if (handler && handler.update) {
-            handler.update(entity, role, game);
+            handler.update(entity, role, game, combatSystem);
         }
     }
 }
