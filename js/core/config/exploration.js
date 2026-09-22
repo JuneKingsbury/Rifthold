@@ -3419,33 +3419,6 @@ export const STORY_MILESTONES = {
         trigger: 'realm_oblivion_rift',
         text: `TODO`,
     },
-    realm_kingdom_outskirts: {
-        tab: 'realms',
-        realmGroup: 'The Kingdom',
-        title: 'Kingdom Outskirts',
-        trigger: 'realm_kingdom_outskirts',
-        text: 'TODO: Write lore text for exploring the Kingdom.',
-    },
-    realm_crusader_barracks: {
-        tab: 'realms',
-        realmGroup: 'The Kingdom',
-        title: 'Crusader Barracks',
-        trigger: 'realm_crusader_barracks',
-        text: 'TODO: Write lore text for exploring the Kingdom.',
-    },
-    realm_palace_fortress: {
-        tab: 'realms',
-        realmGroup: 'The Kingdom',
-        title: 'Palace Fortress',
-        trigger: 'realm_palace_fortress',
-        text: `
-        TODO: Write lore text for exploring the Kingdom.
-        <br><br>
-        <div style="text-align:center;margin-top:12px;">
-            <button onclick="window.game.startOutro()" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">Return Home (Epilogue)</button>
-        </div>`,
-    },
-
     // ── Void Nexus / Void Whispers ───────────────────────────────────────────
     void_nexus_built: {
         tab: 'colony',
@@ -3483,7 +3456,6 @@ export const STORY_MILESTONES = {
         trigger: 'waves_10_complete',
         text: `TODO`,
     },
-
     // ── Void Pact realms ────────────────────────────────────────────────────
     realm_void_hollow: {
         tab: 'realms',
@@ -3506,7 +3478,6 @@ export const STORY_MILESTONES = {
         trigger: 'realm_void_heart',
         text: `TODO`,
     },
-
     // ── Chaos realms ────────────────────────────────────────────────────────
     realm_fracture_gate: {
         tab: 'realms',
@@ -3528,5 +3499,31 @@ export const STORY_MILESTONES = {
         title: 'Unraveling Core',
         trigger: 'realm_unraveling_core',
         text: `TODO`,
+    },
+    realm_kingdom_outskirts: {
+        tab: 'realms',
+        realmGroup: 'The Kingdom',
+        title: 'Kingdom Outskirts',
+        trigger: 'realm_kingdom_outskirts',
+        text: 'TODO: Write lore text for exploring the Kingdom.',
+    },
+    realm_crusader_barracks: {
+        tab: 'realms',
+        realmGroup: 'The Kingdom',
+        title: 'Crusader Barracks',
+        trigger: 'realm_crusader_barracks',
+        text: 'TODO: Write lore text for exploring the Kingdom.',
+    },
+    realm_palace_fortress: {
+        tab: 'realms',
+        realmGroup: 'The Kingdom',
+        title: 'Palace Fortress',
+        trigger: 'realm_palace_fortress',
+        text: `
+        TODO: Write lore text for exploring the Kingdom.
+        <br><br>
+        <div style="text-align:center;margin-top:12px;">
+            <button onclick="window.game.startOutro()" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">Return Home (Epilogue)</button>
+        </div>`,
     },
 };
