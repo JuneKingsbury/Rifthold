@@ -67,7 +67,7 @@ export function updateWildlife(game) {
 function maybeSpawnAnimal(game) {
     const spawnRate = SEASON_EFFECTS[game.weather.season].animalSpawnRate;
     if (Math.random() > spawnRate) return;
-    const wildCount = game.entities.filter(e => e.category === 'animal' && !e.tamed).length;
+    const wildCount = game.entities.filter(e => e.category === 'animal' && !e.tamed && !e.pendingTame).length;
     if (wildCount >= WILDLIFE_CONFIG.maxCount) return;
 
     let edge;

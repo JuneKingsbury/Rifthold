@@ -1529,6 +1529,11 @@ img.pixel-art {
     font-style: italic;
 }
 
+.story-entry-new {
+    border-left: 3px solid #ffcc44 !important;
+    background: #2a2210 !important;
+}
+
 .research-tabs {
     display: flex;
     gap: 0;

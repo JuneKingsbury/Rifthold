@@ -222,8 +222,11 @@ export class ExplorationSystem {
         for (const c of party) {
             c.expeditionPending = true;
             if (c.currentTaskId) {
-                game.taskQueue.release(c.currentTaskId);
-                c.currentTaskId = null;
+                const currentTask = game.taskQueue.getById(c.currentTaskId);
+                if (!currentTask || currentTask.type !== 'lead_animal') {
+                    game.taskQueue.release(c.currentTaskId);
+                    c.currentTaskId = null;
+                }
             }
             const path = findPathAdjacent(game.map, c.x, c.y, gatePos.x, gatePos.y, game._occupiedTiles);
             if (path && path.length > 0) {
@@ -858,7 +861,7 @@ export class ExplorationSystem {
         }
     }
 
-    savePartyPreset(name, colonistIds, formation, potions, mutators) {
+    savePartyPreset(name, colonistIds, formation, potions, mutators, packAnimalIds = [], warBeastIds = []) {
         const existing = this.partyPresets.findIndex(p => p.name === name);
         const preset = {
             name,
@@ -866,6 +869,8 @@ export class ExplorationSystem {
             formation: formation ? { front: [...formation.front], back: [...formation.back] } : null,
             potions: potions ? { ...potions } : {},
             mutators: mutators ? [...mutators] : [],
+            packAnimalIds: [...packAnimalIds],
+            warBeastIds: [...warBeastIds],
         };
         if (existing >= 0) this.partyPresets[existing] = preset;
         else this.partyPresets.push(preset);

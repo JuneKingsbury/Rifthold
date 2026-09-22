@@ -633,7 +633,7 @@ const arcaneMethods = {
             html += `<div class="info-row" style="color:#bbaa44;margin-top:6px;"><b>Pack Animals (max 2):</b></div>`;
             for (const a of packAnimals) {
                 const def = TAMED_ANIMALS[a.type];
-                html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${a.id}" data-max="3"> ${a.type} (+${Math.round(def.expeditionSpeedBonus * 100)}% speed)</label></div>`;
+                html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${a.id}" data-max="2"> ${a.type} (+${Math.round(def.expeditionSpeedBonus * 100)}% speed)</label></div>`;
             }
         }
         const warBeasts = this.game.entities.filter(a => {
@@ -800,7 +800,7 @@ const arcaneMethods = {
             boxes.forEach(cb => { cb.addEventListener('change', handler); });
         };
         enforce('exp-check', 5);
-        enforce('exp-pack-check', 3);
+        enforce('exp-pack-check', 2);
         enforce('exp-war-check', 2);
 
         const syncFormation = () => {
@@ -2292,37 +2292,82 @@ const arcaneMethods = {
         }
 
         if (activeExp.packAnimals && activeExp.packAnimals.length > 0) {
-            for (let i = 0; i < activeExp.packAnimals.length; i++) {
-                const pa = activeExp.packAnimals[i];
-                const pay = H / 2 + (i - activeExp.packAnimals.length / 2) * 28 + 14;
+            for (let paIndex = 0; paIndex < activeExp.packAnimals.length; paIndex++) {
+                const pa = activeExp.packAnimals[paIndex];
+                const pay = H / 2 + (paIndex - activeExp.packAnimals.length / 2) * 28 + 14;
                 const pax = partyX - 32 + (pay - H / 2) * diagSlope;
                 const animalDef = ANIMALS[pa.type];
+                let paBounceY = 0;
+                if (isCelebrating) {
+                    const t = (Date.now() - this._expVisState._celebrateStart) / 1000;
+                    paBounceY = -Math.abs(Math.sin((t * 4) + paIndex * 1.2)) * 8;
+                }
                 ctx.globalAlpha = 0.25;
                 ctx.fillStyle = '#000000';
                 ctx.beginPath();
                 ctx.ellipse(pax, pay + 8, 10, 4, 0, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalAlpha = 1;
-                const paGrow = _breathe(100 + i);
+                const paGrow = _breathe(100 + paIndex);
                 // Pack animals don't attack. They get sway + locomotion polish only.
-                const paAnim = _animFor(pa, 1, 100 + i, _walkSway(100 + i));
+                const paAnim = _animFor(pa, 1, 100 + paIndex, _walkSway(100 + paIndex));
                 if (useSkins) {
                     const sprite = skinMgr.getSprite('entities', pa.type);
                     if (sprite) {
-                        this._drawEntityWithAnim(ctx, sprite, pax - 16, pay - 16 - paGrow, 32, 32 + paGrow, pax, pay + 16, paAnim);
+                        this._drawEntityWithAnim(ctx, sprite, pax - 16, pay - 16 - paGrow + paBounceY, 32, 32 + paGrow, pax, pay + 16, paAnim);
                     } else {
                         ctx.font = 'bold 18px monospace';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillStyle = animalDef?.color || '#bbaa44';
-                        ctx.fillText(animalDef?.char || 'a', pax, pay - paGrow);
+                        ctx.fillText(animalDef?.char || 'a', pax, pay - paGrow + paBounceY);
                     }
                 } else {
                     ctx.font = 'bold 18px monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = animalDef?.color || '#bbaa44';
-                    ctx.fillText(animalDef?.char || 'a', pax, pay - paGrow);
+                    ctx.fillText(animalDef?.char || 'a', pax, pay - paGrow + paBounceY);
+                }
+            }
+        }
+
+        if (activeExp.warBeasts && activeExp.warBeasts.length > 0) {
+            for (let wbIndex = 0; wbIndex < activeExp.warBeasts.length; wbIndex++) {
+                const wb = activeExp.warBeasts[wbIndex];
+                const wby = H / 2 + (wbIndex - activeExp.warBeasts.length / 2) * 28 + 14;
+                const wbx = partyX + 32 + (wby - H / 2) * diagSlope;
+                const animalDef = ANIMALS[wb.type];
+                let wbBounceY = 0;
+                if (isCelebrating) {
+                    const t = (Date.now() - this._expVisState._celebrateStart) / 1000;
+                    wbBounceY = -Math.abs(Math.sin((t * 4) + wbIndex * 1.2)) * 8;
+                }
+                ctx.globalAlpha = 0.25;
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.ellipse(wbx, wby + 8, 10, 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                const wbGrow = _breathe(150 + wbIndex);
+                const wbAnim = _animFor(wb, 1, 150 + wbIndex, _walkSway(150 + wbIndex));
+                if (useSkins) {
+                    const sprite = skinMgr.getSprite('entities', wb.type);
+                    if (sprite) {
+                        this._drawEntityWithAnim(ctx, sprite, wbx - 16, wby - 16 - wbGrow + wbBounceY, 32, 32 + wbGrow, wbx, wby + 16, wbAnim);
+                    } else {
+                        ctx.font = 'bold 18px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = wb.color || animalDef?.color || '#cc4444';
+                        ctx.fillText(wb.char || animalDef?.char || 'w', wbx, wby - wbGrow + wbBounceY);
+                    }
+                } else {
+                    ctx.font = 'bold 18px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = wb.color || animalDef?.color || '#cc4444';
+                    ctx.fillText(wb.char || animalDef?.char || 'w', wbx, wby - wbGrow + wbBounceY);
                 }
             }
         }

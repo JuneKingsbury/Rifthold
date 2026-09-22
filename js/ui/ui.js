@@ -59,6 +59,7 @@ export class UI {
         this._collapsedRealmGroups = new Set();
         this._collapsedBestiarySections = new Set();
         this._lastStoryHtml = '';
+        this._storyNewAtOpen = new Set();
         this._lastStoryHasNew = false;
         this._lastResearchNeedsAttention = false;
         // Persistent per-bar animation state for live stat bars (see stat-bar.js),
@@ -2718,6 +2719,10 @@ export class UI {
     }
 
     _buildCostChip(key, amount) {
+        if (this.game.skinManager?.isActive) {
+            const url = this.game.skinManager.getItemSpriteDataURL(key);
+            if (url) return `<span class="cost-chip"><img src="${url}" style="width:12px;height:12px;vertical-align:middle;image-rendering:pixelated;" title="${key}">${amount}</span>`;
+        }
         const colors = {
             wood: '#8b6b3a', stone: '#999', food: '#88cc44', planks: '#c89648',
             bricks: '#cc6633', iron_ore: '#887766', iron: '#aaa', runite: '#44ccff',
@@ -3726,9 +3731,14 @@ export class UI {
         this._panelPause(opening);
         this.elements.storyPanel.style.display = opening ? 'block' : 'none';
         if (opening) {
+            this._storyNewAtOpen = new Set(
+                [...this.game.story.unlocked.keys()].filter(k => !this.game.story.viewed.has(k))
+            );
             this.game.story.markAllViewed();
             this._lastStoryHtml = '';
             this.updateStoryPanel();
+        } else {
+            this._storyNewAtOpen = new Set();
         }
         window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
         this._updateOverlay();
@@ -3746,9 +3756,18 @@ export class UI {
             tabCounts[m.tab].total++;
             if (unlocked.has(key)) tabCounts[m.tab].unlocked++;
         }
+        const newAtOpen = this._storyNewAtOpen;
+        const tabHasNew = (name) => {
+            for (const [key, m] of Object.entries(STORY_MILESTONES)) {
+                if (m.tab === name && newAtOpen.has(key)) return true;
+            }
+            return false;
+        };
+        const newBadge = `<span style="color:#ffcc44"> •</span>`;
         const tabLabel = (name, label) => {
             const c = tabCounts[name] || { unlocked: 0, total: 0 };
-            return `${label} (${c.unlocked}/${c.total})`;
+            const badge = tabHasNew(name) ? newBadge : '';
+            return `${label} (${c.unlocked}/${c.total})${badge}`;
         };
 
         html += '<div class="story-tabs">';
@@ -3934,12 +3953,23 @@ export class UI {
                 }
             }
         } else {
-            const unlockedEntries = entries.filter(([k]) => unlocked.has(k)).reverse();
+            const seasonOrder = { spring: 0, summer: 1, autumn: 2, winter: 3 };
+            const unlockedEntries = entries.filter(([k]) => unlocked.has(k));
+            unlockedEntries.sort(([ka], [kb]) => {
+                const ia = unlocked.get(ka);
+                const ib = unlocked.get(kb);
+                if (!ia && !ib) return 0;
+                if (!ia) return 1;
+                if (!ib) return -1;
+                if (ib.year !== ia.year) return ib.year - ia.year;
+                return (seasonOrder[ib.season] ?? 0) - (seasonOrder[ia.season] ?? 0);
+            });
             const lockedEntries = entries.filter(([k]) => !unlocked.has(k));
             for (const [key, milestone] of unlockedEntries) {
                 const info = unlocked.get(key);
                 const dateStr = info ? `Year ${info.year}, ${info.season.charAt(0).toUpperCase() + info.season.slice(1)}` : '';
-                html += `<div class="story-entry unlocked">`;
+                const isNew = newAtOpen.has(key);
+                html += `<div class="story-entry unlocked${isNew ? ' story-entry-new' : ''}">`;
                 if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
                 html += `<div class="story-entry-title">${milestone.title}</div>`;
                 html += `<div class="story-entry-text">${milestone.text}</div>`;

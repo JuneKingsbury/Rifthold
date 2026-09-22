@@ -78,7 +78,8 @@ export const ROLE_HANDLERS = {
                         }
                     }
                 } else {
-                    moveToward(entity, target, game.map, dur, game);
+                    const engageDur = bondedColonist ? _colonistFollowDur(bondedColonist, game) : dur;
+                    moveToward(entity, target, game.map, engageDur, game);
                 }
             } else {
                 rs.state = 'patrolling';
@@ -653,6 +654,7 @@ function findAnchor(entity, game) {
 }
 
 function findPen(entity, game) {
+    if (entity.penX !== undefined) return { x: entity.penX, y: entity.penY };
     return game.mapIndex.findNearest('beast_circle', entity.x, entity.y);
 }
 

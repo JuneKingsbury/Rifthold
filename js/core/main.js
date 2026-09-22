@@ -1176,9 +1176,15 @@ class Game {
     }
 
     _enchantItem(itemIndex, itemType) {
-        const itemKey = this.resources[itemType][itemIndex]?.key;
-        const itemTier = this.resources[itemType][itemIndex]?.tier;
-        const result = queueEnchantingOrder(this, itemKey, this.resources[itemType][itemIndex].quality, itemType, itemTier);
+        const item = this.resources[itemType]?.[itemIndex];
+        if (!item) {
+            this.notifications.push({ text: 'Item no longer available', tick: this.tick, type: 'warning' });
+            this.ui.updateInventoryPanel();
+            return;
+        }
+        const itemKey = item.key;
+        const itemTier = item.tier;
+        const result = queueEnchantingOrder(this, itemKey, item.quality, itemType, itemTier);
         if (result === true) {
             this.notifications.push({ text: `Queued Enchantment on ${itemKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
             // Discard original item if successfully queued for enchanting.
@@ -1752,8 +1758,10 @@ class Game {
             if (count > 0) potions[input.dataset.potion] = count;
         }
         const mutators = Array.from(panel.querySelectorAll('.exp-mutator:checked')).map(cb => cb.value);
+        const packAnimalIds = [...panel.querySelectorAll('.exp-pack-check:checked')].map(cb => parseInt(cb.value));
+        const warBeastIds = [...panel.querySelectorAll('.exp-war-check:checked')].map(cb => parseInt(cb.value));
 
-        this.exploration.savePartyPreset(name, ids, { front: frontRowIds, back: backRowIds }, potions, mutators);
+        this.exploration.savePartyPreset(name, ids, { front: frontRowIds, back: backRowIds }, potions, mutators, packAnimalIds, warBeastIds);
         this.notifications.push({ text: `Saved preset "${name}"`, tick: this.tick, type: 'success' });
         this.ui._lastArcaneHtml = '';
         this.ui.updateArcanePanel();
@@ -1777,6 +1785,13 @@ class Game {
         this.ui._expPresetMutators = preset.mutators || [];
         this.ui._lastArcaneHtml = '';
         this.ui.updateArcanePanel();
+        panel.querySelectorAll('.exp-pack-check').forEach(cb => {
+            cb.checked = (preset.packAnimalIds || []).includes(parseInt(cb.value));
+        });
+        panel.querySelectorAll('.exp-war-check').forEach(cb => {
+            cb.checked = (preset.warBeastIds || []).includes(parseInt(cb.value));
+        });
+        this.ui._setupExpCheckboxLimits();
     }
 
     launchExpedition(realmKey) {
@@ -2479,7 +2494,7 @@ function applyBlightImmunity(game, radius, centerX, centerY) {
             const ty = centerY + dy, tx = centerX + dx;
             if (ty < 0 || ty >= mapHeight || tx < 0 || tx >= mapWidth) continue;
             const cropTile = game.map[ty][tx];
-            if (cropTile.crop) cropTile.blightImmune = true;
+            if (cropTile.zone) cropTile.blightImmune = true;
         }
     }
 }

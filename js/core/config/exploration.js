@@ -64,7 +64,7 @@ export const EXPEDITION_ENEMIES = {
 // while demo mode is on, even if their research / event / prior-realm
 // prerequisites are otherwise met (e.g. defeating the year-8 crusader raid must
 // not open the kingdom chain in the demo).
-export const DEMO_ALLOWED_REALM_CHAINS = new Set(['crystal']);
+export const DEMO_ALLOWED_REALM_CHAINS = new Set(['crystal', 'verdant']);
 
 // Exploration / realms. Used by exploration.js.
 export const REALMS = {
@@ -713,9 +713,9 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The Oblivion Sovereign',
-            lore: `TODO`,
+            lore: `An insect-like entity that seems to be made entirely of shadow. It appears to be the ruler of the abyss, with all denizens of this place treating it with reverence and fear. The most unsettling aspect of the creature is its complete lack of sound, with even its most devastating attacks being completely silent.`,
             attackAnim: 'Swing',
-            approachText: 'The darkness at the center of the chamber condenses. Something that has been here longer than light regards your party.',
+            approachText: 'The darkness at the center of the chamber condenses. Something that has been here longer than light gazes upon your party.',
             defeatText: 'The Sovereign does not scream. It simply becomes less. The abyss is quieter without it. Somewhat.',
             guaranteedLoot: [
                 { item: 'shard_of_oblivion', chance: 0.4 },

@@ -917,6 +917,15 @@ export class InputHandler {
         if (animal) {
             animal.penX = pos.x;
             animal.penY = pos.y;
+            // Cancel any existing feed_animal task for this animal so it gets
+            // re-queued at the new pen location.
+            for (const t of this.game.taskQueue.getAll()) {
+                if (t.type === 'feed_animal' && t.targetAnimalId === animalId) {
+                    this.game.taskQueue.remove(t.id);
+                    break;
+                }
+            }
+            if (animal._feedTaskQueued !== undefined) animal._feedTaskQueued = false;
             this.game.notifications.push({ text: `${animal.type} pen reassigned`, tick: this.game.tick, type: 'success' });
         }
         this.penReassignTargeting = null;

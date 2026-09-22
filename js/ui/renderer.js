@@ -1,4 +1,4 @@
-import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES } from '../core/config.js';
+import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
 import { writeTileVisuals } from '../world/map.js';
 import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
 import { SkinManager } from './skin-manager.js';
@@ -306,8 +306,12 @@ export class Renderer {
                 // output pixel-identical even if a terrain sprite is semi-transparent
                 // (its gaps show the terrain bg, not the main canvas color).
                 const tv = writeTileVisuals(tile, season, this._tileVisuals);
-                if (tv.bg) {
-                    tctx.fillStyle = tv.bg;
+                let bakeBg = tv.bg;
+                if (tile.terrain === 'grass' && !tile.snowCovered && season && SEASON_EFFECTS[season] && bakeBg === '#1a2a12') {
+                    bakeBg = SEASON_EFFECTS[season].grassBg;
+                }
+                if (bakeBg) {
+                    tctx.fillStyle = bakeBg;
                     tctx.fillRect(px, py, tw, th);
                 }
                 // The live path draws the shadow sprite under the ground sprite for
@@ -836,7 +840,9 @@ export class Renderer {
             }
         }
 
-        ctx.fillStyle = RENDER_CONFIG.bgColor;
+        const seasonBg = season && SEASON_EFFECTS[season]?.bgColor;
+        const bgColor = seasonBg || RENDER_CONFIG.bgColor;
+        ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         // Dither settings are per-frame so we can do it once and re-use for all tiles.
@@ -1063,6 +1069,17 @@ export class Renderer {
                 const tile = map[wy][wx];
                 const tv = writeTileVisuals(tile, season, this._tileVisuals);
                 let char = tv.char, color = tv.color, bg = tv.bg;
+
+                // Apply seasonal grass terrain colors.
+                if (tile.terrain === 'grass' && !tile.snowCovered && season && SEASON_EFFECTS[season]) {
+                    const se = SEASON_EFFECTS[season];
+                    // bg '#1a2a12' is the default grass terrain bg; override it on all
+                    // grass tiles (bare, resource, zone) so the tile background shifts.
+                    if (bg === '#85a643') bg = se.grassBg;
+                    // color '#85a643' only appears on bare grass tiles (no structure/
+                    // resource/floor overriding it); safe to replace unconditionally.
+                    if (color === '#85a643') color = se.grassColor;
+                }
 
                 // Update tile color based on work task designation if one exists (e.g. marked for destruction).
                 if (tile.designation) {
