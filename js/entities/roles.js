@@ -423,7 +423,7 @@ export const ROLE_HANDLERS = {
 
             const dist = manhattanDist(entity.x, entity.y, owner.x, owner.y);
             if (dist > FOLLOW_RANGE) return;
-            if (dist > 2) {
+            if (dist > 1) {
                 const followDur = _colonistFollowDur(owner, game);
                 moveToward(entity, owner, game.map, followDur, game);
             }
@@ -636,7 +636,7 @@ function getTargets(entity, game) {
 // speed, so following animals keep up visually when their owner has speed boosts.
 function _colonistFollowDur(colonist, game) {
     const moveBonus = getMoveSpeedBonus(colonist);
-    return computeMoveDuration(1, moveBonus, game.speed);
+    return computeMoveDuration(1, moveBonus, game.speed) * 0.75;
 }
 
 function findAnchor(entity, game) {

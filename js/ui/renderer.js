@@ -1239,6 +1239,11 @@ export class Renderer {
                             && tile.terrain === 'grass' && !tile.snowCovered && !tile.onFire) {
                             this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch, season);
                         }
+                    } else if (tile.zone) {
+                        // Farm plots sit on terrain: draw the seasonal ground first so the
+                        // soil sprite composites over green/autumn/snowy grass correctly.
+                        const ground = this._resolveGroundSprite(tile, season);
+                        if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
                     }
                     const canDither = !tile.structure && !tile.resource && !tile.zone && !tile.floor;
                     if (entity) {
