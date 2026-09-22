@@ -155,5 +155,33 @@ export const RAID_CONFIG = {
     timeout: 900,
 };
 
+// How much each stockpiled resource contributes to raid attraction.
+// Lower than TRADE_VALUES for bulk materials raiders can't easily carry;
+// higher for portable, high-fence-value goods.
+export const RAID_WEALTH_WEIGHTS = {
+    wood:      0.10,
+    stone:     0.05,
+    planks:    0.15,
+    bricks:    0.05,
+    food:      0.25,
+    wheat:     0.15,
+    corn:      0.15,
+    potatoes:  0.15,
+    berries:   0.15,
+    meat:      0.25,
+    eggs:      0.10,
+    milk:      0.10,
+    hides:     0.50,
+    leather:   0.70,
+    wool:      0.35,
+    cotton:    0.15,
+    cloth:     0.50,
+    iron_ore:  0.35,
+    iron:      0.90,
+    runite:    1.00,
+    moonbloom: 0.80,
+    void_essence: 1.00,
+};
+
 // TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT moved to ./trade.js
 // (still re-exported via index.js).

@@ -102,7 +102,7 @@ export class CombatSystem {
     }
 
     startRaid(game) {
-        const wealth = game.resources.getWealth();
+        const wealth = game.resources.getRaidWealth();
         const timeFactor = Math.min(1, game.tick / RAID_CONFIG.timeScalingPeak);
         const scaledRaiders = wealth * RAID_CONFIG.wealthScaling * timeFactor;
         const numRaiders = Math.max(RAID_CONFIG.baseRaiders,
@@ -135,7 +135,7 @@ export class CombatSystem {
             for (let i = 0; i < numRaiders; i++) {
                 const pos = getEdgePosition(edge, i);
                 const entity = createRaidEntity('raider_brute', pos.x, pos.y, raidLevel, { hpMult: 0.1, damageMult: 0.05 });
-                if (entity) game.raiders.push(entity);
+                if (entity) { game.raiders.push(entity); spawned++; }
             }
         }
 
@@ -144,12 +144,12 @@ export class CombatSystem {
         const raidPos = { x: game.raiders[0]?.x || 0, y: game.raiders[0]?.y || 0 };
         _startleNearbyColonists(game, raidPos.x, raidPos.y);
         game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
-        game.notifications.push({ text: `Raid! ${numRaiders} raiders approaching!`, tick: game.tick, type: 'danger' });
-        game.eventLog.add(game, `Raid! ${numRaiders} raiders attacking!`, 'danger', { type: 'position', ...raidPos });
+        game.notifications.push({ text: `Raid! ${spawned} raiders approaching!`, tick: game.tick, type: 'danger' });
+        game.eventLog.add(game, `Raid! ${spawned} raiders attacking!`, 'danger', { type: 'position', ...raidPos });
 
         game.events.pendingEvent = {
             type: 'raid',
-            text: `Raid! ${numRaiders} raiders are approaching from the ${['north','east','south','west'][edge]}!`,
+            text: `Raid! ${spawned} raiders are approaching from the ${['north','east','south','west'][edge]}!`,
             choices: ['Go To Raiders', 'Dismiss'],
             data: raidPos,
         };

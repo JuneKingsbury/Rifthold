@@ -5,7 +5,7 @@
  * FOOD_DECAY_CONFIG.decayInterval cadence; the rest is invoked on demand by
  * building, crafting, trading, and equipment code.
  */
-import { CONFIG, FOODSTUFFS, FOOD_DECAY_CONFIG, WORK_CONFIG, ALL_ITEMS, TRADE_VALUES } from '../core/config.js';
+import { CONFIG, FOODSTUFFS, FOOD_DECAY_CONFIG, WORK_CONFIG, ALL_ITEMS, TRADE_VALUES, RAID_WEALTH_WEIGHTS } from '../core/config.js';
 
 export { FOODSTUFFS };
 
@@ -249,6 +249,18 @@ export class ResourceManager {
         let wealth = 0;
         for (const [key, amount] of Object.entries(this.stockpile)) {
             wealth += amount * (TRADE_VALUES[key] ?? 1);
+        }
+        wealth += this.weapons.length * WORK_CONFIG.wealthPerWeapon;
+        return wealth;
+    }
+
+    // Wealth as raiders perceive it: portable, high-fence-value goods count fully;
+    // bulk construction materials barely register. Weapons still count.
+    getRaidWealth() {
+        let wealth = 0;
+        for (const [key, amount] of Object.entries(this.stockpile)) {
+            const weight = RAID_WEALTH_WEIGHTS[key] ?? 0.5;
+            wealth += amount * (TRADE_VALUES[key] ?? 1) * weight;
         }
         wealth += this.weapons.length * WORK_CONFIG.wealthPerWeapon;
         return wealth;
