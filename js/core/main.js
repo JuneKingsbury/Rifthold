@@ -19,7 +19,7 @@ import { SocialSystem } from '../systems/social.js';
 import { UI } from '../ui/ui.js';
 import { Minimap } from '../ui/minimap.js';
 import { ResearchSystem, updateResearch } from '../systems/research.js';
-import { updateTamedAnimals, designateTame, releaseAnimal } from '../entities/taming.js';
+import { updateTamedAnimals, updateFollowingAnimalRoles, designateTame, releaseAnimal } from '../entities/taming.js';
 import { updateSummons } from '../entities/summons.js';
 import { completeTask } from '../entities/task-executor.js';
 import { CROPS, WINTER_FEAST_CONFIG } from './config.js';
@@ -676,6 +676,7 @@ class Game {
         if (prof) prof.mark('effect-expiry+progressbars');
 
         updateWildlife(this);
+        updateFollowingAnimalRoles(this);
         updateBlightBlooms(this);
         if (prof) prof.mark('wildlife');
         this.combat.update(this);

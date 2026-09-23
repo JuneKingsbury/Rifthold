@@ -19,8 +19,22 @@ export function updateTamedAnimals(game) {
         if (animal.onExpedition || animal.pendingTame) continue;
 
         _updateHunger(animal, game);
-        updateEntityRoles(animal, game);
+        // pet/guard roles run every tick via updateFollowingAnimalRoles, skip them here.
+        const hasFollowRole = animal.roles && animal.roles.some(r => r.type === 'pet' || r.type === 'guard');
+        if (!hasFollowRole) {
+            updateEntityRoles(animal, game);
+        }
         updateEntityEffects(animal, game);
+    }
+}
+
+export function updateFollowingAnimalRoles(game) {
+    if (!game.research.isResearched('beast_binding')) return;
+    for (const animal of game.entities) {
+        if (!animal.tamed || animal.hp <= 0 || animal.onExpedition || animal.pendingTame) continue;
+        if (!animal.roles) continue;
+        if (!animal.roles.some(r => r.type === 'pet' || r.type === 'guard')) continue;
+        updateEntityRoles(animal, game);
     }
 }
 
