@@ -369,10 +369,6 @@ export function completeTask(colonist, task, game) {
                     }
                     game.resources.add(output);
                 }
-                const tile = game.map[colonist.y]?.[colonist.x];
-                if (tile?.structure === 'enchanting_table' && game.stats) {
-                    game.stats.itemsEnchanted++;
-                }
                 applyThought(colonist, 'crafted', game.tick);
                 const craftedName = Object.keys(task.recipe.output)[0]?.replace(/_/g, ' ') || 'item';
                 game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Crafted ${craftedName}`, color: '#ffcc00', fontSize: 10, ttl: 20, maxTtl: 20 });
@@ -521,6 +517,9 @@ export function completeTask(colonist, task, game) {
                             colonist.state = 'idle';
                             colonist.workProgress = 0;
                             return;
+                        } else {
+                            // No pen exists: clear the pending-lead flag so the animal can be retamed.
+                            if (animal._leadPending) delete animal._leadPending;
                         }
                     }
                 }
@@ -603,12 +602,12 @@ export function completeTask(colonist, task, game) {
                     target.trinketBroken = false;
                     target._repairQueued = false;
                     invalidateEquipStatCache(target);
+                    if (game.resources.stockpile.runite >= 1) {
+                        game.resources.stockpile.runite -= 1;
+                    }
                     const artName = target.trinket?.name || 'trinket';
                     game.eventLog.add(game, `${artName} repaired at the anvil`, 'success', null);
                 }
-            }
-            if (game.resources.stockpile.runite >= 1) {
-                game.resources.stockpile.runite -= 1;
             }
             applyThought(colonist, 'crafted', game.tick);
             break;

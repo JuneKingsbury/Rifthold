@@ -964,6 +964,7 @@ export class ExplorationSystem {
                 // Colonist died or was removed during gathering. Clear the pending flag
                 // so they aren't permanently locked out of future tasks.
                 if (c) { delete c.expeditionPending; delete c._expeditionMove; }
+                allArrived = false;
                 continue;
             }
             if (c.onExpedition) continue;
@@ -998,6 +999,7 @@ export class ExplorationSystem {
             exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
             exp.partySnapshot = exp.partyIds.map(id => {
                 const c = game.getColonist(id);
+                if (!c) return null;
                 const baseCd = (c.weapon && c.weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
                 const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
                 const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
@@ -1043,7 +1045,7 @@ export class ExplorationSystem {
                     dodgeCharges: 0,
                     chaosResistance: getEquipmentStat(c, 'chaosResistance'),
                 };
-            });
+            }).filter(Boolean);
             this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
             game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
             exp.lastMicroEventTick = game.tick;
@@ -1229,6 +1231,7 @@ export class ExplorationSystem {
     }
 
     _rollLoot(dim, diffSettings) {
+        if (!dim.loot || dim.loot.length === 0) return null;
         const lootMult = diffSettings ? diffSettings.lootAmountMult : 1;
         const totalWeight = dim.loot.reduce((s, l) => s + l.weight, 0);
         let roll = Math.random() * totalWeight;
@@ -2773,15 +2776,15 @@ export class ExplorationSystem {
         for (let i = exp.activeEffects.length - 1; i >= 0; i--) {
             const effect = exp.activeEffects[i];
             if (effect.type === 'dot' && game.tick - (effect.lastTick || 0) >= effect.interval) {
+                effect.lastTick = game.tick;
+                effect.ticksRemaining--;
                 const member = exp.partySnapshot.find(p => p.id === effect.targetId);
                 if (member && member.hp > 0) {
                     const dmg = randInt(effect.damageRange[0], effect.damageRange[1]);
                     member.hp -= dmg;
-                    effect.lastTick = game.tick;
                     // Out-of-combat DoT (trap/enemy residue): stamp for a visual mote.
                     member._lastDotTick = game.tick;
                     member._lastDotType = effect.dotType || 'poison';
-                    effect.ticksRemaining--;
                     if (member.hp <= 0) this._checkExpeditionRevive(exp, member, game);
                 }
             }

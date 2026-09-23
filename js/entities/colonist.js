@@ -445,7 +445,8 @@ export function getSpellCooldownFactor(colonist, spell) {
 }
 
 export function recalcMaxMana(colonist) {
-    const levels = Object.values(colonist.magicSkills);
+    const rawLevels = Object.values(colonist.magicSkills);
+    const levels = rawLevels.map(lvl => (typeof lvl === 'object' ? lvl.level : lvl) || 0);
     const combinedLevel = levels.reduce((sum, lvl) => sum + lvl, 0);
     const maxLevel = levels.length ? Math.max(...levels) : 0;
     colonist._combinedMagicLevel = combinedLevel;
@@ -565,9 +566,9 @@ function checkCriticalAlerts(colonist, game) {
     if (colonist.hp < colonist.maxHp * 0.25 && !flags.lowHealthPaused) {
         flags.lowHealthPaused = true;
         if (game.settings.pauseOnLowHealth && !game.paused) {
-            game.paused = true;
+            game.togglePause(true);
             game.camera.centerOn(colonist.x, colonist.y);
-            game.notifications.push({ text: `${colonist.name} is critically wounded! (auto-paused)`, color: '#ff4444', duration: 180 });
+            game.notifications.push({ text: `${colonist.name} is critically wounded! (auto-paused)`, tick: game.tick, type: 'warning' });
         }
     } else if (colonist.hp > colonist.maxHp * 0.35) {
         flags.lowHealthPaused = false;
@@ -925,17 +926,17 @@ function tickDotEffects(colonist, game) {
 export function grantCastXp(colonist, spell, game) {
     const school = spell.school;
     if (!school || colonist.magicSkills[school] >= 10) return;
-    if (!colonist._magicXpAccumulator) colonist._magicXpAccumulator = {};
-    if (!colonist._magicXpAccumulator[school]) colonist._magicXpAccumulator[school] = 0;
+    if (!colonist.magicXpAccumulator) colonist.magicXpAccumulator = {};
+    if (!colonist.magicXpAccumulator[school]) colonist.magicXpAccumulator[school] = 0;
     let castXpGain = MAGIC_STUDY_CONFIG.xpPerCast;
     if (colonist.traits.includes('scholar')) castXpGain *= TRAITS.scholar.magicXpMult;
     if (colonist.traits.includes('prodigy')) castXpGain *= TRAITS.prodigy.magicXpMult;
     if (colonist.traits.includes('magically_inept')) castXpGain *= TRAITS.magically_inept.magicXpMult;
     castXpGain *= getRaceModifier(colonist, 'magicXpMult', 1);
-    colonist._magicXpAccumulator[school] += castXpGain;
+    colonist.magicXpAccumulator[school] += castXpGain;
     let magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
-    while (colonist._magicXpAccumulator[school] >= magicXpNeeded && colonist.magicSkills[school] < 10) {
-        colonist._magicXpAccumulator[school] -= magicXpNeeded;
+    while (colonist.magicXpAccumulator[school] >= magicXpNeeded && colonist.magicSkills[school] < 10) {
+        colonist.magicXpAccumulator[school] -= magicXpNeeded;
         colonist.magicSkills[school] = Math.min(10, colonist.magicSkills[school] + 1);
         recalcMaxMana(colonist);
         game.notifications.push({ text: `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}`, tick: game.tick, type: 'success' });
@@ -1578,7 +1579,7 @@ function applySpellEffect(colonist, spell, game) {
                     const ty = colonist.y + dy;
                     const tile = game.map[ty]?.[tx];
                     if (!tile || !tile.passable) continue;
-                    if (game._occupiedTiles?.has(`${tx},${ty}`)) continue;
+                    if (game._occupiedTiles?.has((ty << 16) | tx)) continue;
                     const dToTarget = teleTarget
                         ? manhattanDist(tx, ty, teleTarget.x, teleTarget.y)
                         : manhattanDist(tx, ty, colonist.x, colonist.y);
@@ -1970,7 +1971,7 @@ function finishRelaxing(colonist, game) {
         addThought(colonist, q.tierName, q.moodEffect, q.duration, game.tick);
     } else if (info) {
         const th = THOUGHTS[info.thought];
-        addThought(colonist, th.text, th.moodEffect, th.duration, game.tick);
+        if (th) addThought(colonist, th.text, th.moodEffect, th.duration, game.tick);
     }
     delete colonist._relaxActivity;
     delete colonist._relaxTimer;
@@ -2172,7 +2173,7 @@ function updateMoving(colonist, game) {
         const task = game.taskQueue.getById(colonist.currentTaskId);
         if (task) {
             const newPath = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y, game._occupiedTiles);
-            if (newPath) {
+            if (newPath && newPath.length > 0) {
                 colonist.path = newPath;
             } else {
                 game.taskQueue.release(colonist.currentTaskId);
@@ -2372,7 +2373,7 @@ function updateSleeping(colonist, game) {
                 const rq = game.roomQualities[roomId];
                 addThought(colonist, rq.tierName, rq.moodEffect, rq.duration, game.tick);
             } else if (roomId !== null) {
-                addThought(colonist, 'Slept in nice room', COLONIST_CONFIG.sleptInRoomMoodBonus, COLONIST_CONFIG.sleptInRoomMoodDuration, game.tick);
+                addThought(colonist, 'Slept in a room', COLONIST_CONFIG.sleptInBedMoodBonus, COLONIST_CONFIG.sleptInBedMoodDuration, game.tick);
             } else {
                 addThought(colonist, 'Slept in bed', COLONIST_CONFIG.sleptInBedMoodBonus, COLONIST_CONFIG.sleptInBedMoodDuration, game.tick);
             }
@@ -2577,12 +2578,17 @@ function updateFighting(colonist, game) {
         // Cleave: hit all other adjacent hostiles for 50% of the main attack's damage.
         if (weapon && weapon.cleave) {
             const cleaveDmg = Math.max(1, Math.floor(dmg * 0.5));
-            for (const raider of game.raiders) {
-                if (raider === target || raider.hp <= 0) continue;
-                if (Math.abs(raider.x - colonist.x) <= 1 && Math.abs(raider.y - colonist.y) <= 1) {
-                    raider.hp -= cleaveDmg;
-                    raider._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
-                    spawnDamageText(game, raider.x, raider.y, cleaveDmg, '#ff8844', false);
+            const cleaveTargets = [
+                ...game.raiders,
+                ...(game.waves?.enemies ?? []),
+                ...game.entities.filter(e => e.hostile && !e.tamed),
+            ];
+            for (const e of cleaveTargets) {
+                if (e === target || e.hp <= 0) continue;
+                if (Math.abs(e.x - colonist.x) <= 1 && Math.abs(e.y - colonist.y) <= 1) {
+                    e.hp -= cleaveDmg;
+                    e._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
+                    spawnDamageText(game, e.x, e.y, cleaveDmg, '#ff8844', false);
                 }
             }
         }

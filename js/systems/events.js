@@ -703,10 +703,15 @@ export class EventSystem {
         }
     }
 
-    eventVoidWhisper(game) {
-        if (!game.voidWhisperStats) game.voidWhisperStats = { accepted: 0, refused: 0 };
+    _getVoidWhisper(game, key) {
+        // Build the whispers list and find by key. Called at resolution time so
+        // function references survive save/load (functions cannot be serialized in JSON).
+        const whispers = this._buildVoidWhispers(game);
+        return whispers.find(w => w.key === key) || null;
+    }
 
-        const WHISPERS = [
+    _buildVoidWhispers(game) {
+        return [
             {
                 key: 'blood_tithe',
                 title: 'Blood Tithe',
@@ -821,7 +826,12 @@ export class EventSystem {
                 },
             },
         ];
+    }
 
+    eventVoidWhisper(game) {
+        if (!game.voidWhisperStats) game.voidWhisperStats = { accepted: 0, refused: 0 };
+
+        const WHISPERS = this._buildVoidWhispers(game);
         const eligible = WHISPERS.filter(w => !w.condition || w.condition(game));
         if (eligible.length === 0) return;
 
@@ -838,7 +848,7 @@ export class EventSystem {
             askText: whisper.ask,
             rewardText: whisper.reward,
             choices: ['Accept', 'Refuse'],
-            data: { whisperKey: whisper.key, applyFn: whisper.apply },
+            data: { whisperKey: whisper.key },
         };
         game.notifications.push({ text: 'The Void Nexus stirs...', tick: game.tick, type: 'event' });
         game.eventLog.add(game, 'The Void Nexus pulsed with intent.', 'event', null);
@@ -853,7 +863,9 @@ export class EventSystem {
         if (!game.voidWhisperStats) game.voidWhisperStats = { accepted: 0, refused: 0 };
 
         if (accept) {
-            this.pendingEvent.data.applyFn(game);
+            const whisperKey = this.pendingEvent.data.whisperKey;
+            const whisper = this._getVoidWhisper(game, whisperKey);
+            if (whisper) whisper.apply(game);
             game.voidWhisperStats.accepted++;
             game.story.checkMilestone('void_whisper_first_accepted', game);
             if (game.voidWhisperStats.accepted >= 5) game.story.checkMilestone('void_whisper_accepted_5', game);
@@ -918,6 +930,7 @@ function getRandomEdge() {
         case 1: return { x: CONFIG.MAP_WIDTH - 1, y: Math.floor(Math.random() * CONFIG.MAP_HEIGHT) };
         case 2: return { x: Math.floor(Math.random() * CONFIG.MAP_WIDTH), y: CONFIG.MAP_HEIGHT - 1 };
         case 3: return { x: 0, y: Math.floor(Math.random() * CONFIG.MAP_HEIGHT) };
+        default: return { x: Math.floor(CONFIG.MAP_WIDTH / 2), y: 0 };
     }
 }
 
@@ -929,6 +942,7 @@ function getRandomEdgeZone() {
         case 1: return { x: CONFIG.MAP_WIDTH - 3 - Math.floor(Math.random() * margin), y: margin + Math.floor(Math.random() * (CONFIG.MAP_HEIGHT - margin * 2)) };
         case 2: return { x: margin + Math.floor(Math.random() * (CONFIG.MAP_WIDTH - margin * 2)), y: CONFIG.MAP_HEIGHT - 3 - Math.floor(Math.random() * margin) };
         case 3: return { x: 3 + Math.floor(Math.random() * margin), y: margin + Math.floor(Math.random() * (CONFIG.MAP_HEIGHT - margin * 2)) };
+        default: return { x: Math.floor(CONFIG.MAP_WIDTH / 2), y: margin };
     }
 }
 
@@ -1014,8 +1028,15 @@ export function updateFires(game) {
 }
 
 function _updateFiresFallback(game) {
+    // Snapshot fire positions before iterating so newly ignited tiles in this
+    // tick are not immediately re-processed (which would cause multi-hop spread).
+    const fireTiles = [];
     for (let y = 0; y < game.map.length; y++) {
         for (let x = 0; x < game.map[y].length; x++) {
+            if (game.map[y][x].onFire) fireTiles.push({ x, y });
+        }
+    }
+    for (const { x, y } of fireTiles) {
             const tile = game.map[y][x];
             if (!tile.onFire) continue;
 
@@ -1060,6 +1081,5 @@ function _updateFiresFallback(game) {
                     workAmount: 5,
                 });
             }
-        }
     }
 }

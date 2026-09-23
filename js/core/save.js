@@ -290,7 +290,7 @@ export function loadGame(game) {
         game.ritualCooldowns = data.ritualCooldowns || {};
         game.lastFeastYear = data.lastFeastYear || 0;
 
-        game.events.cooldowns = data.events.cooldowns;
+        game.events.cooldowns = data.events.cooldowns || {};
 
         if (data.waves) {
             game.waves.highestWaveCompleted = data.waves.highestWaveCompleted || 0;

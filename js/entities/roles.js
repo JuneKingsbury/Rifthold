@@ -274,6 +274,7 @@ export const ROLE_HANDLERS = {
                     }
                 }
             } else {
+                rs.charged = false;
                 // Siege: route toward the target, breaching walls/doors when the
                 // colonist is sealed off rather than freezing at the barrier.
                 siegeMoveToward(entity, target, role, game.map, dur, game);
@@ -353,7 +354,9 @@ export const ROLE_HANDLERS = {
             const threshold = role.enrageThreshold || 0.3;
             if (!rs.enraged && entity.hp / entity.maxHp <= threshold) {
                 rs.enraged = true;
-                entity.damage = Math.floor(entity.damage * (role.enrageDamageMult || 1.5));
+                const baseDmg = rs.prEnrageDamage ?? entity.damage;
+                rs.prEnrageDamage = baseDmg;
+                entity.damage = Math.floor(baseDmg * (role.enrageDamageMult || 1.5));
                 entity.speed = Math.min(1, entity.speed * 1.2);
                 game.combatEffects.push({ x: entity.x, y: entity.y, char: COMBAT_VISUALS.hitChar, color: '#ff0000', ttl: COMBAT_VISUALS.hitTtl });
             }
@@ -501,6 +504,7 @@ export function updateEntityRoles(entity, game, combatSystem) {
         const handler = ROLE_HANDLERS[role.type];
         if (handler && handler.update) {
             handler.update(entity, role, game, combatSystem);
+            if (entity.hp <= 0) return;
         }
     }
 }
@@ -661,6 +665,7 @@ function findAnchor(entity, game) {
 
 function findPen(entity, game) {
     if (entity.penX !== undefined) return { x: entity.penX, y: entity.penY };
+    if (!game.mapIndex) return null;
     return game.mapIndex.findNearest('beast_circle', entity.x, entity.y);
 }
 

@@ -281,6 +281,7 @@ export class CombatSystem {
                     }
                 }
             }
+            if (raider.hp <= 0) continue;
             updateRaider(raider, game, this);
             // Cull raiders that have left the map, and fleeing raiders that have reached a
             // border tile. moveToEdge parks a fleer on the edge (dx/dy become 0 there), so it
@@ -345,7 +346,7 @@ function updateRaider(raider, game, combatSystem) {
         updateEntityRoles(raider, game, combatSystem);
     }
 
-    if (raider.roles && raider.roles.some(r => r.type === 'ranged_attacker' || r.type === 'melee_charger')) return;
+    if (raider.roles && raider.roles.some(r => r.type === 'ranged_attacker' || r.type === 'melee_charger' || r.type === 'structure_breaker')) return;
 
     const nearest = findNearestColonist(raider, game);
     if (!nearest) {
@@ -501,11 +502,14 @@ export function attackStructure(game, x, y, damage) {
 
 function getEdgePosition(side, offset) {
     const spread = offset * 2;
+    const clampX = v => Math.max(1, Math.min(CONFIG.MAP_WIDTH - 2, v));
+    const clampY = v => Math.max(1, Math.min(CONFIG.MAP_HEIGHT - 2, v));
     switch (side) {
-        case 0: return { x: Math.floor(CONFIG.MAP_WIDTH / 2) + spread, y: 0 };
-        case 1: return { x: CONFIG.MAP_WIDTH - 1, y: Math.floor(CONFIG.MAP_HEIGHT / 2) + spread };
-        case 2: return { x: Math.floor(CONFIG.MAP_WIDTH / 2) + spread, y: CONFIG.MAP_HEIGHT - 1 };
-        case 3: return { x: 0, y: Math.floor(CONFIG.MAP_HEIGHT / 2) + spread };
+        case 0: return { x: clampX(Math.floor(CONFIG.MAP_WIDTH / 2) + spread), y: 0 };
+        case 1: return { x: CONFIG.MAP_WIDTH - 1, y: clampY(Math.floor(CONFIG.MAP_HEIGHT / 2) + spread) };
+        case 2: return { x: clampX(Math.floor(CONFIG.MAP_WIDTH / 2) + spread), y: CONFIG.MAP_HEIGHT - 1 };
+        case 3: return { x: 0, y: clampY(Math.floor(CONFIG.MAP_HEIGHT / 2) + spread) };
+        default: return { x: Math.floor(CONFIG.MAP_WIDTH / 2), y: 0 };
     }
 }
 

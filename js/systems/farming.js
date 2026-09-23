@@ -79,6 +79,7 @@ export function updateFarming(game) {
 function updateFarmTile(game, x, y, season, growthMult) {
     const tile = game.map[y][x];
     if (!tile.zone) return;
+    if (tile.structure) return;
 
     const crop = CROPS[tile.zone.crop];
     if (!crop) return;

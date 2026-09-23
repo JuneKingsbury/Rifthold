@@ -88,7 +88,7 @@ export class ResourceManager {
             if (this.reservedFoodstuffs[item]) continue;
             const available = this.stockpile[item] || 0;
             const take = Math.min(available, remaining);
-            this.stockpile[item] -= take;
+            this.stockpile[item] = (this.stockpile[item] || 0) - take;
             remaining -= take;
         }
         if (remaining > 0) {
@@ -96,7 +96,7 @@ export class ResourceManager {
                 if (remaining <= 0) break;
                 const available = this.stockpile[item] || 0;
                 const take = Math.min(available, remaining);
-                this.stockpile[item] -= take;
+                this.stockpile[item] = (this.stockpile[item] || 0) - take;
                 remaining -= take;
             }
         }
@@ -109,7 +109,7 @@ export class ResourceManager {
                     this.addTome({ ...ALL_ITEMS[resource], key: resource });
                 }
             } else {
-                this.stockpile[resource] = (this.stockpile[resource] || 0) + amount;
+                this.stockpile[resource] = (this.stockpile[resource] || 0) + Math.max(0, amount);
             }
         }
     }

@@ -278,7 +278,7 @@ class Game {
         document.getElementById('pause-overlay').style.display = 'block';
         this.mapIndex.rebuild(this.map);
         this.lastTime = performance.now();
-        requestAnimationFrame(this.gameLoop);
+        this._rafId = requestAnimationFrame(this.gameLoop);
         requestAnimationFrame(() => resetMinimapSize());
 
         this.skinManager.init().then(() => {
@@ -290,16 +290,18 @@ class Game {
             this.ui.populateSkinDropdown();
         });
 
-        document.addEventListener('visibilitychange', () => {
+        this._onVisibilityChange = () => {
             if (document.hidden && this.settings.pauseOnFocusLoss && !this.paused) {
                 this.togglePause();
             }
-        });
-        window.addEventListener('blur', () => {
+        };
+        this._onWindowBlur = () => {
             if (this.settings.pauseOnFocusLoss && !this.paused) {
                 this.togglePause();
             }
-        });
+        };
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
+        window.addEventListener('blur', this._onWindowBlur);
 
         this.tutorial.update(this);
         this.ui.updateTutorialNote(this);
@@ -414,7 +416,7 @@ class Game {
         // swaps and before paint, so the white-ghost recede keeps playing and
         // recreated bar elements are corrected from persisted state (no flash).
         this.ui.animateStatBars(dt);
-        requestAnimationFrame(this.gameLoop);
+        this._rafId = requestAnimationFrame(this.gameLoop);
     }
 
     // The heartbeat of the simulation, driven by gameLoop at a fixed cadence.
@@ -424,7 +426,7 @@ class Game {
     //                room/quality recompute WHEN roomsDirty; turrets (if powered);
     //                per-colonist update; summons; wildlife; combat; waves;
     //                exploration; events; social; fires; effect/projectile expiry.
-    //   Every 5:     farming, research.
+    //   Every 5:     farming. Every 8: research.
     //   Every 10:    power, tamed animals, auto-cook, auto-craft, auto-repair,
     //                pedestal auras (aura fields are cleared then reapplied here).
     //   Periodic:    music state (%30), snow (%50), food decay (FOOD_DECAY_CONFIG
@@ -445,8 +447,8 @@ class Game {
 
         if (this.tick % 30 === 0 && window.soundManager) {
             if (!this._gameOver) window.soundManager.updateMusicState(this);
-            window.soundManager.setMusicVolume(game.settings.musicVolume);
-            window.soundManager.setSFXVolume(game.settings.sfxVolume);
+            window.soundManager.setMusicVolume(this.settings.musicVolume);
+            window.soundManager.setSFXVolume(this.settings.sfxVolume);
         }
 
         const hostileEntities = [];
@@ -1135,7 +1137,7 @@ class Game {
 
     _recalcEquipmentStats(c) {
         invalidateEquipStatCache(c);
-        const baseHp = c.golem ? (GOLEM_TYPES[c.golem]?.hp || c.maxHp) : COLONIST_CONFIG.maxHp;
+        const baseHp = c.golem ? (GOLEM_TYPES[c.golemType]?.hp || COLONIST_CONFIG.maxHp) : COLONIST_CONFIG.maxHp;
         let bonus = 0;
         for (const item of [c.weapon, c.armor, c.helmet, c.clothes, c.boots, c.tool, c.trinket].filter(Boolean)) {
             if (item.maxHpBonus) bonus += item.maxHpBonus;
@@ -2615,6 +2617,7 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
 
 function updateBlightBlooms(game) {
     const blooms = game.entities.filter(e => e.category === 'blight_bloom');
+    const spawnedBloomPositions = new Set();
     for (let i = blooms.length - 1; i >= 0; i--) {
         const bloom = blooms[i];
         if (bloom._pedestalDmg > 0 && game.tick % BLIGHT_CONFIG.bloomPassiveDamageInterval === 0) {
@@ -2676,8 +2679,10 @@ function updateBlightBlooms(game) {
                 const tile = game.map[ny][nx];
                 if (!tile.zone || tile.zone.state !== 'growing') continue;
                 if (blooms.some(b => b.x === nx && b.y === ny)) continue;
+                if (spawnedBloomPositions.has(`${nx},${ny}`)) continue;
                 tile.zone.state = 'empty';
                 tile.zone.growth = 0;
+                spawnedBloomPositions.add(`${nx},${ny}`);
                 game.entities.push({
                     type: 'blight_bloom', category: 'blight_bloom',
                     id: getNextId(),
@@ -4344,7 +4349,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('outro-overlay').style.display = 'none';
         gameContainer.style.display = 'none';
         startScreen.style.display = '';
-        window.game = null;
+        if (window.game) {
+            cancelAnimationFrame(window.game._rafId);
+            document.removeEventListener('visibilitychange', window.game._onVisibilityChange);
+            window.removeEventListener('blur', window.game._onWindowBlur);
+            window.game = null;
+        }
         window.soundManager?.playMusic('menu_theme');
     });
 

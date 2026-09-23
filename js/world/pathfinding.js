@@ -143,6 +143,7 @@ function furniturePenalty(map, x, y, endX, endY) {
 }
 
 function colonistPassability(map, x, y, endX, endY) {
+    if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     if (!isPassable(map, x, y)) return false;
     return getMoveCost(map, x, y) + furniturePenalty(map, x, y, endX, endY);
 }
@@ -156,6 +157,7 @@ function colonistPassability(map, x, y, endX, endY) {
 function makeColonistPassability(occupied) {
     if (!occupied) return colonistPassability;
     return function (map, x, y, endX, endY) {
+        if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
         if (!isPassable(map, x, y)) return false;
         let cost = getMoveCost(map, x, y) + furniturePenalty(map, x, y, endX, endY);
         if ((x !== endX || y !== endY) && occupied.has(tileKey(x, y))) {

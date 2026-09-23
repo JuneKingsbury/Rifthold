@@ -161,7 +161,7 @@ export class WaveSystem {
     spawnEnemy(game) {
         const portal = this.portals[Math.floor(Math.random() * this.portals.length)];
         const waveTypeKeys = Object.keys(WAVE_TYPES);
-        const waveType = waveTypeKeys.length > 0 ? WAVE_TYPES[waveTypeKeys[0]] : null;
+        const waveType = waveTypeKeys.length > 0 ? WAVE_TYPES[waveTypeKeys[Math.floor(Math.random() * waveTypeKeys.length)]] : null;
 
         let entityType = null;
         if (waveType) {
@@ -450,5 +450,6 @@ function getWaveSpawnPosition(side, nexus) {
         case 1: return { x: Math.min(CONFIG.MAP_WIDTH - 1, nexus.x + near), y: Math.max(0, Math.min(CONFIG.MAP_HEIGHT - 1, nexus.y + offset)) };
         case 2: return { x: Math.max(0, Math.min(CONFIG.MAP_WIDTH - 1, nexus.x + offset)), y: Math.min(CONFIG.MAP_HEIGHT - 1, nexus.y + near) };
         case 3: return { x: Math.max(0, nexus.x - near), y: Math.max(0, Math.min(CONFIG.MAP_HEIGHT - 1, nexus.y + offset)) };
+        default: return { x: nexus.x, y: Math.max(0, nexus.y - near) };
     }
 }
