@@ -2153,11 +2153,15 @@ const arcaneMethods = {
         } else if (!isCelebrating) {
             this._expVisState._celebrateStart = null;
         }
+        const frontRow = party.filter(p => !backRowIds.includes(p.id));
+        const backRow = party.filter(p => backRowIds.includes(p.id));
         for (let i = 0; i < party.length; i++) {
             const p = party[i];
             const isBackRow = backRowIds.includes(p.id);
-            const py = H / 2 + (i - party.length / 2) * 28 + 14;
-            const px = partyX + (py - H / 2) * diagSlope - (isBackRow ? 24 : 0);
+            const rowMembers = isBackRow ? backRow : frontRow;
+            const rowIndex = rowMembers.indexOf(p);
+            const py = H / 2 + (rowIndex - rowMembers.length / 2) * 28 + 14;
+            const px = partyX + (py - H / 2) * diagSlope - (isBackRow ? 32 : 0);
             const hpPct = p.maxHp > 0 ? p.hp / p.maxHp : 0;
             let bounceY = 0;
             if (isCelebrating && p.hp > 0) {
@@ -2296,7 +2300,7 @@ const arcaneMethods = {
             for (let paIndex = 0; paIndex < activeExp.packAnimals.length; paIndex++) {
                 const pa = activeExp.packAnimals[paIndex];
                 const pay = H / 2 + (paIndex - activeExp.packAnimals.length / 2) * 28 + 14;
-                const pax = partyX - 32 + (pay - H / 2) * diagSlope;
+                const pax = partyX - 64 + (pay - H / 2) * diagSlope;
                 const animalDef = ANIMALS[pa.type];
                 let paBounceY = 0;
                 if (isCelebrating) {
@@ -2333,10 +2337,18 @@ const arcaneMethods = {
             }
         }
 
+        const activeSummons = (activeExp.summons || []).filter(s => s.hp > 0);
+        const vanguard = [];
+        if (activeExp.warBeasts) {
+            for (const wb of activeExp.warBeasts) vanguard.push({ kind: 'warbeast', entity: wb });
+        }
+        for (const s of activeSummons) vanguard.push({ kind: 'summon', entity: s });
+
         if (activeExp.warBeasts && activeExp.warBeasts.length > 0) {
             for (let wbIndex = 0; wbIndex < activeExp.warBeasts.length; wbIndex++) {
                 const wb = activeExp.warBeasts[wbIndex];
-                const wby = H / 2 + (wbIndex - activeExp.warBeasts.length / 2) * 28 + 14;
+                const wbSlot = vanguard.findIndex(v => v.entity === wb);
+                const wby = H / 2 + (wbSlot - vanguard.length / 2) * 28 + 14;
                 const wbx = partyX + 32 + (wby - H / 2) * diagSlope;
                 const animalDef = ANIMALS[wb.type];
                 let wbBounceY = 0;
@@ -2373,13 +2385,11 @@ const arcaneMethods = {
             }
         }
 
-        const activeSummons = (activeExp.summons || []).filter(s => s.hp > 0);
         for (let si = 0; si < activeSummons.length; si++) {
             const summon = activeSummons[si];
-            const ownerIdx = party.findIndex(p => p.id === summon.ownerId);
-            const oy = ownerIdx >= 0 ? H / 2 + (ownerIdx - party.length / 2) * 28 + 14 : H / 2 + si * 28 - 6;
-            const sy = oy;
-            const sx = partyX + 30 + (sy - H / 2) * diagSlope;
+            const sSlot = vanguard.findIndex(v => v.entity === summon);
+            const sy = H / 2 + (sSlot - vanguard.length / 2) * 28 + 14;
+            const sx = partyX + 32 + (sy - H / 2) * diagSlope;
             ctx.globalAlpha = 0.2;
             ctx.fillStyle = '#000000';
             ctx.beginPath();
