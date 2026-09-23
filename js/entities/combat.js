@@ -210,7 +210,7 @@ export class CombatSystem {
             const raider = game.raiders[i];
             if (raider.hp <= 0) {
                 game.combatEffects.push({ x: raider.x, y: raider.y, char: COMBAT_VISUALS.deathChar, color: COMBAT_VISUALS.deathColor, ttl: COMBAT_VISUALS.deathTtl });
-                window.soundManager?.playSFX('enemy_death');
+                window.soundManager?.playSFXAt('enemy_death', raider.x, raider.y);
                 // Roll loot. Only surface the loot effect if something actually
                 // dropped: most raiders carry `loot: []` (an empty array is truthy,
                 // so a bare `if (raider.loot)` fired the effect on nearly every kill).
@@ -247,7 +247,7 @@ export class CombatSystem {
                             shape: 'square',
                         });
                     }
-                    window.soundManager?.playSFX('loot_drop');
+                    window.soundManager?.playSFXAt('loot_drop', fx.x, fx.y);
                 }
                 if (game.exploration) {
                     const existing = game.exploration.raiderKills.get(raider.type);

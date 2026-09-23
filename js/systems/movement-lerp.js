@@ -8,6 +8,7 @@ export function moveEntity(entity, newX, newY, durationMs) {
     entity._moveDuration = durationMs;
     entity.x = newX;
     entity.y = newY;
+    // window.soundManager?.playSFXAt('footstep', newX, newY);
 }
 
 export function teleportEntity(entity, newX, newY) {

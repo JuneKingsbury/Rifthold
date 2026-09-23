@@ -222,7 +222,7 @@ export function completeTask(colonist, task, game) {
                     maxDist: 0.9,
                 });
             }
-            window.soundManager?.playSFX('build_complete');
+            window.soundManager?.playSFXAt('build_complete', task.x, task.y);
             break;
         }
         case 'chop':
@@ -262,7 +262,7 @@ export function completeTask(colonist, task, game) {
                             maxY: task.y + 1,
                         });
                     }
-                    window.soundManager?.playSFX('mine_hit');
+                    window.soundManager?.playSFXAt('mine_hit', task.x, task.y);
                 }
                 else {
                     for (let i = 0; i < 14; i++) {
@@ -280,7 +280,7 @@ export function completeTask(colonist, task, game) {
                             maxY: task.y + 1,
                         });
                     }
-                    window.soundManager?.playSFX('chop_hit');
+                    window.soundManager?.playSFXAt('chop_hit', task.x, task.y);
                 }
             }
             tile.designation = null;
@@ -315,7 +315,7 @@ export function completeTask(colonist, task, game) {
                 tile.zone.growth = 0;
                 applyThought(colonist, 'harvested', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.harvestChar, color: COMBAT_VISUALS.harvestColor, ttl: COMBAT_VISUALS.harvestTtl });
-                window.soundManager?.playSFX('harvest');
+                window.soundManager?.playSFXAt('harvest', task.x, task.y);
             }
             break;
         }
@@ -335,7 +335,7 @@ export function completeTask(colonist, task, game) {
                     game.resources.addItem(item);
                     applyThought(colonist, 'enchanted an item', game.tick);
                     game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Enchanted ${item.name}`, color: '#ff00f7', fontSize: 10, ttl: 20, maxTtl: 20 });
-                    window.soundManager?.playSFX('enchant_complete');
+                    window.soundManager?.playSFXAt('enchant_complete', colonist.x, colonist.y);
                 }
                 const tile = game.map[colonist.y]?.[colonist.x];
                 if (tile?.structure === 'enchanting_table' && game.stats) {
@@ -372,7 +372,7 @@ export function completeTask(colonist, task, game) {
                 applyThought(colonist, 'crafted', game.tick);
                 const craftedName = Object.keys(task.recipe.output)[0]?.replace(/_/g, ' ') || 'item';
                 game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Crafted ${craftedName}`, color: '#ffcc00', fontSize: 10, ttl: 20, maxTtl: 20 });
-                window.soundManager?.playSFX('craft_complete');
+                window.soundManager?.playSFXAt('craft_complete', colonist.x, colonist.y);
                 if (game.tutorial && output.planks) game.tutorial.flags.craftedPlanks = true;
             }
             break;
@@ -457,7 +457,7 @@ export function completeTask(colonist, task, game) {
                 game.eventLog.add(game, `Research unlocked: ${name}`, 'success', null);
                 game.story.checkMilestone(`research_${completedKey}`, game);
                 game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.researchCompleteChar, color: COMBAT_VISUALS.researchCompleteColor, ttl: COMBAT_VISUALS.researchCompleteTtl });
-                window.soundManager?.playSFX('research_complete');
+                window.soundManager?.playSFXAt('research_complete', colonist.x, colonist.y);
                 if (!game.events.pendingEvent) {
                     game.events.pendingEvent = {
                         type: 'research_complete',
@@ -645,7 +645,7 @@ export function completeTask(colonist, task, game) {
                 game.roomsDirty = true;
                 applyThought(colonist, 'deconstructed', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
-                window.soundManager?.playSFX('chop_hit');
+                window.soundManager?.playSFXAt('chop_hit', task.x, task.y);
                 for (let i = 0; i < 16; i++) {
                     const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
                     const speed = 0.7 + Math.random() * 0.9;
@@ -682,7 +682,7 @@ export function completeTask(colonist, task, game) {
                 game.roomsDirty = true;
                 applyThought(colonist, 'deconstructed', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
-                window.soundManager?.playSFX('chop_hit');
+                window.soundManager?.playSFXAt('chop_hit', task.x, task.y);
                 for (let i = 0; i < 16; i++) {
                     const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
                     const speed = 0.7 + Math.random() * 0.9;

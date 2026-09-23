@@ -65,6 +65,47 @@ class SoundManagerClass {
         }
     }
 
+    async playSFXAt(name, worldX, worldY) {
+        try {
+            if (!this.ctx || this.unavailable.has(name)) return;
+            if (this.activeSfxCount >= MAX_CONCURRENT_SFX) return;
+
+            const camera = window.game?.camera;
+            let gain = 1.0;
+            if (camera) {
+                const cx = camera.x + CONFIG.VIEWPORT_WIDTH / 2;
+                const cy = camera.y + CONFIG.VIEWPORT_HEIGHT / 2;
+                const dist = Math.hypot(worldX - cx, worldY - cy);
+                const viewportDiag = Math.hypot(CONFIG.VIEWPORT_WIDTH, CONFIG.VIEWPORT_HEIGHT);
+                gain = Math.max(0, 1 - dist / (viewportDiag * 2));
+            }
+            if (gain <= 0.01) return;
+
+            const now = performance.now();
+            const last = this.lastPlayTime.get(name) || 0;
+            if (now - last < SFX_COOLDOWN_MS) return;
+            this.lastPlayTime.set(name, now);
+
+            if (this.ctx.state === 'suspended') await this.ctx.resume();
+
+            const buffer = await this._getBuffer(name, 'sfx');
+            if (!buffer) return;
+
+            const source = this.ctx.createBufferSource();
+            source.buffer = buffer;
+            source.detune.value = (Math.random() * 2 - 1) * 300;
+
+            const distanceGain = this.ctx.createGain();
+            distanceGain.gain.value = gain;
+            source.connect(distanceGain);
+            distanceGain.connect(this.sfxGain);
+
+            this.activeSfxCount++;
+            source.onended = () => { this.activeSfxCount--; };
+            source.start(0);
+        } catch (e) { /* silent */ }
+    }
+
     async playSFX(name) {
         try {
             if (!this.ctx || this.unavailable.has(name)) return;

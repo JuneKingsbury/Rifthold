@@ -516,7 +516,7 @@ class Game {
                         const def = COMPLEX_STRUCTURES[s.key];
                         this.notifications.push({ text: `${def.name} activated!`, tick: this.tick, type: 'success' });
                         this.overlays.push({ type: 'floating_text', x: s.x, y: s.y, text: `${def.name} Active!`, color: '#44ffaa', fontSize: 12, ttl: 40, maxTtl: 40 });
-                        window.soundManager?.playSFX('spell_cast');
+                        window.soundManager?.playSFXAt('spell_cast', s.x, s.y);
                     }
                 }
                 for (const s of prevComplex) {
@@ -1911,7 +1911,7 @@ class Game {
                 teleportEntity(colonist, pos.x, pos.y);
                 colonist.path = [];
                 this.combatEffects.push({ x: pos.x, y: pos.y, char: COMBAT_VISUALS.spellTeleportChar, color: COMBAT_VISUALS.spellTeleportColor, ttl: 3 });
-                window.soundManager?.playSFX('spell_teleport');
+                window.soundManager?.playSFXAt('spell_teleport', pos.x, pos.y);
                 this.notifications.push({ text: `${colonist.name} warped!`, tick: this.tick, type: 'success' });
                 break;
             }
@@ -1945,7 +1945,7 @@ class Game {
                         }
                     }
                 }
-                window.soundManager?.playSFX('spell_growth');
+                window.soundManager?.playSFXAt('spell_growth', pos.x, pos.y);
                 this.notifications.push({ text: `${colonist.name} cast ${spell.name}, boosting ${boosted} crops!`, tick: this.tick, type: 'success' });
                 break;
             }
@@ -1970,7 +1970,7 @@ class Game {
                     if (this.minimap) this.minimap.markTerrainDirty();
                     if (this.renderer) this.renderer.markTerrainDirty();
                 }
-                window.soundManager?.playSFX('spell_terraform');
+                window.soundManager?.playSFXAt('spell_terraform', pos.x, pos.y);
                 this.notifications.push({ text: `${colonist.name} cast ${spell.name}, transforming ${changed} tiles!`, tick: this.tick, type: 'success' });
                 break;
             }
@@ -2038,7 +2038,7 @@ class Game {
                         }
                     }
                 }
-                window.soundManager?.playSFX('spell_growth');
+                window.soundManager?.playSFXAt('spell_growth', pos.x, pos.y);
                 this.notifications.push({ text: `${colonist.name} cast ${spell.name}, ripening ${ripened} crops!`, tick: this.tick, type: 'success' });
                 break;
             }
@@ -2289,7 +2289,7 @@ class Game {
         this.notifications.push({ text: `${def.name} animated!`, tick: this.tick, type: 'success' });
         this.eventLog.add(this, `Crafted a ${def.name}`, 'success', { type: 'position', x, y });
         this.combatEffects.push({ x, y, char: COMBAT_VISUALS.golemActivateChar, color: COMBAT_VISUALS.golemActivateColor, ttl: COMBAT_VISUALS.golemActivateTtl });
-        window.soundManager?.playSFX('golem_activate');
+        window.soundManager?.playSFXAt('golem_activate', x, y);
     }
 
     findBuilding(type) {

@@ -31,6 +31,9 @@ export const SOUND_MANIFEST = {
         mine_hit: 'audio/sfx/work/mine_hit.ogg',
         chop_hit: 'audio/sfx/work/chop_hit.ogg',
 
+        // Movement
+        footstep: 'audio/sfx/environment/footstep.ogg',
+
         // Environment — file paths are wired up; add .ogg files to audio/sfx/environment/ to activate
         fire_ignite: 'audio/sfx/environment/fire_ignite.ogg',
         freezing: 'audio/sfx/environment/freezing.ogg',
