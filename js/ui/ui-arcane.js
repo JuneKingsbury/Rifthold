@@ -515,7 +515,8 @@ const arcaneMethods = {
                 const anyVisible = chainRealms.some(r => dims.find(d => d.key === r.key) || expl.completedRealms.has(r.key));
                 const anyDemoLocked = chainRealms.some(r => expl.isRealmDemoLocked(this.game, r.key));
                 if (!anyVisible && !anyDemoLocked && !chainRealms.some(r => !r.research || this.game.research.isResearched(r.research))) continue;
-                html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
+                const chainIconKey = chain.toLowerCase().replace(/\s+/g, '_');
+                html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;display:flex;align-items:center;gap:4px;"><img src="portraits/chain_${chainIconKey}.png" class="pixel-art-icon" style="width:16px;height:16px;flex-shrink:0;" onerror="this.style.display='none'">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
                 for (const realm of chainRealms) {
                     const available = dims.find(d => d.key === realm.key);
                     const completed = expl.completedRealms.has(realm.key);

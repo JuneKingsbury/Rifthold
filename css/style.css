@@ -239,11 +239,16 @@ body {
 
 img.pixel-art {
   image-rendering: pixelated;
-  width: 200px; 
+  width: 200px;
   height: auto;
   float: inline-end;
   margin-left: 10px;
   margin-bottom: 10px;
+}
+
+img.pixel-art-icon {
+  image-rendering: pixelated;
+  display: block;
 }
 
 #game-area {
