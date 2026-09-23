@@ -113,10 +113,12 @@ function applyInteraction(a, b, interaction, game) {
     const prevTierA = getRelationshipTier(getOpinion(a, b.id)).key;
     const prevTierB = getRelationshipTier(getOpinion(b, a.id)).key;
 
-    // Charismatic amplifies positive opinion gains. Abrasive amplifies negative
-    // losses. Scaled per-participant based on the interaction's valence sign.
-    setOpinion(a, b.id, getOpinion(a, b.id) + scaleOpinionDelta(a, interaction));
-    setOpinion(b, a.id, getOpinion(b, a.id) + scaleOpinionDelta(b, interaction));
+    // Average both colonists' trait-scaled deltas so opinions always move by the
+    // same amount and can never diverge into one-sided tiers. Charismatic/abrasive
+    // traits still influence the outcome; they just do so symmetrically.
+    const sharedDelta = Math.round((scaleOpinionDelta(a, interaction) + scaleOpinionDelta(b, interaction)) / 2);
+    setOpinion(a, b.id, getOpinion(a, b.id) + sharedDelta);
+    setOpinion(b, a.id, getOpinion(b, a.id) + sharedDelta);
 
     if (interaction.thoughtKey && THOUGHTS[interaction.thoughtKey]) {
         const t = THOUGHTS[interaction.thoughtKey];
