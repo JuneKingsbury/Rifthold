@@ -117,6 +117,9 @@ export function createTamedEntity(type, x, y) {
         name: null,
     };
 
+    if (tamed.courage !== undefined) entity.courage = tamed.courage;
+    if (tamed.petDamage !== undefined) entity.petDamage = tamed.petDamage;
+
     initEntityRoles(entity);
 
     return entity;

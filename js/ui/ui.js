@@ -485,6 +485,13 @@ export class UI {
                 this.updateInventoryPanel();
                 return;
             }
+            const rebondPetSel = e.target.closest('[data-animal-rebond-pet]');
+            if (rebondPetSel) {
+                this.game.rebondPet(parseInt(rebondPetSel.dataset.animalRebondPet), parseInt(rebondPetSel.value));
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                return;
+            }
             const penSel = e.target.closest('[data-animal-pen]');
             if (penSel) {
                 const [px, py] = penSel.value.split(',').map(Number);
@@ -2183,6 +2190,21 @@ export class UI {
                     html += `<select onchange="window.game.rebondAnimal(${a.id}, parseInt(this.value))" style="background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;">${opts}</select>`;
                     html += `</div>`;
                 }
+            } else if (a.isPet) {
+                const aliveColonists = this.game.colonists.filter(c => c.hp > 0);
+                if (aliveColonists.length > 0) {
+                    const maxPets = this.game.research?.isResearched('pack_binding') ? 2 : 1;
+                    const ownerPetCount = a.bondedColonistId
+                        ? this.game.entities.filter(e => e.tamed && e.isPet && e.bondedColonistId === a.bondedColonistId).length
+                        : 0;
+                    const opts = aliveColonists.map(c =>
+                        `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                    ).join('');
+                    html += `<div class="info-row" style="margin-top:4px;">`;
+                    html += `<label style="color:#aaaaaa;font-size:0.85em;">Pet (${ownerPetCount}/${maxPets}): </label>`;
+                    html += `<select onchange="window.game.rebondPet(${a.id}, parseInt(this.value))" style="background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;">${opts}</select>`;
+                    html += `</div>`;
+                }
             } else {
                 const penPositions = this.game.mapIndex
                     ? [...this.game.mapIndex.getStructurePositions('beast_circle')].map(k => ({ x: k & 0xFFFF, y: k >> 16 }))
@@ -3218,6 +3240,21 @@ export class UI {
                             html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
                             html += `<label style="color:#aaaaaa;">Defends: </label>`;
                             html += `<select data-animal-rebond="${a.id}" style="${selectStyle}">${opts}</select>`;
+                            html += `</div>`;
+                        }
+                    } else if (a.isPet) {
+                        const aliveColonists = this.game.colonists.filter(c => c.hp > 0);
+                        if (aliveColonists.length > 0) {
+                            const maxPets = this.game.research?.isResearched('pack_binding') ? 2 : 1;
+                            const ownerPetCount = a.bondedColonistId
+                                ? this.game.entities.filter(e => e.tamed && e.isPet && e.bondedColonistId === a.bondedColonistId).length
+                                : 0;
+                            const opts = aliveColonists.map(c =>
+                                `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                            ).join('');
+                            html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
+                            html += `<label style="color:#aaaaaa;">Pet (${ownerPetCount}/${maxPets}): </label>`;
+                            html += `<select data-animal-rebond-pet="${a.id}" style="${selectStyle}">${opts}</select>`;
                             html += `</div>`;
                         }
                     } else {

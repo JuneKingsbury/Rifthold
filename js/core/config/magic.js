@@ -217,6 +217,7 @@ export const RESEARCH = {
 
     // Wildlife
     beast_binding: { name: 'Beast Binding', cost: 280, requires: ['druidcraft'], tab: 'nature', description: 'Bind and pen creatures' },
+    pack_binding: { name: 'Pack Binding', cost: 350, requires: ['beast_binding'], tab: 'nature', description: 'Each colonist can bond with up to two pets.' },
     husbandry: { name: 'Husbandry', cost: 350, requires: ['beast_binding'], tab: 'nature', description: 'Tamed animals produce 50% more resources' },
     wolf_mastery: { name: 'Wolf Mastery', cost: 350, requires: ['husbandry'], tab: 'nature', description: 'Wolf tame chance +20%, tamed wolves deal +4 damage' },
     druidcraft: { name: 'Druidcraft', cost: 110, requires: [], tab: 'nature', description: 'Unlock corn and potatoes' },

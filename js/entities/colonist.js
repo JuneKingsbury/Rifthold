@@ -693,6 +693,7 @@ export function getMoveSpeedBonus(colonist) {
     }
     if (colonist.traits.includes('quick')) bonus += TRAITS.quick.moveSpeedBonus;
     bonus += getRaceModifier(colonist, 'moveSpeedBonus', 0);
+    if (colonist.activePetSpeedBonus) bonus += colonist.activePetSpeedBonus;
     return Math.min(bonus, 0.8);
 }
 
@@ -2481,6 +2482,7 @@ function updateFighting(colonist, game) {
         }
         let dmg = weaponDmg + Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
+        if (colonist.activePetDmgBonus) dmg += colonist.activePetDmgBonus;
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
         if (target.armored) {
@@ -2548,6 +2550,7 @@ function updateFighting(colonist, game) {
         }
         let dmg = weaponDmg + Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
         if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
+        if (colonist.activePetDmgBonus) dmg += colonist.activePetDmgBonus;
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
         if (target.armored) {

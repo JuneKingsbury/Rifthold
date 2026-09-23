@@ -392,8 +392,8 @@ export const ROLE_HANDLERS = {
         },
         info(entity) {
             const rs = entity.roleState.pet || {};
-            const stateColor = rs.state === 'sheltering' ? '#ffaa00' : '#aaddff';
-            const stateLabel = rs.state === 'sheltering' ? 'Sheltering' : 'Following';
+            const stateColor = rs.state === 'sheltering' ? '#ffaa00' : rs.state === 'fighting' ? '#ff4444' : '#aaddff';
+            const stateLabel = rs.state === 'sheltering' ? 'Sheltering' : rs.state === 'fighting' ? 'Fighting!' : 'Following';
             return `<div class="info-row" style="color:${stateColor}">Pet: ${stateLabel}</div>`;
         },
         update(entity, role, game) {
@@ -405,10 +405,60 @@ export const ROLE_HANDLERS = {
             const RESUME_FOLLOW_TICKS = 10;
             const FOLLOW_RANGE = 8;
 
-            // Check for nearby hostiles.
+            // If owner is on expedition, wait at pen instead of crowding the rift gate.
+            if (entity.bondedColonistId) {
+                const owner = game.colonists?.find(c => c.id === entity.bondedColonistId && c.hp > 0);
+                if (owner && (owner.onExpedition || owner.expeditionPending)) {
+                    const pen = findPen(entity, game);
+                    if (pen) {
+                        const penDist = manhattanDist(entity.x, entity.y, pen.x, pen.y);
+                        if (penDist > 1) moveToward(entity, pen, game.map, dur, game);
+                    }
+                    rs.state = 'following';
+                    return;
+                }
+            }
+
+            // Fighting state: brave pets engage nearby hostiles.
+            if (rs.state === 'fighting') {
+                if (entity.hp < entity.maxHp * 0.2) {
+                    rs.state = 'sheltering';
+                    rs.noHostileTicks = 0;
+                    return;
+                }
+                const hostiles = getHostiles(game, entity);
+                let fightTarget = null;
+                let minFightDist = HOSTILE_DETECT_RADIUS;
+                for (const h of hostiles) {
+                    const d = manhattanDist(entity.x, entity.y, h.x, h.y);
+                    if (d < minFightDist) { minFightDist = d; fightTarget = h; }
+                }
+                if (!fightTarget) {
+                    rs.state = 'following';
+                    return;
+                }
+                if (minFightDist <= 1) {
+                    if (canAttack(entity, game)) {
+                        const dmg = entity.petDamage || 4;
+                        fightTarget.hp -= dmg;
+                        spawnDamageText(game, fightTarget.x, fightTarget.y, dmg);
+                        game.combatEffects.push({ x: fightTarget.x, y: fightTarget.y, char: COMBAT_VISUALS.hitChar, color: entity.color, ttl: COMBAT_VISUALS.hitTtl });
+                    }
+                } else {
+                    moveToward(entity, fightTarget, game.map, dur, game);
+                }
+                return;
+            }
+
+            // Check for nearby hostiles; brave pets fight, timid ones shelter.
             const hasHostile = _petHasNearbyHostile(entity, game, HOSTILE_DETECT_RADIUS);
 
             if (hasHostile) {
+                if (entity.courage && Math.random() < entity.courage) {
+                    rs.state = 'fighting';
+                    rs.noHostileTicks = 0;
+                    return;
+                }
                 rs.state = 'sheltering';
                 rs.noHostileTicks = 0;
                 const pen = findPen(entity, game);
@@ -435,6 +485,15 @@ export const ROLE_HANDLERS = {
             if (dist > 1) {
                 const followDur = _colonistFollowDur(owner, game);
                 moveToward(entity, owner, game.map, followDur, game);
+            }
+
+            // Per-species passive bonuses applied to bonded owner while following and in range.
+            switch (entity.type) {
+                case 'rabbit': owner.mood = Math.min(100, (owner.mood || 50) + 0.04); break;
+                case 'tapir':  owner.mood = Math.min(100, (owner.mood || 50) + 0.06); break;
+                case 'deer':   owner.activePetSpeedBonus = (owner.activePetSpeedBonus || 0) + 0.10; break;
+                case 'okapi':  owner.activePetSpeedBonus = (owner.activePetSpeedBonus || 0) + 0.15; break;
+                case 'boar':   owner.activePetDmgBonus   = (owner.activePetDmgBonus   || 0) + 1;    break;
             }
         },
     },

@@ -30,6 +30,11 @@ export function updateTamedAnimals(game) {
 
 export function updateFollowingAnimalRoles(game) {
     if (!game.research.isResearched('beast_binding')) return;
+    // Reset per-tick pet bonuses so they only apply when the pet is in follow range.
+    for (const c of game.colonists) {
+        c.activePetSpeedBonus = 0;
+        c.activePetDmgBonus = 0;
+    }
     for (const animal of game.entities) {
         if (!animal.tamed || animal.hp <= 0 || animal.onExpedition || animal.pendingTame) continue;
         if (!animal.roles) continue;

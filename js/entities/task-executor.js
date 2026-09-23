@@ -565,9 +565,11 @@ export function completeTask(colonist, task, game) {
                     const PET_BOND_THRESHOLD = 5;
                     const tamedDef = TAMED_ANIMALS[animal.type];
                     if (animal.bondLevel >= PET_BOND_THRESHOLD && !animal.isPet && !tamedDef?.guardAnimal) {
-                        // Find a colonist without a pet. Prefer the feeder.
-                        const hasPet = (c) => game.entities.some(e => e.tamed && e.isPet && e.bondedColonistId === c.id);
-                        let owner = !hasPet(colonist) ? colonist : game.colonists.find(c => c.hp > 0 && !hasPet(c));
+                        // Find a colonist with a free pet slot (cap: 1 before pack_binding, 2 after). Prefer the feeder.
+                        const petCount = (c) => game.entities.filter(e => e.tamed && e.isPet && e.bondedColonistId === c.id).length;
+                        const maxPets = game.research.isResearched('pack_binding') ? 2 : 1;
+                        const hasFreeSlot = (c) => petCount(c) < maxPets;
+                        let owner = hasFreeSlot(colonist) ? colonist : game.colonists.find(c => c.hp > 0 && hasFreeSlot(c));
                         if (owner) {
                             animal.bondedColonistId = owner.id;
                             animal.isPet = true;

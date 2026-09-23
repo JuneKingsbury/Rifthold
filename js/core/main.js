@@ -2196,6 +2196,29 @@ class Game {
         this.notifications.push({ text: `${animalLabel} now defends ${colonist.name}`, tick: this.tick, type: 'success' });
     }
 
+    rebondPet(animalId, colonistId) {
+        const animal = this.entities.find(e => e.id === animalId && e.tamed && e.isPet);
+        if (!animal) return;
+        const colonist = this.colonists.find(c => c.id === colonistId && c.hp > 0);
+        if (!colonist) return;
+        const existing = this.entities.filter(
+            e => e.tamed && e.isPet && e.bondedColonistId === colonistId && e.id !== animalId
+        ).length;
+        const maxPets = this.research.isResearched('pack_binding') ? 2 : 1;
+        if (existing >= maxPets) {
+            const msg = existing >= 2
+                ? `${colonist.name} already has the maximum of 2 pets`
+                : 'Requires Pack Binding research to assign a second pet';
+            this.notifications.push({ text: msg, tick: this.tick, type: 'warning' });
+            return;
+        }
+        animal.bondedColonistId = colonistId;
+        if (animal._path) animal._path = null;
+        if (animal._pathTarget) animal._pathTarget = null;
+        const label = animal.name || animal.type;
+        this.notifications.push({ text: `${label} is now bonded with ${colonist.name}`, tick: this.tick, type: 'success' });
+    }
+
     directAssignAnimalPen(animalId, x, y) {
         const animal = this.entities.find(e => e.id === animalId && e.tamed);
         if (!animal) return;

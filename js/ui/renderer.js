@@ -1715,7 +1715,8 @@ export class Renderer {
                         if (itemSprite) {
                             const iSize = Math.floor(cw * 0.6);
                             const iOff = Math.floor((cw - iSize) / 2);
-                            ctx.drawImage(itemSprite, px + iOff, py + iOff, iSize, iSize);
+                            const iOffY = 0;
+                            ctx.drawImage(itemSprite, px + iOff, py + iOffY, iSize, iSize);
                         }
                     }
 
