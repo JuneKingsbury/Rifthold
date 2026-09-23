@@ -1543,6 +1543,7 @@ export class ExplorationSystem {
                 window.soundManager?.playExpSFX('enemy_death');
                 if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
                 if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
+                this._processEnemyOnDeath(target, exp, game);
             }
         }
     }
@@ -1658,7 +1659,7 @@ export class ExplorationSystem {
                         if (e === target || e.hp <= 0) continue;
                         e.hp -= cleaveDmg;
                         if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + cleaveDmg;
-                        if (e.hp <= 0) { this._addLog(exp, game, 'A foe falls to the sweep!', 'success'); if (e.elite) { exp.eliteKills++; this._processEliteOnDeath(e, exp, game); } }
+                        if (e.hp <= 0) { this._addLog(exp, game, 'A foe falls to the sweep!', 'success'); if (e.elite) { exp.eliteKills++; this._processEliteOnDeath(e, exp, game); } this._processEnemyOnDeath(e, exp, game); }
                     }
                     if (combat.enemies.filter(e => e.hp > 0).length < combat.enemies.length) this._addLog(exp, game, `${member.name}'s sweeping strike cleaves through the pack!`, 'combat');
                 }
@@ -1684,6 +1685,7 @@ export class ExplorationSystem {
                         + this._combatStatusValue(member, 'buff_hpOnKill', 'value', 0);
                     if (hpOnKill > 0) member.hp = Math.min(member.maxHp, member.hp + hpOnKill);
                     if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
+                    this._processEnemyOnDeath(target, exp, game);
                 }
             }
         }
@@ -1714,6 +1716,7 @@ export class ExplorationSystem {
                         if (summonTarget.hp <= 0) {
                             this._addLog(exp, game, `The ${summon.name} slays a foe!`, 'success');
                             if (summonTarget.elite) { exp.eliteKills++; this._processEliteOnDeath(summonTarget, exp, game); }
+                            this._processEnemyOnDeath(summonTarget, exp, game);
                         }
                     }
                 }
@@ -1741,6 +1744,7 @@ export class ExplorationSystem {
                         this._addLog(exp, game, `The ${beast.name} brings down a foe!`, 'success');
                         window.soundManager?.playExpSFX('enemy_death');
                         if (beastTarget.elite) { exp.eliteKills++; this._processEliteOnDeath(beastTarget, exp, game); }
+                        this._processEnemyOnDeath(beastTarget, exp, game);
                     }
                 }
             }
@@ -1988,6 +1992,7 @@ export class ExplorationSystem {
                         if (enemy.hp <= 0) {
                             this._addLog(exp, game, `${attackerLabel} is slain by thorns!`, 'success');
                             if (enemy.elite) { exp.eliteKills++; this._processEliteOnDeath(enemy, exp, game); }
+                            this._processEnemyOnDeath(enemy, exp, game);
                         }
                     }
 
@@ -2063,7 +2068,7 @@ export class ExplorationSystem {
                         game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                         window.soundManager?.playExpSFX('spell_cast');
                         for (const t of targets) {
-                            if (t.hp <= 0) this._addLog(exp, game, `An enemy is destroyed by the blast!`, 'success');
+                            if (t.hp <= 0) { this._addLog(exp, game, `An enemy is destroyed by the blast!`, 'success'); this._processEnemyOnDeath(t, exp, game); }
                         }
                     } else if (spell.effect === 'chain_damage') {
                         // Arc across up to chainTargets foes, losing chainFalloff of the
@@ -2076,7 +2081,7 @@ export class ExplorationSystem {
                             const applied = Math.max(1, Math.floor(hopDmg));
                             t.hp -= applied;
                             hitCount++;
-                            if (t.hp <= 0) this._addLog(exp, game, `${member.name}'s ${spell.name} arcs through a foe, slaying it!`, 'success');
+                            if (t.hp <= 0) { this._addLog(exp, game, `${member.name}'s ${spell.name} arcs through a foe, slaying it!`, 'success'); this._processEnemyOnDeath(t, exp, game); }
                             hopDmg *= (spell.chainFalloff || 0.6);
                         }
                         this._addLog(exp, game, `${member.name} casts ${spell.name}, arcing through ${hitCount} ${hitCount === 1 ? 'foe' : 'foes'}!`, 'combat');
@@ -2094,7 +2099,7 @@ export class ExplorationSystem {
                                 this._applyCombatStatus(target, 'slow', spell.slowRounds || 2, { mult: spell.slowMult || 0.5 });
                                 this._addLog(exp, game, `The enemy is slowed by frost!`, 'combat');
                             }
-                            if (target.hp <= 0) this._addLog(exp, game, `${member.name}'s spell slays a foe!`, 'success');
+                            if (target.hp <= 0) { this._addLog(exp, game, `${member.name}'s spell slays a foe!`, 'success'); this._processEnemyOnDeath(target, exp, game); }
                         }
                     }
                     break;
@@ -2860,6 +2865,16 @@ export class ExplorationSystem {
         }
     }
 
+    _processEnemyOnDeath(enemy, exp, game) {
+        if (!enemy.onDeath) return;
+        if (enemy.onDeath.applyVoidDrained) {
+            const alive = exp.partySnapshot.filter(p => p.hp > 0);
+            const rounds = enemy.onDeath.rounds ?? 2;
+            for (const m of alive) this._applyCombatStatus(m, 'void_drained', rounds, { maxHpMult: 0.75 });
+            this._addLog(exp, game, `${enemy.name} dies and releases void energy! The party is Void-Drained.`, 'danger');
+        }
+    }
+
     _updateBossPhase(exp, game) {
         if (!exp.bossPhaseData || !exp.combat?.isBoss) return;
         const bossEnemy = exp.combat.enemies.find(e => e.isBoss);
@@ -3327,6 +3342,7 @@ export class ExplorationSystem {
         } else {
             this._addLog(exp, game, pact.logRefuse, 'event');
         }
+        this._unpauseAfterChoice(exp, game);
     }
 
     _applyPuzzleReward(exp, game, reward) {
