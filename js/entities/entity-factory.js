@@ -114,6 +114,7 @@ export function createTamedEntity(type, x, y) {
         hungerTimer: 0,
         bondLevel: 0,
         isPet: false,
+        name: null,
     };
 
     initEntityRoles(entity);

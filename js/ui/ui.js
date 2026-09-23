@@ -407,6 +407,74 @@ export class UI {
                 const res = this.game.resources.reservedFoodstuffs;
                 res[food] = !res[food];
                 this.updateInventoryPanel();
+                return;
+            }
+            const gotoBtn = e.target.closest('[data-animal-goto]');
+            if (gotoBtn) {
+                window.game.centerOnAnimal(parseInt(gotoBtn.dataset.animalGoto));
+                return;
+            }
+            const renameBtn = e.target.closest('[data-animal-rename]');
+            if (renameBtn) {
+                this._renamingAnimalId = parseInt(renameBtn.dataset.animalRename);
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                // Focus the input after render
+                const input = this.elements.inventoryPanel.querySelector('[data-animal-rename-input]');
+                if (input) { input.focus(); input.select(); }
+                return;
+            }
+            const renameConfirm = e.target.closest('[data-animal-rename-confirm]');
+            if (renameConfirm) {
+                const id = parseInt(renameConfirm.dataset.animalRenameConfirm);
+                const input = this.elements.inventoryPanel.querySelector(`[data-animal-rename-input="${id}"]`);
+                if (input) this.game.renameAnimal(id, input.value);
+                this._renamingAnimalId = null;
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                return;
+            }
+            const renameCancel = e.target.closest('[data-animal-rename-cancel]');
+            if (renameCancel) {
+                this._renamingAnimalId = null;
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                return;
+            }
+        });
+
+        this.elements.inventoryPanel.addEventListener('change', (e) => {
+            const rebondSel = e.target.closest('[data-animal-rebond]');
+            if (rebondSel) {
+                this.game.rebondAnimal(parseInt(rebondSel.dataset.animalRebond), parseInt(rebondSel.value));
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                return;
+            }
+            const penSel = e.target.closest('[data-animal-pen]');
+            if (penSel) {
+                const [px, py] = penSel.value.split(',').map(Number);
+                this.game.directAssignAnimalPen(parseInt(penSel.dataset.animalPen), px, py);
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+            }
+        });
+
+        this.elements.inventoryPanel.addEventListener('keydown', (e) => {
+            const input = e.target.closest('[data-animal-rename-input]');
+            if (!input) return;
+            if (e.key === 'Enter') {
+                const id = parseInt(input.dataset.animalRenameInput);
+                this.game.renameAnimal(id, input.value);
+                this._renamingAnimalId = null;
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                e.preventDefault();
+            } else if (e.key === 'Escape') {
+                this._renamingAnimalId = null;
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                e.preventDefault();
             }
         });
 
@@ -1921,6 +1989,52 @@ export class UI {
         this.elements.infoPanel.innerHTML = html;
     }
 
+    renameAnimalInPanel(animalId) {
+        const animal = this.game.entities.find(a => a.id === animalId && a.tamed);
+        if (!animal) return;
+        const header = this.elements.infoPanel.querySelector(`[data-animal-header="${animalId}"]`);
+        if (!header) return;
+        const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+        const currentName = animal.name || cap(animal.type);
+        const color = header.style.color;
+        header.innerHTML = `<input id="animal-rename-input-${animalId}" type="text" value="" placeholder="${currentName}" maxlength="24" style="background:#222;color:#eee;border:1px solid #666;padding:1px 4px;font-size:0.9em;width:110px;">` +
+            `<button onclick="window.game.ui._confirmAnimalRename(${animalId})" style="background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:4px;">OK</button>` +
+            `<button onclick="window.game.ui._cancelAnimalRename(${animalId})" style="background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:2px;">✕</button>`;
+        const input = document.getElementById(`animal-rename-input-${animalId}`);
+        if (input) {
+            input.focus();
+            input.select();
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); this._confirmAnimalRename(animalId); }
+                else if (e.key === 'Escape') { e.preventDefault(); this._cancelAnimalRename(animalId); }
+            });
+        }
+    }
+
+    _confirmAnimalRename(animalId) {
+        const input = document.getElementById(`animal-rename-input-${animalId}`);
+        if (input) this.game.renameAnimal(animalId, input.value);
+        this._restoreAnimalPanelHeader(animalId);
+    }
+
+    _cancelAnimalRename(animalId) {
+        this._restoreAnimalPanelHeader(animalId);
+    }
+
+    _restoreAnimalPanelHeader(animalId) {
+        const animal = this.game.entities.find(a => a.id === animalId && a.tamed);
+        const header = this.elements.infoPanel.querySelector(`[data-animal-header="${animalId}"]`);
+        if (!animal || !header) return;
+        const def = TAMED_ANIMALS[animal.type];
+        const color = def?.color || '#ccaa88';
+        header.style.color = color;
+        const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+        const headerName = animal.name ? `${animal.name} <span style="color:#888;font-size:0.85em;">(${animal.type})</span>` : animal.type;
+        const petLabel = animal.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
+        const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
+        header.innerHTML = `${headerName} (tamed)${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${animalId})">Rename</button>`;
+    }
+
     showTileEntities(tile, x, y, colonists, animals, raiders = [], tamedAnimals = [], summons = []) {
         this._switchToInfoTab();
         this._viewingRiftGate = (tile.structure === 'rift_gate');
@@ -1986,7 +2100,9 @@ export class UI {
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
             const petLabel = a.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
-            html += `<div class="info-header" style="color:${color};">${a.type} (tamed)${petLabel}</div>`;
+            const headerName = a.name ? `${a.name} <span style="color:#888;font-size:0.85em;">(${a.type})</span>` : a.type;
+            const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
+            html += `<div class="info-header" style="color:${color};" data-animal-header="${a.id}">${headerName} (tamed)${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">Rename</button></div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
             if (a.bondedColonistId) {
                 const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
@@ -2033,7 +2149,21 @@ export class UI {
                     html += `</div>`;
                 }
             } else {
-                html += `<button onclick="window.game.reassignAnimalPen(${a.id})">Reassign pen</button>`;
+                const penPositions = this.game.mapIndex
+                    ? [...this.game.mapIndex.getStructurePositions('beast_circle')].map(k => ({ x: k & 0xFFFF, y: k >> 16 }))
+                    : [];
+                if (penPositions.length > 0) {
+                    const penOpts = penPositions.map(p => {
+                        const isCurrent = p.x === a.penX && p.y === a.penY;
+                        return `<option value="${p.x},${p.y}"${isCurrent ? ' selected' : ''}>Pen (${p.x}, ${p.y})</option>`;
+                    }).join('');
+                    html += `<div class="info-row" style="margin-top:4px;">`;
+                    html += `<label style="color:#aaaaaa;font-size:0.85em;">Pen: </label>`;
+                    html += `<select onchange="const [px,py]=this.value.split(',').map(Number);window.game.directAssignAnimalPen(${a.id},px,py)" style="background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;">${penOpts}</select>`;
+                    html += `</div>`;
+                } else {
+                    html += `<button onclick="window.game.reassignAnimalPen(${a.id})">Reassign pen</button>`;
+                }
             }
             html += `</div>`;
         }
@@ -2570,6 +2700,7 @@ export class UI {
         const opening = !this.inventoryVisible;
         this._closeAllPanels();
         this.inventoryVisible = opening;
+        if (!opening) this._renamingAnimalId = null;
         this._panelPause(opening);
         this.elements.inventoryPanel.style.display = opening ? 'block' : 'none';
         if (opening) this.updateInventoryPanel();
@@ -2920,16 +3051,103 @@ export class UI {
     }
 
     _buildInvAnimals(tamed) {
-        let html = '';
-        if (tamed.length > 0) {
-            const counts = countByKey(tamed, a => a.type);
-            for (const [type, count] of Object.entries(counts)) {
-                const def = TAMED_ANIMALS[type];
-                let role = def.produces ? `produces: ${def.produces}` : def.packAnimal ? 'pack animal' : def.happinessAura ? 'happiness aura' : def.guardAnimal ? 'guard' : '';
-                html += `<div class="inv-row"><span class="inv-name">${type}</span><span class="inv-amount">x${count}${role ? ` (${role})` : ''}</span></div>`;
-            }
+        if (!tamed.length) return '<div class="info-row" style="color:#666;">No tamed animals.</div>';
+
+        const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+        const PET_BOND_THRESHOLD = 5;
+        const selectStyle = 'background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;';
+        const btnStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;';
+        const nameBtnStyle = 'background:none;border:none;color:#999;cursor:pointer;font-size:0.8em;padding:0 4px;';
+
+        // group by type while preserving first-seen order
+        const groups = {};
+        const order = [];
+        for (const a of tamed) {
+            if (!groups[a.type]) { groups[a.type] = []; order.push(a.type); }
+            groups[a.type].push(a);
         }
-        if (!html) html = '<div class="info-row" style="color:#666;">No tamed animals.</div>';
+
+        let html = '';
+        for (const type of order) {
+            const animals = groups[type];
+            const def = TAMED_ANIMALS[type] || {};
+            const color = def.color || '#ccaa88';
+            html += `<div style="margin-bottom:8px;">`;
+            html += `<div style="color:${color};font-weight:bold;border-bottom:1px solid #333;margin-bottom:4px;padding-bottom:2px;">${cap(type)}s (${animals.length})</div>`;
+
+            for (const a of animals) {
+                const displayName = a.name || cap(a.type);
+                html += `<div style="padding:4px 0 4px 8px;border-bottom:1px solid #2a2a2a;">`;
+
+                // name row: clickable name + rename button / inline input when editing
+                html += `<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">`;
+                if (this._renamingAnimalId === a.id) {
+                    html += `<input data-animal-rename-input="${a.id}" type="text" value="" placeholder="${displayName}" style="background:#222;color:#eee;border:1px solid #666;padding:1px 4px;font-size:0.9em;width:100px;" maxlength="24" autofocus>`;
+                    html += `<button data-animal-rename-confirm="${a.id}" style="${btnStyle}">OK</button>`;
+                    html += `<button data-animal-rename-cancel style="${btnStyle}">✕</button>`;
+                } else {
+                    html += `<span data-animal-goto="${a.id}" style="cursor:pointer;color:#eee;text-decoration:underline dotted;font-weight:bold;" title="Click to locate on map">${displayName}</span>`;
+                    html += `<button data-animal-rename="${a.id}" style="${btnStyle}" title="Rename">Rename</button>`;
+                }
+                html += `</div>`;
+
+                // bond
+                if (a.bondedColonistId) {
+                    const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
+                    const bondName = bonded ? bonded.name : 'Unknown';
+                    const bondDisplay = a.isPet ? `${bondName} (Pet)` : `${bondName} (Bond: ${a.bondLevel || 0}/${PET_BOND_THRESHOLD})`;
+                    html += `<div class="info-row" style="color:#aaddff;font-size:0.9em;">Bonded: ${bondDisplay}</div>`;
+                }
+
+                // hunger
+                if (def.hungerRate) {
+                    const threshold = def.hungerThreshold || 3;
+                    const hunger = a.hunger || 0;
+                    if (hunger >= threshold) {
+                        html += `<div class="info-row" style="color:#ff6644;font-size:0.9em;">Hungry! (${hunger}/${threshold})</div>`;
+                    } else if (hunger > 0) {
+                        html += `<div class="info-row" style="color:#ddaa44;font-size:0.9em;">Hunger: ${hunger}/${threshold}</div>`;
+                    }
+                }
+
+                if (a.onExpedition) {
+                    html += `<div class="info-row" style="color:#33ccff;font-size:0.9em;">On expedition</div>`;
+                } else {
+                    const isGuard = a.roles && a.roles.some(r => r.type === 'guard');
+                    if (isGuard && !a.isPet) {
+                        const aliveColonists = this.game.colonists.filter(c => c.hp > 0);
+                        if (aliveColonists.length > 0) {
+                            const opts = aliveColonists.map(c =>
+                                `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                            ).join('');
+                            html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
+                            html += `<label style="color:#aaaaaa;">Defends: </label>`;
+                            html += `<select data-animal-rebond="${a.id}" style="${selectStyle}">${opts}</select>`;
+                            html += `</div>`;
+                        }
+                    } else {
+                        const penPositions = this.game.mapIndex
+                            ? [...this.game.mapIndex.getStructurePositions('beast_circle')].map(k => ({ x: k & 0xFFFF, y: k >> 16 }))
+                            : [];
+                        if (penPositions.length > 0) {
+                            const penOpts = penPositions.map(p => {
+                                const isCurrent = p.x === a.penX && p.y === a.penY;
+                                return `<option value="${p.x},${p.y}"${isCurrent ? ' selected' : ''}>Pen (${p.x}, ${p.y})</option>`;
+                            }).join('');
+                            html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
+                            html += `<label style="color:#aaaaaa;">Pen: </label>`;
+                            html += `<select data-animal-pen="${a.id}" style="${selectStyle}">${penOpts}</select>`;
+                            html += `</div>`;
+                        } else {
+                            html += `<div class="info-row" style="color:#666;font-size:0.85em;">No beast circles built</div>`;
+                        }
+                    }
+                }
+
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
         return html;
     }
 

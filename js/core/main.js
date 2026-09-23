@@ -2189,7 +2189,49 @@ class Game {
         animal.bondedColonistId = colonistId;
         if (animal._path) animal._path = null;
         if (animal._pathTarget) animal._pathTarget = null;
-        this.notifications.push({ text: `${animal.type} now defends ${colonist.name}`, tick: this.tick, type: 'success' });
+        const animalLabel = animal.name || animal.type;
+        this.notifications.push({ text: `${animalLabel} now defends ${colonist.name}`, tick: this.tick, type: 'success' });
+    }
+
+    directAssignAnimalPen(animalId, x, y) {
+        const animal = this.entities.find(e => e.id === animalId && e.tamed);
+        if (!animal) return;
+        animal.penX = x;
+        animal.penY = y;
+        // Cancel any existing feed or relocate tasks for this animal.
+        for (const t of this.taskQueue.getAll()) {
+            if ((t.type === 'feed_animal' || t.type === 'relocate_animal') && t.targetAnimalId === animalId) {
+                this.taskQueue.remove(t.id);
+            }
+        }
+        if (animal._feedTaskQueued !== undefined) animal._feedTaskQueued = false;
+        animal._relocateTaskQueued = false;
+        const animalLabel = animal.name || animal.type;
+        this.notifications.push({ text: `${animalLabel} pen reassigned, colonist dispatched`, tick: this.tick, type: 'success' });
+        this.taskQueue.add({
+            type: 'relocate_animal',
+            skillRequired: 'animals',
+            x: animal.x,
+            y: animal.y,
+            penX: x,
+            penY: y,
+            workAmount: 8,
+            targetAnimalId: animalId,
+        });
+        animal._relocateTaskQueued = true;
+    }
+
+    renameAnimal(animalId, newName) {
+        const animal = this.entities.find(e => e.id === animalId && e.tamed);
+        if (!animal) return;
+        animal.name = (typeof newName === 'string' ? newName.trim() : '') || null;
+    }
+
+    centerOnAnimal(animalId) {
+        const animal = this.entities.find(e => e.id === animalId && e.tamed);
+        if (!animal) return;
+        this.ui.toggleInventoryPanel();
+        this.camera.centerOn(animal.x, animal.y);
     }
 
     craftGolem(golemType) {

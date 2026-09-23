@@ -150,12 +150,18 @@ function updateAnimal(animal, game) {
 
 function syncAnimalTasks(game) {
     for (const task of game.taskQueue.getAll()) {
-        if (task.type !== 'hunt' && task.type !== 'tame' && task.type !== 'lead_animal' && task.type !== 'feed_animal') continue;
+        if (task.type !== 'hunt' && task.type !== 'tame' && task.type !== 'lead_animal' && task.type !== 'feed_animal' && task.type !== 'relocate_animal') continue;
         const animal = game.entities.find(a => a.id === task.targetAnimalId && a.category === 'animal');
         if (!animal || animal.hp <= 0) {
             if (task.type === 'lead_animal' && animal) { animal.pendingTame = false; animal.leaderId = null; }
             if (task.type === 'feed_animal' && animal) animal._feedTaskQueued = false;
+            if (task.type === 'relocate_animal' && animal) animal._relocateTaskQueued = false;
             game.taskQueue.remove(task.id);
+        } else if (task.type === 'relocate_animal') {
+            // Keep task x/y tracking the animal so the colonist can find it if it moves.
+            if (task.x !== animal.x || task.y !== animal.y) {
+                game.taskQueue.updatePosition(task.id, animal.x, animal.y);
+            }
         } else if (task.type === 'hunt' || task.type === 'tame') {
             if (task.x !== animal.x || task.y !== animal.y) {
                 game.taskQueue.updatePosition(task.id, animal.x, animal.y);

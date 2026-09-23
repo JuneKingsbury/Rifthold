@@ -535,6 +535,22 @@ export function completeTask(colonist, task, game) {
             }
             break;
         }
+        case 'relocate_animal': {
+            if (task.targetAnimalId) {
+                const animal = game.entities.find(a => a.id === task.targetAnimalId && a.tamed);
+                if (animal) {
+                    animal.x = task.penX;
+                    animal.y = task.penY;
+                    animal._relocateTaskQueued = false;
+                    if (animal._path) animal._path = null;
+                    if (animal._pathTarget) animal._pathTarget = null;
+                    const animalLabel = animal.name || animal.type;
+                    game.notifications.push({ text: `${animalLabel} moved to new pen`, tick: game.tick, type: 'success' });
+                    game.overlays.push({ type: 'floating_text', x: task.penX, y: task.penY, text: 'Settled!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+                }
+            }
+            break;
+        }
         case 'feed_animal': {
             if (task.targetAnimalId) {
                 const animal = game.entities.find(a => a.id === task.targetAnimalId && a.tamed);
