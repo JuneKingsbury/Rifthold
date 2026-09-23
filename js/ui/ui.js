@@ -2947,11 +2947,24 @@ export class UI {
         tt.style.top = Math.max(y, 4) + 'px';
     }
 
+    _invTierDivider(tier, hasAbove) {
+        const TIER_NAMES = ['', 'Primitive', 'Iron', 'Runic', 'Void'];
+        const label = TIER_NAMES[tier] || `Tier ${tier}`;
+        const mt = hasAbove ? 'margin-top:6px;' : '';
+        return `<div style="padding:2px 0;${mt}font-size:0.78em;color:#666;border-top:1px solid #2a2a2a;letter-spacing:0.08em;text-transform:uppercase;">Tier ${tier}: ${label}</div>`;
+    }
+
     _buildInvEquipment(weapons, armors, helmets, clothes, tools, boots, trinkets) {
+        const sortByTier = arr => [...arr].sort((a, b) => (a.tier ?? Infinity) - (b.tier ?? Infinity));
         let html = '';
         if (weapons.length > 0) {
             html += '<div class="info-row" style="color:#cc8888;margin-bottom:4px;"><b>Weapons:</b></div>';
-            weapons.forEach((w, i) => {
+            let lastTier = null;
+            sortByTier(weapons).forEach((w) => {
+                if (w.tier !== undefined && w.tier !== lastTier) {
+                    html += this._invTierDivider(w.tier, lastTier !== null);
+                    lastTier = w.tier;
+                }
                 const extras = getItemStatLines({ ...w, damage: undefined });
                 const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
                 let stats = `${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`;
@@ -2959,82 +2972,119 @@ export class UI {
                 const tip = w.description || '';
                 const wec = ENCHANT_COST_BY_TIER[w.tier] ?? { resource: 'runite', amount: 5 };
                 const wecLabel = `${wec.amount} ${wec.resource.replace(/_/g, ' ')}`;
+                const wi = weapons.indexOf(w);
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${tip}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${w.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${w.name.replace(/'/g, "\\'")} for ${wecLabel}?')){window.game.enchantWeapon(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${w.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(w, this.game)}')){window.game.discardWeapon(${i})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${w.name.replace(/'/g, "\\'")} for ${wecLabel}?')){window.game.enchantWeapon(${wi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${w.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(w, this.game)}')){window.game.discardWeapon(${wi})}">♻</button></span></div>`;
             });
         }
         if (armors.length > 0) {
             html += '<div class="info-row" style="color:#9966cc;margin-top:8px;margin-bottom:4px;"><b>Armor:</b></div>';
-            armors.forEach((a, i) => {
+            let lastTier = null;
+            sortByTier(armors).forEach((a) => {
+                if (a.tier !== undefined && a.tier !== lastTier) {
+                    html += this._invTierDivider(a.tier, lastTier !== null);
+                    lastTier = a.tier;
+                }
                 const stats = getItemStatLines(a).join(', ');
                 const tip = a.description || '';
                 const aec = ENCHANT_COST_BY_TIER[a.tier] ?? { resource: 'runite', amount: 5 };
                 const aecLabel = `${aec.amount} ${aec.resource.replace(/_/g, ' ')}`;
+                const ai = armors.indexOf(a);
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${tip}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${a.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${a.name.replace(/'/g, "\\'")} for ${aecLabel}?')){window.game.enchantArmor(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardArmor(${i})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${a.name.replace(/'/g, "\\'")} for ${aecLabel}?')){window.game.enchantArmor(${ai});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardArmor(${ai})}">♻</button></span></div>`;
             });
         }
         if (helmets.length > 0) {
             html += '<div class="info-row" style="color:#7799cc;margin-top:8px;margin-bottom:4px;"><b>Helmets:</b></div>';
-            helmets.forEach((h, i) => {
+            let lastTier = null;
+            sortByTier(helmets).forEach((h) => {
+                if (h.tier !== undefined && h.tier !== lastTier) {
+                    html += this._invTierDivider(h.tier, lastTier !== null);
+                    lastTier = h.tier;
+                }
                 const stats = getItemStatLines(h).join(', ');
                 const tip = h.description || '';
                 const hec = ENCHANT_COST_BY_TIER[h.tier] ?? { resource: 'runite', amount: 5 };
                 const hecLabel = `${hec.amount} ${hec.resource.replace(/_/g, ' ')}`;
+                const hi = helmets.indexOf(h);
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${tip}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${h.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${h.name.replace(/'/g, "\\'")} for ${hecLabel}?')){window.game.enchantHelmet(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(h, this.game)}')){window.game.discardHelmet(${i})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${h.name.replace(/'/g, "\\'")} for ${hecLabel}?')){window.game.enchantHelmet(${hi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(h, this.game)}')){window.game.discardHelmet(${hi})}">♻</button></span></div>`;
             });
         }
         if (boots.length > 0) {
             html += '<div class="info-row" style="color:#aa8855;margin-top:8px;margin-bottom:4px;"><b>Boots:</b></div>';
-            boots.forEach((b, i) => {
+            let lastTier = null;
+            sortByTier(boots).forEach((b) => {
+                if (b.tier !== undefined && b.tier !== lastTier) {
+                    html += this._invTierDivider(b.tier, lastTier !== null);
+                    lastTier = b.tier;
+                }
                 const stats = getItemStatLines(b).join(', ');
                 const tip = b.description || '';
                 const bec = ENCHANT_COST_BY_TIER[b.tier] ?? { resource: 'runite', amount: 5 };
                 const becLabel = `${bec.amount} ${bec.resource.replace(/_/g, ' ')}`;
+                const bi = boots.indexOf(b);
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${tip}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${b.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${b.name.replace(/'/g, "\\'")} for ${becLabel}?')){window.game.enchantBoots(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${b.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(b, this.game)}')){window.game.discardBoots(${i})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${b.name.replace(/'/g, "\\'")} for ${becLabel}?')){window.game.enchantBoots(${bi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${b.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(b, this.game)}')){window.game.discardBoots(${bi})}">♻</button></span></div>`;
             });
         }
         if (clothes.length > 0) {
             html += '<div class="info-row" style="color:#cc8866;margin-top:8px;margin-bottom:4px;"><b>Clothes:</b></div>';
-            clothes.forEach((c, i) => {
+            let lastTier = null;
+            sortByTier(clothes).forEach((c) => {
+                if (c.tier !== undefined && c.tier !== lastTier) {
+                    html += this._invTierDivider(c.tier, lastTier !== null);
+                    lastTier = c.tier;
+                }
                 const stats = getItemStatLines(c).join(', ');
                 const tip = c.description || '';
                 const cec = ENCHANT_COST_BY_TIER[c.tier] ?? { resource: 'runite', amount: 5 };
                 const cecLabel = `${cec.amount} ${cec.resource.replace(/_/g, ' ')}`;
+                const ci = clothes.indexOf(c);
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${tip}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${c.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${c.name.replace(/'/g, "\\'")} for ${cecLabel}?')){window.game.enchantClothes(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${c.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(c, this.game)}')){window.game.discardClothes(${i})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${c.name.replace(/'/g, "\\'")} for ${cecLabel}?')){window.game.enchantClothes(${ci});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${c.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(c, this.game)}')){window.game.discardClothes(${ci})}">♻</button></span></div>`;
             });
         }
         if (tools.length > 0) {
             html += '<div class="info-row" style="color:#88aacc;margin-top:8px;margin-bottom:4px;"><b>Tools:</b></div>';
-            tools.forEach((t, i) => {
+            let lastTier = null;
+            sortByTier(tools).forEach((t) => {
+                if (t.tier !== undefined && t.tier !== lastTier) {
+                    html += this._invTierDivider(t.tier, lastTier !== null);
+                    lastTier = t.tier;
+                }
                 const stats = getItemStatLines(t).join(', ');
                 const tip = t.description || '';
                 const tec = ENCHANT_COST_BY_TIER[t.tier] ?? { resource: 'runite', amount: 5 };
                 const tecLabel = `${tec.amount} ${tec.resource.replace(/_/g, ' ')}`;
+                const ti = tools.indexOf(t);
                 html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(t)}" data-tip="${tip}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${t.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${t.name.replace(/'/g, "\\'")} for ${tecLabel}?')){window.game.enchantTool(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(t, this.game)}')){window.game.discardTool(${i})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${t.name.replace(/'/g, "\\'")} for ${tecLabel}?')){window.game.enchantTool(${ti});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(t, this.game)}')){window.game.discardTool(${ti})}">♻</button></span></div>`;
             });
         }
         if (trinkets.length > 0) {
             html += '<div class="info-row" style="color:#ccaa44;margin-top:8px;margin-bottom:4px;"><b>Trinkets:</b></div>';
-            trinkets.forEach((a, i) => {
+            let lastTier = null;
+            sortByTier(trinkets).forEach((a) => {
+                if (a.tier !== undefined && a.tier !== lastTier) {
+                    html += this._invTierDivider(a.tier, lastTier !== null);
+                    lastTier = a.tier;
+                }
                 const tip = this._getTrinketTooltip(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'trinket')}${a.name}</span><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardTrinket(${i})}">♻</button></div>`;
+                const ai = trinkets.indexOf(a);
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'trinket')}${a.name}</span><span class="inv-amount"></span><span class="inv-actions"><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardTrinket(${ai})}">♻</button></span></div>`;
             });
         }
         if (!html) html = '<div class="info-row" style="color:#666;">No equipment in storage.</div>';
