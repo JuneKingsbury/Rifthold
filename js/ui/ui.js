@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE } from '../core/config.js';
 import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
@@ -37,6 +37,15 @@ function magicXpTip(def, level, acc) {
     return level >= 10
         ? `${def.description} (MAX)`
         : `${def.description} (${pct}% to next level)`;
+}
+
+function salvagePreview(item, game) {
+    const recipe = Object.values(RECIPES).find(r => Object.keys(r.output)[0] === item.key);
+    if (!recipe) return '1 planks';
+    const rate = game.research.isResearched('artisans_touch') ? WORK_CONFIG.artisanSalvageRate : SALVAGE_RATE;
+    return Object.entries(recipe.input)
+        .map(([res, amt]) => `${Math.max(1, Math.floor(amt * rate))} ${res.replace(/_/g, ' ')}`)
+        .join(', ');
 }
 
 export class UI {
@@ -417,6 +426,7 @@ export class UI {
             const renameBtn = e.target.closest('[data-animal-rename]');
             if (renameBtn) {
                 this._renamingAnimalId = parseInt(renameBtn.dataset.animalRename);
+                this._releasingAnimalId = null;
                 this._lastInvHtml = null;
                 this.updateInventoryPanel();
                 // Focus the input after render
@@ -437,6 +447,30 @@ export class UI {
             const renameCancel = e.target.closest('[data-animal-rename-cancel]');
             if (renameCancel) {
                 this._renamingAnimalId = null;
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                return;
+            }
+            const releaseBtn = e.target.closest('[data-animal-release]');
+            if (releaseBtn) {
+                this._releasingAnimalId = parseInt(releaseBtn.dataset.animalRelease);
+                this._renamingAnimalId = null;
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                return;
+            }
+            const releaseConfirm = e.target.closest('[data-animal-release-confirm]');
+            if (releaseConfirm) {
+                const id = parseInt(releaseConfirm.dataset.animalReleaseConfirm);
+                this.game.releaseAnimalToWild(id);
+                this._releasingAnimalId = null;
+                this._lastInvHtml = null;
+                this.updateInventoryPanel();
+                return;
+            }
+            const releaseCancel = e.target.closest('[data-animal-release-cancel]');
+            if (releaseCancel) {
+                this._releasingAnimalId = null;
                 this._lastInvHtml = null;
                 this.updateInventoryPanel();
                 return;
@@ -2927,8 +2961,8 @@ export class UI {
                 const wecLabel = `${wec.amount} ${wec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${tip}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${w.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${w.name.replace(/'/g, "\\\\'")} for ${wecLabel}?')){window.game.enchantWeapon(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${w.name.replace(/'/g, "\\\\'")}?')){window.game.discardWeapon(${i})}">♻</button></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${w.name.replace(/'/g, "\\'")} for ${wecLabel}?')){window.game.enchantWeapon(${i});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${w.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(w, this.game)}')){window.game.discardWeapon(${i})}">♻</button></span></div>`;
             });
         }
         if (armors.length > 0) {
@@ -2940,8 +2974,8 @@ export class UI {
                 const aecLabel = `${aec.amount} ${aec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${tip}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${a.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${a.name.replace(/'/g, "\\\\'")} for ${aecLabel}?')){window.game.enchantArmor(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardArmor(${i})}">♻</button></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${a.name.replace(/'/g, "\\'")} for ${aecLabel}?')){window.game.enchantArmor(${i});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardArmor(${i})}">♻</button></span></div>`;
             });
         }
         if (helmets.length > 0) {
@@ -2953,8 +2987,8 @@ export class UI {
                 const hecLabel = `${hec.amount} ${hec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${tip}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${h.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${h.name.replace(/'/g, "\\\\'")} for ${hecLabel}?')){window.game.enchantHelmet(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\\\'")}?')){window.game.discardHelmet(${i})}">♻</button></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${h.name.replace(/'/g, "\\'")} for ${hecLabel}?')){window.game.enchantHelmet(${i});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(h, this.game)}')){window.game.discardHelmet(${i})}">♻</button></span></div>`;
             });
         }
         if (boots.length > 0) {
@@ -2966,8 +3000,8 @@ export class UI {
                 const becLabel = `${bec.amount} ${bec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${tip}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${b.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${b.name.replace(/'/g, "\\\\'")} for ${becLabel}?')){window.game.enchantBoots(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${b.name.replace(/'/g, "\\\\'")}?')){window.game.discardBoots(${i})}">♻</button></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${b.name.replace(/'/g, "\\'")} for ${becLabel}?')){window.game.enchantBoots(${i});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${b.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(b, this.game)}')){window.game.discardBoots(${i})}">♻</button></span></div>`;
             });
         }
         if (clothes.length > 0) {
@@ -2979,8 +3013,8 @@ export class UI {
                 const cecLabel = `${cec.amount} ${cec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${tip}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${c.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${c.name.replace(/'/g, "\\\\'")} for ${cecLabel}?')){window.game.enchantClothes(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${c.name.replace(/'/g, "\\\\'")}?')){window.game.discardClothes(${i})}">♻</button></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${c.name.replace(/'/g, "\\'")} for ${cecLabel}?')){window.game.enchantClothes(${i});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${c.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(c, this.game)}')){window.game.discardClothes(${i})}">♻</button></span></div>`;
             });
         }
         if (tools.length > 0) {
@@ -2992,15 +3026,15 @@ export class UI {
                 const tecLabel = `${tec.amount} ${tec.resource.replace(/_/g, ' ')}`;
                 html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(t)}" data-tip="${tip}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${t.name}</span>
                         <span class="inv-amount">${stats}</span>
-                        <button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${t.name.replace(/'/g, "\\\\'")} for ${tecLabel}?')){window.game.enchantTool(${i});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\\\'")}?')){window.game.discardTool(${i})}">♻</button></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${t.name.replace(/'/g, "\\'")} for ${tecLabel}?')){window.game.enchantTool(${i});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(t, this.game)}')){window.game.discardTool(${i})}">♻</button></span></div>`;
             });
         }
         if (trinkets.length > 0) {
             html += '<div class="info-row" style="color:#ccaa44;margin-top:8px;margin-bottom:4px;"><b>Trinkets:</b></div>';
             trinkets.forEach((a, i) => {
                 const tip = this._getTrinketTooltip(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'trinket')}${a.name}</span><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\\\'")}?')){window.game.discardTrinket(${i})}">♻</button></div>`;
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'trinket')}${a.name}</span><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardTrinket(${i})}">♻</button></div>`;
             });
         }
         if (!html) html = '<div class="info-row" style="color:#666;">No equipment in storage.</div>';
@@ -3074,7 +3108,9 @@ export class UI {
             const def = TAMED_ANIMALS[type] || {};
             const color = def.color || '#ccaa88';
             html += `<div style="margin-bottom:8px;">`;
-            html += `<div style="color:${color};font-weight:bold;border-bottom:1px solid #333;margin-bottom:4px;padding-bottom:2px;">${cap(type)}s (${animals.length})</div>`;
+            const irregularPlurals = { sheep: 'Sheep', goose: 'Geese' };
+            const typeLabel = irregularPlurals[type] || (cap(type) + 's');
+            html += `<div style="color:${color};font-weight:bold;border-bottom:1px solid #333;margin-bottom:4px;padding-bottom:2px;">${typeLabel} (${animals.length})</div>`;
 
             for (const a of animals) {
                 const displayName = a.name || cap(a.type);
@@ -3086,9 +3122,17 @@ export class UI {
                     html += `<input data-animal-rename-input="${a.id}" type="text" value="" placeholder="${displayName}" style="background:#222;color:#eee;border:1px solid #666;padding:1px 4px;font-size:0.9em;width:100px;" maxlength="24" autofocus>`;
                     html += `<button data-animal-rename-confirm="${a.id}" style="${btnStyle}">OK</button>`;
                     html += `<button data-animal-rename-cancel style="${btnStyle}">✕</button>`;
+                } else if (this._releasingAnimalId === a.id) {
+                    html += `<span style="color:#eee;font-weight:bold;">${displayName}</span>`;
+                    html += `<span style="color:#ff9944;font-size:0.85em;margin-left:4px;">Release into the wild?</span>`;
+                    html += `<span style="margin-left:auto;display:flex;gap:4px;">`;
+                    html += `<button data-animal-release-confirm="${a.id}" style="${btnStyle.replace('#333','#882200')}">Yes</button>`;
+                    html += `<button data-animal-release-cancel style="${btnStyle}">No</button>`;
+                    html += `</span>`;
                 } else {
                     html += `<span data-animal-goto="${a.id}" style="cursor:pointer;color:#eee;text-decoration:underline dotted;font-weight:bold;" title="Click to locate on map">${displayName}</span>`;
                     html += `<button data-animal-rename="${a.id}" style="${btnStyle}" title="Rename">Rename</button>`;
+                    html += `<button data-animal-release="${a.id}" style="margin-left:auto;${btnStyle}" title="Release this animal back into the wild">Release</button>`;
                 }
                 html += `</div>`;
 

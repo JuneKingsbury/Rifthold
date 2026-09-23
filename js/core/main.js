@@ -19,7 +19,7 @@ import { SocialSystem } from '../systems/social.js';
 import { UI } from '../ui/ui.js';
 import { Minimap } from '../ui/minimap.js';
 import { ResearchSystem, updateResearch } from '../systems/research.js';
-import { updateTamedAnimals, designateTame } from '../entities/taming.js';
+import { updateTamedAnimals, designateTame, releaseAnimal } from '../entities/taming.js';
 import { updateSummons } from '../entities/summons.js';
 import { completeTask } from '../entities/task-executor.js';
 import { CROPS, WINTER_FEAST_CONFIG } from './config.js';
@@ -2229,6 +2229,17 @@ class Game {
         animal.name = (typeof newName === 'string' ? newName.trim() : '') || null;
     }
 
+    releaseAnimalToWild(animalId) {
+        const animal = this.entities.find(e => e.id === animalId && e.tamed);
+        if (!animal) return;
+        for (const t of this.taskQueue.getAll()) {
+            if ((t.type === 'feed_animal' || t.type === 'relocate_animal') && t.targetAnimalId === animalId) {
+                this.taskQueue.remove(t.id);
+            }
+        }
+        releaseAnimal(animal, this);
+    }
+
     centerOnAnimal(animalId) {
         const animal = this.entities.find(e => e.id === animalId && e.tamed);
         if (!animal) return;
@@ -2912,6 +2923,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Populate start screen skin dropdown
     const startBgCanvas = document.getElementById('start-bg-canvas');
     let startBgData = null;
+    let startBgRevealed = false;
 
     // Dither state for start screen background
     let _startDitherMasks = null;
@@ -3085,6 +3097,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
+        }
+        if (!startBgRevealed) {
+            startBgRevealed = true;
+            startBgCanvas.style.opacity = '0.3';
         }
     }
 

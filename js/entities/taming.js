@@ -66,6 +66,32 @@ function _updateHunger(animal, game) {
     }
 }
 
+export function releaseAnimal(animal, game) {
+    const typeName = animal.type.charAt(0).toUpperCase() + animal.type.slice(1);
+    const label = animal.name || typeName;
+    game.notifications.push({ text: `${label} released into the wild`, tick: game.tick, type: 'info' });
+    game.eventLog.add(game, `${label} released by the colony`, 'info', { type: 'position', x: animal.x, y: animal.y });
+    if (animal.bondedColonistId) {
+        const bonded = game.colonists.find(c => c.id === animal.bondedColonistId);
+        if (bonded) {
+            const t = THOUGHTS.animal_escaped;
+            if (t) addThought(bonded, t.text, t.moodEffect, t.duration, game.tick);
+        }
+    }
+    animal.tamed = false;
+    animal.fleeing = true;
+    animal.penX = undefined;
+    animal.penY = undefined;
+    animal.bondedColonistId = null;
+    animal.isPet = false;
+    animal.bondLevel = 0;
+    animal._feedTaskQueued = false;
+    animal.hunger = 0;
+    animal.roles = [];
+    animal.roleState = {};
+    animal.effects = [];
+}
+
 function _escapeAnimal(animal, game) {
     const typeName = animal.type.charAt(0).toUpperCase() + animal.type.slice(1);
     game.notifications.push({ text: `${typeName} escaped! (starved)`, tick: game.tick, type: 'danger' });
