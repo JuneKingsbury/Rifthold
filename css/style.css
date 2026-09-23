@@ -607,6 +607,7 @@ img.pixel-art {
 .notif-danger { background: #442222; color: #ff6666; border: 1px solid #663333; }
 .notif-success { background: #224422; color: #66ff66; border: 1px solid #336633; }
 .notif-event { background: #333322; color: #ffcc44; border: 1px solid #665533; }
+.notif-story { background: #2a2210; color: #ffcc44; border: 1px solid #aa8822; font-style: italic; }
 
 /* Newly-arrived notifications slide in from the right and fade up. Applied only
    to freshly-added notifs (see updateNotifications) so the stack doesn't
@@ -1532,6 +1533,28 @@ img.pixel-art {
 .story-entry-new {
     border-left: 3px solid #ffcc44 !important;
     background: #2a2210 !important;
+}
+
+.story-new-badge {
+    display: inline-block;
+    background: #ffcc44;
+    color: #1a1200;
+    font-size: 0.7em;
+    font-weight: bold;
+    padding: 1px 5px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 4px;
+    letter-spacing: 0.05em;
+}
+
+@keyframes story-button-pulse {
+    0%, 100% { text-shadow: none; }
+    50%       { text-shadow: 0 0 8px #ffcc44, 0 0 16px #cc9900; }
+}
+.story-new-pulse {
+    color: #ffcc44;
+    animation: story-button-pulse 1.8s ease-in-out infinite;
 }
 
 .research-tabs {

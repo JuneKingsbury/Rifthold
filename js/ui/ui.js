@@ -760,6 +760,8 @@ export class UI {
             this._updateGatherPanel(input);
         } else {
             html += '<span class="mode-options">';
+            const storyPulse = this.game.story.hasUnviewed() ? ' story-new-pulse' : '';
+            html += `<span class="mode-opt${storyPulse}" data-mode-action="story">[J]Story${this.game.story.hasUnviewed() ? ' ✦' : ''}</span>`;
             html += `<span class="mode-opt" data-mode-action="build">[B]Build</span>`;
             html += `<span class="mode-opt" data-mode-action="zone">[F]Farm</span>`;
             html += `<span class="mode-opt" data-mode-action="gather">[G]Gather</span>`;
@@ -773,8 +775,6 @@ export class UI {
             const arcaneStyle = pendingAutoCount > 0 ? ' style="color:#44ff88"' : '';
             const arcaneBadge = pendingAutoCount > 0 ? ` <span style="background:#44ff88;color:#000;border-radius:8px;padding:0 4px;font-size:0.75em;">${pendingAutoCount}</span>` : '';
             html += `<span class="mode-opt" data-mode-action="arcane"${arcaneStyle}>[V]Rifts${arcaneBadge}</span>`;
-            const storyNew = this.game.story.hasUnviewed() ? ' style="color:#ffcc44"' : '';
-            html += `<span class="mode-opt" data-mode-action="story"${storyNew}>[J]Story${this.game.story.hasUnviewed() ? ' •' : ''}</span>`;
             html += '</span>';
         }
         if (input.mode !== 'build' && input.mode !== 'zone' && input.mode !== 'designate') this._hideBuildPanel();
@@ -3952,6 +3952,13 @@ export class UI {
             this._storyNewAtOpen = new Set(
                 [...this.game.story.unlocked.keys()].filter(k => !this.game.story.viewed.has(k))
             );
+            if (this._storyNewAtOpen.size > 0) {
+                const tabOrder = ['colony', 'research', 'races', 'realms', 'bestiary'];
+                const firstNewTab = tabOrder.find(t =>
+                    [...this._storyNewAtOpen].some(k => STORY_MILESTONES[k]?.tab === t)
+                );
+                if (firstNewTab) this._storyTab = firstNewTab;
+            }
             this.game.story.markAllViewed();
             this._lastStoryHtml = '';
             this.updateStoryPanel();
@@ -4156,9 +4163,11 @@ export class UI {
                         if (unlocked.has(key)) {
                             const info = unlocked.get(key);
                             const dateStr = info ? `Year ${info.year}, ${info.season.charAt(0).toUpperCase() + info.season.slice(1)}` : '';
-                            html += `<div class="story-entry unlocked">`;
+                            const isNew = newAtOpen.has(key);
+                            html += `<div class="story-entry unlocked${isNew ? ' story-entry-new' : ''}">`;
                             if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
-                            html += `<div class="story-entry-title">${milestone.title}</div>`;
+                            const realmNewBadge = isNew ? `<span class="story-new-badge">NEW</span> ` : '';
+                            html += `<div class="story-entry-title">${realmNewBadge}${milestone.title}</div>`;
                             html += `<div class="story-entry-text">${milestone.text}</div>`;
                             html += `</div>`;
                         } else {
@@ -4189,7 +4198,8 @@ export class UI {
                 const isNew = newAtOpen.has(key);
                 html += `<div class="story-entry unlocked${isNew ? ' story-entry-new' : ''}">`;
                 if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
-                html += `<div class="story-entry-title">${milestone.title}</div>`;
+                const newBadge = isNew ? `<span class="story-new-badge">NEW</span> ` : '';
+                html += `<div class="story-entry-title">${newBadge}${milestone.title}</div>`;
                 html += `<div class="story-entry-text">${milestone.text}</div>`;
                 html += `</div>`;
             }
@@ -4206,6 +4216,10 @@ export class UI {
         if (html !== this._lastStoryHtml) {
             this._lastStoryHtml = html;
             this.elements.storyPanel.innerHTML = html;
+            if (this._storyNewAtOpen?.size > 0) {
+                const firstNew = this.elements.storyPanel.querySelector('.story-entry-new');
+                firstNew?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         }
     }
 }

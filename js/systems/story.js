@@ -15,7 +15,7 @@ export class StorySystem {
                 year: game.weather.year,
                 season: game.weather.season,
             });
-            game.notifications.push({ text: 'New story entry unlocked!', tick: game.tick, type: 'event' });
+            game.notifications.push({ text: `Story: "${milestone.title}"`, tick: game.tick, type: 'story' });
             game.eventLog.add(game, `Story unlocked: ${milestone.title}`, 'event', null);
             unlockedAny = true;
         }
