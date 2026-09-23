@@ -2173,7 +2173,7 @@ function updateMoving(colonist, game) {
         const task = game.taskQueue.getById(colonist.currentTaskId);
         if (task) {
             const newPath = findPathAdjacent(game.map, colonist.x, colonist.y, task.x, task.y, game._occupiedTiles);
-            if (newPath && newPath.length > 0) {
+            if (newPath !== null) {
                 colonist.path = newPath;
             } else {
                 game.taskQueue.release(colonist.currentTaskId);

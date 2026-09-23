@@ -964,7 +964,6 @@ export class ExplorationSystem {
                 // Colonist died or was removed during gathering. Clear the pending flag
                 // so they aren't permanently locked out of future tasks.
                 if (c) { delete c.expeditionPending; delete c._expeditionMove; }
-                allArrived = false;
                 continue;
             }
             if (c.onExpedition) continue;
@@ -1176,7 +1175,7 @@ export class ExplorationSystem {
             }
 
             const lootEntry = this._rollLoot(dim, diffSettings);
-            encounters.push({ type: 'loot', ...lootEntry });
+            if (lootEntry) encounters.push({ type: 'loot', ...lootEntry });
         }
 
         for (let i = encounters.length - 1; i > 0; i--) {
@@ -1303,17 +1302,19 @@ export class ExplorationSystem {
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm) * (exp.potionLootBoosts?.lootMult || 1);
             const discPool = (dimEvents && dimEvents.discoveries) || EXPLORATION_EVENTS.discoveries;
             const msg = pickRandom(discPool).replace('{name}', member.name);
-            if (lootEntry.item) {
-                if (!exp.loot._items) exp.loot._items = [];
-                exp.loot._items.push(lootEntry.item);
-                const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
-                this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
-            } else {
-                const boostedAmount = Math.floor(lootEntry.amount * lootMult);
-                exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + boostedAmount;
-                this._addLog(exp, game, `${msg} (+${boostedAmount} ${lootEntry.resource.replace(/_/g, ' ')})`, 'loot');
+            if (lootEntry) {
+                if (lootEntry.item) {
+                    if (!exp.loot._items) exp.loot._items = [];
+                    exp.loot._items.push(lootEntry.item);
+                    const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
+                    this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
+                } else {
+                    const boostedAmount = Math.floor(lootEntry.amount * lootMult);
+                    exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + boostedAmount;
+                    this._addLog(exp, game, `${msg} (+${boostedAmount} ${lootEntry.resource.replace(/_/g, ' ')})`, 'loot');
+                }
+                window.soundManager?.playExpSFX('loot_drop');
             }
-            window.soundManager?.playExpSFX('loot_drop');
         } else {
             const currentEnc = exp.encounters[exp.currentEncounter];
             const crossAmbient = currentEnc?._crossRealmAmbient;
@@ -2359,21 +2360,22 @@ export class ExplorationSystem {
 
             const dsCombat = exp.diffSettings || EXPEDITION_DIFFICULTY[1];
             const lootEntry = this._rollLoot(dim, dsCombat);
-            if (lootEntry.item) {
-                if (!exp.loot._items) exp.loot._items = [];
-                exp.loot._items.push(lootEntry.item);
-                const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
-                this._addLog(exp, game, `Victory! Found ${itemName}!`, 'success');
-                window.soundManager?.playExpSFX('loot_drop');
-            } else {
-                let resMult = 1.0;
-                for (const event of this.activeRealmEvents) {
-                    if (!event.realms?.includes(exp.realm)) continue;
-                    if (event.effects?.resourceMult?.[lootEntry.resource]) resMult *= event.effects.resourceMult[lootEntry.resource];
+            if (lootEntry) {
+                if (lootEntry.item) {
+                    if (!exp.loot._items) exp.loot._items = [];
+                    exp.loot._items.push(lootEntry.item);
+                    const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
+                    this._addLog(exp, game, `Victory! Found ${itemName}!`, 'success');
+                } else {
+                    let resMult = 1.0;
+                    for (const event of this.activeRealmEvents) {
+                        if (!event.realms?.includes(exp.realm)) continue;
+                        if (event.effects?.resourceMult?.[lootEntry.resource]) resMult *= event.effects.resourceMult[lootEntry.resource];
+                    }
+                    const amount = Math.floor(lootEntry.amount * lootMult * eliteLootMult * lootAmountMutMult * resMult) + lootBonusFlat;
+                    exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
+                    this._addLog(exp, game, `Victory! Looted ${amount} ${lootEntry.resource.replace(/_/g, ' ')}.`, 'success');
                 }
-                const amount = Math.floor(lootEntry.amount * lootMult * eliteLootMult * lootAmountMutMult * resMult) + lootBonusFlat;
-                exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                this._addLog(exp, game, `Victory! Looted ${amount} ${lootEntry.resource.replace(/_/g, ' ')}.`, 'success');
                 window.soundManager?.playExpSFX('loot_drop');
             }
         } else {
@@ -3256,16 +3258,18 @@ export class ExplorationSystem {
             const dim = REALMS[exp.realm];
             const lootEntry = this._rollLoot(dim, exp.diffSettings);
             const mult = effects.grantLoot.mult || 1.0;
-            if (lootEntry.item) {
-                if (!exp.loot._items) exp.loot._items = [];
-                exp.loot._items.push(lootEntry.item);
-                this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
-            } else {
-                const amount = Math.floor(lootEntry.amount * mult);
-                exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+            if (lootEntry) {
+                if (lootEntry.item) {
+                    if (!exp.loot._items) exp.loot._items = [];
+                    exp.loot._items.push(lootEntry.item);
+                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
+                } else {
+                    const amount = Math.floor(lootEntry.amount * mult);
+                    exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
+                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+                }
+                window.soundManager?.playExpSFX('loot_drop');
             }
-            window.soundManager?.playExpSFX('loot_drop');
         }
         if (effects.spawnCombat && exp.partySnapshot.some(p => p.hp > 0)) {
             const dim = REALMS[exp.realm];
@@ -3353,16 +3357,18 @@ export class ExplorationSystem {
         if (reward.type === 'bonus_loot') {
             const dim = REALMS[exp.realm];
             const lootEntry = this._rollLoot(dim, exp.diffSettings);
-            if (lootEntry.item) {
-                if (!exp.loot._items) exp.loot._items = [];
-                exp.loot._items.push(lootEntry.item);
-                this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
-            } else {
-                const amount = Math.floor(lootEntry.amount * (reward.mult || 1.0));
-                exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+            if (lootEntry) {
+                if (lootEntry.item) {
+                    if (!exp.loot._items) exp.loot._items = [];
+                    exp.loot._items.push(lootEntry.item);
+                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
+                } else {
+                    const amount = Math.floor(lootEntry.amount * (reward.mult || 1.0));
+                    exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
+                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+                }
+                window.soundManager?.playExpSFX('loot_drop');
             }
-            window.soundManager?.playExpSFX('loot_drop');
         }
     }
 

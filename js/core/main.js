@@ -374,7 +374,7 @@ class Game {
 
         if (this.settings.fpsCap === 30) {
             const elapsed = timestamp - (this._lastRenderTime || 0);
-            if (elapsed < 33) { requestAnimationFrame(this.gameLoop); return; }
+            if (elapsed < 33) { this._rafId = requestAnimationFrame(this.gameLoop); return; }
             this._lastRenderTime = timestamp;
         }
 

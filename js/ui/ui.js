@@ -989,7 +989,7 @@ export class UI {
             const magicEntry = Object.entries(MAGIC_SKILLS).find(([, def]) => def.name === name);
             if (magicEntry) {
                 const [k, def] = magicEntry;
-                tip.dataset.tip = magicXpTip(def, colonist.magicSkills[k], colonist._magicXpAccumulator?.[k] || 0);
+                tip.dataset.tip = magicXpTip(def, colonist.magicSkills[k], colonist.magicXpAccumulator?.[k] || 0);
             }
         }
     }
@@ -1314,7 +1314,7 @@ export class UI {
             html += `<div class="info-row">Magic: ${Object.entries(MAGIC_SKILLS).filter(([k]) => colonist.magicSkills[k] > 0).map(([k, def]) => {
                 const level = colonist.magicSkills[k];
                 const isAttuned = attunedSchools.includes(k);
-                const tip = magicXpTip(def, level, colonist._magicXpAccumulator?.[k] || 0) + (isAttuned ? ' — attuned' : '');
+                const tip = magicXpTip(def, level, colonist.magicXpAccumulator?.[k] || 0) + (isAttuned ? ' — attuned' : '');
                 const style = isAttuned ? `color:${def.color};font-weight:bold` : 'color:#bb88ff';
                 return `<span class="skill-tip" data-tip="${tip}" style="${style}">${isAttuned ? '★' : ''}${def.name}:${level}</span>`;
             }).join(' ')}</div>`;

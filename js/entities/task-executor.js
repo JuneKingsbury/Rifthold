@@ -141,20 +141,20 @@ function advanceTomeStudy(colonist, game, rate) {
     const progressAmount = rate !== undefined ? rate : MAGIC_STUDY_CONFIG.studyTicksPerProgress;
     colonist.tomeProgress[tomeKey] += progressAmount;
 
-    if (!colonist._magicXpAccumulator) colonist._magicXpAccumulator = {};
-    if (!colonist._magicXpAccumulator[school]) colonist._magicXpAccumulator[school] = 0;
+    if (!colonist.magicXpAccumulator) colonist.magicXpAccumulator = {};
+    if (!colonist.magicXpAccumulator[school]) colonist.magicXpAccumulator[school] = 0;
     let studyXpGain = MAGIC_STUDY_CONFIG.xpPerStudyTick;
     if (colonist.traits.includes('scholar')) studyXpGain *= TRAITS.scholar.magicXpMult;
     if (colonist.traits.includes('prodigy')) studyXpGain *= TRAITS.prodigy.magicXpMult;
     if (colonist.traits.includes('magically_inept')) studyXpGain *= TRAITS.magically_inept.magicXpMult;
     studyXpGain *= getRaceModifier(colonist, 'magicXpMult', 1);
-    colonist._magicXpAccumulator[school] += studyXpGain;
+    colonist.magicXpAccumulator[school] += studyXpGain;
     if (game.tick % 10 === 0) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.xpGainChar, color: COMBAT_VISUALS.xpGainColor, ttl: COMBAT_VISUALS.xpGainTtl });
     }
     let magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
-    while (colonist._magicXpAccumulator[school] >= magicXpNeeded && colonist.magicSkills[school] < 10) {
-        colonist._magicXpAccumulator[school] -= magicXpNeeded;
+    while (colonist.magicXpAccumulator[school] >= magicXpNeeded && colonist.magicSkills[school] < 10) {
+        colonist.magicXpAccumulator[school] -= magicXpNeeded;
         colonist.magicSkills[school] = Math.min(10, colonist.magicSkills[school] + 1);
         magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
         recalcMaxMana(colonist);
