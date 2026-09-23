@@ -99,9 +99,10 @@ export class InputHandler {
         const rect = this.pre.getBoundingClientRect();
         const px = e.clientX - rect.left;
         const py = e.clientY - rect.top;
-        const sx = Math.max(0, Math.floor(px / this.charWidth));
-        const sy = Math.max(0, Math.floor(py / this.charHeight));
-        return this.game.camera.screenToWorld(sx, sy);
+        return {
+            x: Math.max(0, Math.floor(this.game.camera.x + px / this.charWidth)),
+            y: Math.max(0, Math.floor(this.game.camera.y + py / this.charHeight)),
+        };
     }
 
     getSelectionRect() {
@@ -186,10 +187,10 @@ export class InputHandler {
     // Rebinding maps keys onto these action names. The handlers never change.
     buildActions() {
         return {
-            panUp: () => this.game.camera.pan(0, -3),
-            panDown: () => this.game.camera.pan(0, 3),
-            panLeft: () => this.game.camera.pan(-3, 0),
-            panRight: () => this.game.camera.pan(3, 0),
+            panUp: () => this.game.camera.panTarget(0, -3),
+            panDown: () => this.game.camera.panTarget(0, 3),
+            panLeft: () => this.game.camera.panTarget(-3, 0),
+            panRight: () => this.game.camera.panTarget(3, 0),
 
             toggleBuild: () => this.setMode(this.mode === 'build' ? 'normal' : 'build'),
             toggleZone: () => this.setMode(this.mode === 'zone' ? 'normal' : 'zone'),
@@ -577,13 +578,8 @@ export class InputHandler {
         if (this._middleDrag) {
             const dx = e.clientX - this._middleLast.x;
             const dy = e.clientY - this._middleLast.y;
-            const tilesX = Math.round(dx / this.charWidth);
-            const tilesY = Math.round(dy / this.charHeight);
-            if (tilesX !== 0 || tilesY !== 0) {
-                this.game.camera.pan(-tilesX, -tilesY);
-                this._middleLast.x += tilesX * this.charWidth;
-                this._middleLast.y += tilesY * this.charHeight;
-            }
+            this.game.camera.pan(-dx / this.charWidth, -dy / this.charHeight);
+            this._middleLast = { x: e.clientX, y: e.clientY };
             return;
         }
 
@@ -646,9 +642,10 @@ export class InputHandler {
         const rect = this.pre.getBoundingClientRect();
         const px = touch.clientX - rect.left;
         const py = touch.clientY - rect.top;
-        const sx = Math.max(0, Math.floor(px / this.charWidth));
-        const sy = Math.max(0, Math.floor(py / this.charHeight));
-        return this.game.camera.screenToWorld(sx, sy);
+        return {
+            x: Math.max(0, Math.floor(this.game.camera.x + px / this.charWidth)),
+            y: Math.max(0, Math.floor(this.game.camera.y + py / this.charHeight)),
+        };
     }
 
     onTouchStart(e) {
@@ -721,13 +718,8 @@ export class InputHandler {
         if (this._touchPanning) {
             const dx = e.touches[0].clientX - this._touchPanLast.x;
             const dy = e.touches[0].clientY - this._touchPanLast.y;
-            const tilesX = Math.round(dx / this.charWidth);
-            const tilesY = Math.round(dy / this.charHeight);
-            if (tilesX !== 0 || tilesY !== 0) {
-                this.game.camera.pan(-tilesX, -tilesY);
-                this._touchPanLast.x += tilesX * this.charWidth;
-                this._touchPanLast.y += tilesY * this.charHeight;
-            }
+            this.game.camera.pan(-dx / this.charWidth, -dy / this.charHeight);
+            this._touchPanLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             return;
         }
 
@@ -744,13 +736,8 @@ export class InputHandler {
             if (this._gesturePanning) {
                 const dx = e.touches[0].clientX - this._gesturePanLast.x;
                 const dy = e.touches[0].clientY - this._gesturePanLast.y;
-                const tilesX = Math.round(dx / this.charWidth);
-                const tilesY = Math.round(dy / this.charHeight);
-                if (tilesX !== 0 || tilesY !== 0) {
-                    this.game.camera.pan(-tilesX, -tilesY);
-                    this._gesturePanLast.x += tilesX * this.charWidth;
-                    this._gesturePanLast.y += tilesY * this.charHeight;
-                }
+                this.game.camera.pan(-dx / this.charWidth, -dy / this.charHeight);
+                this._gesturePanLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             }
             return;
         }

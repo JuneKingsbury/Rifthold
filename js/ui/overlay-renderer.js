@@ -183,7 +183,7 @@ export class OverlayRenderer {
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (game.input && (game.input.mode === 'build' || game.input.mode === 'zone')) {
-            this._renderBuildGrid(ctx, cw, ch, this.canvas.width, this.canvas.height);
+            this._renderBuildGrid(ctx, cw, ch, this.canvas.width, this.canvas.height, camera);
         }
 
         if (game.weather) {
@@ -286,22 +286,30 @@ export class OverlayRenderer {
         }
     }
 
-    _renderBuildGrid(ctx, cw, ch, canvasWidth, canvasHeight) {
+    _renderBuildGrid(ctx, cw, ch, canvasWidth, canvasHeight, camera) {
+        // Mirror the tile loop's pixel math: px = Math.round(wx * cw - camOriginX).
+        // The first visible world tile column is Math.floor(camera.x), so the first
+        // grid line falls at Math.round(Math.floor(camera.x) * cw - camOriginX).
+        // Expressed as an offset from pixel 0: startX = -(camOriginX % cw) mod cw.
+        const camOriginX = camera ? camera.x * cw : 0;
+        const camOriginY = camera ? camera.y * ch : 0;
+        // How many pixels into a tile cell the camera is sitting (0..cw, 0..ch).
+        const startX = ((camOriginX % cw) + cw) % cw;
+        const startY = ((camOriginY % ch) + ch) % ch;
         ctx.save();
-        ctx.translate(1, 1);
         ctx.strokeStyle = RENDER_CONFIG.buildGridColor;
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
-        for (let i = 0; i <= Math.ceil(canvasWidth / cw); i++) {
-            const x = Math.round(i * cw);
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvasHeight);
+        for (let x = -startX; x <= canvasWidth; x += cw) {
+            const rx = Math.round(x) + 1;
+            ctx.moveTo(rx, 0);
+            ctx.lineTo(rx, canvasHeight);
         }
-        for (let i = 0; i <= Math.ceil(canvasHeight / ch); i++) {
-            const y = Math.round(i * ch);
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvasWidth, y);
+        for (let y = -startY; y <= canvasHeight; y += ch) {
+            const ry = Math.round(y) + 1;
+            ctx.moveTo(0, ry);
+            ctx.lineTo(canvasWidth, ry);
         }
         ctx.stroke();
         ctx.restore();

@@ -388,6 +388,8 @@ class Game {
             }
         }
 
+        this.camera.lerpToward(dt / 1000);
+
         const prof = this._profiler;
         if (prof) { prof.countFrame(); prof.begin(); }
 

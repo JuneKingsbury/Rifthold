@@ -1036,8 +1036,8 @@ export class Renderer {
                 const dstY = camera.y < 0 ? Math.round(-camera.y * ch) : 0;
                 const availW = this._terrainCanvas.width - srcX;
                 const availH = this._terrainCanvas.height - srcY;
-                const wantW = (vw + 1) * cw - dstX;
-                const wantH = (vh + 1) * ch - dstY;
+                const wantW = (vw + 2) * cw - dstX;
+                const wantH = (vh + 2) * ch - dstY;
                 const w = Math.min(availW, wantW);
                 const h = Math.min(availH, wantH);
                 if (w > 0 && h > 0) {
@@ -1052,14 +1052,25 @@ export class Renderer {
         // (skin active) or an ASCII character. Layering order for sprites:
         //   ground → structure/entity → dither → pedestal item overlay → designation tint
         // Effects (combat hits, shots, portals) draw as overlays on top of the base.
+        // Pixel origin of the camera: the exact canvas pixel where world tile (0,0)
+        // would sit. Subtracting camera.x*cw from a world tile's canvas pixel gives a
+        // sub-pixel-accurate screen position. All tile positions are then derived as
+        // Math.round(wx*cw - camOriginX) so adjacent tiles always share exact integer
+        // pixel boundaries, eliminating anti-aliased seams at fractional positions.
+        const camOriginX = camera.x * cw;
+        const camOriginY = camera.y * ch;
         let lastColor = '';
-        for (let sy = 0; sy <= vh; sy++) {
-            for (let sx = 0; sx <= vw; sx++) {
+        for (let sy = 0; sy <= vh + 1; sy++) {
+            for (let sx = 0; sx <= vw + 1; sx++) {
                 // Keep track of the x,y coordinate for the tile we are currently drawing on and its relation to the player camera.
-                const wx = camera.x + sx;
-                const wy = camera.y + sy;
-                const px = sx * cw;
-                const py = sy * ch;
+                const wx = Math.floor(camera.x) + sx;
+                const wy = Math.floor(camera.y) + sy;
+                const px = Math.round(wx * cw - camOriginX);
+                const py = Math.round(wy * ch - camOriginY);
+                // Per-tile pixel dimensions derived from adjacent tile boundaries so
+                // adjacent tiles always abut exactly (no sub-pixel gap or overlap).
+                const cw1 = Math.round((wx + 1) * cw - camOriginX) - px;
+                const ch1 = Math.round((wy + 1) * ch - camOriginY) - py;
 
                 if (wx < 0 || wx >= mapW || wy < 0 || wy >= CONFIG.MAP_HEIGHT) {
                     continue;
@@ -1203,7 +1214,7 @@ export class Renderer {
                 // false whenever any dynamic bg override applies, so nothing is lost.
                 if (bg && !bakedGround) {
                     ctx.fillStyle = bg;
-                    ctx.fillRect(px, py, cw, ch);
+                    ctx.fillRect(px, py, cw1, ch1);
                     lastColor = '';
                 }
 
@@ -1217,14 +1228,14 @@ export class Renderer {
                          BUILDINGS[tile.structure].showGround === true);
                     if (needsGround || entity) {
                         const ground = this._resolveGroundSprite(tile, season);
-                        if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                        if (ground) ctx.drawImage(ground, px, py, cw1, ch1);
                         const material = this._resolveMaterialSprite(tile, season);
                         if (material) {
                             // A tree on a tile that also holds an entity sways behind the
                             // entity, just as a bare tree tile sways (drawn later below).
                             const matRot = (showTreeSway && tile.resource && tile.resource.type === 'tree')
                                 ? getTreeSway(now, tileKey, treeWind) : 0;
-                            this._drawSwayed(ctx, material, matRot, px, py, cw, ch, px + cw / 2, py + ch);
+                            this._drawSwayed(ctx, material, matRot, px, py, cw1, ch1, px + cw / 2, py + ch);
                         }
                     } else if (tile.resource) {
                         // Resources (trees, stone, ore) are not full-tile sprites, so
@@ -1232,22 +1243,22 @@ export class Renderer {
                         // the terrain beneath. The resource sprite itself is drawn by the
                         // main sprite path below (so it can carry the tree-sway transform).
                         const ground = this._resolveGroundSprite(tile, season);
-                        if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                        if (ground) ctx.drawImage(ground, px, py, cw1, ch1);
                         // Grass tufts also sprout under trees on grass terrain: draw the
                         // swaying tuft here so the tree sprite (drawn below) covers it.
                         if (showTerrainDetail && tile.resource.type === 'tree'
                             && tile.terrain === 'grass' && !tile.snowCovered && !tile.onFire) {
-                            this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch, season);
+                            this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season);
                         }
                     } else if (tile.zone) {
                         // Farm plots sit on terrain: draw the seasonal ground first so the
                         // soil sprite composites over green/autumn/snowy grass correctly.
                         const ground = this._resolveGroundSprite(tile, season);
-                        if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                        if (ground) ctx.drawImage(ground, px, py, cw1, ch1);
                     }
                     const canDither = !tile.structure && !tile.resource && !tile.zone && !tile.floor;
                     if (entity) {
-                        if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+                        if (canDither) this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw1, ch1, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         // Terrain detail behind an entity so it stands on the same
                         // animated ground as a bare tile: grass tufts on grass, water
                         // waves on water. Water also keeps its `in_water` overlay on top
@@ -1255,9 +1266,9 @@ export class Renderer {
                         if (showTerrainDetail && !tile.structure && !tile.resource
                             && !tile.zone && !tile.floor && !tile.onFire) {
                             if (tile.terrain === 'grass' && !tile.snowCovered) {
-                                this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch, season);
+                                this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season);
                             } else if (tile.terrain === 'water') {
-                                this._drawWaterWaves(ctx, now, tileKey, px, py, cw, ch);
+                                this._drawWaterWaves(ctx, now, tileKey, px, py, cw1, ch1);
                             }
                         }
                         // Farm tiles are drawn behind the entity here so colonists
@@ -1268,22 +1279,22 @@ export class Renderer {
                             const baseSprite = isPlanted
                                 ? (sm.getSprite('farms', 'farm_planted') || sm.getSprite('farms', 'farm_empty'))
                                 : sm.getSprite('farms', 'farm_' + cropState);
-                            if (baseSprite) ctx.drawImage(baseSprite, px, py, cw + 1, ch + 1);
+                            if (baseSprite) ctx.drawImage(baseSprite, px, py, cw1, ch1);
                             if (isPlanted) {
                                 const cropSprite = sm.getSprite('farms', tile.zone.crop + '_' + cropState)
                                     || sm.getSprite('farms', 'farm_' + cropState);
                                 if (cropSprite) {
                                     if (showTerrainDetail) {
-                                        this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw, ch, cropSprite);
+                                        this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw1, ch1, cropSprite);
                                     } else {
-                                        ctx.drawImage(cropSprite, px, py, cw, ch);
+                                        ctx.drawImage(cropSprite, px, py, cw1, ch1);
                                     }
                                 }
                             }
                         }
                         if (tile.structure) {
                             const structSprite = sm.getSprite('buildings', tile.structure);
-                            if (structSprite) ctx.drawImage(structSprite, px, py, cw, ch);
+                            if (structSprite) ctx.drawImage(structSprite, px, py, cw1, ch1);
                         }
                     }
 
@@ -1310,14 +1321,13 @@ export class Renderer {
                         const submerge = !!(entity && tile.terrain === 'water' && showTerrainDetail
                             && detailCfg && detailCfg.enabled && detailCfg.submergeFrac > 0);
                         const shadowLift = submerge ? ch * detailCfg.submergeFrac : 0;
-                        if (shadowSprite) ctx.drawImage(shadowSprite, px, py - shadowLift, cw, ch);
+                        if (shadowSprite) ctx.drawImage(shadowSprite, px, py - shadowLift, cw1, ch1);
                         // Determine any shake effects that need to be applied to the entity sprite before we draw it.
                         const shakeActive = showOverlays && enableScreenShake && entity && entity._atkShakeUntil > game.tick;
                         const shakePx = atkShakePx;
                         const shakeX = shakeActive ? ((game.tick * 7) % (shakePx * 2 + 1)) - shakePx : 0;
                         const shakeY = shakeActive ? ((game.tick * 13) % (shakePx + 1)) - Math.floor(shakePx / 2) : 0;
                         const hlOff = hl ? 1 : 0;
-                        const bleed = (!entity && !tile.structure) ? 1 : 0;
                         // Composed action-animation transform (breathe grow + one-shot
                         // lunge/recoil/cast/hit + work bob). Scratch/stamps live on the
                         // persistent sim entity (`_sim`). The per-tile map object is
@@ -1339,8 +1349,8 @@ export class Renderer {
                         const grow = xf ? xf.growPx : 0;
                         const dx = px + shakeX - hlOff;
                         const dy = py + shakeY - hlOff - grow;
-                        const dw = cw + hlOff * 2 + bleed;
-                        const dh = ch + hlOff * 2 + bleed + grow;
+                        const dw = cw1 + hlOff * 2;
+                        const dh = ch1 + hlOff * 2 + grow;
                         // Submerged entities: clip the lower part of the sprite at a
                         // gently bobbing waterline so it reads as partially under water
                         // (the animated waves drawn behind show through the gap). This
@@ -1381,19 +1391,19 @@ export class Renderer {
                             // Fallback for when terrain detail is off: the legacy "in
                             // water" overlay drawn on top of the entity.
                             const waterSprite = sm.getSprite('effects', 'in_water');
-                            if (waterSprite) ctx.drawImage(waterSprite, px, py, cw, ch);
+                            if (waterSprite) ctx.drawImage(waterSprite, px, py, cw1, ch1);
                         }
                         if (!entity && canDither) {
-                            this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+                            this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw1, ch1, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
                         }
                         if (showOverlays && showDamageFlash && entity && entity._dmgFlashUntil > game.tick) {
                             const flashSprite = sm.getSprite('effects', 'damage_flash');
                             if (flashSprite) {
-                                ctx.drawImage(flashSprite, px + shakeX, py + shakeY, cw, ch);
+                                ctx.drawImage(flashSprite, px + shakeX, py + shakeY, cw1, ch1);
                             } else {
                                 ctx.globalAlpha = COMBAT_VISUALS.dmgFlashAlpha;
                                 ctx.fillStyle = COMBAT_VISUALS.dmgFlashColor;
-                                ctx.fillRect(px, py, cw, ch);
+                                ctx.fillRect(px, py, cw1, ch1);
                                 ctx.globalAlpha = 1.0;
                                 lastColor = '';
                             }
@@ -1402,14 +1412,14 @@ export class Renderer {
                         if (showOverlays && entity && entity.freezing) {
                             ctx.globalAlpha = 0.35;
                             ctx.fillStyle = '#88ddff';
-                            ctx.fillRect(px, py, cw, ch);
+                            ctx.fillRect(px, py, cw1, ch1);
                             ctx.globalAlpha = 1.0;
                             lastColor = '';
                         }
                         // If we are actively shaking after an attack begins, draw the
                         // per-weapon attack effect (aimed at the target, DrawAndShoot none).
                         if (entity && shakeActive) {
-                            this._queueAttackEffect(entity._sim || entity, now, px, py, cw, ch);
+                            this._queueAttackEffect(entity._sim || entity, now, px, py, cw1, ch1);
                         }
 
                         // Mining/chopping debris particles
@@ -1503,7 +1513,7 @@ export class Renderer {
                             const overlaySprite = sm.getSprite('effects', xf.overlayKey);
                             if (overlaySprite) {
                                 ctx.globalAlpha = xf.overlayAlpha;
-                                ctx.drawImage(overlaySprite, px, py, cw, ch);
+                                ctx.drawImage(overlaySprite, px, py, cw1, ch1);
                                 ctx.globalAlpha = 1.0;
                             }
                         }
@@ -1511,11 +1521,11 @@ export class Renderer {
                         if (showOverlays && showDamageFlash && !entity && tile.structure && tile._dmgFlashUntil > game.tick) {
                             const flashSprite = sm.getSprite('effects', 'damage_flash');
                             if (flashSprite) {
-                                ctx.drawImage(flashSprite, px, py, cw, ch);
+                                ctx.drawImage(flashSprite, px, py, cw1, ch1);
                             } else {
                                 ctx.globalAlpha = COMBAT_VISUALS.dmgFlashAlpha;
                                 ctx.fillStyle = COMBAT_VISUALS.dmgFlashColor;
-                                ctx.fillRect(px, py, cw, ch);
+                                ctx.fillRect(px, py, cw1, ch1);
                                 ctx.globalAlpha = 1.0;
                                 lastColor = '';
                             }
@@ -1530,11 +1540,11 @@ export class Renderer {
                     if (showTerrainDetail && !entity && !tile.structure && !tile.resource
                         && !tile.zone && !tile.floor && !tile.onFire) {
                         if (tile.terrain === 'grass' && !tile.snowCovered) {
-                            if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw, ch, season)) {
+                            if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season)) {
                                 spriteDrawn = true;
                             }
                         } else if (tile.terrain === 'water') {
-                            if (this._drawWaterWaves(ctx, now, tileKey, px, py, cw, ch)) {
+                            if (this._drawWaterWaves(ctx, now, tileKey, px, py, cw1, ch1)) {
                                 spriteDrawn = true;
                                 // Spawn rain ripples on water tiles during rain/thunderstorm
                                 const rainChance = weather.currentWeather === 'thunderstorm' ? 0.04 : weather.currentWeather === 'rain' ? 0.02 : 0;
@@ -1565,9 +1575,9 @@ export class Renderer {
                             || this.skinManager.getSprite('farms', 'farm_' + cropState);
                         if (cropSprite) {
                             if (showTerrainDetail) {
-                                this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw, ch, cropSprite);
+                                this._drawCropSway(ctx, now, tileKey, detailWind, px, py, cw1, ch1, cropSprite);
                             } else {
-                                ctx.drawImage(cropSprite, px, py, cw, ch);
+                                ctx.drawImage(cropSprite, px, py, cw1, ch1);
                             }
                         }
                     }
@@ -1669,7 +1679,7 @@ export class Renderer {
                         if (flashFrames > 0) {
                             ctx.globalAlpha = Math.min(0.4, flashFrames / 8 * 0.4);
                             ctx.fillStyle = '#ffffff';
-                            ctx.fillRect(px, py, cw, ch);
+                            ctx.fillRect(px, py, cw1, ch1);
                             ctx.globalAlpha = 1;
                         }
 
@@ -1703,7 +1713,7 @@ export class Renderer {
                                 const shakeX = Math.sin(now * 0.05) * shakeAmt;
                                 const shakeY = reduceMotion ? 0 : Math.abs(Math.sin(now * 0.05)) * 0.3;
                                 ctx.globalAlpha = 0.4;
-                                ctx.drawImage(structSprite, px + shakeX, py + shakeY, cw, ch);
+                                ctx.drawImage(structSprite, px + shakeX, py + shakeY, cw1, ch1);
                                 ctx.globalAlpha = 1;
                             }
                         }
@@ -1739,7 +1749,7 @@ export class Renderer {
                             ctx.drawImage(effectSprite, px + (cw - dw) / 2, py + deathFloatY + (ch - dh) / 2, dw, dh);
                             ctx.globalAlpha = prevA;
                         } else {
-                            ctx.drawImage(effectSprite, px, py, cw, ch);
+                            ctx.drawImage(effectSprite, px, py, cw1, ch1);
                         }
                         spriteDrawn = true;
                     }
@@ -1754,12 +1764,12 @@ export class Renderer {
                                 if (!spriteDrawn) {
                                     const ground = this._resolveGroundSprite(tile, season);
                                     if (ground) {
-                                        ctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                                        ctx.drawImage(ground, px, py, cw1, ch1);
                                         spriteDrawn = true;
                                     }
                                 }
                                 ctx.globalAlpha = 0.4;
-                                ctx.drawImage(ghostSprite, px, py, cw, ch);
+                                ctx.drawImage(ghostSprite, px, py, cw1, ch1);
                                 ctx.globalAlpha = 1.0;
                                 spriteDrawn = true;
                             }
@@ -1767,7 +1777,7 @@ export class Renderer {
                             const tintColor = TILE_COLORS[`designation_${tile.designation.type}`] || '#ffff00';
                             ctx.fillStyle = tintColor;
                             ctx.globalAlpha = 0.35;
-                            ctx.fillRect(px, py, cw, ch);
+                            ctx.fillRect(px, py, cw1, ch1);
                             ctx.globalAlpha = 1.0;
                             lastColor = '';
                         }
@@ -1785,11 +1795,11 @@ export class Renderer {
                             ctx.fillStyle = color;
                             lastColor = color;
                         }
-                        ctx.fillRect(px + asx, py + asy, cw, ch);
+                        ctx.fillRect(px + asx, py + asy, cw1, ch1);
                     } else {
                         if (skinActive) {
                             const ground = this._resolveGroundSprite(tile, season);
-                            if (ground) ctx.drawImage(ground, px, py, cw + 1, ch + 1);
+                            if (ground) ctx.drawImage(ground, px, py, cw1, ch1);
                         }
                         if (color !== lastColor) {
                             ctx.fillStyle = color;
@@ -1822,7 +1832,7 @@ export class Renderer {
                 if (spriteDrawn && showPortalPath && portalPathMap.has(tileKey)) {
                     ctx.fillStyle = COMBAT_VISUALS.portalPathColor;
                     ctx.globalAlpha = 0.35;
-                    ctx.fillRect(px, py, cw, ch);
+                    ctx.fillRect(px, py, cw1, ch1);
                     ctx.globalAlpha = 1.0;
                     lastColor = '';
                 }
@@ -1845,7 +1855,7 @@ export class Renderer {
                     } else {
                         ctx.fillStyle = RENDER_CONFIG.cursorBg;
                     }
-                    ctx.fillRect(px, py, cw, ch);
+                    ctx.fillRect(px, py, cw1, ch1);
                     ctx.globalAlpha = 1.0;
                     lastColor = '';
                 }
@@ -1858,7 +1868,7 @@ export class Renderer {
                     ctx.strokeStyle = '#ffcc44';
                     ctx.lineWidth = pulseWidth;
                     ctx.globalAlpha = pulseAlpha;
-                    ctx.strokeRect(px + 0.5, py + 0.5, cw - 1, ch - 1);
+                    ctx.strokeRect(px + 0.5, py + 0.5, cw1 - 1, ch1 - 1);
                     ctx.restore();
                     lastColor = '';
                 }
