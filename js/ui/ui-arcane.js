@@ -2390,6 +2390,7 @@ const arcaneMethods = {
             const sSlot = vanguard.findIndex(v => v.entity === summon);
             const sy = H / 2 + (sSlot - vanguard.length / 2) * 28 + 14;
             const sx = partyX + 32 + (sy - H / 2) * diagSlope;
+            this._expVisState.summonLastPos[summon.name] = { x: sx, y: sy, color: summon.color };
             ctx.globalAlpha = 0.2;
             ctx.fillStyle = '#000000';
             ctx.beginPath();
@@ -2650,6 +2651,14 @@ const arcaneMethods = {
                         frame: 0, maxFrames: 90,
                     });
                     this._expVisState.shakeFrames = 12;
+                } else if (text.startsWith('The ') && (text.endsWith('fades away.') || text.endsWith('is slain!'))) {
+                    // Summon expires or is killed: dissolve puff at last known position.
+                    const summonName = text.replace(/^The /, '').replace(/ fades away\.$| is slain!$/, '');
+                    const pos = this._expVisState.summonLastPos[summonName];
+                    const px = pos ? pos.x : (partyX + 30 + Math.random() * 10);
+                    const py = pos ? pos.y : (H / 2 + Math.random() * 10);
+                    const pColor = pos?.color || '#aa44ff';
+                    this._expVisState.effects.push({ type: 'summon_puff', x: px, y: py, color: pColor, frame: 0, maxFrames: 35 });
                 } else if (text.includes('slays') || text.includes('is slain')) {
                     const isPartyKill = partyNames.some(n => text.startsWith(n));
                     const deathX = isPartyKill ? (partyX + 70 + Math.random() * 20) : (partyX + Math.random() * 15);
@@ -3079,6 +3088,30 @@ const arcaneMethods = {
                         ctx.textBaseline = 'middle';
                         ctx.fillText('★', eff.x, eff.y);
                     }
+                }
+            } else if (eff.type === 'summon_puff') {
+                const progress = eff.frame / eff.maxFrames;
+                // Expanding burst of 8 particles in the summon's color, fading out.
+                const particleCount = 8;
+                for (let p = 0; p < particleCount; p++) {
+                    const angle = (p / particleCount) * Math.PI * 2;
+                    const dist = progress * 18;
+                    const px = eff.x + Math.cos(angle) * dist;
+                    const py = eff.y + Math.sin(angle) * dist - progress * 6;
+                    ctx.globalAlpha = alpha * (1 - progress) * 0.9;
+                    ctx.fillStyle = eff.color;
+                    const sz = 2.5 * (1 - progress * 0.7);
+                    ctx.fillRect(px - sz / 2, py - sz / 2, sz, sz);
+                }
+                // Central flash ring that quickly fades.
+                if (progress < 0.4) {
+                    const ringAlpha = (0.4 - progress) / 0.4;
+                    ctx.globalAlpha = alpha * ringAlpha * 0.5;
+                    ctx.strokeStyle = eff.color;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(eff.x, eff.y, 4 + progress * 14, 0, Math.PI * 2);
+                    ctx.stroke();
                 }
             } else if (eff.type === 'damage_number') {
                 ctx.font = 'bold 10px monospace';

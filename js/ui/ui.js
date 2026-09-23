@@ -53,7 +53,7 @@ export class UI {
         this._arcaneTab = 'nexus';
         this._arcaneExpSetup = null;
         this._lastArcaneHtml = '';
-        this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, _prevExpStatus: null, _arriveFrame: 0, _seenDiscoveryTick: 0, _seenResolutionTick: 0, _seenFatigueTick: 0, _seenRallyTick: 0 };
+        this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, _prevExpStatus: null, _arriveFrame: 0, _seenDiscoveryTick: 0, _seenResolutionTick: 0, _seenFatigueTick: 0, _seenRallyTick: 0, summonLastPos: {} };
         this.storyPanelVisible = false;
         this._storyTab = 'colony';
         this._collapsedRealmGroups = new Set();
@@ -2029,10 +2029,10 @@ export class UI {
         const color = def?.color || '#ccaa88';
         header.style.color = color;
         const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-        const headerName = animal.name ? `${animal.name} <span style="color:#888;font-size:0.85em;">(${animal.type})</span>` : animal.type;
+        const headerName = animal.name ? `${animal.name} <span style="color:#888;font-size:0.85em;">(${cap(animal.type)})</span>` : cap(animal.type);
         const petLabel = animal.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
         const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
-        header.innerHTML = `${headerName} (tamed)${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${animalId})">Rename</button>`;
+        header.innerHTML = `${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${animalId})">Rename</button>`;
     }
 
     showTileEntities(tile, x, y, colonists, animals, raiders = [], tamedAnimals = [], summons = []) {
@@ -2066,7 +2066,7 @@ export class UI {
             const def = ANIMALS[a.type];
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            html += `<div class="info-header" style="color:${color};">${a.type}${a.hostile ? ' (hostile)' : ''}${def?.tameable ? ' (tameable)' : ''}</div>`;
+            html += `<div class="info-header" style="color:${color};">${a.type.charAt(0).toUpperCase() + a.type.slice(1)}${a.hostile ? ' (hostile)' : ''}</div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
             if (def?.meatYield) html += `<div class="info-row">Meat yield: ${def.meatYield}</div>`;
             if (def?.hideYield) html += `<div class="info-row">Hide yield: ${def.hideYield}</div>`;
@@ -2100,9 +2100,10 @@ export class UI {
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
             const petLabel = a.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
-            const headerName = a.name ? `${a.name} <span style="color:#888;font-size:0.85em;">(${a.type})</span>` : a.type;
+            const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+            const headerName = a.name ? `${a.name} <span style="color:#888;font-size:0.85em;">(${cap(a.type)})</span>` : cap(a.type);
             const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
-            html += `<div class="info-header" style="color:${color};" data-animal-header="${a.id}">${headerName} (tamed)${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">Rename</button></div>`;
+            html += `<div class="info-header" style="color:${color};" data-animal-header="${a.id}">${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">Rename</button></div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
             if (a.bondedColonistId) {
                 const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);

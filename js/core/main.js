@@ -1692,7 +1692,7 @@ class Game {
             this.ui._arcaneExpIsAuto = false;
             this.ui._lastArcaneHtml = '';
             this.ui._expBackRowIds = new Set();
-            this.ui._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0 };
+            this.ui._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, summonLastPos: {} };
             this.ui.updateArcanePanel();
         } else {
             this.notifications.push({ text: 'Cannot launch expedition', tick: this.tick, type: 'danger' });
