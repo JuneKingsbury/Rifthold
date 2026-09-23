@@ -735,8 +735,9 @@ class Game {
 
     togglePause(silent = false) {
         this.paused = !this.paused;
-        document.getElementById('game').classList.toggle('paused', this.paused && this.settings.darkenOnPause);
-        document.getElementById('pause-overlay').style.display = this.paused ? 'block' : 'none';
+        const recording = this.input?._recordingMode;
+        document.getElementById('game').classList.toggle('paused', this.paused && this.settings.darkenOnPause && !recording);
+        document.getElementById('pause-overlay').style.display = (this.paused && !recording) ? 'block' : 'none';
         if (!silent) window.soundManager?.playSFXPitched('open_close_click', this.paused ? 3 : -3);
     }
 
@@ -2793,6 +2794,7 @@ function zoomOut() {
 
 window.zoomIn = zoomIn;
 window.zoomOut = zoomOut;
+window.fitGameFont = fitGameFont;
 
 function resetMinimapSize() {
     const container = document.getElementById('minimap-container');

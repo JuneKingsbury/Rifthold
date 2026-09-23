@@ -232,7 +232,111 @@ export class InputHandler {
             selectAll: () => this.selectAllColonists(),
             nextIdle: () => this.game.cycleIdleColonist(),
             centerSelection: () => this.centerOnSelection(),
+
+            toggleRecordingMode: (e) => { e?.preventDefault(); this._toggleRecordingMode(); },
         };
+    }
+
+    _toggleRecordingMode() {
+        this._recordingMode = !this._recordingMode;
+        const hide = this._recordingMode;
+
+        // Elements to show/hide: all UI chrome outside the game canvas.
+        const uiIds = [
+            'status-bar', 'game-footer', 'bottom-bar', 'build-panel',
+            'info-panel', 'panel-overlay', 'notifications', 'touch-toolbar',
+            'priority-panel', 'craft-panel', 'event-panel', 'research-panel',
+            'inventory-panel', 'settings-panel', 'arcane-panel', 'story-panel',
+        ];
+        for (const id of uiIds) {
+            const el = document.getElementById(id);
+            if (el) el.style.visibility = hide ? 'hidden' : '';
+        }
+
+        if (hide) {
+            this.game.cursor = null;
+            this.game.ui.hideTileTooltip();
+            // If already paused, clear the visual indicators immediately.
+            if (this.game.paused) {
+                document.getElementById('game')?.classList.remove('paused');
+                document.getElementById('pause-overlay').style.display = 'none';
+            }
+            // Hide selected colonist name tag.
+            this._savedColonistNames = this.game.settings.showColonistNames;
+            this.game.settings.showColonistNames = 'never';
+            // Mute music by zeroing both the gain node and soundManager.musicVolume
+            // so crossfades during track swaps also fade in silently.
+            // game.settings.musicVolume is left untouched as the restore value.
+            this._savedMusicVolume = this.game.settings.musicVolume;
+            this.game.settings.musicVolume = 0;
+            window.soundManager?.setMusicVolume(0);
+            this._applyRecordingLayout();
+        } else {
+            // Restore pause visuals if still paused.
+            if (this.game.paused) {
+                document.getElementById('game')?.classList.toggle('paused', this.game.settings.darkenOnPause);
+                document.getElementById('pause-overlay').style.display = 'block';
+            }
+            // Restore colonist name display.
+            if (this._savedColonistNames !== undefined) {
+                this.game.settings.showColonistNames = this._savedColonistNames;
+                this._savedColonistNames = undefined;
+            }
+            // Restore music volume to both settings and the gain node.
+            if (this._savedMusicVolume !== undefined) {
+                this.game.settings.musicVolume = this._savedMusicVolume;
+                window.soundManager?.setMusicVolume(this._savedMusicVolume);
+                this._savedMusicVolume = undefined;
+            }
+            this._restoreRecordingLayout();
+        }
+    }
+
+    _applyRecordingLayout() {
+        const container = document.getElementById('game-container');
+        const statusBar = document.getElementById('status-bar');
+        const gameFooter = document.getElementById('game-footer');
+        const bottomBar = document.getElementById('bottom-bar');
+        const infoPanelEl = document.getElementById('info-panel');
+        if (!container || !statusBar || !gameFooter || !bottomBar || !infoPanelEl) return;
+
+        const totalW = container.clientWidth;
+        const totalH = container.clientHeight;
+        const statusH = statusBar.offsetHeight;
+        const bottomH = bottomBar.offsetHeight;
+
+        // Height available for game-area + footer combined.
+        const midH = totalH - statusH - bottomH;
+
+        // Find the largest game-area height that is 16:9 relative to the full
+        // container width (info-panel will be collapsed to 0).
+        // gameAreaH / totalW = 9/16  →  gameAreaH = totalW * 9/16
+        const idealGameH = Math.round(totalW * 9 / 16);
+        const footerH = Math.max(0, midH - idealGameH);
+
+        // Save current inline sizes so we can restore them exactly.
+        this._savedRecordingStyles = {
+            footerHeight: gameFooter.style.height,
+            infoPanelWidth: container.style.gridTemplateColumns,
+        };
+
+        gameFooter.style.height = footerH + 'px';
+        // Collapse the info-panel column to 0 so game-area spans full width.
+        container.style.gridTemplateColumns = '1fr 0px';
+
+        window.fitGameFont?.();
+    }
+
+    _restoreRecordingLayout() {
+        const container = document.getElementById('game-container');
+        const gameFooter = document.getElementById('game-footer');
+        if (!container || !gameFooter || !this._savedRecordingStyles) return;
+
+        gameFooter.style.height = this._savedRecordingStyles.footerHeight;
+        container.style.gridTemplateColumns = this._savedRecordingStyles.infoPanelWidth;
+        this._savedRecordingStyles = null;
+
+        window.fitGameFont?.();
     }
 
     // Rebuild the key->action lookup from DEFAULT_KEYMAP merged with any
@@ -485,13 +589,15 @@ export class InputHandler {
 
         const pos = this.getMouseTile(e);
         if (pos.x >= 0 && pos.x < CONFIG.MAP_WIDTH && pos.y >= 0 && pos.y < CONFIG.MAP_HEIGHT) {
-            this.game.cursor = pos;
+            if (!this._recordingMode) {
+                this.game.cursor = pos;
+                this.game.ui.updateTileTooltip(pos.x, pos.y, e);
+            }
             if (this.dragging) {
                 this.dragEnd = pos;
             }
-            this.game.ui.updateTileTooltip(pos.x, pos.y, e);
         } else {
-            this.game.ui.hideTileTooltip();
+            if (!this._recordingMode) this.game.ui.hideTileTooltip();
         }
     }
 
