@@ -147,7 +147,7 @@ export const RAID_CONFIG = {
     minInterval: 1500,
     maxInterval: 4000,
     baseRaiders: 1,
-    wealthScaling: 0.003,
+    wealthScaling: 0.004,
     timeScalingPeak: 18000,
     raiderHp: 50,
     raiderDamage: 5,
@@ -183,6 +183,7 @@ export const RAID_WEALTH_WEIGHTS = {
     runite:    1.00,
     moonbloom: 0.80,
     void_essence: 1.00,
+    gold:      1.00,
 };
 
 // TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT moved to ./trade.js
