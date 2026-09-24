@@ -111,6 +111,8 @@ class Game {
             showTutorial: true,
             fpsCap: 60,
             keyBindings: {},
+            showCrtScanlines: true,
+            showCrtWarp: true,
         };
         try {
             const saved = JSON.parse(localStorage.getItem('colony_settings'));
@@ -280,6 +282,11 @@ class Game {
         this.lastTime = performance.now();
         this._rafId = requestAnimationFrame(this.gameLoop);
         requestAnimationFrame(() => resetMinimapSize());
+
+        if (this.settings.showCrtWarp) {
+            const ga = document.getElementById('game-area');
+            if (ga) ga.classList.add('crt-warp');
+        }
 
         this.skinManager.init().then(() => {
             if (this.settings.activeSkin !== 'ascii' && this.skinManager.activeSkin !== this.settings.activeSkin) {

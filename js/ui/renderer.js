@@ -1,6 +1,7 @@
 import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
 import { writeTileVisuals } from '../world/map.js';
 import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
+import { CrtRenderer } from './crt-renderer.js';
 import { SkinManager } from './skin-manager.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
 import { getEntityTransform, getTreeSway, getGrassSway, getCropSway, getWaterWave, windStrengthFor, setSwayWind } from './entity-animation.js';
@@ -27,6 +28,8 @@ export class Renderer {
         container.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d', { alpha: false });
         this.overlayRenderer = new OverlayRenderer(container);
+        this.crtRenderer = new CrtRenderer(container);
+        this.crtRenderer.initWarpMap();
 
         this.charWidth = 0;
         this.charHeight = 0;
@@ -138,6 +141,7 @@ export class Renderer {
             this.ctx.textBaseline = 'top';
         }
         this.overlayRenderer.resize(w, h);
+        this.crtRenderer.resize(w, h);
         this._lastViewportW = CONFIG.VIEWPORT_WIDTH;
         this._lastViewportH = CONFIG.VIEWPORT_HEIGHT;
     }
@@ -2404,6 +2408,8 @@ export class Renderer {
         this.overlayRenderer.render(game, cw, ch, game.camera);
 
         if (rprof) { const t = performance.now(); rprof.add('render:overlayRenderer', t - rmark); rmark = t; }
+
+        this.crtRenderer.render(game.settings);
     }
 
     renderFps(fps) {

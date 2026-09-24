@@ -3458,6 +3458,8 @@ export class UI {
         graphics += `</select></div>`;
         graphics += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', 'Show FPS counter (top-right of game grid)');
         graphics += this._settingsCheck('set-fps-cap', s.fpsCap === 30, 'window.game.settings.fpsCap=this.checked?30:60', 'Cap framerate to 30 FPS (reduces CPU/GPU usage)');
+        graphics += this._settingsCheck('set-crt-scanlines', s.showCrtScanlines, 'window.game.settings.showCrtScanlines=this.checked;if(window.game.renderer?.crtRenderer)window.game.renderer.crtRenderer._scanlinePattern=null;window.game.saveSettingsToStorage()', 'CRT scanline overlay');
+        graphics += this._settingsCheck('set-crt-warp', s.showCrtWarp, 'window.game.settings.showCrtWarp=this.checked;document.getElementById("game-area")?.classList.toggle("crt-warp",this.checked);window.game.saveSettingsToStorage()', 'CRT barrel warp (lens distortion)');
         graphics += `</div>`;
 
         // ===== CONTROLS TAB =====
