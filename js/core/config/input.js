@@ -45,6 +45,7 @@ export const DEFAULT_KEYMAP = {
     centerSelection: ['home'],
 
     toggleRecordingMode: ['\\'],
+    timelapseToggle: ['t'],
 };
 
 // Ordered, grouped metadata for the rebinding settings UI. `action` matches a
@@ -82,6 +83,7 @@ export const KEYBIND_ACTIONS = [
         { action: 'zoomOut', label: 'Zoom out' },
         { action: 'resetMinimap', label: 'Reset minimap size' },
         { action: 'toggleRecordingMode', label: 'Toggle recording mode (hide UI / 1080p)' },
+        { action: 'timelapseToggle', label: 'Timelapse toggle (recording mode: 1x / 15x speed)' },
     ] },
     { group: 'Colonists', items: [
         { action: 'cyclePrev', label: 'Select previous colonist' },

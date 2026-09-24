@@ -389,6 +389,7 @@ class Game {
         }
 
         this.camera.lerpToward(dt / 1000);
+        _tickSmoothZoom(timestamp);
 
         const prof = this._profiler;
         if (prof) { prof.countFrame(); prof.begin(); }
@@ -1854,6 +1855,31 @@ class Game {
     equipBoots(colonistId, index) { this._equipItem(colonistId, index, 'boots', 'boots', 'addBoots'); }
     unequipBoots(colonistId) { this._unequipItem(colonistId, 'boots', 'addBoots', 'boots'); }
 
+    // Walk slot priority and equip the first available item from inventory.
+    // Used by the recording-mode G hotkey to layer gear onto a colonist one piece at a time.
+    autoEquipNextItem(colonistId) {
+        const c = this.getColonist(colonistId);
+        if (!c) return false;
+        const slots = [
+            { slot: 'helmet',  list: 'helmets',  fn: (i) => this.equipHelmet(colonistId, i) },
+            { slot: 'armor',   list: 'armors',   fn: (i) => this.equipArmor(colonistId, i) },
+            { slot: 'clothes', list: 'clothes',  fn: (i) => this.equipClothes(colonistId, i) },
+            { slot: 'weapon',  list: 'weapons',  fn: (i) => this.equipWeapon(colonistId, i) },
+            { slot: 'boots',   list: 'boots',    fn: (i) => this.equipBoots(colonistId, i) },
+            { slot: 'trinket', list: 'trinkets', fn: (i) => this.equipTrinket(colonistId, i) },
+            { slot: 'tool',    list: 'tools',    fn: (i) => this.equipTool(colonistId, i) },
+        ];
+        for (const { slot, list, fn } of slots) {
+            if (c[slot]) continue;
+            if (this.resources[list] && this.resources[list].length > 0) {
+                fn(0);
+                return true;
+            }
+        }
+        this.notifications.push({ text: 'No gear to equip (all slots filled or inventory empty)', tick: this.tick, type: 'info' });
+        return false;
+    }
+
     equipTome(colonistId, index) {
         const c = this.getColonist(colonistId);
         if (!c) return;
@@ -2742,6 +2768,23 @@ const MAX_FONT = 48;
 const ZOOM_STEP = 2;
 
 let currentZoomFont = null;
+let _zoomTarget = null;
+let _zoomLastFrameTime = 0;
+
+function _tickSmoothZoom(timestamp) {
+    if (_zoomTarget === null) return;
+    if (currentZoomFont === null) currentZoomFont = 14;
+    const dt = Math.min(timestamp - _zoomLastFrameTime, 100);
+    _zoomLastFrameTime = timestamp;
+    const step = Math.max(0.5, Math.abs(_zoomTarget - currentZoomFont) * 0.25) * (dt / 16.67);
+    if (Math.abs(_zoomTarget - currentZoomFont) <= 0.1) {
+        currentZoomFont = _zoomTarget;
+        _zoomTarget = null;
+    } else {
+        currentZoomFont += Math.sign(_zoomTarget - currentZoomFont) * Math.min(step, Math.abs(_zoomTarget - currentZoomFont));
+    }
+    fitGameFont();
+}
 
 function fitGameFont() {
     const gameArea = document.getElementById('game-area');
@@ -2784,14 +2827,16 @@ function fitGameFont() {
 
 function zoomIn() {
     if (currentZoomFont === null) currentZoomFont = 14;
-    currentZoomFont = Math.min(MAX_FONT, currentZoomFont + ZOOM_STEP);
-    fitGameFont();
+    const base = _zoomTarget !== null ? _zoomTarget : currentZoomFont;
+    _zoomTarget = Math.min(MAX_FONT, base + ZOOM_STEP);
+    _zoomLastFrameTime = performance.now();
 }
 
 function zoomOut() {
     if (currentZoomFont === null) currentZoomFont = 14;
-    currentZoomFont = Math.max(MIN_FONT, currentZoomFont - ZOOM_STEP);
-    fitGameFont();
+    const base = _zoomTarget !== null ? _zoomTarget : currentZoomFont;
+    _zoomTarget = Math.max(MIN_FONT, base - ZOOM_STEP);
+    _zoomLastFrameTime = performance.now();
 }
 
 window.zoomIn = zoomIn;

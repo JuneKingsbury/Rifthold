@@ -20,6 +20,12 @@ export class Camera {
         this.targetY = Math.max(0, Math.min(CONFIG.MAP_HEIGHT - CONFIG.VIEWPORT_HEIGHT, this.targetY + dy));
     }
 
+    // Like panTarget but moves by fractional tile amounts for smooth cinematic glides.
+    panSmoothTarget(dx, dy) {
+        this.targetX = Math.max(0, Math.min(CONFIG.MAP_WIDTH - CONFIG.VIEWPORT_WIDTH, this.targetX + dx));
+        this.targetY = Math.max(0, Math.min(CONFIG.MAP_HEIGHT - CONFIG.VIEWPORT_HEIGHT, this.targetY + dy));
+    }
+
     lerpToward(dt) {
         const SPEED = 12;
         const maxStep = SPEED * dt;

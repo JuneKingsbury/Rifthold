@@ -4848,3 +4848,20 @@ details.settings-debug > summary::marker {
     cursor: pointer;
     user-select: none;
 }
+
+/* Recording mode: arcane/expedition panel floats over the 16:9 canvas without
+   affecting layout. Toggled via V key while recording mode is active. */
+.recording-arcane-float {
+    position: fixed !important;
+    right: 0 !important;
+    top: 0 !important;
+    left: auto !important;
+    transform: none !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    width: 340px !important;
+    max-width: 38vw !important;
+    z-index: 9999 !important;
+    overflow-y: auto !important;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.7) !important;
+}

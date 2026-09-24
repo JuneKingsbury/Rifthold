@@ -3589,6 +3589,23 @@ export class UI {
         html += keybindingRowsHtml('window.game.ui._startRebind', 'window.game.ui._resetRebind');
         html += `<div class="settings-row" style="margin-top:6px;"><button onclick="window.game.resetKeyBindings()" class="settings-btn settings-btn-danger">Reset all keybinds to Default</button></div>`;
         html += `</div>`;
+        html += `<div class="settings-section">`;
+        html += `<div class="settings-section-title">Recording Mode Hotkeys</div>`;
+        html += `<div style="opacity:0.7;font-size:0.85em;margin-bottom:6px;">Active only while recording mode is on (<kbd style="background:#333;padding:1px 4px;border-radius:3px;">\\</kbd>). Not rebindable.</div>`;
+        html += `<table style="width:100%;border-collapse:collapse;font-size:0.9em;">`;
+        const rows = [
+            ['T', 'Timelapse toggle (1x / 15x speed)'],
+            ['C', 'Cinematic pan mode (smooth WASD glide)'],
+            ['G', 'Equip next item on selected colonist'],
+            ['H', 'Toggle building ghosts (hide unbuilt construction)'],
+            ['V', 'Show / hide expedition panel as overlay'],
+            [', / .', 'Fine speed control (1x up to 20x)'],
+        ];
+        for (const [key, desc] of rows) {
+            html += `<tr><td style="padding:3px 8px 3px 0;white-space:nowrap;"><kbd style="background:#333;padding:1px 5px;border-radius:3px;color:#ffcc00;">${key}</kbd></td><td style="padding:3px 0;opacity:0.85;">${desc}</td></tr>`;
+        }
+        html += `</table>`;
+        html += `</div>`;
         return html;
     }
 

@@ -1757,7 +1757,7 @@ export class Renderer {
                     // Draw partially opaque color over tiles that are being actively selected or have some colonist
                     // task designation (e.g. marked for destruction).
                     if (tile.designation) {
-                        if (tile.designation.type === 'build' && tile.designation.buildType) {
+                        if (tile.designation.type === 'build' && tile.designation.buildType && !game.input?._hideGhosts) {
                             const ghostSprite = sm.getSprite('buildings', tile.designation.buildType)
                                 || sm.getSprite('floors', tile.designation.buildType);
                             if (ghostSprite) {
@@ -1773,7 +1773,7 @@ export class Renderer {
                                 ctx.globalAlpha = 1.0;
                                 spriteDrawn = true;
                             }
-                        } else if (spriteDrawn) {
+                        } else if (spriteDrawn && !(tile.designation.type === 'build' && game.input?._hideGhosts)) {
                             const tintColor = TILE_COLORS[`designation_${tile.designation.type}`] || '#ffff00';
                             ctx.fillStyle = tintColor;
                             ctx.globalAlpha = 0.35;

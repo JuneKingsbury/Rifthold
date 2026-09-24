@@ -187,10 +187,10 @@ export class InputHandler {
     // Rebinding maps keys onto these action names. The handlers never change.
     buildActions() {
         return {
-            panUp: () => this.game.camera.panTarget(0, -3),
-            panDown: () => this.game.camera.panTarget(0, 3),
-            panLeft: () => this.game.camera.panTarget(-3, 0),
-            panRight: () => this.game.camera.panTarget(3, 0),
+            panUp: () => this._cinematicPanMode ? this.game.camera.panSmoothTarget(0, -0.4) : this.game.camera.panTarget(0, -3),
+            panDown: () => this._cinematicPanMode ? this.game.camera.panSmoothTarget(0, 0.4) : this.game.camera.panTarget(0, 3),
+            panLeft: () => this._cinematicPanMode ? this.game.camera.panSmoothTarget(-0.4, 0) : this.game.camera.panTarget(-3, 0),
+            panRight: () => this._cinematicPanMode ? this.game.camera.panSmoothTarget(0.4, 0) : this.game.camera.panTarget(3, 0),
 
             toggleBuild: () => this.setMode(this.mode === 'build' ? 'normal' : 'build'),
             toggleZone: () => this.setMode(this.mode === 'zone' ? 'normal' : 'zone'),
@@ -201,7 +201,21 @@ export class InputHandler {
             toggleCraft: () => this.game.ui.toggleCraftPanel(),
             toggleResearch: () => { if (this.mode === 'normal') this.game.ui.toggleResearchPanel(); },
             toggleInventory: () => this.game.ui.toggleInventoryPanel(),
-            toggleArcane: () => this.game.ui.toggleArcanePanel(),
+            toggleArcane: () => {
+                if (this._recordingMode) {
+                    // In recording mode, toggle the arcane panel as a float overlay.
+                    const arcaneEl = document.getElementById('arcane-panel');
+                    if (!arcaneEl) return;
+                    const visible = arcaneEl.style.visibility !== 'hidden';
+                    arcaneEl.style.visibility = visible ? 'hidden' : 'visible';
+                    if (!visible) {
+                        this.game.ui._lastArcaneHtml = '';
+                        this.game.ui.updateArcanePanel();
+                    }
+                } else {
+                    this.game.ui.toggleArcanePanel();
+                }
+            },
             toggleStory: () => this.game.ui.toggleStoryPanel(),
             toggleWarmthOverlay: () => {
                 this.game.settings.showWarmthOverlay = !this.game.settings.showWarmthOverlay;
@@ -235,6 +249,18 @@ export class InputHandler {
             centerSelection: () => this.centerOnSelection(),
 
             toggleRecordingMode: (e) => { e?.preventDefault(); this._toggleRecordingMode(); },
+
+            timelapseToggle: () => {
+                if (!this._recordingMode) return;
+                if (this.game.speed >= 15) {
+                    this.game.speed = 1;
+                    this.game.notifications.push({ text: 'Timelapse off (1x)', tick: this.game.tick, type: 'info' });
+                } else {
+                    this.game.speed = 15;
+                    if (this.game.paused) this.game.togglePause();
+                    this.game.notifications.push({ text: 'Timelapse on (15x)', tick: this.game.tick, type: 'info' });
+                }
+            },
         };
     }
 
@@ -243,11 +269,12 @@ export class InputHandler {
         const hide = this._recordingMode;
 
         // Elements to show/hide: all UI chrome outside the game canvas.
+        // arcane-panel is excluded here and handled separately as a float overlay.
         const uiIds = [
             'status-bar', 'game-footer', 'bottom-bar', 'build-panel',
             'info-panel', 'panel-overlay', 'notifications', 'touch-toolbar',
             'priority-panel', 'craft-panel', 'event-panel', 'research-panel',
-            'inventory-panel', 'settings-panel', 'arcane-panel', 'story-panel',
+            'inventory-panel', 'settings-panel', 'story-panel',
         ];
         for (const id of uiIds) {
             const el = document.getElementById(id);
@@ -271,6 +298,17 @@ export class InputHandler {
             this._savedMusicVolume = this.game.settings.musicVolume;
             this.game.settings.musicVolume = 0;
             window.soundManager?.setMusicVolume(0);
+            // Raise the speed cap for timelapse use.
+            this._savedDebugMaxSpeed = this.game.debugMaxSpeed;
+            this.game.debugMaxSpeed = 20;
+            // Put arcane panel in float-overlay mode (hidden by default, shown via V).
+            const arcaneEl = document.getElementById('arcane-panel');
+            if (arcaneEl) {
+                this._savedArcaneDisplay = arcaneEl.style.display;
+                arcaneEl.classList.add('recording-arcane-float');
+                arcaneEl.style.visibility = 'hidden';
+                arcaneEl.style.display = 'block';
+            }
             this._applyRecordingLayout();
         } else {
             // Restore pause visuals if still paused.
@@ -289,6 +327,21 @@ export class InputHandler {
                 window.soundManager?.setMusicVolume(this._savedMusicVolume);
                 this._savedMusicVolume = undefined;
             }
+            // Restore speed cap and clamp current speed.
+            this.game.debugMaxSpeed = this._savedDebugMaxSpeed;
+            this._savedDebugMaxSpeed = undefined;
+            if (this.game.speed > (this.game.debugMaxSpeed || 3)) this.game.speed = this.game.debugMaxSpeed || 3;
+            // Restore arcane panel from float-overlay mode.
+            const arcaneEl = document.getElementById('arcane-panel');
+            if (arcaneEl) {
+                arcaneEl.classList.remove('recording-arcane-float');
+                arcaneEl.style.visibility = '';
+                arcaneEl.style.display = this._savedArcaneDisplay || '';
+                this._savedArcaneDisplay = undefined;
+            }
+            // Reset cinematic pan mode and ghost visibility.
+            this._cinematicPanMode = false;
+            this._hideGhosts = false;
             this._restoreRecordingLayout();
         }
     }
@@ -374,6 +427,25 @@ export class InputHandler {
         if (key.length === 1 && key >= '0' && key <= '9') {
             this.handleNumberKey(key === '0' ? 10 : parseInt(key));
             return;
+        }
+
+        // Recording-mode-only hotkeys that bypass the rebindable action map.
+        if (this._recordingMode) {
+            if (key === 'c') {
+                this._cinematicPanMode = !this._cinematicPanMode;
+                this.game.notifications.push({ text: `Cinematic pan ${this._cinematicPanMode ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+                return;
+            }
+            if (key === 'g') {
+                const c = this.game.selectedColonist;
+                if (c) this.game.autoEquipNextItem(c.id);
+                return;
+            }
+            if (key === 'h') {
+                this._hideGhosts = !this._hideGhosts;
+                this.game.notifications.push({ text: `Building ghosts ${this._hideGhosts ? 'hidden' : 'visible'}`, tick: this.game.tick, type: 'info' });
+                return;
+            }
         }
 
         const action = this.keyToAction[key];
