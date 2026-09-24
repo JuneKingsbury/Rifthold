@@ -2298,13 +2298,18 @@ export class Renderer {
             const lightGrid = this._lightGrid;
 
             // Cache static light grid
-            const srcHash = sources.reduce((h, s) => h ^ (s.x * 7919 + s.y * 104729 + s.radius * 31), 0) ^ (camera.x * 48611 + camera.y * 96293) ^ (sources.length * 104723) ^ (vw * 40503 + vh * 27691);
+            // Use Math.floor(camera) for grid alignment: the light grid maps integer
+            // indices 0..vw-1 to the viewport tiles starting at Math.floor(camera.x).
+            // Fractional camera offsets only affect where the overlay is drawn on screen.
+            const camFloorX = Math.floor(camera.x);
+            const camFloorY = Math.floor(camera.y);
+            const srcHash = sources.reduce((h, s) => h ^ (s.x * 7919 + s.y * 104729 + s.radius * 31), 0) ^ (camFloorX * 48611 + camFloorY * 96293) ^ (sources.length * 104723) ^ (vw * 40503 + vh * 27691);
             if (srcHash !== this._lastLightHash) {
                 this._lastLightHash = srcHash;
                 this._staticLightGrid.fill(0);
                 for (const src of sources) {
-                    const localX = src.x - camera.x;
-                    const localY = src.y - camera.y;
+                    const localX = src.x - camFloorX;
+                    const localY = src.y - camFloorY;
                     const r = src.radius;
                     const yStart = Math.max(0, localY - r);
                     const yEnd = Math.min(vh - 1, localY + r);
@@ -2328,8 +2333,8 @@ export class Renderer {
             // Each frame: copy static grid, then stamp mobile sources on top
             lightGrid.set(this._staticLightGrid);
             for (const src of mobileSources) {
-                const localX = src.x - camera.x;
-                const localY = src.y - camera.y;
+                const localX = src.x - camFloorX;
+                const localY = src.y - camFloorY;
                 const r = src.radius;
                 const yStart = Math.max(0, localY - r);
                 const yEnd = Math.min(vh - 1, localY + r);
@@ -2352,8 +2357,8 @@ export class Renderer {
             // into a small tile-resolution ImageData, put it onto a tiny offscreen
             // canvas, then drawImage it scaled up onto the main canvas. This replaces
             // thousands of fillRect calls with one drawImage composite.
-            const nightW = vw + 1;
-            const nightH = vh + 1;
+            const nightW = vw + 2;
+            const nightH = vh + 2;
             if (!this._nightCanvas) {
                 this._nightCanvas = document.createElement('canvas');
                 this._nightCtx = this._nightCanvas.getContext('2d', { alpha: true });
@@ -2384,7 +2389,11 @@ export class Renderer {
             this._nightCtx.putImageData(this._nightImageData, 0, 0);
             const prevSmoothing = ctx.imageSmoothingEnabled;
             ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(this._nightCanvas, 0, 0, nightW, nightH, 0, 0, nightW * cw, nightH * ch);
+            // Shift the overlay by the sub-tile fractional camera offset so darkness
+            // tiles align with the tile sprites (which are drawn at Math.round(wx*cw - camOriginX)).
+            const nightOffX = Math.round((camFloorX - camera.x) * cw);
+            const nightOffY = Math.round((camFloorY - camera.y) * ch);
+            ctx.drawImage(this._nightCanvas, 0, 0, nightW, nightH, nightOffX, nightOffY, nightW * cw, nightH * ch);
             ctx.imageSmoothingEnabled = prevSmoothing;
         }
 
