@@ -75,13 +75,16 @@ body {
 }
 
 #start-screen h1 {
-    font-size: 28px;
+    font-family: 'Pixelify Sans', monospace;
+    font-size: 36px;
     color: #ffcc00;
     text-shadow: 0 0 10px #ffcc0044, 0 1px 4px #000;
     margin-bottom: -12px;
 }
 
 #start-screen h2 {
+    font-family: 'Pixelify Sans', monospace;
+    font-size: 18px;
     margin-top: 0;
 }
 
@@ -91,6 +94,16 @@ body {
     text-align: center;
     line-height: 1.6;
     text-shadow: 0 1px 4px #000, 0 0 8px #000;
+}
+
+#start-controls-details summary {
+    display: inline-block;
+}
+#start-controls-details summary:hover {
+    color: #ccc;
+}
+#start-controls-details[open] summary {
+    color: #ccc;
 }
 
 .start-btn-grid {
@@ -152,9 +165,7 @@ body {
     display: flex;
     align-items: center;
     gap: 2px;
-    margin-left: auto;
     flex-wrap: wrap;
-    flex: 1 1 0%;
     min-width: 0px;
     justify-content: flex-end;
 }
@@ -190,25 +201,78 @@ body {
 #status-bar {
     grid-column: 1 / -1;
     background: #0d0d1a;
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-bottom: 1px solid #333;
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
+    gap: 6px;
+    align-items: stretch;
     font-size: var(--ui-font-size);
     min-width: 0;
     overflow: hidden;
 }
 
-#status-info {
+/* HUD pods: bordered "card" groups mirroring the footer panels below, so the
+   top bar reads as one system with the Colonists/Log/Map cards. Each pod is a
+   single row: a dim uppercase label prefix followed inline by its content, so
+   the bar stays one line tall. */
+.hud-pod {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 2px 8px;
+    background: #10101f;
+}
+/* Resources absorbs the slack so there is no dead middle gap; Colony sizes to
+   its content; Controls never shrinks (buttons must stay tappable). */
+.hud-pod--resources { flex: 1 1 auto; }
+.hud-pod--colony { flex: 0 1 auto; }
+.hud-pod--controls { flex: 0 0 auto; }
+
+#status-resources,
+#status-colony {
+    display: flex;
+    flex-wrap: nowrap;
     gap: 8px;
     align-items: center;
-    flex: 1;
     min-width: 0;
 }
+/* Resources absorbs slack; if the chips can't all fit, scroll within the pod
+   rather than wrapping to a second line (which would grow the bar's height). */
+#status-resources {
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+#status-resources::-webkit-scrollbar { display: none; }
+
+/* Mood meter: a thin static-width bar with a value label. */
+.hud-mood {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.hud-mood-label { color: #aaa; }
+.hud-mood-bar {
+    display: inline-block;
+    width: 54px;
+    height: 8px;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 3px;
+    overflow: hidden;
+    vertical-align: middle;
+}
+.hud-mood-fill {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+}
+.hud-mood-val { color: #ccc; }
+
 #status-bar .res { color: #88cc88; }
 /* Resource-counter punch: a quick grow-then-settle when a counter's value
    changes, drawing the eye to the resource that just ticked. inline-block so the
@@ -657,6 +721,15 @@ img.pixel-art-icon {
 
 .info-row { margin: 3px 0; color: #ccc; }
 .info-row.fire { color: #ff4400; font-weight: bold; }
+
+/* Persistent Colony Summary footer inside the info panel. When a tile/structure
+   is selected it sits below that info (separated); when nothing is selected the
+   info panel above is empty and the summary stands alone at the top. */
+#info-content:not(:empty) + #colony-summary {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #333;
+}
 .skill-tip { cursor: help; border-bottom: 1px dotted #666; }
 #ui-tooltip {
     position: fixed;
@@ -1056,9 +1129,7 @@ img.pixel-art-icon {
     border-top: 1px solid #333;
     padding: 4px 6px;
     gap: 4px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;
 }
 
 #touch-toolbar button {
@@ -1070,9 +1141,9 @@ img.pixel-art-icon {
     color: #ccc;
     cursor: pointer;
     border-radius: 4px;
-    min-width: 36px;
+    min-width: 64px;
     text-align: center;
-    flex-shrink: 0;
+    flex: 1 1 auto;
     white-space: nowrap;
 }
 
@@ -1239,8 +1310,24 @@ img.pixel-art-icon {
 }
 
 .hud-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    align-items: center;
     font-size: 0.8em;
-    letter-spacing: 1px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.hud-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.hud-stat-dot {
+    font-size: 1em;
+    line-height: 1;
 }
 
 .craft-multi {
@@ -2566,7 +2653,7 @@ details.settings-debug > summary::marker {
         font-size: var(--ui-font-size);
     }
 
-    #start-screen h1 { font-size: 22px; }
+    #start-screen h1 { font-size: 28px; }
     #start-screen p { font-size: 11px; max-width: 90vw; }
     #start-screen button { font-size: 14px; padding: 10px 20px; }
 
@@ -2683,13 +2770,42 @@ details.settings-debug > summary::marker {
         grid-row: 5;
     }
 
+    /* Two-row HUD: a scrollable Resources+Colony stats strip on top, and a
+       full-width Controls row beneath. Labels and pod borders drop out so the
+       header stays short. */
     #status-bar {
         padding: 3px 6px;
-        gap: 5px;
+        gap: 4px;
         font-size: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        overflow: hidden;
+    }
+    #status-bar .hud-pod {
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        background: transparent;
+        flex-direction: row;
+        align-items: center;
+    }
+    #status-bar .hud-pod--resources,
+    #status-bar .hud-pod--colony {
+        flex: 1 1 auto;
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+    }
+    #status-bar #status-resources,
+    #status-bar #status-colony {
+        flex-wrap: nowrap;
+    }
+    #status-bar .hud-pod--controls {
+        flex: 1 0 100%;
+        justify-content: center;
+        border-top: 1px solid #333;
+        padding-top: 3px;
+        margin-top: 1px;
     }
 
     #notifications {
@@ -2808,7 +2924,7 @@ details.settings-debug > summary::marker {
     #touch-toolbar button {
         padding: 5px 7px;
         font-size: 10px;
-        min-width: 30px;
+        min-width: 56px;
     }
 
     #game-footer {
@@ -2878,7 +2994,14 @@ details.settings-debug > summary::marker {
 .force-tabbed .mode-opt { margin: 0 2px; padding: 1px 3px; }
 .force-tabbed .mode-hint { display: none; }
 .force-tabbed #touch-toolbar { display: flex; grid-row: 5; }
-.force-tabbed #status-bar { padding: 3px 6px; gap: 5px; font-size: 10px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Force-tabbed mirrors the two-row narrow HUD regardless of screen size. */
+.force-tabbed #status-bar { padding: 3px 6px; gap: 4px; font-size: 10px; flex-wrap: wrap; align-items: center; overflow: hidden; }
+.force-tabbed #status-bar .hud-pod { border: none; border-radius: 0; padding: 0; background: transparent; flex-direction: row; align-items: center; }
+.force-tabbed #status-bar .hud-pod--resources,
+.force-tabbed #status-bar .hud-pod--colony { flex: 1 1 auto; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.force-tabbed #status-bar #status-resources,
+.force-tabbed #status-bar #status-colony { flex-wrap: nowrap; }
+.force-tabbed #status-bar .hud-pod--controls { flex: 1 0 100%; justify-content: center; border-top: 1px solid #333; padding-top: 3px; margin-top: 1px; }
 .force-tabbed #notifications { font-size: 10px; left: 4px; top: 2px; }
 .force-tabbed .notif { padding: 1px 5px; font-size: 10px; }
 .force-tabbed #priority-panel, .force-tabbed #craft-panel, .force-tabbed #research-panel,
@@ -2920,7 +3043,15 @@ details.settings-debug > summary::marker {
     .force-separate .mode-options { font-size: inherit; white-space: normal; }
     .force-separate .mode-hint { display: inline; }
     .force-separate #touch-toolbar { display: none; }
-    .force-separate #status-bar { padding: 4px 8px; gap: 6px; font-size: inherit; flex-wrap: wrap; overflow-x: visible; }
+    /* Force-separate keeps the desktop bordered-pod HUD even on small screens,
+       so restore what the base narrow rules stripped. */
+    .force-separate #status-bar { padding: 4px 8px; gap: 6px; font-size: inherit; flex-wrap: wrap; align-items: stretch; overflow: hidden; }
+    .force-separate #status-bar .hud-pod { border: 1px solid #333; border-radius: 4px; padding: 2px 8px; background: #10101f; flex-direction: row; align-items: center; }
+    .force-separate #status-bar .hud-pod--resources { flex: 1 1 auto; }
+    .force-separate #status-bar .hud-pod--colony { flex: 0 1 auto; overflow-x: visible; }
+    .force-separate #status-bar .hud-pod--controls { flex: 0 0 auto; border-top: none; padding-top: 2px; margin-top: 0; }
+    .force-separate #status-bar #status-resources { flex-wrap: nowrap; overflow-x: auto; }
+    .force-separate #status-bar #status-colony { flex-wrap: nowrap; }
     .force-separate #notifications { font-size: inherit; left: 8px; top: 32px; }
     .force-separate .notif { padding: 4px 10px; font-size: inherit; }
     .force-separate #priority-panel, .force-separate #craft-panel, .force-separate #research-panel,

@@ -74,22 +74,23 @@ export class UI {
         // Persistent per-bar animation state for live stat bars (see stat-bar.js),
         // keyed by globally-unique bar key. Survives the per-frame innerHTML swaps.
         this._statBarState = new Map();
+        // The Colony Summary is a persistent footer in the info panel, shown
+        // whenever the subject is not a living entity (i.e. nothing selected, or
+        // a tile/structure is selected). Boots visible with nothing selected.
+        this._summaryVisible = true;
         this.elements = {};
         this.initElements();
     }
 
     initElements() {
         this.elements.statusBar = document.getElementById('status-bar');
-        document.getElementById('btn-cycle-back').addEventListener('click', () => this.game.cycleColonist(-1));
-        document.getElementById('btn-cycle-forward').addEventListener('click', () => this.game.cycleColonist(1));
-        document.getElementById('btn-zoom-in').addEventListener('click', () => window.zoomIn());
-        document.getElementById('btn-zoom-out').addEventListener('click', () => window.zoomOut());
         document.getElementById('btn-pause').addEventListener('click', () => { if (!this.game.paused) this.game.togglePause(); });
         document.getElementById('btn-speed-1').addEventListener('click', () => this.game.setSpeed(1));
         document.getElementById('btn-speed-2').addEventListener('click', () => this.game.setSpeed(2));
         document.getElementById('btn-speed-3').addEventListener('click', () => this.game.setSpeed(3));
         document.getElementById('btn-settings').addEventListener('click', () => this.game.toggleSettingsPanel());
         this.elements.infoPanel = document.getElementById('info-content');
+        this.elements.colonySummary = document.getElementById('colony-summary');
         this.elements.infoPanel.addEventListener('mouseleave', () => {
             if (this._pendingColonistInfoHtml) {
                 this.elements.infoPanel.innerHTML = this._pendingColonistInfoHtml;
@@ -97,6 +98,22 @@ export class UI {
                 // Set bar widths on the freshly-swapped elements right away so
                 // they don't paint one static frame before the next pass.
                 this.animateStatBars(0);
+            }
+        });
+        // The persistent Colony Summary defers its rebuild while hovered (so a
+        // click on an alert row isn't lost to a mid-hover swap), then flushes.
+        this.elements.colonySummary.addEventListener('mouseleave', () => {
+            if (this._pendingSummaryHtml) {
+                this.elements.colonySummary.innerHTML = this._pendingSummaryHtml;
+                this._pendingSummaryHtml = null;
+                this.animateStatBars(0);
+            }
+        });
+        // Colony Summary alert rows jump to the flagged colonist.
+        this.elements.colonySummary.addEventListener('click', (e) => {
+            const alertRow = e.target.closest('.overview-alert[data-colonist-id]');
+            if (alertRow) {
+                this.game.selectColonistById(parseInt(alertRow.dataset.colonistId));
             }
         });
         this.elements.modeBar = document.getElementById('mode-bar');
@@ -576,6 +593,7 @@ export class UI {
         if (this._viewingRiftGate) this._refreshRiftGateInfo();
         if (this._viewingColonistId != null) this._refreshColonistInfo();
         if (this._viewingRitualAltar) this._refreshRitualAltarInfo();
+        if (this._summaryVisible) this._refreshColonySummary();
         const hasNew = this.game.story.hasUnviewed();
         const researchNeedsAtt = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
         const currentManaCrystalBonus = this.game.manaCrystalBonus || 0;
@@ -604,6 +622,7 @@ export class UI {
         const { fillK, leadK } = statBarFactors(dt);
         const seen = new Set();
         runStatBarPass(this.elements.infoPanel, this._statBarState, fillK, leadK, seen);
+        runStatBarPass(this.elements.colonySummary, this._statBarState, fillK, leadK, seen);
         runStatBarPass(this.elements.colonistHud, this._statBarState, fillK, leadK, seen);
         if (this.arcanePanelVisible) {
             runStatBarPass(this.elements.arcanePanel, this._statBarState, fillK, leadK, seen);
@@ -626,20 +645,13 @@ export class UI {
         this._lastStatusSpeed = this.game.speed;
         const r = this.game.resources.stockpile;
         const season = this.game.weather.getSeasonDisplay();
+        const dayStr = this.game.weather.getDayDisplay();
         const weather = this.game.weather.getWeatherDisplay();
         const tempC = Math.round(this.game.weather.temperature);
         const useF = this.game.settings.temperatureUnit === 'F';
         const temp = useF ? Math.round(tempC * 9 / 5 + 32) : tempC;
         const tempUnit = useF ? 'F' : 'C';
         const speed = this.game.paused ? 'PAUSED' : `${this.game.speed}x`;
-        let alive = 0, aliveGolemCount = 0, moodSum = 0;
-        for (const c of this.game.colonists) {
-            if (c.hp > 0) {
-                if (c.golem) { aliveGolemCount++; }
-                else { alive++; moodSum += c.mood; }
-            }
-        }
-        const avgMood = alive > 0 ? Math.round(moodSum / alive) : 0;
         const dayProgress = Math.floor((this.game.timeOfDay / CONFIG.TICKS_PER_DAY) * 24);
         const timeStr = `${String(dayProgress).padStart(2, '0')}:00`;
         const power = this.game.power;
@@ -650,10 +662,7 @@ export class UI {
             const crystalMax = 4 + (this.game.manaCrystalBonus || 0) + reservoirBonus;
             manaStr = `Mana:${power.getNetPower()} (${crystalCount}/${crystalMax})`;
         }
-        const pendingTasks = this.game.taskQueue.getPendingCount();
-
         const waves = this.game.waves;
-        const cap = waves.getColonistCap(this.game);
         const voidEssence = r.void_essence || 0;
         const waveStr = waves.active ? `Wave:${waves.currentWave}` : '';
 
@@ -695,36 +704,45 @@ export class UI {
             const alertAttr = resStyle(res.key, raw);
             resHtml += `<span class="res" data-res="${res.key}"${alertAttr}>${resIcon(res.key, res.label, res.color)}${val}</span>`;
         }
-        const html = resHtml +
-            (manaStr ? `<span class="res" style="color:${power.hasPower() ? '#aa44ff' : '#ff6666'}">${manaStr}</span>` : '') +
-            `<span class="sep">|</span>` +
+        // Resources pod: the core resource chips plus mana (if generating).
+        const resPodHtml = resHtml +
+            (manaStr ? `<span class="res" style="color:${power.hasPower() ? '#aa44ff' : '#ff6666'}">${manaStr}</span>` : '');
+
+        // Colony pod: season/date, weather, time, plus any conditional extras
+        // (wave, peaceful/demo badges). Population, average mood, and pending
+        // tasks now live in the Colony Summary panel, so they're intentionally
+        // omitted here to avoid duplication.
+        const colonyPodHtml =
             `<span class="info">${season}</span>` +
+            `<span class="info status-extra">${dayStr}</span>` +
             `<span class="sep">|</span>` +
             `<span class="info status-extra">${this._getWeatherIcon()} ${weather} ${temp}°${tempUnit}</span>` +
             `<span class="info">${timeStr}</span>` +
-            `<span class="sep status-extra">|</span>` +
-            `<span class="info status-extra">Pop:${alive}/${cap}</span>` +
-            (aliveGolemCount > 0 ? `<span class="info status-extra" style="color:#aaaaaa">Golems:${aliveGolemCount}</span>` : '') +
-            `<span class="info status-extra">Mood:${avgMood}%</span>` +
             (waveStr ? `<span class="info" style="color:#cc00ff">${waveStr}</span>` : '') +
-            (pendingTasks > 0 ? `<span class="info status-extra" style="color:#ccaa44">Tasks:${pendingTasks}</span>` : '') +
             (CONFIG.PEACEFUL_MODE ? `<span class="peaceful">PEACEFUL</span>` : '') +
             (this.game.settings.demoMode ? `<span class="demo-mode">DEMO</span>` : '');
 
-        if (html !== this._lastStatusHtml) {
-            this._lastStatusHtml = html;
-            const statusEl = document.getElementById('status-info');
-            statusEl.innerHTML = html;
-            // Punch the counters whose value just changed (skip under reduced
-            // motion). innerHTML was just rebuilt, so each span is a fresh DOM
-            // element; adding the class plays the keyframe once. The next value
-            // change rebuilds the span again, which re-triggers it.
-            if (punchedKeys.length && !this.game.settings.reduceMotion) {
-                for (const key of punchedKeys) {
-                    const span = statusEl.querySelector(`.res[data-res="${key}"]`);
-                    if (span) span.classList.add('res-punch');
+        if (resPodHtml !== this._lastResHtml) {
+            this._lastResHtml = resPodHtml;
+            const resEl = document.getElementById('status-resources');
+            if (resEl) {
+                resEl.innerHTML = resPodHtml;
+                // Punch the counters whose value just changed (skip under reduced
+                // motion). innerHTML was just rebuilt, so each span is a fresh DOM
+                // element; adding the class plays the keyframe once. The next value
+                // change rebuilds the span again, which re-triggers it.
+                if (punchedKeys.length && !this.game.settings.reduceMotion) {
+                    for (const key of punchedKeys) {
+                        const span = resEl.querySelector(`.res[data-res="${key}"]`);
+                        if (span) span.classList.add('res-punch');
+                    }
                 }
             }
+        }
+        if (colonyPodHtml !== this._lastColonyHtml) {
+            this._lastColonyHtml = colonyPodHtml;
+            const colonyEl = document.getElementById('status-colony');
+            if (colonyEl) colonyEl.innerHTML = colonyPodHtml;
         }
         this._updateSpeedButtons();
     }
@@ -998,7 +1016,9 @@ export class UI {
     _refreshColonistInfo() {
         const colonist = this.game.getColonist(this._viewingColonistId);
         if (!colonist) {
+            // The viewed colonist died or was removed: fall back to the summary.
             this._viewingColonistId = null;
+            this.showColonyOverview();
             return;
         }
         const html = this.buildColonistInfoHtml(colonist);
@@ -1586,8 +1606,100 @@ export class UI {
     showColonistInfo(colonist) {
         this._switchToInfoTab();
         this._viewingRiftGate = false;
+        this.setSummaryVisible(false);
         this._viewingColonistId = colonist.id;
         this.elements.infoPanel.innerHTML = this.buildColonistInfoHtml(colonist);
+    }
+
+    // Live colony summary shown in the Info panel whenever nothing is selected.
+    // Surfaces population, average mood, and actionable alerts (threats, hurt/
+    // hungry/exhausted/idle colonists, pending tasks). Read-only; the optional
+    // .overview-alert rows jump to the first matching colonist when clicked.
+    buildColonyOverviewHtml() {
+        let alive = 0, aliveGolems = 0, moodSum = 0;
+        let idle = 0, hungry = 0, lowRest = 0, lowHp = 0, homeless = 0;
+        let idleId = null, hungryId = null, lowRestId = null, lowHpId = null, homelessId = null;
+        for (const c of this.game.colonists) {
+            if (c.hp <= 0) continue;
+            if (c.golem) { aliveGolems++; continue; }
+            alive++;
+            moodSum += c.mood;
+            if (!c.drafted && !c.currentTaskId && c.state !== 'working') { idle++; if (idleId === null) idleId = c.id; }
+            if (c.needs.hunger <= 25) { hungry++; if (hungryId === null) hungryId = c.id; }
+            if (c.needs.rest <= 25) { lowRest++; if (lowRestId === null) lowRestId = c.id; }
+            if (c.maxHp > 0 && c.hp / c.maxHp <= 0.35) { lowHp++; if (lowHpId === null) lowHpId = c.id; }
+            if (!c.assignedBed) { homeless++; if (homelessId === null) homelessId = c.id; }
+        }
+        const avgMood = alive > 0 ? Math.round(moodSum / alive) : 0;
+        const moodLevel = getMoodLabel(avgMood);
+        const cap = this.game.waves.getColonistCap(this.game);
+        const pendingTasks = this.game.taskQueue.getPendingCount();
+        const waves = this.game.waves;
+        const raiderCount = this.game.raiders.filter(r => r.hp > 0).length;
+
+        let html = '<div class="info-header">Colony Summary</div>';
+        html += `<div class="info-row">Population: ${alive}/${cap}${aliveGolems > 0 ? ` <span style="color:#aaa">(+${aliveGolems} golems)</span>` : ''}</div>`;
+        const moodColor = avgMood >= 60 ? '#88cc44' : avgMood >= 35 ? '#ccaa44' : '#ff6644';
+        const moodBar = statBarHtml({ key: 'overview:mood', pct: avgMood, color: moodColor, max: 100, width: 90 });
+        html += `<div class="info-row">Mood: ${avgMood}% ${moodBar} <span style="color:${moodColor}">(${moodLevel})</span></div>`;
+
+        html += '<div class="info-row" style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333;margin-top:8px;padding-bottom:2px">Alerts</div>';
+        const alerts = [];
+        if (waves.active) alerts.push(`<div class="info-row" style="color:#ff6644">[!] Wave ${waves.currentWave} active</div>`);
+        if (raiderCount > 0) alerts.push(`<div class="info-row" style="color:#ff6644">[!] ${raiderCount} hostile${raiderCount > 1 ? 's' : ''} on the map</div>`);
+        if (lowHp > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowHpId}" style="color:#ff4444;cursor:pointer">${lowHp} badly hurt</div>`);
+        if (hungry > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${hungryId}" style="color:#ccaa44;cursor:pointer">${hungry} hungry</div>`);
+        if (lowRest > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowRestId}" style="color:#ccaa44;cursor:pointer">${lowRest} exhausted</div>`);
+        if (idle > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${idleId}" style="color:#88aaff;cursor:pointer">${idle} idle</div>`);
+        if (homeless > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${homelessId}" style="color:#ccaa44;cursor:pointer">${homeless} without a home</div>`);
+        if (pendingTasks > 0) alerts.push(`<div class="info-row" style="color:#ccaa44">${pendingTasks} pending task${pendingTasks > 1 ? 's' : ''}</div>`);
+        if (alerts.length === 0) alerts.push('<div class="info-row" style="color:#88cc44">All is well.</div>');
+        html += alerts.join('');
+        return html;
+    }
+
+    // Select nothing: clear the info panel and let the persistent summary footer
+    // stand on its own. The summary itself is driven every frame by update().
+    showColonyOverview() {
+        this._switchToInfoTab();
+        this._viewingColonistId = null;
+        this._viewingRiftGate = false;
+        this._viewingRitualAltar = false;
+        this._lastTileInfo = null;
+        if (this.elements.infoPanel.innerHTML !== '') this.elements.infoPanel.innerHTML = '';
+        this._lastColonistInfoHtml = null;
+        this.setSummaryVisible(true);
+    }
+
+    // Show or hide the persistent Colony Summary footer, and keep its contents
+    // live while visible. `visible` is set by the show* methods: false whenever
+    // a living entity (colonist/animal/raider/tamed/summon) is the subject, true
+    // otherwise (nothing selected, or a tile/structure is selected).
+    setSummaryVisible(visible) {
+        this._summaryVisible = visible;
+        if (!visible) {
+            if (this.elements.colonySummary.innerHTML !== '') this.elements.colonySummary.innerHTML = '';
+            this.elements.colonySummary.style.display = 'none';
+            this._lastSummaryHtml = null;
+            this._pendingSummaryHtml = null;
+        } else {
+            this.elements.colonySummary.style.display = '';
+            this._refreshColonySummary();
+        }
+    }
+
+    _refreshColonySummary() {
+        if (!this._summaryVisible) return;
+        const html = this.buildColonyOverviewHtml();
+        if (html !== this._lastSummaryHtml) {
+            this._lastSummaryHtml = html;
+            if (this.elements.colonySummary.matches(':hover')) {
+                this._pendingSummaryHtml = html;
+            } else {
+                this.elements.colonySummary.innerHTML = html;
+                this._pendingSummaryHtml = null;
+            }
+        }
     }
 
     _buildSlotSelect(colonist, slot) {
@@ -1900,6 +2012,7 @@ export class UI {
     showAnimalInfo(animal) {
         this._switchToInfoTab();
         this._viewingColonistId = null;
+        this.setSummaryVisible(false);
         const def = ANIMALS[animal.type];
         let html = `<div class="info-header">${animal.type}</div>`;
         html += `<div class="info-row">HP: ${animal.hp}/${animal.maxHp}</div>`;
@@ -1958,6 +2071,7 @@ export class UI {
         this._switchToInfoTab();
         this._lastTileInfo = { tile, x, y };
         this._viewingColonistId = null;
+        this.setSummaryVisible(true);
         this._viewingRiftGate = (tile.structure === 'rift_gate');
         let html = `<div class="info-header">Tile (${x},${y})</div>`;
         html += `<div class="info-row">Terrain: ${tile.terrain}</div>`;
@@ -2078,6 +2192,10 @@ export class UI {
 
     showTileEntities(tile, x, y, colonists, animals, raiders = [], tamedAnimals = [], summons = []) {
         this._switchToInfoTab();
+        // Living entities suppress the summary; a tile-only selection keeps it.
+        const hasEntities = colonists.length > 0 || animals.length > 0 || raiders.length > 0
+            || tamedAnimals.length > 0 || summons.length > 0;
+        this.setSummaryVisible(!hasEntities);
         this._viewingRiftGate = (tile.structure === 'rift_gate');
         this._viewingColonistId = (colonists.length === 1 && animals.length === 0 && raiders.length === 0 && tamedAnimals.length === 0 && summons.length === 0)
             ? colonists[0].id : null;
@@ -2312,6 +2430,7 @@ export class UI {
     showMultiColonistInfo(colonists) {
         this._switchToInfoTab();
         this._viewingColonistId = null;
+        this.setSummaryVisible(false);
         const draftedCount = colonists.filter(c => c.drafted).length;
         let html = `<div class="info-header">${colonists.length} Colonists Selected</div>`;
         html += `<div class="info-actions" style="margin-bottom:8px;">`;
@@ -2674,16 +2793,18 @@ export class UI {
             const weaponIcon = c.weapon ? this._itemIcon(c.weapon.key, 'weapon') : '';
             const weapon = c.weapon?.name || 'Fists';
             html += `<div class="hud-colonist" data-colonist-id="${c.id}">`;
-            const needsDots = `<span class="hud-dots"><span style="color:${moodColor}">●</span><span style="color:${hungerColor}">●</span><span style="color:${restColor}">●</span><span style="color:${hpColor}">●</span></span>`;
             const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ' <span style="color:#ff6644">[Fatigued]</span>' : '';
-            html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> ${needsDots} <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
-            const cHpPct = c.maxHp > 0 ? (c.hp / c.maxHp) * 100 : 100;
-            const hpBar = statBarHtml({ key: `hud:hp:${c.id}`, pct: cHpPct, color: hpColor, max: c.maxHp, width: 60 });
+            html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
+            // Labeled colored dots: one at-a-glance line per need, dot color = level.
+            const dot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
             const cManaPct = c.maxMana > 0 ? (c.mana / c.maxMana) * 100 : 0;
-            const manaBar = c.maxMana > 0
-                ? ` | <span style="color:#4488ff">Mana: ${Math.floor(c.mana)}/${c.maxMana}</span>${statBarHtml({ key: `hud:mana:${c.id}`, pct: cManaPct, color: '#4488ff', max: c.maxMana, width: 60 })}`
-                : '';
-            html += `<div class="hud-bars">Mood: <span style="color:${moodColor}">${c.mood.toFixed(0)} (${moodLevel})</span> | Hunger: <span style="color:${hungerColor}">${c.needs.hunger.toFixed(0)}</span> | Rest: <span style="color:${restColor}">${c.needs.rest.toFixed(0)}</span> | HP: <span style="color:${hpColor}">${Math.round(c.hp)}/${c.maxHp}</span>${hpBar}${manaBar}</div>`;
+            html += `<div class="hud-dots">`;
+            html += dot('Mood', moodColor);
+            html += dot('Food', hungerColor);
+            html += dot('Rest', restColor);
+            html += dot('HP', hpColor);
+            if (c.maxMana > 0) html += dot('MP', statColor(cManaPct));
+            html += `</div>`;
             html += `</div>`;
         }
 
@@ -2703,10 +2824,9 @@ export class UI {
                 const weaponIcon = g.weapon ? this._itemIcon(g.weapon.key, 'weapon') : '';
                 const weapon = g.weapon?.name || 'None';
                 html += `<div class="hud-colonist" data-colonist-id="${g.id}">`;
-                html += `<span class="hud-name" style="color:${g.nameColor || '#ffff00'}">${g.name}</span> <span class="hud-dots"><span style="color:${hpColor}">●</span></span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${g.state}${g.drafted ? ' [D]' : ''}</span>`;
-                const gHpPct = g.maxHp > 0 ? (g.hp / g.maxHp) * 100 : 100;
-                const gHpBar = statBarHtml({ key: `hud:hp:${g.id}`, pct: gHpPct, color: hpColor, max: g.maxHp, width: 60 });
-                html += `<div class="hud-bars">HP: <span style="color:${hpColor}">${Math.round(g.hp)}/${g.maxHp}</span>${gHpBar}</div>`;
+                html += `<span class="hud-name" style="color:${g.nameColor || '#ffff00'}">${g.name}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${g.state}${g.drafted ? ' [D]' : ''}</span>`;
+                const gDot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
+                html += `<div class="hud-dots">${gDot('HP', hpColor)}</div>`;
                 html += `</div>`;
             }
         }

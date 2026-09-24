@@ -86,10 +86,16 @@ export class Weather {
     }
 
     getSeasonDisplay() {
-        const daysPerSeason = Math.floor(CONFIG.TICKS_PER_SEASON / CONFIG.TICKS_PER_DAY);
-        const currentDay = Math.floor(this.seasonTick / CONFIG.TICKS_PER_DAY) + 1;
         const seasonName = this.season.charAt(0).toUpperCase() + this.season.slice(1);
-        return `${seasonName} Y${this.year} Day ${currentDay}/${daysPerSeason}`;
+        return `${seasonName} Y${this.year}`;
+    }
+
+    // Current day within the season (1-based) and the season's total day count,
+    // derived from the tick constants so it tracks any config change.
+    getDayDisplay() {
+        const daysPerSeason = Math.max(1, Math.round(CONFIG.TICKS_PER_SEASON / CONFIG.TICKS_PER_DAY));
+        const dayOfSeason = Math.min(daysPerSeason, Math.floor(this.seasonTick / CONFIG.TICKS_PER_DAY) + 1);
+        return `Day ${dayOfSeason}/${daysPerSeason}`;
     }
 
     getWeatherDisplay() {

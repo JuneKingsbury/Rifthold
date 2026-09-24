@@ -5,6 +5,11 @@ import { isPassable } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getSpellCooldownMult } from '../systems/complexBuildings.js';
 
+// Minimum cursor travel (px) in normal mode before a mouse gesture counts as a
+// box-select rather than a click. Guards clicks near a tile boundary, where
+// sub-tile jitter would otherwise cross into the next tile and read as a drag.
+const DRAG_SELECT_PX = 4;
+
 export class InputHandler {
     constructor(game, preElement) {
         this.game = game;
@@ -640,6 +645,7 @@ export class InputHandler {
             this.dragEnd = pos;
             this.dragging = true;
             this._clickPos = pos;
+            this._downClient = { x: e.clientX, y: e.clientY };
             return;
         }
 
@@ -695,7 +701,13 @@ export class InputHandler {
             } else if (this.mode === 'designate') {
                 this.designateArea(this.dragStart, pos);
             } else if (this.mode === 'normal') {
-                const wasDrag = this.dragStart.x !== pos.x || this.dragStart.y !== pos.y;
+                // Require real pixel movement (not just crossing a tile edge) to
+                // count as a box-select, so a click with sub-tile jitter near a
+                // tile boundary stays a click. Mirrors the touch path's _touchMoved.
+                const dpx = this._downClient ? Math.abs(e.clientX - this._downClient.x) : 0;
+                const dpy = this._downClient ? Math.abs(e.clientY - this._downClient.y) : 0;
+                const movedFar = Math.max(dpx, dpy) > DRAG_SELECT_PX;
+                const wasDrag = movedFar && (this.dragStart.x !== pos.x || this.dragStart.y !== pos.y);
                 if (wasDrag) {
                     this.selectColonistsInRect(this.dragStart, pos);
                 } else {
@@ -707,6 +719,7 @@ export class InputHandler {
             this.dragging = false;
             this._clickPos = null;
             this._rightDrag = false;
+            this._downClient = null;
         }
     }
 
@@ -1216,7 +1229,12 @@ export class InputHandler {
         const raiders = this.game.raiders.filter(inRect);
         const waveEnemies = this.game.waves ? this.game.waves.enemies.filter(inRect) : [];
 
-        if (colonists.length === 0 && animals.length === 0 && tamed.length === 0 && raiders.length === 0 && waveEnemies.length === 0 && summons.length === 0) return;
+        if (colonists.length === 0 && animals.length === 0 && tamed.length === 0 && raiders.length === 0 && waveEnemies.length === 0 && summons.length === 0) {
+            this.game.selectedColonist = null;
+            this.game.selectedColonists = [];
+            this.game.ui.showColonyOverview();
+            return;
+        }
 
         if (colonists.length > 0) {
             this.game.selectedColonist = colonists[0];
@@ -1253,6 +1271,19 @@ export class InputHandler {
         } else {
             this.game.selectedColonist = null;
             this.game.selectedColonists = [];
+        }
+
+        // Clicking bare terrain (nothing on it, no feature worth inspecting)
+        // clears the info panel so only the persistent Colony Summary shows,
+        // rather than a near-empty "Terrain: grass" tile block above it.
+        const nothingHere = colonistsHere.length === 0 && animalsHere.length === 0 && tamedHere.length === 0
+            && summonsHere.length === 0 && raidersHere.length === 0 && waveEnemiesHere.length === 0;
+        const bareTile = !tile.structure && !tile.floor && !tile.resource && !tile.zone
+            && tile.roomId === null && !tile.onFire;
+        if (nothingHere && bareTile) {
+            this.game.radiusHighlight = null;
+            this.game.ui.showColonyOverview();
+            return;
         }
 
         this.game.radiusHighlight = this._getRadiusHighlight(pos, tile, colonistsHere);
