@@ -2186,6 +2186,15 @@ export class Renderer {
         if (nameMode === 'always' || nameMode === 'selected') {
             const nameFontSize = Math.max(8, this.fontSize * 0.6);
             if (!this._nameCache) this._nameCache = new Map();
+            if (!this._pixelFontReady) {
+                this._pixelFontReady = document.fonts.check(`${nameFontSize}px 'Pixelify Sans'`);
+                if (!this._pixelFontReady) {
+                    document.fonts.load(`${nameFontSize}px 'Pixelify Sans'`).then(() => {
+                        this._pixelFontReady = true;
+                        this._nameCache.clear();
+                    });
+                }
+            }
             if (this._nameCacheFontSize !== nameFontSize) {
                 this._nameCache.clear();
                 this._nameCacheFontSize = nameFontSize;
@@ -2203,7 +2212,7 @@ export class Renderer {
                 const cacheKey = `${c.id}:${c.name}:${color}`;
                 let cached = this._nameCache.get(cacheKey);
                 if (!cached) {
-                    const nameFont = `${nameFontSize}px monospace`;
+                    const nameFont = `${nameFontSize}px 'Pixelify Sans', monospace`;
                     const offscreen = document.createElement('canvas');
                     const offCtx = offscreen.getContext('2d');
                     offCtx.font = nameFont;

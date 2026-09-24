@@ -1951,7 +1951,7 @@ function updateRelaxTick(colonist, game) {
     colonist._relaxTimer--;
     const info = RELAX_ACTIVITIES[colonist._relaxActivity];
     if (info && game.tick % 12 === 0) {
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: info.glyph, color: info.color, fontSize: 10, ttl: 11, maxTtl: 11 });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: info.glyph, color: info.color, fontSize: 14, ttl: 11, maxTtl: 11, initialAlpha: 0.9 });
     }
     // Strolling colonists amble about. Other activities stand in place.
     if (colonist._relaxActivity === 'stroll' && Math.random() < COLONIST_CONFIG.wanderChance) {
@@ -2341,7 +2341,7 @@ function updateSleeping(colonist, game) {
     if (colonist.traits.includes('insomniac')) sleepRestMult *= TRAITS.insomniac.sleepRestMult;
     colonist.needs.rest = Math.min(100, colonist.needs.rest + COLONIST_CONFIG.restPerTick * sleepRestMult);
     if (game.tick % 12 === 0) {
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Zzz', color: '#8888ff', fontSize: 10, ttl: 11, maxTtl: 11 });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Zzz', color: '#8888ff', fontSize: 14, ttl: 11, maxTtl: 11, initialAlpha: 0.9 });
     }
 
     // If resting to recover from injury, wake immediately when combat starts,

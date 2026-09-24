@@ -531,7 +531,7 @@ export class OverlayRenderer {
     _renderFloatingText(ctx, overlay, cw, ch, camera) {
         const progress = 1 - (overlay.ttl / overlay.maxTtl);
         const floatOffset = progress * 30;
-        const alpha = 1 - progress;
+        const alpha = (overlay.initialAlpha ?? 1) * (1 - progress);
 
         const sx = (overlay.x - camera.x) * cw + cw / 2;
         const sy = (overlay.y - camera.y) * ch - floatOffset;
@@ -539,7 +539,7 @@ export class OverlayRenderer {
 
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.font = `bold ${Math.round((overlay.fontSize || 12) * (this._uiFontScale || 1))}px monospace`;
+        ctx.font = `bold ${Math.round((overlay.fontSize || 12) * (this._uiFontScale || 1) * 1.4)}px 'VT323', monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -565,7 +565,7 @@ export class OverlayRenderer {
         const sy = (overlay.y - camera.y) * ch - floatOffset;
         if (sx < -100 || sx > this.canvas.width + 100 || sy < -50 || sy > this.canvas.height + 50) return;
 
-        const fontSize = Math.round(12 * (this._uiFontScale || 1));
+        const fontSize = Math.round(12 * (this._uiFontScale || 1) * 1.4);
         const text = `+${overlay.amount}`;
 
         // Resolve a sprite for the produced item/material (skin packs only).
@@ -579,7 +579,7 @@ export class OverlayRenderer {
 
         ctx.save();
         ctx.globalAlpha = Math.max(0, alpha);
-        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.font = `bold ${fontSize}px 'VT323', monospace`;
         ctx.textBaseline = 'middle';
 
         if (sprite) {
@@ -619,11 +619,15 @@ export class OverlayRenderer {
         if (sx < -100 || sx > this.canvas.width + 100 || sy < -50 || sy > this.canvas.height + 50) return;
 
         const text = overlay.text || '...';
-        const fontSize = Math.round(11 * (this._uiFontScale || 1));
+        const fontSize = Math.round(11 * (this._uiFontScale || 1) * 1.2);
+        const isEmoticon = text === ':)' || text === ':(' || text === '...';
+        const bubbleFont = isEmoticon
+            ? `${fontSize}px 'VT323', monospace`
+            : `bold ${fontSize}px 'Pixelify Sans', monospace`;
 
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.font = bubbleFont;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
