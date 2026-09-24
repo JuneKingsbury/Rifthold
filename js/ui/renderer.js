@@ -2289,11 +2289,15 @@ export class Renderer {
             // Light grid: each cell holds the max illumination (0..1) from any source.
             // Sources stamp their radius using Manhattan distance (matches the game's
             // tile-based movement so light feels consistent with gameplay distances).
-            if (!this._lightGrid || this._lightGrid.length < vw * vh) {
-                this._lightGrid = new Float32Array(vw * vh);
+            // Grid covers vw+2 x vh+2 tiles (matching the night canvas) so the two
+            // extra edge columns/rows have real light values rather than clamped copies.
+            const nightW = vw + 2;
+            const nightH = vh + 2;
+            if (!this._lightGrid || this._lightGrid.length < nightW * nightH) {
+                this._lightGrid = new Float32Array(nightW * nightH);
             }
-            if (!this._staticLightGrid || this._staticLightGrid.length < vw * vh) {
-                this._staticLightGrid = new Float32Array(vw * vh);
+            if (!this._staticLightGrid || this._staticLightGrid.length < nightW * nightH) {
+                this._staticLightGrid = new Float32Array(nightW * nightH);
             }
             const lightGrid = this._lightGrid;
 
@@ -2312,18 +2316,18 @@ export class Renderer {
                     const localY = src.y - camFloorY;
                     const r = src.radius;
                     const yStart = Math.max(0, localY - r);
-                    const yEnd = Math.min(vh - 1, localY + r);
+                    const yEnd = Math.min(nightH - 1, localY + r);
                     const xStart = Math.max(0, localX - r);
-                    const xEnd = Math.min(vw - 1, localX + r);
+                    const xEnd = Math.min(nightW - 1, localX + r);
                     for (let sy = yStart; sy <= yEnd; sy++) {
-                        const rowOff = sy * vw;
+                        const rowOff = sy * nightW;
                         const dy = Math.abs(sy - localY);
                         for (let sx = xStart; sx <= xEnd; sx++) {
                             const dist = dy + Math.abs(sx - localX);
                             if (dist > r) continue;
                             const falloff = 1 - (dist / (r + 1));
                             const idx = rowOff + sx;
-                            if (falloff > this._staticLightGrid[idx]) 
+                            if (falloff > this._staticLightGrid[idx])
                             this._staticLightGrid[idx] = falloff;
                         }
                     }
@@ -2337,11 +2341,11 @@ export class Renderer {
                 const localY = src.y - camFloorY;
                 const r = src.radius;
                 const yStart = Math.max(0, localY - r);
-                const yEnd = Math.min(vh - 1, localY + r);
+                const yEnd = Math.min(nightH - 1, localY + r);
                 const xStart = Math.max(0, localX - r);
-                const xEnd = Math.min(vw - 1, localX + r);
+                const xEnd = Math.min(nightW - 1, localX + r);
                 for (let sy = yStart; sy <= yEnd; sy++) {
-                    const rowOff = sy * vw;
+                    const rowOff = sy * nightW;
                     const dy = Math.abs(sy - localY);
                     for (let sx = xStart; sx <= xEnd; sx++) {
                         const dist = dy + Math.abs(sx - localX);
@@ -2357,8 +2361,6 @@ export class Renderer {
             // into a small tile-resolution ImageData, put it onto a tiny offscreen
             // canvas, then drawImage it scaled up onto the main canvas. This replaces
             // thousands of fillRect calls with one drawImage composite.
-            const nightW = vw + 2;
-            const nightH = vh + 2;
             if (!this._nightCanvas) {
                 this._nightCanvas = document.createElement('canvas');
                 this._nightCtx = this._nightCanvas.getContext('2d', { alpha: true });
@@ -2372,9 +2374,9 @@ export class Renderer {
             }
             const nightData = this._nightImageData.data;
             for (let sy = 0; sy < nightH; sy++) {
-                const rowOff = Math.min(sy, vh - 1) * vw;
+                const rowOff = sy * nightW;
                 for (let sx = 0; sx < nightW; sx++) {
-                    const shade = Math.round((1 - lightGrid[rowOff + Math.min(sx, vw - 1)]) * steps);
+                    const shade = Math.round((1 - lightGrid[rowOff + sx]) * steps);
                     const pIdx = (sy * nightW + sx) * 4;
                     if (shade < 1) {
                         nightData[pIdx + 3] = 0;
