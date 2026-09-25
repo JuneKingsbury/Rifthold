@@ -708,19 +708,18 @@ export class UI {
         const resPodHtml = resHtml +
             (manaStr ? `<span class="res" style="color:${power.hasPower() ? '#aa44ff' : '#ff6666'}">${manaStr}</span>` : '');
 
-        // Colony pod: season/date, weather, time, plus any conditional extras
-        // (wave, peaceful/demo badges). Population, average mood, and pending
-        // tasks now live in the Colony Summary panel, so they're intentionally
-        // omitted here to avoid duplication.
-        const colonyPodHtml =
+        // Datetime pod: season/year, day, time, plus wave/badges.
+        const datetimePodHtml =
             `<span class="info">${season}</span>` +
             `<span class="info status-extra">${dayStr}</span>` +
-            `<span class="sep">|</span>` +
-            `<span class="info status-extra">${this._getWeatherIcon()} ${weather} ${temp}°${tempUnit}</span>` +
             `<span class="info">${timeStr}</span>` +
             (waveStr ? `<span class="info" style="color:#cc00ff">${waveStr}</span>` : '') +
             (CONFIG.PEACEFUL_MODE ? `<span class="peaceful">PEACEFUL</span>` : '') +
             (this.game.settings.demoMode ? `<span class="demo-mode">DEMO</span>` : '');
+
+        // Weather pod: icon, condition, temperature.
+        const colonyPodHtml =
+            `<span class="info status-extra">${this._getWeatherIcon()} ${weather} ${temp}°${tempUnit}</span>`;
 
         if (resPodHtml !== this._lastResHtml) {
             this._lastResHtml = resPodHtml;
@@ -741,8 +740,13 @@ export class UI {
         }
         if (colonyPodHtml !== this._lastColonyHtml) {
             this._lastColonyHtml = colonyPodHtml;
-            const colonyEl = document.getElementById('status-colony');
-            if (colonyEl) colonyEl.innerHTML = colonyPodHtml;
+            const weatherEl = document.getElementById('status-weather');
+            if (weatherEl) weatherEl.innerHTML = colonyPodHtml;
+        }
+        if (datetimePodHtml !== this._lastDatetimeHtml) {
+            this._lastDatetimeHtml = datetimePodHtml;
+            const datetimeEl = document.getElementById('status-datetime');
+            if (datetimeEl) datetimeEl.innerHTML = datetimePodHtml;
         }
         this._updateSpeedButtons();
     }

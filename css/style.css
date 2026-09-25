@@ -227,14 +227,20 @@ body {
     padding: 2px 8px;
     background: #10101f;
 }
-/* Resources absorbs the slack so there is no dead middle gap; Colony sizes to
-   its content; Controls never shrinks (buttons must stay tappable). */
+/* Resources absorbs the slack so there is no dead middle gap; weather/datetime
+   size to their content; Controls never shrinks (buttons must stay tappable). */
 .hud-pod--resources { flex: 1 1 auto; }
-.hud-pod--colony { flex: 0 1 auto; }
+.hud-pod--weather { flex: 0 1 auto; }
+.hud-pod--datetime { flex: 0 1 auto; }
 .hud-pod--controls { flex: 0 0 auto; }
 
+/* Invisible on desktop; becomes a full-width flex break on mobile to force
+   datetime+controls onto their own row. */
+.hud-row-break { display: none; }
+
 #status-resources,
-#status-colony {
+#status-weather,
+#status-datetime {
     display: flex;
     flex-wrap: nowrap;
     gap: 8px;
@@ -2770,9 +2776,8 @@ details.settings-debug > summary::marker {
         grid-row: 5;
     }
 
-    /* Two-row HUD: a scrollable Resources+Colony stats strip on top, and a
-       full-width Controls row beneath. Labels and pod borders drop out so the
-       header stays short. */
+    /* Two-row HUD: Resources+Weather on the first row; Datetime+Controls share
+       the second row. Pod borders drop out so the header stays short. */
     #status-bar {
         padding: 3px 6px;
         gap: 4px;
@@ -2789,23 +2794,38 @@ details.settings-debug > summary::marker {
         flex-direction: row;
         align-items: center;
     }
-    #status-bar .hud-pod--resources,
-    #status-bar .hud-pod--colony {
+    #status-bar .hud-pod--resources {
         flex: 1 1 auto;
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
+    #status-bar .hud-pod--weather {
+        flex: 0 0 auto;
+        margin-left: auto;
+    }
     #status-bar #status-resources,
-    #status-bar #status-colony {
+    #status-bar #status-weather,
+    #status-bar #status-datetime {
         flex-wrap: nowrap;
     }
-    #status-bar .hud-pod--controls {
-        flex: 1 0 100%;
-        justify-content: center;
+    /* Force a line break before datetime so it always starts a new row. */
+    #status-bar .hud-row-break {
+        display: block;
+        width: 100%;
+        height: 0;
         border-top: 1px solid #333;
-        padding-top: 3px;
-        margin-top: 1px;
+        margin: 1px 0;
+    }
+    /* Datetime and Controls share the second row. */
+    #status-bar .hud-pod--datetime {
+        flex: 1 1 auto;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    #status-bar .hud-pod--controls {
+        flex: 0 0 auto;
+        justify-content: center;
     }
 
     #notifications {
@@ -2997,11 +3017,14 @@ details.settings-debug > summary::marker {
 /* Force-tabbed mirrors the two-row narrow HUD regardless of screen size. */
 .force-tabbed #status-bar { padding: 3px 6px; gap: 4px; font-size: 10px; flex-wrap: wrap; align-items: center; overflow: hidden; }
 .force-tabbed #status-bar .hud-pod { border: none; border-radius: 0; padding: 0; background: transparent; flex-direction: row; align-items: center; }
-.force-tabbed #status-bar .hud-pod--resources,
-.force-tabbed #status-bar .hud-pod--colony { flex: 1 1 auto; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.force-tabbed #status-bar .hud-pod--resources { flex: 1 1 auto; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.force-tabbed #status-bar .hud-pod--weather { flex: 0 0 auto; margin-left: auto; }
 .force-tabbed #status-bar #status-resources,
-.force-tabbed #status-bar #status-colony { flex-wrap: nowrap; }
-.force-tabbed #status-bar .hud-pod--controls { flex: 1 0 100%; justify-content: center; border-top: 1px solid #333; padding-top: 3px; margin-top: 1px; }
+.force-tabbed #status-bar #status-weather,
+.force-tabbed #status-bar #status-datetime { flex-wrap: nowrap; }
+.force-tabbed #status-bar .hud-row-break { display: block; width: 100%; height: 0; border-top: 1px solid #333; margin: 1px 0; }
+.force-tabbed #status-bar .hud-pod--datetime { flex: 1 1 auto; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.force-tabbed #status-bar .hud-pod--controls { flex: 0 0 auto; justify-content: center; }
 .force-tabbed #notifications { font-size: 10px; left: 4px; top: 2px; }
 .force-tabbed .notif { padding: 1px 5px; font-size: 10px; }
 .force-tabbed #priority-panel, .force-tabbed #craft-panel, .force-tabbed #research-panel,
@@ -3048,10 +3071,12 @@ details.settings-debug > summary::marker {
     .force-separate #status-bar { padding: 4px 8px; gap: 6px; font-size: inherit; flex-wrap: wrap; align-items: stretch; overflow: hidden; }
     .force-separate #status-bar .hud-pod { border: 1px solid #333; border-radius: 4px; padding: 2px 8px; background: #10101f; flex-direction: row; align-items: center; }
     .force-separate #status-bar .hud-pod--resources { flex: 1 1 auto; }
-    .force-separate #status-bar .hud-pod--colony { flex: 0 1 auto; overflow-x: visible; }
+    .force-separate #status-bar .hud-pod--weather { flex: 0 1 auto; overflow-x: visible; }
+    .force-separate #status-bar .hud-pod--datetime { flex: 0 1 auto; overflow-x: visible; }
     .force-separate #status-bar .hud-pod--controls { flex: 0 0 auto; border-top: none; padding-top: 2px; margin-top: 0; }
     .force-separate #status-bar #status-resources { flex-wrap: nowrap; overflow-x: auto; }
-    .force-separate #status-bar #status-colony { flex-wrap: nowrap; }
+    .force-separate #status-bar #status-weather,
+    .force-separate #status-bar #status-datetime { flex-wrap: nowrap; }
     .force-separate #notifications { font-size: inherit; left: 8px; top: 32px; }
     .force-separate .notif { padding: 4px 10px; font-size: inherit; }
     .force-separate #priority-panel, .force-separate #craft-panel, .force-separate #research-panel,
