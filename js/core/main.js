@@ -3070,6 +3070,136 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveSlotsPanel = document.getElementById('save-slots-panel');
     const modalBackdropEl = document.getElementById('modal-backdrop');
 
+    const splashOverlay = document.getElementById('splash-overlay');
+    const splashImage = document.getElementById('splash-image');
+    const splashStudio = document.getElementById('splash-studio');
+    let splashDone = false;
+    let splashFreezeTimer = null;
+
+    function endSplash() {
+        if (splashDone) return;
+        splashDone = true;
+        if (splashFreezeTimer) clearTimeout(splashFreezeTimer);
+        document.removeEventListener('click', skipSplash);
+        document.removeEventListener('keydown', skipSplash);
+        document.removeEventListener('touchstart', skipSplash);
+        startScreen.style.visibility = '';
+        splashOverlay.classList.add('hidden');
+        splashOverlay.addEventListener('transitionend', () => {
+            splashOverlay.remove();
+        }, { once: true });
+    }
+
+    function skipSplash() {
+        endSplash();
+    }
+
+    function parseGifDuration(buffer) {
+        const view = new Uint8Array(buffer);
+        let i = 13;
+        if (view[10] & 0x80) i += 3 * (1 << ((view[10] & 0x07) + 1));
+        let totalMs = 0;
+        while (i < view.length) {
+            if (view[i] === 0x3B) break;
+            if (view[i] === 0x21) {
+                if (view[i + 1] === 0xF9) {
+                    const delay = (view[i + 4] | (view[i + 5] << 8)) * 10;
+                    totalMs += delay || 100;
+                    i += 8;
+                } else {
+                    i += 2;
+                    while (i < view.length && view[i] !== 0) i += view[i] + 1;
+                    i++;
+                }
+            } else if (view[i] === 0x2C) {
+                i += 9;
+                const packed = view[i];
+                i++;
+                if (packed & 0x80) i += 3 * (1 << ((packed & 0x07) + 1));
+                i++;
+                while (i < view.length && view[i] !== 0) i += view[i] + 1;
+                i++;
+            } else {
+                i++;
+            }
+        }
+        return totalMs;
+    }
+
+    function removeGifLoop(buffer) {
+        const src = new Uint8Array(buffer);
+        for (let i = 0; i < src.length - 19; i++) {
+            if (src[i] !== 0x21 || src[i + 1] !== 0xFF || src[i + 2] !== 0x0B) continue;
+            const id = String.fromCharCode(...src.slice(i + 3, i + 14));
+            if (id === 'NETSCAPE2.0') {
+                const before = src.slice(0, i);
+                const after = src.slice(i + 19);
+                const result = new Uint8Array(before.length + after.length);
+                result.set(before);
+                result.set(after, before.length);
+                return result;
+            }
+        }
+        return src;
+    }
+
+    if (splashOverlay) {
+        startScreen.style.visibility = 'hidden';
+        document.addEventListener('click', skipSplash);
+        document.addEventListener('keydown', skipSplash);
+        document.addEventListener('touchstart', skipSplash);
+
+        const splashSrc = splashImage.src;
+        const isGif = splashSrc && splashSrc.match(/\.gif(\?|$)/i);
+
+        if (isGif) {
+            splashImage.src = '';
+            fetch(splashSrc)
+                .then(r => r.arrayBuffer())
+                .then(buf => {
+                    const duration = parseGifDuration(buf);
+                    const patched = removeGifLoop(buf);
+
+                    const frameUrl = URL.createObjectURL(new Blob([patched], { type: 'image/gif' }));
+                    const tempImg = new Image();
+                    tempImg.onload = () => {
+                        const c = document.createElement('canvas');
+                        c.width = tempImg.naturalWidth;
+                        c.height = tempImg.naturalHeight;
+                        c.getContext('2d').drawImage(tempImg, 0, 0);
+                        const staticUrl = c.toDataURL();
+                        URL.revokeObjectURL(frameUrl);
+
+                        splashImage.onload = () => {
+                            requestAnimationFrame(() => {
+                                splashImage.classList.add('visible');
+                                if (splashStudio) splashStudio.classList.add('visible');
+                                splashImage.addEventListener('transitionend', () => {
+                                    if (splashDone) return;
+                                    const playUrl = URL.createObjectURL(new Blob([patched], { type: 'image/gif' }));
+                                    splashImage.src = playUrl;
+                                    setTimeout(() => endSplash(), Math.max(duration + 2000, 3000));
+                                }, { once: true });
+                            });
+                        };
+                        splashImage.src = staticUrl;
+                    };
+                    tempImg.src = frameUrl;
+                })
+                .catch(() => endSplash());
+        } else {
+            if (splashImage.complete && splashImage.naturalWidth > 0) {
+                requestAnimationFrame(() => { splashImage.classList.add('visible'); if (splashStudio) splashStudio.classList.add('visible'); });
+            } else {
+                splashImage.onload = () => { splashImage.classList.add('visible'); if (splashStudio) splashStudio.classList.add('visible'); };
+                splashImage.onerror = () => endSplash();
+            }
+            setTimeout(() => endSplash(), 3000);
+        }
+    } else {
+        startScreen.style.visibility = '';
+    }
+
     function renderSlotCard(slotKey, meta, isAuto) {
         const isEmpty = !meta;
         const slotIndex = parseInt(slotKey.slice(-1));

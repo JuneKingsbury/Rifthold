@@ -43,7 +43,13 @@
     .slot-name-input{background:#0e0e22;color:#eee;border:1px solid #555;border-radius:3px;padding:2px 6px;font-size:11px;font-family:inherit;width:110px;}
     .slot-primary{border-color:#ffcc00 !important;}
     </style>
-    <div id="start-screen">
+    <div id="splash-overlay">
+        <div id="splash-bg"></div>
+        <div id="splash-vignette"></div>
+        <img id="splash-image" src="icons/splash.gif" alt="">
+        <div id="splash-studio"><img src="icons/juniperBerries.png" class="splash-berry" alt=""><span>berry branch games</span><img src="icons/juniperBerries.png" class="splash-berry" alt=""></div>
+    </div>
+    <div id="start-screen" style="visibility:hidden">
         <canvas id="start-bg-canvas"></canvas>
         <h1>Rifthold</h1>
         <h2>Arcane Frontiers</h2>

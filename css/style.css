@@ -69,6 +69,89 @@ body {
     transition: opacity 1s ease;
 }
 
+#splash-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20000;
+    transition: opacity 1s ease;
+    overflow: hidden;
+}
+
+#splash-bg {
+    position: absolute;
+    inset: -64px;
+    background: url('../icons/splashBackgroundTile.png') repeat;
+    background-size: 64px 64px;
+    image-rendering: pixelated;
+    animation: splash-scroll 16s linear infinite;
+    z-index: 0;
+}
+
+#splash-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+}
+
+@keyframes splash-scroll {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(64px, 64px); }
+}
+
+@keyframes splash-glow {
+    0%, 100% { text-shadow: 0 0 8px rgba(255,255,255,0.2); }
+    50%      { text-shadow: 0 0 18px rgba(255,255,255,0.5), 0 0 36px rgba(200,180,255,0.25); }
+}
+
+#splash-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#splash-image {
+    max-width: 80vw;
+    max-height: 60vh;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    object-fit: contain;
+    position: relative;
+    z-index: 2;
+}
+
+#splash-image.visible, #splash-studio.visible {
+    opacity: 1;
+}
+
+#splash-studio {
+    font-family: 'Pixelify Sans', monospace;
+    color: #ffffff;
+    font-size: 35px;
+    margin-top: 16px;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    position: relative;
+    z-index: 2;
+}
+
+
+.splash-berry {
+    height: 35px;
+    width: auto;
+    image-rendering: pixelated;
+}
+
 #start-screen > *:not(#start-bg-canvas) {
     position: relative;
     z-index: 1;
