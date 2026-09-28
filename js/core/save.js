@@ -8,6 +8,47 @@ const SAVE_VERSION = 10;
 const SLOT_META_KEY = 'colony_slot_meta';
 const SLOT_AUTO_NEXT_KEY = 'colony_slot_auto_next';
 
+function _steamCloud() {
+    return window.electronAPI?.steam;
+}
+
+export async function syncSlotToCloud(slotKey) {
+    const steam = _steamCloud();
+    if (!steam || !(await steam.available())) return;
+    const json = localStorage.getItem(slotKey);
+    if (json) steam.cloudWrite(`${slotKey}.json`, json);
+    const metaJson = localStorage.getItem(SLOT_META_KEY);
+    if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+}
+
+export async function syncAllFromCloud() {
+    const steam = _steamCloud();
+    if (!steam || !(await steam.available()) || !(await steam.cloudEnabled())) return;
+    const cloudMetaRaw = await steam.cloudRead(`${SLOT_META_KEY}.json`);
+    if (!cloudMetaRaw) return;
+    let cloudMeta;
+    try { cloudMeta = JSON.parse(cloudMetaRaw); } catch { return; }
+    const localMeta = getAllSlotsMeta();
+    for (const [slotKey, cloudEntry] of Object.entries(cloudMeta)) {
+        const localEntry = localMeta[slotKey];
+        if (localEntry && localEntry.timestamp >= cloudEntry.timestamp) continue;
+        const slotData = await steam.cloudRead(`${slotKey}.json`);
+        if (slotData) {
+            localStorage.setItem(slotKey, slotData);
+            localMeta[slotKey] = cloudEntry;
+        }
+    }
+    localStorage.setItem(SLOT_META_KEY, JSON.stringify(localMeta));
+}
+
+async function _cloudDeleteSlot(slotKey) {
+    const steam = _steamCloud();
+    if (!steam || !(await steam.available())) return;
+    steam.cloudDelete(`${slotKey}.json`);
+    const metaJson = localStorage.getItem(SLOT_META_KEY);
+    if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+}
+
 function _buildSaveData(game) {
     const layout = captureLayout();
     return {
@@ -191,6 +232,7 @@ export function saveToSlot(game, slotKey, opts = {}) {
     if (opts.label) meta.label = opts.label;
     meta.thumbnail = captureThumbnail(game);
     _writeMeta(slotKey, meta);
+    syncSlotToCloud(slotKey);
     return true;
 }
 
@@ -219,6 +261,7 @@ export function deleteSlot(slotKey) {
     const all = getAllSlotsMeta();
     delete all[slotKey];
     localStorage.setItem(SLOT_META_KEY, JSON.stringify(all));
+    _cloudDeleteSlot(slotKey);
 }
 
 export function migrateColonySave() {

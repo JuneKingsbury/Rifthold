@@ -1,6 +1,7 @@
 const { app, BrowserWindow, protocol, net, ipcMain } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
+const steamBridge = require('./steam-bridge');
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'app',
@@ -62,6 +63,26 @@ ipcMain.handle('is-fullscreen', () => {
   return mainWindow ? mainWindow.isFullScreen() : false;
 });
 
+ipcMain.handle('quit', () => {
+  app.quit();
+});
+
+ipcMain.handle('steam:available', () => steamBridge.steamAvailable);
+ipcMain.handle('steam:player-info', () => steamBridge.getPlayerInfo());
+ipcMain.handle('steam:get-achievements', () => steamBridge.getAchievements());
+ipcMain.handle('steam:activate-achievement', (_, name) => steamBridge.activateAchievement(name));
+ipcMain.handle('steam:clear-achievement', (_, name) => steamBridge.clearAchievement(name));
+ipcMain.handle('steam:get-stat-int', (_, name) => steamBridge.getStatInt(name));
+ipcMain.handle('steam:set-stat-int', (_, name, value) => steamBridge.setStatInt(name, value));
+ipcMain.handle('steam:store-stats', () => steamBridge.storeStats());
+ipcMain.handle('steam:cloud-read', (_, filename) => steamBridge.cloudRead(filename));
+ipcMain.handle('steam:cloud-write', (_, filename, data) => steamBridge.cloudWrite(filename, data));
+ipcMain.handle('steam:cloud-delete', (_, filename) => steamBridge.cloudDelete(filename));
+ipcMain.handle('steam:cloud-list', () => steamBridge.cloudList());
+ipcMain.handle('steam:cloud-enabled', () => steamBridge.cloudEnabled());
+ipcMain.handle('steam:overlay-store', () => steamBridge.openOverlayStore());
+ipcMain.handle('steam:overlay-url', (_, url) => steamBridge.openOverlayUrl(url));
+
 app.whenReady().then(() => {
   protocol.handle('app', (request) => {
     const url = new URL(request.url);
@@ -74,10 +95,16 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(fullPath).href);
   });
 
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(path.join(__dirname, 'icons', 'RiftholdIcon2.png'));
+  }
+
   createWindow();
+  steamBridge.initialize(480);
 });
 
 app.on('window-all-closed', () => {
+  steamBridge.shutdown();
   app.quit();
 });
 

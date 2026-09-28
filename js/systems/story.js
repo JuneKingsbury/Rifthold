@@ -15,6 +15,7 @@ export class StorySystem {
                 year: game.weather.year,
                 season: game.weather.season,
             });
+            window.electronAPI?.steam?.activateAchievement(key);
             game.notifications.push({ text: `Story: "${milestone.title}"`, tick: game.tick, type: 'story' });
             game.eventLog.add(game, `Story unlocked: ${milestone.title}`, 'event', null);
             unlockedAny = true;

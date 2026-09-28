@@ -30,7 +30,7 @@ import { TradeRiftSystem } from '../systems/traderift.js';
 import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
-import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot } from './save.js';
+import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud } from './save.js';
 import { initResizeHandles } from '../ui/resize.js';
 import { SpatialHash } from '../world/spatial.js';
 import { MapIndex } from '../world/mapindex.js';
@@ -400,6 +400,13 @@ class Game {
                     this._lastAutoSaveTick = this.tick;
                     if (saveAutoSlot(this)) {
                         this.notifications.push({ text: 'Auto-saved', tick: this.tick, type: 'success' });
+                        if (window.electronAPI?.steam) {
+                            const steam = window.electronAPI.steam;
+                            for (const [key, value] of Object.entries(this.stats)) {
+                                if (typeof value === 'number') steam.setStatInt(key, value);
+                            }
+                            steam.storeStats();
+                        }
                     }
                 }
             }
@@ -3053,6 +3060,7 @@ function initPanelOverlay() {
 
 document.addEventListener('DOMContentLoaded', () => {
     migrateColonySave();
+    syncAllFromCloud();
 
     const startScreen = document.getElementById('start-screen');
     const gameContainer = document.getElementById('game-container');
@@ -4292,6 +4300,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (window.electronAPI?.onFullscreenChanged) {
         window.electronAPI.onFullscreenChanged(_syncFullscreenState);
+    }
+
+    if (window.electronAPI?.quit) {
+        document.getElementById('start-quit-row').style.display = '';
+        document.getElementById('start-quit').addEventListener('click', () => {
+            window.electronAPI.quit();
+        });
     }
     document.addEventListener('fullscreenchange', () => {
         _syncFullscreenState(!!document.fullscreenElement);
