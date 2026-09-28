@@ -49,6 +49,7 @@ import { TickProfiler } from './perf-probe.js';
 import { keybindingRowsHtml, beginRebindCapture, clearStoredBindings, resetStoredBinding, formatKeyLabel } from '../ui/keybindings-ui.js';
 
 function _setFullscreen(enabled) {
+    if (window.Capacitor?.isNativePlatform()) return;
     if (window.electronAPI?.setFullscreen) {
         window.electronAPI.setFullscreen(enabled);
     } else if (enabled && !document.fullscreenElement) {
@@ -56,6 +57,14 @@ function _setFullscreen(enabled) {
     } else if (!enabled && document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
     }
+}
+
+const _isMobileApp = !!window.Capacitor?.isNativePlatform();
+if (_isMobileApp) {
+    import('@capacitor/status-bar').then(({ StatusBar }) => {
+        StatusBar.setOverlaysWebView({ overlay: true });
+        StatusBar.hide();
+    }).catch(() => {});
 }
 
 class Game {
@@ -129,6 +138,11 @@ class Game {
         try {
             const saved = JSON.parse(localStorage.getItem('colony_settings'));
             if (saved) Object.assign(this.settings, saved);
+            if (_isMobileApp && !saved) {
+                this.settings.particleDensity = 50;
+                this.settings.showCrtScanlines = false;
+                this.settings.showCrtWarp = false;
+            }
         } catch (e) {}
         this._fpsFrames = 0;
         this._fpsLastTime = 0;

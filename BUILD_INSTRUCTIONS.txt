@@ -1,9 +1,11 @@
 ===============================================================================
-  RIFTHOLD - Desktop Build Instructions
+  RIFTHOLD - Build Instructions (Desktop & Android)
 ===============================================================================
 
 This game uses Electron to package the browser game as a standalone desktop
-executable. electron-builder handles creating platform-specific installers.
+executable, and Capacitor to package it as a native Android app.
+electron-builder handles desktop installers; Capacitor generates a standard
+Android Studio project.
 
 
 --- PREREQUISITES ---
@@ -74,16 +76,141 @@ Linux:
     cross-platform without issues.
 
 
+===============================================================================
+  ANDROID BUILD
+===============================================================================
+
+
+--- ANDROID PREREQUISITES ---
+
+1. Everything in the desktop prerequisites above (Node.js, npm, npm install).
+
+2. Android Studio: https://developer.android.com/studio
+   After installing, open Android Studio and let it download the Android SDK
+   and build tools via the setup wizard.
+
+
+--- BUILDING FOR ANDROID ---
+
+Sync web assets and open Android Studio:
+
+  npm run cap:android
+
+This does three things:
+  1. Copies game files into www/ (excluding Electron/dev files)
+  2. Syncs web assets and Capacitor plugins into the Android project
+  3. Opens the android/ project in Android Studio
+
+If you only want to sync without opening Android Studio:
+
+  npm run cap:sync
+
+
+--- RUNNING ON DEVICE / EMULATOR ---
+
+In Android Studio:
+
+  1. Select a device or emulator from the device dropdown in the toolbar.
+  2. Click the Run button (green play icon), or press Shift+F10.
+  3. The game will install and launch on the selected device.
+
+To build a debug APK without Android Studio:
+
+  cd android && ./gradlew assembleDebug
+
+Output: android/app/build/outputs/apk/debug/app-debug.apk
+
+
+--- BUILDING FOR PLAY STORE ---
+
+  1. In Android Studio: Build > Generate Signed Bundle / APK
+  2. Choose "Android App Bundle" (.aab) for Play Store uploads
+  3. Create or select a keystore for signing
+  4. Build the release bundle
+
+The .aab file will be in android/app/build/outputs/bundle/release/
+
+To submit to Google Play, you need a Google Play Developer account ($25 one-time
+fee): https://play.google.com/console
+
+
+--- ANDROID-SPECIFIC NOTES ---
+
+Orientation:
+  The app is locked to landscape mode (sensorLandscape) in AndroidManifest.xml.
+
+Screen:
+  The status bar is hidden automatically. The screen stays awake while the game
+  is running (FLAG_KEEP_SCREEN_ON).
+
+Safe areas:
+  UI elements (status bar, touch toolbar, footer) respect display cutouts and
+  notches via CSS env(safe-area-inset-*).
+
+Performance:
+  On a fresh install (no existing settings), the game defaults to lower particle
+  density (50%) and disables CRT effects for better mobile performance. Players
+  can re-enable these in the settings menu.
+
+Save data:
+  Saves use localStorage inside the WebView, which persists across app restarts.
+  The in-game Export button uses the Android share sheet to send save files.
+  Import works via the standard file picker.
+
+Touch input:
+  The game already supports touch controls: tap to select, drag to pan,
+  pinch to zoom, and a touch toolbar for common actions.
+
+
+--- UPDATING THE ANDROID BUILD ---
+
+After making changes to game code or assets:
+
+  npm run cap:sync
+
+This re-copies www/ and re-syncs plugins. Then rebuild in Android Studio.
+
+If you change Capacitor plugins (add/remove/update in package.json):
+
+  npm run cap:sync
+
+Capacitor will update the Android project's plugin registrations automatically.
+
+If you need to change Android-native settings (manifest, themes, icons):
+  Edit files directly in android/app/src/main/. These changes survive cap sync.
+
+
+--- ANDROID APP ICON ---
+
+The default Capacitor icon is a placeholder. To set the Rifthold icon:
+
+  Option A (manual):
+    Generate icons at all required densities from build/icon.png and place them
+    in android/app/src/main/res/mipmap-*/ic_launcher.png (and ic_launcher_round).
+    Android requires these sizes: 48, 72, 96, 144, 192 (mdpi through xxxhdpi).
+
+  Option B (automated):
+    npm install -g @capacitor/assets
+    Place a 1024x1024 source icon at assets/icon-only.png, then:
+    npx capacitor-assets generate --android
+
+
+===============================================================================
+  SAVE DATA LOCATION
+===============================================================================
+
+
 --- SAVE DATA LOCATION ---
 
-Player saves (localStorage) are stored in the Electron app data folder:
+Player saves (localStorage) are stored in the platform's app data folder:
 
-  Mac:    ~/Library/Application Support/Rifthold/
-  Win:    %APPDATA%/Rifthold/
-  Linux:  ~/.config/Rifthold/
+  Mac:     ~/Library/Application Support/Rifthold/
+  Win:     %APPDATA%/Rifthold/
+  Linux:   ~/.config/Rifthold/
+  Android: WebView localStorage (internal app storage, not user-accessible)
 
-These are separate from browser saves. Players can use the in-game
-Export/Import feature to transfer saves between browser and desktop versions.
+Each platform's saves are separate. Players can use the in-game Export/Import
+feature to transfer saves between browser, desktop, and mobile versions.
 
 
 --- TROUBLESHOOTING ---

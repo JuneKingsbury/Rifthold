@@ -515,29 +515,48 @@ export function hasSave() {
     return Object.keys(meta).length > 0;
 }
 
-export function exportSave() {
-    const json = localStorage.getItem(SAVE_KEY);
-    if (!json) return false;
+async function _mobileExport(json, filename) {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const { Share } = await import('@capacitor/share');
+    const result = await Filesystem.writeFile({
+        path: filename,
+        data: btoa(unescape(encodeURIComponent(json))),
+        directory: Directory.Cache,
+    });
+    await Share.share({ title: 'Rifthold Save', url: result.uri });
+}
+
+function _downloadJson(json, filename) {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `colony_save_${Date.now()}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+}
+
+export function exportSave() {
+    const json = localStorage.getItem(SAVE_KEY);
+    if (!json) return false;
+    const filename = `colony_save_${Date.now()}.json`;
+    if (window.Capacitor?.isNativePlatform()) {
+        _mobileExport(json, filename).catch(e => console.error('Mobile export failed:', e));
+    } else {
+        _downloadJson(json, filename);
+    }
     return true;
 }
 
 export function exportSlot(slotKey) {
     const json = localStorage.getItem(slotKey);
     if (!json) return false;
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${slotKey}_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const filename = `${slotKey}_${Date.now()}.json`;
+    if (window.Capacitor?.isNativePlatform()) {
+        _mobileExport(json, filename).catch(e => console.error('Mobile export failed:', e));
+    } else {
+        _downloadJson(json, filename);
+    }
     return true;
 }
 
