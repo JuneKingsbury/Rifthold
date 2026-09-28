@@ -17,6 +17,7 @@ import { statBarHtml, runStatBarPass, statBarFactors } from './stat-bar.js';
 import { installArcanePanel } from './ui-arcane.js';
 import { installResearchPanel } from './ui-research.js';
 import { installTutorialPanel } from './ui-tutorial.js';
+import { getAllSlotsMeta, exportSlot } from '../core/save.js';
 
 const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '❄', blizzard: '❅', heatwave: '♨' };
 
@@ -58,6 +59,7 @@ export class UI {
         this._invTab = 'resources';
         this._researchTab = 'foundations';
         this.settingsPanelVisible = false;
+        this.saveSlotPanelVisible = false;
         this.arcanePanelVisible = false;
         this._arcaneTab = 'nexus';
         this._arcaneExpSetup = null;
@@ -139,6 +141,7 @@ export class UI {
         this.elements.settingsPanel = document.getElementById('settings-panel');
         this.elements.arcanePanel = document.getElementById('arcane-panel');
         this.elements.storyPanel = document.getElementById('story-panel');
+        this.elements.saveSlotPanel = document.getElementById('save-slot-ingame-panel');
 
         this.initTutorialNote();
 
@@ -2464,7 +2467,7 @@ export class UI {
     _updateOverlay() {
         const anyOpen = this.priorityPanelVisible || this.craftPanelVisible ||
             this.researchPanelVisible || this.inventoryVisible ||
-            this.settingsPanelVisible ||
+            this.settingsPanelVisible || this.saveSlotPanelVisible ||
             this.arcanePanelVisible || this.storyPanelVisible;
         const overlay = document.getElementById('panel-overlay');
         if (overlay) overlay.classList.toggle('visible', anyOpen);
@@ -2498,6 +2501,10 @@ export class UI {
         if (this.storyPanelVisible) {
             this.storyPanelVisible = false;
             this.elements.storyPanel.style.display = 'none';
+        }
+        if (this.saveSlotPanelVisible) {
+            this.saveSlotPanelVisible = false;
+            this.elements.saveSlotPanel.style.display = 'none';
         }
     }
 
@@ -3418,6 +3425,74 @@ export class UI {
         this._updateOverlay();
     }
 
+    toggleSaveSlotPanel() {
+        const opening = !this.saveSlotPanelVisible;
+        this._closeAllPanels();
+        this.saveSlotPanelVisible = opening;
+        this._panelPause(opening);
+        this.elements.saveSlotPanel.style.display = opening ? 'block' : 'none';
+        if (opening) this.updateSaveSlotPanel();
+        window.soundManager?.playSFXPitched('open_close_click', opening ? 3 : -3);
+        this._updateOverlay();
+    }
+
+    updateSaveSlotPanel() {
+        const meta = getAllSlotsMeta();
+        const primary = this.game.settings.primarySaveSlot;
+        let html = `<div class="settings-section"><div class="settings-section-title">Save Slots</div>`;
+        html += `<div style="color:#aaa;font-size:11px;margin-bottom:8px;">Saving to a slot marks it as your active slot — the <b>Save Game</b> button will always save to it.</div>`;
+        for (let i = 0; i < 10; i++) {
+            const key = `colony_slot_manual_${i}`;
+            const m = meta[key] || null;
+            const isPrimary = key === primary;
+            const season = m ? (m.season.charAt(0).toUpperCase() + m.season.slice(1)) : '';
+            const gameStr = m ? `${season} Y${m.year} · Day ${m.dayOfSeason} · ${m.colonistCount} colonist${m.colonistCount !== 1 ? 's' : ''}` : '';
+            const dateStr = m ? new Date(m.timestamp).toLocaleString() : '';
+            const thumbHtml = m?.thumbnail
+                ? `<img class="slot-thumbnail" src="${m.thumbnail}" alt="">`
+                : `<div class="slot-thumbnail-placeholder"></div>`;
+            const nameVal = (m?.label || '').replace(/"/g, '&quot;');
+            const primaryBadge = isPrimary ? `<span style="color:#ffcc00;font-size:10px;margin-right:4px;" title="Active save slot">&#9733; Active</span>` : '';
+            html += `<div class="slot-card${m ? '' : ' slot-empty'}${isPrimary ? ' slot-primary' : ''}">
+                ${thumbHtml}
+                <div class="slot-label">Slot ${i + 1}${isPrimary ? '<br><span style="color:#ffcc00;font-size:9px;">&#9733; ACTIVE</span>' : ''}</div>
+                <div class="slot-meta">${m ? `${gameStr}<br><span class="slot-timestamp">${dateStr}</span>` : '<span style="color:#555">Empty</span>'}</div>
+                <input class="slot-name-input" type="text" placeholder="Name…" value="${nameVal}" data-slot-name-key="${key}" maxlength="30" style="margin-right:4px;">
+                <button class="slot-save-btn" data-slot-save-key="${key}">Save</button>
+                <button class="slot-export-btn" ${m ? '' : 'disabled'} data-slot-export-key="${key}">Export</button>
+                <button class="slot-load-btn" ${m ? '' : 'disabled'} data-slot-load-key="${key}">Load</button>
+            </div>`;
+        }
+        html += `</div>`;
+        this.elements.saveSlotPanel.innerHTML = html;
+
+        if (!this._saveSlotPanelListenerAdded) {
+            this._saveSlotPanelListenerAdded = true;
+            this.elements.saveSlotPanel.addEventListener('click', (e) => {
+                const saveBtn = e.target.closest('.slot-save-btn[data-slot-save-key]');
+                if (saveBtn) {
+                    const key = saveBtn.dataset.slotSaveKey;
+                    const nameInput = this.elements.saveSlotPanel.querySelector(`[data-slot-name-key="${key}"]`);
+                    const label = nameInput?.value.trim() || '';
+                    this.game.saveToSlot(key, label ? { label } : {});
+                    this.updateSaveSlotPanel();
+                    return;
+                }
+                const exportBtnEl = e.target.closest('.slot-export-btn[data-slot-export-key]');
+                if (exportBtnEl && !exportBtnEl.disabled) {
+                    exportSlot(exportBtnEl.dataset.slotExportKey);
+                    return;
+                }
+                const loadBtnEl = e.target.closest('.slot-load-btn[data-slot-load-key]');
+                if (loadBtnEl && !loadBtnEl.disabled) {
+                    const key = loadBtnEl.dataset.slotLoadKey;
+                    this.toggleSaveSlotPanel();
+                    this.game.loadFromSlot(key);
+                }
+            });
+        }
+    }
+
     populateSkinDropdown() {
         const el = document.getElementById('set-skin');
         if (!el) return;
@@ -3450,9 +3525,13 @@ export class UI {
         // ===== GENERAL TAB =====
         let general = '';
         general += `<div class="settings-section"><div class="settings-section-title">Save / Load</div>`;
+        const primarySlot = this.game.settings.primarySaveSlot;
+        const primaryLabel = primarySlot ? `Slot ${parseInt(primarySlot.slice(-1)) + 1}` : 'none';
+        general += `<div style="color:#aaa;font-size:11px;margin-bottom:6px;">Active slot: <span style="color:${primarySlot ? '#ffcc00' : '#666'}">${primaryLabel}</span></div>`;
         general += `<div class="settings-row" style="gap:8px;">`;
-        general += `<button onclick="window.game.save()" class="settings-btn settings-btn-green">Save Game</button>`;
+        general += `<button onclick="window.game.save()" class="settings-btn settings-btn-green"${primarySlot ? '' : ' title="No active slot selected"'}>Save Game</button>`;
         general += `<button onclick="window.game.exportSave()" class="settings-btn settings-btn-blue">Export Save</button>`;
+        general += `<button onclick="window.game.toggleSaveSlotPanel()" class="settings-btn">Save to Slot…</button>`;
         general += `</div></div>`;
 
         general += `<div class="settings-section"><button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">View Glossary</button></div>`;

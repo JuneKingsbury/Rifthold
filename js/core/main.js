@@ -30,7 +30,7 @@ import { TradeRiftSystem } from '../systems/traderift.js';
 import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
-import { saveGame, loadGame, hasSave, exportSave, importSave } from './save.js';
+import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot } from './save.js';
 import { initResizeHandles } from '../ui/resize.js';
 import { SpatialHash } from '../world/spatial.js';
 import { MapIndex } from '../world/mapindex.js';
@@ -75,6 +75,7 @@ class Game {
             activeSkin: localStorage.getItem('convocation_skin') || '16x16_tiny_world',
             demoMode: false,
             darkenOnPause: true,
+            primarySaveSlot: null,
             toolbarMode: 'auto',
             largeClickTargets: false,
             pauseOnFocusLoss: true,
@@ -372,7 +373,7 @@ class Game {
                 if (this._lastAutoSaveTick === undefined) this._lastAutoSaveTick = this.tick;
                 if (this.tick - this._lastAutoSaveTick >= intervalTicks) {
                     this._lastAutoSaveTick = this.tick;
-                    if (saveGame(this)) {
+                    if (saveAutoSlot(this)) {
                         this.notifications.push({ text: 'Auto-saved', tick: this.tick, type: 'success' });
                     }
                 }
@@ -2415,9 +2416,46 @@ class Game {
     }
 
     save() {
-        if (saveGame(this)) {
-            this.notifications.push({ text: 'Game saved!', tick: this.tick, type: 'success' });
+        const slot = this.settings.primarySaveSlot;
+        if (!slot) {
+            this.notifications.push({ text: 'No save slot selected. Use Settings → Save to Slot…', tick: this.tick, type: 'warning' });
+            return;
         }
+        if (saveToSlot(this, slot)) {
+            this.notifications.push({ text: 'Game saved!', tick: this.tick, type: 'success' });
+            this.saveSettingsToStorage();
+        }
+    }
+
+    saveToSlot(slotKey, opts = {}) {
+        if (saveToSlot(this, slotKey, opts)) {
+            this.settings.primarySaveSlot = slotKey;
+            this.saveSettingsToStorage();
+            this.notifications.push({ text: 'Saved!', tick: this.tick, type: 'success' });
+            return true;
+        }
+        return false;
+    }
+
+    loadFromSlot(slotKey) {
+        if (loadFromSlot(this, slotKey)) {
+            this.settings.primarySaveSlot = slotKey;
+            this.saveSettingsToStorage();
+            if (this.renderer) this.renderer.markTerrainDirty();
+            this.notifications.push({ text: 'Game loaded!', tick: this.tick, type: 'success' });
+            this.ui.updateModeDisplay(this.input);
+            if (this.settings.layoutMode && this.settings.layoutMode !== 'auto') {
+                this.setLayoutMode(this.settings.layoutMode);
+            }
+            if (this.settings.uiFontScale != null) window.setUIFontScale?.(this.settings.uiFontScale);
+            else if (this.settings.uiFontSize != null) window.setUIFontScale?.(this.settings.uiFontSize / 12);
+            return true;
+        }
+        return false;
+    }
+
+    toggleSaveSlotPanel() {
+        this.ui.toggleSaveSlotPanel();
     }
 
     load() {
@@ -2987,11 +3025,71 @@ function initPanelOverlay() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    migrateColonySave();
+
     const startScreen = document.getElementById('start-screen');
     const gameContainer = document.getElementById('game-container');
     const settingsPanel = document.getElementById('start-settings-panel');
     const loadBtn = document.getElementById('load-game');
     const exportBtn = document.getElementById('export-game');
+    const saveSlotsPanel = document.getElementById('save-slots-panel');
+    const modalBackdropEl = document.getElementById('modal-backdrop');
+
+    function renderSlotCard(slotKey, meta, isAuto) {
+        const isEmpty = !meta;
+        const slotIndex = parseInt(slotKey.slice(-1));
+        const defaultLabel = isAuto ? `Auto ${slotIndex + 1}` : `Slot ${slotIndex + 1}`;
+        const displayName = meta?.label || defaultLabel;
+        const season = meta ? (meta.season.charAt(0).toUpperCase() + meta.season.slice(1)) : '';
+        const gameStr = meta ? `${season} Y${meta.year} · Day ${meta.dayOfSeason} · ${meta.colonistCount} colonist${meta.colonistCount !== 1 ? 's' : ''}` : '';
+        const dateStr = meta ? new Date(meta.timestamp).toLocaleString() : '';
+        const thumbHtml = meta?.thumbnail
+            ? `<img class="slot-thumbnail" src="${meta.thumbnail}" alt="">`
+            : `<div class="slot-thumbnail-placeholder"></div>`;
+        return `<div class="slot-card${isEmpty ? ' slot-empty' : ''}">
+            ${thumbHtml}
+            <div class="slot-label">${defaultLabel}</div>
+            <div class="slot-meta">${isEmpty ? '<span style="color:#555">Empty</span>' : `<span class="slot-name">${displayName}</span><br>${gameStr}<br><span class="slot-timestamp">${dateStr}</span>`}</div>
+            <button class="slot-export-btn" ${isEmpty ? 'disabled' : ''} data-slot-export-key="${slotKey}">Export</button>
+            <button class="slot-load-btn" ${isEmpty ? 'disabled' : ''} data-slot-key="${slotKey}">Load</button>
+        </div>`;
+    }
+
+    function openSaveSlotScreen() {
+        const meta = getAllSlotsMeta();
+        let autoHtml = '';
+        for (let i = 0; i < 3; i++) {
+            autoHtml += renderSlotCard(`colony_slot_auto_${i}`, meta[`colony_slot_auto_${i}`] || null, true);
+        }
+        let manualHtml = '';
+        for (let i = 0; i < 10; i++) {
+            manualHtml += renderSlotCard(`colony_slot_manual_${i}`, meta[`colony_slot_manual_${i}`] || null, false);
+        }
+        document.getElementById('save-slots-auto').innerHTML = autoHtml;
+        document.getElementById('save-slots-manual').innerHTML = manualHtml;
+        saveSlotsPanel.style.display = 'block';
+        modalBackdropEl.style.display = 'block';
+        window.soundManager?.playSFXPitched('open_close_click', 3);
+    }
+
+    saveSlotsPanel.addEventListener('click', (e) => {
+        const exportBtn2 = e.target.closest('.slot-export-btn[data-slot-export-key]');
+        if (exportBtn2 && !exportBtn2.disabled) {
+            exportSlot(exportBtn2.dataset.slotExportKey);
+            return;
+        }
+        const btn = e.target.closest('.slot-load-btn[data-slot-key]');
+        if (!btn || btn.disabled) return;
+        const key = btn.dataset.slotKey;
+        saveSlotsPanel.style.display = 'none';
+        modalBackdropEl.style.display = 'none';
+        window.soundManager?.playSFXPitched('open_close_click', -3);
+        launchGame(game => {
+            loadFromSlot(game, key);
+            game.settings.primarySaveSlot = key;
+            game.saveSettingsToStorage();
+        });
+    });
 
     const versionLabel = document.getElementById('version-label');
     if (versionLabel) versionLabel.textContent = `v${GAME_VERSION}`;
@@ -3216,7 +3314,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', renderStartBackground);
 
     if (hasSave()) {
-        loadBtn.disabled = false;
         exportBtn.disabled = false;
     }
 
@@ -3246,6 +3343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         changelogPanel.style.display = 'none';
         const colonistsPanelEl = document.getElementById('colonists-panel');
         if (colonistsPanelEl) colonistsPanelEl.style.display = 'none';
+        saveSlotsPanel.style.display = 'none';
         modalBackdrop.style.display = 'none';
     }
 
@@ -4384,6 +4482,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const customDefs = readCustomColonistDefs();
         launchGame(game => {
             Object.assign(game.settings, startSettings);
+            game.settings.primarySaveSlot = null;
             if (startSettings.colorblindMode !== 'none') {
                 document.getElementById('game-container').setAttribute('data-colorblind', startSettings.colorblindMode);
             }
@@ -4395,7 +4494,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     loadBtn.addEventListener('click', () => {
-        launchGame(game => game.load());
+        openSaveSlotScreen();
     });
 
     document.getElementById('start-blueprint').addEventListener('click', () => {
@@ -4467,9 +4566,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!file) return;
         const success = await importSave(file);
         if (success) {
-            loadBtn.disabled = false;
             exportBtn.disabled = false;
-            launchGame(game => game.load());
+            openSaveSlotScreen();
         } else {
             alert('Invalid save file.');
         }

@@ -28,7 +28,23 @@
             </filter>
         </defs>
     </svg>
-    <style>.crt-warp{filter:url(#crt-warp);}</style>
+    <style>.crt-warp{filter:url(#crt-warp);}
+    .slot-card{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #444;border-radius:4px;background:#16162a;margin-bottom:6px;min-height:56px;}
+    .slot-card.slot-empty{opacity:0.5;}
+    .slot-thumbnail{width:60px;height:40px;object-fit:cover;border-radius:3px;border:1px solid #333;flex-shrink:0;background:#0a0a1a;}
+    .slot-thumbnail-placeholder{width:60px;height:40px;flex-shrink:0;background:#0a0a1a;border:1px solid #333;border-radius:3px;}
+    .slot-label{color:#ffcc00;font-size:11px;font-weight:bold;min-width:52px;}
+    .slot-meta{flex:1;font-size:11px;color:#ccc;line-height:1.4;}
+    .slot-name{color:#eee;font-size:12px;font-weight:bold;}
+    .slot-timestamp{color:#777;font-size:10px;}
+    .slot-load-btn{padding:4px 10px;font-size:11px;background:#2a2a4e;color:#ffcc00;border:1px solid #555;border-radius:3px;cursor:pointer;font-family:inherit;}
+    .slot-load-btn:disabled{color:#555;border-color:#333;cursor:default;background:#16162a;}
+    .slot-export-btn{padding:4px 10px;font-size:11px;background:#2a1e3a;color:#bb99dd;border:1px solid #664488;border-radius:3px;cursor:pointer;font-family:inherit;margin-right:4px;}
+    .slot-export-btn:disabled{color:#555;border-color:#333;cursor:default;background:#16162a;}
+    .slot-save-btn{padding:4px 10px;font-size:11px;background:#1e3a1e;color:#88cc88;border:1px solid #446644;border-radius:3px;cursor:pointer;font-family:inherit;margin-right:4px;}
+    .slot-name-input{background:#0e0e22;color:#eee;border:1px solid #555;border-radius:3px;padding:2px 6px;font-size:11px;font-family:inherit;width:110px;}
+    .slot-primary{border-color:#ffcc00 !important;}
+    </style>
     <div id="start-screen">
         <canvas id="start-bg-canvas"></canvas>
         <h1>Rifthold</h1>
@@ -41,7 +57,7 @@
         <div class="start-btn-grid">
             <div class="start-btn-row">
                 <button id="start-game">New Game</button>
-                <button id="load-game" disabled>Load Game</button>
+                <button id="load-game">Load Game</button>
             </div>
             <div class="start-btn-row">
                 <button id="start-colonists" data-modal-open>Party Setup</button>
@@ -318,6 +334,17 @@
         <div id="colonist-slots-container" style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;"></div>
     </div>
 
+    <div id="save-slots-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(600px,94vw); max-height:82vh; overflow-y:auto; font-size:12px; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Load Game</div>
+            <button data-modal-close onclick="document.getElementById('save-slots-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
+        </div>
+        <div style="color:#aaa; font-size:11px; margin-bottom:8px;">Auto-saves</div>
+        <div id="save-slots-auto"></div>
+        <div style="color:#aaa; font-size:11px; margin:12px 0 8px;">Manual Saves</div>
+        <div id="save-slots-manual"></div>
+    </div>
+
     <div id="blueprint-editor" style="display:none;"></div>
     <div id="skin-editor" style="display:none;"></div>
     <div id="realm-editor" style="display:none;"></div>
@@ -401,6 +428,7 @@
         <div id="settings-panel"></div>
         <div id="arcane-panel"></div>
         <div id="story-panel"></div>
+        <div id="save-slot-ingame-panel"></div>
     </div>
 
     <div id="outro-overlay" style="display:none;">

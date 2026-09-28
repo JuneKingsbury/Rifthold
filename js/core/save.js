@@ -5,10 +5,12 @@ import { recalcMaxMana, invalidateEquipStatCache, defaultAttunedSchools } from '
 
 const SAVE_KEY = 'colony_save';
 const SAVE_VERSION = 10;
+const SLOT_META_KEY = 'colony_slot_meta';
+const SLOT_AUTO_NEXT_KEY = 'colony_slot_auto_next';
 
-export function saveGame(game) {
+function _buildSaveData(game) {
     const layout = captureLayout();
-    const data = {
+    return {
         version: SAVE_VERSION,
         tick: game.tick,
         timeOfDay: game.timeOfDay,
@@ -133,18 +135,120 @@ export function saveGame(game) {
         tasks: game.taskQueue.getAll(),
         eventLog: game.eventLog.entries,
     };
+}
 
+export function extractMeta(data) {
+    // CONFIG.TICKS_PER_DAY = 480
+    const dayOfSeason = Math.floor((data.weather?.seasonTick || 0) / 480) + 1;
+    return {
+        colonistCount: (data.colonists || []).length,
+        season: data.weather?.season || 'spring',
+        year: data.weather?.year || 1,
+        dayOfSeason,
+        timestamp: Date.now(),
+    };
+}
+
+export function captureThumbnail(game) {
+    try {
+        const src = document.getElementById('game-canvas');
+        if (!src || !src.width || !src.height) return null;
+        const W = 240, H = 160;
+        const offscreen = document.createElement('canvas');
+        offscreen.width = W;
+        offscreen.height = H;
+        const cropW = src.width * 0.75;
+        const cropH = src.height * 0.75;
+        const cropX = (src.width - cropW) / 2;
+        const cropY = (src.height - cropH) / 2;
+        offscreen.getContext('2d').drawImage(src, cropX, cropY, cropW, cropH, 0, 0, W, H);
+        return offscreen.toDataURL('image/png');
+    } catch {
+        return null;
+    }
+}
+
+export function getAllSlotsMeta() {
+    try {
+        return JSON.parse(localStorage.getItem(SLOT_META_KEY) || '{}');
+    } catch {
+        return {};
+    }
+}
+
+function _writeMeta(slotKey, metaEntry) {
+    const all = getAllSlotsMeta();
+    all[slotKey] = metaEntry;
+    localStorage.setItem(SLOT_META_KEY, JSON.stringify(all));
+}
+
+export function saveToSlot(game, slotKey, opts = {}) {
+    const data = _buildSaveData(game);
+    const json = JSON.stringify(data, (key, value) => key.startsWith('_') ? undefined : value);
+    localStorage.setItem(slotKey, json);
+    const meta = extractMeta(data);
+    meta.timestamp = Date.now();
+    if (opts.label) meta.label = opts.label;
+    meta.thumbnail = captureThumbnail(game);
+    _writeMeta(slotKey, meta);
+    return true;
+}
+
+export function loadFromSlot(game, slotKey) {
+    try {
+        const json = localStorage.getItem(slotKey);
+        if (!json) return false;
+        const data = JSON.parse(json);
+        return _applyLoadData(game, data);
+    } catch (e) {
+        console.error('Failed to load slot:', slotKey, e);
+        return false;
+    }
+}
+
+export function saveAutoSlot(game) {
+    const next = parseInt(localStorage.getItem(SLOT_AUTO_NEXT_KEY) || '0') % 3;
+    const slotKey = `colony_slot_auto_${next}`;
+    const result = saveToSlot(game, slotKey, { label: `Auto-save ${next + 1}` });
+    localStorage.setItem(SLOT_AUTO_NEXT_KEY, String((next + 1) % 3));
+    return result;
+}
+
+export function deleteSlot(slotKey) {
+    localStorage.removeItem(slotKey);
+    const all = getAllSlotsMeta();
+    delete all[slotKey];
+    localStorage.setItem(SLOT_META_KEY, JSON.stringify(all));
+}
+
+export function migrateColonySave() {
+    const existing = localStorage.getItem(SAVE_KEY);
+    if (!existing) return;
+    if (localStorage.getItem(SLOT_META_KEY)) return;
+    // Migrate old single save to manual slot 0
+    localStorage.setItem('colony_slot_manual_0', existing);
+    try {
+        const data = JSON.parse(existing);
+        const meta = extractMeta(data);
+        meta.label = 'Migrated Save';
+        const all = {};
+        all['colony_slot_manual_0'] = meta;
+        localStorage.setItem(SLOT_META_KEY, JSON.stringify(all));
+    } catch {
+        localStorage.setItem(SLOT_META_KEY, '{}');
+    }
+    localStorage.removeItem(SAVE_KEY);
+}
+
+export function saveGame(game) {
+    const data = _buildSaveData(game);
     const json = JSON.stringify(data, (key, value) => key.startsWith('_') ? undefined : value);
     localStorage.setItem(SAVE_KEY, json);
     return true;
 }
 
-export function loadGame(game) {
+function _applyLoadData(game, data) {
     try {
-        const json = localStorage.getItem(SAVE_KEY);
-        if (!json) return false;
-
-        const data = JSON.parse(json);
 
         // Saves are not migrated across versions. A mismatch is discarded and the
         // caller falls back to starting a fresh game.
@@ -154,7 +258,7 @@ export function loadGame(game) {
                 `Your save was made with an older game version (v${data.version}) and cannot be loaded.\n\nWould you like to export a backup of your save file before starting a new game?`
             );
             if (wantExport) {
-                const blob = new Blob([json], { type: 'application/json' });
+                const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -162,7 +266,6 @@ export function loadGame(game) {
                 a.click();
                 URL.revokeObjectURL(url);
             }
-            localStorage.removeItem(SAVE_KEY);
             return false;
         }
 
@@ -395,8 +498,21 @@ export function loadGame(game) {
     }
 }
 
+export function loadGame(game) {
+    try {
+        const json = localStorage.getItem(SAVE_KEY);
+        if (!json) return false;
+        const data = JSON.parse(json);
+        return _applyLoadData(game, data);
+    } catch (e) {
+        console.error('Failed to load save:', e);
+        return false;
+    }
+}
+
 export function hasSave() {
-    return localStorage.getItem(SAVE_KEY) !== null;
+    const meta = getAllSlotsMeta();
+    return Object.keys(meta).length > 0;
 }
 
 export function exportSave() {
@@ -412,6 +528,19 @@ export function exportSave() {
     return true;
 }
 
+export function exportSlot(slotKey) {
+    const json = localStorage.getItem(slotKey);
+    if (!json) return false;
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slotKey}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return true;
+}
+
 export function importSave(file) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -422,7 +551,11 @@ export function importSave(file) {
                     resolve(false);
                     return;
                 }
-                localStorage.setItem(SAVE_KEY, e.target.result);
+                const slotKey = 'colony_slot_manual_0';
+                localStorage.setItem(slotKey, e.target.result);
+                const meta = extractMeta(data);
+                meta.label = 'Imported Save';
+                _writeMeta(slotKey, meta);
                 resolve(true);
             } catch {
                 resolve(false);
