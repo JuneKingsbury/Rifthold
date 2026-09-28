@@ -122,8 +122,9 @@ function initPanelResizeHandle(handle) {
         const newLeft = startLeftWidth + dx;
         const newRight = startRightWidth - dx;
         if (newLeft < 60 || newRight < 60) return;
-        leftPanel.style.flex = `0 0 ${newLeft}px`;
-        rightPanel.style.flex = `0 0 ${newRight}px`;
+        const total = newLeft + newRight;
+        leftPanel.style.flex = `${newLeft / total} 1 0`;
+        rightPanel.style.flex = `${newRight / total} 1 0`;
     }
 
     function onPointerUp() {

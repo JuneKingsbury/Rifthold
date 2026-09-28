@@ -2935,7 +2935,9 @@ function resetMinimapSize() {
     const minWidth = controls.offsetWidth + 14;
     const controlsWidth = controls.offsetWidth + 4 + 10;
 
-    const totalWidth = footerContent.clientWidth;
+    const cs = getComputedStyle(footerContent);
+    const paddingH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const totalWidth = footerContent.clientWidth - paddingH;
     const resizeHandles = footerContent.querySelectorAll('.footer-panel-resize');
     const handleSpace = resizeHandles.length * 5;
     const panels = footerContent.querySelectorAll('.footer-panel');
@@ -3040,6 +3042,7 @@ function setFooterMode(tabbed) {
         infoPanel.classList.remove('active');
     }
     fitGameFont();
+    requestAnimationFrame(() => resetMinimapSize());
 }
 
 window.setFooterMode = setFooterMode;
@@ -4788,10 +4791,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const footer = document.getElementById('game-footer');
         if (!footer) return;
         const layoutMode = window.game?.settings?.layoutMode || 'auto';
-        if (layoutMode !== 'auto') return;
+        if (layoutMode !== 'auto') {
+            requestAnimationFrame(() => resetMinimapSize());
+            return;
+        }
         const isTabbed = footer.classList.contains('tabbed');
         const shouldTab = window.innerWidth <= 768;
         if (shouldTab && !isTabbed) setFooterMode(true);
         else if (!shouldTab && isTabbed) setFooterMode(false);
+        else requestAnimationFrame(() => resetMinimapSize());
     });
 });

@@ -2770,7 +2770,9 @@ export class UI {
             html += `<div style="color:#777; font-size:0.83em; margin-top:4px;">Automatically queues cooking when food drops below target. Set 0 to disable.</div>`;
             html += '</div>';
         }
-        if (html !== this._lastCraftHtml) {
+        const inputFocused = this.elements.craftPanel.contains(document.activeElement) &&
+            document.activeElement.tagName === 'INPUT';
+        if (!inputFocused && html !== this._lastCraftHtml) {
             this._lastCraftHtml = html;
             this.elements.craftPanel.innerHTML = html;
             const newTabsContainer = this.elements.craftPanel.querySelector('.craft-tabs');

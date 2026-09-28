@@ -22,7 +22,7 @@ export function detectRooms(map) {
             if (visited.has(key)) continue;
             const tile = map[y][x];
             if (isWall(tile)) continue;
-            if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock') continue;
+            if (tile.terrain === 'water' || tile.terrain === 'tall_rock') continue;
             if (!tile.passable) continue;
 
             const result = floodFill(map, x, y, visited);
@@ -78,10 +78,7 @@ function floodFill(map, startX, startY, visited) {
                 continue;
             }
             if (neighbor.terrain === 'water') continue;
-            if (neighbor.terrain === 'rock') {
-                enclosed = false;
-                continue;
-            }
+            if (neighbor.terrain === 'rock') continue;
             queue.push({ x: nx, y: ny });
         }
     }

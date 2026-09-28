@@ -142,7 +142,7 @@ export class InputHandler {
                 if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) continue;
                 const tile = this.game.map[y][x];
                 const key = y * CONFIG.MAP_WIDTH + x;
-                if (tile.resource || tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock' || !tile.passable) {
+                if (tile.resource || tile.terrain === 'water' || tile.terrain === 'tall_rock' || !tile.passable) {
                     blocked.add(key);
                     continue;
                 }

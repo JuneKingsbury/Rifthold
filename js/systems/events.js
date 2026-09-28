@@ -538,6 +538,7 @@ export class EventSystem {
             const res = available[Math.floor(Math.random() * available.length)];
             traderResources[res] = (traderResources[res] || 0) + 3 + Math.floor(Math.random() * 8);
         }
+        delete traderResources['gold'];
 
         // Build the exclusive stock: a handful of low-tier items plus a few premium
         // ones, each drawn without replacement and rolled to a per-merchant quality.
