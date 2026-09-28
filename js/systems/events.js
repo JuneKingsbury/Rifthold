@@ -705,10 +705,11 @@ export class EventSystem {
     }
 
     _getVoidWhisper(game, key) {
-        // Build the whispers list and find by key. Called at resolution time so
-        // function references survive save/load (functions cannot be serialized in JSON).
         const whispers = this._buildVoidWhispers(game);
-        return whispers.find(w => w.key === key) || null;
+        const found = whispers.find(w => w.key === key);
+        if (found) return found;
+        const communion = this._buildVoidCommunionWhispers(game);
+        return communion.find(w => w.key === key) || null;
     }
 
     _buildVoidWhispers(game) {
@@ -851,7 +852,7 @@ export class EventSystem {
             choices: ['Accept', 'Refuse'],
             data: { whisperKey: whisper.key },
         };
-        game.notifications.push({ text: 'The Void Nexus stirs...', tick: game.tick, type: 'event' });
+        game.notifications.push({ text: `The Void Nexus stirs before Wave ${game.waves.highestWaveCompleted + 1}...`, tick: game.tick, type: 'event' });
         game.eventLog.add(game, 'The Void Nexus pulsed with intent.', 'event', null);
         if (game.settings?.autoPauseEvent && !game.paused) {
             game.togglePause();
@@ -877,6 +878,118 @@ export class EventSystem {
         }
 
         this.pendingEvent = null;
+    }
+
+    _buildVoidCommunionWhispers(game) {
+        return [
+            {
+                key: 'crucible',
+                title: 'The Crucible',
+                text: 'The rift hungers. Feed it violence and I will amplify the spoils.',
+                ask: 'Immediately starts the next wave',
+                reward: '+50% bonus void essence from this wave',
+                condition: (g) => !g.waves.active && g.waves.findNexus(g) !== null,
+                apply: (g) => {
+                    g._voidWhisperForcedWaveBonusMult = 1.5;
+                    g.waves.startWave(g);
+                    g.camera.centerOn(g.waves.nexusPosition.x, g.waves.nexusPosition.y);
+                    g.eventLog.add(g, 'The Crucible begins! Wave forced with +50% essence reward.', 'danger', null);
+                },
+            },
+            {
+                key: 'void_pact',
+                title: 'Void Pact',
+                text: 'One of yours could be so much more. Let me reshape them. But know, if the Nexus falls, they fall with it.',
+                ask: 'A colonist becomes Void-Bound: +15% combat damage, -10% work speed',
+                reward: 'Permanent combat buff. But if the next wave is lost, they die',
+                condition: (g) => {
+                    const eligible = g.colonists.filter(c => c.hp > 0 && !c.golem && !c.voidBound);
+                    return eligible.length >= 2;
+                },
+                apply: (g) => {
+                    const eligible = g.colonists.filter(c => c.hp > 0 && !c.golem && !c.voidBound);
+                    const target = eligible.reduce((best, c) => {
+                        const dmg = c.weapon?.damage || 0;
+                        const bestDmg = best.weapon?.damage || 0;
+                        return dmg > bestDmg ? c : best;
+                    }, eligible[0]);
+                    target.voidBound = true;
+                    g._voidWhisperPactColonist = target.id;
+                    addThought(target, 'I feel off', -5, 960, g.tick);
+                    g.eventLog.add(g, `${target.name} is now Void-Bound. +15% combat damage, -10% work speed. If the next wave fails, the void will claim them.`, 'event', { type: 'colonist', id: target.id });
+                },
+            },
+            {
+                key: 'fortification',
+                title: 'Nexus Fortification',
+                text: 'Give me stone. Give me iron. I will protect you from what comes next.',
+                ask: 'Consume 10 stone and 5 iron',
+                reward: 'Nexus gets +50% max HP for the next wave',
+                condition: (g) => (g.resources.stockpile.stone || 0) >= 10 && (g.resources.stockpile.iron || 0) >= 5,
+                apply: (g) => {
+                    g.resources.deduct({ stone: 10, iron: 5 });
+                    g._voidWhisperNexusHpMult = 1.5;
+                    g.eventLog.add(g, 'Stone and iron consumed. The Nexus hardens. Next wave: +50% Nexus HP.', 'success', null);
+                },
+            },
+            {
+                key: 'hastened_swarm',
+                title: 'Hastened Swarm',
+                text: 'They will come faster. But each one carries more of what you seek.',
+                ask: 'Next wave enemies spawn twice as fast',
+                reward: '+100% void essence per kill during that wave',
+                condition: (g) => g.waves.findNexus(g) !== null,
+                apply: (g) => {
+                    g._voidWhisperHastenedSwarm = true;
+                    g.eventLog.add(g, 'The swarm hastens. Next wave: 2x spawn rate, 2x void essence per kill.', 'event', null);
+                },
+            },
+            {
+                key: 'tide_caller',
+                title: 'Tide Caller',
+                text: 'Let me summon something fiercer. Entertain me and you shall earn my favor.',
+                ask: `Next wave treated as Wave ${game.waves.highestWaveCompleted + 3} for enemy strength`,
+                reward: 'Permanent colony buff (+5% research, crafting, or combat) + bonus void essence',
+                condition: (g) => g.waves.findNexus(g) !== null && g.waves.highestWaveCompleted >= 1,
+                apply: (g) => {
+                    g._voidWhisperTideCallerActive = true;
+                    g.eventLog.add(g, 'The tide rises. Next wave will be far more dangerous — but the rewards will match.', 'danger', null);
+                },
+            },
+        ];
+    }
+
+    eventVoidCommunion(game) {
+        if (!game.voidWhisperStats) game.voidWhisperStats = { accepted: 0, refused: 0 };
+
+        const WHISPERS = this._buildVoidCommunionWhispers(game);
+        const eligible = WHISPERS.filter(w => !w.condition || w.condition(game));
+        if (eligible.length === 0) {
+            game.notifications.push({ text: 'The void has nothing to offer right now.', tick: game.tick, type: 'event' });
+            return;
+        }
+
+        if (!game._voidCommunionLastKey) game._voidCommunionLastKey = null;
+        const filtered = eligible.filter(w => w.key !== game._voidCommunionLastKey);
+        const pool = filtered.length > 0 ? filtered : eligible;
+        const whisper = pool[Math.floor(Math.random() * pool.length)];
+        game._voidCommunionLastKey = whisper.key;
+
+        this.pendingEvent = {
+            type: 'void_whisper',
+            title: whisper.title,
+            text: whisper.text,
+            askText: whisper.ask,
+            rewardText: whisper.reward,
+            choices: ['Accept', 'Refuse'],
+            data: { whisperKey: whisper.key },
+        };
+        game.notifications.push({ text: `You commune with the void before Wave ${game.waves.highestWaveCompleted + 1}...`, tick: game.tick, type: 'event' });
+        game.eventLog.add(game, 'You reach into the Nexus. Something answers.', 'event', null);
+        if (game.settings?.autoPauseEvent && !game.paused) {
+            game.togglePause();
+            game._eventPaused = true;
+        }
     }
 
     eventFire(game) {

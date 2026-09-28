@@ -1556,6 +1556,23 @@ class Game {
         }
     }
 
+    communeWithVoid() {
+        if (this.waves.active) {
+            this.notifications.push({ text: 'Cannot commune during a wave!', tick: this.tick, type: 'danger' });
+            return;
+        }
+        if (this._voidCommunionAvailable === false) {
+            this.notifications.push({ text: 'The Nexus is silent until the next wave concludes.', tick: this.tick, type: 'event' });
+            return;
+        }
+        if (!this.waves.findNexus(this)) {
+            this.notifications.push({ text: 'Build a Void Nexus first!', tick: this.tick, type: 'danger' });
+            return;
+        }
+        this.events.eventVoidCommunion(this);
+        this._voidCommunionAvailable = false;
+    }
+
     showExpeditionSetup(realmKey) {
         const available = this.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.drafted);
         if (available.length === 0) {

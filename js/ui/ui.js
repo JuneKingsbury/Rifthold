@@ -1345,6 +1345,9 @@ export class UI {
         html += `<div class="info-row">State: ${colonist.state} | Task: ${this.getColonistTaskDescription(colonist)}</div>`;
         const allTraits = traitSpanArr.filter(Boolean).join(', ');
         if (allTraits) html += `<div class="info-row">Traits: ${allTraits}</div>`;
+        if (colonist.voidBound) {
+            html += `<div class="info-row"><span style="color:#bb66ff">◈ Void-Bound</span> <span style="color:#888;font-size:0.85em">(+15% combat damage, -10% work speed)</span></div>`;
+        }
         html += `<div class="info-row">Bed: ${colonist.assignedBed ? `(${colonist.assignedBed.x},${colonist.assignedBed.y})` : 'None'}</div>`;
         if (this.game.exploration) {
             const expl = this.game.exploration;
@@ -1652,7 +1655,15 @@ export class UI {
 
         html += '<div class="info-row" style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333;margin-top:8px;padding-bottom:2px">Alerts</div>';
         const alerts = [];
-        if (waves.active) alerts.push(`<div class="info-row" style="color:#ff6644">[!] Wave ${waves.currentWave} active</div>`);
+        if (waves.active) {
+            const hpPct = waves.nexusMaxHp > 0 ? Math.round((waves.nexusHp / waves.nexusMaxHp) * 100) : 0;
+            const hpColor = hpPct > 60 ? '#44ff44' : hpPct > 30 ? '#ffaa44' : '#ff4444';
+            const hpBar = statBarHtml({ key: 'overview:nexushp', pct: hpPct, color: hpColor, max: waves.nexusMaxHp, width: 70 });
+            const remaining = waves.enemiesToSpawn - waves.enemiesSpawned;
+            alerts.push(`<div class="info-row" style="color:#ff6644;font-weight:bold">[!] Wave ${waves.currentWave} active</div>`);
+            alerts.push(`<div class="info-row" style="color:#bb88ff">Nexus HP: ${waves.nexusHp}/${waves.nexusMaxHp} ${hpBar}</div>`);
+            alerts.push(`<div class="info-row" style="color:#ff8844">Enemies: ${waves.enemies.length} alive${remaining > 0 ? `, ${remaining} spawning` : ''}</div>`);
+        }
         if (raiderCount > 0) alerts.push(`<div class="info-row" style="color:#ff6644">[!] ${raiderCount} hostile${raiderCount > 1 ? 's' : ''} on the map</div>`);
         if (lowHp > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowHpId}" style="color:#ff4444;cursor:pointer">${lowHp} badly hurt</div>`);
         if (hungry > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${hungryId}" style="color:#ccaa44;cursor:pointer">${hungry} hungry</div>`);
@@ -3959,13 +3970,22 @@ export class UI {
         this._lastEventId = eventId;
         this.elements.eventPanel.style.display = 'block';
         window.soundManager?.playSFXPitched('open_close_click', 3);
-        this.elements.eventPanel.className = evt.type === 'raid' ? 'event-panel-raid' : '';
-        let html = `<div class="event-text">${evt.text}</div>`;
+        this.elements.eventPanel.className = evt.type === 'raid' ? 'event-panel-raid' : evt.type === 'void_whisper' ? 'event-panel-void' : '';
+        let html = '';
         if (evt.type === 'void_whisper') {
-            html += `<div style="margin:6px 0;padding:6px;background:#0d0d1a;border-radius:3px;">`;
+            html += `<div class="event-text">◈ ${evt.title} ◈</div>`;
+            const waves = this.game.waves;
+            const waveCtx = waves.active
+                ? `The Nexus trembles — Wave ${waves.currentWave} rages`
+                : `The Nexus pulses before Wave ${waves.highestWaveCompleted + 1}`;
+            html += `<div class="void-whisper-context">◈ ${waveCtx} ◈</div>`;
+            html += `<div style="color:#aa88cc;font-size:0.9em;margin-bottom:6px;">${evt.text}</div>`;
+            html += `<div class="void-whisper-body">`;
             html += `<div style="color:#cc66ff;font-size:0.85em;margin-bottom:3px;"><b>It asks:</b> ${evt.askText}</div>`;
             html += `<div style="color:#88ddaa;font-size:0.85em;"><b>It offers:</b> ${evt.rewardText}</div>`;
             html += `</div>`;
+        } else {
+            html += `<div class="event-text">${evt.text}</div>`;
         }
         html += `<div class="event-choices">`;
         if (evt.type === 'trade') {

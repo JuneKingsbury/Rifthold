@@ -666,6 +666,8 @@ function getWorkSpeed(colonist, game) {
     }
     speed *= isNight ? getRaceModifier(colonist, 'nightSpeedMult', 1) : getRaceModifier(colonist, 'daySpeedMult', 1);
 
+    if (colonist.voidBound) speed *= 0.90;
+
     return speed;
 }
 
@@ -763,6 +765,16 @@ function getTraitDamageMult(colonist) {
     const postMoveBonus = getEquipmentStat(colonist, 'postMoveAttackBonus');
     if (postMoveBonus > 0 && colonist._lastMoveTick && (colonist._lastMoveTick >= (colonist._lastAttackTick || 0) - 2)) {
         mult *= (1 + postMoveBonus);
+    }
+    if (colonist.voidBound) mult *= 1.15;
+    return mult;
+}
+
+function getVoidCombatMult(game) {
+    if (!game.voidTideCallerBuffs) return 1;
+    let mult = 1;
+    for (const b of game.voidTideCallerBuffs) {
+        if (b.type === 'combat_damage') mult *= (1 + b.mult);
     }
     return mult;
 }
@@ -2229,6 +2241,11 @@ function updateWorking(colonist, game) {
             if (e.type === 'scholarship' && e.researchSpeedBonus) speed *= (1 + e.researchSpeedBonus);
         }
     }
+    if (task.type === 'research' && game.voidTideCallerBuffs) {
+        for (const b of game.voidTideCallerBuffs) {
+            if (b.type === 'research_speed') speed *= (1 + b.mult);
+        }
+    }
     if (task.type === 'research' && game.tick % 10 === 0) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.xpGainChar, color: COMBAT_VISUALS.xpGainColor, ttl: COMBAT_VISUALS.xpGainTtl });
     }
@@ -2485,6 +2502,7 @@ function updateFighting(colonist, game) {
         if (colonist.activePetDmgBonus) dmg += colonist.activePetDmgBonus;
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
+        dmg = Math.floor(dmg * getVoidCombatMult(game));
         if (target.armored) {
             const armoredBonus = getEquippedItems(colonist).reduce((sum, it) => sum + (it.armoredDamageBonus || 0), 0);
             if (armoredBonus > 0) dmg = Math.floor(dmg * (1 + armoredBonus));
@@ -2553,6 +2571,7 @@ function updateFighting(colonist, game) {
         if (colonist.activePetDmgBonus) dmg += colonist.activePetDmgBonus;
         dmg = Math.floor(dmg * getTraitDamageMult(colonist));
         dmg = Math.floor(dmg * getDefenseBonusMult(game));
+        dmg = Math.floor(dmg * getVoidCombatMult(game));
         if (target.armored) {
             const armoredBonus = getEquippedItems(colonist).reduce((sum, it) => sum + (it.armoredDamageBonus || 0), 0);
             if (armoredBonus > 0) dmg = Math.floor(dmg * (1 + armoredBonus));
@@ -2672,6 +2691,7 @@ function updateHunting(colonist, game) {
     huntDmg += Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
     if (colonist.pedestalDamageBonus > 1) huntDmg = Math.floor(huntDmg * colonist.pedestalDamageBonus);
     huntDmg = Math.floor(huntDmg * getTraitDamageMult(colonist));
+    huntDmg = Math.floor(huntDmg * getVoidCombatMult(game));
     const critChance = getCritChance(colonist);
     let isCrit = false;
     if (critChance > 0 && Math.random() < critChance) {

@@ -2067,6 +2067,61 @@ img.pixel-art-icon {
     background: #4a3a3a;
 }
 
+.event-panel-void {
+    background: #0d0d1a;
+    border-color: #7722cc;
+    animation: void-pulse 2.5s ease-in-out infinite, void-breathe 8s ease-in-out infinite, void-warp 6s ease-in-out infinite;
+}
+
+@keyframes void-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(119, 34, 204, 0.3); border-color: #7722cc; }
+    50%      { box-shadow: 0 0 22px rgba(187, 102, 255, 0.5); border-color: #bb66ff; }
+}
+
+@keyframes void-breathe {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50%      { transform: translate(-50%, -50%) scale(1.012); }
+}
+
+@keyframes void-warp {
+    0%, 100% { border-radius: 6px 6px 6px 6px; }
+    33%      { border-radius: 8px 4px 8px 4px; }
+    66%      { border-radius: 4px 8px 4px 8px; }
+}
+
+.event-panel-void .event-text {
+    color: #cc88ff;
+}
+
+.event-panel-void .void-whisper-context {
+    color: #8866aa;
+    font-size: 0.8em;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+}
+
+.event-panel-void .void-whisper-body {
+    margin: 6px 0;
+    padding: 6px;
+    background: #12102a;
+    border: 1px solid #3a2266;
+    border-radius: 3px;
+}
+
+.event-panel-void .event-choices button {
+    background: #1a1a2e;
+    border-color: #7733aa;
+    color: #ddbbff;
+}
+
+.event-panel-void .event-choices button:hover {
+    background: #2a2244;
+}
+
+.event-panel-void .event-choices button:first-child:hover {
+    box-shadow: 0 0 10px rgba(119, 34, 204, 0.4);
+}
+
 .event-text {
     margin-bottom: 12px;
     color: #ffcc44;

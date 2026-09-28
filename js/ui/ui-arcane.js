@@ -180,6 +180,11 @@ const arcaneMethods = {
             const nextWave = waves.highestWaveCompleted + 1;
             html += `<div class="info-row" style="margin-top:8px;">Next: Wave ${nextWave} — ${this.getWavePreview(nextWave)}</div>`;
             html += `<div class="info-actions" style="margin-top:8px;"><button onclick="window.game.startWave()" style="background:#6622aa;color:white;padding:8px 16px;font-size:1em;cursor:pointer;border:none;border-radius:4px;">Start Wave ${nextWave}</button></div>`;
+            if (this.game._voidCommunionAvailable !== false) {
+                html += `<div class="info-actions" style="margin-top:6px;"><button onclick="window.game.communeWithVoid()" style="background:#1a1a2e;color:#bb88ff;padding:8px 16px;font-size:1em;cursor:pointer;border:1px solid #7722cc;border-radius:4px;">◈ Commune with the Void</button></div>`;
+            } else {
+                html += `<div class="info-row" style="margin-top:6px;color:#554477;font-size:0.85em;">The Nexus is silent until the next wave concludes.</div>`;
+            }
         }
 
         if (waves.lastWaveResult) {

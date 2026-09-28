@@ -81,6 +81,11 @@ export function getCraftSpeedBonus(game) {
             if (b.type === 'crafting_speed') mult *= b.mult;
         }
     }
+    if (game.voidTideCallerBuffs) {
+        for (const b of game.voidTideCallerBuffs) {
+            if (b.type === 'crafting_speed') mult *= (1 + b.mult);
+        }
+    }
     return mult;
 }
 

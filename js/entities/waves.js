@@ -76,16 +76,45 @@ export class WaveSystem {
         this.enemies = [];
         const waveEnemyMult = game._voidWhisperWaveEnemyMult || 1;
         if (game._voidWhisperWaveEnemyMult) game._voidWhisperWaveEnemyMult = null;
-        this.enemiesToSpawn = Math.max(1, Math.round((WAVE_CONFIG.baseEnemies + WAVE_CONFIG.enemiesPerWave * (this.currentWave - 1)) * waveEnemyMult));
+        let effectiveWave = this.currentWave;
+        this.tideCallerActive = !!game._voidWhisperTideCallerActive;
+        if (game._voidWhisperTideCallerActive) {
+            game._voidWhisperTideCallerActive = null;
+            effectiveWave = this.currentWave + 2;
+        }
+
+        this.enemiesToSpawn = Math.max(1, Math.round((WAVE_CONFIG.baseEnemies + WAVE_CONFIG.enemiesPerWave * (effectiveWave - 1)) * waveEnemyMult));
         this.enemiesSpawned = 0;
         this.spawnTimer = 0;
         this.waveStartTick = game.tick;
+
+        this.forcedWaveBonusMult = game._voidWhisperForcedWaveBonusMult || 1;
+        if (game._voidWhisperForcedWaveBonusMult) game._voidWhisperForcedWaveBonusMult = null;
+
+        this.spawnIntervalOverride = 0;
+        this.essenceMultOverride = 1;
+        if (game._voidWhisperHastenedSwarm) {
+            game._voidWhisperHastenedSwarm = null;
+            this.spawnIntervalOverride = Math.floor(WAVE_CONFIG.spawnInterval / 2);
+            this.essenceMultOverride = 2;
+        }
+
+        const nexusHpMult = game._voidWhisperNexusHpMult || 1;
+        if (game._voidWhisperNexusHpMult) game._voidWhisperNexusHpMult = null;
+        this.nexusMaxHp = Math.round(this.nexusMaxHp * nexusHpMult);
+        this.nexusHp = this.nexusMaxHp;
+
         this.portals = [
             getWaveSpawnPosition(0, nexus),
             getWaveSpawnPosition(1, nexus),
             getWaveSpawnPosition(2, nexus),
             getWaveSpawnPosition(3, nexus),
         ];
+
+        if (game._voidWhisperReducedPortals) {
+            game._voidWhisperReducedPortals = null;
+            this.portals = [this.portals[0], this.portals[2]];
+        }
 
         game.notifications.push({ text: `Wave ${this.currentWave} begins! Defend the Void Nexus!`, tick: game.tick, type: 'danger' });
         game.eventLog.add(game, `Wave ${this.currentWave} started. ${this.enemiesToSpawn} enemies incoming!`, 'danger', { type: 'position', ...nexus });
@@ -104,7 +133,7 @@ export class WaveSystem {
 
         if (this.enemiesSpawned < this.enemiesToSpawn) {
             this.spawnTimer++;
-            if (this.spawnTimer >= WAVE_CONFIG.spawnInterval) {
+            if (this.spawnTimer >= (this.spawnIntervalOverride || WAVE_CONFIG.spawnInterval)) {
                 this.spawnTimer = 0;
                 this.spawnEnemy(game);
             }
@@ -120,7 +149,7 @@ export class WaveSystem {
                 // stays clear of the death skull that lingers on the corpse tile.
                 const voidMult = game.colonists.filter(c => c.hp > 0 && !c.golem && !c.onExpedition)
                     .reduce((best, c) => Math.max(best, getEquipmentStat(c, 'voidEssenceGainMult') || 1), 1);
-                game.resources.add({ void_essence: Math.round(WAVE_CONFIG.essencePerKill * voidMult) });
+                game.resources.add({ void_essence: Math.round(WAVE_CONFIG.essencePerKill * voidMult * (this.essenceMultOverride || 1)) });
                 if (enemy.loot) {
                     for (const drop of enemy.loot) {
                         if (Math.random() < (drop.chance || 1)) {
@@ -294,10 +323,8 @@ export class WaveSystem {
             this.highestWaveCompleted = this.currentWave;
             const voidMult = game.colonists.filter(c => c.hp > 0 && !c.golem && !c.onExpedition)
                 .reduce((best, c) => Math.max(best, getEquipmentStat(c, 'voidEssenceGainMult') || 1), 1);
-            const bonusEssence = Math.round(this.currentWave * WAVE_CONFIG.bonusEssencePerWave * voidMult);
+            const bonusEssence = Math.round(this.currentWave * WAVE_CONFIG.bonusEssencePerWave * voidMult * (this.forcedWaveBonusMult || 1));
             game.resources.add({ void_essence: bonusEssence });
-            // Each completed wave unlocks one additional Hearth Shrine slot.
-            // Players must still build and power each shrine to grow their colony cap.
             if (!game.hearthShrineBonus) game.hearthShrineBonus = 0;
             game.hearthShrineBonus++;
             game.ui?.updateBuildPanel?.(game.input);
@@ -306,6 +333,21 @@ export class WaveSystem {
             game.story.checkMilestone('first_wave_completed', game);
             if (game.stats) game.stats.wavesCompleted++;
             if (game.stats?.wavesCompleted >= 10) game.story.checkMilestone('waves_10_complete', game);
+
+            if (this.tideCallerActive) {
+                if (!game.voidTideCallerBuffs) game.voidTideCallerBuffs = [];
+                const buffTypes = [
+                    { type: 'research_speed', mult: 0.05, label: '+5% research speed' },
+                    { type: 'crafting_speed', mult: 0.05, label: '+5% crafting speed' },
+                    { type: 'combat_damage', mult: 0.05, label: '+5% combat damage' },
+                ];
+                const picked = buffTypes[Math.floor(Math.random() * buffTypes.length)];
+                game.voidTideCallerBuffs.push({ type: picked.type, mult: picked.mult });
+                const tideBonus = Math.round(this.currentWave * 3 * voidMult);
+                game.resources.add({ void_essence: tideBonus });
+                game.notifications.push({ text: `Tide Caller: ${picked.label} (permanent)! +${tideBonus} void essence.`, tick: game.tick, type: 'success' });
+                game.eventLog.add(game, `The Tide Caller's bargain fulfilled: ${picked.label} (permanent). +${tideBonus} void essence.`, 'success', null);
+            }
         } else {
             game.notifications.push({ text: `Wave ${this.currentWave} failed! The Void Nexus was destroyed!`, tick: game.tick, type: 'danger' });
             game.eventLog.add(game, `The Void Nexus was destroyed during wave ${this.currentWave}!`, 'danger', { type: 'position', ...this.nexusPosition });
@@ -316,6 +358,20 @@ export class WaveSystem {
             game.roomsDirty = true;
         }
 
+        if (game._voidWhisperPactColonist) {
+            const pactId = game._voidWhisperPactColonist;
+            game._voidWhisperPactColonist = null;
+            if (!victory) {
+                const pactColonist = game.colonists.find(c => c.id === pactId);
+                if (pactColonist && pactColonist.hp > 0) {
+                    pactColonist.hp = 0;
+                    game.notifications.push({ text: `${pactColonist.name}'s void pact is forfeit. The Nexus claims them.`, tick: game.tick, type: 'danger' });
+                    game.eventLog.add(game, `${pactColonist.name}'s void pact is forfeit. The Nexus claims them.`, 'danger', { type: 'colonist', id: pactColonist.id });
+                }
+            }
+        }
+
+        game._voidCommunionAvailable = true;
         this.lastWaveResult = { wave: this.currentWave, victory };
         this.active = false;
         this.enemies = [];
