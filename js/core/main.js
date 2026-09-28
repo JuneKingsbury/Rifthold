@@ -48,6 +48,16 @@ import { SoundManager } from './sound.js';
 import { TickProfiler } from './perf-probe.js';
 import { keybindingRowsHtml, beginRebindCapture, clearStoredBindings, resetStoredBinding, formatKeyLabel } from '../ui/keybindings-ui.js';
 
+function _setFullscreen(enabled) {
+    if (window.electronAPI?.setFullscreen) {
+        window.electronAPI.setFullscreen(enabled);
+    } else if (enabled && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else if (!enabled && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
 class Game {
     constructor() {
         this.tick = 74;
@@ -111,6 +121,7 @@ class Game {
             showColonistHighlight: false,
             showTutorial: true,
             fpsCap: 60,
+            enableFullscreen: false,
             keyBindings: {},
             showCrtScanlines: true,
             showCrtWarp: true,
@@ -2380,12 +2391,14 @@ class Game {
             showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, showActionAnimations: true, showTreeSway: true, showTerrainDetail: true, showExpeditionExtras: true, reduceMotion: false, layoutMode: 'auto',
             musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
             ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true,
+            enableFullscreen: false,
         });
         this.settings.keyBindings = keep;
         this.settings.craftTargets = craftTargets;
         this.settings.potionAutoUse = potionAutoUse;
         this.saveSettingsToStorage();
         // Re-apply live effects that have side effects beyond the settings object.
+        _setFullscreen(false);
         window.setUIFontScale?.(1);
         if (window.soundManager) { window.soundManager.setMusicVolume(50); window.soundManager.setSFXVolume(50); }
         document.getElementById('game')?.classList.toggle('paused', this.paused && this.settings.darkenOnPause);
@@ -4148,6 +4161,9 @@ document.addEventListener('DOMContentLoaded', () => {
             s.showMinimap = document.getElementById('start-minimap').checked;
             s.showFps = document.getElementById('start-fps').checked;
             s.fpsCap = document.getElementById('start-fps-cap').checked ? 30 : 60;
+            s.enableFullscreen = document.getElementById('start-fullscreen').checked;
+            s.showCrtScanlines = document.getElementById('start-crt-scanlines').checked;
+            s.showCrtWarp = document.getElementById('start-crt-warp').checked;
             s.ditherDistance = document.getElementById('start-dither-dist').value;
             s.ditherQuality = document.getElementById('start-dither-qual').value;
             s.darkenOnPause = document.getElementById('start-darken-pause').checked;
@@ -4167,6 +4183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
                 SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
             }
+            _setFullscreen(s.enableFullscreen);
         } catch (e) {}
     }
 
@@ -4214,6 +4231,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.showMinimap != null) document.getElementById('start-minimap').checked = s.showMinimap;
             if (s.showFps != null) document.getElementById('start-fps').checked = s.showFps;
             if (s.fpsCap != null) document.getElementById('start-fps-cap').checked = s.fpsCap === 30;
+            if (s.enableFullscreen != null) document.getElementById('start-fullscreen').checked = s.enableFullscreen;
+            if (s.showCrtScanlines != null) document.getElementById('start-crt-scanlines').checked = s.showCrtScanlines;
+            if (s.showCrtWarp != null) document.getElementById('start-crt-warp').checked = s.showCrtWarp;
             if (s.ditherDistance != null) document.getElementById('start-dither-dist').value = s.ditherDistance;
             if (s.ditherQuality != null) document.getElementById('start-dither-qual').value = s.ditherQuality;
             if (s.darkenOnPause != null) document.getElementById('start-darken-pause').checked = s.darkenOnPause;
@@ -4241,6 +4261,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('start-settings-panel').addEventListener('change', saveStartSettings);
     document.getElementById('start-settings-panel').addEventListener('input', saveStartSettings);
+
+    function _syncFullscreenState(isFs) {
+        const startCb = document.getElementById('start-fullscreen');
+        if (startCb) startCb.checked = isFs;
+        try {
+            const s = JSON.parse(localStorage.getItem('colony_settings') || '{}');
+            s.enableFullscreen = isFs;
+            localStorage.setItem('colony_settings', JSON.stringify(s));
+        } catch (e) {}
+        if (window.game) {
+            window.game.settings.enableFullscreen = isFs;
+            window.game.saveSettingsToStorage();
+        }
+    }
+
+    if (window.electronAPI?.onFullscreenChanged) {
+        window.electronAPI.onFullscreenChanged(_syncFullscreenState);
+    }
+    document.addEventListener('fullscreenchange', () => {
+        _syncFullscreenState(!!document.fullscreenElement);
+    });
 
     // Start-screen settings tabs (General / Graphics / Controls). Sections are
     // tagged with data-start-tab. We toggle visibility rather than re-render.
@@ -4316,8 +4357,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('start-particle-density-val').textContent = '100%';
         document.getElementById('start-minimap').checked = true;
         document.getElementById('start-equip-overlays').checked = true;
+        document.getElementById('start-fullscreen').checked = false;
         document.getElementById('start-fps').checked = false;
         document.getElementById('start-fps-cap').checked = false;
+        document.getElementById('start-crt-scanlines').checked = true;
+        document.getElementById('start-crt-warp').checked = true;
         document.getElementById('start-dither-dist').value = 'light';
         document.getElementById('start-dither-qual').value = 'medium';
         document.getElementById('start-darken-pause').checked = true;
@@ -4459,6 +4503,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showMinimap: document.getElementById('start-minimap').checked,
             showFps: document.getElementById('start-fps').checked,
             fpsCap: document.getElementById('start-fps-cap').checked ? 30 : 60,
+            enableFullscreen: document.getElementById('start-fullscreen').checked,
+            showCrtScanlines: document.getElementById('start-crt-scanlines').checked,
+            showCrtWarp: document.getElementById('start-crt-warp').checked,
             ditherDistance: document.getElementById('start-dither-dist').value,
             ditherQuality: document.getElementById('start-dither-qual').value,
             showColonistNames: document.getElementById('start-names').value,
@@ -4488,6 +4535,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (startSettings.layoutMode !== 'auto') {
                 game.setLayoutMode(startSettings.layoutMode);
+            }
+            if (startSettings.enableFullscreen) {
+                _setFullscreen(true);
             }
             game._pendingCustomColonists = customDefs;
         });

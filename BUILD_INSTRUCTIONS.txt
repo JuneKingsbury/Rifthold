@@ -1,0 +1,112 @@
+===============================================================================
+  RIFTHOLD - Desktop Build Instructions
+===============================================================================
+
+This game uses Electron to package the browser game as a standalone desktop
+executable. electron-builder handles creating platform-specific installers.
+
+
+--- PREREQUISITES ---
+
+1. Node.js (v18 or later): https://nodejs.org
+   Check: node --version
+
+2. npm (comes with Node.js):
+   Check: npm --version
+
+3. For Windows builds from Mac, you need Wine:
+   brew install --cask wine-stable
+
+4. Install project dependencies (run once, or after pulling changes):
+   npm install
+
+
+--- RUNNING LOCALLY (DEV MODE) ---
+
+  npm start
+
+This launches the game in an Electron window. Use F12 to toggle DevTools.
+All game features work identically to the browser version.
+
+
+--- BUILDING EXECUTABLES ---
+
+Build for a single platform:
+
+  npm run dist:mac       Mac .dmg installer       -> dist/
+  npm run dist:win       Windows .exe installer    -> dist/
+  npm run dist:linux     Linux .AppImage and .deb  -> dist/
+
+Build for all platforms at once:
+
+  npm run dist:all
+
+Output goes to the dist/ folder. Build artifacts:
+
+  Platform   | File                          | Format
+  -----------|-------------------------------|------------------
+  Mac        | Rifthold-0.2.0.dmg            | Disk image
+  Windows    | Rifthold Setup 0.2.0.exe      | NSIS installer
+  Linux      | Rifthold-0.2.0.AppImage       | Portable binary
+  Linux      | rifthold_0.2.0_amd64.deb      | Debian package
+
+
+--- PLATFORM-SPECIFIC NOTES ---
+
+Mac:
+  - The .dmg is unsigned. Users may need to right-click > Open the first time,
+    or go to System Preferences > Privacy & Security to allow it.
+  - To distribute via the Mac App Store or avoid Gatekeeper warnings, you need
+    an Apple Developer account and code signing. See:
+    https://www.electron.build/code-signing
+
+Windows:
+  - Cross-compiling from Mac requires Wine (see prerequisites above).
+  - The .exe installer is unsigned. Windows SmartScreen may show a warning on
+    first run. To avoid this, purchase a code signing certificate. See:
+    https://www.electron.build/code-signing
+  - The NSIS installer lets users choose the install directory.
+
+Linux:
+  - AppImage is a portable single-file executable (chmod +x, then run).
+  - .deb installs via: sudo dpkg -i rifthold_0.2.0_amd64.deb
+  - Building .deb from Mac may require additional tools. AppImage works
+    cross-platform without issues.
+
+
+--- SAVE DATA LOCATION ---
+
+Player saves (localStorage) are stored in the Electron app data folder:
+
+  Mac:    ~/Library/Application Support/Rifthold/
+  Win:    %APPDATA%/Rifthold/
+  Linux:  ~/.config/Rifthold/
+
+These are separate from browser saves. Players can use the in-game
+Export/Import feature to transfer saves between browser and desktop versions.
+
+
+--- TROUBLESHOOTING ---
+
+"npm start" shows a blank white window:
+  Check the DevTools console (F12) for errors. Most likely a font or asset
+  loading issue.
+
+Audio doesn't play:
+  Electron requires a user interaction before AudioContext can start (same as
+  browsers). Click anywhere in the game window first.
+
+"npm run dist:win" fails on Mac:
+  Install Wine: brew install --cask wine-stable
+
+Build output is very large:
+  The asar packaging is enabled by default, which helps. If audio files make
+  the build too large, consider compressing OGG files or excluding unused
+  tracks. Unused tracks are already excluded in the build config.
+
+Game runs but fonts look wrong:
+  The fonts are bundled locally in the fonts/ directory. If fonts/fonts.css
+  is missing or the woff2 files are missing, fonts will fall back to the
+  browser default.
+
+===============================================================================
