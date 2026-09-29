@@ -128,7 +128,7 @@ export function enabled() {
 export function beginAuth() {
     return new Promise(async (resolve, reject) => {
         const { verifier, challenge } = await _pkceChallenge();
-        const redirectUri = `${location.origin}/oauth-callback.html`;
+        const redirectUri = new URL('oauth-callback.html', location.href).href;
         const authUrl = new URL('https://accounts.google.com/o/oauth2/auth');
         authUrl.searchParams.set('client_id', CLIENT_ID);
         authUrl.searchParams.set('redirect_uri', redirectUri);
