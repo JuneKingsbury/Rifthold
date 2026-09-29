@@ -158,6 +158,11 @@ export function createColonist(x, y, skillBias, existingNames = [], forcedRace =
         trinket: null,
         boots: null,
         hiddenEquipmentSlots: {},
+        equipmentSets: {
+            Colony:     { weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null },
+            Expedition: { weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null },
+        },
+        activeSet: 'Colony',
         drafted: false,
         draftTarget: null,
         guardMode: false,

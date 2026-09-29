@@ -1398,54 +1398,77 @@ export class UI {
         // --- Equipment ---
         html += `<div style="${sectionHdr}">Equipment</div>`;
         const id = colonist.id;
+        // Determine which set tab the player is currently viewing (may differ from activeSet while browsing).
+        const viewingSet = this._colonistViewingSet?.[colonist.id] || colonist.activeSet || 'Colony';
+        const isViewingActive = viewingSet === (colonist.activeSet || 'Colony');
+        const setNames = Object.keys(colonist.equipmentSets || { Colony: {}, Expedition: {} });
+
+        // Set tab switcher
+        html += `<div style="display:flex;gap:4px;margin:4px 0 2px 0;">`;
+        for (const sn of setNames) {
+            const isActive = sn === (colonist.activeSet || 'Colony');
+            const isViewing = sn === viewingSet;
+            const bg = isViewing ? '#2a2a4e' : '#111';
+            const border = isViewing ? (isActive ? '#88aaff' : '#5566aa') : '#333';
+            const label = isActive ? `${sn} ◆` : sn;
+            html += `<button onclick="window.game.ui._setColonistViewingSet(${colonist.id},'${sn}')" style="flex:1;padding:2px 4px;background:${bg};border:1px solid ${border};border-radius:3px;color:${isViewing ? '#ddd' : '#888'};font-size:11px;cursor:pointer;">${label}</button>`;
+        }
+        html += `</div>`;
+        if (!isViewingActive) {
+            html += `<div style="font-size:10px;color:#5566aa;margin-bottom:3px;">Previewing ${viewingSet} set. Chain icon = shared from ${colonist.activeSet || 'Colony'}. Expedition set activates automatically on departure.</div>`;
+        }
+
         const tomeName = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : null;
         const tomeTip = tomeName ? (() => { const p = (colonist.tomeProgress?.[colonist.equippedTome] || 0); return `${tomeName} (${Math.floor(p / SPELL_TOMES[colonist.equippedTome].learningWork * 100)}%)`; })() : 'No tome equipped';
         const slotStyle = 'position:relative;border:1px solid #444;border-radius:4px;padding:4px 2px;background:#1a1a2e;cursor:pointer;min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+
+        const _buildSetSlotHtml = (slot, label, fallbackChar, tipText) => {
+            if (isViewingActive) {
+                // Active set: render normally using existing slot select mechanism.
+                const item = colonist[slot];
+                let inner = item ? this._itemIcon(item.key, slot) : `<span style="color:#333;font-size:14px">${fallbackChar}</span>`;
+                return `<div class="skill-tip" data-tip="${tipText}" style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
+            }
+            // Inactive set: show set-specific override or shared fallback.
+            const setItem = (colonist.equipmentSets?.[viewingSet])?.[slot] || null;
+            const sharedItem = colonist[slot]; // currently equipped (shared if setItem is null)
+            const SLOT_LIST = { weapon: 'weapons', armor: 'armors', helmet: 'helmets', clothes: 'clothes', tool: 'tools', trinket: 'trinkets', boots: 'boots' };
+            const listName = SLOT_LIST[slot];
+            if (setItem) {
+                // This set owns a dedicated item for this slot.
+                const tip = `${setItem.name} (${viewingSet} set override)`;
+                const removeBtn = `<span onclick="window.game.removeItemFromSet(${colonist.id},'${viewingSet}','${slot}')" style="position:absolute;top:1px;right:2px;color:#cc4444;font-size:10px;cursor:pointer;z-index:10;" title="Return to inventory">x</span>`;
+                const assignSelect = this._buildSetAssignSelect(colonist, viewingSet, slot, listName);
+                return `<div class="skill-tip" data-tip="${tip}" style="${slotStyle}">${removeBtn}<div style="color:#666;font-size:10px">${label}</div>${this._itemIcon(setItem.key, slot)}${assignSelect}</div>`;
+            } else {
+                // Shared: dim the currently-equipped item and show chain icon.
+                const inner = sharedItem
+                    ? `<span style="opacity:0.4;">${this._itemIcon(sharedItem.key, slot)}</span><span style="position:absolute;bottom:2px;right:3px;font-size:9px;color:#5566aa;" title="Shared from ${colonist.activeSet || 'Colony'} set">⛓</span>`
+                    : `<span style="color:#222;font-size:14px">${fallbackChar}</span>`;
+                const tip = sharedItem ? `Shared: ${sharedItem.name} (from ${colonist.activeSet || 'Colony'} set). Click to assign a dedicated item.` : `No item. Click to assign.`;
+                const assignSelect = this._buildSetAssignSelect(colonist, viewingSet, slot, listName);
+                return `<div class="skill-tip" data-tip="${tip}" style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${assignSelect}</div>`;
+            }
+        };
+
         html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:4px 0 0 0;text-align:center;">`;
         // Row 1: Tome | Helmet | Armor | Trinket
+        // Tome always uses the normal select (not part of equipment sets).
         html += `<div class="skill-tip" data-tip="${tomeTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Tome</div>`;
         html += colonist.equippedTome ? `${this._itemIcon(colonist.equippedTome, 'tome')}` : `<span style="color:#333;font-size:14px">~</span>`;
         html += this._buildSlotSelect(colonist, 'tome');
         html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${helmetTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Helmet</div>`;
-        html += colonist.helmet ? `${this._itemIcon(colonist.helmet.key, 'helmet')}` : `<span style="color:#333;font-size:14px">^</span>`;
-        html += this._buildSlotSelect(colonist, 'helmet');
-        html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${armorTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Armor</div>`;
-        html += colonist.armor ? `${this._itemIcon(colonist.armor.key, 'armor')}` : `<span style="color:#333;font-size:14px">[]</span>`;
-        html += this._buildSlotSelect(colonist, 'armor');
-        html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${trinketTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Trinket</div>`;
-        html += colonist.trinket ? `${this._itemIcon(colonist.trinket.key, 'trinket')}` : `<span style="color:#333;font-size:14px">*</span>`;
-        html += this._buildSlotSelect(colonist, 'trinket');
-        html += `</div>`;
+        html += _buildSetSlotHtml('helmet', 'Helmet', '^', helmetTip);
+        html += _buildSetSlotHtml('armor', 'Armor', '[]', armorTip);
+        html += _buildSetSlotHtml('trinket', 'Trinket', '*', trinketTip);
         html += `</div>`;
         html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:0 0 4px 0;text-align:center;">`;
         // Row 2: Weapon | Boots | Clothes | Offhand
-        html += `<div class="skill-tip" data-tip="${weaponTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Weapon</div>`;
-        html += colonist.weapon ? `${this._itemIcon(colonist.weapon.key, 'weapon')}` : `<span style="color:#333;font-size:14px">/</span>`;
-        html += this._buildSlotSelect(colonist, 'weapon');
-        html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${bootsTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Boots</div>`;
-        html += colonist.boots ? `${this._itemIcon(colonist.boots.key, 'boots')}` : `<span style="color:#333;font-size:14px">∟</span>`;
-        html += this._buildSlotSelect(colonist, 'boots');
-        html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${clothesTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Clothes</div>`;
-        html += colonist.clothes ? `${this._itemIcon(colonist.clothes.key, 'clothes')}` : `<span style="color:#333;font-size:14px">♦</span>`;
-        html += this._buildSlotSelect(colonist, 'clothes');
-        html += `</div>`;
-        html += `<div class="skill-tip" data-tip="${toolTip}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Offhand</div>`;
-        html += colonist.tool ? `${this._itemIcon(colonist.tool.key, 'tool')}` : `<span style="color:#333;font-size:14px">\\</span>`;
-        html += this._buildSlotSelect(colonist, 'tool');
-        html += `</div>`;
+        html += _buildSetSlotHtml('weapon', 'Weapon', '/', weaponTip);
+        html += _buildSetSlotHtml('boots', 'Boots', '⌟', bootsTip);
+        html += _buildSetSlotHtml('clothes', 'Clothes', '◆', clothesTip);
+        html += _buildSetSlotHtml('tool', 'Offhand', '\\', toolTip);
         html += `</div>`;
 
         // --- Equipment Effects Summary ---
@@ -1466,7 +1489,7 @@ export class UI {
             const hiddenSlots = colonist.hiddenEquipmentSlots || {};
             const togglesHtml = VISUAL_SLOTS.map(s => {
                 const checked = !hiddenSlots[s.key] ? 'checked' : '';
-                return `<label class="eq-vis-toggle"><input type="checkbox" ${checked} onchange="window.game.toggleEquipmentSlotVisibility(${colonist.id},'${s.key}');window.ui.showColonistInfo(window.game.colonists.find(c=>c.id===${colonist.id}))">${s.label}</label>`;
+                return `<label class="eq-vis-toggle"><input type="checkbox" ${checked} onchange="window.game.toggleEquipmentSlotVisibility(${colonist.id},'${s.key}');window.game.ui.showColonistInfo(window.game.colonists.find(c=>c.id===${colonist.id}))">${s.label}</label>`;
             }).join('');
             html += `<div class="eq-vis-row"><span class="eq-vis-label">Show:</span>${togglesHtml}</div>`;
         }
@@ -1598,7 +1621,7 @@ export class UI {
         if (colonist.guardMode) html += `<button onclick="window.game.input.startGuardPointTargeting(${colonist.id})">Set Guard Point</button>`;
         html += `<button onclick="window.game.draftAll()">Draft All</button>`;
         html += `<button onclick="window.game.undraftAll()">Undraft All</button>`;
-        html += `<button onclick="window.game.autoEquipBest(${colonist.id})">Auto-equip Best</button>`;
+        html += `<button onclick="window.game.autoEquipBest(${colonist.id})" title="Auto-equip best available items into the active set (${colonist.activeSet || 'Colony'})">Auto-equip Best</button>`;
         const others = this.game.colonists.filter(c => c.hp > 0 && c.id !== colonist.id);
         if (others.length > 0) {
             html += `<select onchange="if(this.value)window.game.copyPriorities(${colonist.id},parseInt(this.value))"><option value="">Copy Priorities From...</option>`;
@@ -1799,6 +1822,40 @@ export class UI {
             html += `<option value="${i}">${item.name}${stats ? ` (${stats})` : ''}</option>`;
         });
         if (items.length === 0 && !current) html += `<option disabled>No ${cfg.label.toLowerCase()}s available</option>`;
+        html += `</select>`;
+        return html;
+    }
+
+    // Track which equipment set tab each colonist is viewing in the UI.
+    _setColonistViewingSet(colonistId, setName) {
+        if (!this._colonistViewingSet) this._colonistViewingSet = {};
+        this._colonistViewingSet[colonistId] = setName;
+        const c = this.game.getColonist(colonistId);
+        if (c) this.showColonistInfo(c);
+    }
+
+    // Build an invisible select overlay for assigning items from global inventory into an
+    // inactive set slot. Selecting an item calls assignItemToSet; selecting "none" is a no-op.
+    _buildSetAssignSelect(colonist, setName, slot, listName) {
+        const overlayStyle = 'position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;';
+        const items = this.game.resources[listName] || [];
+        const SLOT_CONFIG_LABELS = {
+            weapon: { label: 'Weapon', statRenderer: w => { const cd = w.attackCooldown || 20; return `${w.damage}d (${(w.damage/cd).toFixed(1)} dps)`; } },
+            armor:   { label: 'Armor',   statRenderer: a => getItemStatLines(a).join(', ') },
+            helmet:  { label: 'Helmet',  statRenderer: h => getItemStatLines(h).join(', ') },
+            clothes: { label: 'Clothes', statRenderer: c => getItemStatLines(c).join(', ') },
+            tool:    { label: 'Offhand', statRenderer: t => getItemStatLines(t).join(', ') },
+            trinket: { label: 'Trinket', statRenderer: a => getItemStatLines(a).join(', ') },
+            boots:   { label: 'Boots',   statRenderer: b => getItemStatLines(b).join(', ') },
+        };
+        const cfg = SLOT_CONFIG_LABELS[slot];
+        let html = `<select style="${overlayStyle}" onchange="if(this.value!==''){window.game.assignItemToSet(${colonist.id},'${setName}','${slot}','${listName}',parseInt(this.value));this.value=''}">`;
+        html += `<option value="">Assign ${cfg.label}...</option>`;
+        items.forEach((item, i) => {
+            const stats = cfg.statRenderer(item);
+            html += `<option value="${i}">${item.name}${stats ? ` (${stats})` : ''}</option>`;
+        });
+        if (items.length === 0) html += `<option disabled>No items available</option>`;
         html += `</select>`;
         return html;
     }

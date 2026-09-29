@@ -228,6 +228,10 @@ export class ExplorationSystem {
                     c.currentTaskId = null;
                 }
             }
+            // Auto-switch to Expedition gear set when joining the party.
+            if (c.equipmentSets?.Expedition && c.activeSet !== 'Expedition') {
+                game.switchEquipmentSet(c.id, 'Expedition');
+            }
             const path = findPathAdjacent(game.map, c.x, c.y, gatePos.x, gatePos.y, game._occupiedTiles);
             if (path && path.length > 0) {
                 c.path = path;
@@ -2537,6 +2541,10 @@ export class ExplorationSystem {
             const colonist = game.getColonist(snapshot.id);
             if (!colonist) continue;
             colonist.onExpedition = false;
+            // Switch back to Colony gear set on return.
+            if (colonist.equipmentSets?.Colony && colonist.activeSet !== 'Colony') {
+                game.switchEquipmentSet(colonist.id, 'Colony');
+            }
             colonist.x = gx;
             colonist.y = gy;
             if (snapshot.hp <= 0) {
@@ -3723,6 +3731,14 @@ function pickRandom(arr) {
     return arr[randInt(0, arr.length - 1)];
 }
 
+// Returns the item a colonist will have in a given slot once they enter an expedition.
+// If they have an Expedition set override for that slot it takes priority; otherwise
+// falls back to whatever is currently equipped.
+export function getExpeditionSlotItem(c, slot) {
+    const override = c.equipmentSets?.Expedition?.[slot];
+    return override !== undefined && override !== null ? override : c[slot];
+}
+
 export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, mutators = []) {
     const realm = REALMS[realmKey];
     if (!realm) return null;
@@ -3744,18 +3760,20 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
         const c = game.getColonist(id);
         if (!c || c.hp <= 0) continue;
         size++;
-        let dmg = c.weapon ? c.weapon.damage : EXPLORATION_CONFIG.baseFistDamage;
-        const items = [c.weapon, c.armor, c.helmet, c.clothes, c.boots, c.tool, c.trinket].filter(Boolean);
+        const expWeapon = getExpeditionSlotItem(c, 'weapon');
+        let dmg = expWeapon ? expWeapon.damage : EXPLORATION_CONFIG.baseFistDamage;
+        const items = ['weapon','armor','helmet','clothes','boots','tool','trinket'].map(s => getExpeditionSlotItem(c, s)).filter(Boolean);
         for (const item of items) {
-            if (item !== c.weapon && item.damage) dmg += item.damage;
+            if (item !== expWeapon && item.damage) dmg += item.damage;
         }
-        const baseCd = (c.weapon && c.weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
-        const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
+        const baseCd = (expWeapon && expWeapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
+        const atkSpeed = 1 + items.reduce((sum, item) => sum + (item.attackSpeed || 0), 0);
         const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
         const hitsPerRound = Math.max(1, Math.round(baseCd / effCd));
         const memberDmg = dmg * hitsPerRound;
         totalDmg += memberDmg;
-        totalHp += c.maxHp;
+        const expMaxHp = COLONIST_CONFIG.maxHp + items.reduce((sum, item) => sum + (item.maxHpBonus || 0), 0);
+        totalHp += expMaxHp;
         let dr = 1;
         for (const item of items) {
             if (item.damageReduction) dr *= (1 - item.damageReduction);
@@ -3817,11 +3835,12 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
             }
         }
 
+        const expTrinket = getExpeditionSlotItem(c, 'trinket');
         members.push({
-            name: c.name, id: c.id, dmgPerRound: memberDmg, hitsPerRound, hp: c.maxHp,
+            name: c.name, id: c.id, dmgPerRound: memberDmg, hitsPerRound, hp: expMaxHp,
             dr: Math.round((1 - dr) * 100), maxMana: c.maxMana || 0,
             traits: combatTraits, expeditionTraits, spells: memberSpells,
-            trinketName: c.trinket?.name || null,
+            trinketName: expTrinket?.name || null,
             expLevel, fatigued: fatigue,
         });
     }
@@ -3833,7 +3852,17 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
     const effectKeys = ['partyDamageMult', 'trapDamageMult', 'lootMult', 'rareEncounterMult', 'durationMult'];
     const mockSnapshot = colonistIds.map(id => {
         const c = game.getColonist(id);
-        return c ? { hp: c.hp, traits: c.traits || [], weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, boots: c.boots, tool: c.tool, trinket: c.trinketBroken ? null : c.trinket } : null;
+        if (!c) return null;
+        return {
+            hp: c.hp, traits: c.traits || [],
+            weapon:  getExpeditionSlotItem(c, 'weapon'),
+            armor:   getExpeditionSlotItem(c, 'armor'),
+            helmet:  getExpeditionSlotItem(c, 'helmet'),
+            clothes: getExpeditionSlotItem(c, 'clothes'),
+            boots:   getExpeditionSlotItem(c, 'boots'),
+            tool:    getExpeditionSlotItem(c, 'tool'),
+            trinket: c.trinketBroken ? null : getExpeditionSlotItem(c, 'trinket'),
+        };
     }).filter(Boolean);
     for (const key of effectKeys) {
         const val = getPartyExpeditionEffect(mockSnapshot, key, realmKey);

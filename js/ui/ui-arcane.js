@@ -3,7 +3,7 @@ import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CL
     ELITE_MODIFIERS, NODE_MAP_CONFIG, EXPEDITION_XP_CONFIG, BESTIARY_CONFIG,
     getItemStatLines, RENDER_CONFIG,
 } from '../core/config.js';
-import { estimatePartyStrength } from '../systems/exploration.js';
+import { estimatePartyStrength, getExpeditionSlotItem } from '../systems/exploration.js';
 import { getOmens } from '../systems/omens.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
@@ -617,8 +617,10 @@ const arcaneMethods = {
         html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">Select Party</div>`;
         html += `<div class="info-row" style="color:#888;">Choose up to 5 colonists:</div>`;
         for (const c of available) {
-            const dmg = c.weapon ? c.weapon.damage : 5;
-            const def = c.armor ? Math.round(c.armor.damageReduction * 100) : 0;
+            const expWeapon = getExpeditionSlotItem(c, 'weapon');
+            const expArmor = getExpeditionSlotItem(c, 'armor');
+            const dmg = expWeapon ? expWeapon.damage : 5;
+            const def = expArmor ? Math.round(expArmor.damageReduction * 100) : 0;
             const priority = getTargetPriority(c);
             const priorityStr = priority !== 0 ? ` <span style="color:${priority > 0 ? '#ff6644' : '#66aaff'}">${priority > 0 ? '▲' : '▼'}Thr</span>` : '';
             const defStr = def > 0 ? ` Def:${def}%` : '';

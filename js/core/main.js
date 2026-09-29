@@ -1180,6 +1180,101 @@ class Game {
         this.ui.showColonistInfo(c);
     }
 
+    // Equipment Sets
+
+    _equipSetSlots() { return ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'trinket', 'boots']; }
+
+    // Swap to a different named equipment set.
+    // Slots where the target set has an item: swap that item in and store the current item back
+    // into the old set slot. Slots where the target set is null: leave the equipped item alone
+    // (shared fallback) and clear the old set's ownership of that slot.
+    switchEquipmentSet(colonistId, targetSetName) {
+        const c = this.getColonist(colonistId);
+        if (!c || !c.equipmentSets) return;
+        if (c.activeSet === targetSetName) return;
+        const targetSet = c.equipmentSets[targetSetName];
+        if (!targetSet) return;
+        const activeSet = c.equipmentSets[c.activeSet];
+        const visualSlots = new Set(['armor', 'helmet', 'clothes', 'weapon', 'tool', 'boots']);
+        let changed = false;
+        for (const slot of this._equipSetSlots()) {
+            if (targetSet[slot] !== null) {
+                // Store current equipped item back into old set slot, then equip target item.
+                activeSet[slot] = c[slot];
+                c[slot] = targetSet[slot];
+                targetSet[slot] = null;
+                changed = true;
+                if (visualSlots.has(slot)) this.renderer?.skinManager?.invalidateComposite(colonistId);
+            } else {
+                // No override in target set: item stays equipped but neither set owns it now.
+                activeSet[slot] = null;
+            }
+        }
+        c.activeSet = targetSetName;
+        this._recalcEquipmentStats(c);
+        if (c.trinket) this._updateColonistRadiusHighlight(c);
+        // Reset UI viewing tab to follow the new active set.
+        if (this.ui._colonistViewingSet) this.ui._colonistViewingSet[colonistId] = targetSetName;
+        if (changed) this.notifications.push({ text: `${c.name} switched to ${targetSetName} gear`, tick: this.tick, type: 'success' });
+        this.ui.showColonistInfo(c);
+    }
+
+    // Assign an item from the global inventory into a specific set slot for a colonist.
+    // If the targeted set is currently active the item is also immediately equipped.
+    assignItemToSet(colonistId, setName, slot, listName, itemIndex) {
+        const c = this.getColonist(colonistId);
+        if (!c || !c.equipmentSets?.[setName]) return;
+        const list = this.resources[listName];
+        if (itemIndex < 0 || itemIndex >= list.length) return;
+        const newItem = list.splice(itemIndex, 1)[0];
+        const setData = c.equipmentSets[setName];
+
+        // Return any item already in that set slot to global inventory.
+        if (setData[slot]) {
+            const addMethod = this._slotAddMethod(slot);
+            if (addMethod) this.resources[addMethod](setData[slot]);
+            setData[slot] = null;
+        }
+
+        if (c.activeSet === setName) {
+            // Active set: also swap out the currently equipped item.
+            const addMethod = this._slotAddMethod(slot);
+            if (c[slot] && addMethod) this.resources[addMethod](c[slot]);
+            c[slot] = newItem;
+            // setData[slot] stays null: active set items live on c[slot] directly.
+            const visualSlots = new Set(['armor', 'helmet', 'clothes', 'weapon', 'tool', 'boots']);
+            if (visualSlots.has(slot)) this.renderer?.skinManager?.invalidateComposite(colonistId);
+        } else {
+            // Inactive set: store directly in the set slot.
+            setData[slot] = newItem;
+        }
+        this._recalcEquipmentStats(c);
+        if (slot === 'trinket') this._updateColonistRadiusHighlight(c);
+        this.notifications.push({ text: `${c.name}: ${newItem.name} saved to ${setName} set`, tick: this.tick, type: 'success' });
+        this.ui.showColonistInfo(c);
+    }
+
+    // Remove a dedicated item from an inactive set slot, returning it to global inventory.
+    removeItemFromSet(colonistId, setName, slot) {
+        const c = this.getColonist(colonistId);
+        if (!c || !c.equipmentSets?.[setName]) return;
+        if (c.activeSet === setName) return; // use normal unequip for the active set
+        const setData = c.equipmentSets[setName];
+        if (!setData[slot]) return;
+        const addMethod = this._slotAddMethod(slot);
+        if (addMethod) this.resources[addMethod](setData[slot]);
+        setData[slot] = null;
+        this.ui.showColonistInfo(c);
+    }
+
+    _slotAddMethod(slot) {
+        const map = {
+            weapon: 'addWeapon', armor: 'addArmor', helmet: 'addHelmet',
+            clothes: 'addClothes', tool: 'addTool', trinket: 'addTrinket', boots: 'addBoots',
+        };
+        return map[slot] || null;
+    }
+
     _recalcEquipmentStats(c) {
         invalidateEquipStatCache(c);
         const baseHp = c.golem ? (GOLEM_TYPES[c.golemType]?.hp || COLONIST_CONFIG.maxHp) : COLONIST_CONFIG.maxHp;
@@ -2240,10 +2335,16 @@ class Game {
                 this.equipClothes(colonistId, 0);
             }
         }
-        if (this.resources.tools.length > 0) {
-            this.resources.tools.sort((a, b) => (b.tier || 0) - (a.tier || 0));
-            if (!c.tool || (this.resources.tools[0].tier || 0) > (c.tool.tier || 0)) {
-                this.equipTool(colonistId, 0);
+        // Tools: only upgrade if the colonist already has one equipped, and only swap for a
+        // higher-tier item of the same key (e.g. iron_hammer -> runic_hammer). Never auto-equip
+        // a tool onto an empty slot since tool choice is always a player decision.
+        if (c.tool && this.resources.tools.length > 0) {
+            const sameTool = this.resources.tools
+                .map((t, i) => ({ t, i }))
+                .filter(({ t }) => t.key === c.tool.key && (t.tier || 0) > (c.tool.tier || 0));
+            if (sameTool.length > 0) {
+                sameTool.sort((a, b) => (b.t.tier || 0) - (a.t.tier || 0));
+                this.equipTool(colonistId, sameTool[0].i);
             }
         }
         if (this.resources.boots.length > 0) {
@@ -2253,12 +2354,7 @@ class Game {
                 this.equipBoots(colonistId, 0);
             }
         }
-        if (this.resources.trinkets.length > 0) {
-            this.resources.trinkets.sort((a, b) => (b.tradeValue || 0) - (a.tradeValue || 0));
-            if (!c.trinket || (this.resources.trinkets[0].tradeValue || 0) > (c.trinket.tradeValue || 0)) {
-                this.equipTrinket(colonistId, 0);
-            }
-        }
+        // Trinkets are never auto-equipped; they are always a player decision.
         this.ui.showColonistInfo(c);
     }
 

@@ -379,6 +379,13 @@ function _applyLoadData(game, data) {
             }
             c.boots = c.boots || null;
             c.hiddenEquipmentSlots = c.hiddenEquipmentSlots || {};
+            if (!c.equipmentSets) {
+                c.equipmentSets = {
+                    Colony:     { weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null },
+                    Expedition: { weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null },
+                };
+            }
+            c.activeSet = c.activeSet || 'Colony';
         }
 
         // Migration: flatten item.combat stats to top-level
@@ -396,6 +403,9 @@ function _applyLoadData(game, data) {
         const _equipSlots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
         for (const c of (data.colonists || [])) {
             for (const slot of _equipSlots) _flattenCombat(c[slot]);
+            for (const setName of Object.keys(c.equipmentSets || {})) {
+                for (const slot of _equipSlots) _flattenCombat(c.equipmentSets[setName][slot]);
+            }
         }
         for (const exp of (data.exploration?.expeditions || [])) {
             for (const member of (exp.partySnapshot || [])) {
