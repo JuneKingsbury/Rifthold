@@ -1105,6 +1105,10 @@ export const REALMS = {
             bonusResources: { void_essence: 15, runite: 6 },
             isChaosEncounter: true,
             chaosPhaseTransition: true,
+            // The Unraveler builds its early phases at spawn as buffed "masks" of
+            // other realm bosses (see ExplorationSystem._buildUnravelerMasks). The
+            // final phase below is always kept as the true, undisguised form.
+            dynamicMasks: true,
             phases: [
                 {
                     name: 'Incoherent', hp: 280, damage: 18,

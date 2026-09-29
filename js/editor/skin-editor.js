@@ -61,16 +61,27 @@ const ENTITY_MANUAL = [
     { key: 'boss_high_king_enraged', char: '▲', color: '#ff2200', desc: 'High King (Phase 2)' },
     { key: 'boss_high_king_guard', char: '▲', color: '#ff4400', desc: 'High King (Phase 3)' },
     { key: 'boss_high_king_desperate', char: '▲', color: '#ff0000', desc: 'High King (Phase 4)' },
+    { key: 'boss_void_arbiter', char: '▲', color: '#8844bb', desc: 'Void Arbiter (Phase 1-2)' },
+    { key: 'boss_void_arbiter_enraged', char: '▲', color: '#440088', desc: 'Void Arbiter (Phase 3)' },
+    { key: 'boss_unraveler', char: '▲', color: '#cc33cc', desc: 'The Unraveler (all phases)' },
 ];
 
 const ENTITY_AUTO_CATEGORIES = ['golem', 'summon', 'enemy', 'boss'];
 
-const ENTITY_SPECIALS = [
-    ...ENTITY_MANUAL,
-    ...Object.entries(ENTITIES)
-        .filter(([, def]) => ENTITY_AUTO_CATEGORIES.includes(def.category))
-        .map(([key, def]) => ({ key, char: def.char, color: def.color, desc: def.name || key })),
-];
+const ENTITY_SPECIALS = (() => {
+    const combined = [
+        ...ENTITY_MANUAL,
+        ...Object.entries(ENTITIES)
+            .filter(([, def]) => ENTITY_AUTO_CATEGORIES.includes(def.category))
+            .map(([key, def]) => ({ key, char: def.char, color: def.color, desc: def.name || key })),
+    ];
+    // Keep the first occurrence of each key so the richer ENTITY_MANUAL phase
+    // labels win over auto-pulled config names, and the manual-only phase-3/4
+    // sprites survive. Prevents any future MANUAL/ENTITIES key collision from
+    // re-introducing a duplicate palette entry.
+    const seen = new Set();
+    return combined.filter(e => (seen.has(e.key) ? false : (seen.add(e.key), true)));
+})();
 
 const VARIANT_COLORS = ['#ffff00', '#00ffff', '#00ff00', '#ff88ff', '#ffaa00', '#88ffaa', '#ff8888', '#aaaaff'];
 

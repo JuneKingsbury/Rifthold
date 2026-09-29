@@ -1207,7 +1207,12 @@ export class ExplorationSystem {
         if (dim.boss) {
             const boss = dim.boss;
             const maxPhases = diffSettings.bossPhases || 2;
-            const phases = boss.phases.slice(0, maxPhases);
+            // The Unraveler generates its phase list at spawn: buffed "masks" of
+            // other realm bosses followed by its true final form (see
+            // _buildUnravelerMasks). Every other boss uses its static phases.
+            const phases = boss.dynamicMasks
+                ? this._buildUnravelerMasks(boss, maxPhases)
+                : boss.phases.slice(0, maxPhases);
             const phase0 = phases[0];
             const bossHp = Math.round(phase0.hp * hpMult);
             const bossDmg = Math.round(phase0.damage * dmgMult);
@@ -1216,7 +1221,7 @@ export class ExplorationSystem {
                 bossPhases: phases,
                 enemies: [{
                     hp: bossHp, maxHp: bossHp, damage: bossDmg,
-                    isBoss: true, name: boss.name,
+                    isBoss: true, name: (boss.dynamicMasks && phase0.displayName) ? phase0.displayName : boss.name,
                     enraged: false,
                     color: phase0.color,
                     sprite: phase0.sprite,
@@ -1227,6 +1232,95 @@ export class ExplorationSystem {
         }
 
         return { encounters, bossEncounter };
+    }
+
+    // Damage multiplier applied to a borrowed boss "mask" phase. Masks inherit the
+    // Unraveler's own per-slot HP (see _buildUnravelerMasks) so the fight's total
+    // HP budget is unchanged; only their damage is nudged up to reflect that this
+    // is a chaos-buffed impostor rather than the original realm boss.
+    static get MASK_DAMAGE_BUFF() { return 1.2; }
+    // Per-round chance, during an autoChaosTick phase, that the Unraveler flickers
+    // into a different mask mid-fight (see _executeBossAbilities).
+    static get MASK_SWAP_CHANCE() { return 0.12; }
+
+    // Builds a visual/ability "mask" identity from another realm boss's opening
+    // (phase-0) form. Only appearance and generic combat abilities are copied;
+    // HP/damage come from the Unraveler's own phase budget, and realm-specific
+    // hooks (e.g. voidPactChoice) are deliberately NOT carried over.
+    _buildBossMask(bossKey, otherBoss) {
+        const p0 = otherBoss.phases?.[0] || {};
+        return {
+            maskKey: bossKey,
+            // displayName is the HP-bar identity; label is the combat-log phase tag.
+            displayName: `${otherBoss.name}, Unraveled`,
+            label: otherBoss.name,
+            sprite: p0.sprite || otherBoss.sprite,
+            color: p0.color || otherBoss.color || '#cc33cc',
+            // Deep-copy abilities so a mid-fight mutation never aliases config.
+            abilities: (p0.abilities || []).map(a => ({ ...a })),
+        };
+    }
+
+    // Returns every available mask (all realm bosses except the Unraveler itself),
+    // used both for the initial disguise phases and for mid-fight chaos swaps.
+    _buildAllMasks() {
+        return Object.entries(REALMS)
+            .filter(([, r]) => r.boss && !r.boss.dynamicMasks && Array.isArray(r.boss.phases) && r.boss.phases.length > 0)
+            .map(([, r]) => this._buildBossMask(r.boss.name, r.boss));
+    }
+
+    // Generates the Unraveler's phase list at spawn: (maxPhases - 1) buffed masks of
+    // distinct other realm bosses, followed by the true final form (the last config
+    // phase). The finale is ALWAYS the true Unraveler regardless of the difficulty
+    // phase cap, so the "it drops the disguise" climax survives at every difficulty.
+    _buildUnravelerMasks(boss, maxPhases) {
+        const configPhases = boss.phases;
+        // A static boss at this difficulty would use configPhases[0 .. maxPhases-1]
+        // and END on configPhases[maxPhases-1]. Anchor the finale to THAT slot (not
+        // the last config phase) so the fight's HP budget, damage curve, and which
+        // phases carry autoChaosTick all match the static difficulty curve exactly.
+        // Only its identity (sprite/name) is the true Unraveler.
+        const kept = Math.min(maxPhases, configPhases.length);
+        const finaleSlot = configPhases[kept - 1];
+        const maskCount = Math.max(0, kept - 1);
+
+        // Draw distinct masks; if fewer bosses exist than slots, allow repeats.
+        const available = this._buildAllMasks();
+        for (let i = available.length - 1; i > 0; i--) {
+            const j = randInt(0, i);
+            [available[i], available[j]] = [available[j], available[i]];
+        }
+        const chosen = [];
+        for (let i = 0; i < maskCount; i++) {
+            chosen.push(available.length > 0 ? available[i % available.length] : null);
+        }
+
+        const buff = ExplorationSystem.MASK_DAMAGE_BUFF;
+        const phases = [];
+        for (let i = 0; i < maskCount; i++) {
+            const slot = configPhases[i] || finaleSlot; // slot supplies the HP budget + chaos flags
+            const mask = chosen[i];
+            const isLastMask = i === maskCount - 1;
+            phases.push({
+                // name = combat-log phase label; displayName = HP-bar identity.
+                name: mask ? mask.label : slot.name,
+                displayName: mask ? mask.displayName : null,
+                hp: slot.hp,
+                damage: Math.round(slot.damage * buff),
+                color: mask ? mask.color : slot.color,
+                sprite: mask ? mask.sprite : slot.sprite,
+                abilities: mask ? mask.abilities : (slot.abilities || []),
+                autoChaosTick: slot.autoChaosTick || false,
+                transitionText: isLastMask
+                    ? 'The borrowed faces slough away all at once. What is left underneath wears nothing but itself.'
+                    : 'The stolen shape destabilizes, and the Unraveler drags a different face over itself.',
+            });
+        }
+        // Finale: the true, undisguised Unraveler. Uses the finale SLOT's stats (the
+        // phase a static boss would end on at this difficulty) but restores the real
+        // sprite/name so the disguise visibly drops for the climax.
+        phases.push({ ...finaleSlot, displayName: boss.name });
+        return phases;
     }
 
     _rollLoot(dim, diffSettings) {
@@ -1420,12 +1514,23 @@ export class ExplorationSystem {
             const approachMsg = dim.boss?.approachText || `A powerful foe blocks the path: ${bossEnemy.name}!`;
             this._addLog(exp, game, approachMsg, 'danger');
             window.soundManager?.playExpSFX('wave_alert');
-            this._updateBestiary(exp, 'boss', bossEnemy.name, { name: bossEnemy.name, sprite: bossEnemy.sprite || dim.boss?.sprite, color: bossEnemy.color || dim.boss?.color, lore: dim.boss?.lore || '' }, game);
+            // Bestiary records the boss's TRUE identity. For dynamic-mask bosses the
+            // spawned enemy starts disguised as a random mask, so recording
+            // bossEnemy.name/sprite would key a bogus, per-fight-randomized entry
+            // instead of one stable "The Unraveler". Use the config identity (and
+            // the true final-phase sprite/color) for those.
+            const trueFinale = dim.boss?.dynamicMasks ? dim.boss.phases[dim.boss.phases.length - 1] : null;
+            const bestiaryName = trueFinale ? dim.boss.name : bossEnemy.name;
+            const bestiarySprite = trueFinale ? (trueFinale.sprite || dim.boss?.sprite) : (bossEnemy.sprite || dim.boss?.sprite);
+            const bestiaryColor = trueFinale ? (trueFinale.color || dim.boss?.color) : (bossEnemy.color || dim.boss?.color);
+            this._updateBestiary(exp, 'boss', bestiaryName, { name: bestiaryName, sprite: bestiarySprite, color: bestiaryColor, lore: dim.boss?.lore || '' }, game);
 
             if (encounter.bossPhases) {
                 exp.bossPhaseData = {
                     currentPhaseIndex: 0,
                     phases: encounter.bossPhases,
+                    // Re-armed each phase; drives the guaranteed first mask swap.
+                    _swappedThisPhase: false,
                 };
             }
         } else {
@@ -2891,6 +2996,8 @@ export class ExplorationSystem {
 
         const nextPhase = phases[nextIdx];
         exp.bossPhaseData.currentPhaseIndex = nextIdx;
+        // New phase: re-arm the guaranteed first mask swap (see _tryMaskSwap).
+        exp.bossPhaseData._swappedThisPhase = false;
 
         const oldPhase = phases[nextIdx - 1];
         if (oldPhase.transitionText) {
@@ -2906,6 +3013,12 @@ export class ExplorationSystem {
         if (nextPhase.sprite) bossEnemy.sprite = nextPhase.sprite;
         bossEnemy.abilities = nextPhase.abilities || [];
         bossEnemy.enraged = false;
+
+        // For dynamic-mask bosses (the Unraveler) each phase carries a `displayName`
+        // that IS the on-screen boss identity ("Crystal Colossus, Unraveled", or the
+        // true name on the finale), so it follows the phase. Other bosses have no
+        // displayName and keep their own name; their phase `name` is only a log label.
+        if (nextPhase.displayName) bossEnemy.name = nextPhase.displayName;
 
         this._addLog(exp, game, `${bossEnemy.name} enters phase: ${nextPhase.name}!`, 'danger');
 
@@ -2929,11 +3042,16 @@ export class ExplorationSystem {
     }
 
     _executeBossAbilities(bossEnemy, exp, game) {
-        // Auto-chaos tick: phases marked autoChaosTick trigger chaos every round
+        // Auto-chaos tick: phases marked autoChaosTick trigger chaos every round.
         const currentPhase = exp.bossPhaseData?.phases?.[exp.bossPhaseData?.currentPhaseIndex];
         if (currentPhase?.autoChaosTick && exp.combat) {
             this._applyRandomChaosEffect(exp, game, exp.combat);
         }
+        // Mid-fight disguise flicker. Independent of autoChaosTick so the Unraveler's
+        // signature "wears stolen faces" mechanic is live at every difficulty (even
+        // difficulty 1, where there is a single mask phase), not just where the
+        // party-punishing chaos tick is unlocked.
+        this._tryMaskSwap(bossEnemy, exp, game);
         if (!bossEnemy.abilities) return;
         for (const ability of bossEnemy.abilities) {
             if (ability.type === 'aoe' && Math.random() < (ability.chance || 0)) {
@@ -2959,6 +3077,48 @@ export class ExplorationSystem {
                 this._addLog(exp, game, ability.text || `${bossEnemy.name} summons reinforcements!`, 'danger');
             }
         }
+    }
+
+    // Mid-fight disguise flicker for the Unraveler: each round of a non-finale mask
+    // phase, a small chance (MASK_SWAP_CHANCE) to reskin the boss into a different
+    // mask. HP is carried over as a FRACTION of max, and because every mask shares
+    // the same per-phase HP budget (set in _updateBossPhase from the phase's `hp`),
+    // the swap is neutral in absolute HP: the health bar stays honest and damage
+    // already dealt is never refunded. Only appearance and abilities change;
+    // hp/maxHp/damage are untouched.
+    _tryMaskSwap(bossEnemy, exp, game) {
+        if (!REALMS[exp.realm]?.boss?.dynamicMasks) return;
+        if (bossEnemy.hp <= 0) return;
+        // Never re-disguise during the finale: once the true Unraveler is revealed
+        // (the last phase), the disguise has been dropped for good.
+        const pd = exp.bossPhaseData;
+        if (pd && pd.currentPhaseIndex >= pd.phases.length - 1) return;
+        // Guarantee at least one swap per mask phase: the first time this phase's
+        // boss-ability step runs, force a swap; every later round rolls the normal
+        // chance. _swappedThisPhase is reset on each phase transition
+        // (_updateBossPhase) and at combat start. If the party bursts a mask phase
+        // to 0 in a single round the ability step never runs, so no swap is possible
+        // that phase; that is the expected edge, not a missed guarantee.
+        const forced = pd ? !pd._swappedThisPhase : false;
+        if (!forced && Math.random() >= ExplorationSystem.MASK_SWAP_CHANCE) return;
+
+        // Pick a mask different from the current one where possible.
+        const masks = this._buildAllMasks();
+        if (masks.length === 0) return;
+        const candidates = masks.filter(m => m.displayName !== bossEnemy.name);
+        const pool = candidates.length > 0 ? candidates : masks;
+        const mask = pool[randInt(0, pool.length - 1)];
+
+        // Preserve HP fraction; maxHp is unchanged (shared budget), so hp is too.
+        const frac = bossEnemy.maxHp > 0 ? bossEnemy.hp / bossEnemy.maxHp : 1;
+        bossEnemy.hp = Math.max(1, Math.round(bossEnemy.maxHp * frac));
+        bossEnemy.sprite = mask.sprite;
+        bossEnemy.color = mask.color;
+        bossEnemy.name = mask.displayName;
+        bossEnemy.abilities = mask.abilities.map(a => ({ ...a }));
+        if (pd) pd._swappedThisPhase = true;
+
+        this._addLog(exp, game, `⚡ CHAOS: The form collapses and reknits as the ${mask.label}!`, 'danger');
     }
 
     _tryUsePotions(exp, game) {
