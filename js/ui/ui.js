@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
 import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
@@ -15,6 +15,7 @@ import { getRoleInfoHtml, getEffectInfoHtml } from '../entities/roles.js';
 import { keybindingRowsHtml, beginRebindCapture, formatKeyLabel } from './keybindings-ui.js';
 import { statBarHtml, runStatBarPass, statBarFactors } from './stat-bar.js';
 import { installArcanePanel } from './ui-arcane.js';
+import { getGdriveAPI } from '../core/gdrive-web.js';
 import { installResearchPanel } from './ui-research.js';
 import { installTutorialPanel } from './ui-tutorial.js';
 import { getAllSlotsMeta, exportSlot } from '../core/save.js';
@@ -405,6 +406,16 @@ export class UI {
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
                 // sound fired inside cyclePriority with pitch based on new value
+                return;
+            }
+            const profileCell = e.target.closest('[data-profile-skill]');
+            if (profileCell) {
+                const skill = profileCell.dataset.profileSkill;
+                if (!this._prioProfileDraft) return;
+                const cur = this._prioProfileDraft[skill] ?? 3;
+                this._prioProfileDraft[skill] = cur >= 5 ? 0 : cur + 1;
+                this._lastPrioHtml = null;
+                this.updatePriorityPanel();
             }
         });
 
@@ -418,6 +429,16 @@ export class UI {
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
                 // sound fired inside cycleBackPriority with pitch based on new value
+                return;
+            }
+            const profileCell = e.target.closest('[data-profile-skill]');
+            if (profileCell) {
+                const skill = profileCell.dataset.profileSkill;
+                if (!this._prioProfileDraft) return;
+                const cur = this._prioProfileDraft[skill] ?? 3;
+                this._prioProfileDraft[skill] = cur <= 0 ? 5 : cur - 1;
+                this._lastPrioHtml = null;
+                this.updatePriorityPanel();
             }
         });
 
@@ -556,12 +577,7 @@ export class UI {
         });
 
         const uiTooltip = document.getElementById('ui-tooltip');
-        document.addEventListener('mouseover', (e) => {
-            const tip = e.target.closest('.skill-tip[data-tip]');
-            if (!tip) return;
-            uiTooltip.textContent = tip.dataset.tip;
-            uiTooltip.style.opacity = '1';
-            const rect = tip.getBoundingClientRect();
+        const _positionTooltip = (rect) => {
             let left = rect.left + rect.width / 2 - uiTooltip.offsetWidth / 2;
             let top = rect.top - uiTooltip.offsetHeight - 6;
             if (top < 4) top = rect.bottom + 6;
@@ -571,8 +587,29 @@ export class UI {
             }
             uiTooltip.style.left = left + 'px';
             uiTooltip.style.top = top + 'px';
+        };
+        document.addEventListener('mouseover', (e) => {
+            const compareTip = e.target.closest('.skill-tip[data-compare]');
+            if (compareTip) {
+                uiTooltip.innerHTML = compareTip.dataset.compare;
+                uiTooltip.style.opacity = '1';
+                _positionTooltip(compareTip.getBoundingClientRect());
+                return;
+            }
+            const tip = e.target.closest('.skill-tip[data-tip]');
+            if (!tip) return;
+            uiTooltip.textContent = tip.dataset.tip;
+            uiTooltip.style.opacity = '1';
+            _positionTooltip(tip.getBoundingClientRect());
         });
         document.addEventListener('mouseout', (e) => {
+            const compareTip = e.target.closest('.skill-tip[data-compare]');
+            if (compareTip) {
+                const related = e.relatedTarget;
+                if (related && related.closest && related.closest('.skill-tip[data-compare]')) return;
+                uiTooltip.style.opacity = '0';
+                return;
+            }
             const tip = e.target.closest('.skill-tip[data-tip]');
             if (!tip) return;
             const related = e.relatedTarget;
@@ -705,7 +742,18 @@ export class UI {
             if (prevVal !== undefined && prevVal !== val) punchedKeys.push(res.key);
             this._resPunchValues[res.key] = val;
             const alertAttr = resStyle(res.key, raw);
-            resHtml += `<span class="res" data-res="${res.key}"${alertAttr}>${resIcon(res.key, res.label, res.color)}${val}</span>`;
+            let spoilSuffix = '';
+            if (res.key === 'food') {
+                const spoilPerDay = this.game.resources.estimateDailyCookedFoodSpoilage(this.game);
+                const eatPerDay = this.game.resources.estimateDailyFoodConsumption(this.game);
+                const totalPerDay = spoilPerDay + eatPerDay;
+                if (totalPerDay > 0) {
+                    const spoilClass = totalPerDay > eatPerDay * 1.25 ? 'spoil-warn' : 'spoil-ok';
+                    const tip = `~${eatPerDay} eaten + ~${spoilPerDay} spoiled per day`;
+                    spoilSuffix = `<span class="${spoilClass}" title="${tip}"> -${totalPerDay}/d</span>`;
+                }
+            }
+            resHtml += `<span class="res" data-res="${res.key}"${alertAttr}>${resIcon(res.key, res.label, res.color)}${val}${spoilSuffix}</span>`;
         }
         // Resources pod: the core resource chips plus mana (if generating).
         const resPodHtml = resHtml +
@@ -897,6 +945,21 @@ export class UI {
             html += `</div>`;
         });
         html += '</div>';
+        if (input.buildType === 'arcane_core') {
+            const availableStructures = Object.entries(COMPLEX_STRUCTURES).filter(([, def]) =>
+                !def.research || this.game.research.isResearched(def.research)
+            );
+            if (availableStructures.length > 0) {
+                const current = input._complexStructurePreview || '';
+                const opts = availableStructures.map(([k, def]) =>
+                    `<option value="${k}"${current === k ? ' selected' : ''}>${def.name}</option>`
+                ).join('');
+                html += `<div style="padding:6px 8px;background:#1a1a2e;border-top:1px solid #333;">` +
+                    `<div style="color:#888;font-size:10px;margin-bottom:3px;">Preview chalk pattern:</div>` +
+                    `<select id="complex-struct-select" style="width:100%;background:#222;color:#ccc;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:12px;" onchange="window.game.input._complexStructurePreview=this.value">` +
+                    `<option value="">-- None --</option>${opts}</select></div>`;
+            }
+        }
         const savedBuildScroll = panel.querySelector('.build-grid')?.scrollTop ?? 0;
         panel.innerHTML = html;
         const buildGrid = panel.querySelector('.build-grid');
@@ -1234,6 +1297,63 @@ export class UI {
         return `<div class="info-row" style="color:#aaffaa;font-size:11px;">${effects.join(' | ')}</div>`;
     }
 
+    // Returns HTML string for an equipment stat tooltip.
+    // When candidateItem is provided, shows a side-by-side comparison.
+    // When candidateItem is null, shows just the equipped item's stats as a reference.
+    _buildEquipCompareHtml(slotLabel, equippedItem, candidateItem) {
+        const SKIP = new Set(['key', 'name', 'description', 'tier', 'textColor', 'char', 'pedestal', 'expedition', 'enchantment', 'enchantmentTier', 'enchantmentEffect', 'rarity']);
+        const getStats = (item) => {
+            if (!item) return {};
+            const stats = {};
+            for (const [k, v] of Object.entries(item)) {
+                if (SKIP.has(k) || typeof v !== 'number') continue;
+                if (STAT_META[k]) stats[k] = v;
+            }
+            return stats;
+        };
+        const higherIsBetter = new Set([
+            'damageReduction', 'moodBonus', 'workSpeedBonus', 'moveSpeedBonus', 'damage', 'spellDamageBonus',
+            'manaRegen', 'maxMana', 'warmth', 'critChance', 'critMultiplier', 'blockChance', 'gatherBonus',
+            'craftSpeedBonus', 'qualityBonus', 'lightRadius', 'maxHpBonus',
+        ]);
+        if (!equippedItem && !candidateItem) return slotLabel + ': empty';
+        if (!candidateItem) {
+            // Reference view: show equipped item stats.
+            const stats = getStats(equippedItem);
+            const rows = Object.entries(stats).map(([k, v]) => {
+                const meta = STAT_META[k];
+                if (!meta) return '';
+                return `<tr><td style="color:#888;padding-right:8px;">${meta.label}</td><td style="color:#aaa;">${formatStatValue(k, v)}</td></tr>`;
+            }).filter(Boolean).join('');
+            return `<div style="min-width:160px;"><div style="color:#ffdd88;margin-bottom:4px;font-weight:bold;">${equippedItem.name}</div>` +
+                (equippedItem.description ? `<div style="color:#888;font-size:10px;margin-bottom:4px;">${equippedItem.description}</div>` : '') +
+                `<table style="border-collapse:collapse;font-size:11px;">${rows || '<tr><td style="color:#666;">No stats</td></tr>'}</table></div>`;
+        }
+        // Comparison view.
+        const eqStats = getStats(equippedItem);
+        const cStats = getStats(candidateItem);
+        const allKeys = new Set([...Object.keys(eqStats), ...Object.keys(cStats)]);
+        const rowsHtml = [...allKeys].map(k => {
+            const meta = STAT_META[k];
+            if (!meta) return '';
+            const eqVal = eqStats[k];
+            const cVal = cStats[k];
+            const eqStr = eqVal !== undefined ? formatStatValue(k, eqVal) : '-';
+            const cStr = cVal !== undefined ? formatStatValue(k, cVal) : '-';
+            let color = '#aaa';
+            if (eqVal !== undefined && cVal !== undefined && eqVal !== cVal) {
+                const better = higherIsBetter.has(k) ? cVal > eqVal : cVal < eqVal;
+                color = better ? '#66cc66' : '#cc6644';
+            }
+            return `<tr><td style="color:#888;padding-right:6px;">${meta.label}</td><td style="color:#aaa;">${eqStr}</td><td style="color:${color};font-weight:bold;">${cStr}</td></tr>`;
+        }).filter(Boolean).join('');
+        const eqName = equippedItem ? equippedItem.name : 'Empty';
+        return `<div style="min-width:200px;"><table style="border-collapse:collapse;font-size:11px;width:100%;">` +
+            `<tr><th style="color:#666;text-align:left;padding-bottom:3px;">${slotLabel}</th><th style="color:#aaa;text-align:left;padding-right:6px;">${eqName}</th><th style="color:#ffdd88;text-align:left;">${candidateItem.name}</th></tr>` +
+            (rowsHtml || `<tr><td colspan="3" style="color:#666;">No stat differences</td></tr>`) +
+            `</table></div>`;
+    }
+
     _buildEquipmentEffectsHtml(colonist) {
         const items = getEquippedItems(colonist);
         if (items.length === 0) return '';
@@ -1427,7 +1547,11 @@ export class UI {
                 // Active set: render normally using existing slot select mechanism.
                 const item = colonist[slot];
                 let inner = item ? this._itemIcon(item.key, slot) : `<span style="color:#333;font-size:14px">${fallbackChar}</span>`;
-                return `<div class="skill-tip" data-tip="${tipText}" style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
+                const compareHtml = this._buildEquipCompareHtml(label, item, null).replace(/"/g, '&quot;');
+                const tipAttr = item
+                    ? `data-compare="${compareHtml}"`
+                    : `data-tip="${tipText}"`;
+                return `<div class="skill-tip" ${tipAttr} style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
             }
             // Inactive set: show set-specific override or shared fallback.
             const setItem = (colonist.equipmentSets?.[viewingSet])?.[slot] || null;
@@ -2611,19 +2735,142 @@ export class UI {
         const body = this._prioTab === 'attune' ? this._attunementGridHtml() : this._workPriorityGridHtml();
         const heading = this._prioTab === 'attune'
             ? `<h3>Magic Attunement (click to toggle, max ${MAGIC_STUDY_CONFIG.attunementSlots})</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Only spells from attuned schools autocast in the world and on expeditions. Free to change anytime.</div>`
-            : '<h3>Work Priorities (click to cycle, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Note: Golem priorities are locked to their specialization</div>';
-        const fullHtml = '<div class="panel-close" data-panel-close="priority">&times;</div>' + tabs + heading + body;
+            : '<h3>Work Priorities (click to cycle, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">1 = highest priority, 5 = lowest. Note: Golem priorities are locked to their specialization</div>';
+        let profileToolbar = '';
+        if (this._prioTab === 'work') {
+            const customProfiles = this.game.priorityProfiles || {};
+            const allProfileNames = [
+                ...Object.keys(PRIORITY_PROFILES),
+                ...Object.keys(customProfiles).filter(k => k.startsWith('Custom')),
+            ];
+            const selectedName = this._prioSelectedProfile || '';
+            const profileOptions = allProfileNames
+                .map(name => `<option value="${name}"${name === selectedName ? ' selected' : ''}>${name}</option>`)
+                .join('');
+
+            // Load draft from selected profile if selection changed or draft missing.
+            if (selectedName) {
+                const source = PRIORITY_PROFILES[selectedName] || customProfiles[selectedName] || {};
+                if (!this._prioProfileDraft || this._prioProfileDraftSource !== selectedName) {
+                    this._prioProfileDraft = { ...source };
+                    this._prioProfileDraftSource = selectedName;
+                }
+            } else {
+                this._prioProfileDraft = null;
+                this._prioProfileDraftSource = null;
+            }
+
+            const skills = Object.keys(SKILLS);
+            const isBuiltIn = selectedName && !!PRIORITY_PROFILES[selectedName];
+
+            // Profile value row.
+            let profileValueRow = '';
+            if (this._prioProfileDraft) {
+                const hint = isBuiltIn
+                    ? '<span style="color:#666;font-size:10px;">Built-in profile (read-only)</span>'
+                    : '<span style="color:#666;font-size:10px;">Click to cycle (1=highest, 5=lowest, -=off). Right-click to reverse.</span>';
+                const cells = skills.map(s => {
+                    const v = this._prioProfileDraft[s] ?? 0;
+                    const display = v === 0 ? '-' : v;
+                    const style = isBuiltIn
+                        ? 'background:#1a1a1a;color:#888;padding:2px 6px;border-radius:2px;font-size:12px;'
+                        : 'background:#2a2a2a;color:#ccc;padding:2px 6px;border-radius:2px;font-size:12px;cursor:pointer;border:1px solid #444;';
+                    const attr = isBuiltIn ? '' : `data-profile-skill="${s}"`;
+                    return `<td ${attr} style="${style}">${display}</td>`;
+                }).join('');
+                const nameInput = isBuiltIn ? '' :
+                    `<input id="prio-profile-name" value="${selectedName}" maxlength="20" style="background:#222;color:#ccc;border:1px solid #444;border-radius:3px;padding:2px 6px;font-size:12px;width:110px;" />`;
+                const saveBtn = isBuiltIn ? '' :
+                    `<button onclick="window.game.ui._saveProfileDraft()" style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">Save</button>`;
+                profileValueRow =
+                    `<div style="margin-bottom:6px;">${hint}</div>` +
+                    `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">` +
+                    `<table style="border-collapse:collapse;"><tr><td style="font-size:11px;color:#888;padding-right:6px;">Values:</td>${cells}</tr></table>` +
+                    `${nameInput}${saveBtn}` +
+                    `</div>`;
+            }
+
+            profileToolbar =
+                `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">` +
+                `<select id="prio-profile-select" onchange="window.game.ui._onProfileSelectChange(this.value)" style="background:#222;color:#ccc;border:1px solid #444;border-radius:3px;padding:2px 4px;font-size:12px;">` +
+                `<option value="">-- Select Profile --</option>${profileOptions}</select>` +
+                `<button onclick="window.game.ui._applyProfileToAll()" style="background:#2a2a4e;color:#88aaff;border:1px solid #445;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">Apply to All</button>` +
+                `<button onclick="window.game.ui._newCustomProfile()" style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">New Profile</button>` +
+                `</div>` +
+                profileValueRow;
+        }
+        const fullHtml = '<div class="panel-close" data-panel-close="priority">&times;</div>' + tabs + heading + profileToolbar + body;
         if (fullHtml !== this._lastPrioHtml) {
             this._lastPrioHtml = fullHtml;
             this.elements.priorityPanel.innerHTML = fullHtml;
         }
     }
 
+    _onProfileSelectChange(value) {
+        this._prioSelectedProfile = value;
+        this._prioProfileDraft = null;
+        this._prioProfileDraftSource = null;
+        this._lastPrioHtml = null;
+        this.updatePriorityPanel();
+    }
+
+    _applyProfileToAll() {
+        if (!this._prioProfileDraft) return;
+        for (const c of this.game.colonists) {
+            if (c.hp > 0 && !c.golem) {
+                for (const skill of Object.keys(SKILLS)) {
+                    if (this._prioProfileDraft[skill] !== undefined) c.priorities[skill] = this._prioProfileDraft[skill];
+                }
+            }
+        }
+        this._lastPrioHtml = null;
+        this.updatePriorityPanel();
+    }
+
+    _applyProfileToColonist(colonistId) {
+        if (!this._prioProfileDraft) return;
+        const c = this.game.getColonist(colonistId);
+        if (!c || c.golem) return;
+        for (const skill of Object.keys(SKILLS)) {
+            if (this._prioProfileDraft[skill] !== undefined) c.priorities[skill] = this._prioProfileDraft[skill];
+        }
+        this._lastPrioHtml = null;
+        this.updatePriorityPanel();
+    }
+
+    _newCustomProfile() {
+        const existing = Object.keys(this.game.priorityProfiles || {}).filter(k => k.startsWith('Custom'));
+        const name = `Custom ${existing.length + 1}`;
+        if (!this.game.settings.priorityProfiles) this.game.settings.priorityProfiles = {};
+        this.game.settings.priorityProfiles[name] = { building: 3, farming: 3, crafting: 3, cooking: 3, animals: 3, research: 3 };
+        this._prioSelectedProfile = name;
+        this._prioProfileDraft = null;
+        this._prioProfileDraftSource = null;
+        this._lastPrioHtml = null;
+        this.updatePriorityPanel();
+    }
+
+    _saveProfileDraft() {
+        if (!this._prioProfileDraft || !this._prioProfileDraftSource) return;
+        const nameInput = document.getElementById('prio-profile-name');
+        const newName = nameInput ? nameInput.value.trim() : this._prioProfileDraftSource;
+        if (!newName) return;
+        if (!this.game.settings.priorityProfiles) this.game.settings.priorityProfiles = {};
+        if (newName !== this._prioProfileDraftSource) {
+            delete this.game.settings.priorityProfiles[this._prioProfileDraftSource];
+        }
+        this.game.settings.priorityProfiles[newName] = { ...this._prioProfileDraft };
+        this._prioSelectedProfile = newName;
+        this._prioProfileDraftSource = newName;
+        this._lastPrioHtml = null;
+        this.updatePriorityPanel();
+    }
+
     _workPriorityGridHtml() {
         const skills = Object.keys(SKILLS);
         let html = '<table><tr><th>Colonist</th>';
         skills.forEach(s => { html += `<th>${s.substring(0, 8)}</th>`; });
-        html += '</tr>';
+        html += '<th></th></tr>';
 
         for (const c of this.game.colonists) {
             if (c.hp <= 0) continue;
@@ -2637,6 +2884,11 @@ export class UI {
                 const cellClass = isGolem ? 'prio-cell golem-locked' : 'prio-cell';
                 const cellStyle = isGolem ? 'opacity: 0.6; cursor: not-allowed;' : `background-color:${colorFromLevel};color:white;text-shadow:-1px -1px 0.5px #000, 1px -1px 0.5px #000, -1px  1px 0.5px #000, 1px  1px 0.5px #000;`;
                 html += `<td class="${cellClass}" data-colonist-id="${c.id}" data-skill="${s}" style="${cellStyle}">${display}</td>`;
+            }
+            if (!c.golem) {
+                html += `<td><button onclick="window.game.ui._applyProfileToColonist(${c.id})" style="background:#2a2a4e;color:#88aaff;border:1px solid #445;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px;">Apply</button></td>`;
+            } else {
+                html += '<td></td>';
             }
             html += '</tr>';
         }
@@ -2850,6 +3102,21 @@ export class UI {
         }
     }
 
+    _moodSparklineSvg(colonist) {
+        const history = colonist.moodHistory;
+        if (!history || history.length < 3) return '';
+        const W = 32, H = 6;
+        const pts = history.slice(-32);
+        const min = 0, max = 100;
+        const xs = pts.map((_, i) => (i / (pts.length - 1)) * W);
+        const ys = pts.map(v => H - ((v - min) / (max - min)) * H);
+        const points = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+        const last8 = pts.slice(-8);
+        const trending = last8.length >= 2 ? last8[last8.length - 1] - last8[0] : 0;
+        const strokeColor = trending <= -8 ? '#ff8844' : '#888';
+        return `<svg width="${W}" height="${H}" style="vertical-align:middle;margin-left:3px;overflow:visible;" xmlns="http://www.w3.org/2000/svg"><polyline points="${points}" fill="none" stroke="${strokeColor}" stroke-width="1.2"/></svg>`;
+    }
+
     updateColonistHud() {
         const colonists = this.game.colonists.filter(c => !c.golem);
         const golems = this.game.colonists.filter(c => c.golem);
@@ -2880,7 +3147,10 @@ export class UI {
             const dot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
             const cManaPct = c.maxMana > 0 ? (c.mana / c.maxMana) * 100 : 0;
             html += `<div class="hud-dots">`;
-            html += dot('Mood', moodColor);
+            const sparkline = this._moodSparklineSvg(c);
+            const moodThoughtLines = (c.thoughts || []).slice(-5).map(t => `${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)}: ${t.text}`).join('&#10;');
+            const moodTip = `Mood: ${c.mood.toFixed(0)} (${moodLevel})${moodThoughtLines ? '&#10;' + moodThoughtLines : ''}`;
+            html += `<span class="hud-stat skill-tip" data-tip="${moodTip}"><span class="hud-stat-dot" style="color:${moodColor}">●</span>Mood${sparkline}</span>`;
             html += dot('Food', hungerColor);
             html += dot('Rest', restColor);
             html += dot('HP', hpColor);
@@ -3041,7 +3311,11 @@ export class UI {
         }
 
         if (foodEntries.length > 0) {
-            html += '<div class="info-row" style="color:#66aa44;margin-top:8px;margin-bottom:4px;"><b>Foodstuffs</b></div>';
+            const spoilPerDay = this.game.resources.estimateDailyFoodSpoilage(this.game);
+            const spoilLabel = spoilPerDay > 0
+                ? ` <span style="color:#cc6644;font-size:0.9em;">(-${spoilPerDay}/day spoilage)</span>`
+                : '';
+            html += `<div class="info-row" style="color:#66aa44;margin-top:8px;margin-bottom:4px;"><b>Foodstuffs</b>${spoilLabel}</div>`;
             for (const [key, amount] of foodEntries) {
                 const isFood = FOODSTUFFS.includes(key);
                 const isReserved = reserved[key];
@@ -3544,8 +3818,7 @@ export class UI {
                     const key = saveBtn.dataset.slotSaveKey;
                     const nameInput = this.elements.saveSlotPanel.querySelector(`[data-slot-name-key="${key}"]`);
                     const label = nameInput?.value.trim() || '';
-                    this.game.saveToSlot(key, label ? { label } : {});
-                    this.updateSaveSlotPanel();
+                    this.game.saveToSlot(key, label ? { label } : {}).then(() => this.updateSaveSlotPanel());
                     return;
                 }
                 const exportBtnEl = e.target.closest('.slot-export-btn[data-slot-export-key]');
@@ -3603,6 +3876,15 @@ export class UI {
         general += `<button onclick="window.game.exportSave()" class="settings-btn settings-btn-blue">Export Save</button>`;
         general += `<button onclick="window.game.toggleSaveSlotPanel()" class="settings-btn">Save to Slot…</button>`;
         general += `</div></div>`;
+
+        {
+            general += `<div class="settings-section" id="gdrive-settings-section">`;
+            general += `<div class="settings-section-title">Cloud Save (Google Drive)</div>`;
+            general += `<div id="gdrive-status-row" style="min-height:28px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
+            general += `<span id="gdrive-status-label" style="color:#aaa;font-size:11px;">Checking…</span>`;
+            general += `</div>`;
+            general += `</div>`;
+        }
 
         general += `<div class="settings-section"><button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">View Glossary</button></div>`;
 
@@ -3849,6 +4131,36 @@ export class UI {
 
         html += tab === 'graphics' ? graphics : tab === 'controls' ? controls : general;
         this.elements.settingsPanel.innerHTML = html;
+        if (tab === 'general' || !tab) this._updateGdriveStatus();
+    }
+
+    async _updateGdriveStatus() {
+        const row = document.getElementById('gdrive-status-row');
+        if (!row) return;
+        const api = getGdriveAPI();
+        const connected = await api.enabled().catch(() => false);
+        if (connected) {
+            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;flex:1;">Saves sync automatically</span><button onclick="window.game.ui._disconnectGdrive()" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
+        } else {
+            row.innerHTML = `<span style="color:#aaa;font-size:11px;flex:1;">Not connected &mdash; saves stay local only</span><button onclick="window.game.ui._connectGdrive()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Connect Google Drive</button>`;
+        }
+    }
+
+    async _connectGdrive() {
+        const row = document.getElementById('gdrive-status-row');
+        if (row) row.innerHTML = `<span style="color:#ffcc00;font-size:11px;">Opening browser… complete sign-in then return here.</span>`;
+        try {
+            await getGdriveAPI().beginAuth();
+            this._updateGdriveStatus();
+        } catch (e) {
+            if (row) row.innerHTML = `<span style="color:#ff6666;font-size:11px;">Connection failed. Try again.</span><button onclick="window.game.ui._connectGdrive()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Retry</button>`;
+        }
+    }
+
+    async _disconnectGdrive() {
+        if (!confirm('Disconnect Google Drive? Your saves will remain local and will no longer sync.')) return;
+        await getGdriveAPI().revoke().catch(() => {});
+        this._updateGdriveStatus();
     }
 
     // Switch the active settings tab and re-render the panel.
@@ -4403,6 +4715,73 @@ export class UI {
         this._updateOverlay();
     }
 
+    _buildSocialSummaryHtml() {
+        const colonists = this.game.colonists.filter(c => c.hp > 0 && !c.golem);
+        if (colonists.length < 2) return '<div style="color:#666;padding:8px;">Not enough colonists for relationships yet.</div>';
+
+        const TIER_COLORS = {
+            lovers:       '#ff88cc',
+            close_friend: '#66dd88',
+            friend:       '#44bb66',
+            acquaintance: '#888',
+            stranger:     '#555',
+            adversary:    '#dd8844',
+            rival:        '#dd4444',
+        };
+
+        const pairs = [];
+        for (let i = 0; i < colonists.length; i++) {
+            for (let j = i + 1; j < colonists.length; j++) {
+                const a = colonists[i], b = colonists[j];
+                const score = a.opinions?.[b.id] ?? 0;
+                pairs.push({ a, b, score });
+            }
+        }
+        pairs.sort((x, y) => Math.abs(y.score) - Math.abs(x.score));
+
+        const synCfg = EXPLORATION_CONFIG.synergy;
+
+        let html = '<div style="display:flex;flex-direction:column;gap:3px;">';
+        for (const { a, b, score } of pairs) {
+            const tier = getRelationshipTier(score);
+            const color = TIER_COLORS[tier.key] || '#555';
+            const sign = score > 0 ? '+' : '';
+            const tipLines = [];
+            for (const src of [a, b]) {
+                const other = src === a ? b : a;
+                if (src.thoughts) {
+                    src.thoughts
+                        .filter(t => t.text && (t.text.includes(other.name) || t.targetId === other.id))
+                        .slice(-2)
+                        .forEach(t => tipLines.push(`${src.name}: ${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)} ${t.text}`));
+                }
+            }
+            const tip = tipLines.length ? tipLines.join('&#10;').replace(/"/g, '&quot;') : '';
+            const tipAttr = tip ? `class="skill-tip" data-tip="${tip}"` : '';
+
+            let synergyTag = '';
+            if (synCfg) {
+                if (score >= synCfg.allyOpinion) {
+                    const pct = Math.round(synCfg.allyDamageBonus * 100);
+                    synergyTag = `<span style="color:#66dd88;font-size:10px;" title="Each gains +${pct}% damage when on the same expedition">+${pct}% dmg</span>`;
+                } else if (score <= synCfg.rivalOpinion) {
+                    const pct = Math.round(synCfg.rivalDamagePenalty * 100);
+                    synergyTag = `<span style="color:#dd4444;font-size:10px;" title="Each suffers -${pct}% damage when on the same expedition">-${pct}% dmg</span>`;
+                }
+            }
+
+            html += `<div ${tipAttr} style="display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:3px;background:#1a1a1a;cursor:${tip ? 'help' : 'default'};">` +
+                `<span style="color:${a.nameColor || '#ffff00'};font-size:11px;min-width:70px;">${a.name}</span>` +
+                `<span style="color:${color};font-size:10px;min-width:80px;text-align:center;">${tier.key.replace('_', ' ')}</span>` +
+                `<span style="color:${b.nameColor || '#ffff00'};font-size:11px;min-width:70px;">${b.name}</span>` +
+                `<span style="color:${color};font-size:10px;">${sign}${score}</span>` +
+                (synergyTag ? `<span style="margin-left:auto;">${synergyTag}</span>` : '') +
+                `</div>`;
+        }
+        html += '</div>';
+        return html;
+    }
+
     updateStoryPanel() {
         const tab = this._storyTab || 'colony';
         const unlocked = this.game.story.unlocked;
@@ -4439,6 +4818,7 @@ export class UI {
             (this.game.exploration?.raiderKills?.size || 0) +
             (this.game.exploration?.summonsSeen?.size || 0);
         html += `<button class="story-tab-btn${tab === 'bestiary' ? ' active' : ''}" data-story-tab="bestiary">Bestiary (${bestiarySize})</button>`;
+        html += `<button class="story-tab-btn${tab === 'social' ? ' active' : ''}" data-story-tab="social">Social</button>`;
         html += '</div>';
 
         const entries = Object.entries(STORY_MILESTONES)
@@ -4613,6 +4993,8 @@ export class UI {
                     }
                 }
             }
+        } else if (tab === 'social') {
+            html += this._buildSocialSummaryHtml();
         } else {
             const seasonOrder = { spring: 0, summer: 1, autumn: 2, winter: 3 };
             const unlockedEntries = entries.filter(([k]) => unlocked.has(k));

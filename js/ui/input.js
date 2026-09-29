@@ -1,4 +1,4 @@
-import { CONFIG, CROPS, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP } from '../core/config.js';
+import { CONFIG, CROPS, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { isPassable } from '../world/map.js';
@@ -670,9 +670,32 @@ export class InputHandler {
             if (this.dragging) {
                 this.dragEnd = pos;
             }
+            if (this.mode === 'build' && this.buildType === 'arcane_core' && this._complexStructurePreview) {
+                this._updateComplexPreviewTiles(pos.x, pos.y);
+            } else if (this._complexPreviewTiles) {
+                this._complexPreviewTiles = null;
+            }
         } else {
             if (!this._recordingMode) this.game.ui.hideTileTooltip();
+            if (this._complexPreviewTiles) this._complexPreviewTiles = null;
         }
+    }
+
+    _updateComplexPreviewTiles(cx, cy) {
+        const def = COMPLEX_STRUCTURES[this._complexStructurePreview];
+        if (!def) { this._complexPreviewTiles = null; return; }
+        const tiles = [];
+        for (const { dx, dy, req } of def.layout) {
+            const tx = cx + dx, ty = cy + dy;
+            if (tx < 0 || ty < 0 || tx >= CONFIG.MAP_WIDTH || ty >= CONFIG.MAP_HEIGHT) {
+                tiles.push({ x: tx, y: ty, blocked: true });
+                continue;
+            }
+            const tile = this.game.map[ty]?.[tx];
+            const blocked = !tile || tile.structure !== undefined || tile.resource !== undefined;
+            tiles.push({ x: tx, y: ty, blocked });
+        }
+        this._complexPreviewTiles = tiles;
     }
 
     onMouseUp(e) {
@@ -1027,6 +1050,22 @@ export class InputHandler {
                 }
                 if (!this.buildType) break;
                 if (designateBuild(this.game, pos.x, pos.y, this.buildType)) {
+                    if (this.buildType === 'arcane_core' && this._complexStructurePreview) {
+                        const def = COMPLEX_STRUCTURES[this._complexStructurePreview];
+                        if (def) {
+                            for (const { dx, dy, req } of def.layout) {
+                                if (req === 'ritual_chalk') {
+                                    const tx = pos.x + dx, ty = pos.y + dy;
+                                    if (tx >= 0 && ty >= 0 && tx < CONFIG.MAP_WIDTH && ty < CONFIG.MAP_HEIGHT) {
+                                        const tile = this.game.map[ty]?.[tx];
+                                        if (tile && !tile.structure && !tile.designation) {
+                                            designateBuild(this.game, tx, ty, 'ritual_chalk');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     this.game.ui.updateBuildPanel(this);
                 }
                 break;

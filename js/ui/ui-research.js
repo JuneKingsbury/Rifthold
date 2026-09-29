@@ -134,7 +134,12 @@ const researchMethods = {
                         html += '<div class="research-gates">';
                         for (const gate of gateLines) {
                             const color = gate.met ? '#66cc66' : '#cc8844';
-                            html += `<div class="research-gate" style="color:${color};">${gate.met ? '✓' : '○'} ${gate.label}</div>`;
+                            const pct = gate.required > 0 ? Math.round((gate.current / gate.required) * 100) : 100;
+                            const countText = gate.required > 1 ? ` ${gate.current}/${gate.required}` : '';
+                            html += `<div class="research-gate">` +
+                                `<div class="gate-bar-label" style="color:${color};">${gate.label}${countText}</div>` +
+                                `<div class="gate-bar"><div class="gate-bar-fill${gate.met ? ' gate-bar-met' : ''}" style="width:${pct}%"></div></div>` +
+                                `</div>`;
                         }
                         html += '</div>';
                     }
@@ -401,19 +406,11 @@ const researchMethods = {
 
         if (tech.requiresBuildings) {
             for (const [building, count] of Object.entries(tech.requiresBuildings)) {
-                let found = 0;
-                for (let y = 0; y < game.map.length; y++) {
-                    for (let x = 0; x < game.map[y].length; x++) {
-                        if (game.map[y][x].structure === building) found++;
-                        if (found >= count) break;
-                    }
-                    if (found >= count) break;
-                }
-                const bName = BUILDINGS[building]?.description?.split('.')[0] || building.replace(/_/g, ' ');
+                const found = game.mapIndex ? game.mapIndex.getStructurePositions(building).size : 0;
                 const label = count > 1
-                    ? `Build ${count}× ${building.replace(/_/g, ' ')} (${found}/${count})`
+                    ? `Build ${count}x ${building.replace(/_/g, ' ')}`
                     : `Build ${building.replace(/_/g, ' ')}`;
-                gates.push({ label, met: found >= count });
+                gates.push({ label, met: found >= count, current: Math.min(found, count), required: count });
             }
         }
 
@@ -422,12 +419,12 @@ const researchMethods = {
             const current = game.stats?.[stat] || 0;
             const labels = {
                 raidsDefeated: 'Survive a raid',
-                wavesCompleted: 'Complete 3 void waves',
+                wavesCompleted: 'Complete void waves',
                 expeditionsCompleted: 'Complete an expedition',
                 superiorItemsCrafted: 'Craft a Superior item',
-                itemsEnchanted: `Enchant ${min} items (${current}/${min})`,
+                itemsEnchanted: `Enchant items`,
             };
-            gates.push({ label: labels[stat] || stat, met: current >= min });
+            gates.push({ label: labels[stat] || stat, met: current >= min, current: Math.min(current, min), required: min });
         }
 
         if (tech.requiresTabCount) {
@@ -436,8 +433,10 @@ const researchMethods = {
                 if (t.tab === tech.tab && research.completed.has(k)) tabCompleted++;
             }
             gates.push({
-                label: `${tech.requiresTabCount} techs in tab (${tabCompleted}/${tech.requiresTabCount})`,
+                label: `Techs in tab`,
                 met: tabCompleted >= tech.requiresTabCount,
+                current: Math.min(tabCompleted, tech.requiresTabCount),
+                required: tech.requiresTabCount,
             });
         }
 

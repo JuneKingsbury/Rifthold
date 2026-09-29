@@ -5,7 +5,7 @@
  * FOOD_DECAY_CONFIG.decayInterval cadence; the rest is invoked on demand by
  * building, crafting, trading, and equipment code.
  */
-import { CONFIG, FOODSTUFFS, FOOD_DECAY_CONFIG, WORK_CONFIG, ALL_ITEMS, TRADE_VALUES, RAID_WEALTH_WEIGHTS } from '../core/config.js';
+import { CONFIG, FOODSTUFFS, FOOD_DECAY_CONFIG, WORK_CONFIG, ALL_ITEMS, TRADE_VALUES, RAID_WEALTH_WEIGHTS, NEED_DECAY, COLONIST_CONFIG, TRAITS } from '../core/config.js';
 
 export { FOODSTUFFS };
 
@@ -309,5 +309,75 @@ export class ResourceManager {
         }
 
         return totalLost;
+    }
+
+    // Returns estimated food units lost per in-game day without mutating state.
+    estimateDailyFoodSpoilage(game) {
+        const season = game.weather.season;
+        const seasonMult = FOOD_DECAY_CONFIG.seasonDecayMult[season] || 1.0;
+
+        const foodChestCount = game.mapIndex ? game.mapIndex.getStructurePositions('food_chest').size : 0;
+        const iceBoxCount = game.mapIndex ? game.mapIndex.getStructurePositions('ice_box').size : 0;
+        const noPower = game.power && !game.power.powered;
+
+        let reduction = Math.min(FOOD_DECAY_CONFIG.foodChestMaxReduction, foodChestCount * FOOD_DECAY_CONFIG.foodChestReduction);
+        if (!noPower) {
+            reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
+        }
+        reduction = Math.min(FOOD_DECAY_CONFIG.maxTotalReduction, reduction);
+        const storageMult = 1.0 - reduction;
+
+        const intervalsPerDay = CONFIG.TICKS_PER_DAY / FOOD_DECAY_CONFIG.decayInterval;
+        const decayableItems = [...FOODSTUFFS, 'food'];
+        let totalPerDay = 0;
+
+        for (const item of decayableItems) {
+            const qty = this.stockpile[item] || 0;
+            if (qty <= 0) continue;
+            const itemMult = FOOD_DECAY_CONFIG.decayMultipliers[item] || 1.0;
+            const decayRate = FOOD_DECAY_CONFIG.baseDecayRate * itemMult * seasonMult * storageMult;
+            totalPerDay += qty * decayRate * intervalsPerDay;
+        }
+
+        return Math.round(totalPerDay);
+    }
+
+    // Returns estimated cooked food (stockpile.food only) lost to spoilage per day.
+    estimateDailyCookedFoodSpoilage(game) {
+        const season = game.weather.season;
+        const seasonMult = FOOD_DECAY_CONFIG.seasonDecayMult[season] || 1.0;
+
+        const foodChestCount = game.mapIndex ? game.mapIndex.getStructurePositions('food_chest').size : 0;
+        const iceBoxCount = game.mapIndex ? game.mapIndex.getStructurePositions('ice_box').size : 0;
+        const noPower = game.power && !game.power.powered;
+
+        let reduction = Math.min(FOOD_DECAY_CONFIG.foodChestMaxReduction, foodChestCount * FOOD_DECAY_CONFIG.foodChestReduction);
+        if (!noPower) reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
+        reduction = Math.min(FOOD_DECAY_CONFIG.maxTotalReduction, reduction);
+        const storageMult = 1.0 - reduction;
+
+        const qty = this.stockpile.food || 0;
+        if (qty <= 0) return 0;
+        const itemMult = FOOD_DECAY_CONFIG.decayMultipliers.food || 1.0;
+        const decayRate = FOOD_DECAY_CONFIG.baseDecayRate * itemMult * seasonMult * storageMult;
+        const intervalsPerDay = CONFIG.TICKS_PER_DAY / FOOD_DECAY_CONFIG.decayInterval;
+        return Math.round(qty * decayRate * intervalsPerDay);
+    }
+
+    // Returns estimated cooked food eaten by all colonists per in-game day.
+    estimateDailyFoodConsumption(game) {
+        const EAT_THRESHOLD = 30;
+        const hungerPerMeal = COLONIST_CONFIG.cookedFoodRestore - EAT_THRESHOLD;
+        let total = 0;
+        for (const colonist of game.colonists) {
+            if (colonist.golem || colonist.dead) continue;
+            let hungerMult = 1;
+            if (colonist.traits.includes('iron_stomach'))  hungerMult *= TRAITS.iron_stomach.hungerDecayMult;
+            if (colonist.traits.includes('gluttonous'))    hungerMult *= TRAITS.gluttonous.hungerDecayMult;
+            if (colonist.traits.includes('comfort_eater')) hungerMult *= TRAITS.comfort_eater.hungerDecayMult;
+            const ticksPerMeal = hungerPerMeal / (NEED_DECAY.hunger * hungerMult);
+            total += CONFIG.TICKS_PER_DAY / ticksPerMeal;
+        }
+        return Math.ceil(total);
     }
 }

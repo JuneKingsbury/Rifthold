@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rifthold: Google Sign-In</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a2e; color: #ccc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        h2 { color: #66ff99; }
+        p { color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div>
+        <h2>Rifthold: Google Drive Connected!</h2>
+        <p>You can close this tab and return to the game.</p>
+    </div>
+    <script>
+        // Post the full query string back to the opener via BroadcastChannel, then
+        // close. The game page listens on the same channel name.
+        try {
+            const ch = new BroadcastChannel('rifthold_gdrive_auth');
+            ch.postMessage(window.location.search);
+            ch.close();
+        } catch (e) {
+            // Fallback: postMessage to opener (same-origin only)
+            if (window.opener) window.opener.postMessage({ riftholdGdriveAuth: window.location.search }, window.location.origin);
+        }
+        setTimeout(() => window.close(), 1000);
+    </script>
+</body>
+</html>

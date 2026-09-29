@@ -1,4 +1,4 @@
-import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS } from './config.js';
+import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS, SEASONS, SEASON_ADVANCE_NOTICE, PRIORITY_PROFILES } from './config.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -31,6 +31,7 @@ import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
 import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud } from './save.js';
+import { getGdriveAPI } from './gdrive-web.js';
 import { initResizeHandles } from '../ui/resize.js';
 import { SpatialHash } from '../world/spatial.js';
 import { MapIndex } from '../world/mapindex.js';
@@ -398,7 +399,10 @@ class Game {
                 if (this._lastAutoSaveTick === undefined) this._lastAutoSaveTick = this.tick;
                 if (this.tick - this._lastAutoSaveTick >= intervalTicks) {
                     this._lastAutoSaveTick = this.tick;
-                    if (saveAutoSlot(this)) {
+                    // Fire-and-forget: saveAutoSlot is async (compression), but the tick
+                    // loop must not block on it. Notify/report stats when it resolves.
+                    saveAutoSlot(this).then(ok => {
+                        if (!ok) return;
                         this.notifications.push({ text: 'Auto-saved', tick: this.tick, type: 'success' });
                         if (window.electronAPI?.steam) {
                             const steam = window.electronAPI.steam;
@@ -407,7 +411,7 @@ class Game {
                             }
                             steam.storeStats();
                         }
-                    }
+                    }).catch(e => console.error('Auto-save failed:', e));
                 }
             }
         }
@@ -536,6 +540,16 @@ class Game {
             this.weather.applySnow(this.map);
             if (this.minimap) this.minimap.markTerrainDirty();
             if (this.renderer) this.renderer.markTerrainDirty();
+        }
+
+        const ticksRemaining = CONFIG.TICKS_PER_SEASON - this.weather.seasonTick;
+        if (ticksRemaining === CONFIG.TICKS_PER_DAY) {
+            const nextSeasonIndex = (this.weather.seasonIndex + 1) % 4;
+            const nextSeason = SEASONS[nextSeasonIndex];
+            const notice = SEASON_ADVANCE_NOTICE[nextSeason];
+            if (notice) {
+                this.notifications.push({ text: notice, tick: this.tick, type: 'event' });
+            }
         }
 
         if (this.tick % FOOD_DECAY_CONFIG.decayInterval === 0) {
@@ -837,6 +851,26 @@ class Game {
     setMobileMode(mode) {
         this.input.setMode(mode);
     }
+
+    applyPriorityProfile(colonistId, profileName) {
+        const c = this.getColonist(colonistId);
+        if (!c || c.golem) return;
+        const profile = this.settings?.priorityProfiles?.[profileName] || PRIORITY_PROFILES[profileName];
+        if (!profile) return;
+        for (const skill of Object.keys(SKILLS)) {
+            if (profile[skill] !== undefined) c.priorities[skill] = profile[skill];
+        }
+    }
+
+    savePriorityProfile(slotIndex, colonistId) {
+        const c = this.getColonist(colonistId);
+        if (!c) return;
+        if (!this.settings.priorityProfiles) this.settings.priorityProfiles = {};
+        const name = `Custom ${slotIndex + 1}`;
+        this.settings.priorityProfiles[name] = { ...c.priorities };
+    }
+
+    get priorityProfiles() { return this.settings?.priorityProfiles || {}; }
 
     cyclePriority(colonistId, skill) {
         const c = this.getColonist(colonistId);
@@ -2562,20 +2596,20 @@ class Game {
         this.ui.updateSettingsPanel();
     }
 
-    save() {
+    async save() {
         const slot = this.settings.primarySaveSlot;
         if (!slot) {
             this.notifications.push({ text: 'No save slot selected. Use Settings → Save to Slot…', tick: this.tick, type: 'warning' });
             return;
         }
-        if (saveToSlot(this, slot)) {
+        if (await saveToSlot(this, slot)) {
             this.notifications.push({ text: 'Game saved!', tick: this.tick, type: 'success' });
             this.saveSettingsToStorage();
         }
     }
 
-    saveToSlot(slotKey, opts = {}) {
-        if (saveToSlot(this, slotKey, opts)) {
+    async saveToSlot(slotKey, opts = {}) {
+        if (await saveToSlot(this, slotKey, opts)) {
             this.settings.primarySaveSlot = slotKey;
             this.saveSettingsToStorage();
             this.notifications.push({ text: 'Saved!', tick: this.tick, type: 'success' });
@@ -2584,8 +2618,8 @@ class Game {
         return false;
     }
 
-    loadFromSlot(slotKey) {
-        if (loadFromSlot(this, slotKey)) {
+    async loadFromSlot(slotKey) {
+        if (await loadFromSlot(this, slotKey)) {
             this.settings.primarySaveSlot = slotKey;
             this.saveSettingsToStorage();
             if (this.renderer) this.renderer.markTerrainDirty();
@@ -2605,8 +2639,8 @@ class Game {
         this.ui.toggleSaveSlotPanel();
     }
 
-    load() {
-        if (loadGame(this)) {
+    async load() {
+        if (await loadGame(this)) {
             // loadGame replaces this.map wholesale, so the baked ground cache is
             // now stale (built from the pre-load map). Force a rebuild on the next
             // frame. The minimap already gets the same treatment inside loadGame.
@@ -2621,9 +2655,9 @@ class Game {
         }
     }
 
-    exportSave() {
-        this.save();
-        if (exportSave()) {
+    async exportSave() {
+        await this.save();
+        if (await exportSave()) {
             this.notifications.push({ text: 'Save exported!', tick: this.tick, type: 'success' });
         }
     }
@@ -3365,8 +3399,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveSlotsPanel.style.display = 'none';
         modalBackdropEl.style.display = 'none';
         window.soundManager?.playSFXPitched('open_close_click', -3);
-        launchGame(game => {
-            loadFromSlot(game, key);
+        launchGame(async game => {
+            await loadFromSlot(game, key);
             game.settings.primarySaveSlot = key;
             game.saveSettingsToStorage();
         });
@@ -3628,6 +3662,34 @@ document.addEventListener('DOMContentLoaded', () => {
         modalBackdrop.style.display = 'none';
     }
 
+    async function updateStartGdriveStatus() {
+        const section = document.getElementById('start-gdrive-section');
+        const row = document.getElementById('start-gdrive-status-row');
+        if (!section || !row) return;
+        section.style.display = '';
+        const connected = await getGdriveAPI().enabled().catch(() => false);
+        if (connected) {
+            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;flex:1;">Saves sync automatically</span><button id="start-gdrive-disconnect" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
+            document.getElementById('start-gdrive-disconnect').addEventListener('click', async () => {
+                if (!confirm('Disconnect Google Drive? Your saves will remain local and will no longer sync.')) return;
+                await getGdriveAPI().revoke().catch(() => {});
+                updateStartGdriveStatus();
+            });
+        } else {
+            row.innerHTML = `<span style="color:#aaa;font-size:11px;flex:1;">Not connected &mdash; saves stay local only</span><button id="start-gdrive-connect" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Connect Google Drive</button>`;
+            document.getElementById('start-gdrive-connect').addEventListener('click', async () => {
+                row.innerHTML = `<span style="color:#ffcc00;font-size:11px;">Opening browser&#x2026; complete sign-in then return here.</span>`;
+                try {
+                    await getGdriveAPI().beginAuth();
+                    updateStartGdriveStatus();
+                } catch {
+                    row.innerHTML = `<span style="color:#ff6666;font-size:11px;">Connection failed. Try again.</span><button id="start-gdrive-retry" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Retry</button>`;
+                    document.getElementById('start-gdrive-retry').addEventListener('click', () => updateStartGdriveStatus().then(() => document.getElementById('start-gdrive-connect')?.click()));
+                }
+            });
+        }
+    }
+
     document.getElementById('start-settings').addEventListener('click', () => {
         const opening = settingsPanel.style.display === 'none';
         closeModals();
@@ -3635,6 +3697,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadStartSettings();
             settingsPanel.style.display = 'block';
             modalBackdrop.style.display = 'block';
+            updateStartGdriveStatus();
         }
     });
 
@@ -4571,6 +4634,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.style.color = active ? '#ffcc00' : '#999';
         });
         if (tab === 'controls') renderStartKeybindings();
+        if (tab === 'general') updateStartGdriveStatus();
     }
     document.querySelectorAll('#start-settings-panel [data-start-tab-btn]').forEach(btn => {
         btn.addEventListener('click', () => setStartSettingsTab(btn.getAttribute('data-start-tab-btn')));
@@ -4667,10 +4731,12 @@ document.addEventListener('DOMContentLoaded', () => {
         initPanelOverlay();
         initResizeHandles(fitGameFont);
         if (window.innerWidth <= 768) setFooterMode(true);
-        requestAnimationFrame(() => {
+        requestAnimationFrame(async () => {
             fitGameFont();
             const game = new Game();
-            setup(game);
+            // setup may be async (loading a slot now decompresses off the main
+            // thread), so await it before start() to avoid starting on unloaded state.
+            await setup(game);
             window.soundManager.stopMusic();
             // New games start at timeOfDay 75 (~0.16 of the day), which is night
             // per DAY_NIGHT.dayStart. Start on the night track so it matches what

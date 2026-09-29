@@ -1,52 +1,199 @@
-import { CONFIG, ENTITIES, ALL_ITEMS } from './config.js';
+import { CONFIG, ENTITIES } from './config.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
-import { recalcMaxMana, invalidateEquipStatCache, defaultAttunedSchools } from '../entities/colonist.js';
+import { recalcMaxMana, invalidateEquipStatCache, TRANSIENT_COLONIST_FIELDS, TRANSIENT_COLONIST_DEFAULTS } from '../entities/colonist.js';
+import * as gdriveWeb from './gdrive-web.js';
 
 const SAVE_KEY = 'colony_save';
-const SAVE_VERSION = 10;
+// v11 is the first version of the compressed, migration-laddered format. Saves at
+// versions below 11 predate the ladder and are discarded one final time on load
+// (see _applyLoadData). From v11 onward, schema changes add a MIGRATIONS step and
+// bump SAVE_VERSION instead of invalidating saves.
+const SAVE_VERSION = 11;
 const SLOT_META_KEY = 'colony_slot_meta';
 const SLOT_AUTO_NEXT_KEY = 'colony_slot_auto_next';
+
+// Stored-string format markers. The first bytes of a stored slot tell the loader
+// how to decode it, so compressed, uncompressed, and legacy raw-JSON saves can
+// coexist without ambiguity.
+const COMPRESS_MAGIC = 'RHc1:';   // COMPRESS_MAGIC + base64(deflate-raw(json))
+const PLAIN_MAGIC = 'RHj1:';      // PLAIN_MAGIC + json (fallback when compression unavailable)
+
+// Entities and raiders share these movement-only transient fields (see
+// entity-factory.js). They are re-derived at runtime, so they are stripped on save
+// and re-seeded to these defaults on load (simulation code assumes they exist).
+const TRANSIENT_ENTITY_DEFAULTS = { path: null, pathAge: 0, moveCooldown: 0 };
+const TRANSIENT_ENTITY_FIELDS = Object.keys(TRANSIENT_ENTITY_DEFAULTS);
+
+let _compressSupport = null;
+function _canCompress() {
+    if (_compressSupport !== null) return _compressSupport;
+    try {
+        _compressSupport = typeof CompressionStream !== 'undefined'
+            && typeof DecompressionStream !== 'undefined'
+            && !!new CompressionStream('deflate-raw');
+    } catch {
+        _compressSupport = false;
+    }
+    return _compressSupport;
+}
+
+// Chunked base64 so btoa / String.fromCharCode never overflow the call stack on
+// large save buffers (a developed colony compresses to tens of KB of bytes).
+function _bytesToBase64(bytes) {
+    const CHUNK = 0x8000;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+}
+
+function _base64ToBytes(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+// Encode a JSON string into the stored form: compressed when the platform supports
+// CompressionStream, otherwise a plain-text fallback that still carries a format
+// marker so the loader stays format-aware.
+async function _encodeSave(json) {
+    if (!_canCompress()) return PLAIN_MAGIC + json;
+    try {
+        const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+        const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+        return COMPRESS_MAGIC + _bytesToBase64(buf);
+    } catch (e) {
+        console.warn('Save compression failed, storing uncompressed:', e);
+        return PLAIN_MAGIC + json;
+    }
+}
+
+// Inverse of _encodeSave. Accepts compressed, plain-marked, or legacy raw-JSON
+// (starts with '{') strings and returns the decoded JSON text.
+async function _decodeSave(stored) {
+    if (stored.startsWith(COMPRESS_MAGIC)) {
+        const bytes = _base64ToBytes(stored.slice(COMPRESS_MAGIC.length));
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return await new Response(stream).text();
+    }
+    if (stored.startsWith(PLAIN_MAGIC)) return stored.slice(PLAIN_MAGIC.length);
+    return stored;   // legacy raw JSON (pre-v11)
+}
+
+// Shallow-copy an object minus the given transient fields and any _-prefixed keys
+// (render/state caches). Non-destructive: the live game object is untouched.
+function _stripTransient(obj, transientFields) {
+    const out = {};
+    for (const key of Object.keys(obj)) {
+        if (key.startsWith('_')) continue;
+        if (transientFields.includes(key)) continue;
+        out[key] = obj[key];
+    }
+    return out;
+}
+
+// Re-seed transient fields that _stripTransient dropped on save. Simulation code
+// assumes these always exist (e.g. updateMoving reads colonist.path.length), so a
+// loaded object must have them restored to their factory defaults. Array/object
+// defaults are cloned so instances never share a reference.
+function _restoreTransient(obj, defaults) {
+    for (const [key, def] of Object.entries(defaults)) {
+        if (obj[key] !== undefined) continue;
+        obj[key] = Array.isArray(def) ? [] : (def && typeof def === 'object' ? { ...def } : def);
+    }
+}
 
 function _steamCloud() {
     return window.electronAPI?.steam;
 }
 
+// Returns the GDrive API surface regardless of context:
+//   - Electron: the IPC bridge exposed via preload.js
+//   - Browser: the PKCE web implementation in gdrive-web.js
+// Capacitor (native Android) has neither, and gdriveWeb.enabled() returns false
+// there too, so sync silently no-ops on mobile.
+function _gdriveCloud() {
+    return window.electronAPI?.gdrive || gdriveWeb;
+}
+
 export async function syncSlotToCloud(slotKey) {
     const steam = _steamCloud();
-    if (!steam || !(await steam.available())) return;
-    const json = localStorage.getItem(slotKey);
-    if (json) steam.cloudWrite(`${slotKey}.json`, json);
-    const metaJson = localStorage.getItem(SLOT_META_KEY);
-    if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+    if (steam && (await steam.available())) {
+        const json = localStorage.getItem(slotKey);
+        if (json) steam.cloudWrite(`${slotKey}.json`, json);
+        const metaJson = localStorage.getItem(SLOT_META_KEY);
+        if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+    }
+    const gdrive = _gdriveCloud();
+    if (gdrive && (await gdrive.enabled())) {
+        const json = localStorage.getItem(slotKey);
+        if (json) gdrive.cloudWrite(`${slotKey}.json`, json);
+        const metaJson = localStorage.getItem(SLOT_META_KEY);
+        if (metaJson) gdrive.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+    }
 }
 
 export async function syncAllFromCloud() {
     const steam = _steamCloud();
-    if (!steam || !(await steam.available()) || !(await steam.cloudEnabled())) return;
-    const cloudMetaRaw = await steam.cloudRead(`${SLOT_META_KEY}.json`);
-    if (!cloudMetaRaw) return;
-    let cloudMeta;
-    try { cloudMeta = JSON.parse(cloudMetaRaw); } catch { return; }
-    const localMeta = getAllSlotsMeta();
-    for (const [slotKey, cloudEntry] of Object.entries(cloudMeta)) {
-        const localEntry = localMeta[slotKey];
-        if (localEntry && localEntry.timestamp >= cloudEntry.timestamp) continue;
-        const slotData = await steam.cloudRead(`${slotKey}.json`);
-        if (slotData) {
-            localStorage.setItem(slotKey, slotData);
-            localMeta[slotKey] = cloudEntry;
+    if (steam && (await steam.available()) && (await steam.cloudEnabled())) {
+        const cloudMetaRaw = await steam.cloudRead(`${SLOT_META_KEY}.json`);
+        if (cloudMetaRaw) {
+            let cloudMeta;
+            try { cloudMeta = JSON.parse(cloudMetaRaw); } catch { cloudMeta = null; }
+            if (cloudMeta) {
+                const localMeta = getAllSlotsMeta();
+                for (const [slotKey, cloudEntry] of Object.entries(cloudMeta)) {
+                    const localEntry = localMeta[slotKey];
+                    if (localEntry && localEntry.timestamp >= cloudEntry.timestamp) continue;
+                    const slotData = await steam.cloudRead(`${slotKey}.json`);
+                    if (slotData) {
+                        localStorage.setItem(slotKey, slotData);
+                        localMeta[slotKey] = cloudEntry;
+                    }
+                }
+                localStorage.setItem(SLOT_META_KEY, JSON.stringify(localMeta));
+            }
         }
     }
-    localStorage.setItem(SLOT_META_KEY, JSON.stringify(localMeta));
+    const gdrive = _gdriveCloud();
+    if (gdrive && (await gdrive.enabled())) {
+        const cloudMetaRaw = await gdrive.cloudRead(`${SLOT_META_KEY}.json`);
+        if (cloudMetaRaw) {
+            let cloudMeta;
+            try { cloudMeta = JSON.parse(cloudMetaRaw); } catch { cloudMeta = null; }
+            if (cloudMeta) {
+                const localMeta = getAllSlotsMeta();
+                for (const [slotKey, cloudEntry] of Object.entries(cloudMeta)) {
+                    const localEntry = localMeta[slotKey];
+                    if (localEntry && localEntry.timestamp >= cloudEntry.timestamp) continue;
+                    const slotData = await gdrive.cloudRead(`${slotKey}.json`);
+                    if (slotData) {
+                        localStorage.setItem(slotKey, slotData);
+                        localMeta[slotKey] = cloudEntry;
+                    }
+                }
+                localStorage.setItem(SLOT_META_KEY, JSON.stringify(localMeta));
+            }
+        }
+    }
 }
 
 async function _cloudDeleteSlot(slotKey) {
     const steam = _steamCloud();
-    if (!steam || !(await steam.available())) return;
-    steam.cloudDelete(`${slotKey}.json`);
-    const metaJson = localStorage.getItem(SLOT_META_KEY);
-    if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+    if (steam && (await steam.available())) {
+        steam.cloudDelete(`${slotKey}.json`);
+        const metaJson = localStorage.getItem(SLOT_META_KEY);
+        if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+    }
+    const gdrive = _gdriveCloud();
+    if (gdrive && (await gdrive.enabled())) {
+        gdrive.cloudDelete(`${slotKey}.json`);
+        const metaJson = localStorage.getItem(SLOT_META_KEY);
+        if (metaJson) gdrive.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+    }
 }
 
 function _buildSaveData(game) {
@@ -61,9 +208,9 @@ function _buildSaveData(game) {
         layout,
 
         map: serializeMap(game.map),
-        colonists: game.colonists,
-        entities: game.entities,
-        raiders: game.raiders,
+        colonists: game.colonists.map(c => _stripTransient(c, TRANSIENT_COLONIST_FIELDS)),
+        entities: game.entities.map(e => _stripTransient(e, TRANSIENT_ENTITY_FIELDS)),
+        raiders: game.raiders.map(r => _stripTransient(r, TRANSIENT_ENTITY_FIELDS)),
 
         resources: {
             stockpile: game.resources.stockpile,
@@ -203,7 +350,9 @@ export function captureThumbnail(game) {
         const cropX = (src.width - cropW) / 2;
         const cropY = (src.height - cropH) / 2;
         offscreen.getContext('2d').drawImage(src, cropX, cropY, cropW, cropH, 0, 0, W, H);
-        return offscreen.toDataURL('image/png');
+        // JPEG at 0.7 quality: thumbnails are screenshot-like, so this cuts the
+        // meta-index payload substantially versus PNG with no meaningful loss at 240x160.
+        return offscreen.toDataURL('image/jpeg', 0.7);
     } catch {
         return null;
     }
@@ -223,10 +372,11 @@ function _writeMeta(slotKey, metaEntry) {
     localStorage.setItem(SLOT_META_KEY, JSON.stringify(all));
 }
 
-export function saveToSlot(game, slotKey, opts = {}) {
+export async function saveToSlot(game, slotKey, opts = {}) {
     const data = _buildSaveData(game);
     const json = JSON.stringify(data, (key, value) => key.startsWith('_') ? undefined : value);
-    localStorage.setItem(slotKey, json);
+    const stored = await _encodeSave(json);
+    localStorage.setItem(slotKey, stored);
     const meta = extractMeta(data);
     meta.timestamp = Date.now();
     if (opts.label) meta.label = opts.label;
@@ -236,11 +386,11 @@ export function saveToSlot(game, slotKey, opts = {}) {
     return true;
 }
 
-export function loadFromSlot(game, slotKey) {
+export async function loadFromSlot(game, slotKey) {
     try {
-        const json = localStorage.getItem(slotKey);
-        if (!json) return false;
-        const data = JSON.parse(json);
+        const stored = localStorage.getItem(slotKey);
+        if (!stored) return false;
+        const data = JSON.parse(await _decodeSave(stored));
         return _applyLoadData(game, data);
     } catch (e) {
         console.error('Failed to load slot:', slotKey, e);
@@ -248,10 +398,10 @@ export function loadFromSlot(game, slotKey) {
     }
 }
 
-export function saveAutoSlot(game) {
+export async function saveAutoSlot(game) {
     const next = parseInt(localStorage.getItem(SLOT_AUTO_NEXT_KEY) || '0') % 3;
     const slotKey = `colony_slot_auto_${next}`;
-    const result = saveToSlot(game, slotKey, { label: `Auto-save ${next + 1}` });
+    const result = await saveToSlot(game, slotKey, { label: `Auto-save ${next + 1}` });
     localStorage.setItem(SLOT_AUTO_NEXT_KEY, String((next + 1) % 3));
     return result;
 }
@@ -283,20 +433,48 @@ export function migrateColonySave() {
     localStorage.removeItem(SAVE_KEY);
 }
 
-export function saveGame(game) {
+export async function saveGame(game) {
     const data = _buildSaveData(game);
     const json = JSON.stringify(data, (key, value) => key.startsWith('_') ? undefined : value);
-    localStorage.setItem(SAVE_KEY, json);
+    const stored = await _encodeSave(json);
+    localStorage.setItem(SAVE_KEY, stored);
     return true;
+}
+
+// Sequential save migrations. Each key N is a function that upgrades a v(N-1)
+// save object in place to vN. To evolve the schema: write the transform that
+// makes an old save match the new shape, add it here keyed by the NEW version,
+// and bump SAVE_VERSION. _migrate walks these in order so a very old save is
+// carried forward one step at a time.
+//
+// Example (when adding v12):
+//   12: (d) => { d.someNewField = d.someNewField || []; },
+const MIGRATIONS = {};
+
+// Walk `data` up the migration ladder to SAVE_VERSION, applying each step in
+// order. A missing step is a no-op (versions with no schema change). Returns the
+// migrated object.
+function _migrate(data) {
+    let v = data.version || 0;
+    while (v < SAVE_VERSION) {
+        const step = MIGRATIONS[v + 1];
+        if (step) step(data);
+        v++;
+    }
+    data.version = Math.max(data.version || 0, v);
+    return data;
 }
 
 function _applyLoadData(game, data) {
     try {
 
-        // Saves are not migrated across versions. A mismatch is discarded and the
-        // caller falls back to starting a fresh game.
-        if (data.version !== SAVE_VERSION) {
-            console.warn(`Incompatible save version ${data.version}, expected ${SAVE_VERSION}. Starting fresh.`);
+        // Saves below v11 predate the migration ladder and the compressed format.
+        // They are discarded one final time (with an export-backup offer) and the
+        // caller falls back to starting a fresh game. This is the LAST version at
+        // which any save is ever discarded; from v11 up, MIGRATIONS carries them
+        // forward.
+        if (!(data.version >= 11)) {
+            console.warn(`Incompatible save version ${data.version}. Starting fresh.`);
             const wantExport = window.confirm(
                 `Your save was made with an older game version (v${data.version}) and cannot be loaded.\n\nWould you like to export a backup of your save file before starting a new game?`
             );
@@ -312,6 +490,16 @@ function _applyLoadData(game, data) {
             return false;
         }
 
+        // Saves from a newer client (e.g. Steam cloud synced from an updated
+        // machine) are NOT hard-rejected. We warn and load best-effort: the
+        // explicit `|| default` fallbacks below and the transient-field handling
+        // mean unknown newer fields are simply ignored rather than crashing.
+        if (data.version > SAVE_VERSION) {
+            console.warn(`Save version ${data.version} is newer than supported ${SAVE_VERSION}; loading best-effort.`);
+        } else {
+            _migrate(data);
+        }
+
         CONFIG.PEACEFUL_MODE = data.peaceful;
         game.tick = data.tick;
         game.timeOfDay = data.timeOfDay;
@@ -322,96 +510,15 @@ function _applyLoadData(game, data) {
 
         game.colonists = data.colonists;
         for (const c of game.colonists) {
+            _restoreTransient(c, TRANSIENT_COLONIST_DEFAULTS);
             recalcMaxMana(c);
             invalidateEquipStatCache(c);
-            // Migration: default attunement for saves predating the attunement system.
-            // Pick the colonist's highest-level schools up to the slot count.
-            if (!Array.isArray(c.attunedSchools)) {
-                c.attunedSchools = defaultAttunedSchools(c);
-            }
         }
         game.rebuildColonistIndex();
         game.entities = data.entities || [];
         game.raiders = data.raiders || [];
-
-        // Migration: rename artifacts -> trinkets, route re-categorized items, add boots
-        if (data.resources.artifacts && !data.resources.trinkets) {
-            data.resources.trinkets = [];
-            data.resources.boots = data.resources.boots || [];
-            for (const item of data.resources.artifacts) {
-                const def = ALL_ITEMS[item.key];
-                if (!def) { data.resources.trinkets.push(item); continue; }
-                switch (def.type) {
-                    case 'boots': data.resources.boots.push(item); break;
-                    case 'tool': (data.resources.tools = data.resources.tools || []).push(item); break;
-                    case 'armor': (data.resources.armors = data.resources.armors || []).push(item); break;
-                    case 'helmet': (data.resources.helmets = data.resources.helmets || []).push(item); break;
-                    case 'clothes': (data.resources.clothes = data.resources.clothes || []).push(item); break;
-                    default: data.resources.trinkets.push(item); break;
-                }
-            }
-            delete data.resources.artifacts;
-        }
-        data.resources.boots = data.resources.boots || [];
-
-        // Migration: colonist artifact -> trinket (route re-categorized equipped items), add boots
-        for (const c of (data.colonists || [])) {
-            if (c.artifact !== undefined && c.trinket === undefined) {
-                const equipped = c.artifact;
-                if (equipped) {
-                    const def = ALL_ITEMS[equipped.key];
-                    const newType = def?.type || 'trinket';
-                    if (newType === 'trinket') {
-                        c.trinket = equipped;
-                    } else {
-                        c.trinket = null;
-                        const listMap = { boots: 'boots', tool: 'tools', armor: 'armors', helmet: 'helmets', clothes: 'clothes' };
-                        const listName = listMap[newType] || 'trinkets';
-                        data.resources[listName] = data.resources[listName] || [];
-                        data.resources[listName].push(equipped);
-                    }
-                } else {
-                    c.trinket = null;
-                }
-                delete c.artifact;
-                c.trinketBroken = c.artifactBroken || false;
-                delete c.artifactBroken;
-            }
-            c.boots = c.boots || null;
-            c.hiddenEquipmentSlots = c.hiddenEquipmentSlots || {};
-            if (!c.equipmentSets) {
-                c.equipmentSets = {
-                    Colony:     { weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null },
-                    Expedition: { weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null },
-                };
-            }
-            c.activeSet = c.activeSet || 'Colony';
-        }
-
-        // Migration: flatten item.combat stats to top-level
-        const _flattenCombat = (item) => {
-            if (!item || !item.combat) return;
-            for (const [k, v] of Object.entries(item.combat)) {
-                if (v && item[k] === undefined) item[k] = v;
-            }
-            delete item.combat;
-        };
-        const _itemLists = ['weapons', 'armors', 'helmets', 'clothes', 'tools', 'trinkets', 'boots'];
-        for (const list of _itemLists) {
-            for (const item of (data.resources[list] || [])) _flattenCombat(item);
-        }
-        const _equipSlots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
-        for (const c of (data.colonists || [])) {
-            for (const slot of _equipSlots) _flattenCombat(c[slot]);
-            for (const setName of Object.keys(c.equipmentSets || {})) {
-                for (const slot of _equipSlots) _flattenCombat(c.equipmentSets[setName][slot]);
-            }
-        }
-        for (const exp of (data.exploration?.expeditions || [])) {
-            for (const member of (exp.partySnapshot || [])) {
-                for (const slot of _equipSlots) _flattenCombat(member[slot]);
-            }
-        }
+        for (const e of game.entities) _restoreTransient(e, TRANSIENT_ENTITY_DEFAULTS);
+        for (const r of game.raiders) _restoreTransient(r, TRANSIENT_ENTITY_DEFAULTS);
 
         game.resources.stockpile = data.resources.stockpile;
         game.resources.weapons = data.resources.weapons;
@@ -529,14 +636,6 @@ function _applyLoadData(game, data) {
             }
         }
 
-        for (const row of game.map) {
-            for (const tile of row) {
-                if (tile.structure === 'forge_core' || tile.structure === 'ritual_core') {
-                    tile.structure = 'arcane_core';
-                }
-            }
-        }
-
         game.roomsDirty = true;
         game._complexStructuresInitialized = false;
 
@@ -551,11 +650,11 @@ function _applyLoadData(game, data) {
     }
 }
 
-export function loadGame(game) {
+export async function loadGame(game) {
     try {
-        const json = localStorage.getItem(SAVE_KEY);
-        if (!json) return false;
-        const data = JSON.parse(json);
+        const stored = localStorage.getItem(SAVE_KEY);
+        if (!stored) return false;
+        const data = JSON.parse(await _decodeSave(stored));
         return _applyLoadData(game, data);
     } catch (e) {
         console.error('Failed to load save:', e);
@@ -589,9 +688,13 @@ function _downloadJson(json, filename) {
     URL.revokeObjectURL(url);
 }
 
-export function exportSave() {
-    const json = localStorage.getItem(SAVE_KEY);
-    if (!json) return false;
+// Exports decode the stored (possibly compressed) form back to readable JSON so
+// the downloaded .json file is human-readable and portable, matching the backup
+// blob written on the clean-break discard path.
+export async function exportSave() {
+    const stored = localStorage.getItem(SAVE_KEY);
+    if (!stored) return false;
+    const json = await _decodeSave(stored);
     const filename = `colony_save_${Date.now()}.json`;
     if (window.Capacitor?.isNativePlatform()) {
         _mobileExport(json, filename).catch(e => console.error('Mobile export failed:', e));
@@ -601,9 +704,10 @@ export function exportSave() {
     return true;
 }
 
-export function exportSlot(slotKey) {
-    const json = localStorage.getItem(slotKey);
-    if (!json) return false;
+export async function exportSlot(slotKey) {
+    const stored = localStorage.getItem(slotKey);
+    if (!stored) return false;
+    const json = await _decodeSave(stored);
     const filename = `${slotKey}_${Date.now()}.json`;
     if (window.Capacitor?.isNativePlatform()) {
         _mobileExport(json, filename).catch(e => console.error('Mobile export failed:', e));
@@ -613,18 +717,22 @@ export function exportSlot(slotKey) {
     return true;
 }
 
+// Accepts an exported file in any form: readable JSON, or a compressed/plain
+// marked string. The parsed save is re-encoded into storage so the imported slot
+// matches the current on-disk format.
 export function importSave(file) {
     return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
-                const data = JSON.parse(e.target.result);
-                if (data.version !== SAVE_VERSION || !data.map || !data.colonists) {
+                const json = await _decodeSave(e.target.result);
+                const data = JSON.parse(json);
+                if (!(data.version >= 11) || data.version > SAVE_VERSION || !data.map || !data.colonists) {
                     resolve(false);
                     return;
                 }
                 const slotKey = 'colony_slot_manual_0';
-                localStorage.setItem(slotKey, e.target.result);
+                localStorage.setItem(slotKey, await _encodeSave(json));
                 const meta = extractMeta(data);
                 meta.label = 'Imported Save';
                 _writeMeta(slotKey, meta);

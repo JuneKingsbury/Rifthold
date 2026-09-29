@@ -186,6 +186,10 @@ export class OverlayRenderer {
             this._renderBuildGrid(ctx, cw, ch, this.canvas.width, this.canvas.height, camera);
         }
 
+        if (game.input?._complexPreviewTiles?.length) {
+            this._renderComplexStructurePreview(ctx, game.input._complexPreviewTiles, cw, ch, camera);
+        }
+
         if (game.weather) {
             const dt = this._lastWeatherTime ? Math.min((now - this._lastWeatherTime) / 1000, 0.1) : 0.016;
             this._lastWeatherTime = now;
@@ -312,6 +316,22 @@ export class OverlayRenderer {
             ctx.lineTo(canvasWidth, ry);
         }
         ctx.stroke();
+        ctx.restore();
+    }
+
+    _renderComplexStructurePreview(ctx, tiles, cw, ch, camera) {
+        const camOriginX = camera ? camera.x * cw : 0;
+        const camOriginY = camera ? camera.y * ch : 0;
+        ctx.save();
+        for (const { x, y, blocked } of tiles) {
+            const px = Math.round(x * cw - camOriginX);
+            const py = Math.round(y * ch - camOriginY);
+            ctx.fillStyle = blocked ? 'rgba(255,80,80,0.35)' : 'rgba(80,255,80,0.35)';
+            ctx.fillRect(px, py, cw, ch);
+            ctx.strokeStyle = blocked ? 'rgba(255,80,80,0.8)' : 'rgba(80,255,80,0.8)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px + 0.5, py + 0.5, cw - 1, ch - 1);
+        }
         ctx.restore();
     }
 

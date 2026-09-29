@@ -8,6 +8,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onFullscreenChanged: (callback) => {
     ipcRenderer.on('fullscreen-changed', (event, isFullscreen) => callback(isFullscreen));
   },
+  gdrive: {
+    enabled:     () => ipcRenderer.invoke('gdrive:enabled'),
+    beginAuth:   () => ipcRenderer.invoke('gdrive:begin-auth'),
+    revoke:      () => ipcRenderer.invoke('gdrive:revoke'),
+    cloudRead:   (filename)       => ipcRenderer.invoke('gdrive:read', filename),
+    cloudWrite:  (filename, data) => ipcRenderer.invoke('gdrive:write', filename, data),
+    cloudDelete: (filename)       => ipcRenderer.invoke('gdrive:delete', filename),
+    cloudList:   ()               => ipcRenderer.invoke('gdrive:list'),
+  },
   steam: {
     available: () => ipcRenderer.invoke('steam:available'),
     getPlayerInfo: () => ipcRenderer.invoke('steam:player-info'),

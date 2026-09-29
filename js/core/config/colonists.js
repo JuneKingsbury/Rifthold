@@ -241,6 +241,14 @@ export const NEED_DECAY = {
     rest: 0.1,
 };
 
+export const PRIORITY_PROFILES = {
+    'All-Rounder': { building: 3, farming: 3, crafting: 3, cooking: 3, animals: 3, research: 3 },
+    'Builder':     { building: 1, farming: 4, crafting: 4, cooking: 4, animals: 4, research: 5 },
+    'Farmer':      { building: 4, farming: 1, crafting: 4, cooking: 4, animals: 4, research: 5 },
+    'Crafter':     { building: 4, farming: 4, crafting: 1, cooking: 4, animals: 4, research: 5 },
+    'Scholar':     { building: 5, farming: 5, crafting: 3, cooking: 4, animals: 5, research: 1 },
+};
+
 export const MOOD_THRESHOLDS = {
     inspired: 75,
     content: 40,

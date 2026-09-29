@@ -365,6 +365,8 @@ body {
 .hud-mood-val { color: #ccc; }
 
 #status-bar .res { color: #88cc88; }
+#status-bar .spoil-warn { color: #ff6644; font-size: 0.78em; opacity: 0.9; }
+#status-bar .spoil-ok   { color: #888; font-size: 0.78em; opacity: 0.7; }
 /* Resource-counter punch: a quick grow-then-settle when a counter's value
    changes, drawing the eye to the resource that just ticked. inline-block so the
    scale transform takes effect on the inline span. Origin left so it grows in
@@ -2006,9 +2008,32 @@ img.pixel-art-icon {
 .research-gate {
     font-size: 0.68em;
     line-height: 1.4;
+    margin-bottom: 2px;
+}
+
+.gate-bar-label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-bottom: 1px;
+}
+
+.gate-bar {
+    height: 3px;
+    background: #333;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.gate-bar-fill {
+    height: 100%;
+    background: #cc8844;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.gate-bar-fill.gate-bar-met {
+    background: #66cc66;
 }
 
 .research-node.dimmed {

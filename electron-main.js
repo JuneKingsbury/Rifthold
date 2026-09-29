@@ -2,6 +2,7 @@ const { app, BrowserWindow, protocol, net, ipcMain } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const steamBridge = require('./steam-bridge');
+const gdriveBridge = require('./google-drive-bridge');
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'app',
@@ -82,6 +83,14 @@ ipcMain.handle('steam:cloud-list', () => steamBridge.cloudList());
 ipcMain.handle('steam:cloud-enabled', () => steamBridge.cloudEnabled());
 ipcMain.handle('steam:overlay-store', () => steamBridge.openOverlayStore());
 ipcMain.handle('steam:overlay-url', (_, url) => steamBridge.openOverlayUrl(url));
+
+ipcMain.handle('gdrive:enabled',    () => gdriveBridge.cloudEnabled());
+ipcMain.handle('gdrive:begin-auth', () => gdriveBridge.beginAuth());
+ipcMain.handle('gdrive:revoke',     () => gdriveBridge.revokeAuth());
+ipcMain.handle('gdrive:read',   (_, filename) => gdriveBridge.cloudRead(filename));
+ipcMain.handle('gdrive:write',  (_, filename, data) => gdriveBridge.cloudWrite(filename, data));
+ipcMain.handle('gdrive:delete', (_, filename) => gdriveBridge.cloudDelete(filename));
+ipcMain.handle('gdrive:list',   () => gdriveBridge.cloudList());
 
 app.whenReady().then(() => {
   protocol.handle('app', (request) => {

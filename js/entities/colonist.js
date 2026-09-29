@@ -20,6 +20,19 @@ function hslToHex(h, s, l) {
     return '#' + [f(0), f(8), f(4)].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
 }
 
+// Runtime-only colonist fields that are reset or re-derived on load, so they are
+// stripped before serialization to shrink the save. `path` is the meaningful size
+// win (a coordinate array); the timers are tiny but safe to drop. `workProgress` is
+// deliberately NOT listed: it is accumulated task progress (borderline-persistent),
+// so it is kept to avoid losing player progress for a negligible size gain.
+//
+// The map is keyed by field name with the default the loader restores. Downstream
+// simulation code assumes these fields always exist (e.g. updateMoving reads
+// colonist.path.length), so a loaded colonist must have them re-seeded rather than
+// left undefined. Defaults mirror the createColonist factory.
+export const TRANSIENT_COLONIST_DEFAULTS = { path: [], stateTimer: 0, wanderCooldown: 0, moveCooldown: 0 };
+export const TRANSIENT_COLONIST_FIELDS = Object.keys(TRANSIENT_COLONIST_DEFAULTS);
+
 export function createColonist(x, y, skillBias, existingNames = [], forcedRace = null) {
     const id = getNextId();
     const usedNames = new Set(existingNames);
@@ -246,6 +259,16 @@ export function updateColonist(colonist, game) {
         updateThoughts(colonist, game);
     }
     colonist.mood = computeMood(colonist);
+
+    // Sample mood history for sparkline (one sample every ~10 ticks = ~48 samples/day).
+    if (!colonist.golem) {
+        const sampleInterval = Math.max(1, Math.floor(CONFIG.TICKS_PER_DAY / 48));
+        if (game.tick % sampleInterval === (colonist.id % sampleInterval)) {
+            if (!colonist.moodHistory) colonist.moodHistory = [];
+            colonist.moodHistory.push(Math.round(colonist.mood));
+            if (colonist.moodHistory.length > 48) colonist.moodHistory.shift();
+        }
+    }
 
     if (!colonist.golem) checkCriticalAlerts(colonist, game);
 

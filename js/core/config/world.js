@@ -1,5 +1,12 @@
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 
+export const SEASON_ADVANCE_NOTICE = {
+    spring: 'Spring arrives tomorrow. Crops can be planted again and food decay will return to normal.',
+    summer: 'Summer arrives tomorrow. Crops will grow faster but food spoils more quickly in the heat.',
+    autumn: 'Autumn arrives tomorrow. Crop growth will slow. Harvest before winter.',
+    winter: 'Winter arrives tomorrow. Crop growth halts. Ensure colonists have warm clothing and food is stocked.',
+};
+
 export const SEASON_EFFECTS = {
     spring: { cropGrowthMult: 1.0, animalSpawnRate: 0.04, tempRange: [10, 20], bgColor: '#000000', grassColor: '#85a643', grassBg: '#85a643' },
     summer: { cropGrowthMult: 1.5, animalSpawnRate: 0.035, tempRange: [20, 35], bgColor: '#000000', grassColor: '#85a643', grassBg: '#85a643' },
