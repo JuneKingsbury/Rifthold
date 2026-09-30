@@ -5,6 +5,7 @@ import { recalcMaxMana, invalidateEquipStatCache, TRANSIENT_COLONIST_FIELDS, TRA
 import * as gdriveWeb from './gdrive-web.js';
 
 const SAVE_KEY = 'colony_save';
+const GDRIVE_LAST_SYNC_KEY = 'gdrive_last_sync_ts';
 // v11 is the first version of the compressed, migration-laddered format. Saves at
 // versions below 11 predate the ladder and are discarded one final time on load
 // (see _applyLoadData). From v11 onward, schema changes add a MIGRATIONS step and
@@ -130,9 +131,10 @@ export async function syncSlotToCloud(slotKey) {
     const gdrive = _gdriveCloud();
     if (gdrive && (await gdrive.enabled())) {
         const json = localStorage.getItem(slotKey);
-        if (json) gdrive.cloudWrite(`${slotKey}.json`, json);
+        if (json) await gdrive.cloudWrite(`${slotKey}.json`, json);
         const metaJson = localStorage.getItem(SLOT_META_KEY);
-        if (metaJson) gdrive.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+        if (metaJson) await gdrive.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+        localStorage.setItem(GDRIVE_LAST_SYNC_KEY, String(Date.now()));
     }
 }
 
@@ -176,9 +178,29 @@ export async function syncAllFromCloud() {
                     }
                 }
                 localStorage.setItem(SLOT_META_KEY, JSON.stringify(localMeta));
+                localStorage.setItem(GDRIVE_LAST_SYNC_KEY, String(Date.now()));
             }
         }
     }
+}
+
+export function getLastSyncTime() {
+    const raw = localStorage.getItem(GDRIVE_LAST_SYNC_KEY);
+    return raw ? parseInt(raw, 10) : null;
+}
+
+export async function forceSyncNow() {
+    const gdrive = _gdriveCloud();
+    const gdriveEnabled = gdrive && (await gdrive.enabled().catch(() => false));
+    const steam = _steamCloud();
+    const steamEnabled = steam && (await steam.available().catch(() => false));
+    if (!gdriveEnabled && !steamEnabled) return 'no-cloud';
+    await syncAllFromCloud();
+    const meta = getAllSlotsMeta();
+    for (const slotKey of Object.keys(meta)) {
+        await syncSlotToCloud(slotKey);
+    }
+    return 'ok';
 }
 
 async function _cloudDeleteSlot(slotKey) {

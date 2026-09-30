@@ -30,7 +30,7 @@ import { TradeRiftSystem } from '../systems/traderift.js';
 import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
-import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud } from './save.js';
+import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, getLastSyncTime, forceSyncNow } from './save.js';
 import { getGdriveAPI } from './gdrive-web.js';
 import { initResizeHandles } from '../ui/resize.js';
 import { SpatialHash } from '../world/spatial.js';
@@ -3698,7 +3698,23 @@ document.addEventListener('DOMContentLoaded', () => {
         section.style.display = '';
         const connected = await getGdriveAPI().enabled().catch(() => false);
         if (connected) {
-            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;flex:1;">Saves sync automatically</span><button id="start-gdrive-disconnect" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
+            const ts = getLastSyncTime();
+            const syncLabel = ts ? new Date(ts).toLocaleString() : 'never';
+            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;">Saves sync automatically</span><span id="start-gdrive-last-sync" style="color:#aaa;font-size:10px;flex:1;">Last synced: ${syncLabel}</span><button id="start-gdrive-sync-now" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Sync Now</button><button id="start-gdrive-disconnect" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
+            document.getElementById('start-gdrive-sync-now').addEventListener('click', async () => {
+                const lbl = document.getElementById('start-gdrive-last-sync');
+                const btn = document.getElementById('start-gdrive-sync-now');
+                if (lbl) lbl.textContent = 'Syncing...';
+                if (btn) btn.disabled = true;
+                try {
+                    await forceSyncNow();
+                    const newTs = getLastSyncTime();
+                    if (lbl) lbl.textContent = `Last synced: ${newTs ? new Date(newTs).toLocaleString() : 'never'}`;
+                } catch {
+                    if (lbl) lbl.textContent = 'Sync failed. Try again.';
+                }
+                if (btn) btn.disabled = false;
+            });
             document.getElementById('start-gdrive-disconnect').addEventListener('click', async () => {
                 if (!confirm('Disconnect Google Drive? Your saves will remain local and will no longer sync.')) return;
                 await getGdriveAPI().revoke().catch(() => {});

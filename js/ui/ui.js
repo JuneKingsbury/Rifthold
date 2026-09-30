@@ -18,7 +18,7 @@ import { installArcanePanel } from './ui-arcane.js';
 import { getGdriveAPI } from '../core/gdrive-web.js';
 import { installResearchPanel } from './ui-research.js';
 import { installTutorialPanel } from './ui-tutorial.js';
-import { getAllSlotsMeta, exportSlot } from '../core/save.js';
+import { getAllSlotsMeta, exportSlot, getLastSyncTime, forceSyncNow } from '../core/save.js';
 
 const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '❄', blizzard: '❅', heatwave: '♨' };
 
@@ -4140,7 +4140,9 @@ export class UI {
         const api = getGdriveAPI();
         const connected = await api.enabled().catch(() => false);
         if (connected) {
-            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;flex:1;">Saves sync automatically</span><button onclick="window.game.ui._disconnectGdrive()" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
+            const ts = getLastSyncTime();
+            const syncLabel = ts ? new Date(ts).toLocaleString() : 'never';
+            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;">Saves sync automatically</span><span id="gdrive-last-sync-label" style="color:#aaa;font-size:10px;flex:1;">Last synced: ${syncLabel}</span><button id="gdrive-sync-now-btn" onclick="window.game.ui._forceSyncNow()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Sync Now</button><button onclick="window.game.ui._disconnectGdrive()" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
         } else {
             row.innerHTML = `<span style="color:#aaa;font-size:11px;flex:1;">Not connected &mdash; saves stay local only</span><button onclick="window.game.ui._connectGdrive()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Connect Google Drive</button>`;
         }
@@ -4161,6 +4163,22 @@ export class UI {
         if (!confirm('Disconnect Google Drive? Your saves will remain local and will no longer sync.')) return;
         await getGdriveAPI().revoke().catch(() => {});
         this._updateGdriveStatus();
+    }
+
+    async _forceSyncNow() {
+        const label = document.getElementById('gdrive-last-sync-label');
+        const btn = document.getElementById('gdrive-sync-now-btn');
+        if (label) label.textContent = 'Syncing...';
+        if (btn) btn.disabled = true;
+        try {
+            await forceSyncNow();
+            const ts = getLastSyncTime();
+            const syncLabel = ts ? new Date(ts).toLocaleString() : 'never';
+            if (label) label.textContent = `Last synced: ${syncLabel}`;
+        } catch {
+            if (label) label.textContent = 'Sync failed. Try again.';
+        }
+        if (btn) btn.disabled = false;
     }
 
     // Switch the active settings tab and re-render the panel.
