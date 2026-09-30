@@ -1168,7 +1168,12 @@ function _updateFiresFallback(game) {
                 if (tile.resource?.type === 'tree') {
                     tile.resource = null;
                 } else if (tile.structure && tile.structure !== 'wall') {
+                    // Keep mapIndex in sync, matching the primary fire path
+                    // (~line 1109). Without this the index retains a burned-out
+                    // structure key and drifts from a fresh rebuild.
+                    const oldStructure = tile.structure;
                     tile.structure = null;
+                    if (game.mapIndex) game.mapIndex.removeStructure(x, y, oldStructure);
                 }
             }
 

@@ -507,6 +507,11 @@ function _applyLoadData(game, data) {
         game.settings = { ...game.settings, ...data.settings };
 
         deserializeMap(game.map, data.map);
+        // deserializeMap rebuilds tiles but never touches mapIndex. Rebuild it
+        // explicitly so the index reflects the loaded map. Previously the index
+        // was only repopulated as a side effect of the periodic roomsDirty
+        // rebuild, which has been removed from the recompute hot path.
+        if (game.mapIndex) game.mapIndex.rebuild(game.map);
 
         game.colonists = data.colonists;
         for (const c of game.colonists) {
@@ -636,7 +641,10 @@ function _applyLoadData(game, data) {
             }
         }
 
-        game.roomsDirty = true;
+        // Compute rooms promptly on the first post-load tick (bypass the build
+        // coalescing delay) so a loaded game shows correct room state immediately.
+        game.roomsDirtyTick = game.tick;
+        game.roomsDirtyDeadline = game.tick;
         game._complexStructuresInitialized = false;
 
         if (data.layout) {

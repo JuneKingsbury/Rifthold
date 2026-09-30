@@ -817,7 +817,7 @@ function damageStructureTile(map, x, y, breakDmg, game) {
         tile.structureHp = undefined;
         tile.passable = true;
         if (game.mapIndex) game.mapIndex.removeStructure(x, y, old);
-        game.roomsDirty = true;
+        game.markRoomsDirty();
         // Clear dangling bed assignments and invalidate wave routing, matching
         // combat.js attackStructure so a breached tile is handled the same way
         // regardless of which breaker (raider siege, structure_breaker) opened it.

@@ -485,7 +485,7 @@ export function attackStructure(game, x, y, damage) {
         tile.structureHp = undefined;
         tile.passable = true;
         if (game.mapIndex) game.mapIndex.removeStructure(x, y, oldStructure);
-        game.roomsDirty = true;
+        game.markRoomsDirty();
         if (oldStructure === 'bed') {
             for (const c of game.colonists) {
                 if (c.assignedBed && c.assignedBed.x === x && c.assignedBed.y === y) {

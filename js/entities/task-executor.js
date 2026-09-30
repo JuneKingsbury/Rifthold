@@ -193,15 +193,19 @@ export function completeTask(colonist, task, game) {
             } else {
                 tile.structure = task.buildType;
                 tile.passable = !IMPASSABLE_STRUCTURES.has(task.buildType);
+                // Only index tiles whose type lands in tile.structure. Floors are
+                // written to tile.floor and are not tracked by mapIndex (which
+                // scans tile.structure on rebuild), so indexing them here would
+                // drift the incremental index away from a fresh rebuild.
+                if (game.mapIndex) game.mapIndex.addStructure(task.x, task.y, task.buildType);
             }
             tile.designation = null;
-            if (game.mapIndex) game.mapIndex.addStructure(task.x, task.y, task.buildType);
             if (task.buildType === 'bed') autoAssignNewBed(game, task.x, task.y);
             if (task.buildType === 'trade_rift' && game.tradeRift && !game.tradeRift.seeded) {
                 game.tradeRift.regenerate(game, 'season');
                 game.tradeRift.regenerate(game, 'year');
             }
-            game.roomsDirty = true;
+            game.markRoomsDirty();
             if (game.waves && game.waves.active) game.waves.invalidatePathPreview();
             applyThought(colonist, 'built_something', game.tick);
             game.story.checkMilestone('first_building_placed', game);
@@ -642,7 +646,7 @@ export function completeTask(colonist, task, game) {
                     tile.floor = null;
                 }
                 tile.designation = null;
-                game.roomsDirty = true;
+                game.markRoomsDirty();
                 applyThought(colonist, 'deconstructed', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
                 window.soundManager?.playSFXAt('chop_hit', task.x, task.y);
@@ -679,7 +683,7 @@ export function completeTask(colonist, task, game) {
                 if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.floor);
                 tile.floor = null;
                 tile.designation = null;
-                game.roomsDirty = true;
+                game.markRoomsDirty();
                 applyThought(colonist, 'deconstructed', game.tick);
                 game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.mineDustChar, color: COMBAT_VISUALS.mineDustColor, ttl: COMBAT_VISUALS.mineDustTtl });
                 window.soundManager?.playSFXAt('chop_hit', task.x, task.y);

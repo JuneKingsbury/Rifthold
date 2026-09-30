@@ -192,7 +192,14 @@ class Game {
         this.selectedColonist = null;
         this.selectedColonists = [];
         this.followingColonist = null;
-        this.roomsDirty = true;
+        // Coalesced room-recompute scheduling. roomsDirtyTick is the earliest
+        // tick the recompute may run (null when nothing is pending); it is pushed
+        // back on each new dirtying so a burst of builds triggers a single
+        // recompute once building settles. roomsDirtyDeadline is a hard cap so a
+        // continuous build stream cannot starve the recompute indefinitely.
+        // Init to 0 so the very first tick recomputes, as it did previously.
+        this.roomsDirtyTick = 0;
+        this.roomsDirtyDeadline = 0;
         this.roomQualities = {};
         this.workshopQualities = {};
         this.townHallQualities = {};
@@ -470,7 +477,7 @@ class Game {
     // Work is spread across ticks to bound per-tick cost:
     //
     //   Every tick:  rebuild hostile + colonist spatial hashes; weather update;
-    //                room/quality recompute WHEN roomsDirty; turrets (if powered);
+    //                room/quality recompute WHEN scheduled (see markRoomsDirty);
     //                per-colonist update; summons; wildlife; combat; waves;
     //                exploration; events; social; fires; effect/projectile expiry.
     //   Every 5:     farming. Every 8: research.
@@ -484,6 +491,23 @@ class Game {
     // an incremental path risks desync). findBestTask stays a linear scan (a task
     // spatial index is a correctness risk that needs measurement first). Both are
     // revisited under Phase 6 only if a timing probe shows they matter.
+    // Schedule the room/quality/complex-structure recompute. Rather than run the
+    // heavy full-map recompute on the same tick a structure changes, we defer it
+    // by ROOMS_DIRTY_DELAY ticks and push that target back on each new change, so
+    // a burst of builds (e.g. a run of walls) collapses into a single recompute
+    // once building settles. ROOMS_DIRTY_MAX caps the total deferral so a
+    // continuous build stream cannot starve the recompute. Pathfinding reads live
+    // tile.passable and is unaffected by the delay; only room-quality mood buffs
+    // and complex-structure activation lag by up to the delay, which is imperceptible.
+    markRoomsDirty() {
+        const DELAY = 3;  // ~600ms at 1x speed (TICK_RATE = 200ms)
+        const MAX = 12;
+        this.roomsDirtyTick = this.tick + DELAY;
+        if (this.roomsDirtyDeadline === 0) {
+            this.roomsDirtyDeadline = this.tick + MAX;
+        }
+    }
+
     simulationTick() {
         this.tick++;
         this.timeOfDay = this.tick % CONFIG.TICKS_PER_DAY;
@@ -559,9 +583,12 @@ class Game {
             }
         }
 
-        if (this.roomsDirty) {
+        if (this.roomsDirtyTick !== null &&
+            (this.tick >= this.roomsDirtyTick || this.tick >= this.roomsDirtyDeadline)) {
+            // Note: no mapIndex.rebuild here. The index is maintained incrementally
+            // at every structure add/remove site and rebuilt explicitly on load,
+            // so the periodic full rescan was redundant work in the hot path.
             const roomCount = detectRooms(this.map);
-            this.mapIndex.rebuild(this.map);
             const prevComplex = this.activeComplexStructures.slice();
             checkComplexStructures(this);
             if (this._complexStructuresInitialized) {
@@ -625,7 +652,8 @@ class Game {
             this.roomQualities = qualities.roomQualities;
             this.workshopQualities = qualities.workshopQualities;
             this.townHallQualities = qualities.townHallQualities;
-            this.roomsDirty = false;
+            this.roomsDirtyTick = null;
+            this.roomsDirtyDeadline = 0;
             if (this.minimap) this.minimap.markTerrainDirty();
             if (this.renderer) this.renderer.markTerrainDirty();
         }

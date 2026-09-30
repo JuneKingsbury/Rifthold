@@ -6,29 +6,68 @@ export const ROOM_SCORE_CAPS = {
     workshop: { size: 15, floor: 20, light: 15, focus: 25, support: 25 },
 };
 
+// Reusable scratch buffers for detectRooms, sized to the map on first use and
+// kept across calls to avoid re-allocating ~200KB of typed arrays on every
+// recompute. Sized off CONFIG.MAP_WIDTH/HEIGHT, which are fixed for a session.
+let _roomScratch = null;
+
+function getRoomScratch() {
+    const N = CONFIG.MAP_WIDTH * CONFIG.MAP_HEIGHT;
+    if (!_roomScratch || _roomScratch.N !== N) {
+        _roomScratch = {
+            N,
+            // visitedGlobal persists across flood fills within one detectRooms call
+            // (used only by the seed loop so a consumed tile isn't re-seeded).
+            visitedGlobal: new Uint8Array(N),
+            // visitedLocal is per-fill, stamped with an incrementing fillId so it
+            // never needs clearing between fills. fillId is monotonic across calls
+            // (see detectRooms) so stale stamps from a prior call never match.
+            visitedLocal: new Int32Array(N),
+            // queue holds packed tile ids (y*W+x); tiles holds the current room's
+            // collected cells (also packed). Both bounded by N with mark-on-enqueue.
+            queue: new Int32Array(N),
+            tiles: new Int32Array(N),
+            fillId: 0,
+        };
+    }
+    return _roomScratch;
+}
+
 export function detectRooms(map) {
-    for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
-        for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
-            map[y][x].roomId = null;
+    const W = CONFIG.MAP_WIDTH;
+    const H = CONFIG.MAP_HEIGHT;
+
+    for (let y = 0; y < H; y++) {
+        const row = map[y];
+        for (let x = 0; x < W; x++) {
+            row[x].roomId = null;
         }
     }
 
-    let roomId = 0;
-    const visited = new Set();
+    const scratch = getRoomScratch();
+    const { visitedGlobal, visitedLocal, queue, tiles } = scratch;
+    // visitedGlobal is a per-call accumulator, so clear it. visitedLocal relies on
+    // monotonic fillId stamping instead of clearing.
+    visitedGlobal.fill(0);
 
-    for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
-        for (let x = 0; x < CONFIG.MAP_WIDTH; x++) {
-            const key = `${x},${y}`;
-            if (visited.has(key)) continue;
-            const tile = map[y][x];
+    let roomId = 0;
+
+    for (let y = 0; y < H; y++) {
+        const row = map[y];
+        for (let x = 0; x < W; x++) {
+            const idx = y * W + x;
+            if (visitedGlobal[idx]) continue;
+            const tile = row[x];
             if (isWall(tile)) continue;
             if (tile.terrain === 'water' || tile.terrain === 'tall_rock') continue;
             if (!tile.passable) continue;
 
-            const result = floodFill(map, x, y, visited);
-            if (result.enclosed && result.tiles.length <= 100) {
-                for (const pos of result.tiles) {
-                    map[pos.y][pos.x].roomId = roomId;
+            const fillId = ++scratch.fillId;
+            const count = floodFill(map, x, y, W, H, visitedGlobal, visitedLocal, fillId, queue, tiles);
+            if (count >= 0 && count <= 100) {
+                for (let i = 0; i < count; i++) {
+                    const k = tiles[i];
+                    map[(k / W) | 0][k % W].roomId = roomId;
                 }
                 roomId++;
             }
@@ -38,52 +77,76 @@ export function detectRooms(map) {
     return roomId;
 }
 
-function floodFill(map, startX, startY, visited) {
-    const tiles = [];
-    const queue = [{ x: startX, y: startY }];
+// Flood-fills the region seeded at (startX, startY), writing the collected tile
+// ids into the `tiles` buffer. Returns the number of collected tiles when the
+// region qualifies as a room, or -1 when it does not. A region qualifies when it
+// is enclosed (never touches the map border) AND its boundary includes at least
+// one door: a fully-sealed doorless box is not a usable room, and an open pocket
+// leaks to the border and fails the enclosed test. Only built walls, tall_rock
+// (impassable cliffs), and water bound the fill. Ordinary terrain including rock
+// is traversed like grass, so natural rock can sit inside a room (and be floored
+// over) but does not itself enclose one. Marks tiles on enqueue so each is queued
+// once (queue/tiles stay bounded by N). Mirrors the original two-set semantics: a
+// door or shared tile consumed by one fill can still be re-collected by an
+// adjacent fill because visitedLocal is per-fill while visitedGlobal only gates
+// re-seeding.
+function floodFill(map, startX, startY, W, H, visitedGlobal, visitedLocal, fillId, queue, tiles) {
+    let count = 0;
     let enclosed = true;
-    const localVisited = new Set();
+    let hasDoor = false;
+    let head = 0;
+    let tail = 0;
 
-    while (queue.length > 0) {
-        const { x, y } = queue.shift();
-        const key = `${x},${y}`;
-        if (localVisited.has(key)) continue;
-        localVisited.add(key);
-        visited.add(key);
+    const startIdx = startY * W + startX;
+    queue[tail++] = startIdx;
+    visitedLocal[startIdx] = fillId;
+    visitedGlobal[startIdx] = 1;
 
-        if (x <= 0 || x >= CONFIG.MAP_WIDTH - 1 || y <= 0 || y >= CONFIG.MAP_HEIGHT - 1) {
+    while (head < tail) {
+        const k = queue[head++];
+        const x = k % W;
+        const y = (k / W) | 0;
+
+        if (x <= 0 || x >= W - 1 || y <= 0 || y >= H - 1) {
             enclosed = false;
             continue;
         }
 
-        const tile = map[y][x];
-        tiles.push({ x, y });
+        tiles[count++] = k;
 
-        const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-        for (const [dx, dy] of dirs) {
-            const nx = x + dx, ny = y + dy;
-            const nKey = `${nx},${ny}`;
-            if (localVisited.has(nKey)) continue;
-            if (nx < 0 || nx >= CONFIG.MAP_WIDTH || ny < 0 || ny >= CONFIG.MAP_HEIGHT) {
-                enclosed = false;
-                continue;
-            }
+        // Neighbor order matches the original [[0,-1],[1,0],[0,1],[-1,0]].
+        for (let d = 0; d < 4; d++) {
+            let nx = x, ny = y;
+            if (d === 0) ny = y - 1;
+            else if (d === 1) nx = x + 1;
+            else if (d === 2) ny = y + 1;
+            else nx = x - 1;
+
+            const nk = ny * W + nx;
+            if (visitedLocal[nk] === fillId) continue;
             const neighbor = map[ny][nx];
             if (isWall(neighbor)) continue;
             if (neighbor.terrain === 'tall_rock') continue;
             if (DOOR_STRUCTURES.has(neighbor.structure)) {
-                localVisited.add(nKey);
-                visited.add(nKey);
-                tiles.push({ x: nx, y: ny });
+                // Doors are collected but terminal: mark and add, don't expand.
+                // A door on the boundary is what makes an enclosure a real room.
+                hasDoor = true;
+                visitedLocal[nk] = fillId;
+                visitedGlobal[nk] = 1;
+                tiles[count++] = nk;
                 continue;
             }
             if (neighbor.terrain === 'water') continue;
-            if (neighbor.terrain === 'rock') continue;
-            queue.push({ x: nx, y: ny });
+            // Rock terrain is walkable ground, not a wall: it is traversed like
+            // grass/dirt, so it can be enclosed within a room (and floored over)
+            // but never forms a room boundary on its own.
+            visitedLocal[nk] = fillId;
+            visitedGlobal[nk] = 1;
+            queue[tail++] = nk;
         }
     }
 
-    return { enclosed, tiles };
+    return (enclosed && hasDoor) ? count : -1;
 }
 
 function isWall(tile) {

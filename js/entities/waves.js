@@ -355,7 +355,7 @@ export class WaveSystem {
             tile.structure = null;
             tile.passable = true;
             if (game.mapIndex) game.mapIndex.removeStructure(this.nexusPosition.x, this.nexusPosition.y, 'void_nexus');
-            game.roomsDirty = true;
+            game.markRoomsDirty();
         }
 
         if (game._voidWhisperPactColonist) {
