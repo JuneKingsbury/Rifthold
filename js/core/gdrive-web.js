@@ -1,5 +1,6 @@
 // Google Drive integration for the browser (non-Electron) context.
-// Uses OAuth2 PKCE so no client_secret is needed in browser JS.
+// Uses OAuth2 PKCE. Token exchanges go through a Cloudflare Worker proxy so
+// the client_secret never appears in client-side code.
 //
 // getGdriveAPI() returns the right implementation for the current context:
 //   Electron  => window.electronAPI.gdrive (IPC bridge)
@@ -13,6 +14,9 @@ export function getGdriveAPI() {
 let webGdriveAPI;
 
 const CLIENT_ID = '169773847895-lf82014dhkmiuqai9vdcv54r46q96nag.apps.googleusercontent.com';
+// Token exchanges are proxied through this Worker, which injects CLIENT_SECRET
+// server-side. Replace with your own Worker URL after deploying.
+const TOKEN_PROXY = 'https://rifthold-oauth.jurbanics.workers.dev/token';
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const TOKEN_KEY = 'gdrive_tokens';
 
@@ -37,7 +41,7 @@ function _saveTokens(t) {
 async function _refreshTokens(tokens) {
     // PKCE tokens don't support refresh_token on public clients unless granted
     // offline access. If refresh fails, clear tokens so the user re-auths.
-    const resp = await fetch('https://oauth2.googleapis.com/token', {
+    const resp = await fetch(TOKEN_PROXY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -150,7 +154,7 @@ export function beginAuth() {
             const params = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs);
             const code = params.get('code');
             if (!code) { reject(new Error('No auth code')); return; }
-            fetch('https://oauth2.googleapis.com/token', {
+            fetch(TOKEN_PROXY, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({
