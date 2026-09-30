@@ -3,26 +3,11 @@
 ## Content
 
 ### Story Milestones
-Milestone triggers and story left to flesh out.
+#### Story Text 
+Milestone story left to flesh out. These are all labeled with "TODO" in js/core/config/exploration.js.
 
-**Realm exploration lore:**
-- [X] `crystal_caves`
-- [ ] `crystal_mines`
-- [ ] `crystal_depths`
-- [ ] `verdant_depths`
-- [ ] `fungal_hollows`
-- [ ] `primeval_canopy`
-- [X] `arcane_library`
-- [X] `ancient_university`
-- [X] `abandoned_laboratory`
-- [ ] `shadow_realm`
-- [ ] `void_abyss`
-- [ ] `oblivion_rift`
-- [ ] `kingdom_outskirts`
-- [ ] `crusader_barracks`
-- [ ] `palace_fortress`
-
-**Bestiary lore**
+#### Achievement Portrait Art
+Make portrait art for every story that is planned to be tied to a Steam achievement.
 
 ### Audio Assets
 The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest.js`). Music tracks are all present. The tables below list only the **missing** SFX files. All paths are relative to the project root. Format: `.ogg` (Vorbis).
@@ -46,11 +31,9 @@ The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest
 |------|-------------|
 | `fire_ignite.ogg` | Fire starts (event or structure) |
 | `freezing.ogg` | Colonist freezing warning |
-| `rain_start.ogg` | Weather transitions to rain |
-| `blizzard_start.ogg` | Weather transitions to blizzard |
-| `snow_start.ogg` | Weather transitions to snow |
-| `heatwave_start.ogg` | Weather transitions to heatwave |
-| `weather_clear.ogg` | Weather clears up |
+
+#### Weather Music
+Music to transition to when different types of weather start (think Terraria biome music transitions. This is already programmed, just need to add the music oggs).
 
 ### Steam Integration
 The steamworks.js foundation is wired up (`steam-bridge.js`, IPC handlers, preload bridge, cloud save hooks, achievement triggers in `story.js`). The game runs normally without Steam. Remaining steps to finish:
@@ -76,17 +59,6 @@ The steamworks.js foundation is wired up (`steam-bridge.js`, IPC handlers, prelo
 - [ ] Test the packaged app launches through Steam client with overlay working (Shift+Tab)
 - [ ] Set up platform-specific CI runners if cross-compiling (native modules need to match target platform)
 
-**Polish (optional)**
+**Polish**
 - [ ] Display Steam player name somewhere in the UI (start screen or settings)
-- [ ] Add a cloud save sync status indicator in the save slot UI
 - [ ] Add a "cloud vs local" conflict resolution prompt instead of auto-picking newest
-
-### Cooking System
-Today the cooking system in Rifthold is really really simple. You throw 5 foodstuffs into a cauldron and 1 cooked food comes out.
-
-Can we make the ingredients used actually matter? For example, we could have colonists
-attempt to cook food with their random 5 foodstuffs and that will be tied to a cooked food item for that specific recipe. From there you should be able to toggle different dishes off and on so colonists only cook the dishes you prefer. When a dish is toggled off it will not be cooked by colonists (they will not cook with that 5 foodstuffs recipe combo) and colonists will prefer other food items when eating.
-
-From there we can do things like make colonists have food preferences and favorite dishes. Another option is to introduce boosts to the colonist that eats a particular dish for several in-game hours. These boosts could be basically any small buff from our existing effects list.
-
-Basically these are potions again but instead of being used strategically in relevant situations, it instead boosts the colonist for a longer period of time every time they eat.
