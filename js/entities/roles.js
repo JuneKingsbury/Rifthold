@@ -317,7 +317,8 @@ export const ROLE_HANDLERS = {
                 return;
             }
 
-            moveTowardPassable(entity, nexus, game.map, dur, game);
+            const breakerRole = entity.roles.find(r => r.type === 'structure_breaker');
+            siegeMoveToward(entity, nexus, breakerRole || role, game.map, dur, game);
         },
     },
 

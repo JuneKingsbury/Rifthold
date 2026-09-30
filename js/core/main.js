@@ -1706,6 +1706,7 @@ class Game {
     startWave() {
         if (this.waves.startWave(this)) {
             this.camera.centerOn(this.waves.nexusPosition.x, this.waves.nexusPosition.y);
+            if (this.ui.arcanePanelVisible) this.ui.toggleArcanePanel();
         } else if (this.waves.active) {
             this.notifications.push({ text: 'A wave is already in progress!', tick: this.tick, type: 'danger' });
         } else {
