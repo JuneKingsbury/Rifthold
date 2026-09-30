@@ -41,12 +41,15 @@ function checkRelationshipChange(colonist, other, prevTierKey, game) {
 
     if (newTierKey === storedTier) return;
 
-    // Prevent a colonist from having multiple lovers. If the computed tier would be
-    // 'lovers' but this colonist already has a different lover, cap at close_friend.
+    // Prevent either side from ending up with multiple lovers. If the computed tier
+    // would be 'lovers' but colonist OR other already has a different lover, cap at
+    // close_friend. Checking both sides here prevents the force-mutual write below
+    // from bypassing the cap on the other colonist.
     let effectiveTierKey = newTierKey;
     if (newTierKey === 'lovers') {
-        const existingLover = Object.entries(colonist.relationships || {}).find(([id, t]) => t === 'lovers' && id !== String(other.id));
-        if (existingLover) effectiveTierKey = 'close_friend';
+        const colonistHasOtherLover = Object.entries(colonist.relationships || {}).some(([id, t]) => t === 'lovers' && id !== String(other.id));
+        const otherHasOtherLover = Object.entries(other.relationships || {}).some(([id, t]) => t === 'lovers' && id !== String(colonist.id));
+        if (colonistHasOtherLover || otherHasOtherLover) effectiveTierKey = 'close_friend';
     }
 
     colonist.relationships[other.id] = effectiveTierKey;
