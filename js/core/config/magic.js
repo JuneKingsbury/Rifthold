@@ -208,38 +208,37 @@ export const RESEARCH = {
     // Foundations
     runecraft: { name: 'Runecraft', cost: 80, requires: [], tab: 'foundations', description: 'Etch runes into stone weapons'},
     metalworking: { name: 'Metalworking', cost: 100, requires: [], tab: 'foundations', description: 'Smelting metal and crafting gear at anvils' },
-    ley_channeling: { name: 'Ley Channeling', cost: 300, requires: ['runecraft', 'metalworking'], tab: 'foundations', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
-    alchemy: { name: 'Alchemy', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Learn how to brew potions. Cooking also produces +2 bonus food per meal' },
+    ley_channeling: { name: 'Ley Channeling', cost: 175, requires: ['runecraft', 'metalworking'], tab: 'mana', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
+    alchemy: { name: 'Alchemy', cost: 150, requires: ['runecraft'], tab: 'foundations', description: 'Learn how to brew potions and unlock corn and potatoes' },
     trade_routes: { name: 'Trade Routes', cost: 300, requires: ['alchemy'], tab: 'foundations', description: 'Caravans arrive more often and offer better prices' },
     trade_rifts: { name: 'Trade Rifts', cost: 450, requires: ['trade_routes', 'void_summoning'], tab: 'foundations', description: 'Open Trade Rifts to barter materials with far-off traders for mystery goods' },
     domestic_alchemy: { name: 'Domestic Alchemy', cost: 280, requires: ['alchemy'], tab: 'foundations', description: 'Brew tonics for use around the colony' },
     battle_brewing: { name: 'Battle Brewing', cost: 500, requires: ['domestic_alchemy', 'herbalism'], tab: 'foundations', description: 'Brew potions for expeditions, making it easier for your colonists to go further' },
 
     // Wildlife
-    beast_binding: { name: 'Beast Binding', cost: 280, requires: ['druidcraft'], tab: 'nature', description: 'Bind and pen creatures' },
-    pack_binding: { name: 'Pack Binding', cost: 350, requires: ['beast_binding'], tab: 'nature', description: 'Each colonist can bond with up to two pets.' },
+    beast_binding: { name: 'Beast Binding', cost: 280, requires: ['alchemy'], tab: 'nature', description: 'Bind and pen creatures' },
+    pack_binding: { name: 'Pack Binding', cost: 350, requires: ['husbandry'], tab: 'nature', description: 'Each colonist can bond with up to two pets.' },
     husbandry: { name: 'Husbandry', cost: 350, requires: ['beast_binding'], tab: 'nature', description: 'Tamed animals produce 50% more resources' },
-    wolf_mastery: { name: 'Wolf Mastery', cost: 350, requires: ['husbandry'], tab: 'nature', description: 'Wolf tame chance +20%, tamed wolves deal +4 damage' },
-    druidcraft: { name: 'Druidcraft', cost: 110, requires: [], tab: 'nature', description: 'Unlock corn and potatoes' },
+    wolf_mastery: { name: 'Wolf Mastery', cost: 350, requires: ['pack_binding'], tab: 'nature', description: 'Wolf tame chance +20%, tamed wolves deal +4 damage' },
     textiles: { name: 'Textiles', cost: 150, requires: [], tab: 'nature', description: 'Grow cotton and weave cloth into clothing at the loom' },
-    irrigation: { name: 'Irrigation', cost: 250, requires: ['druidcraft'], tab: 'nature', description: 'Crops grow in winter at half speed; water-adjacent farms grow 20% faster' },
+    irrigation: { name: 'Irrigation', cost: 250, requires: ['textiles'], tab: 'nature', description: 'Crops grow in winter at half speed; water-adjacent farms grow 20% faster' },
     herbalism: { name: 'Herbalism', cost: 350, requires: ['alchemy', 'irrigation'], tab: 'nature', description: 'Grow moonbloom and brew mana/resistance potions' },
     verdant_growth: { name: 'Verdant Growth', cost: 500, requires: ['herbalism'], tab: 'nature', description: 'All crops gain +1 harvest yield; moonbloom grows 30% faster' },
 
     // Crafting
     marksmanship: { name: 'Marksmanship', cost: 250, requires: ['runecraft', 'metalworking'], tab: 'crafting', description: 'Crossbow crafting and +1 range to all ranged weapons' },
-    arcane_implements: { name: 'Arcane Implements', cost: 250, requires: ['runecraft', 'ley_channeling'], tab: 'crafting', description: 'Craft wands and staves for spellcasters' },
+    arcane_implements: { name: 'Arcane Implements', cost: 250, requires: ['runecraft'], tab: 'crafting', description: 'Craft wands and staves for spellcasters' },
     artisans_touch: { name: "Artisan's Touch", cost: 450, requires: ['marksmanship'], tab: 'crafting', description: 'Better crafting quality odds; salvage returns 75%' },
-    runeforging: { name: 'Runic Forging', cost: 350, requires: ['arcane_implements', 'arcane_infusion'], tab: 'crafting', description: 'Forge weapons using runite at an enchanting table' },
+    runeforging: { name: 'Runic Forging', cost: 350, requires: ['arcane_implements'], tab: 'crafting', description: 'Forge weapons using runite at an enchanting table' },
     masterwork: { name: 'Masterwork', cost: 800, requires: ['runeforging', 'arcane_infusion', 'artisans_touch'], tab: 'crafting', description: 'Forge legendary enchanted weapons, and let master crafters rarely produce Masterwork-quality gear', requiresBuildings: { enchanting_table: 1 }, requiresMilestone: { stat: 'superiorItemsCrafted', min: 1 }, requiresTabCount: 3 },
     golem_craft: { name: 'Golem Craft', cost: 1000, requires: ['arcane_infusion', 'void_forging', 'mana_reservoir'], tab: 'crafting', description: 'Animate stone golems to serve as tireless workers', requiresBuildings: { enchanting_table: 1 }, requiresTabCount: 3 },
 
     // Spells
-    arcane_studies: { name: 'Arcane Studies', cost: 180, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
+    arcane_studies: { name: 'Arcane Studies', cost: 100, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
     arcane_infusion: { name: 'Arcane Infusion', cost: 400, requires: ['ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
     advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_studies', 'arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
     ritual_magic: { name: 'Ritual Magic', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Unlock complex arcane rituals patterns for powerful colony-wide effects' },
-    void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands and void staves', requiresTabCount: 3 },
+    void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands and void staves', requiresTabCount: 2 },
     mana_weaving: { name: 'Mana Weaving', cost: 650, requires: ['arcane_infusion', 'textiles'], tab: 'magic', description: 'Weave mana into protective garb', requiresTabCount: 3 },
 
     // Mana
@@ -248,9 +247,10 @@ export const RESEARCH = {
     arcane_conduits: { name: 'Arcane Conduits', cost: 400, requires: ['ley_channeling'], tab: 'mana', description: 'Mana relays reduce nearby building consumption' },
     ember_magic: { name: 'Ember Magic', cost: 250, requires: ['luminance'], tab: 'mana', description: 'Ember Beacons: smart warmth that only draws mana in winter' },
     mana_reservoir: { name: 'Mana Reservoir', cost: 600, requires: ['arcane_conduits'], tab: 'mana', description: 'Mana crystal cap +3 and each generates +1 mana', requiresTabCount: 3 },
-    pyroclasm: { name: 'Pyroclasm', cost: 750, requires: ['brilliance'], tab: 'mana', description: 'Fire ward incinerates nearby foes', requiresTabCount: 3 },
+    pyroclasm: { name: 'Pyroclasm', cost: 750, requires: ['ember_magic'], tab: 'mana', description: 'Fire ward incinerates nearby foes', requiresTabCount: 3 },
 
     // Rifts
+    warrior_training: { name: 'Warrior Training', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Forge heavy war axes for frontline fighters' },
     warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards and build tougher structures using bricks' },
     fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
     void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },

@@ -2866,15 +2866,6 @@ export const STORY_MILESTONES = {
         going forward, so giving your colonists a good understanding of the fundamentals 
         is a must.`,
     },
-    research_druidcraft: {
-        tab: 'research',
-        title: 'Druidcraft',
-        trigger: 'research_druidcraft',
-        text: `
-        Much like the Nympha, nature is inherently magical. By working with this 
-        magic you'll find your crops growing taller and the wildlife around you becoming 
-        less hostile.`,
-    },
     research_beast_binding: {
         tab: 'research',
         title: 'Beast Binding',
@@ -2978,8 +2969,8 @@ export const STORY_MILESTONES = {
         title: 'Alchemy',
         trigger: 'research_alchemy',
         text: `
-        Who would've guessed that your crops would have more uses than just 
-        cooking? You excitedly write up recipes for potions based on each plant's 
+        Who would've guessed that your crops would have more uses than just
+        cooking? You excitedly write up recipes for potions based on each plant's
         properties.`,
     },
     research_trade_routes: {

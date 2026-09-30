@@ -272,7 +272,6 @@ export const WORK_CONFIG = {
     dangerousTameWork: 30,
     tameSkillChanceBonus: 0.06,
     poweredWorkbenchDivisor: 1.5,
-    alchemyFoodBonus: 2,
     stoneworkMiningMult: 1.25,
     husbandryProductionMult: 1.5,
     artisanQualityBonus: 1,

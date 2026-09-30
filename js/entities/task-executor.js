@@ -392,9 +392,6 @@ export function completeTask(colonist, task, game) {
                     }
                 }
                 if (!handled) {
-                    if (output.food && game.research.isResearched('alchemy')) {
-                        output.food += WORK_CONFIG.alchemyFoodBonus;
-                    }
                     let cookBonus = getPedestalEffect(game, 'cookingBonusFood');
                     if (colonist.traits?.includes('chef')) cookBonus += TRAITS.chef.cookingBonusFood;
                     if (output.food && cookBonus > 0) output.food += cookBonus;
