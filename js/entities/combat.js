@@ -16,6 +16,9 @@ export class CombatSystem {
         this.crusaderRaidTriggered = false;
         this.crusaderRaidDefeated = false;
         this.crusaderRaidWarned = false;
+        this.crusaderRaidArmed = false;
+        this.crusaderRaidFireTick = null;
+        this.crusaderRaidLevel = 8;
         this.raidMarchSpeed = null;
         this.raidEngaged = false;
     }
@@ -23,16 +26,10 @@ export class CombatSystem {
     update(game) {
         if (CONFIG.PEACEFUL_MODE) return;
 
-        if (!this.crusaderRaidWarned && !this.crusaderRaidDefeated &&
-            game.weather.year === 9 && game.weather.season === 'spring') {
-            this.crusaderRaidWarned = true;
-            game.notifications.push({ text: '⚠ Crusader scouts have been spotted in the region. Prepare your defenses.', color: '#ffaa44', duration: 300 });
-            game.eventLog?.add(game, 'Crusader scouts spotted! A full raid force may arrive next year.', 'danger');
-        }
-
-        if (!this.raidActive && !this.crusaderRaidTriggered && !this.crusaderRaidDefeated &&
-            game.weather.year === 10 && game.weather.season === 'spring') {
-            this.startScriptedRaid(game, 'crusader_raid');
+        if (this.crusaderRaidArmed && !this.raidActive &&
+            !this.crusaderRaidTriggered && !this.crusaderRaidDefeated &&
+            game.tick >= this.crusaderRaidFireTick) {
+            this.startScriptedRaid(game, 'crusader_raid', this.crusaderRaidLevel);
         }
 
         if (this.raidActive) {
@@ -48,13 +45,27 @@ export class CombatSystem {
         }
     }
 
-    startScriptedRaid(game, raidTypeKey) {
+    armCrusaderRaid(game) {
+        if (this.crusaderRaidArmed || this.crusaderRaidTriggered || this.crusaderRaidDefeated) return;
+
+        const wealth = game.resources.getRaidWealth();
+        const colonistCount = game.colonists.filter(c => c.hp > 0).length;
+        const level = Math.max(8, Math.min(15, 8 + Math.floor(wealth / 300) + Math.floor(colonistCount / 3)));
+
+        this.crusaderRaidLevel = level;
+        this.crusaderRaidArmed = true;
+        this.crusaderRaidFireTick = game.tick + CONFIG.TICKS_PER_SEASON;
+
+        game.notifications.push({ text: '⚠ Crusader scouts have been spotted in the region. Prepare your defenses.', tick: game.tick, type: 'danger' });
+        game.eventLog?.add(game, 'Crusader scouts spotted! A raid force will arrive next season.', 'danger');
+    }
+
+    startScriptedRaid(game, raidTypeKey, raidLevel = 8) {
         const raidType = RAID_TYPES[raidTypeKey];
         if (!raidType) return;
 
         if (raidTypeKey === 'crusader_raid') this.crusaderRaidTriggered = true;
 
-        const raidLevel = 8;
         const edge = Math.floor(Math.random() * 4);
         let spawned = 0;
 

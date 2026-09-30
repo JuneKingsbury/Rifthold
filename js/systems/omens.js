@@ -82,16 +82,14 @@ export function getOmens(game) {
         }
     }
 
-    // The scripted crusader assault (year 10 spring) is a fixed prophecy any seer feels.
-    if (game.combat && !game.combat.crusaderRaidDefeated && !game.combat.crusaderRaidTriggered) {
-        if (game.weather.year >= 8) {
-            omens.push({
-                icon: '✝',
-                title: 'The Crusade Comes',
-                text: 'A crusader host marches from the kingdom. It will arrive in the spring of the tenth year.',
-                tone: 'bad',
-            });
-        }
+    if (game.combat && game.combat.crusaderRaidArmed &&
+        !game.combat.crusaderRaidDefeated && !game.combat.crusaderRaidTriggered) {
+        omens.push({
+            icon: '✝',
+            title: 'The Crusade Comes',
+            text: 'A crusader warband has been sighted. They will descend upon your settlement before the next season ends.',
+            tone: 'bad',
+        });
     }
 
     // Seasonal turning. Everyone with the sight feels the wheel turn.

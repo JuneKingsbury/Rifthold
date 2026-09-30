@@ -108,8 +108,8 @@ export const RAID_TYPES = {
         name: 'Crusader Raid',
         scripted: true,
         composition: [
-            { entity: 'crusader', count: [3, 3] },
-            { entity: 'crusader_archer', count: [2, 2] },
+            { entity: 'crusader',        count: [5, 5] },
+            { entity: 'crusader_archer', count: [3, 3] },
         ],
         scaling: { hpMult: 0.15, damageMult: 0.08 },
     },

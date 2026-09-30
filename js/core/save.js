@@ -274,6 +274,9 @@ function _buildSaveData(game) {
             crusaderRaidTriggered: game.combat.crusaderRaidTriggered,
             crusaderRaidDefeated: game.combat.crusaderRaidDefeated,
             crusaderRaidWarned: game.combat.crusaderRaidWarned,
+            crusaderRaidArmed: game.combat.crusaderRaidArmed,
+            crusaderRaidFireTick: game.combat.crusaderRaidFireTick,
+            crusaderRaidLevel: game.combat.crusaderRaidLevel,
         },
 
         divinationModifiers: game.divinationModifiers || [],
@@ -579,6 +582,9 @@ function _applyLoadData(game, data) {
         game.combat.crusaderRaidTriggered = data.combat.crusaderRaidTriggered || false;
         game.combat.crusaderRaidDefeated = data.combat.crusaderRaidDefeated || false;
         game.combat.crusaderRaidWarned = data.combat.crusaderRaidWarned || false;
+        game.combat.crusaderRaidArmed = data.combat.crusaderRaidArmed || false;
+        game.combat.crusaderRaidFireTick = data.combat.crusaderRaidFireTick ?? null;
+        game.combat.crusaderRaidLevel = data.combat.crusaderRaidLevel ?? 8;
         game.divinationModifiers = data.divinationModifiers || [];
         game.ritualCooldowns = data.ritualCooldowns || {};
         game.lastFeastYear = data.lastFeastYear || 0;

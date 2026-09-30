@@ -457,6 +457,7 @@ export function completeTask(colonist, task, game) {
                 game.notifications.push({ text: `Research complete: ${name}!`, tick: game.tick, type: 'success' });
                 game.eventLog.add(game, `Research unlocked: ${name}`, 'success', null);
                 game.story.checkMilestone(`research_${completedKey}`, game);
+                if (completedKey === 'deep_delving' && game.combat) game.combat.armCrusaderRaid(game);
                 game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.researchCompleteChar, color: COMBAT_VISUALS.researchCompleteColor, ttl: COMBAT_VISUALS.researchCompleteTtl });
                 window.soundManager?.playSFXAt('research_complete', colonist.x, colonist.y);
                 if (!game.events.pendingEvent) {
