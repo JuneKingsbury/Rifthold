@@ -200,6 +200,9 @@ export async function forceSyncNow() {
     for (const slotKey of Object.keys(meta)) {
         await syncSlotToCloud(slotKey);
     }
+    if (gdriveEnabled) {
+        localStorage.setItem(GDRIVE_LAST_SYNC_KEY, String(Date.now()));
+    }
     return 'ok';
 }
 

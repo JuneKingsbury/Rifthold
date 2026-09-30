@@ -3708,12 +3708,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn) btn.disabled = true;
                 try {
                     await forceSyncNow();
-                    const newTs = getLastSyncTime();
-                    if (lbl) lbl.textContent = `Last synced: ${newTs ? new Date(newTs).toLocaleString() : 'never'}`;
                 } catch {
-                    if (lbl) lbl.textContent = 'Sync failed. Try again.';
+                    // updateStartGdriveStatus below will show current stored timestamp
                 }
-                if (btn) btn.disabled = false;
+                await updateStartGdriveStatus();
             });
             document.getElementById('start-gdrive-disconnect').addEventListener('click', async () => {
                 if (!confirm('Disconnect Google Drive? Your saves will remain local and will no longer sync.')) return;

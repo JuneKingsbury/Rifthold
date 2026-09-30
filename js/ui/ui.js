@@ -4172,13 +4172,10 @@ export class UI {
         if (btn) btn.disabled = true;
         try {
             await forceSyncNow();
-            const ts = getLastSyncTime();
-            const syncLabel = ts ? new Date(ts).toLocaleString() : 'never';
-            if (label) label.textContent = `Last synced: ${syncLabel}`;
         } catch {
-            if (label) label.textContent = 'Sync failed. Try again.';
+            // _updateGdriveStatus below will show current stored timestamp
         }
-        if (btn) btn.disabled = false;
+        await this._updateGdriveStatus();
     }
 
     // Switch the active settings tab and re-render the panel.
