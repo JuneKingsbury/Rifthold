@@ -48,6 +48,13 @@ export class Camera {
         this.targetY = this.y;
     }
 
+    // Sets only the target (no snap), so lerpToward smoothly tracks a moving entity.
+    // Accepts fractional world coordinates for sub-tile precision.
+    smoothCenterOn(wx, wy) {
+        this.targetX = Math.max(0, Math.min(CONFIG.MAP_WIDTH - CONFIG.VIEWPORT_WIDTH, wx - CONFIG.VIEWPORT_WIDTH / 2));
+        this.targetY = Math.max(0, Math.min(CONFIG.MAP_HEIGHT - CONFIG.VIEWPORT_HEIGHT, wy - CONFIG.VIEWPORT_HEIGHT / 2));
+    }
+
     clamp() {
         this.x = Math.max(0, Math.min(CONFIG.MAP_WIDTH - CONFIG.VIEWPORT_WIDTH, this.x));
         this.y = Math.max(0, Math.min(CONFIG.MAP_HEIGHT - CONFIG.VIEWPORT_HEIGHT, this.y));

@@ -433,7 +433,7 @@ class Game {
             const fc = this.getColonist(this.followingColonist);
             if (fc && fc.hp > 0) {
                 const pos = getEntityRenderPos(fc, performance.now());
-                this.camera.centerOn(Math.round(pos.x), Math.round(pos.y));
+                this.camera.smoothCenterOn(pos.x, pos.y);
             } else {
                 this.followingColonist = null;
             }
