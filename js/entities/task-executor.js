@@ -487,7 +487,7 @@ export function completeTask(colonist, task, game) {
                 let tameResult;
                 if (tamedDef && tamedDef.dangerousTame) {
                     const result = attemptDangerousTame(game, colonist, task.targetAnimalId);
-                    tameResult = result === 'success' ? true : false;
+                    tameResult = result === 'success' ? true : result === 'lead' ? 'lead' : false;
                 } else {
                     tameResult = completeTame(game, task.targetAnimalId, colonist.id);
                 }

@@ -179,7 +179,10 @@ function updatePendingLeadAnimal(animal, game) {
     );
     if (leadTask) {
         animal.leaderId = leadTask.assignedTo;
-    } else if (!animal.leaderId) {
+    } else {
+        // No active lead task: clear pending state so the animal is not stuck following.
+        animal.pendingTame = false;
+        animal.leaderId = null;
         return;
     }
 

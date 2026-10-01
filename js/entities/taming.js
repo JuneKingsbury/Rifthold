@@ -263,8 +263,8 @@ export function attemptDangerousTame(game, colonist, wildAnimalId) {
     const chance = getTameChance(colonist, wildAnimal.type, game);
 
     if (Math.random() < chance) {
-        completeTame(game, wildAnimalId, colonist.id);
-        return 'success';
+        const tameResult = completeTame(game, wildAnimalId, colonist.id);
+        return tameResult === 'lead' ? 'lead' : 'success';
     }
 
     const retDmg = tamedDef.retaliationDamage || ANIMALS[wildAnimal.type].damage;
