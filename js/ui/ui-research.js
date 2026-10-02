@@ -313,8 +313,10 @@ const researchMethods = {
         let panOriginX = 0, panOriginY = 0;
 
         tree.addEventListener('pointerdown', (e) => {
-            // Only single-finger / left-button drag; ignore zoom buttons
+            // Only single-finger / left-button drag; ignore zoom buttons and interactive elements
             if (e.target.closest('.research-zoom-btn')) return;
+            if (e.target.closest('.research-node-btn')) return;
+            if (e.target.closest('.research-cross-tab')) return;
             if (e.pointerType === 'touch') return; // handled by touch handler
             if (e.button !== 0) return;
             panActive = true;
