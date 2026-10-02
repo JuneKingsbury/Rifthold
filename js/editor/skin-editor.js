@@ -501,6 +501,7 @@ class SkinEditor {
                     if (def.structureType === 'floor') continue;
                     items.push({ key, char: def.char, color: def.color, desc: def.description || key, category: 'buildings' });
                 }
+                items.push({ key: 'scouting_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 items.push({ key: 'crystal_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 items.push({ key: 'verdant_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 items.push({ key: 'university_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
@@ -617,6 +618,7 @@ class SkinEditor {
                     if (def.structureType !== 'floor') continue;
                     items.push({ key, char: def.char, color: def.color, desc: def.description || key, category: 'floors' });
                 }
+                items.push({ key: 'scouting_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
                 items.push({ key: 'crystal_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
                 items.push({ key: 'verdant_floor', char: '.', color: '#444444', desc: '', category: 'floors' });
                 items.push({ key: 'university_floor', char: '.', color: '#444444', desc: '', category: 'floors' });

@@ -78,7 +78,7 @@ export const REALMS = {
         duration: [120, 240],
         encounters: 4,
         combatEncounters: [1, 2],
-        vis: { wall: 'stone_wall', floor: 'grass' },
+        vis: { wall: 'scouting_wall', floor: 'scouting_floor' },
         loot: [
             { resource: 'wood', weight: 40, amount: [3, 8] },
             { resource: 'stone', weight: 25, amount: [2, 6] },
