@@ -237,6 +237,16 @@ export class UI {
                 this.updateCraftPanel();
                 return;
             }
+            const tomeSchoolBtn = e.target.closest('[data-craft-tome-school]');
+            if (tomeSchoolBtn) {
+                if (!this._tomeHiddenSchools) this._tomeHiddenSchools = new Set();
+                const s = tomeSchoolBtn.dataset.craftTomeSchool;
+                if (this._tomeHiddenSchools.has(s)) this._tomeHiddenSchools.delete(s);
+                else this._tomeHiddenSchools.add(s);
+                this._lastCraftHtml = '';
+                this.updateCraftPanel();
+                return;
+            }
         });
 
         this.elements.researchPanel.addEventListener('click', (e) => {
@@ -2969,19 +2979,19 @@ export class UI {
             html += '</div>';
         }
         if (hasTomeFilter) {
-            if (this._tomeSchoolFilter === undefined) this._tomeSchoolFilter = 'All';
             if (this._tomeHiddenLevels === undefined) this._tomeHiddenLevels = new Set();
-            const schools = ['All', ...Object.keys(MAGIC_SKILLS)];
+            if (this._tomeHiddenSchools === undefined) this._tomeHiddenSchools = new Set();
             const levels = [0, 1, 2, 3, 4];
             html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
-            html += '<span style="color:#888;font-size:0.82em;">School:</span>';
-            html += `<select onchange="window.game.ui._tomeSchoolFilter=this.value;window.game.ui.updateCraftPanel()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:3px;padding:1px 4px;font-size:0.82em;">`;
-            for (const s of schools) {
-                const label = s === 'All' ? 'All' : MAGIC_SKILLS[s].name;
-                html += `<option value="${s}"${s === this._tomeSchoolFilter ? ' selected' : ''}>${label}</option>`;
+            html += '<span style="color:#888;font-size:0.82em;">Schools:</span>';
+            for (const [sk, sd] of Object.entries(MAGIC_SKILLS)) {
+                const hidden = this._tomeHiddenSchools.has(sk);
+                const col = hidden ? '#444' : sd.color;
+                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tome-school="${sk}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#1a1a2e'};color:${hidden ? '#555' : sd.color};border:1px solid ${col};border-radius:3px;cursor:pointer;">${sd.name}</button>`;
             }
-            html += '</select>';
-            html += '<span style="color:#888;font-size:0.82em;margin-left:6px;">Min level:</span>';
+            html += '</div>';
+            html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
+            html += '<span style="color:#888;font-size:0.82em;">Min level:</span>';
             for (const lv of levels) {
                 const hidden = this._tomeHiddenLevels.has(lv);
                 html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tome-level="${lv}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#336633'};color:${hidden ? '#666' : '#ccc'};border:1px solid ${hidden ? '#444' : '#4a4'};border-radius:3px;cursor:pointer;">${lv}</button>`;
@@ -2998,13 +3008,13 @@ export class UI {
             });
         }
         if (hasTomeFilter) {
-            if (this._tomeSchoolFilter && this._tomeSchoolFilter !== 'All') {
+            if (this._tomeHiddenSchools && this._tomeHiddenSchools.size > 0) {
                 filtered = filtered.filter(r => {
                     const outputKey = Object.keys(r.recipe.output)[0];
                     const tome = SPELL_TOMES[outputKey];
                     if (!tome) return true;
                     const spell = SPELLS[tome.spell];
-                    return spell && spell.school === this._tomeSchoolFilter;
+                    return !spell || !this._tomeHiddenSchools.has(spell.school);
                 });
             }
             if (this._tomeHiddenLevels && this._tomeHiddenLevels.size > 0) {
@@ -3015,6 +3025,18 @@ export class UI {
                     return !this._tomeHiddenLevels.has(tome.minSchoolLevel);
                 });
             }
+            const schoolOrder = Object.keys(MAGIC_SKILLS);
+            filtered.sort((a, b) => {
+                const aKey = Object.keys(a.recipe.output)[0];
+                const bKey = Object.keys(b.recipe.output)[0];
+                const aTome = SPELL_TOMES[aKey];
+                const bTome = SPELL_TOMES[bKey];
+                const aSchool = SPELLS[aTome?.spell]?.school;
+                const bSchool = SPELLS[bTome?.spell]?.school;
+                const schoolDiff = (schoolOrder.indexOf(aSchool) ?? 999) - (schoolOrder.indexOf(bSchool) ?? 999);
+                if (schoolDiff !== 0) return schoolDiff;
+                return (aTome?.minSchoolLevel ?? 0) - (bTome?.minSchoolLevel ?? 0);
+            });
         }
         if (hasEquipTiers) {
             filtered.sort((a, b) => {
@@ -3039,6 +3061,7 @@ export class UI {
         };
         let lastTier = null;
         let lastMaterialsGroup = null;
+        let lastTomeSchool = null;
         for (const { key, recipe, canCraft, hasStation } of filtered) {
             if (hasEquipTiers) {
                 const outputKey = Object.keys(recipe.output)[0];
@@ -3048,6 +3071,17 @@ export class UI {
                     const label = EQUIP_TIER_NAMES[tier] || `Tier ${tier}`;
                     html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;color:#888;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;">Tier ${tier} — ${label}</div>`;
                     lastTier = tier;
+                }
+            }
+            if (hasTomeFilter) {
+                const outputKey = Object.keys(recipe.output)[0];
+                const tome = SPELL_TOMES[outputKey];
+                const school = tome ? SPELLS[tome.spell]?.school : null;
+                if (school && school !== lastTomeSchool) {
+                    const schoolDef = MAGIC_SKILLS[school];
+                    const color = schoolDef?.color || '#aaa';
+                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;color:${color};">${schoolDef?.name || school}</div>`;
+                    lastTomeSchool = school;
                 }
             }
             if (this._craftTab === 'Materials') {

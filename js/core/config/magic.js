@@ -216,7 +216,7 @@ export const RESEARCH = {
     battle_brewing: { name: 'Battle Brewing', cost: 500, requires: ['domestic_alchemy', 'herbalism'], tab: 'foundations', description: 'Brew potions for expeditions, making it easier for your colonists to go further' },
 
     // Wildlife
-    beast_binding: { name: 'Beast Binding', cost: 280, requires: ['alchemy'], tab: 'nature', description: 'Bind and pen creatures' },
+    beast_binding: { name: 'Beast Binding', cost: 280, requires: ['wayfinding'], tab: 'nature', description: 'Bind and pen creatures' },
     pack_binding: { name: 'Pack Binding', cost: 350, requires: ['husbandry'], tab: 'nature', description: 'Each colonist can bond with up to two pets.' },
     husbandry: { name: 'Husbandry', cost: 350, requires: ['beast_binding'], tab: 'nature', description: 'Tamed animals produce 50% more resources' },
     wolf_mastery: { name: 'Wolf Mastery', cost: 350, requires: ['pack_binding'], tab: 'nature', description: 'Wolf tame chance +20%, tamed wolves deal +4 damage' },
@@ -235,8 +235,8 @@ export const RESEARCH = {
 
     // Spells
     arcane_studies: { name: 'Arcane Studies', cost: 100, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
-    arcane_infusion: { name: 'Arcane Infusion', cost: 400, requires: ['ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
-    advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_studies', 'arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
+    arcane_infusion: { name: 'Arcane Infusion', cost: 400, requires: ['arcane_studies', 'ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
+    advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
     ritual_magic: { name: 'Ritual Magic', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Unlock complex arcane rituals patterns for powerful colony-wide effects' },
     void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands and void staves', requiresTabCount: 2 },
     mana_weaving: { name: 'Mana Weaving', cost: 650, requires: ['arcane_infusion', 'textiles'], tab: 'magic', description: 'Weave mana into protective garb', requiresTabCount: 3 },
@@ -250,14 +250,14 @@ export const RESEARCH = {
     pyroclasm: { name: 'Pyroclasm', cost: 750, requires: ['ember_magic'], tab: 'mana', description: 'Fire ward incinerates nearby foes', requiresTabCount: 3 },
 
     // Rifts
-    wayfinding: { name: 'Wayfinding', cost: 120, requires: [], tab: 'rifts', description: 'Scout the wild lands beyond the colony. Send small scouting parties to forage and explore nearby wilderness.' },
-    warrior_training: { name: 'Warrior Training', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Forge heavy war axes for frontline fighters' },
+    warrior_training: { name: 'Heavy Arms', cost: 150, requires: ['metalworking'], tab: 'crafting', description: 'Forge heavy war axes for frontline fighters' },
     warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards and build tougher structures using bricks' },
     fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
     void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['fortification'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
     void_forging: { name: 'Void Shaping', cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
-    planar_rift: { name: 'Planar Rifts', cost: 800, requires: ['void_summoning', 'arcane_infusion'], tab: 'rifts', description: 'Open stable rifts for exploration expeditions', requiresMilestone: { stat: 'wavesCompleted', min: 3 } },
+    wayfinding: { name: 'Wayfinding', cost: 120, requires: [], tab: 'rifts', description: 'Scout the wild lands beyond the colony. Send small scouting parties to forage and explore nearby wilderness.' },
+    planar_rift: { name: 'Planar Rifts', cost: 800, requires: ['void_summoning', 'arcane_infusion', 'wayfinding'], tab: 'rifts', description: 'Open stable rifts for exploration expeditions', requiresMilestone: { stat: 'wavesCompleted', min: 3 } },
     deep_delving: { name: 'Deep Delving', cost: 1200, requires: ['auto_expedition'], tab: 'rifts', description: 'Access deeper, more dangerous realms' },
     auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually', requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, },
     auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['deep_delving'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },

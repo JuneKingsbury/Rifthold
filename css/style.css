@@ -1862,17 +1862,55 @@ img.pixel-art-icon {
 
 .research-tree {
     position: relative;
+    overflow: hidden;
+    width: 100%;
+    max-height: 60vh;
+    min-height: 200px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.research-tree.panning { cursor: grabbing; }
+
+.research-world {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 24px;
-    padding: 12px 0;
-    min-width: max-content;
-    max-height: 60vh;
-    overflow-y: auto;
-    overflow-x: auto;
-    width: 100%;
+    padding: 40px 60px;
+    width: max-content;
+    transform-origin: 0 0;
+    will-change: transform;
 }
+
+.research-zoom-controls {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+}
+
+.research-zoom-btn {
+    width: 28px;
+    height: 28px;
+    background: #222233;
+    border: 1px solid #444;
+    color: #aaa;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+}
+
+.research-zoom-btn:hover { background: #2a2a4a; color: #fff; }
 
 .research-lines {
     position: absolute;
@@ -3095,12 +3133,11 @@ details.settings-debug > summary::marker {
     }
 
     .research-tree {
-        gap: 18px;
         max-height: calc(70vh - 110px);
-        overflow-x: auto;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        touch-action: pan-x pan-y;
+    }
+
+    .research-world {
+        gap: 18px;
     }
 
     .research-drag-handle { display: block; }
@@ -3208,7 +3245,8 @@ details.settings-debug > summary::marker {
 }
 .force-tabbed .research-node { min-width: 100px; max-width: 150px; padding: 6px 6px; }
 .force-tabbed .research-layer { gap: 10px; }
-.force-tabbed .research-tree { gap: 18px; max-height: calc(70vh - 110px); overflow-x: auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.force-tabbed .research-tree { max-height: calc(70vh - 110px); }
+.force-tabbed .research-world { gap: 18px; }
 .force-tabbed .research-node-name { font-size: 0.83em; }
 .force-tabbed .research-node-desc { font-size: 0.67em; }
 .force-tabbed .research-node-btn { padding: 8px 12px; }
@@ -3260,7 +3298,7 @@ details.settings-debug > summary::marker {
     }
     .force-separate .research-node { min-width: 120px; max-width: 180px; padding: 8px 10px; }
     .force-separate .research-layer { gap: 16px; }
-    .force-separate .research-tree { gap: 24px; }
+    .force-separate .research-world { gap: 24px; }
     .force-separate .research-node-name { font-size: inherit; }
     .force-separate .research-node-desc { font-size: inherit; }
 }

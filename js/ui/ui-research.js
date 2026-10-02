@@ -4,6 +4,9 @@ export function installResearchPanel(UI) {
     Object.assign(UI.prototype, researchMethods);
 }
 
+const MIN_SCALE = 0.35;
+const MAX_SCALE = 1.5;
+
 const researchMethods = {
     toggleResearchPanel() {
         const opening = !this.researchPanelVisible;
@@ -29,11 +32,13 @@ const researchMethods = {
         if (tabsContainer) {
             this._researchTabsScroll = tabsContainer.scrollLeft;
         }
-        // Save vertical scroll position per tab
-        const tree = this.elements.researchPanel.querySelector('.research-tree');
-        if (tree) {
-            if (!this._researchTreeScrolls) this._researchTreeScrolls = {};
-            this._researchTreeScrolls[activeTab] = tree.scrollTop;
+        // Save current transform before re-render
+        const oldWorld = this.elements.researchPanel.querySelector('.research-world');
+        if (oldWorld) {
+            if (!this._researchTreeTransforms) this._researchTreeTransforms = {};
+            this._researchTreeTransforms[activeTab] = oldWorld.dataset.transform
+                ? JSON.parse(oldWorld.dataset.transform)
+                : null;
         }
 
         let html = '<div class="research-drag-handle"></div><div class="panel-close" data-panel-close="research">&times;</div><h3>Research</h3>';
@@ -77,6 +82,7 @@ const researchMethods = {
         const tabKeys = Object.keys(RESEARCH).filter(k => RESEARCH[k].tab === activeTab);
         const layers = this._buildResearchLayers(tabKeys);
         html += `<div class="research-tree">`;
+        html += `<div class="research-world">`;
         html += `<svg class="research-lines" id="research-lines"></svg>`;
         for (let depth = 0; depth < layers.length; depth++) {
             html += `<div class="research-layer">`;
@@ -166,7 +172,13 @@ const researchMethods = {
             }
             html += `</div>`;
         }
+        html += `</div>`; // .research-world
+        html += `<div class="research-zoom-controls">`;
+        html += `<button class="research-zoom-btn" data-zoom="in" title="Zoom in">+</button>`;
+        html += `<button class="research-zoom-btn" data-zoom="reset" title="Reset view">&#8635;</button>`;
+        html += `<button class="research-zoom-btn" data-zoom="out" title="Zoom out">&minus;</button>`;
         html += `</div>`;
+        html += `</div>`; // .research-tree
 
         if (html !== this._lastResearchHtml) {
             this._lastResearchHtml = html;
@@ -175,12 +187,10 @@ const researchMethods = {
             if (tabsContainer && this._researchTabsScroll) {
                 tabsContainer.scrollLeft = this._researchTabsScroll;
             }
-            // Restore vertical scroll position for this tab
-            const newTree = this.elements.researchPanel.querySelector('.research-tree');
-            if (newTree && this._researchTreeScrolls?.[activeTab]) {
-                newTree.scrollTop = this._researchTreeScrolls[activeTab];
-            }
-            requestAnimationFrame(() => this._drawResearchLines());
+            requestAnimationFrame(() => {
+                this._initResearchPanZoom(activeTab);
+                this._drawResearchLines();
+            });
             this._initResearchHover();
             this._initResearchTouch();
         }
@@ -215,24 +225,222 @@ const researchMethods = {
         }
     },
 
+    _applyResearchTransform(world, x, y, scale) {
+        scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+        world.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+        world.dataset.transform = JSON.stringify({ x, y, scale });
+        return scale;
+    },
+
+    _initResearchPanZoom(activeTab) {
+        const tree = this.elements.researchPanel.querySelector('.research-tree');
+        const world = tree?.querySelector('.research-world');
+        if (!tree || !world) return;
+
+        // Determine initial scale for narrow screens
+        const treeW = tree.clientWidth;
+        const worldW = world.scrollWidth;
+        const defaultScale = worldW > 0 ? Math.min(1, Math.max(MIN_SCALE, (treeW - 16) / worldW)) : 1;
+
+        // Restore saved transform or use default
+        const saved = this._researchTreeTransforms?.[activeTab];
+        let { x, y, scale } = saved || { x: 0, y: 0, scale: defaultScale };
+
+        // If no saved state, center the world horizontally in the viewport
+        if (!saved) {
+            const scaledW = worldW * scale;
+            x = Math.max(0, (treeW - scaledW) / 2);
+            y = 0;
+        }
+
+        scale = this._applyResearchTransform(world, x, y, scale);
+
+        const saveTransform = () => {
+            if (!this._researchTreeTransforms) this._researchTreeTransforms = {};
+            this._researchTreeTransforms[activeTab] = JSON.parse(world.dataset.transform);
+        };
+
+        // --- Zoom buttons ---
+        tree.querySelectorAll('.research-zoom-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const t = JSON.parse(world.dataset.transform);
+                const treeRect = tree.getBoundingClientRect();
+                const cx = treeRect.width / 2;
+                const cy = treeRect.height / 2;
+                let newScale = t.scale;
+                if (btn.dataset.zoom === 'in') newScale *= 1.15;
+                else if (btn.dataset.zoom === 'out') newScale *= 1 / 1.15;
+                else {
+                    // reset: recalc default and re-center
+                    const w = world.scrollWidth;
+                    newScale = Math.min(1, Math.max(MIN_SCALE, (tree.clientWidth - 16) / w));
+                    const nx = Math.max(0, (tree.clientWidth - w * newScale) / 2);
+                    this._applyResearchTransform(world, nx, 0, newScale);
+                    saveTransform();
+                    this._drawResearchLines();
+                    return;
+                }
+                // Zoom toward center
+                const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+                const nx = cx - (cx - t.x) * (clampedScale / t.scale);
+                const ny = cy - (cy - t.y) * (clampedScale / t.scale);
+                this._applyResearchTransform(world, nx, ny, clampedScale);
+                saveTransform();
+                this._drawResearchLines();
+            });
+        });
+
+        // --- Mouse wheel zoom ---
+        tree.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const t = JSON.parse(world.dataset.transform);
+            const treeRect = tree.getBoundingClientRect();
+            const mx = e.clientX - treeRect.left;
+            const my = e.clientY - treeRect.top;
+            const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+            const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, t.scale * factor));
+            const nx = mx - (mx - t.x) * (newScale / t.scale);
+            const ny = my - (my - t.y) * (newScale / t.scale);
+            this._applyResearchTransform(world, nx, ny, newScale);
+            saveTransform();
+            this._drawResearchLines();
+        }, { passive: false });
+
+        // --- Pointer (mouse) pan ---
+        let panActive = false;
+        let panStartX = 0, panStartY = 0;
+        let panOriginX = 0, panOriginY = 0;
+
+        tree.addEventListener('pointerdown', (e) => {
+            // Only single-finger / left-button drag; ignore zoom buttons
+            if (e.target.closest('.research-zoom-btn')) return;
+            if (e.pointerType === 'touch') return; // handled by touch handler
+            if (e.button !== 0) return;
+            panActive = true;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            const t = JSON.parse(world.dataset.transform);
+            panOriginX = t.x;
+            panOriginY = t.y;
+            tree.classList.add('panning');
+            tree.setPointerCapture(e.pointerId);
+        });
+
+        tree.addEventListener('pointermove', (e) => {
+            if (!panActive || e.pointerType === 'touch') return;
+            const t = JSON.parse(world.dataset.transform);
+            const nx = panOriginX + (e.clientX - panStartX);
+            const ny = panOriginY + (e.clientY - panStartY);
+            this._applyResearchTransform(world, nx, ny, t.scale);
+        });
+
+        const endPan = (e) => {
+            if (!panActive || e.pointerType === 'touch') return;
+            panActive = false;
+            tree.classList.remove('panning');
+            saveTransform();
+            this._drawResearchLines();
+        };
+        tree.addEventListener('pointerup', endPan);
+        tree.addEventListener('pointercancel', endPan);
+
+        // --- Touch pan + pinch ---
+        let activeTouches = {};
+
+        tree.addEventListener('touchstart', (e) => {
+            for (const t of e.changedTouches) activeTouches[t.identifier] = { x: t.clientX, y: t.clientY };
+        }, { passive: true });
+
+        tree.addEventListener('touchmove', (e) => {
+            const ids = Object.keys(activeTouches);
+            if (ids.length === 0) return;
+
+            if (e.touches.length === 2) {
+                // Pinch-to-zoom
+                e.preventDefault();
+                const t0 = e.touches[0], t1 = e.touches[1];
+                const prevT0 = activeTouches[t0.identifier];
+                const prevT1 = activeTouches[t1.identifier];
+                if (!prevT0 || !prevT1) return;
+
+                const prevDist = Math.hypot(prevT0.x - prevT1.x, prevT0.y - prevT1.y);
+                const currDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+                const factor = currDist / (prevDist || 1);
+
+                const midX = (t0.clientX + t1.clientX) / 2;
+                const midY = (t0.clientY + t1.clientY) / 2;
+                const prevMidX = (prevT0.x + prevT1.x) / 2;
+                const prevMidY = (prevT0.y + prevT1.y) / 2;
+                const treeRect = tree.getBoundingClientRect();
+                const mx = midX - treeRect.left;
+                const my = midY - treeRect.top;
+
+                const tr = JSON.parse(world.dataset.transform);
+                const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, tr.scale * factor));
+                const nx = mx - (mx - tr.x) * (newScale / tr.scale) + (midX - prevMidX);
+                const ny = my - (my - tr.y) * (newScale / tr.scale) + (midY - prevMidY);
+                this._applyResearchTransform(world, nx, ny, newScale);
+
+                activeTouches[t0.identifier] = { x: t0.clientX, y: t0.clientY };
+                activeTouches[t1.identifier] = { x: t1.clientX, y: t1.clientY };
+            } else if (e.touches.length === 1) {
+                // Single-finger pan
+                const t = e.touches[0];
+                const prev = activeTouches[t.identifier];
+                if (!prev) return;
+                const tr = JSON.parse(world.dataset.transform);
+                const nx = tr.x + (t.clientX - prev.x);
+                const ny = tr.y + (t.clientY - prev.y);
+                this._applyResearchTransform(world, nx, ny, tr.scale);
+                activeTouches[t.identifier] = { x: t.clientX, y: t.clientY };
+            }
+        }, { passive: false });
+
+        tree.addEventListener('touchend', (e) => {
+            for (const t of e.changedTouches) delete activeTouches[t.identifier];
+            if (e.touches.length === 0) {
+                saveTransform();
+                this._drawResearchLines();
+            }
+        }, { passive: true });
+
+        tree.addEventListener('touchcancel', (e) => {
+            for (const t of e.changedTouches) delete activeTouches[t.identifier];
+            saveTransform();
+        }, { passive: true });
+    },
+
     _initResearchTouch() {
         const tree = this.elements.researchPanel.querySelector('.research-tree');
         if (!tree) return;
 
-        // Swipe left/right on tree switches tabs
+        // Swipe left/right on tree switches tabs (single-finger, mostly horizontal)
         let touchStartX = null;
         let touchStartY = null;
+        let touchMoved = false;
+
         tree.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
+            touchMoved = false;
         }, { passive: true });
+
+        tree.addEventListener('touchmove', (e) => {
+            if (e.touches.length !== 1) return;
+            const dx = Math.abs(e.touches[0].clientX - touchStartX);
+            const dy = Math.abs(e.touches[0].clientY - touchStartY);
+            if (dx > 8 || dy > 8) touchMoved = true;
+        }, { passive: true });
+
         tree.addEventListener('touchend', (e) => {
             if (touchStartX === null) return;
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = e.changedTouches[0].clientY - touchStartY;
             touchStartX = null;
             touchStartY = null;
-            // Only count as a tab-switch swipe if mostly horizontal and long enough
+            // Only count as a tab-switch swipe if mostly horizontal, long enough, and not a node tap
             if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
                 const tabs = RESEARCH_TABS;
                 const idx = tabs.findIndex(t => t.key === (this._researchTab || 'foundations'));
@@ -248,6 +456,7 @@ const researchMethods = {
         // Tap-to-highlight: first tap highlights family chain, second tap on same node selects
         let tappedKey = null;
         tree.addEventListener('touchend', (e) => {
+            if (touchMoved) return;
             const node = e.target.closest('.research-node[data-key]');
             if (!node) { tappedKey = null; this._clearResearchHighlight(); return; }
             const key = node.dataset.key;
@@ -485,21 +694,29 @@ const researchMethods = {
     },
 
     _drawResearchLines() {
+        const tree = this.elements.researchPanel?.querySelector('.research-tree');
+        const world = tree?.querySelector('.research-world');
         const svg = document.getElementById('research-lines');
-        const tree = svg?.closest('.research-tree');
-        if (!svg || !tree) return;
-        const treeRect = tree.getBoundingClientRect();
-        svg.setAttribute('width', tree.scrollWidth);
-        svg.setAttribute('height', tree.scrollHeight);
+        if (!svg || !world) return;
+        svg.setAttribute('width', world.scrollWidth);
+        svg.setAttribute('height', world.scrollHeight);
+        const worldRect = world.getBoundingClientRect();
+        // Get current scale from transform to correct for getBoundingClientRect scaling
+        let scale = 1;
+        try {
+            const t = JSON.parse(world.dataset.transform || '{}');
+            scale = t.scale || 1;
+        } catch (_) {}
         let paths = '';
-        const nodes = tree.querySelectorAll('.research-node[data-key]');
+        const nodes = world.querySelectorAll('.research-node[data-key]');
         const nodeRects = {};
         for (const node of nodes) {
             const r = node.getBoundingClientRect();
+            // Divide by scale to get positions in world (unscaled) space
             nodeRects[node.dataset.key] = {
-                cx: r.left + r.width / 2 - treeRect.left,
-                top: r.top - treeRect.top,
-                bottom: r.bottom - treeRect.top
+                cx: (r.left + r.width / 2 - worldRect.left) / scale,
+                top: (r.top - worldRect.top) / scale,
+                bottom: (r.bottom - worldRect.top) / scale,
             };
         }
         for (const node of nodes) {
@@ -509,7 +726,7 @@ const researchMethods = {
             const nodeCompleted = node.classList.contains('completed');
             for (const req of requires.split(',')) {
                 if (!req || !nodeRects[req] || !nodeRects[key]) continue;
-                const reqNode = tree.querySelector(`.research-node[data-key="${req}"]`);
+                const reqNode = world.querySelector(`.research-node[data-key="${req}"]`);
                 const reqCompleted = reqNode?.classList.contains('completed');
                 const color = (reqCompleted && nodeCompleted) ? '#66cc66' : reqCompleted ? '#886622' : '#444';
                 const from = nodeRects[req];
