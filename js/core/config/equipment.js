@@ -12,7 +12,7 @@ export const MATERIALS = {
     moonbloom: { name: 'Moonbloom'},
     hides: { name: 'Hides'},
     iron_ore: { name: 'Iron Ore'},
-    runite: { name: 'Runite'},
+    runite_ore: { name: 'Runite Ore' },
     eggs: { name: 'Eggs'},
     milk: { name: 'Milk'},
     wool: { name: 'Wool'},
@@ -21,9 +21,10 @@ export const MATERIALS = {
     gold: { name: 'Gold' },
     planks: { name: 'Planks', recipe: { input: { wood: 2 }, output: 3, ticks: 10, prefix: 'craft_' } },
     bricks: { name: 'Bricks', recipe: { input: { stone: 2 }, output: 3, ticks: 12, prefix: 'craft_' } },
-    iron: { name: 'Iron', recipe: { input: { iron_ore: 2 }, output: 2, ticks: 12, prefix: 'smelt_', research: 'metalworking', station: 'anvil' } },
     leather: { name: 'Leather', recipe: { input: { hides: 2 }, output: 2, ticks: 10, prefix: 'tan_' } },
     cloth: { name: 'Cloth', recipe: { input: { cotton: 2 }, output: 3, ticks: 10, prefix: 'weave_', research: 'textiles', station: 'loom' } },
+    iron: { name: 'Iron', recipe: { input: { iron_ore: 2 }, output: 2, ticks: 12, prefix: 'smelt_', research: 'metalworking', station: 'anvil' } },
+    runite: { name: 'Runite Bar', recipe: { input: { runite_ore: 2 }, output: 2, ticks: 14, prefix: 'smelt_', research: 'runeforging', station: 'anvil' } },
 };
 
 const BASE_RECIPES = {
@@ -132,6 +133,7 @@ export const ARMORS = {
 export const HELMETS = {
     // ── Tier 1 ──
     wool_cap: { name: 'Wool Cap', damageReduction: 0.02, tier: 1, order: 1, coldResistance: 0.4, moodBonus: 3, description: 'A cozy wool cap. Keeps spirits and warmth up.', recipe: { input: { wool: 3 }, ticks: 10 } },
+    cotton_cap: { name: 'Cotton Cap', damageReduction: 0.02, tier: 1, order: 2, coldResistance: 0.2, moodBonus: 2, description: 'A light cotton cap. Less warm than wool, but better than nothing.', recipe: { input: { cotton: 3 }, ticks: 10, research: 'textiles', station: 'loom' } },
     leather_cap: { name: 'Leather Cap', damageReduction: 0.05, tier: 1, order: 3, description: 'A simple leather skullcap.', recipe: { input: { leather: 2 }, ticks: 12 } },
     // ── Tier 2 ──
     iron_helmet: { name: 'Iron Helmet', damageReduction: 0.08, tier: 2, order: 7, description: 'A solid iron helmet.', recipe: { input: { iron: 3 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
@@ -150,15 +152,17 @@ export const HELMETS = {
 
 export const CLOTHES = {
     // ── Tier 1 ──
+    leather_cloak: { name: 'Leather Cloak', tier: 1, order: 0, coldResistance: 0.25, description: 'A rough cloak stitched from cured hides. Not elegant, but keeps out the cold.', recipe: { input: { leather: 3 }, ticks: 14 } },
     cotton_shirt: { name: 'Cotton Shirt', tier: 1, order: 1, coldResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.05, description: 'A light cotton shirt. Comfortable for work.', recipe: { input: { cloth: 3 }, ticks: 14, research: 'textiles', station: 'loom' } },
     wool_tunic: { name: 'Wool Tunic', tier: 1, order: 2, coldResistance: 0.5, moodBonus: 3, description: 'A warm wool tunic. Good protection from the cold.', recipe: { input: { wool: 4, cloth: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
+    cotton_tunic: { name: 'Cotton Tunic', tier: 1, order: 3, coldResistance: 0.3, moodBonus: 2, description: 'A tunic woven from thick cotton. Warmer than a shirt, lighter than wool.', recipe: { input: { cotton: 4 }, ticks: 18, research: 'textiles', station: 'loom' } },
     // ── Tier 2 ──
-    leather_jerkin: { name: 'Leather Jerkin', tier: 2, order: 3, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, description: 'A rugged leather jerkin. Versatile in all seasons.', recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, research: 'textiles', station: 'loom' } },
+    leather_jerkin: { name: 'Leather Jerkin', tier: 2, order: 4, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, description: 'A rugged leather jerkin. Versatile in all seasons.', recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, research: 'textiles', station: 'loom' } },
     // ── Tier 3 ──
-    ashwalkers_cloak: { name: "Ashwalker's Cloak", tier: 3, order: 4, heatResistance: 0.7, coldResistance: -0.2, moodBonus: 2, description: 'A fire-treated cloak woven for desert scouts. Shrugs off heat but offers no warmth.', recipe: { input: { leather: 3, cloth: 2, void_essence: 1 }, ticks: 26, research: 'mana_weaving', station: 'loom' } },
-    mana_silk_vestments: { name: 'Mana-Silk Vestments', tier: 3, order: 5, coldResistance: 0.4, heatResistance: 0.3, moodBonus: 4, workSpeedBonus: 0.15, description: 'Robes woven from mana-infused silk. Comfortable in any climate and invigorating to work in.', recipe: { input: { cloth: 3, runite: 1, moonbloom: 1 }, ticks: 32, research: 'mana_weaving', station: 'loom' } },
-    cloak_of_shadows: { name: 'Cloak of Shadows', tier: 3, order: 6, textColor: '#4488ff', tradeValue: 45, description: 'A cloak that makes the wearer harder to target.', targetPriority: -10 },
-    berserkers_wraps: { name: "Berserker's Wraps", tier: 3, order: 7, textColor: '#4488ff', tradeValue: 45, lowHpDamageBonus: 0.3, description: 'Savage wraps that awaken something primal. Deal 30% more damage below 40% HP.' },
+    ashwalkers_cloak: { name: "Ashwalker's Cloak", tier: 3, order: 5, heatResistance: 0.7, coldResistance: -0.2, moodBonus: 2, description: 'A fire-treated cloak woven for desert scouts. Shrugs off heat but offers no warmth.', recipe: { input: { leather: 3, cloth: 2, void_essence: 1 }, ticks: 26, research: 'mana_weaving', station: 'loom' } },
+    mana_silk_vestments: { name: 'Mana-Silk Vestments', tier: 3, order: 6, coldResistance: 0.4, heatResistance: 0.3, moodBonus: 4, workSpeedBonus: 0.15, description: 'Robes woven from mana-infused silk. Comfortable in any climate and invigorating to work in.', recipe: { input: { cloth: 3, runite: 1, moonbloom: 1 }, ticks: 32, research: 'mana_weaving', station: 'loom' } },
+    cloak_of_shadows: { name: 'Cloak of Shadows', tier: 3, order: 7, textColor: '#4488ff', tradeValue: 45, description: 'A cloak that makes the wearer harder to target.', targetPriority: -10 },
+    berserkers_wraps: { name: "Berserker's Wraps", tier: 3, order: 8, textColor: '#4488ff', tradeValue: 45, lowHpDamageBonus: 0.3, description: 'Savage wraps that awaken something primal. Deal 30% more damage below 40% HP.' },
 };
 
 export const BOOTS = {

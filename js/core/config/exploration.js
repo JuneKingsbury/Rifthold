@@ -68,6 +68,54 @@ export const DEMO_ALLOWED_REALM_CHAINS = new Set(['crystal', 'verdant']);
 
 // Exploration / realms. Used by exploration.js.
 export const REALMS = {
+    wild_frontiers: {
+        name: 'The Wild Frontiers',
+        difficulty: 1,
+        chain: 'scouting',
+        chainOrder: 1,
+        scoutingMode: true,
+        research: 'wayfinding',
+        duration: [120, 240],
+        encounters: 4,
+        combatEncounters: [1, 2],
+        vis: { wall: 'stone_wall', floor: 'grass' },
+        loot: [
+            { resource: 'wood', weight: 40, amount: [3, 8] },
+            { resource: 'stone', weight: 25, amount: [2, 6] },
+            { resource: 'leather', weight: 20, amount: [1, 3] },
+            { resource: 'hides', weight: 10, amount: [1, 2] },
+            { resource: 'meat', weight: 5, amount: [1, 3] },
+        ],
+        enemies: { count: [1, 2], types: [
+            { key: 'vine_creeper', weight: 40 },
+            { key: 'thorn_beast', weight: 35 },
+            { key: 'spore_walker', weight: 25 },
+        ] },
+        events: {
+            ambient: [
+                '{name} pushes through dense undergrowth, scanning the horizon.',
+                'The scouts find a half-overgrown trail leading deeper into the wilds.',
+                '{name} spots fresh animal tracks in the mud.',
+                'A distant howl echoes through the trees.',
+                'The forest here is ancient and still.',
+            ],
+            discoveries: [
+                '{name} uncovers a hidden cache of supplies left by a previous traveller!',
+                '{name} finds a cluster of wild herbs growing near a stream.',
+                'A collapsed lean-to shelters some useful salvage.',
+                '{name} spots a game trail and follows it to a natural clearing.',
+            ],
+            traps: [
+                '{name} stumbles into a hunter\'s snare!',
+                'A concealed pit nearly catches the scouts off guard.',
+                '{name} triggers a tripwire strung across the path.',
+            ],
+            rare: [
+                { chance: 0.05, text: '{name} discovers the ruins of an old ritual site. Amid the rubble lies something valuable.', loot: { resource: 'runite', amount: [1, 2] } },
+                { chance: 0.04, text: 'The scouts find the remains of a traveller\'s pack. Old but well-stocked.', loot: { resource: 'leather', amount: [2, 4] } },
+            ],
+        },
+    },
     crystal_caves: {
         name: 'Crystal Caves', difficulty: 1,
         chain: 'crystal', chainOrder: 1,

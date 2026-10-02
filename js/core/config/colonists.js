@@ -1,10 +1,37 @@
 export const SKILLS = {
-    building: { name: 'Building', baseLevel: [1, 3], biasBonus: 3, description: 'Construction, mining, chopping, and repairs' },
-    farming:  { name: 'Farming', baseLevel: [1, 3], biasBonus: 3, description: 'Planting and harvesting crops' },
-    crafting: { name: 'Crafting', baseLevel: [1, 3], biasBonus: 3, description: 'Crafting items at workbenches' },
-    cooking:  { name: 'Cooking', baseLevel: [1, 3], biasBonus: 3, description: 'Cooking meals at cooking pots' },
-    animals:  { name: 'Animals', baseLevel: [1, 2], biasBonus: 3, description: 'Taming and handling animals' },
-    research: { name: 'Research', baseLevel: [1, 2], biasBonus: 3, description: 'Studying and discovering new knowledge' },
+    building: { name: 'Building', baseLevel: [0, 2], biasBonus: 3, description: 'Construction, mining, chopping, and repairs' },
+    farming:  { name: 'Farming', baseLevel: [0, 2], biasBonus: 3, description: 'Planting and harvesting crops' },
+    crafting: { name: 'Crafting', baseLevel: [0, 2], biasBonus: 3, description: 'Crafting items at workbenches' },
+    cooking:  { name: 'Cooking', baseLevel: [0, 2], biasBonus: 3, description: 'Cooking meals at cooking pots' },
+    animals:  { name: 'Animals', baseLevel: [0, 2], biasBonus: 3, description: 'Taming and handling animals' },
+    research: { name: 'Research', baseLevel: [0, 2], biasBonus: 3, description: 'Studying and discovering new knowledge' },
+};
+
+export const SKILL_MILESTONES = {
+    building: {
+        5:  { description: '15% faster deconstruct', type: 'deconstructSpeed', value: 0.15 },
+        10: { description: '15% chance to recover materials on deconstruct', type: 'deconstructRefund', value: 0.15 },
+    },
+    farming: {
+        5:  { description: '+1 yield every 5th harvest', type: 'harvestBonus', value: 5 },
+        10: { description: 'Chance to double full plot yield on harvest', type: 'harvestDouble', value: 0.20 },
+    },
+    crafting: {
+        5:  { description: '10% chance to not consume materials on craft', type: 'craftFreeChance', value: 0.10 },
+        10: { description: 'Always produce at least fine quality', type: 'craftMinQuality', value: 'fine' },
+    },
+    cooking: {
+        5:  { description: 'Cooked meals grant a brief work speed boost to the colonist who eats them', type: 'mealWorkBuff', value: 0.15, duration: 30 },
+        10: { description: 'Cooked meals grant a work speed boost colony-wide', type: 'mealWorkBuffColony', value: 0.10, duration: 30 },
+    },
+    animals: {
+        5:  { description: 'Taming tasks take 20% less work', type: 'tameWorkReduction', value: 0.20 },
+        10: { description: 'Bonded animals gain +1 to their combat damage', type: 'bondedAnimalDamage', value: 1 },
+    },
+    research: {
+        5:  { description: '+10% research speed contribution', type: 'researchSpeedBonus', value: 0.10 },
+        10: { description: 'Contributes at 75% efficiency while studying tomes (default 50%)', type: 'tomeResearchEfficiency', value: 0.75 },
+    },
 };
 
 // THOUGHTS moved to ./social.js (still re-exported via index.js).
@@ -197,7 +224,7 @@ export const COLONIST_CONFIG = {
     skillMaxLevel: 10,
     skillXpPerTask: 1,
     skillXpToLevel: 15,
-    skillXpScalePerLevel: 8,
+    skillXpScalePerLevel: 15,
 };
 
 export const HUMAN_NAMES = [

@@ -52,7 +52,7 @@ export const MERCHANTS = [
     {
         name: 'Arms Dealer',               // weapons/armor specialist: better quality odds
         weight: 7,
-        resourcePool: ['iron', 'planks', 'leather', 'iron_ore', 'runite'],
+        resourcePool: ['iron', 'planks', 'leather', 'iron_ore', 'runite_ore', 'runite'],
         lowTierItems: ['iron_sword', 'stone_spear', 'etched_axe', 'etched_mace', 'iron_helmet', 'iron_chainmail', 'iron_greaves', 'hunting_bow'],
         highTierItems: ['aegis_of_the_vanguard', 'runic_blade', 'iron_crossbow', 'runic_plate', 'runic_helm'],
         lowDrawCount: [1, 0.7, 0.5],       // leans toward carrying more stock
@@ -134,7 +134,7 @@ export const MERCHANTS = [
 export const TRADE_VALUES = {
     wood: 1, stone: 1.5, planks: 2, food: 1.5, bricks: 3,
     hides: 1.5, leather: 3, iron_ore: 2, iron: 4,
-    runite: 6, void_essence: 10, meat: 1, wheat: 0.7, berries: 0.6,
+    runite_ore: 3, runite: 6, void_essence: 10, meat: 1, wheat: 0.7, berries: 0.6,
     corn: 0.8, potatoes: 0.7, moonbloom: 3, eggs: 1.5, milk: 2, wool: 2.5,
     cotton: 0.8, cloth: 2, gold: 5,
 };

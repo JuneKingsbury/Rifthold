@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
 import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
@@ -24,12 +24,22 @@ const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '�
 
 // Skill/magic XP tooltip text, shared by the colonist tooltip refresh and the
 // colonist info panel so both show identical "XP: x/y (z%)" (or "(MAX)") text.
-function skillXpTip(def, level, xp) {
+function skillXpTip(def, skillKey, level, xp) {
     const maxXp = COLONIST_CONFIG.skillXpToLevel + level * COLONIST_CONFIG.skillXpScalePerLevel;
     const pct = Math.floor((xp / maxXp) * 100);
-    return level >= COLONIST_CONFIG.skillMaxLevel
-        ? `${def.description} (MAX)`
-        : `${def.description} — XP: ${xp}/${maxXp} (${pct}%)`;
+    const milestones = SKILL_MILESTONES[skillKey] || {};
+    const lines = [];
+    if (level >= COLONIST_CONFIG.skillMaxLevel) {
+        lines.push(`${def.description} (MAX)`);
+    } else {
+        lines.push(`${def.description} — XP: ${xp}/${maxXp} (${pct}%)`);
+    }
+    for (const [threshold, m] of Object.entries(milestones).sort((a, b) => Number(a[0]) - Number(b[0]))) {
+        const lvl = Number(threshold);
+        const unlocked = level >= lvl;
+        lines.push(unlocked ? `✓ Lvl ${lvl}: ${m.description}` : `  Lvl ${lvl}: ${m.description}`);
+    }
+    return lines.join('\n');
 }
 
 // Magic XP is stored as an accumulator scaled to /100 (max level hardcoded at 10).
@@ -710,7 +720,7 @@ export class UI {
         const resStyle = (key, val) => (alerts[key] && val <= alerts[key]) ? ' style="color:#ff4444;font-weight:bold"' : '';
         const mgr = this.game.skinManager;
         const hasSkin = mgr && mgr.isActive;
-        const RES_ABBR = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', gold: 'Au' };
+        const RES_ABBR = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', gold: 'Au' };
         const resIcon = (key, label, color) => {
             if (hasSkin) {
                 const url = mgr.getItemSpriteDataURL(key);
@@ -1114,7 +1124,7 @@ export class UI {
             const skillEntry = Object.entries(SKILLS).find(([, def]) => def.name === name);
             if (skillEntry) {
                 const [k, def] = skillEntry;
-                tip.dataset.tip = skillXpTip(def, colonist.skills[k] || 1, colonist.skillXp?.[k] || 0);
+                tip.dataset.tip = skillXpTip(def, k, colonist.skills[k] || 1, colonist.skillXp?.[k] || 0);
                 continue;
             }
             const magicEntry = Object.entries(MAGIC_SKILLS).find(([, def]) => def.name === name);
@@ -1493,7 +1503,7 @@ export class UI {
         html += `<div style="${sectionHdr}">Skills</div>`;
         html += `<div class="info-row">${Object.entries(SKILLS).map(([k, def]) => {
             const level = colonist.skills[k] || 1;
-            const xpTip = skillXpTip(def, level, colonist.skillXp?.[k] || 0);
+            const xpTip = skillXpTip(def, k, level, colonist.skillXp?.[k] || 0);
             return `<span class="skill-tip" data-tip="${xpTip}">${def.name}:${level}</span>`;
         }).join(' ')}</div>`;
         const hasMagic = colonist.magicSkills && Object.values(colonist.magicSkills).some(v => v > 0);
@@ -2238,7 +2248,7 @@ export class UI {
     }
 
     _buildRitualHtml(inner = false) {
-        const RES_LABEL = { void_essence: 'Void Essence', runite: 'Runite', moonbloom: 'Moonbloom' };
+        const RES_LABEL = { void_essence: 'Void Essence', runite_ore: 'Runite Ore', runite: 'Runite', moonbloom: 'Moonbloom' };
         let html = inner ? '' : `<div id="ritual-altar-section">`;
         html += `<div class="info-row" style="color:#cc99ff;font-weight:bold;margin-top:6px;">Rituals</div>`;
         for (const [key, ritual] of Object.entries(RITUALS)) {
@@ -3023,9 +3033,9 @@ export class UI {
         }
         const EQUIP_TIER_NAMES = ['', 'Primitive', 'Iron', 'Runic', 'Void'];
         const MATERIALS_GROUPS = {
-            craft_planks: 'Carpentry', craft_bricks: 'Carpentry', smelt_iron: 'Carpentry',
+            craft_planks: 'Carpentry', craft_bricks: 'Carpentry',
             tan_leather: 'Textiles', weave_cloth: 'Textiles',
-            repair_trinket: 'Repair',
+            smelt_iron: 'Smithing', smelt_runite: 'Smithing', repair_trinket: 'Smithing',
         };
         let lastTier = null;
         let lastMaterialsGroup = null;
@@ -3295,7 +3305,7 @@ export class UI {
             html += `<div class="info-row" style="color:#aa8844;font-size:0.9em;">Food preservation: -${pct}% spoilage${seasonLabel}</div>`;
         }
 
-        const buildingMats = ['wood', 'stone', 'planks', 'bricks', 'hides', 'leather', 'iron_ore', 'iron', 'runite', 'wool', 'cotton', 'cloth', 'void_essence'];
+        const buildingMats = ['wood', 'stone', 'planks', 'bricks', 'hides', 'leather', 'iron_ore', 'iron', 'runite_ore', 'runite', 'wool', 'cotton', 'cloth', 'void_essence'];
         const foodKeys = [...FOODSTUFFS, 'food'];
         const reserved = this.game.resources.reservedFoodstuffs;
 
@@ -3388,13 +3398,13 @@ export class UI {
         }
         const colors = {
             wood: '#8b6b3a', stone: '#999', food: '#88cc44', planks: '#c89648',
-            bricks: '#cc6633', iron_ore: '#887766', iron: '#aaa', runite: '#44ccff',
+            bricks: '#cc6633', iron_ore: '#887766', runite_ore: '#2aaa88', iron: '#aaa', runite: '#44ccff',
             void_essence: '#9933ff', hides: '#8b7355', leather: '#a0522d',
             gold: '#ffdd00',
         };
         const abbr = {
             wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk',
-            iron_ore: 'Or', iron: 'Fe', runite: 'Ru', leather: 'Le',
+            iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le',
             void_essence: 'Ve', hides: 'Hi', gold: 'Au',
         };
         const color = colors[key] || '#aaa';
@@ -4396,13 +4406,13 @@ export class UI {
         }
         const colors = {
             wood: '#8b6b3a', stone: '#999', food: '#88cc44', planks: '#c89648',
-            bricks: '#cc6633', iron_ore: '#887766', iron: '#aaa', runite: '#44ccff',
+            bricks: '#cc6633', iron_ore: '#887766', runite_ore: '#2aaa88', iron: '#aaa', runite: '#44ccff',
             void_essence: '#9933ff', hides: '#8b7355', leather: '#a0522d',
             meat: '#cc6666', wheat: '#daa520', berries: '#cc4488', corn: '#ccaa22',
             potatoes: '#c8a060', moonbloom: '#cc88ff', eggs: '#eecc88',
             milk: '#eeeedd', wool: '#ddd', gold: '#ffdd00',
         };
-        const abbr = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', hides: 'Hi', meat: 'Mt', wheat: 'Wh', berries: 'Be', corn: 'Cn', potatoes: 'Po', moonbloom: 'Mb', eggs: 'Eg', milk: 'Mk', gold: 'Au' };
+        const abbr = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', hides: 'Hi', meat: 'Mt', wheat: 'Wh', berries: 'Be', corn: 'Cn', potatoes: 'Po', moonbloom: 'Mb', eggs: 'Eg', milk: 'Mk', gold: 'Au' };
         const color = colors[key] || '#aaa';
         const ch = abbr[key] || this._formatResourceName(key).slice(0, 2);
         return `<span style="color:${color};font-weight:bold;margin-right:3px;font-size:0.9em;">${ch}</span>`;

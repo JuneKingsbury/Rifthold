@@ -11,7 +11,7 @@ const TOWN_HALL_TIER_INDEX = new Map(TOWN_HALL_QUALITY_TIERS.map((t, i) => [t.ke
 // label is a short readable name. Unknown keys fall back to the raw key + white.
 const YIELD_COLORS = {
     wood: '#c49a6c', stone: '#bbb', food: '#88cc44', planks: '#c89648',
-    bricks: '#cc7744', iron_ore: '#b98', iron: '#ccc', runite: '#44ccff',
+    bricks: '#cc7744', iron_ore: '#b98', runite_ore: '#2aaa88', iron: '#ccc', runite: '#44ccff',
     leather: '#b8875a', hides: '#b8875a', wool: '#eee', cloth: '#ddd',
     void_essence: '#bb66ff', gold: '#ffdd44', meat: '#e08888', wheat: '#e0c060',
     berries: '#d05070', corn: '#f0d040', potatoes: '#c9a06a', moonbloom: '#aaccff',
@@ -19,7 +19,7 @@ const YIELD_COLORS = {
 };
 const YIELD_LABELS = {
     wood: 'Wood', stone: 'Stone', food: 'Food', planks: 'Planks',
-    bricks: 'Bricks', iron_ore: 'Ore', iron: 'Iron', runite: 'Runite',
+    bricks: 'Bricks', iron_ore: 'Ore', runite_ore: 'R.Ore', iron: 'Iron', runite: 'Runite',
     leather: 'Leather', hides: 'Hides', wool: 'Wool', cloth: 'Cloth',
     void_essence: 'Void', gold: 'Gold', meat: 'Meat', wheat: 'Wheat',
     berries: 'Berries', corn: 'Corn', potatoes: 'Potatoes', moonbloom: 'Moonbloom',

@@ -710,7 +710,7 @@ export function completeTask(colonist, task, game) {
         if (colonist.skills[task.skillRequired] < maxLevel) {
             if (!colonist.skillXp) colonist.skillXp = {};
             if (!colonist.skillXp[task.skillRequired]) colonist.skillXp[task.skillRequired] = 0;
-            let xpGain = task.skillXpGain ?? Math.max(0.5, Math.round(task.workAmount / 10 * 2) / 2);
+            let xpGain = task.skillXpGain ?? Math.min(2.0, Math.max(0.5, Math.round(task.workAmount / 10 * 2) / 2));
             if (colonist.pedestalSkillBonus) xpGain *= (1 + colonist.pedestalSkillBonus);
             if (colonist.activeEffects) {
                 for (const e of colonist.activeEffects) {
@@ -729,6 +729,13 @@ export function completeTask(colonist, task, game) {
                 xpNeeded = COLONIST_CONFIG.skillXpToLevel + colonist.skills[task.skillRequired] * COLONIST_CONFIG.skillXpScalePerLevel;
                 game.eventLog.add(game, `${colonist.name}'s ${task.skillRequired} skill increased to ${colonist.skills[task.skillRequired]}!`, 'success', { type: 'colonist', id: colonist.id });
                 game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${task.skillRequired} lvl ${colonist.skills[task.skillRequired]}`, color: '#44ff44', fontSize: 11, ttl: 20, maxTtl: 20 });
+                // Check skill milestones at level 5 and 10
+                const newLevel = colonist.skills[task.skillRequired];
+                if (newLevel === 5 || newLevel === 10) {
+                    const label = newLevel === 5 ? 'Journeyman' : 'Master';
+                    game.eventLog.add(game, `${colonist.name} is now a ${label} ${task.skillRequired} (level ${newLevel})!`, 'success', { type: 'colonist', id: colonist.id });
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${label}!`, color: '#ffdd44', fontSize: 12, ttl: 25, maxTtl: 25 });
+                }
             }
         }
     }

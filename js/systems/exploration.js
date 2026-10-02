@@ -100,6 +100,7 @@ export class ExplorationSystem {
         if (this._isRealmDemoLocked(game, dim)) return false;
         if (dim.research && !game.research.isResearched(dim.research)) return false;
         if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) return false;
+        if (dim.scoutingMode) return true;
         if (!game.power || !game.power.powered) return false;
         if (!game.mapIndex || game.mapIndex.getStructurePositions('rift_gate').size === 0) return false;
         return true;
@@ -183,8 +184,8 @@ export class ExplorationSystem {
 
         if (party.length === 0) return null;
 
-        const gatePos = this._findRiftGatePosition(game);
-        if (!gatePos) return null;
+        let gatePos = dim.scoutingMode ? null : this._findRiftGatePosition(game);
+        if (!dim.scoutingMode && !gatePos) return null;
 
         const packAnimals = [];
         for (const id of cappedPacks) {
@@ -232,11 +233,13 @@ export class ExplorationSystem {
             if (c.equipmentSets?.Expedition && c.activeSet !== 'Expedition') {
                 game.switchEquipmentSet(c.id, 'Expedition');
             }
-            const path = findPathAdjacent(game.map, c.x, c.y, gatePos.x, gatePos.y, game._occupiedTiles);
-            if (path && path.length > 0) {
-                c.path = path;
-                c.state = 'moving';
-                c._expeditionMove = true;
+            if (gatePos) {
+                const path = findPathAdjacent(game.map, c.x, c.y, gatePos.x, gatePos.y, game._occupiedTiles);
+                if (path && path.length > 0) {
+                    c.path = path;
+                    c.state = 'moving';
+                    c._expeditionMove = true;
+                }
             }
         }
 
@@ -958,6 +961,66 @@ export class ExplorationSystem {
     }
 
     _updateGathering(exp, game) {
+        // Scouting expeditions have no gate. Colonists depart immediately.
+        if (!exp.gatePos) {
+            for (const id of exp.partyIds) {
+                const c = game.getColonist(id);
+                if (c && !c.onExpedition) {
+                    c.hp = c.maxHp;
+                    if (c.maxMana) c.mana = c.maxMana;
+                    c.onExpedition = true;
+                    c.state = 'idle';
+                    c.path = [];
+                    delete c._expeditionMove;
+                    delete c.expeditionPending;
+                }
+            }
+            exp.status = 'exploring';
+            exp.startTick = game.tick;
+            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
+            exp.partySnapshot = exp.partyIds.map(id => {
+                const c = game.getColonist(id);
+                if (!c) return null;
+                const baseCd = (c.weapon && c.weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
+                const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
+                const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
+                return {
+                    id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp, raceKey: c.race,
+                    opinions: { ...(c.opinions || {}) },
+                    bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor,
+                    golem: c.golem, golemType: c.golemType,
+                    weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
+                    boots: c.boots,
+                    trinket: c.trinketBroken ? null : c.trinket,
+                    traits: c.traits || [],
+                    knownSpells: (c.knownSpells || []).filter(s =>
+                        (!c.disabledSpells || !c.disabledSpells.includes(s)) &&
+                        isSpellAttuned(c, SPELLS[s])),
+                    magicSkills: { ...(c.magicSkills || {}) },
+                    mana: c.mana || 0,
+                    maxMana: c.maxMana || 0,
+                    spellCooldowns: {},
+                    spellDamageBonus: getEquipmentStat(c, 'spellDamageBonus'),
+                    schoolBonuses: buildSchoolBonuses(c),
+                    spellHealBonus: getEquipmentStat(c, 'spellHealBonus'),
+                    manaRegen: getEquipmentStat(c, 'manaRegen'),
+                    spellCostReduction: getEquipmentStat(c, 'spellCostReduction'),
+                    spellCooldownReduction: getEquipmentStat(c, 'spellCooldownReduction'),
+                    healthRegen: getEquipmentStat(c, 'healthRegen'),
+                    attackCooldown: baseCd,
+                    effectiveCooldown: effCd,
+                    _atkAnimMult: effCd / COLONIST_CONFIG.baseAttackCooldown,
+                    attackAnim: (c.weapon && c.weapon.attackAnim) || (c.weapon && c.weapon.ranged ? 'DrawAndShoot' : 'Swing'),
+                    shieldActive: false,
+                    shieldReduction: 0,
+                    dodgeCharges: 0,
+                    chaosResistance: getEquipmentStat(c, 'chaosResistance'),
+                };
+            }).filter(Boolean);
+            this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
+            game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
+            return;
+        }
         const gx = exp.gatePos.x;
         const gy = exp.gatePos.y;
         let allArrived = true;
@@ -2533,8 +2596,8 @@ export class ExplorationSystem {
             game.story.checkMilestone(`realm_${exp.realm}`, game);
             if (game.stats) game.stats.expeditionsCompleted++;
         }
-        const gx = exp.gatePos.x;
-        const gy = exp.gatePos.y;
+        const gx = exp.gatePos ? exp.gatePos.x : null;
+        const gy = exp.gatePos ? exp.gatePos.y : null;
 
         const fatigueTicks = this._calculateFatigueCooldown(exp);
         for (const snapshot of exp.partySnapshot) {
@@ -2545,8 +2608,11 @@ export class ExplorationSystem {
             if (colonist.equipmentSets?.Colony && colonist.activeSet !== 'Colony') {
                 game.switchEquipmentSet(colonist.id, 'Colony');
             }
-            colonist.x = gx;
-            colonist.y = gy;
+            // Only reposition to gate if one exists (scouting expeditions have none).
+            if (gx !== null && gy !== null) {
+                colonist.x = gx;
+                colonist.y = gy;
+            }
             if (snapshot.hp <= 0) {
                 colonist.hp = 1;
             } else {
@@ -2644,8 +2710,10 @@ export class ExplorationSystem {
         for (const itemKey of items) {
             game.resources.addItem({ ...ALL_ITEMS[itemKey], key: itemKey });
         }
-        for (const [res, amt] of Object.entries(lootResources)) {
-            game.overlays.push({ type: 'floating_text', x: exp.gatePos.x, y: exp.gatePos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
+        if (exp.gatePos) {
+            for (const [res, amt] of Object.entries(lootResources)) {
+                game.overlays.push({ type: 'floating_text', x: exp.gatePos.x, y: exp.gatePos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
+            }
         }
         if (game.discoveredLoot) {
             for (const res of Object.keys(lootResources)) {

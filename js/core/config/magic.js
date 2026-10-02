@@ -250,6 +250,7 @@ export const RESEARCH = {
     pyroclasm: { name: 'Pyroclasm', cost: 750, requires: ['ember_magic'], tab: 'mana', description: 'Fire ward incinerates nearby foes', requiresTabCount: 3 },
 
     // Rifts
+    wayfinding: { name: 'Wayfinding', cost: 120, requires: [], tab: 'rifts', description: 'Scout the wild lands beyond the colony. Send small scouting parties to forage and explore nearby wilderness.' },
     warrior_training: { name: 'Warrior Training', cost: 150, requires: ['metalworking'], tab: 'foundations', description: 'Forge heavy war axes for frontline fighters' },
     warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards and build tougher structures using bricks' },
     fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
