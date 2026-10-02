@@ -308,11 +308,12 @@ const arcaneMethods = {
             if (hasGate) break;
         }
 
-        if (!hasGate) {
+        const hasWayfinding = this.game.research.isResearched('wayfinding');
+        if (!hasGate && !hasWayfinding) {
             html += `<div class="arcane-section" style="color:#888;padding:20px 0;text-align:center;">`;
-            html += `<div style="font-size:1.2em;color:#33ccff;margin-bottom:8px;">Rift Gate Required</div>`;
-            html += `<div>Build a Rift Gate to send expeditions to other realms.</div>`;
-            html += `<div style="margin-top:6px;color:#666;">Explore for treasure, rare items, and rare materials. Requires mana to operate.</div>`;
+            html += `<div style="font-size:1.2em;color:#33ccff;margin-bottom:8px;">Wayfinding Required</div>`;
+            html += `<div>Research Wayfinding to send scouting parties into the wilderness.</div>`;
+            html += `<div style="margin-top:6px;color:#666;">Explore for treasure, rare items, and rare materials.</div>`;
             html += `</div>`;
             return html;
         }
@@ -524,11 +525,12 @@ const arcaneMethods = {
                 html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;display:flex;align-items:center;gap:4px;"><img src="portraits/chain_${chainIconKey}.png" class="pixel-art-icon" style="width:16px;height:16px;flex-shrink:0;" onerror="this.style.display='none'">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
                 for (const realm of chainRealms) {
                     const available = dims.find(d => d.key === realm.key);
+                    const sendable = available && expl.canSend(this.game, realm.key);
                     const completed = expl.completedRealms.has(realm.key);
                     const badge = completed ? `<span style="color:#44cc44;font-size:0.8em;"> ✓</span>` : '';
                     const indentPx = (realm.chainOrder - 1) * 16;
                     const indent = indentPx > 0 ? `margin-left:${indentPx}px;border-left:2px solid #446;padding-left:8px;` : '';
-                    if (available) {
+                    if (sendable) {
                         html += `<div class="info-actions" style="${indent}display:flex;align-items:center;gap:4px;">`;
                         if (canSendWatched) {
                             html += `<button onclick="window.game.showExpeditionSetupInPanel('${realm.key}')" style="background:#1a4466;color:#88ddff;padding:6px 12px;border:none;border-radius:3px;cursor:pointer;margin:2px 0;">${realm.name} (Difficulty ${realm.difficulty})${badge}</button>`;
@@ -539,6 +541,8 @@ const arcaneMethods = {
                             html += `<button onclick="window.game.showExpeditionSetupInPanel('${realm.key}', true)" style="background:#1a3322;color:#66dd99;padding:6px 10px;border:1px solid #336644;border-radius:3px;cursor:pointer;margin:2px 0;font-size:0.85em;">Auto</button>`;
                         }
                         html += `</div>`;
+                    } else if (available && !hasGate && !realm.scoutingMode) {
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — <span style="color:#888;">requires Rift Gate</span></span></div>`;
                     } else if (expl.isRealmDemoLocked(this.game, realm.key)) {
                         html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
                     } else if (realm.requiresEvent && !expl._checkEvent(this.game, realm.requiresEvent)) {
@@ -553,6 +557,10 @@ const arcaneMethods = {
             html += `<div class="info-row" style="color:#ff4444;margin-top:8px;">No mana — cannot send expeditions</div>`;
         } else {
             html += `<div class="info-row" style="color:#888;margin-top:8px;">No realms available yet</div>`;
+        }
+
+        if (!hasGate && hasWayfinding) {
+            html += `<div class="info-row" style="color:#666;margin-top:10px;font-size:0.85em;border-top:1px solid #333;padding-top:8px;">Build a <span style="color:#888;">Rift Gate</span> to unlock expeditions to other realms.</div>`;
         }
 
         // Active realm events
