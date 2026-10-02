@@ -146,7 +146,7 @@ export class Renderer {
         this._lastViewportH = CONFIG.VIEWPORT_HEIGHT;
     }
 
-    _resolveSprite(tile, entity, season, highlight) {
+    _resolveSprite(tile, entity, season, highlight, tileKey) {
         const sm = this.skinManager;
         if (entity) {
             if (entity.type === 'colonist') {
@@ -190,7 +190,14 @@ export class Renderer {
             }
         }
         if (tile.onFire) return sm.getSprite('effects', 'fire');
-        if (tile.structure) return sm.getSprite('buildings', tile.structure);
+        if (tile.structure) {
+            if (tileKey !== undefined && this._doorFlash.get(tileKey) > 0
+                && BUILDINGS[tile.structure]?.structureType === 'door') {
+                const openSprite = sm.getSprite('buildings', tile.structure + '_open');
+                if (openSprite) return openSprite;
+            }
+            return sm.getSprite('buildings', tile.structure);
+        }
         if (tile.zone) {
             const state = tile.zone.state || 'empty';
             if (tile.zone.crop && state !== 'empty') {
@@ -1229,6 +1236,7 @@ export class Renderer {
                     // Draw ground sprite (terrain, floor, or furniture) so it will appear underneath the colonist sprite.
                     const needsGround = tile.structure && BUILDINGS[tile.structure] &&
                         (BUILDINGS[tile.structure].structureType === 'furniture' ||
+                         BUILDINGS[tile.structure].structureType === 'door' ||
                          BUILDINGS[tile.structure].showGround === true);
                     if (needsGround || entity) {
                         const ground = this._resolveGroundSprite(tile, season);
@@ -1297,7 +1305,10 @@ export class Renderer {
                             }
                         }
                         if (tile.structure) {
-                            const structSprite = sm.getSprite('buildings', tile.structure);
+                            const isDoorOpen = this._doorFlash.get(tileKey) > 0
+                                && BUILDINGS[tile.structure]?.structureType === 'door';
+                            const structSprite = (isDoorOpen && sm.getSprite('buildings', tile.structure + '_open'))
+                                || sm.getSprite('buildings', tile.structure);
                             if (structSprite) ctx.drawImage(structSprite, px, py, cw1, ch1);
                         }
                     }
@@ -1309,7 +1320,7 @@ export class Renderer {
                     // (all gated on entity/structure/resource/zone/effects, which a
                     // bakeable pristine tile lacks). Skip the block and mark spriteDrawn
                     // so downstream overlays (grass tufts, ripples) still layer on top.
-                    const sprite = bakedGround ? null : this._resolveSprite(tile, entity, season, hl);
+                    const sprite = bakedGround ? null : this._resolveSprite(tile, entity, season, hl, tileKey);
                     if (bakedGround) {
                         spriteDrawn = true;
                     }
@@ -1677,15 +1688,7 @@ export class Renderer {
                         });
                     }
 
-                    // Door flash: brief white overlay when an entity just entered a structure tile
                     if (tile.structure) {
-                        const flashFrames = this._doorFlash.get(tileKey);
-                        if (flashFrames > 0) {
-                            ctx.globalAlpha = Math.min(0.4, flashFrames / 8 * 0.4);
-                            ctx.fillStyle = '#ffffff';
-                            ctx.fillRect(px, py, cw1, ch1);
-                            ctx.globalAlpha = 1;
-                        }
 
                         // Working building pulse glow
                         if (this._workingBuildingSet.has(`${wx},${wy}`)) {
@@ -1953,9 +1956,14 @@ export class Renderer {
                     ent._lastRenderedTile = { x: ent.x, y: ent.y };
                 }
             } else {
-                // Still moving. Update last rendered tile to current destination so we
-                // only fire on the NEXT arrival (not retroactively on every frame)
-                if (!lastTile) ent._lastRenderedTile = { x: ent.x, y: ent.y };
+                // Still moving. Fire door flash at lerp start (destination tile just changed).
+                if (!lastTile || lastTile.x !== ent.x || lastTile.y !== ent.y) {
+                    const destTile = game.map[ent.y]?.[ent.x];
+                    if (destTile && destTile.structure && BUILDINGS[destTile.structure]?.structureType === 'door') {
+                        this._doorFlash.set(ent.y * CONFIG.MAP_WIDTH + ent.x, 8);
+                    }
+                    ent._lastRenderedTile = { x: ent.x, y: ent.y };
+                }
             }
         }
 

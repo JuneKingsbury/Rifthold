@@ -505,6 +505,10 @@ class SkinEditor {
                 items.push({ key: 'university_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 items.push({ key: 'abyss_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
                 items.push({ key: 'kingdom_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
+                items.push({ key: 'door_open', char: '+', color: '#cc9955', desc: 'Door (open) — shown while a colonist passes through', category: 'buildings' });
+                items.push({ key: 'reinforced_door_open', char: '╬', color: '#aa8855', desc: 'Reinforced Door (open) — shown while a colonist passes through', category: 'buildings' });
+                items.push({ key: 'void_door_open', char: '▒', color: '#7733bb', desc: 'Void Door (open) — shown while a colonist passes through', category: 'buildings' });
+                items.push({ key: 'fence_gate_open', char: '╪', color: '#886644', desc: 'Fence Gate (open) — shown while a colonist passes through', category: 'buildings' });
                 break;
             case 'Terrain':
                 for (const [key, def] of Object.entries(TERRAIN)) {
