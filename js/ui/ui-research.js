@@ -187,6 +187,12 @@ const researchMethods = {
             if (tabsContainer && this._researchTabsScroll) {
                 tabsContainer.scrollLeft = this._researchTabsScroll;
             }
+            // Apply saved transform immediately so there's no frame where the world snaps to default position
+            const savedTransform = this._researchTreeTransforms?.[activeTab];
+            if (savedTransform) {
+                const newWorld = this.elements.researchPanel.querySelector('.research-world');
+                if (newWorld) this._applyResearchTransform(newWorld, savedTransform.x, savedTransform.y, savedTransform.scale);
+            }
             requestAnimationFrame(() => {
                 this._initResearchPanZoom(activeTab);
                 this._drawResearchLines();
