@@ -50,6 +50,7 @@ export function removeFarmZone(game, x, y) {
     if (!tile.zone) return;
     tile.zone = null;
     if (game.mapIndex) game.mapIndex.removeZone(x, y);
+    if (game.renderer) game.renderer.markTerrainDirty();
     const task = game.taskQueue.getByPosition(x, y);
     if (task && (task.type === 'plant' || task.type === 'harvest' || task.type === 'cleanse_blight')) {
         game.taskQueue.remove(task.id);
