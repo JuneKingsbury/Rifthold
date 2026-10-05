@@ -4585,7 +4585,7 @@ export class UI {
         // Exclude resources in the merchant's pool (they don't buy what they sell)
         const merchantResourcePool = data.merchantResourcePool ? new Set(data.merchantResourcePool) : null;
         const tradableStock = Object.entries(stock)
-            .filter(([res, amt]) => typeof amt === 'number' && amt > 0 && !res.startsWith('_') && TRADE_VALUES[res] && (!merchantResourcePool || !merchantResourcePool.has(res)))
+            .filter(([res, amt]) => typeof amt === 'number' && amt > 0 && !res.startsWith('_') && res !== 'gold' && TRADE_VALUES[res] && (!merchantResourcePool || !merchantResourcePool.has(res)))
             .sort((a, b) => (TRADE_VALUES[b[0]] || 0) - (TRADE_VALUES[a[0]] || 0));
 
         // Equipment items the merchant will buy, filtered by buyCategories

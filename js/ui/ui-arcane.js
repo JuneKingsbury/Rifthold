@@ -814,6 +814,7 @@ const arcaneMethods = {
                 updateStrength();
             };
             boxes.forEach(cb => { cb.addEventListener('change', handler); });
+            handler();
         };
         enforce('exp-check', 5);
         enforce('exp-pack-check', 2);
