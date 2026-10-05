@@ -1794,8 +1794,8 @@ export class UI {
     // .overview-alert rows jump to the first matching colonist when clicked.
     buildColonyOverviewHtml() {
         let alive = 0, aliveGolems = 0, moodSum = 0;
-        let idle = 0, hungry = 0, lowRest = 0, lowHp = 0, homeless = 0;
-        let idleId = null, hungryId = null, lowRestId = null, lowHpId = null, homelessId = null;
+        let idle = 0, hungry = 0, lowRest = 0, lowHp = 0, homeless = 0, noTome = 0;
+        let idleId = null, hungryId = null, lowRestId = null, lowHpId = null, homelessId = null, noTomeId = null;
         for (const c of this.game.colonists) {
             if (c.hp <= 0) continue;
             if (c.golem) { aliveGolems++; continue; }
@@ -1806,6 +1806,7 @@ export class UI {
             if (c.needs.rest <= 25) { lowRest++; if (lowRestId === null) lowRestId = c.id; }
             if (c.maxHp > 0 && c.hp / c.maxHp <= 0.35) { lowHp++; if (lowHpId === null) lowHpId = c.id; }
             if (!c.assignedBed) { homeless++; if (homelessId === null) homelessId = c.id; }
+            if (!c.equippedTome) { noTome++; if (noTomeId === null) noTomeId = c.id; }
         }
         const avgMood = alive > 0 ? Math.round(moodSum / alive) : 0;
         const moodLevel = getMoodLabel(avgMood);
@@ -1837,6 +1838,7 @@ export class UI {
         if (lowRest > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowRestId}" style="color:#ccaa44;cursor:pointer">${lowRest} exhausted</div>`);
         if (idle > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${idleId}" style="color:#88aaff;cursor:pointer">${idle} idle</div>`);
         if (homeless > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${homelessId}" style="color:#ccaa44;cursor:pointer">${homeless} without a home</div>`);
+        if (noTome > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${noTomeId}" style="color:#88aaff;cursor:pointer">${noTome} without a tome</div>`);
         if (pendingTasks > 0) alerts.push(`<div class="info-row" style="color:#ccaa44">${pendingTasks} pending task${pendingTasks > 1 ? 's' : ''}</div>`);
         if (alerts.length === 0) alerts.push('<div class="info-row" style="color:#88cc44">All is well.</div>');
         html += alerts.join('');
