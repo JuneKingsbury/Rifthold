@@ -292,6 +292,16 @@ export class CombatSystem {
                     }
                 }
             }
+            // Prune and tick spell-applied activeEffects (weaken, hex, charmed, dot_burn).
+            if (raider.activeEffects && raider.activeEffects.length > 0) {
+                raider.activeEffects = raider.activeEffects.filter(e => game.tick < e.expiresAt);
+                for (const e of raider.activeEffects) {
+                    if (e.type === 'dot' && e.tickInterval && game.tick % e.tickInterval === 0) {
+                        raider.hp -= (e.tickDamage || 0);
+                        game.combatEffects.push({ x: raider.x, y: raider.y, char: '~', color: '#ff6600', ttl: 3 });
+                    }
+                }
+            }
             if (raider.hp <= 0) continue;
             updateRaider(raider, game, this);
             // Cull raiders that have left the map, and fleeing raiders that have reached a
@@ -330,6 +340,10 @@ function updateRaider(raider, game, combatSystem) {
     // here too so role-less raiders still show the stun.
     if (raider._stunnedUntil && game.tick < raider._stunnedUntil) {
         if (game.tick % 6 === 0) game.combatEffects.push({ x: raider.x, y: raider.y, char: '✦', color: '#ffccff', ttl: 4 });
+        return;
+    }
+    if (raider.activeEffects?.some(e => e.type === 'charmed' && game.tick < e.expiresAt)) {
+        if (game.tick % 8 === 0) game.combatEffects.push({ x: raider.x, y: raider.y, char: '◈', color: '#ffccff', ttl: 3 });
         return;
     }
     // Slow scales the effective speed used for movement and also inflates the attack
@@ -373,7 +387,9 @@ function updateRaider(raider, game, combatSystem) {
             raider._lastAttackTick = game.tick;
             raider._lastAttackKind = 'melee';
             raider._lastAttackDir = { dx: Math.sign(nearest.x - raider.x), dy: Math.sign(nearest.y - raider.y) };
-            colonistTakeDamage(nearest, raider.damage, game, raider);
+            const rWeaken = raider.activeEffects?.find(e => e.type === 'weaken' && game.tick < e.expiresAt);
+            const rDmg = rWeaken ? Math.max(1, Math.floor(raider.damage * (rWeaken.damageMult || 0.7))) : raider.damage;
+            colonistTakeDamage(nearest, rDmg, game, raider);
             if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) {
                 spawnImpactSpray(game, nearest.x, nearest.y, raider._lastAttackDir.dx, raider._lastAttackDir.dy);
             }

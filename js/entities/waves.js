@@ -243,7 +243,9 @@ export class WaveSystem {
             enemy._lastAttackTick = game.tick;
             enemy._lastAttackKind = 'melee';
             enemy._lastAttackDir = { dx: Math.sign(bestTarget.x - enemy.x), dy: Math.sign(bestTarget.y - enemy.y) };
-            colonistTakeDamage(bestTarget, enemy.damage, game, enemy);
+            const waveWeaken = enemy.activeEffects?.find(e => e.type === 'weaken' && game.tick < e.expiresAt);
+            const waveDmg = waveWeaken ? Math.max(1, Math.floor(enemy.damage * (waveWeaken.damageMult || 0.7))) : enemy.damage;
+            colonistTakeDamage(bestTarget, waveDmg, game, enemy);
             return;
         }
 

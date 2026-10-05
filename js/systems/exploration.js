@@ -1811,7 +1811,9 @@ export class ExplorationSystem {
             const armoredBonus = 1 + totalArmoredBonus;
             const chaosSurgeMult = this._combatStatusValue(member, 'chaos_surge', 'dmgMult', 1);
             const voidBlessedBonus = this._combatStatusValue(member, 'void_blessed', 'dmgBonus', 0);
-            let dmg = Math.max(1, Math.round((weaponDmg + voidBlessedBonus + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist) * chaosSurgeMult));
+            const vulnerableMult = this._combatStatusValue(target, 'vulnerable', 'damageMult', 1);
+            const inspiredMult = this._combatStatusValue(member, 'inspired', 'dmgMult', 1);
+            let dmg = Math.max(1, Math.round((weaponDmg + voidBlessedBonus + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist) * chaosSurgeMult * vulnerableMult * inspiredMult));
             let critHit = false;
             if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
             if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));
@@ -2053,6 +2055,25 @@ export class ExplorationSystem {
                 enemy._lastAttackKind = enemy.attackAnim || (enemy.ranged ? 'DrawAndShoot' : 'Swing');
 
                 const aliveSummons = exp.summons ? exp.summons.filter(s => s.hp > 0) : [];
+                // Decoys have a high threatMult. Enemies always prefer them over
+                // other summons and usually prefer them over party members.
+                const aliveDecoys = aliveSummons.filter(s => s.type === 'decoy');
+                if (aliveDecoys.length > 0 && Math.random() < 0.85) {
+                    const targetSummon = aliveDecoys[randInt(0, aliveDecoys.length - 1)];
+                    let dmg = enemy.damage + randInt(0, 2);
+                    if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
+                    if (Math.random() < baseMissChance) {
+                        this._addLog(exp, game, `${attackerLabel} misses the ${targetSummon.name}!`, 'combat');
+                    } else {
+                        targetSummon.hp -= dmg;
+                        this._addLog(exp, game, `${attackerLabel} strikes the ${targetSummon.name} for ${dmg}!`, 'combat');
+                        if (targetSummon.hp <= 0) {
+                            this._addLog(exp, game, `The ${targetSummon.name} is destroyed!`, 'danger');
+                            exp.summons.splice(exp.summons.indexOf(targetSummon), 1);
+                        }
+                    }
+                    continue;
+                }
                 if (aliveSummons.length > 0 && Math.random() < 0.5) {
                     const targetSummon = aliveSummons[randInt(0, aliveSummons.length - 1)];
                     let dmg = enemy.damage + randInt(0, 2);
@@ -2215,12 +2236,15 @@ export class ExplorationSystem {
     }
 
     _tryCombatSpells(exp, game, alive, combat) {
+        // buff_speed and buff_inspire have trigger:'hasTask' in colony but are
+        // meaningful in combat. Expedition fighting is the only task, so allow them.
+        const combatBuffEffects = new Set(['buff_speed', 'buff_inspire']);
         for (const member of alive) {
             if (member.hp <= 0 || member.knownSpells.length === 0) continue;
 
             for (const spellKey of member.knownSpells) {
                 const spell = SPELLS[spellKey];
-                if (!spell || spell.trigger !== 'inCombat') continue;
+                if (!spell || (spell.trigger !== 'inCombat' && !combatBuffEffects.has(spell.effect))) continue;
                 if (!this._canCastSpell(member, spellKey, game)) continue;
 
                 const dmgEffects = ['ranged_damage', 'ranged_damage_aoe', 'melee_damage', 'chain_damage', 'ranged_damage_slow'];
@@ -2381,6 +2405,131 @@ export class ExplorationSystem {
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     window.soundManager?.playExpSFX('spell_cast');
                     break;
+                } else if (spell.effect === 'dot_burn') {
+                    const target = combat.enemies.find(e => e.hp > 0);
+                    if (!target) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    this._applyCombatStatus(target, 'burn', spell.burnRounds || 3, { damage: spell.damage || 4 });
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, setting a foe ablaze!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_cast');
+                    break;
+                } else if (spell.effect === 'ranged_damage_hex') {
+                    const target = combat.enemies.find(e => e.hp > 0);
+                    if (!target) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    const schoolBonus = (member.schoolBonuses && member.schoolBonuses[spell.school]) || member.spellDamageBonus || 0;
+                    let hexDmg = Math.floor(spell.damage * expeditionSpellPower(member, spell) * (1 + schoolBonus));
+                    hexDmg = Math.floor(hexDmg * this._getMutatorEffect(exp, 'spellDamageMult'));
+                    target.hp -= hexDmg;
+                    this._applyCombatStatus(target, 'vulnerable', spell.hexRounds || 3, { damageMult: spell.hexDamageMult || 1.2 });
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} for ${hexDmg} damage! The foe is hexed and vulnerable.`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_cast');
+                    if (target.hp <= 0) { this._addLog(exp, game, `${member.name}'s spell slays a foe!`, 'success'); this._processEnemyOnDeath(target, exp, game); }
+                    break;
+                } else if (spell.effect === 'knockback') {
+                    const target = combat.enemies.find(e => e.hp > 0);
+                    if (!target) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    const schoolBonus = (member.schoolBonuses && member.schoolBonuses[spell.school]) || member.spellDamageBonus || 0;
+                    let kbDmg = Math.floor(spell.damage * expeditionSpellPower(member, spell) * (1 + schoolBonus));
+                    target.hp -= kbDmg;
+                    this._applyCombatStatus(target, 'stun', spell.stunRounds || 1);
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} for ${kbDmg} damage, blasting a foe back!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_cast');
+                    if (target.hp <= 0) { this._addLog(exp, game, `A foe is destroyed by the blast!`, 'success'); this._processEnemyOnDeath(target, exp, game); }
+                    break;
+                } else if (spell.effect === 'buff_defense_self' && !member.shieldActive) {
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    member.shieldActive = true;
+                    member.shieldReduction = Math.min(0.75, spell.damageReduction * expeditionSpellPower(member, spell));
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} and steels themselves!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_shield');
+                    break;
+                } else if (spell.effect === 'debuff_accuracy') {
+                    const target = combat.enemies.find(e => e.hp > 0);
+                    if (!target) continue;
+                    if (this._hasCombatStatus(target, 'weaken')) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    this._applyCombatStatus(target, 'weaken', spell.weakenRounds || 3, { mult: spell.weakenMult || 0.7 });
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} — a dark omen hangs over a foe!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_cast');
+                    break;
+                } else if (spell.effect === 'buff_miss_chance') {
+                    if (member.dodgeCharges > 0) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    member.dodgeCharges = (member.dodgeCharges || 0) + Math.round((spell.dodgeBonus || 0.25) * 4);
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, shrouding themselves in misdirection!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_buff');
+                    break;
+                } else if (spell.effect === 'convert_enemy') {
+                    const target = combat.enemies.find(e => e.hp > 0);
+                    if (!target) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    this._applyCombatStatus(target, 'stun', spell.bindRounds || 2);
+                    this._addLog(exp, game, `${member.name} casts ${spell.name} — a foe is compelled to stand down!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_buff');
+                    break;
+                } else if (spell.effect === 'summon_decoy') {
+                    if (!exp.summons) exp.summons = [];
+                    if (exp.summons.some(s => s.ownerId === member.id && s.type === 'decoy' && s.hp > 0)) continue;
+                    const summonDef = SUMMON_TYPES[spell.summonType];
+                    if (!summonDef) break;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    exp.summons.push({ type: 'decoy', name: summonDef.name, hp: summonDef.hp, maxHp: summonDef.hp, damage: 0, char: summonDef.char, color: summonDef.color, ownerId: member.id, ticksRemaining: summonDef.duration, maxDuration: summonDef.duration, threatMult: summonDef.threatMult || 5 });
+                    this._addLog(exp, game, `${member.name} conjures a Decoy to draw enemy fire!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('summon_arrival');
+                    break;
+                } else if (spell.effect === 'buff_speed') {
+                    // Expedition combat has no positional movement, so Quicken/Haste
+                    // translate to agility: dodge charges representing supernatural speed.
+                    if (member.dodgeCharges > 0) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    const speedCharges = Math.round((spell.workSpeedBonus || 0.2) * 5) + 1;
+                    member.dodgeCharges = (member.dodgeCharges || 0) + speedCharges;
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, moving with supernatural speed!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_buff');
+                    break;
+                } else if (spell.effect === 'buff_inspire') {
+                    // Inspire translates combat motivation to a damage multiplier for
+                    // a few rounds — the quality bonus has no expedition equivalent.
+                    if (this._hasCombatStatus(member, 'inspired')) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    const inspireDmgMult = 1 + (spell.workSpeedBonus || 0.3);
+                    this._applyCombatStatus(member, 'inspired', spell.inspireRounds || 3, { dmgMult: inspireDmgMult });
+                    member.dodgeCharges = (member.dodgeCharges || 0) + 1;
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, filling the party with fighting spirit!`, 'combat');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_buff');
+                    break;
                 }
             }
         }
@@ -2444,12 +2593,37 @@ export class ExplorationSystem {
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     window.soundManager?.playExpSFX('spell_heal');
                     break;
+                } else if (spell.effect === 'heal_aura') {
+                    const threshold = spell.hpThreshold || 0.8;
+                    const wounded = alive.filter(p => p.hp / p.maxHp < threshold && p.hp < p.maxHp);
+                    if (wounded.length === 0) continue;
+                    if (!this._canCastSpell(member, spellKey, game)) continue;
+                    member.mana -= this._spellManaCost(member, spell);
+                    member.spellCooldowns[spellKey] = game.tick;
+                    member._lastCastTick = game.tick;
+                    const healPerTarget = spell.healPerRound || 4;
+                    let total = 0;
+                    for (const t of wounded) {
+                        const healed = Math.min(healPerTarget, t.maxHp - t.hp);
+                        t.hp += healed;
+                        total += healed;
+                        if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed;
+                    }
+                    this._addLog(exp, game, `${member.name} casts ${spell.name}, restoring ${total} HP across ${wounded.length} ${wounded.length === 1 ? 'ally' : 'allies'}.`, 'success');
+                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    window.soundManager?.playExpSFX('spell_heal');
+                    break;
                 } else if (spell.effect === 'cleanse') {
-                    // Strip lingering harmful effects. Between encounters the relevant
-                    // debuffs are exp.activeEffects DoTs (trap/enemy poison). Clear them
-                    // from the most-afflicted ally.
+                    // Strip harmful effects from the most-afflicted ally. Checks both
+                    // exp.activeEffects (trap/env DoTs between encounters) and the
+                    // in-combat statusEffects array written by _applyCombatStatus().
+                    const harmfulStatusTypes = new Set(['burn', 'poison', 'slow', 'weaken', 'vulnerable']);
                     const afflicted = alive
-                        .map(p => ({ p, n: (exp.activeEffects || []).filter(e => e.targetId === p.id && e.type === 'dot').length }))
+                        .map(p => ({
+                            p,
+                            n: (exp.activeEffects || []).filter(e => e.targetId === p.id && e.type === 'dot').length
+                              + (p.statusEffects || []).filter(e => harmfulStatusTypes.has(e.type)).length,
+                        }))
                         .filter(x => x.n > 0)
                         .sort((a, b) => b.n - a.n)[0];
                     if (!afflicted) continue;
@@ -2459,6 +2633,7 @@ export class ExplorationSystem {
                     member.spellCooldowns[spellKey] = game.tick;
                     member._lastCastTick = game.tick;
                     exp.activeEffects = (exp.activeEffects || []).filter(e => !(e.targetId === afflicted.p.id && e.type === 'dot'));
+                    afflicted.p.statusEffects = (afflicted.p.statusEffects || []).filter(e => !harmfulStatusTypes.has(e.type));
                     afflicted.p._lastCleanseTick = game.tick;
                     this._addLog(exp, game, `${member.name} casts ${spell.name}, cleansing ${afflicted.p.name} of afflictions!`, 'success');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);

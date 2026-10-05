@@ -192,13 +192,15 @@ export const ROLE_HANDLERS = {
                     // A hostile entity's targets are colonists (see getTargets); they must take
                     // damage through colonistTakeDamage so armor/dodge/shield and the death path
                     // apply. Only non-colonist targets (hostiles) use raw hp subtraction.
+                    const rangedWeaken = entity.activeEffects?.find(e => e.type === 'weaken' && game.tick < e.expiresAt);
+                    const rangedDmg = rangedWeaken ? Math.max(1, Math.floor(entity.damage * (rangedWeaken.damageMult || 0.7))) : entity.damage;
                     if (entity.hostile) {
-                        colonistTakeDamage(target, entity.damage, game, entity);
+                        colonistTakeDamage(target, rangedDmg, game, entity);
                     } else {
                         // Friendly ranged (e.g. tamed/guard): colonistTakeDamage already
                         // shows a floater for the hostile branch, so only add one here.
-                        target.hp -= entity.damage;
-                        spawnDamageText(game, target.x, target.y, entity.damage);
+                        target.hp -= rangedDmg;
+                        spawnDamageText(game, target.x, target.y, rangedDmg);
                     }
                     target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
                     const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
@@ -256,7 +258,9 @@ export const ROLE_HANDLERS = {
                 if (canAttack(entity, game)) {
                     const bonus = !rs.charged ? (role.chargeBonus || 5) : 0;
                     rs.charged = true;
-                    const dmg = entity.damage + bonus;
+                    const weakenEff = entity.activeEffects?.find(e => e.type === 'weaken' && game.tick < e.expiresAt);
+                    let dmg = entity.damage + bonus;
+                    if (weakenEff) dmg = Math.max(1, Math.floor(dmg * (weakenEff.damageMult || 0.7)));
                     // Hostile entities target colonists (see getTargets) and must route through
                     // colonistTakeDamage for armor/dodge/shield and the death path. Non-colonist
                     // targets (hostiles) use raw hp subtraction.

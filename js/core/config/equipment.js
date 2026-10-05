@@ -33,35 +33,61 @@ const BASE_RECIPES = {
 
     // Evocation
     craft_tome_of_spark: { input: { planks: 2, stone: 1 }, output: { tome_of_spark: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
+    craft_tome_of_singe: { input: { planks: 2, stone: 1 }, output: { tome_of_singe: 1 }, skill: 'crafting', ticks: 18, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_smite: { input: { planks: 2, runite: 1, iron: 1 }, output: { tome_of_smite: 1 }, skill: 'crafting', ticks: 20, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_magic_missile: { input: { planks: 3, runite: 1 }, output: { tome_of_magic_missile: 1 }, skill: 'crafting', ticks: 30, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
-    craft_tome_of_fireball: { input: { planks: 5, runite: 3, void_essence: 2 }, output: { tome_of_fireball: 1 }, skill: 'crafting', ticks: 50, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_hex_bolt: { input: { planks: 3, runite: 1 }, output: { tome_of_hex_bolt: 1 }, skill: 'crafting', ticks: 28, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_arcane_blast: { input: { planks: 4, runite: 2, stone: 2 }, output: { tome_of_arcane_blast: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_frost_lance: { input: { planks: 4, runite: 2 }, output: { tome_of_frost_lance: 1 }, skill: 'crafting', ticks: 40, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_chain_lightning: { input: { planks: 5, runite: 3, void_essence: 1 }, output: { tome_of_chain_lightning: 1 }, skill: 'crafting', ticks: 48, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_fireball: { input: { planks: 5, runite: 3, void_essence: 2 }, output: { tome_of_fireball: 1 }, skill: 'crafting', ticks: 58, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
 
     // Abjuration
     craft_tome_of_mend: { input: { planks: 2, berries: 2 }, output: { tome_of_mend: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
+    craft_tome_of_cleanse: { input: { planks: 2, berries: 2 }, output: { tome_of_cleanse: 1 }, skill: 'crafting', ticks: 18, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_fortify: { input: { planks: 3, runite: 1, stone: 1 }, output: { tome_of_fortify: 1 }, skill: 'crafting', ticks: 28, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_mending_aura: { input: { planks: 3, runite: 1, berries: 2 }, output: { tome_of_mending_aura: 1 }, skill: 'crafting', ticks: 30, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_renewal: { input: { planks: 4, runite: 2, berries: 3 }, output: { tome_of_renewal: 1 }, skill: 'crafting', ticks: 40, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
-    craft_tome_of_shield: { input: { planks: 4, runite: 3, stone: 3 }, output: { tome_of_shield: 1 }, skill: 'crafting', ticks: 45, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_guardian_ward: { input: { planks: 4, runite: 3 }, output: { tome_of_guardian_ward: 1 }, skill: 'crafting', ticks: 45, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_shield: { input: { planks: 4, runite: 3, stone: 3 }, output: { tome_of_shield: 1 }, skill: 'crafting', ticks: 48, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_chain_heal: { input: { planks: 5, runite: 3, berries: 3 }, output: { tome_of_chain_heal: 1 }, skill: 'crafting', ticks: 55, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
 
     // Enchantment
     craft_tome_of_quicken: { input: { planks: 2, stone: 1 }, output: { tome_of_quicken: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
+    craft_tome_of_diligence: { input: { planks: 2, stone: 1 }, output: { tome_of_diligence: 1 }, skill: 'crafting', ticks: 18, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_haste: { input: { planks: 4, runite: 2 }, output: { tome_of_haste: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_tireless: { input: { planks: 3, runite: 1 }, output: { tome_of_tireless: 1 }, skill: 'crafting', ticks: 30, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_mind_shroud: { input: { planks: 4, runite: 2 }, output: { tome_of_mind_shroud: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_mesmerize: { input: { planks: 4, runite: 2 }, output: { tome_of_mesmerize: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_inspire: { input: { planks: 5, runite: 3, void_essence: 2 }, output: { tome_of_inspire: 1 }, skill: 'crafting', ticks: 50, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_spellbind: { input: { planks: 6, runite: 4, void_essence: 3 }, output: { tome_of_spellbind: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
 
     // Conjuration
     craft_tome_of_phase_step: { input: { planks: 2, stone: 1 }, output: { tome_of_phase_step: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
-    craft_tome_of_summon_familiar: { input: { planks: 2, wheat: 2 }, output: { tome_of_summon_familiar: 1 }, skill: 'crafting', ticks: 55, station: 'workbench', category: 'Tomes' },
+    craft_tome_of_conjure_decoy: { input: { planks: 2, stone: 1 }, output: { tome_of_conjure_decoy: 1 }, skill: 'crafting', ticks: 18, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_summon_familiar: { input: { planks: 2, wheat: 2 }, output: { tome_of_summon_familiar: 1 }, skill: 'crafting', ticks: 22, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_warp: { input: { planks: 4, runite: 2, void_essence: 1 }, output: { tome_of_warp: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
-    craft_tome_of_summon_ghost: { input: { planks: 4, runite: 2, void_essence: 1 }, output: { tome_of_summon_ghost: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
-    craft_tome_of_gate: { input: { planks: 6, runite: 4, void_essence: 4 }, output: { tome_of_gate: 1 }, skill: 'crafting', ticks: 38, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_summon_ghost: { input: { planks: 4, runite: 2, void_essence: 1 }, output: { tome_of_summon_ghost: 1 }, skill: 'crafting', ticks: 48, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_spectral_swarm: { input: { planks: 4, runite: 2, void_essence: 1 }, output: { tome_of_spectral_swarm: 1 }, skill: 'crafting', ticks: 48, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_gate: { input: { planks: 6, runite: 4, void_essence: 4 }, output: { tome_of_gate: 1 }, skill: 'crafting', ticks: 50, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
     craft_tome_of_summon_monster: { input: { planks: 6, runite: 4, void_essence: 4 }, output: { tome_of_summon_monster: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
 
     // Transmutation
     craft_tome_of_nurture: { input: { planks: 2, wheat: 2 }, output: { tome_of_nurture: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
+    craft_tome_of_enrich_soil: { input: { planks: 2, wheat: 2 }, output: { tome_of_enrich_soil: 1 }, skill: 'crafting', ticks: 18, station: 'workbench', category: 'Tomes' },
+    craft_tome_of_transmute_stone: { input: { planks: 2, stone: 2 }, output: { tome_of_transmute_stone: 1 }, skill: 'crafting', ticks: 20, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_stone_shape: { input: { planks: 3, runite: 1, stone: 2 }, output: { tome_of_stone_shape: 1 }, skill: 'crafting', ticks: 32, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_circle_of_growth: { input: { planks: 4, runite: 2, wheat: 3 }, output: { tome_of_circle_of_growth: 1 }, skill: 'crafting', ticks: 40, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
-    craft_tome_of_level_field: { input: { planks: 5, runite: 4, void_essence: 3 }, output: { tome_of_level_field: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_transmute_iron: { input: { planks: 4, runite: 2, stone: 2 }, output: { tome_of_transmute_iron: 1 }, skill: 'crafting', ticks: 42, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_level_field: { input: { planks: 5, runite: 4, void_essence: 3 }, output: { tome_of_level_field: 1 }, skill: 'crafting', ticks: 55, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_verdant_bloom: { input: { planks: 5, runite: 3, void_essence: 2 }, output: { tome_of_verdant_bloom: 1 }, skill: 'crafting', ticks: 55, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
+    craft_tome_of_transmute_runite: { input: { planks: 5, runite: 3, void_essence: 2 }, output: { tome_of_transmute_runite: 1 }, skill: 'crafting', ticks: 58, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
 
     // Divination
     craft_tome_of_foresight: { input: { planks: 2, berries: 1 }, output: { tome_of_foresight: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
+    craft_tome_of_augury: { input: { planks: 2, berries: 1 }, output: { tome_of_augury: 1 }, skill: 'crafting', ticks: 14, station: 'workbench', category: 'Tomes' },
     craft_tome_of_fair_winds: { input: { planks: 3, runite: 1 }, output: { tome_of_fair_winds: 1 }, skill: 'crafting', ticks: 20, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
+    craft_tome_of_ill_omen: { input: { planks: 3, runite: 1 }, output: { tome_of_ill_omen: 1 }, skill: 'crafting', ticks: 28, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_merchants_omen: { input: { planks: 4, runite: 2 }, output: { tome_of_merchants_omen: 1 }, skill: 'crafting', ticks: 25, station: 'scriptorium', research: 'arcane_studies', category: 'Tomes' },
     craft_tome_of_ward_of_calamity: { input: { planks: 5, runite: 3, void_essence: 2 }, output: { tome_of_ward_of_calamity: 1 }, skill: 'crafting', ticks: 50, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },
     craft_tome_of_fortunate_discovery: { input: { planks: 5, runite: 4, void_essence: 3 }, output: { tome_of_fortunate_discovery: 1 }, skill: 'crafting', ticks: 60, station: 'scriptorium', research: 'advanced_arcana', category: 'Tomes' },

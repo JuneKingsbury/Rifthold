@@ -27,12 +27,15 @@ export const MANA_CONFIG = {
 export const SPELLS = {
     // Evocation
     spark: { name: 'Spark', school: 'evocation', minLevel: 0, manaCost: 4, cooldown: 25, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 6, range: 4, projectileColor: '#ffaa33', projectileChar: '.' },
+    singe: { name: 'Singe', school: 'evocation', minLevel: 1, manaCost: 5, cooldown: 35, castType: 'auto', trigger: 'inCombat', effect: 'dot_burn', damage: 4, burnDuration: 45, burnRounds: 3, range: 5, projectileColor: '#ff6600', projectileChar: '~' },
     magic_missile: { name: 'Magic Missile', school: 'evocation', minLevel: 2, manaCost: 8, cooldown: 30, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 15, range: 6, projectileColor: '#ff44ff', projectileChar: '*' },
-    smite: { name: 'Smite', school: 'evocation', minLevel: 2, manaCost: 6, cooldown: 20, castType: 'auto', trigger: 'inCombat', effect: 'melee_damage', damage: 12, range: 1, projectileColor: '#ffffaa', projectileChar: '✝' },
-    fireball: { name: 'Fireball', school: 'evocation', minLevel: 4, manaCost: 18, cooldown: 60, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_aoe', damage: 12, range: 7, radius: 3, projectileColor: '#ff6600', projectileChar: '●' },
+    hex_bolt: { name: 'Hex Bolt', school: 'evocation', minLevel: 2, manaCost: 9, cooldown: 40, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_hex', damage: 10, hexDamageMult: 1.2, hexDuration: 60, hexRounds: 3, range: 5, projectileColor: '#cc44ff', projectileChar: '⁕' },
+    smite: { name: 'Smite', school: 'evocation', minLevel: 1, manaCost: 6, cooldown: 20, castType: 'auto', trigger: 'inCombat', effect: 'melee_damage', damage: 12, range: 1, projectileColor: '#ffffaa', projectileChar: '✝' },
+    fireball: { name: 'Fireball', school: 'evocation', minLevel: 5, manaCost: 18, cooldown: 60, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_aoe', damage: 12, range: 7, radius: 3, projectileColor: '#ff6600', projectileChar: '●' },
     // Chain Lightning arcs from the primary target to nearby foes, each arc dealing
     // chainFalloff× the previous hit's damage. chainTargets counts the primary hit.
-    chain_lightning: { name: 'Chain Lightning', school: 'evocation', minLevel: 3, manaCost: 14, cooldown: 45, castType: 'auto', trigger: 'inCombat', effect: 'chain_damage', damage: 11, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 4, projectileColor: '#88ddff', projectileChar: '⚡' },
+    chain_lightning: { name: 'Chain Lightning', school: 'evocation', minLevel: 4, manaCost: 14, cooldown: 45, castType: 'auto', trigger: 'inCombat', effect: 'chain_damage', damage: 11, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 4, projectileColor: '#88ddff', projectileChar: '⚡' },
+    arcane_blast: { name: 'Arcane Blast', school: 'evocation', minLevel: 3, manaCost: 10, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'knockback', damage: 8, knockbackDist: 2, stunDuration: 20, stunRounds: 1, range: 2, projectileColor: '#aaaaff', projectileChar: '◎' },
     // Frost Lance deals damage and slows the target (movement + attack cadence). Slow is
     // soft CC: slowMult scales speed in the colony, slowRounds skips no turn but adds a
     // "slowed" status in expeditions that reduces the enemy's attacks that round.
@@ -45,7 +48,10 @@ export const SPELLS = {
     // Chain Heal is the abjuration counterpart to Chain Lightning: it mends the most
     // wounded ally, then bounces to further wounded allies, each bounce healing
     // chainFalloff× the previous. chainTargets counts the primary heal.
-    chain_heal: { name: 'Chain Heal', school: 'abjuration', minLevel: 4, manaCost: 18, cooldown: 100, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.7, effect: 'chain_heal', healAmount: 16, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 5 },
+    chain_heal: { name: 'Chain Heal', school: 'abjuration', minLevel: 5, manaCost: 18, cooldown: 100, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.7, effect: 'chain_heal', healAmount: 16, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 5 },
+    fortify: { name: 'Fortify', school: 'abjuration', minLevel: 2, manaCost: 8, cooldown: 100, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense_self', damageReduction: 0.25, duration: 80 },
+    // Mending Aura pulses a small heal-over-time to nearby wounded allies each cast.
+    mending_aura: { name: 'Mending Aura', school: 'abjuration', minLevel: 2, manaCost: 10, cooldown: 120, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.8, effect: 'heal_aura', healPerRound: 4, auraRounds: 3, healPerTick: 0.12, range: 5, duration: 90 },
     // Cleanse strips harmful statuses (bleed/poison/burn/slow/debuff DoTs) from the most
     // afflicted ally in range. Fires whenever an ally nearby is suffering a debuff.
     cleanse: { name: 'Cleanse', school: 'abjuration', minLevel: 1, manaCost: 8, cooldown: 50, castType: 'auto', trigger: 'debuffNearby', effect: 'cleanse', range: 6 },
@@ -61,22 +67,36 @@ export const SPELLS = {
     diligence: { name: 'Diligence', school: 'enchantment', minLevel: 1, manaCost: 8, cooldown: 120, castType: 'auto', trigger: 'hasTask', effect: 'buff_quality', qualityBonus: 3, duration: 150, radius: 4 },
     // Tireless: slows rest-need decay for allies (read in updateNeeds via a 'rest' effect).
     tireless: { name: 'Tireless', school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'buff_rest', restDecayMult: 0.4, duration: 300, idleExclude: true, radius: 5 },
+    // Mind Shroud clouds nearby enemies' senses, granting the caster a chance to evade
+    // incoming attacks (dodge charges in expedition; evasion aura in colony).
+    mind_shroud: { name: 'Mind Shroud', school: 'enchantment', minLevel: 3, manaCost: 11, cooldown: 120, castType: 'auto', trigger: 'inCombat', effect: 'buff_miss_chance', dodgeBonus: 0.25, dodgeRounds: 2, duration: 80 },
     // Mesmerize: brief stun/pacify on a foe (skips its turn / freezes it). Light CC.
     mesmerize: { name: 'Mesmerize', school: 'enchantment', minLevel: 3, manaCost: 12, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'stun', range: 6, stunDuration: 45, stunRounds: 1, projectileColor: '#ffccff', projectileChar: '✦' },
 
+    inspire: { name: 'Inspire', school: 'enchantment', minLevel: 4, manaCost: 14, cooldown: 250, castType: 'auto', trigger: 'hasTask', effect: 'buff_inspire', workSpeedBonus: 0.3, qualityBonus: 4, duration: 120, radius: 5, inspireRounds: 3 },
+    // Spellbind enthralls an enemy mind, compelling it to stand down. In expeditions
+    // this is resolved as a powerful stun (full mind-control is out of scope there).
+    spellbind: { name: 'Spellbind', school: 'enchantment', minLevel: 5, manaCost: 18, cooldown: 300, castType: 'auto', trigger: 'inCombat', effect: 'convert_enemy', bindRounds: 2, charmDuration: 120, range: 6, projectileColor: '#ffccff', projectileChar: '◈' },
+
     // Conjuration
     phase_step: { name: 'Phase Step', school: 'conjuration', minLevel: 0, manaCost: 6, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'teleport', range: 5 },
-    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 0, manaCost: 15, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
+    // Conjure Decoy spawns a short-lived illusory construct that draws enemy attacks.
+    // In expeditions enemies strongly prefer targeting it over party members.
+    conjure_decoy: { name: 'Conjure Decoy', school: 'conjuration', minLevel: 1, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'inCombat', effect: 'summon_decoy', summonType: 'decoy' },
+    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 1, manaCost: 15, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
     warp: { name: 'Warp', school: 'conjuration', minLevel: 2, manaCost: 15, cooldown: 100, castType: 'targeted', effect: 'teleport', range: 15 },
-    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 2, manaCost: 25, cooldown: 300, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
+    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 3, manaCost: 25, cooldown: 300, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
     gate: { name: 'Gate', school: 'conjuration', minLevel: 4, manaCost: 25, cooldown: 200, castType: 'targeted', effect: 'teleport', range: 30 },
-    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 4, manaCost: 40, cooldown: 600, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
+    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 5, manaCost: 40, cooldown: 600, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
     // Spectral Swarm conjures several weak, short-lived skirmishers at once (vs. the single
     // summon of the other conjuration spells). swarmCount uses the spectral_wisp entity.
     spectral_swarm: { name: 'Spectral Swarm', school: 'conjuration', minLevel: 3, manaCost: 22, cooldown: 350, castType: 'auto', trigger: 'inCombat', effect: 'summon_swarm', summonType: 'spectral_wisp', swarmCount: 3 },
 
     // Transmutation
     nurture: { name: 'Nurture', school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 600, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },
+    // Enrich Soil applies a permanent per-tile growth bonus to a farm tile. Unlike
+    // Nurture's temporary boost, this modifier persists across seasons.
+    enrich_soil: { name: 'Enrich Soil', school: 'transmutation', minLevel: 1, manaCost: 12, cooldown: 1200, castType: 'targeted', effect: 'enrich_soil', range: 8, growthBonus: 0.15 },
     circle_of_growth: { name: 'Circle of Growth', school: 'transmutation', minLevel: 2, manaCost: 20, cooldown: 1200, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 10, radius: 3, growthMult: 2.0, duration: 200 },
     level_field: { name: 'Level Field', school: 'transmutation', minLevel: 4, manaCost: 30, cooldown: 600, castType: 'targeted', effect: 'terraform', range: 8, radius: 3, targetTerrain: 'grass' },
     // Stone Shape instantly completes a targeted construction (build task) or repairs a
@@ -87,15 +107,19 @@ export const SPELLS = {
     // i.e. enough of the input material is stockpiled. A missing `fromResource` means the
     // output is conjured from nothing (Transmute Stone). Cheaper/faster at the low tier,
     // costlier/slower and stingier at the high tier so runite stays scarce.
-    transmute_stone: { name: 'Transmute Stone', school: 'transmutation', minLevel: 2, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', toResource: 'stone', outputAmount: 8 },
+    transmute_stone: { name: 'Transmute Stone', school: 'transmutation', minLevel: 1, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', toResource: 'stone', outputAmount: 8 },
     transmute_iron: { name: 'Transmute Iron', school: 'transmutation', minLevel: 3, manaCost: 18, cooldown: 300, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'stone', inputAmount: 10, toResource: 'iron_ore', outputAmount: 6 },
-    transmute_runite: { name: 'Transmute Runite', school: 'transmutation', minLevel: 4, manaCost: 28, cooldown: 500, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'iron', inputAmount: 8, toResource: 'runite', outputAmount: 2 },
+    transmute_runite: { name: 'Transmute Runite', school: 'transmutation', minLevel: 5, manaCost: 28, cooldown: 500, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'iron', inputAmount: 8, toResource: 'runite', outputAmount: 2 },
     // Verdant Bloom instantly ripens all mature growing crops in radius (sets them ready to
     // harvest). Targeted burst of growth, the payoff transmutation capstone for farms.
     verdant_bloom: { name: 'Verdant Bloom', school: 'transmutation', minLevel: 4, manaCost: 28, cooldown: 500, castType: 'targeted', effect: 'ripen_crops', range: 10, radius: 3, ripenThreshold: 0.5 },
 
     // Divination
     foresight: { name: 'Foresight', school: 'divination', minLevel: 0, manaCost: 6, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { raidDelay: 200 }, duration: 300 },
+    augury: { name: 'Augury', school: 'divination', minLevel: 1, manaCost: 7, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'buff_morale', happinessBonus: 6, duration: 400, radius: 6 },
+    // Ill Omen hexes a nearby enemy with bad fortune, reducing its outgoing damage.
+    // Uses the existing weaken status in expedition combat.
+    ill_omen: { name: 'Ill Omen', school: 'divination', minLevel: 2, manaCost: 8, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'debuff_accuracy', weakenMult: 0.7, weakenDuration: 90, weakenRounds: 3, range: 6, projectileColor: '#884488', projectileChar: '☽' },
     fair_winds: { name: 'Fair Winds', school: 'divination', minLevel: 2, manaCost: 10, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { weatherBias: 'clear' }, duration: 200 },
     merchants_omen: { name: "Merchant's Omen", school: 'divination', minLevel: 3, manaCost: 15, cooldown: 600, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'caravan', eventMult: 3.0 }, duration: 400 },
     ward_of_calamity: { name: 'Ward of Calamity', school: 'divination', minLevel: 4, manaCost: 20, cooldown: 800, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { suppressEvents: ['blight_bloom', 'cold_snap', 'fire'], blightSpreadSuppressed: true }, duration: 500 },
@@ -147,49 +171,61 @@ export const RITUALS = {
 export const SPELL_TOMES = {
     // Evocation
     tome_of_spark: { name: 'Tome of Spark', tradeValue: 12, spell: 'spark', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a basic bolt of fire at nearby foes.' },
-    tome_of_smite: { name: 'Tome of Smite', tradeValue: 22, spell: 'smite', learningWork: 120, minSchoolLevel: 2, description: 'Teaches a powerful melee strike of holy energy.' },
+    tome_of_singe: { name: 'Tome of Singe', tradeValue: 18, spell: 'singe', learningWork: 90, minSchoolLevel: 1, description: 'Teaches a flame that scorches enemies with a burning DoT.' },
+    tome_of_smite: { name: 'Tome of Smite', tradeValue: 22, spell: 'smite', learningWork: 120, minSchoolLevel: 1, description: 'Teaches a powerful melee strike of holy energy.' },
     tome_of_magic_missile: { name: 'Tome of Magic Missile', tradeValue: 28, spell: 'magic_missile', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a potent ranged arcane bolt.' },
-    tome_of_fireball: { name: 'Tome of Fireball', tradeValue: 58, spell: 'fireball', learningWork: 350, minSchoolLevel: 4, description: 'Teaches an explosive fireball that damages an area.' },
-    tome_of_chain_lightning: { name: 'Tome of Chain Lightning', tradeValue: 44, spell: 'chain_lightning', learningWork: 260, minSchoolLevel: 3, description: 'Teaches lightning that arcs between multiple nearby foes.' },
+    tome_of_hex_bolt: { name: 'Tome of Hex Bolt', tradeValue: 28, spell: 'hex_bolt', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a hexing bolt that leaves enemies vulnerable to further damage.' },
+    tome_of_arcane_blast: { name: 'Tome of Arcane Blast', tradeValue: 38, spell: 'arcane_blast', learningWork: 200, minSchoolLevel: 3, description: 'Teaches a short-range shockwave that pushes enemies away.' },
     tome_of_frost_lance: { name: 'Tome of Frost Lance', tradeValue: 40, spell: 'frost_lance', learningWork: 240, minSchoolLevel: 3, description: 'Teaches a frozen lance that wounds and slows its target.' },
+    tome_of_chain_lightning: { name: 'Tome of Chain Lightning', tradeValue: 44, spell: 'chain_lightning', learningWork: 260, minSchoolLevel: 4, description: 'Teaches lightning that arcs between multiple nearby foes.' },
+    tome_of_fireball: { name: 'Tome of Fireball', tradeValue: 58, spell: 'fireball', learningWork: 350, minSchoolLevel: 5, description: 'Teaches an explosive fireball that damages an area.' },
 
     // Abjuration
     tome_of_mend: { name: 'Tome of Mend', tradeValue: 12, spell: 'mend', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a healing incantation that mends the most wounded nearby (self or ally).' },
-    tome_of_renewal: { name: 'Tome of Renewal', tradeValue: 40, spell: 'renewal', learningWork: 230, minSchoolLevel: 3, description: 'Teaches potent healing magic that mends the most wounded nearby (self or ally).' },
-    tome_of_shield: { name: 'Tome of Shield', tradeValue: 52, spell: 'shield', learningWork: 320, minSchoolLevel: 4, description: 'Teaches a protective barrier that reduces damage.' },
-    tome_of_chain_heal: { name: 'Tome of Chain Heal', tradeValue: 54, spell: 'chain_heal', learningWork: 330, minSchoolLevel: 4, description: 'Teaches healing that leaps between wounded allies.' },
     tome_of_cleanse: { name: 'Tome of Cleanse', tradeValue: 20, spell: 'cleanse', learningWork: 110, minSchoolLevel: 1, description: 'Teaches a purifying spell that removes poison, bleed and other afflictions.' },
+    tome_of_fortify: { name: 'Tome of Fortify', tradeValue: 28, spell: 'fortify', learningWork: 140, minSchoolLevel: 2, description: 'Teaches a self-only barrier that reduces incoming damage.' },
+    tome_of_mending_aura: { name: 'Tome of Mending Aura', tradeValue: 30, spell: 'mending_aura', learningWork: 160, minSchoolLevel: 2, description: 'Teaches a healing aura that slowly mends nearby wounded allies.' },
+    tome_of_renewal: { name: 'Tome of Renewal', tradeValue: 40, spell: 'renewal', learningWork: 230, minSchoolLevel: 3, description: 'Teaches potent healing magic that mends the most wounded nearby (self or ally).' },
     tome_of_guardian_ward: { name: 'Tome of Guardian Ward', tradeValue: 46, spell: 'guardian_ward', learningWork: 280, minSchoolLevel: 3, description: 'Teaches an absorbing barrier that soaks a burst of damage.' },
+    tome_of_shield: { name: 'Tome of Shield', tradeValue: 52, spell: 'shield', learningWork: 320, minSchoolLevel: 4, description: 'Teaches a protective barrier that reduces damage.' },
+    tome_of_chain_heal: { name: 'Tome of Chain Heal', tradeValue: 54, spell: 'chain_heal', learningWork: 330, minSchoolLevel: 5, description: 'Teaches healing that leaps between wounded allies.' },
 
     // Enchantment
     tome_of_quicken: { name: 'Tome of Quicken', tradeValue: 12, spell: 'quicken', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a spell to hasten work speed.' },
-    tome_of_haste: { name: 'Tome of Haste', tradeValue: 45, spell: 'haste', learningWork: 280, minSchoolLevel: 2, description: 'Teaches a powerful speed enhancement spell.' },
     tome_of_diligence: { name: 'Tome of Diligence', tradeValue: 22, spell: 'diligence', learningWork: 120, minSchoolLevel: 1, description: 'Teaches an aura that sharpens the craft of nearby workers.' },
+    tome_of_haste: { name: 'Tome of Haste', tradeValue: 45, spell: 'haste', learningWork: 280, minSchoolLevel: 2, description: 'Teaches a powerful speed enhancement spell.' },
     tome_of_tireless: { name: 'Tome of Tireless', tradeValue: 38, spell: 'tireless', learningWork: 220, minSchoolLevel: 2, description: 'Teaches a spell that staves off fatigue in allies.' },
+    tome_of_mind_shroud: { name: 'Tome of Mind Shroud', tradeValue: 38, spell: 'mind_shroud', learningWork: 210, minSchoolLevel: 3, description: 'Teaches an enchantment that clouds enemies\' senses, granting evasion.' },
     tome_of_mesmerize: { name: 'Tome of Mesmerize', tradeValue: 40, spell: 'mesmerize', learningWork: 240, minSchoolLevel: 3, description: 'Teaches an enchantment that briefly stuns a foe.' },
+    tome_of_inspire: { name: 'Tome of Inspire', tradeValue: 52, spell: 'inspire', learningWork: 300, minSchoolLevel: 4, description: 'Teaches an inspirational aura that boosts work speed and quality.' },
+    tome_of_spellbind: { name: 'Tome of Spellbind', tradeValue: 70, spell: 'spellbind', learningWork: 460, minSchoolLevel: 5, description: 'Teaches an enchantment that enthralls an enemy mind.' },
 
     // Conjuration
     tome_of_phase_step: { name: 'Tome of Phase Step', tradeValue: 12, spell: 'phase_step', learningWork: 60, minSchoolLevel: 0, description: 'Teaches instant teleportation a short distance away.' },
-    tome_of_summon_familiar: { name: 'Tome of Summon Familiar', tradeValue: 24, spell: 'summon_familiar', learningWork: 120, minSchoolLevel: 0, description: 'Teaches summoning a familiar to fight alongside.' },
+    tome_of_conjure_decoy: { name: 'Tome of Conjure Decoy', tradeValue: 20, spell: 'conjure_decoy', learningWork: 100, minSchoolLevel: 1, description: 'Teaches conjuring an illusory construct that draws enemy attacks.' },
+    tome_of_summon_familiar: { name: 'Tome of Summon Familiar', tradeValue: 24, spell: 'summon_familiar', learningWork: 120, minSchoolLevel: 1, description: 'Teaches summoning a familiar to fight alongside.' },
     tome_of_warp: { name: 'Tome of Warp', tradeValue: 38, spell: 'warp', learningWork: 230, minSchoolLevel: 2, description: 'Teaches instant teleportation to a target location.' },
-    tome_of_summon_ghost: { name: 'Tome of Summon Ghost', tradeValue: 70, spell: 'summon_ghost', learningWork: 440, minSchoolLevel: 2, description: 'Teaches summoning a spectral warrior.' },
-    tome_of_gate: { name: 'Tome of Gate', tradeValue: 38, spell: 'gate', learningWork: 440, minSchoolLevel: 4, description: 'Teaches instant teleportation to a distant location.' },
-    tome_of_summon_monster: { name: 'Tome of Summon Monster', tradeValue: 70, spell: 'summon_monster', learningWork: 650, minSchoolLevel: 4, description: 'Teaches summoning a monster under your control.' },
+    tome_of_summon_ghost: { name: 'Tome of Summon Ghost', tradeValue: 70, spell: 'summon_ghost', learningWork: 440, minSchoolLevel: 3, description: 'Teaches summoning a spectral warrior.' },
     tome_of_spectral_swarm: { name: 'Tome of Spectral Swarm', tradeValue: 56, spell: 'spectral_swarm', learningWork: 340, minSchoolLevel: 3, description: 'Teaches summoning a swarm of fleeting spectral skirmishers.' },
+    tome_of_gate: { name: 'Tome of Gate', tradeValue: 38, spell: 'gate', learningWork: 440, minSchoolLevel: 4, description: 'Teaches instant teleportation to a distant location.' },
+    tome_of_summon_monster: { name: 'Tome of Summon Monster', tradeValue: 70, spell: 'summon_monster', learningWork: 650, minSchoolLevel: 5, description: 'Teaches summoning a monster under your control.' },
 
-    // Transmuation
+    // Transmutation
     tome_of_nurture: { name: 'Tome of Nurture', tradeValue: 12, spell: 'nurture', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a spell to accelerate crop growth.' },
-    tome_of_circle_of_growth: { name: 'Tome of Circle of Growth', tradeValue: 40, spell: 'circle_of_growth', learningWork: 240, minSchoolLevel: 2, description: 'Teaches a wide-area crop growth enhancement.' },
-    tome_of_level_field: { name: 'Tome of Level Field', tradeValue: 70, spell: 'level_field', learningWork: 440, minSchoolLevel: 4, description: 'Teaches terrain-shaping transmutation magic.' },
+    tome_of_enrich_soil: { name: 'Tome of Enrich Soil', tradeValue: 20, spell: 'enrich_soil', learningWork: 100, minSchoolLevel: 1, description: 'Teaches a permanent soil enrichment that boosts farm tile growth.' },
+    tome_of_transmute_stone: { name: 'Tome of Transmute Stone', tradeValue: 30, spell: 'transmute_stone', learningWork: 180, minSchoolLevel: 1, description: 'Teaches conjuring usable stone from raw earth.' },
     tome_of_stone_shape: { name: 'Tome of Stone Shape', tradeValue: 44, spell: 'stone_shape', learningWork: 260, minSchoolLevel: 2, description: 'Teaches shaping matter to finish or mend a structure instantly.' },
-    tome_of_transmute_stone: { name: 'Tome of Transmute Stone', tradeValue: 30, spell: 'transmute_stone', learningWork: 180, minSchoolLevel: 2, description: 'Teaches conjuring usable stone from raw earth.' },
+    tome_of_circle_of_growth: { name: 'Tome of Circle of Growth', tradeValue: 40, spell: 'circle_of_growth', learningWork: 240, minSchoolLevel: 2, description: 'Teaches a wide-area crop growth enhancement.' },
     tome_of_transmute_iron: { name: 'Tome of Transmute Iron', tradeValue: 50, spell: 'transmute_iron', learningWork: 300, minSchoolLevel: 3, description: 'Teaches transmuting stone into raw iron chunks.' },
-    tome_of_transmute_runite: { name: 'Tome of Transmute Runite', tradeValue: 68, spell: 'transmute_runite', learningWork: 420, minSchoolLevel: 4, description: 'Teaches transmuting iron bars into precious runite.' },
+    tome_of_level_field: { name: 'Tome of Level Field', tradeValue: 70, spell: 'level_field', learningWork: 440, minSchoolLevel: 4, description: 'Teaches terrain-shaping transmutation magic.' },
     tome_of_verdant_bloom: { name: 'Tome of Verdant Bloom', tradeValue: 66, spell: 'verdant_bloom', learningWork: 420, minSchoolLevel: 4, description: 'Teaches a surge of growth that ripens crops at once.' },
+    tome_of_transmute_runite: { name: 'Tome of Transmute Runite', tradeValue: 68, spell: 'transmute_runite', learningWork: 420, minSchoolLevel: 5, description: 'Teaches transmuting iron bars into precious runite.' },
 
     // Divination
     tome_of_foresight: { name: 'Tome of Foresight', tradeValue: 12, spell: 'foresight', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a divination that delays enemy raids.' },
+    tome_of_augury: { name: 'Tome of Augury', tradeValue: 18, spell: 'augury', learningWork: 90, minSchoolLevel: 1, description: 'Teaches a divination aura that lifts the spirits of nearby colonists.' },
     tome_of_fair_winds: { name: 'Tome of Fair Winds', tradeValue: 28, spell: 'fair_winds', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a spell that biases weather toward clear skies.' },
+    tome_of_ill_omen: { name: 'Tome of Ill Omen', tradeValue: 28, spell: 'ill_omen', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a hex that diminishes an enemy\'s fighting power.' },
     tome_of_merchants_omen: { name: "Tome of Merchant's Omen", tradeValue: 40, spell: 'merchants_omen', learningWork: 240, minSchoolLevel: 3, description: 'Teaches a divination that attracts caravans.' },
     tome_of_ward_of_calamity: { name: 'Tome of Ward of Calamity', tradeValue: 58, spell: 'ward_of_calamity', learningWork: 350, minSchoolLevel: 4, description: 'Teaches a ward that suppresses natural disasters.' },
     tome_of_fortunate_discovery: { name: 'Tome of Fortunate Discovery', tradeValue: 70, spell: 'fortunate_discovery', learningWork: 440, minSchoolLevel: 5, description: 'Teaches a divination that attracts meteorites.' },

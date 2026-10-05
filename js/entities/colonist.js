@@ -961,6 +961,9 @@ function tickDotEffects(colonist, game) {
             colonistTakeDamage(colonist, e.damagePerTick, null, game);
             e.nextTick += e.tickInterval;
         }
+        if (e.type === 'regen' && game.tick % (e.tickInterval || 5) === 0) {
+            colonist.hp = Math.min(colonist.maxHp, colonist.hp + (e.healPerTick || 0));
+        }
     }
 }
 
@@ -1055,7 +1058,7 @@ function shouldCastSpell(colonist, spell, game) {
             if (dist > (spell.range || COLONIST_CONFIG.fightEngageDistance)) return false;
             // Damage spells need a clear shot. Buffs, teleports and summons may still
             // trigger with an enemy behind cover.
-            const needsLos = spell.effect === 'ranged_damage' || spell.effect === 'ranged_damage_aoe';
+            const needsLos = spell.effect === 'ranged_damage' || spell.effect === 'ranged_damage_aoe' || spell.effect === 'dot_burn' || spell.effect === 'ranged_damage_hex' || spell.effect === 'debuff_accuracy';
             if (needsLos && !hasLineOfSight(game.map, colonist.x, colonist.y, hostile.x, hostile.y)) return false;
             return true;
         }
@@ -1169,10 +1172,13 @@ function getColonyHostiles(game) {
     ].filter(h => h.hp > 0);
 }
 
-// Applies a target's innate DR (damageReduction on its entity def) to a damage value.
+// Applies a target's innate DR and any hex (vulnerability) activeEffects to a damage value.
 function applyEnemyDR(target, dmg) {
     const dr = target.damageReduction || 0;
-    return dr > 0 ? Math.max(1, Math.floor(dmg * (1 - dr))) : dmg;
+    let result = dr > 0 ? Math.max(1, Math.floor(dmg * (1 - dr))) : dmg;
+    const hex = target.activeEffects?.find(e => e.type === 'hex');
+    if (hex) result = Math.floor(result * (hex.damageMult || 1.2));
+    return result;
 }
 
 // Applies a movement/attack "slow" to a hostile entity for `ticks`, stored as a
@@ -1601,6 +1607,166 @@ function applySpellEffect(colonist, spell, game) {
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellGrowthChar, color: '#ffdd44', ttl: 4 });
             const fromStr = from ? `${inAmt} ${from.replace(/_/g, ' ')} → ` : '';
             game.notifications.push({ text: `${colonist.name} transmuted ${fromStr}${outAmt} ${to.replace(/_/g, ' ')}`, tick: game.tick, type: 'success' });
+            break;
+        }
+        case 'dot_burn': {
+            const target = findNearestHostile(colonist, game);
+            if (!target) return;
+            const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
+            if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
+            if (!target.activeEffects) target.activeEffects = [];
+            target.activeEffects.push({ type: 'dot', harmful: true, source: 'spell', tickDamage: spell.damage, tickInterval: 10, expiresAt: game.tick + (spell.burnDuration || 45) });
+            const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
+            game.projectiles.push({ fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y, char: spell.projectileChar || '~', color: spell.projectileColor || '#ff6600', skinKey: 'projectile_spell', _startTime: performance.now(), _duration: projDuration });
+            game.combatEffects.push({ x: target.x, y: target.y, char: '~', color: '#ff6600', ttl: 5 });
+            window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
+            break;
+        }
+        case 'ranged_damage_hex': {
+            const target = findNearestHostile(colonist, game);
+            if (!target) return;
+            const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
+            if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
+            const dmg = applyEnemyDR(target, Math.floor(spell.damage * getSpellDamageMult(colonist, spell)));
+            target.hp -= dmg;
+            spawnDamageText(game, target.x, target.y, dmg);
+            target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
+            if (!target.activeEffects) target.activeEffects = [];
+            target.activeEffects.push({ type: 'hex', harmful: true, source: 'spell', damageMult: spell.hexDamageMult || 1.2, expiresAt: game.tick + (spell.hexDuration || 60) });
+            const projDur = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
+            game.projectiles.push({ fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y, char: spell.projectileChar || '⁕', color: spell.projectileColor || '#cc44ff', skinKey: 'projectile_spell', _startTime: performance.now(), _duration: projDur });
+            game.combatEffects.push({ x: target.x, y: target.y, char: '⁕', color: '#cc44ff', ttl: 4 });
+            window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
+            break;
+        }
+        case 'knockback': {
+            const target = findNearestHostile(colonist, game);
+            if (!target) return;
+            const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
+            if (dist > (spell.range || 2)) return;
+            const dmg = applyEnemyDR(target, Math.floor(spell.damage * getSpellDamageMult(colonist, spell)));
+            target.hp -= dmg;
+            spawnDamageText(game, target.x, target.y, dmg);
+            target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
+            // Push target away from caster along each axis independently.
+            const kbDist = spell.knockbackDist || 2;
+            const dx = target.x - colonist.x;
+            const dy = target.y - colonist.y;
+            const nx = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+            const ny = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+            for (let step = 1; step <= kbDist; step++) {
+                const tx = target.x + nx * step;
+                const ty = target.y + ny * step;
+                if (game.map[ty]?.[tx]?.passable && !game._occupiedTiles?.has((ty << 16) | tx)) {
+                    target.x = tx; target.y = ty;
+                }
+            }
+            applyEnemyStun(target, spell.stunDuration || 20, game);
+            game.combatEffects.push({ x: target.x, y: target.y, char: spell.projectileChar || '◎', color: spell.projectileColor || '#aaaaff', ttl: 4 });
+            window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
+            break;
+        }
+        case 'buff_defense_self': {
+            const dr = Math.min(0.75, (spell.damageReduction || 0.25) * getSpellPower(colonist, spell));
+            const shieldDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({ type: 'shield', source: 'spell', damageReduction: dr, expiresAt: game.tick + shieldDur });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellShieldChar, color: COMBAT_VISUALS.spellShieldColor, ttl: 3 });
+            window.soundManager?.playSFXAt('spell_shield', colonist.x, colonist.y);
+            break;
+        }
+        case 'heal_aura': {
+            const healDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.range || 5)) {
+                if (ally.hp >= ally.maxHp) continue;
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({ type: 'regen', source: 'spell', healPerTick: spell.healPerTick || 0.1, tickInterval: 5, expiresAt: game.tick + healDur });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellHealChar, color: COMBAT_VISUALS.spellHealColor, ttl: 3 });
+            }
+            window.soundManager?.playSFXAt('spell_heal', colonist.x, colonist.y);
+            break;
+        }
+        case 'buff_miss_chance': {
+            const evadeDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            if (!colonist.activeEffects) colonist.activeEffects = [];
+            colonist.activeEffects.push({ type: 'evasion', source: 'spell', dodgeChance: spell.dodgeBonus || 0.25, expiresAt: game.tick + evadeDur });
+            game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#aaaaff', ttl: 3 });
+            window.soundManager?.playSFXAt('spell_buff', colonist.x, colonist.y);
+            break;
+        }
+        case 'convert_enemy': {
+            const target = findNearestHostile(colonist, game);
+            if (!target) return;
+            const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
+            if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
+            if (!target.activeEffects) target.activeEffects = [];
+            target.activeEffects.push({ type: 'charmed', source: 'spell', expiresAt: game.tick + (spell.charmDuration || 120) });
+            const projDur = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
+            game.projectiles.push({ fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y, char: spell.projectileChar || '◈', color: spell.projectileColor || '#ffccff', skinKey: 'projectile_spell', _startTime: performance.now(), _duration: projDur });
+            game.combatEffects.push({ x: target.x, y: target.y, char: '◈', color: '#ffccff', ttl: 6 });
+            window.soundManager?.playSFXAt('spell_buff', colonist.x, colonist.y);
+            break;
+        }
+        case 'buff_inspire': {
+            const inspireDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.radius)) {
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({ type: 'speed', source: 'spell', moveSpeedBonus: 0, workSpeedBonus: spell.workSpeedBonus || 0.3, expiresAt: game.tick + inspireDur });
+                ally.activeEffects.push({ type: 'quality', source: 'spell', qualityBonus: spell.qualityBonus || 4, expiresAt: game.tick + inspireDur });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellBuffChar, color: '#ffdd88', ttl: 3 });
+            }
+            window.soundManager?.playSFXAt('spell_buff', colonist.x, colonist.y);
+            break;
+        }
+        case 'enrich_soil': {
+            // Targeted spell: colonist.targetX/targetY are set by the targeted cast UI.
+            const tx = colonist.targetX ?? colonist.x;
+            const ty = colonist.targetY ?? colonist.y;
+            const dist = manhattanDist(colonist.x, colonist.y, tx, ty);
+            if (dist > spell.range) return;
+            const tile = game.map[ty]?.[tx];
+            if (!tile?.zone) return;
+            tile.zone._soilEnriched = true;
+            tile.zone._soilGrowthBonus = (tile.zone._soilGrowthBonus || 0) + (spell.growthBonus || 0.15);
+            game.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: '#88ff44', ttl: 6 });
+            game.notifications.push({ text: `${colonist.name} enriched the soil`, tick: game.tick, type: 'success' });
+            window.soundManager?.playSFXAt('spell_growth', colonist.x, colonist.y);
+            break;
+        }
+        case 'buff_morale': {
+            const moodDur = Math.round(spell.duration * getSpellDurationMult(colonist, spell));
+            for (const ally of getBuffTargets(colonist, game, spell.radius)) {
+                if (!ally.activeEffects) ally.activeEffects = [];
+                ally.activeEffects.push({ type: 'mood', source: 'spell', moodBonus: spell.happinessBonus || 6, expiresAt: game.tick + moodDur });
+                game.combatEffects.push({ x: ally.x, y: ally.y, char: COMBAT_VISUALS.spellDivinationChar, color: COMBAT_VISUALS.spellDivinationColor, ttl: 2 });
+            }
+            window.soundManager?.playSFXAt('spell_divination', colonist.x, colonist.y);
+            break;
+        }
+        case 'debuff_accuracy': {
+            const target = findNearestHostile(colonist, game);
+            if (!target) return;
+            const dist = manhattanDist(colonist.x, colonist.y, target.x, target.y);
+            if (dist > spell.range) return;
+            if (!hasLineOfSight(game.map, colonist.x, colonist.y, target.x, target.y)) return;
+            if (!target.activeEffects) target.activeEffects = [];
+            target.activeEffects.push({ type: 'weaken', harmful: true, source: 'spell', damageMult: spell.weakenMult || 0.7, expiresAt: game.tick + (spell.weakenDuration || 90) });
+            const projDur = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
+            game.projectiles.push({ fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y, char: spell.projectileChar || '☽', color: spell.projectileColor || '#884488', skinKey: 'projectile_spell', _startTime: performance.now(), _duration: projDur });
+            game.combatEffects.push({ x: target.x, y: target.y, char: '☽', color: '#884488', ttl: 4 });
+            window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
+            break;
+        }
+        case 'summon_decoy': {
+            const summonDef = SUMMON_TYPES[spell.summonType];
+            if (!summonDef) break;
+            const sx = colonist.x + (Math.random() > 0.5 ? 1 : -1);
+            const sy = colonist.y + (Math.random() > 0.5 ? 1 : -1);
+            spawnSummon(spell.summonType, sx, sy, colonist.id, game, 1, 1);
+            window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
             break;
         }
         case 'teleport': {
@@ -2865,6 +3031,8 @@ function isIndoors(colonist, map) {
 export function colonistTakeDamage(colonist, damage, game, attacker) {
     let dodgeChance = getEquipmentStat(colonist, 'dodgeChance');
     if (colonist.traits.includes('duelist')) dodgeChance += TRAITS.duelist.dodgeChance;
+    const evasionEff = colonist.activeEffects?.find(e => e.type === 'evasion' && game.tick < e.expiresAt);
+    if (evasionEff) dodgeChance += evasionEff.dodgeChance || 0;
     if (dodgeChance > 0 && Math.random() < dodgeChance) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '~', color: '#88ccff', ttl: 4 });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Block!', color: '#4488ff', fontSize: 11, ttl: 12, maxTtl: 12 });
