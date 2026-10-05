@@ -624,7 +624,24 @@ const arcaneMethods = {
         if (!this._expBackRowIds) this._expBackRowIds = new Set();
         html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">Select Party</div>`;
         html += `<div class="info-row" style="color:#888;">Choose up to 5 colonists:</div>`;
-        for (const c of available) {
+        const expGroups = this.game.colonistGroups || [];
+        // Sort available colonists by group order, then ungrouped last
+        const expSorted = [...available].sort((a, b) => {
+            const ai = a.group ? expGroups.indexOf(a.group) : Infinity;
+            const bi = b.group ? expGroups.indexOf(b.group) : Infinity;
+            return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+        });
+        let lastExpGroup = undefined;
+        for (const c of expSorted) {
+            const cGroup = (c.group && expGroups.includes(c.group)) ? c.group : null;
+            if (cGroup !== lastExpGroup) {
+                lastExpGroup = cGroup;
+                if (cGroup !== null) {
+                    html += `<div style="color:#ffcc44;font-size:0.8em;margin-top:4px;margin-bottom:1px;padding-left:2px;border-bottom:1px solid #332200;">${cGroup}</div>`;
+                } else if (expSorted.some(x => (x.group && expGroups.includes(x.group)))) {
+                    html += `<div style="color:#888;font-size:0.8em;margin-top:4px;margin-bottom:1px;padding-left:2px;border-bottom:1px solid #333;">Ungrouped</div>`;
+                }
+            }
             const expWeapon = getExpeditionSlotItem(c, 'weapon');
             const expArmor = getExpeditionSlotItem(c, 'armor');
             const dmg = expWeapon ? expWeapon.damage : 5;

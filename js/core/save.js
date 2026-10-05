@@ -233,6 +233,7 @@ function _buildSaveData(game) {
         layout,
 
         map: serializeMap(game.map),
+        colonistGroups: game.colonistGroups || [],
         colonists: game.colonists.map(c => _stripTransient(c, TRANSIENT_COLONIST_FIELDS)),
         entities: game.entities.map(e => _stripTransient(e, TRANSIENT_ENTITY_FIELDS)),
         raiders: game.raiders.map(r => _stripTransient(r, TRANSIENT_ENTITY_FIELDS)),
@@ -541,6 +542,7 @@ function _applyLoadData(game, data) {
         // rebuild, which has been removed from the recompute hot path.
         if (game.mapIndex) game.mapIndex.rebuild(game.map);
 
+        game.colonistGroups = data.colonistGroups || [];
         game.colonists = data.colonists;
         for (const c of game.colonists) {
             _restoreTransient(c, TRANSIENT_COLONIST_DEFAULTS);

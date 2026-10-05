@@ -1372,6 +1372,80 @@ img.pixel-art-icon {
     padding-bottom: 2px;
 }
 
+.hud-lock-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85em;
+    opacity: 0.4;
+    padding: 0;
+    line-height: 1;
+}
+
+.hud-lock-btn:hover,
+.hud-lock-btn.locked {
+    opacity: 1;
+}
+
+.hud-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+    margin-bottom: 1px;
+    padding: 1px 4px 2px;
+    border-bottom: 1px solid #443300;
+    font-size: 0.78em;
+    color: #ffcc44;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hud-group-name {
+    flex: 1;
+}
+
+.hud-group-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.hud-group-header:hover .hud-group-actions {
+    opacity: 1;
+}
+
+.hud-group-btn {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 0 3px;
+    line-height: 1;
+}
+
+.hud-group-btn:hover {
+    color: #ffcc44;
+}
+
+.hud-group-delete:hover {
+    color: #ff6644;
+}
+
+.hud-colonist.hud-drop-before {
+    border-top: 2px solid #ffcc44;
+}
+
+.hud-colonist.hud-drop-after {
+    border-bottom: 2px solid #ffcc44;
+}
+
+.hud-group-header.hud-drop-target {
+    border-top: 2px solid #ffcc44;
+}
+
 .hud-colonist {
     padding: 3px 4px;
     margin: 2px 0;

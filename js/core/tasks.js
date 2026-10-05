@@ -1,4 +1,5 @@
 import { manhattanDist } from '../world/pathfinding.js';
+import { GOLEM_TYPES } from './config/entities.js';
 
 let nextTaskId = 1;
 
@@ -88,6 +89,11 @@ export class TaskQueue {
             // cleanse_blight gets a 25% bonus so it beats plant/harvest at the same farming priority.
             let prio = t.urgent ? 0.5 : colonist.priorities[t.skillRequired];
             if (t.type === 'cleanse_blight') prio = Math.max(prio * 0.75, 0.6);
+            // Golems beat colonists for their specialty tasks (0.75 * 10000 = 7500 < colonist priority-1 score of 10000).
+            if (colonist.golem && colonist.golemType) {
+                const specialty = GOLEM_TYPES[colonist.golemType]?.specialty;
+                if (specialty && t.skillRequired === specialty) prio = Math.min(prio, 0.75);
+            }
             const dist = manhattanDist(colonist.x, colonist.y, t.x, t.y);
             const score = prio * 10000 + dist;
 

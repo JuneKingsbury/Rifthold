@@ -65,6 +65,7 @@ export class UI {
         this.game = game;
         this.priorityPanelVisible = false;
         this.craftPanelVisible = false;
+        this._colonistHudLocked = false;
         this.researchPanelVisible = false;
         this.inventoryVisible = false;
         this._invTab = 'resources';
@@ -282,6 +283,100 @@ export class UI {
             }
         });
 
+        // Drag-to-reorder colonist rows
+        let _dragColonistId = null;
+        this.elements.colonistHud.addEventListener('dragstart', (e) => {
+            const row = e.target.closest('[data-drag-colonist-id]');
+            if (!row) return;
+            if (this._colonistHudLocked) { e.preventDefault(); return; }
+            _dragColonistId = parseInt(row.dataset.dragColonistId);
+            row.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        const _clearDropIndicators = () => {
+            this.elements.colonistHud.querySelectorAll('.hud-drop-before, .hud-drop-after, .hud-drop-target').forEach(el => {
+                el.classList.remove('hud-drop-before', 'hud-drop-after', 'hud-drop-target');
+            });
+        };
+        this.elements.colonistHud.addEventListener('dragend', (e) => {
+            const row = e.target.closest('[data-drag-colonist-id]');
+            if (row) row.style.opacity = '';
+            _dragColonistId = null;
+            _clearDropIndicators();
+        });
+        this.elements.colonistHud.addEventListener('dragover', (e) => {
+            if (_dragColonistId == null) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            _clearDropIndicators();
+            const groupHeader = e.target.closest('.hud-group-header');
+            if (groupHeader) {
+                groupHeader.classList.add('hud-drop-target');
+                return;
+            }
+            const target = e.target.closest('[data-drag-colonist-id]');
+            if (target) {
+                const rect = target.getBoundingClientRect();
+                const before = e.clientY < rect.top + rect.height / 2;
+                target.classList.add(before ? 'hud-drop-before' : 'hud-drop-after');
+            }
+        });
+        this.elements.colonistHud.addEventListener('dragleave', (e) => {
+            if (!this.elements.colonistHud.contains(e.relatedTarget)) {
+                _clearDropIndicators();
+            }
+        });
+        this.elements.colonistHud.addEventListener('drop', (e) => {
+            e.preventDefault();
+            _clearDropIndicators();
+            if (_dragColonistId == null) return;
+            const draggedColonist = this.game.getColonist(_dragColonistId);
+            if (!draggedColonist) return;
+
+            // Drop onto a group header → move colonist to top of that group
+            const groupHeader = e.target.closest('.hud-group-header[data-group-name]');
+            if (groupHeader) {
+                const groupName = groupHeader.dataset.groupName;
+                draggedColonist.group = groupName || null;
+                // Move dragged colonist to just after the first member of that group (or end)
+                const cols = this.game.colonists;
+                const fromIdx = cols.indexOf(draggedColonist);
+                if (fromIdx !== -1) cols.splice(fromIdx, 1);
+                const firstMemberIdx = cols.findIndex(c => c.group === (groupName || null));
+                cols.splice(firstMemberIdx === -1 ? cols.length : firstMemberIdx, 0, draggedColonist);
+                this.game.rebuildColonistIndex();
+                this.forceUpdateColonistHud();
+                if (this.game.selectedColonist) this.game.ui.showColonistInfo(this.game.selectedColonist);
+                return;
+            }
+
+            // Drop onto another colonist row → place before/after that colonist and take their group
+            const targetRow = e.target.closest('[data-drag-colonist-id]');
+            if (targetRow) {
+                const targetId = parseInt(targetRow.dataset.dragColonistId);
+                if (targetId === _dragColonistId) return;
+                const targetColonist = this.game.getColonist(targetId);
+                if (!targetColonist) return;
+
+                // Determine insert before or after based on mouse Y within the target row
+                const rect = targetRow.getBoundingClientRect();
+                const insertBefore = e.clientY < rect.top + rect.height / 2;
+
+                draggedColonist.group = targetColonist.group || null;
+
+                const cols = this.game.colonists;
+                const fromIdx = cols.indexOf(draggedColonist);
+                if (fromIdx !== -1) cols.splice(fromIdx, 1);
+                let toIdx = cols.indexOf(targetColonist);
+                if (!insertBefore) toIdx += 1;
+                cols.splice(toIdx, 0, draggedColonist);
+
+                this.game.rebuildColonistIndex();
+                this.forceUpdateColonistHud();
+                if (this.game.selectedColonist) this.game.ui.showColonistInfo(this.game.selectedColonist);
+            }
+        });
+
         this.elements.eventLog.addEventListener('click', (e) => {
             const row = e.target.closest('[data-entity]');
             if (row) {
@@ -437,6 +532,25 @@ export class UI {
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
             }
+            const delGroup = e.target.closest('[data-delete-group]');
+            if (delGroup) {
+                this.game.deleteColonistGroup(delGroup.dataset.deleteGroup);
+                this._lastPrioHtml = null;
+                this.updatePriorityPanel();
+                return;
+            }
+            const addGroupBtn = e.target.closest('[data-add-group-confirm]');
+            if (addGroupBtn) {
+                const input = this.elements.priorityPanel.querySelector('[data-add-group-input]');
+                const name = input ? input.value.trim() : '';
+                if (name) {
+                    this.game.createColonistGroup(null, name);
+                    if (input) input.value = '';
+                }
+                this._lastPrioHtml = null;
+                this.updatePriorityPanel();
+                return;
+            }
         });
 
         this.elements.priorityPanel.addEventListener('contextmenu', (e) => {
@@ -459,6 +573,19 @@ export class UI {
                 this._prioProfileDraft[skill] = cur <= 0 ? 5 : cur - 1;
                 this._lastPrioHtml = null;
                 this.updatePriorityPanel();
+            }
+        });
+
+        this.elements.priorityPanel.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const input = e.target.closest('[data-add-group-input]');
+                if (input) {
+                    const name = input.value.trim();
+                    if (name) this.game.createColonistGroup(null, name);
+                    input.value = '';
+                    this._lastPrioHtml = null;
+                    this.updatePriorityPanel();
+                }
             }
         });
 
@@ -1488,6 +1615,9 @@ export class UI {
         if (colonist.voidBound) {
             html += `<div class="info-row"><span style="color:#bb66ff">◈ Void-Bound</span> <span style="color:#888;font-size:0.85em">(+15% combat damage, -10% work speed)</span></div>`;
         }
+        const groups = this.game.colonistGroups || [];
+        const groupOptions = `<option value="">— None —</option>` + groups.map(g => `<option value="${g.replace(/"/g, '&quot;')}"${colonist.group === g ? ' selected' : ''}>${g}</option>`).join('');
+        html += `<div class="info-row">Group: <select onchange="window.game.setColonistGroup(${colonist.id},this.value)">${groupOptions}</select></div>`;
         html += `<div class="info-row">Bed: ${colonist.assignedBed ? `(${colonist.assignedBed.x},${colonist.assignedBed.y})` : 'None'}</div>`;
         if (this.game.exploration) {
             const expl = this.game.exploration;
@@ -1536,6 +1666,7 @@ export class UI {
         }
 
         // --- Equipment ---
+        if (!colonist.golem) {
         html += `<div style="${sectionHdr}">Equipment</div>`;
         const id = colonist.id;
         // Determine which set tab the player is currently viewing (may differ from activeSet while browsing).
@@ -1637,6 +1768,7 @@ export class UI {
             }).join('');
             html += `<div class="eq-vis-row"><span class="eq-vis-label">Show:</span>${togglesHtml}</div>`;
         }
+        } // end !colonist.golem equipment block
 
         // --- Spells ---
         const hasSpells = (colonist.knownSpells && colonist.knownSpells.length > 0) || colonist.equippedTome;
@@ -2752,11 +2884,13 @@ export class UI {
             '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
             `<button class="craft-tab${this._prioTab === 'work' ? ' active' : ''}" data-prio-tab="work">Work Priorities</button>` +
             `<button class="craft-tab${this._prioTab === 'attune' ? ' active' : ''}" data-prio-tab="attune">Attunement</button>` +
+            `<button class="craft-tab${this._prioTab === 'groups' ? ' active' : ''}" data-prio-tab="groups">Groups</button>` +
             '</div>';
 
-        const body = this._prioTab === 'attune' ? this._attunementGridHtml() : this._workPriorityGridHtml();
+        const body = this._prioTab === 'attune' ? this._attunementGridHtml() : this._prioTab === 'groups' ? this._colonistGroupsHtml() : this._workPriorityGridHtml();
         const heading = this._prioTab === 'attune'
             ? `<h3>Magic Attunement (click to toggle, max ${MAGIC_STUDY_CONFIG.attunementSlots})</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Only spells from attuned schools autocast in the world and on expeditions. Free to change anytime.</div>`
+            : this._prioTab === 'groups' ? ''
             : '<h3>Work Priorities (click to cycle, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">1 = highest priority, 5 = lowest. Note: Golem priorities are locked to their specialization</div>';
         let profileToolbar = '';
         if (this._prioTab === 'work') {
@@ -2886,6 +3020,38 @@ export class UI {
         this._prioProfileDraftSource = newName;
         this._lastPrioHtml = null;
         this.updatePriorityPanel();
+    }
+
+    _colonistGroupsHtml() {
+        const groups = this.game.colonistGroups || [];
+        const colonists = this.game.colonists.filter(c => !c.golem && c.hp > 0);
+        let html = '<h3>Colonist Groups</h3>';
+        html += '<div style="color:#888;font-size:0.9em;margin-bottom:10px;">Create named groups to organise colonists. Assign members from the colonist info panel or by dragging rows in the HUD.</div>';
+
+        if (groups.length === 0) {
+            html += '<div style="color:#666;font-style:italic;margin-bottom:10px;">No groups yet.</div>';
+        } else {
+            html += '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">';
+            html += '<tr><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">Group</th><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">Members</th><th></th></tr>';
+            for (const g of groups) {
+                const members = colonists.filter(c => c.group === g);
+                const memberNames = members.length > 0 ? members.map(c => `<span style="color:${c.nameColor || '#ffcc00'}">${c.name}</span>`).join(', ') : '<span style="color:#555">—</span>';
+                html += `<tr>`;
+                html += `<td style="padding:4px 8px 4px 0;font-weight:bold;color:#ffcc44;white-space:nowrap;">${g}</td>`;
+                html += `<td style="padding:4px 8px;font-size:0.88em;line-height:1.5;">${memberNames}</td>`;
+                html += `<td style="padding:4px 0;white-space:nowrap;">`;
+                html += `<button data-delete-group="${g.replace(/"/g, '&quot;')}" style="background:none;border:1px solid #552222;color:#cc4444;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:0.85em;" title="Delete group and unassign all members">Delete</button>`;
+                html += `</td>`;
+                html += `</tr>`;
+            }
+            html += '</table>';
+        }
+
+        html += '<div style="display:flex;gap:6px;align-items:center;margin-top:4px;">';
+        html += `<input data-add-group-input type="text" placeholder="New group name…" maxlength="32" style="background:#222;color:#eee;border:1px solid #555;border-radius:3px;padding:3px 6px;font-size:0.9em;flex:1;">`;
+        html += `<button data-add-group-confirm style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:0.9em;">Add Group</button>`;
+        html += '</div>';
+        return html;
     }
 
     _workPriorityGridHtml() {
@@ -3163,46 +3329,93 @@ export class UI {
         return `<svg width="${W}" height="${H}" style="vertical-align:middle;margin-left:3px;overflow:visible;" xmlns="http://www.w3.org/2000/svg"><polyline points="${points}" fill="none" stroke="${strokeColor}" stroke-width="1.2"/></svg>`;
     }
 
+    _hudColonistRow(c) {
+        const draggable = this._colonistHudLocked ? '' : ' draggable="true"';
+        const dragId = this._colonistHudLocked ? '' : ` data-drag-colonist-id="${c.id}"`;
+        if (c.hp <= 0) {
+            return `<div class="hud-colonist dead"><span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span style="color:#cc4444">DEAD</span></div>`;
+        }
+        if (c.onExpedition) {
+            return `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}><span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
+        }
+        const moodLevel = getMoodLabel(c.mood);
+        const moodColor = moodLevel === 'inspired' ? '#66ffcc' : moodLevel === 'content' ? '#88cc88' : moodLevel === 'stressed' ? '#cccc44' : '#ff4444';
+        const hungerColor = statColor(c.needs.hunger);
+        const restColor = statColor(c.needs.rest);
+        const hpColor = statColor(c.maxHp > 0 ? (c.hp / c.maxHp) * 100 : 100);
+        const weaponIcon = c.weapon ? this._itemIcon(c.weapon.key, 'weapon') : '';
+        const weapon = c.weapon?.name || 'Fists';
+        const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ' <span style="color:#ff6644">[Fatigued]</span>' : '';
+        const dot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
+        const cManaPct = c.maxMana > 0 ? (c.mana / c.maxMana) * 100 : 0;
+        const sparkline = this._moodSparklineSvg(c);
+        const moodThoughtLines = (c.thoughts || []).slice(-5).map(t => `${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)}: ${t.text}`).join('&#10;');
+        const moodTip = `Mood: ${c.mood.toFixed(0)} (${moodLevel})${moodThoughtLines ? '&#10;' + moodThoughtLines : ''}`;
+        let row = `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}>`;
+        row += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
+        row += `<div class="hud-dots">`;
+        row += `<span class="hud-stat skill-tip" data-tip="${moodTip}"><span class="hud-stat-dot" style="color:${moodColor}">●</span>Mood${sparkline}</span>`;
+        row += dot('Food', hungerColor);
+        row += dot('Rest', restColor);
+        row += dot('HP', hpColor);
+        if (c.maxMana > 0) row += dot('MP', statColor(cManaPct));
+        row += `</div></div>`;
+        return row;
+    }
+
+    forceUpdateColonistHud() {
+        this._lastHudHtml = null;
+        this._pendingHudHtml = null;
+        // Temporarily suppress the hover gate so updateColonistHud writes to DOM immediately
+        const wasHovered = this._colonistHudHovered;
+        this._colonistHudHovered = false;
+        this.updateColonistHud();
+        this._colonistHudHovered = wasHovered;
+    }
+
     updateColonistHud() {
         const colonists = this.game.colonists.filter(c => !c.golem);
         const golems = this.game.colonists.filter(c => c.golem);
+        const groups = this.game.colonistGroups || [];
 
-        let html = '<div class="footer-panel-header">Colonists</div>';
-        // Show alive colonists first, dead at the bottom
-        const sorted = [...colonists].sort((a, b) => (b.hp > 0 ? 1 : 0) - (a.hp > 0 ? 1 : 0));
-        for (const c of sorted) {
-            if (c.hp <= 0) {
-                html += `<div class="hud-colonist dead"><span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span style="color:#cc4444">DEAD</span></div>`;
-                continue;
+        const locked = this._colonistHudLocked;
+        const lockBtn = `<button class="hud-lock-btn${locked ? ' locked' : ''}" onclick="window.game.ui._colonistHudLocked=!window.game.ui._colonistHudLocked;window.game.ui.forceUpdateColonistHud()" title="${locked ? 'Unlock panel' : 'Lock panel'}">${locked ? '🔒' : '🔓'}</button>`;
+        let html = `<div class="footer-panel-header" style="display:flex;justify-content:space-between;align-items:center;">Colonists${lockBtn}</div>`;
+
+        // Build buckets: one per named group (in order) + ungrouped
+        const buckets = new Map(); // groupName -> colonist[]
+        for (const g of groups) buckets.set(g, []);
+        buckets.set(null, []); // ungrouped
+
+        for (const c of colonists) {
+            const key = (c.group && groups.includes(c.group)) ? c.group : null;
+            buckets.get(key).push(c);
+        }
+
+        // Sort each bucket: alive first, dead last
+        for (const [, members] of buckets) {
+            members.sort((a, b) => (b.hp > 0 ? 1 : 0) - (a.hp > 0 ? 1 : 0));
+        }
+
+        for (const [groupName, members] of buckets) {
+            if (members.length === 0) continue;
+            if (groupName !== null) {
+                const safeGroup = groupName.replace(/'/g, "\\'");
+                html += `<div class="hud-group-header" data-group-name="${groupName.replace(/"/g, '&quot;')}">`;
+                html += `<span class="hud-group-name">${groupName}</span>`;
+                if (!locked) {
+                    html += `<span class="hud-group-actions">`;
+                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupUp('${safeGroup}')" title="Move group up">▲</button>`;
+                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupDown('${safeGroup}')" title="Move group down">▼</button>`;
+                    html += `</span>`;
+                }
+                html += `</div>`;
+            } else if (groups.length > 0) {
+                html += `<div class="hud-group-header" style="color:#888;">Ungrouped</div>`;
             }
-            if (c.onExpedition) {
-                html += `<div class="hud-colonist" data-colonist-id="${c.id}"><span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
-                continue;
+            for (const c of members) {
+                html += this._hudColonistRow(c);
             }
-            const moodLevel = getMoodLabel(c.mood);
-            const moodColor = moodLevel === 'inspired' ? '#66ffcc' : moodLevel === 'content' ? '#88cc88' : moodLevel === 'stressed' ? '#cccc44' : '#ff4444';
-            const hungerColor = statColor(c.needs.hunger);
-            const restColor = statColor(c.needs.rest);
-            const hpColor = statColor(c.maxHp > 0 ? (c.hp / c.maxHp) * 100 : 100);
-            const weaponIcon = c.weapon ? this._itemIcon(c.weapon.key, 'weapon') : '';
-            const weapon = c.weapon?.name || 'Fists';
-            html += `<div class="hud-colonist" data-colonist-id="${c.id}">`;
-            const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ' <span style="color:#ff6644">[Fatigued]</span>' : '';
-            html += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
-            // Labeled colored dots: one at-a-glance line per need, dot color = level.
-            const dot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
-            const cManaPct = c.maxMana > 0 ? (c.mana / c.maxMana) * 100 : 0;
-            html += `<div class="hud-dots">`;
-            const sparkline = this._moodSparklineSvg(c);
-            const moodThoughtLines = (c.thoughts || []).slice(-5).map(t => `${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)}: ${t.text}`).join('&#10;');
-            const moodTip = `Mood: ${c.mood.toFixed(0)} (${moodLevel})${moodThoughtLines ? '&#10;' + moodThoughtLines : ''}`;
-            html += `<span class="hud-stat skill-tip" data-tip="${moodTip}"><span class="hud-stat-dot" style="color:${moodColor}">●</span>Mood${sparkline}</span>`;
-            html += dot('Food', hungerColor);
-            html += dot('Rest', restColor);
-            html += dot('HP', hpColor);
-            if (c.maxMana > 0) html += dot('MP', statColor(cManaPct));
-            html += `</div>`;
-            html += `</div>`;
         }
 
         if (golems.length > 0) {

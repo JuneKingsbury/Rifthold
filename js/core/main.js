@@ -172,6 +172,7 @@ class Game {
         this.stats = { raidsDefeated: 0, wavesCompleted: 0, expeditionsCompleted: 0, superiorItemsCrafted: 0, masterworkItemsCrafted: 0, itemsEnchanted: 0 };
 
         this.colonists = [];
+        this.colonistGroups = [];
         this._colonistById = new Map();
         this.entities = [];
         this.raiders = [];
@@ -1199,6 +1200,53 @@ class Game {
         this.ui.showColonistInfo(c);
     }
 
+    setColonistGroup(colonistId, groupName) {
+        const c = this.getColonist(colonistId);
+        if (!c) return;
+        const name = groupName && groupName.trim() ? groupName.trim() : null;
+        c.group = name;
+        if (name && !this.colonistGroups.includes(name)) {
+            this.colonistGroups.push(name);
+        }
+        if (this.selectedColonist) this.ui.showColonistInfo(this.selectedColonist);
+        this.ui.updateColonistHud();
+    }
+
+    createColonistGroup(colonistId, groupName) {
+        const name = groupName && groupName.trim() ? groupName.trim() : null;
+        if (!name) return;
+        if (!this.colonistGroups.includes(name)) this.colonistGroups.push(name);
+        if (colonistId != null) {
+            const c = this.getColonist(colonistId);
+            if (c) c.group = name;
+        }
+        if (this.selectedColonist) this.ui.showColonistInfo(this.selectedColonist);
+        this.ui.updateColonistHud();
+    }
+
+    deleteColonistGroup(groupName) {
+        this.colonistGroups = this.colonistGroups.filter(g => g !== groupName);
+        for (const c of this.colonists) {
+            if (c.group === groupName) c.group = null;
+        }
+        this.ui.updateColonistHud();
+        if (this.selectedColonist) this.ui.showColonistInfo(this.selectedColonist);
+    }
+
+    moveColonistGroupUp(groupName) {
+        const idx = this.colonistGroups.indexOf(groupName);
+        if (idx <= 0) return;
+        [this.colonistGroups[idx - 1], this.colonistGroups[idx]] = [this.colonistGroups[idx], this.colonistGroups[idx - 1]];
+        this.ui.forceUpdateColonistHud();
+    }
+
+    moveColonistGroupDown(groupName) {
+        const idx = this.colonistGroups.indexOf(groupName);
+        if (idx < 0 || idx >= this.colonistGroups.length - 1) return;
+        [this.colonistGroups[idx], this.colonistGroups[idx + 1]] = [this.colonistGroups[idx + 1], this.colonistGroups[idx]];
+        this.ui.forceUpdateColonistHud();
+    }
+
     toggleFollow(colonistId) {
         if (this.followingColonist === colonistId) {
             this.followingColonist = null;
@@ -1216,7 +1264,7 @@ class Game {
     // Generic equip: takes item from inventory, swaps with colonist's slot
     _equipItem(colonistId, index, slot, listName, addMethod) {
         const c = this.getColonist(colonistId);
-        if (!c) return;
+        if (!c || c.golem) return;
         const list = this.resources[listName];
         if (index === undefined || index < 0 || index >= list.length) return;
         const item = list.splice(index, 1)[0];
@@ -1232,7 +1280,7 @@ class Game {
     // Generic unequip: returns item to inventory, clears colonist slot
     _unequipItem(colonistId, slot, addMethod, label) {
         const c = this.getColonist(colonistId);
-        if (!c || !c[slot]) return;
+        if (!c || !c[slot] || c.golem) return;
         this.resources[addMethod](c[slot]);
         c[slot] = null;
         this._recalcEquipmentStats(c);
