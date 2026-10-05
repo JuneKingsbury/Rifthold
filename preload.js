@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cloudDelete: (filename)       => ipcRenderer.invoke('gdrive:delete', filename),
     cloudList:   ()               => ipcRenderer.invoke('gdrive:list'),
   },
+  writePortrait: (filename, base64Data) => ipcRenderer.invoke('write-portrait', filename, base64Data),
   steam: {
     available: () => ipcRenderer.invoke('steam:available'),
     getPlayerInfo: () => ipcRenderer.invoke('steam:player-info'),

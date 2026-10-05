@@ -1,6 +1,7 @@
 const { app, BrowserWindow, protocol, net, ipcMain } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
+const fs = require('fs');
 const steamBridge = require('./steam-bridge');
 const gdriveBridge = require('./google-drive-bridge');
 
@@ -83,6 +84,12 @@ ipcMain.handle('steam:cloud-list', () => steamBridge.cloudList());
 ipcMain.handle('steam:cloud-enabled', () => steamBridge.cloudEnabled());
 ipcMain.handle('steam:overlay-store', () => steamBridge.openOverlayStore());
 ipcMain.handle('steam:overlay-url', (_, url) => steamBridge.openOverlayUrl(url));
+
+ipcMain.handle('write-portrait', (_, filename, base64Data) => {
+  const safe = path.basename(filename);
+  const dest = path.join(__dirname, 'portraits', safe);
+  fs.writeFileSync(dest, Buffer.from(base64Data, 'base64'));
+});
 
 ipcMain.handle('gdrive:enabled',    () => gdriveBridge.cloudEnabled());
 ipcMain.handle('gdrive:begin-auth', () => gdriveBridge.beginAuth());

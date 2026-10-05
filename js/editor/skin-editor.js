@@ -27,7 +27,56 @@ const MATERIAL_ITEMS = [
     { key: 'gold', char: 'a', color: '#e2ff09', desc: 'Gold resource' },
 ];
 
-const CANVAS_SIZES = [8, 16, 32, 64, 128];
+const CANVAS_SIZES = [8, 16, 32, 64, 128, 256];
+
+const PORTRAIT_ITEMS = [
+    // Existing portrait files
+    { key: 'humanity',                   size: 64,  desc: 'Human race portrait' },
+    { key: 'bufoi',                      size: 64,  desc: 'Bufos race portrait' },
+    { key: 'ferini',                     size: 64,  desc: 'Ferin race portrait' },
+    { key: 'kobaloi',                    size: 64,  desc: 'Kobalos race portrait' },
+    { key: 'nympha',                     size: 64,  desc: 'Nymph race portrait' },
+    { key: 'first_building',             size: 64,  desc: 'First building illustration' },
+    { key: 'mars',                       size: 64,  desc: 'Mars/planet portrait' },
+    { key: 'chain_arcane',               size: 32,  desc: 'Arcane chain icon' },
+    { key: 'chain_chaos',                size: 32,  desc: 'Chaos chain icon' },
+    { key: 'chain_crystal',              size: 32,  desc: 'Crystal chain icon' },
+    { key: 'chain_kingdom',              size: 32,  desc: 'Kingdom chain icon' },
+    { key: 'chain_scouting',             size: 32,  desc: 'Scouting chain icon' },
+    { key: 'chain_shadow',               size: 32,  desc: 'Shadow chain icon' },
+    { key: 'chain_verdant',              size: 32,  desc: 'Verdant chain icon' },
+    { key: 'chain_void_pact',            size: 32,  desc: 'Void Pact chain icon' },
+    // Steam achievement story portraits (64x64)
+    { key: 'colony_5',                   size: 64,  desc: 'Achievement: A Settlement Forms' },
+    { key: 'colony_10',                  size: 64,  desc: 'Achievement: A Thriving Community' },
+    { key: 'first_raid_survived',        size: 64,  desc: 'Achievement: Into the Fire' },
+    { key: 'first_crusader_raid_survived', size: 64, desc: 'Achievement: Fie on Goodness' },
+    { key: 'first_death',                size: 64,  desc: 'Achievement: The First Marker' },
+    { key: 'first_love',                 size: 64,  desc: 'Achievement: Love on the Frontier' },
+    { key: 'first_winter_feast',         size: 64,  desc: 'Achievement: Winter Celebration' },
+    { key: 'first_wave_complete',        size: 64,  desc: 'Achievement: Horrors from the Void' },
+    { key: 'realm_crystal_caves',        size: 64,  desc: 'Achievement: Crystal Caves realm' },
+    { key: 'realm_crystal_mines',        size: 64,  desc: 'Achievement: Crystal Mines realm' },
+    { key: 'realm_crystal_depths',       size: 64,  desc: 'Achievement: Crystal Depths realm' },
+    { key: 'realm_verdant_depths',       size: 64,  desc: 'Achievement: Verdant Depths realm' },
+    { key: 'realm_fungal_hollows',       size: 64,  desc: 'Achievement: Fungal Hollows realm' },
+    { key: 'realm_primeval_canopy',      size: 64,  desc: 'Achievement: Primeval Canopy realm' },
+    { key: 'realm_arcane_library',       size: 64,  desc: 'Achievement: Arcane Library realm' },
+    { key: 'realm_ancient_university',   size: 64,  desc: 'Achievement: Ancient University realm' },
+    { key: 'realm_abandoned_laboratory', size: 64,  desc: 'Achievement: Abandoned Laboratory realm' },
+    { key: 'realm_shadow_realm',         size: 64,  desc: 'Achievement: Abyss Gate realm' },
+    { key: 'realm_void_abyss',           size: 64,  desc: 'Achievement: Sunken Abyss realm' },
+    { key: 'realm_oblivion_rift',        size: 64,  desc: 'Achievement: Oblivion Rift realm' },
+    { key: 'realm_void_hollow',          size: 64,  desc: 'Achievement: Void Hollow realm' },
+    { key: 'realm_void_sanctum',         size: 64,  desc: 'Achievement: Void Sanctum realm' },
+    { key: 'realm_void_heart',           size: 64,  desc: 'Achievement: Void Heart realm' },
+    { key: 'realm_fracture_gate',        size: 64,  desc: 'Achievement: Fracture Gate realm' },
+    { key: 'realm_shifting_labyrinth',   size: 64,  desc: 'Achievement: Shifting Labyrinth realm' },
+    { key: 'realm_unraveling_core',      size: 64,  desc: 'Achievement: Unraveling Core realm' },
+    { key: 'realm_kingdom_outskirts',    size: 64,  desc: 'Achievement: Kingdom Outskirts realm' },
+    { key: 'realm_crusader_barracks',    size: 64,  desc: 'Achievement: Crusader Barracks realm' },
+    { key: 'realm_palace_fortress',      size: 64,  desc: 'Achievement: Palace Fortress realm' },
+];
 const STORAGE_PREFIX = 'convocation_skin_editor_';
 const CHECKERBOARD_LIGHT = '#3a3a3a';
 const CHECKERBOARD_DARK = '#2a2a2a';
@@ -484,7 +533,7 @@ class SkinEditor {
     }
 
     _buildCategoryFilter() {
-        const categories = ['Buildings', 'Terrain', 'Resources', 'Entities', 'Items', 'Materials', 'Floors', 'Farms', 'Effects', 'Icons', 'Overlays', 'Equipment Worn'];
+        const categories = ['Buildings', 'Terrain', 'Resources', 'Entities', 'Items', 'Materials', 'Floors', 'Farms', 'Effects', 'Icons', 'Overlays', 'Equipment Worn', 'Portraits'];
         const container = document.getElementById('se-category-filter');
         container.innerHTML = categories.map(c =>
             `<button class="bp-cat${c === this.categoryFilter ? ' active' : ''}" data-cat="${c}">${c}</button>`
@@ -666,6 +715,11 @@ class SkinEditor {
                 }
                 for (const [key, def] of Object.entries(TOOLS)) {
                     items.push({ key, char: def.char || ITEM_CHARS.tool.char, color: def.charColor || ITEM_CHARS.tool.color, desc: `Worn: ${def.name}`, category: 'equipment_worn' });
+                }
+                break;
+            case 'Portraits':
+                for (const p of PORTRAIT_ITEMS) {
+                    items.push({ key: p.key, char: '▣', color: '#ccaaff', desc: p.desc, category: 'portraits' });
                 }
                 break;
         }
@@ -1433,10 +1487,32 @@ class SkinEditor {
         this._autoSave();
         this._clearUndoHistory();
         this.activeObject = { key, category };
+
+        if (category === 'portraits') {
+            const portraitDef = PORTRAIT_ITEMS.find(p => p.key === key);
+            if (portraitDef && this.canvasSize !== portraitDef.size) {
+                this._setCanvasSize(portraitDef.size);
+                const sizeSelect = document.getElementById('se-canvas-size');
+                if (sizeSelect) {
+                    const opt = [...sizeSelect.options].find(o => parseInt(o.value) === portraitDef.size);
+                    if (opt) {
+                        sizeSelect.value = portraitDef.size;
+                        document.getElementById('se-custom-size').style.display = 'none';
+                    } else {
+                        sizeSelect.value = 'custom';
+                        document.getElementById('se-custom-size').style.display = 'inline-block';
+                        document.getElementById('se-custom-size').value = portraitDef.size;
+                    }
+                }
+            }
+        }
+
         const spriteKey = `${category}:${key}`;
         const saved = this.savedSprites[spriteKey];
         if (saved) {
             this._loadPixelsFromDataURL(saved.data, saved.size);
+        } else if (category === 'portraits') {
+            this._loadPortraitFromDisk(key);
         } else {
             this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
         }
@@ -1497,6 +1573,18 @@ class SkinEditor {
             this.pixels = new Uint8ClampedArray(imageData.data);
         };
         img.src = dataURL;
+    }
+
+    _loadPortraitFromDisk(key) {
+        fetch(`portraits/${key}.png`)
+            .then(r => r.ok ? r.blob() : null)
+            .then(blob => {
+                if (!blob) return;
+                const reader = new FileReader();
+                reader.onload = () => this._loadPixelsFromDataURL(reader.result, this.canvasSize);
+                reader.readAsDataURL(blob);
+            })
+            .catch(() => {});
     }
 
     // --- Color Management ---
@@ -2750,6 +2838,15 @@ class SkinEditor {
         this._persistSkinData();
         this._refreshSavedList();
         this._buildPalette();
+
+        // For portraits in Electron, write directly to the portraits/ folder
+        if (category === 'portraits' && window.electronAPI?.writePortrait) {
+            const base64 = dataURL.split(',')[1];
+            window.electronAPI.writePortrait(`${key}.png`, base64)
+                .then(() => alert(`Saved portraits/${key}.png`))
+                .catch(err => alert(`Failed to save: ${err.message}`));
+            return;
+        }
 
         // Trigger download
         tempCanvas.toBlob((blob) => {

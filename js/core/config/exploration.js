@@ -2744,7 +2744,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'A Settlement Forms',
         trigger: 'colonist_count_5',
-        text: `
+        text: `<img class="pixel-art" src="portraits/colony_5.png" alt="A drawing depicting a small frontier settlement">
         Your community is still small, but growth is steady. You anticipate more will
         join as you advance your ability to harness magic. Until then, you do what you
         can for those who've already made this colony their home.
@@ -2757,7 +2757,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'A Thriving Community',
         trigger: 'colonist_count_10',
-        text: `
+        text: `<img class="pixel-art" src="portraits/colony_10.png" alt="A drawing depicting a thriving frontier community">
         You think back to how this community began. We were small and scared, nearly
         starving through our first winter. You've all grown much stronger, in body,
         mind, and spirit. Your efforts to lead this community are paying off in spades.
@@ -2769,7 +2769,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Into the Fire',
         trigger: 'first_raid_survived',
-        text: `
+        text: `<img class="pixel-art" src="portraits/first_raid_survived.png" alt="A drawing depicting raiders attacking a settlement">
         Not all people are friendly out in the frontier. For every group of traders is 
         a gang of raiders ready to take what they need by force.
         <br><br>
@@ -2781,7 +2781,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Fie on Goodness',
         trigger: 'first_crusader_raid_survived',
-        text: `
+        text: `<img class="pixel-art" src="portraits/first_crusader_raid_survived.png" alt="A drawing depicting crusaders attacking the frontier">
         You hadn't anticipated crusaders making it this deep into the frontier.
         Thankfully you were prepared, pushing back the invaders for the time being.
         <br><br>
@@ -2808,7 +2808,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'The First Marker',
         trigger: 'first_colonist_death',
-        text: `
+        text: `<img class="pixel-art" src="portraits/first_death.png" alt="A drawing depicting a grave marker on the frontier">
         Today a colonist has died. This will take a major toll on the friends they've
         made over their time here. Another may one day take their place in the colony,
         but this loss will be felt for a very long time.
@@ -2855,7 +2855,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Love on the Frontier',
         trigger: 'first_lover_made',
-        text: `
+        text: `<img class="pixel-art" src="portraits/first_love.png" alt="A drawing depicting two colonists in love">
         You overheard some talks of romance among the colonists. It's beautiful to 
         think that they're able to find love so far from home. You can only hope that 
         this relationship helps these two weather the tribulations of The Frontier.`,
@@ -2864,7 +2864,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Winter Celebration',
         trigger: 'first_winter_feast',
-        text: `
+        text: `<img class="pixel-art" src="portraits/first_winter_feast.png" alt="A drawing depicting colonists gathered for a winter feast">
         Winter has arrived and the colony is feeling optimistic. By the first frost
         we were able to secure plenty of food to last through the season. In their
         excitement, the colonists proposed a feast to celebrate their hard work.
@@ -2884,7 +2884,7 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'Horrors from the Void',
         trigger: 'first_wave_completed',
-        text: `
+        text: `<img class="pixel-art" src="portraits/first_wave_complete.png" alt="A drawing depicting void creatures pouring from a rift">
         It was horrifying, but opening these rifts may just be a worthwhile endeavour. 
         Your colonists held fast against the horde of fleshy monsters that poured from 
         the portals, finding time to harvest a shadowy material from beyond the rift.
@@ -3276,7 +3276,7 @@ export const STORY_MILESTONES = {
         realmGroup: 'Crystal Caverns',
         title: 'Crystal Caves',
         trigger: 'realm_crystal_caves',
-        text: `
+        text: `<img class="pixel-art" src="portraits/realm_crystal_caves.png" alt="A drawing depicting the Crystal Caves">
         You tore open a rift between your colony and a distant land. Without practice you 
         had little control over just where this hole in space would open. Thankfully you 
         were greeted by a large cavern lined with beautiful translucent crystals.
@@ -3325,42 +3325,42 @@ export const STORY_MILESTONES = {
         realmGroup: 'Crystal Caverns',
         title: 'Crystal Mines',
         trigger: 'realm_crystal_mines',
-        text: 'TODO: Write lore text for exploring the Crystal Mines.',
+        text: `<img class="pixel-art" src="portraits/realm_crystal_mines.png" alt="A drawing depicting the Crystal Mines">TODO: Write lore text for exploring the Crystal Mines.`,
     },
     realm_crystal_depths: {
         tab: 'realms',
         realmGroup: 'Crystal Caverns',
         title: 'Crystal Depths',
         trigger: 'realm_crystal_depths',
-        text: 'TODO: Write lore text for exploring the Crystal Depths.',
+        text: `<img class="pixel-art" src="portraits/realm_crystal_depths.png" alt="A drawing depicting the Crystal Depths">TODO: Write lore text for exploring the Crystal Depths.`,
     },
     realm_verdant_depths: {
         tab: 'realms',
         realmGroup: 'Verdant Wilds',
         title: 'Verdant Depths',
         trigger: 'realm_verdant_depths',
-        text: 'TODO: Write lore text for exploring the Verdant Depths.',
+        text: `<img class="pixel-art" src="portraits/realm_verdant_depths.png" alt="A drawing depicting the Verdant Depths">TODO: Write lore text for exploring the Verdant Depths.`,
     },
     realm_fungal_hollows: {
         tab: 'realms',
         realmGroup: 'Verdant Wilds',
         title: 'Fungal Hollows',
         trigger: 'realm_fungal_hollows',
-        text: 'TODO: Write lore text for exploring the Fungal Hollows.',
+        text: `<img class="pixel-art" src="portraits/realm_fungal_hollows.png" alt="A drawing depicting the Fungal Hollows">TODO: Write lore text for exploring the Fungal Hollows.`,
     },
     realm_primeval_canopy: {
         tab: 'realms',
         realmGroup: 'Verdant Wilds',
         title: 'Primeval Canopy',
         trigger: 'realm_primeval_canopy',
-        text: 'TODO: Write lore text for exploring the Primeval Canopy.',
+        text: `<img class="pixel-art" src="portraits/realm_primeval_canopy.png" alt="A drawing depicting the Primeval Canopy">TODO: Write lore text for exploring the Primeval Canopy.`,
     },
     realm_arcane_library: {
         tab: 'realms',
         realmGroup: 'University Ruins',
         title: 'Arcane Library',
         trigger: 'realm_arcane_library',
-        text: `
+        text: `<img class="pixel-art" src="portraits/realm_arcane_library.png" alt="A drawing depicting the Arcane Library">
         The Arcane Library was once home to hundreds of prospective mages. 
         With bans on magic the bustling halls quickly became silent. It's
         disappointing to see such a beautiful building slowly rot without
@@ -3383,7 +3383,7 @@ export const STORY_MILESTONES = {
         realmGroup: 'University Ruins',
         title: 'Ancient University',
         trigger: 'realm_ancient_university',
-        text: `
+        text: `<img class="pixel-art" src="portraits/realm_ancient_university.png" alt="A drawing depicting the Ancient University">
         Just as you anticipated, the university grounds contained the answer to 
         the locked off library sections you hoped to explore.
         <br><br>
@@ -3409,7 +3409,7 @@ export const STORY_MILESTONES = {
         realmGroup: 'University Ruins',
         title: 'Abandoned Laboratory',
         trigger: 'realm_abandoned_laboratory',
-        text: `
+        text: `<img class="pixel-art" src="portraits/realm_abandoned_laboratory.png" alt="A drawing depicting the Abandoned Laboratory">
         As you entered the laboratory the lingering magic grew rapidly in strength. 
         After just a dozen steps into the main hallway the energy started to become 
         overwhelming. You pushed through, walking quickly towards the source of this 
@@ -3446,21 +3446,21 @@ export const STORY_MILESTONES = {
         realmGroup: 'The Abyss',
         title: 'Abyss Gate',
         trigger: 'realm_shadow_realm',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_shadow_realm.png" alt="A drawing depicting the Abyss Gate">TODO`,
     },
     realm_void_abyss: {
         tab: 'realms',
         realmGroup: 'The Abyss',
         title: 'Sunken Abyss',
         trigger: 'realm_void_abyss',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_void_abyss.png" alt="A drawing depicting the Sunken Abyss">TODO`,
     },
     realm_oblivion_rift: {
         tab: 'realms',
         realmGroup: 'The Abyss',
         title: 'Oblivion Rift',
         trigger: 'realm_oblivion_rift',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_oblivion_rift.png" alt="A drawing depicting the Oblivion Rift">TODO`,
     },
     // ── Void Nexus / Void Whispers ───────────────────────────────────────────
     void_nexus_built: {
@@ -3505,21 +3505,21 @@ export const STORY_MILESTONES = {
         realmGroup: 'The Void Pact',
         title: 'Void Hollow',
         trigger: 'realm_void_hollow',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_void_hollow.png" alt="A drawing depicting the Void Hollow">TODO`,
     },
     realm_void_sanctum: {
         tab: 'realms',
         realmGroup: 'The Void Pact',
         title: 'Void Sanctum',
         trigger: 'realm_void_sanctum',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_void_sanctum.png" alt="A drawing depicting the Void Sanctum">TODO`,
     },
     realm_void_heart: {
         tab: 'realms',
         realmGroup: 'The Void Pact',
         title: 'Void Heart',
         trigger: 'realm_void_heart',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_void_heart.png" alt="A drawing depicting the Void Heart">TODO`,
     },
     // ── Chaos realms ────────────────────────────────────────────────────────
     realm_fracture_gate: {
@@ -3527,42 +3527,42 @@ export const STORY_MILESTONES = {
         realmGroup: 'The Unraveling',
         title: 'Fracture Gate',
         trigger: 'realm_fracture_gate',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_fracture_gate.png" alt="A drawing depicting the Fracture Gate">TODO`,
     },
     realm_shifting_labyrinth: {
         tab: 'realms',
         realmGroup: 'The Unraveling',
         title: 'Shifting Labyrinth',
         trigger: 'realm_shifting_labyrinth',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_shifting_labyrinth.png" alt="A drawing depicting the Shifting Labyrinth">TODO`,
     },
     realm_unraveling_core: {
         tab: 'realms',
         realmGroup: 'The Unraveling',
         title: 'Unraveling Core',
         trigger: 'realm_unraveling_core',
-        text: `TODO`,
+        text: `<img class="pixel-art" src="portraits/realm_unraveling_core.png" alt="A drawing depicting the Unraveling Core">TODO`,
     },
     realm_kingdom_outskirts: {
         tab: 'realms',
         realmGroup: 'The Kingdom',
         title: 'Kingdom Outskirts',
         trigger: 'realm_kingdom_outskirts',
-        text: 'TODO: Write lore text for exploring the Kingdom.',
+        text: `<img class="pixel-art" src="portraits/realm_kingdom_outskirts.png" alt="A drawing depicting the Kingdom Outskirts">TODO: Write lore text for exploring the Kingdom.`,
     },
     realm_crusader_barracks: {
         tab: 'realms',
         realmGroup: 'The Kingdom',
         title: 'Crusader Barracks',
         trigger: 'realm_crusader_barracks',
-        text: 'TODO: Write lore text for exploring the Kingdom.',
+        text: `<img class="pixel-art" src="portraits/realm_crusader_barracks.png" alt="A drawing depicting the Crusader Barracks">TODO: Write lore text for exploring the Kingdom.`,
     },
     realm_palace_fortress: {
         tab: 'realms',
         realmGroup: 'The Kingdom',
         title: 'Palace Fortress',
         trigger: 'realm_palace_fortress',
-        text: `
+        text: `<img class="pixel-art" src="portraits/realm_palace_fortress.png" alt="A drawing depicting the Palace Fortress">
         TODO: Write lore text for exploring the Kingdom.
         <br><br>
         <div style="text-align:center;margin-top:12px;">
