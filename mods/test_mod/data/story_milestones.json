@@ -1,0 +1,20 @@
+{
+  "test_mod_cursed_forest_entered": {
+    "tab": "cursed_lore",
+    "title": "Into the Shadow Depths",
+    "text": "Your explorers have crossed the threshold into the Cursed Forest. The trees here do not move with the wind. They move on their own.",
+    "trigger": "realm_cursed_forest"
+  },
+  "test_mod_shadeveil_arrived": {
+    "tab": "cursed_lore",
+    "title": "Children of the Veil",
+    "text": "A Shadeveil has joined your colony. They keep to the shadows by habit, not by choice. A remnant of a life spent hiding from those who feared what they did not understand.",
+    "trigger": "first_test_mod_shadeveil_colonist_arrived"
+  },
+  "test_mod_void_first_cast": {
+    "tab": "cursed_lore",
+    "title": "The Void Speaks",
+    "text": "One of your colonists has mastered a spell from beyond the veil. The void does not merely destroy; it unravels. What has been unraveled cannot be put back.",
+    "trigger": "first_spell_cast"
+  }
+}

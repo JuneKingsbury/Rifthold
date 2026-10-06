@@ -1,0 +1,25 @@
+{
+  "cursed_hermit": {
+    "name": "Cursed Hermit",
+    "lore": "A wanderer who ventured too deep into the Cursed Forest and emerged... changed.",
+    "text": "A wild-eyed hermit blocks the path, muttering about shadows.",
+    "triggerWeight": 3,
+    "realmFilter": "cursed_forest",
+    "choices": [
+      {
+        "label": "Trade supplies",
+        "cost": { "potionSlots": 1 },
+        "result": {
+          "text": "The hermit trades a strange trinket for your supplies.",
+          "reward": { "type": "realm_roll", "mult": 1.5 }
+        }
+      },
+      {
+        "label": "Dismiss them",
+        "result": {
+          "text": "The hermit shuffles aside, muttering curses under their breath."
+        }
+      }
+    ]
+  }
+}

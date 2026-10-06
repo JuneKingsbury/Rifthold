@@ -5208,17 +5208,36 @@ export class UI {
             return `${label} (${c.unlocked}/${c.total})${badge}`;
         };
 
-        html += '<div class="story-tabs">';
-        html += `<button class="story-tab-btn${tab === 'colony' ? ' active' : ''}" data-story-tab="colony">${tabLabel('colony', 'Colony')}</button>`;
-        html += `<button class="story-tab-btn${tab === 'research' ? ' active' : ''}" data-story-tab="research">${tabLabel('research', 'Research')}</button>`;
-        html += `<button class="story-tab-btn${tab === 'races' ? ' active' : ''}" data-story-tab="races">${tabLabel('races', 'Races')}</button>`;
-        html += `<button class="story-tab-btn${tab === 'realms' ? ' active' : ''}" data-story-tab="realms">${tabLabel('realms', 'Realms')}</button>`;
+        const FIXED_TABS = [
+            { key: 'colony',   label: 'Colony' },
+            { key: 'research', label: 'Research' },
+            { key: 'races',    label: 'Races' },
+            { key: 'realms',   label: 'Realms' },
+            { key: 'combat',   label: 'Combat' },
+        ];
+        const SPECIAL_TABS = new Set(['bestiary', 'social']);
+        const fixedTabKeys = new Set(FIXED_TABS.map(t => t.key));
+        const modTabs = [...new Set(
+            Object.values(STORY_MILESTONES)
+                .map(m => m.tab)
+                .filter(t => t && !fixedTabKeys.has(t) && !SPECIAL_TABS.has(t))
+        )].map(key => ({ key, label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }));
+
         const bestiarySize = (this.game.exploration?.bestiary?.size || 0) +
             (this.game.exploration?.wildlifeKills?.size || 0) +
             (this.game.exploration?.raiderKills?.size || 0) +
             (this.game.exploration?.summonsSeen?.size || 0);
+
+        html += '<div class="story-tabs">';
+        for (const { key, label } of FIXED_TABS) {
+            if (!tabCounts[key]) continue;
+            html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${key}">${tabLabel(key, label)}</button>`;
+        }
         html += `<button class="story-tab-btn${tab === 'bestiary' ? ' active' : ''}" data-story-tab="bestiary">Bestiary (${bestiarySize})</button>`;
         html += `<button class="story-tab-btn${tab === 'social' ? ' active' : ''}" data-story-tab="social">Social</button>`;
+        for (const { key, label } of modTabs) {
+            html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${key}">${tabLabel(key, label)}</button>`;
+        }
         html += '</div>';
 
         const entries = Object.entries(STORY_MILESTONES)

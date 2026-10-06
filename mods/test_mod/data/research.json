@@ -5,5 +5,19 @@
     "cost": 120,
     "requires": ["metalworking"],
     "description": "Techniques for infusing weapons and armor with cursed properties."
+  },
+  "test_mod_shadow_step": {
+    "name": "Shadow Step",
+    "tab": "shadow_arts",
+    "cost": 200,
+    "requires": [],
+    "description": "Unlock the secrets of moving unseen. Shadeveil colonists gain a passive speed boost."
+  },
+  "test_mod_void_weaving_deep": {
+    "name": "Deep Void Weaving",
+    "tab": "shadow_arts",
+    "cost": 400,
+    "requires": ["test_mod_shadow_step"],
+    "description": "Advanced void techniques. Unlocks the Tome of Void Bolt recipe and the Cursed Altar."
   }
 }

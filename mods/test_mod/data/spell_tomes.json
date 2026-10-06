@@ -1,0 +1,16 @@
+{
+  "tome_of_void_bolt": {
+    "name": "Tome of Void Bolt",
+    "tradeValue": 30,
+    "spell": "void_bolt",
+    "learningWork": 160,
+    "minSchoolLevel": 2,
+    "description": "Teaches a bolt of void energy that tears through enemies.",
+    "recipe": {
+      "input": { "planks": 3, "void_essence": 2 },
+      "ticks": 30,
+      "station": "cursed_altar",
+      "research": "test_mod_void_weaving_deep"
+    }
+  }
+}

@@ -5,5 +5,7 @@
     "test_mod_cursed_bandit",
     "colonist_test_mod_shadeveil_body_1"
   ],
-  "items": ["test_mod_cursed_blade", "test_mod_thornweave", "test_mod_lucky_charm"]
+  "items": ["test_mod_cursed_blade", "test_mod_thornweave", "test_mod_lucky_charm", "tome_of_void_bolt"],
+  "buildings": ["cursed_altar"],
+  "farms": ["voidshroom_growing", "voidshroom_ready"]
 }

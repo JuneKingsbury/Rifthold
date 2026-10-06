@@ -1,0 +1,12 @@
+{
+  "void_whispers": {
+    "weight": 3,
+    "minTick": 960,
+    "cooldown": 2400,
+    "effect": "mood",
+    "mood": -5,
+    "description": "Strange whispers from the void unsettle your colonists.",
+    "message": "Void Whispers",
+    "detail": "Your colonists report hearing strange whispers from beneath the earth."
+  }
+}

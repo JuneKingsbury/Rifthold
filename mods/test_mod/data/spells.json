@@ -1,0 +1,16 @@
+{
+  "void_bolt": {
+    "name": "Void Bolt",
+    "school": "evocation",
+    "minLevel": 2,
+    "manaCost": 7,
+    "cooldown": 30,
+    "castType": "auto",
+    "trigger": "inCombat",
+    "effect": "ranged_damage",
+    "damage": 12,
+    "range": 5,
+    "projectileColor": "#9933cc",
+    "projectileChar": "◆"
+  }
+}

@@ -1,9 +1,16 @@
 import {
     WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES,
     ALL_ITEMS, RECIPES,
-    REALMS, RESEARCH, TRAITS, RACES,
+    REALMS, RESEARCH, RESEARCH_TABS, TRAITS, RACES,
     ENTITIES, ANIMALS, TAMED_ANIMALS, RAID_TYPES,
     EXPEDITION_ENEMIES,
+    NPC_ENCOUNTERS, EXPEDITION_DECISIONS, EXPEDITION_TRAPS, PUZZLE_ENCOUNTERS,
+    ELITE_MODIFIERS, REALM_EVENTS, EXPEDITION_MUTATORS, THOUGHTS, STORY_MILESTONES,
+    EVENTS,
+    SPELLS, SPELL_TOMES, RITUALS,
+    CROPS, FOODSTUFFS, NON_FOOD_CROPS,
+    BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES,
+    WALL_STRUCTURES, FURNITURE_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS,
 } from './config.js';
 import { SOUND_MANIFEST } from './sound-manifest.js';
 import {
@@ -70,10 +77,15 @@ const _baselineKeys = new Set();
 
 function _snapshotBaseline() {
     const sources = [WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES,
-        ALL_ITEMS, RECIPES, REALMS, RESEARCH, TRAITS, RACES, ENTITIES, RAID_TYPES, EXPEDITION_ENEMIES];
+        ALL_ITEMS, RECIPES, REALMS, RESEARCH, TRAITS, RACES, ENTITIES, RAID_TYPES, EXPEDITION_ENEMIES,
+        // Note: RESEARCH_TABS baseline keys are tracked separately (it's an array, not an object)
+        NPC_ENCOUNTERS, EXPEDITION_DECISIONS, EXPEDITION_TRAPS, PUZZLE_ENCOUNTERS,
+        ELITE_MODIFIERS, REALM_EVENTS, EXPEDITION_MUTATORS, THOUGHTS, STORY_MILESTONES,
+        EVENTS, SPELLS, SPELL_TOMES, RITUALS, CROPS, BUILDINGS];
     for (const obj of sources) {
         for (const key of Object.keys(obj)) _baselineKeys.add(key);
     }
+    for (const key of [...FOODSTUFFS, ...NON_FOOD_CROPS]) _baselineKeys.add(key);
 }
 
 function _safeSet(target, key, value, modId, context) {
@@ -181,6 +193,18 @@ function _mergeResearch(modId, data) {
     }
 }
 
+function _mergeResearchTabs(modId, data) {
+    const existingKeys = new Set(RESEARCH_TABS.map(t => t.key));
+    for (const [key, def] of Object.entries(data)) {
+        if (existingKeys.has(key)) {
+            recordWarning(`Mod "${modId}": research tab "${key}" already exists. Skipping.`);
+            continue;
+        }
+        RESEARCH_TABS.push({ key, name: def.name || key });
+        existingKeys.add(key);
+    }
+}
+
 function _mergeTraits(modId, data) {
     for (const [key, def] of Object.entries(data)) {
         _safeSet(TRAITS, key, def, modId, 'traits');
@@ -234,15 +258,134 @@ function _mergeRaces(modId, data) {
     }
 }
 
+// --- Tier 1: pure key-to-object mergers ---
+
+function _mergeNpcEncounters(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(NPC_ENCOUNTERS, key, def, modId, 'npc_encounters');
+}
+function _mergeExpeditionDecisions(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(EXPEDITION_DECISIONS, key, def, modId, 'expedition_decisions');
+}
+function _mergeExpeditionTraps(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(EXPEDITION_TRAPS, key, def, modId, 'expedition_traps');
+}
+function _mergePuzzleEncounters(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(PUZZLE_ENCOUNTERS, key, def, modId, 'puzzle_encounters');
+}
+function _mergeEliteModifiers(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(ELITE_MODIFIERS, key, def, modId, 'elite_modifiers');
+}
+function _mergeRealmEvents(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(REALM_EVENTS, key, def, modId, 'realm_events');
+}
+function _mergeExpeditionMutators(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(EXPEDITION_MUTATORS, key, def, modId, 'expedition_mutators');
+}
+function _mergeThoughts(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(THOUGHTS, key, def, modId, 'thoughts');
+}
+function _mergeStoryMilestones(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(STORY_MILESTONES, key, def, modId, 'story_milestones');
+}
+
+// --- Tier 2: mergers with minor side effects ---
+
+function _mergeEvents(modId, data) {
+    const KNOWN_EFFECTS = new Set([
+        'mood', 'deposit', 'spawn_animals', 'custom', 'trinket_find',
+        'research_boost', 'colony_damage', 'raid', 'trait_add', 'colonist_leave',
+    ]);
+    for (const [key, def] of Object.entries(data)) {
+        if (!_safeSet(EVENTS, key, def, modId, 'events')) continue;
+        if (def.effect && !KNOWN_EFFECTS.has(def.effect)) {
+            recordWarning(`Mod "${modId}": event "${key}" uses unknown effect type "${def.effect}". It will be ignored by the events system.`);
+        }
+    }
+}
+
+function _mergeSpells(modId, data) {
+    for (const [key, def] of Object.entries(data)) _safeSet(SPELLS, key, def, modId, 'spells');
+}
+
+function _mergeSpellTomes(modId, data) {
+    for (const [key, def] of Object.entries(data)) {
+        if (!_safeSet(SPELL_TOMES, key, def, modId, 'spell_tomes')) continue;
+        ALL_ITEMS[key] = { ...def, type: 'tome' };
+        if (def.recipe) {
+            const r = def.recipe;
+            RECIPES[`craft_${key}`] = {
+                input: r.input,
+                output: { [key]: 1 },
+                skill: r.skill || 'crafting',
+                ticks: r.ticks,
+                station: r.station || 'scriptorium',
+                category: 'Tomes',
+                ...(r.research ? { research: r.research } : {}),
+            };
+        }
+    }
+}
+
+function _mergeRituals(modId, data) {
+    const KNOWN_EFFECTS = new Set(['mass_heal', 'weather_bias', 'raid_ward', 'ripen_crops']);
+    for (const [key, def] of Object.entries(data)) {
+        if (!_safeSet(RITUALS, key, def, modId, 'rituals')) continue;
+        if (def.effect && !KNOWN_EFFECTS.has(def.effect)) {
+            recordWarning(`Mod "${modId}": ritual "${key}" uses unknown effect type "${def.effect}". It will be ignored by the ritual system.`);
+        }
+    }
+}
+
+function _mergeCrops(modId, data) {
+    for (const [key, def] of Object.entries(data)) {
+        if (!_safeSet(CROPS, key, def, modId, 'crops')) continue;
+        if (def.food === false) {
+            NON_FOOD_CROPS.push(key);
+        } else {
+            FOODSTUFFS.push(key);
+        }
+    }
+}
+
+function _mergeBuildings(modId, data) {
+    for (const [key, def] of Object.entries(data)) {
+        if (!_safeSet(BUILDINGS, key, def, modId, 'buildings')) continue;
+        TILE_CHARS[key] = def.char;
+        TILE_COLORS[key] = def.color;
+        if (def.passable && !def.passable.colonist) IMPASSABLE_STRUCTURES.add(key);
+        if (def.passable && !def.passable.enemy) ENEMY_BLOCKED_STRUCTURES.add(key);
+        if (def.breakable) BREAKABLE_STRUCTURES.add(key);
+        if (def.structureType === 'wall') WALL_STRUCTURES.add(key);
+        if (def.structureType === 'furniture') FURNITURE_STRUCTURES.add(key);
+        if (def.structureType === 'door') DOOR_STRUCTURES.add(key);
+    }
+}
+
 const _DATA_MERGERS = {
-    items:      _mergeItems,
-    realms:     _mergeRealms,
-    research:   _mergeResearch,
-    traits:     _mergeTraits,
-    enemies:    _mergeEnemies,
-    entities:   _mergeEntities,
-    raid_types: _mergeRaidTypes,
-    races:      _mergeRaces,
+    items:                  _mergeItems,
+    realms:                 _mergeRealms,
+    research:               _mergeResearch,
+    research_tabs:          _mergeResearchTabs,
+    traits:                 _mergeTraits,
+    enemies:                _mergeEnemies,
+    entities:               _mergeEntities,
+    raid_types:             _mergeRaidTypes,
+    races:                  _mergeRaces,
+    npc_encounters:         _mergeNpcEncounters,
+    expedition_decisions:   _mergeExpeditionDecisions,
+    expedition_traps:       _mergeExpeditionTraps,
+    puzzle_encounters:      _mergePuzzleEncounters,
+    elite_modifiers:        _mergeEliteModifiers,
+    realm_events:           _mergeRealmEvents,
+    expedition_mutators:    _mergeExpeditionMutators,
+    thoughts:               _mergeThoughts,
+    story_milestones:       _mergeStoryMilestones,
+    events:                 _mergeEvents,
+    spells:                 _mergeSpells,
+    spell_tomes:            _mergeSpellTomes,
+    rituals:                _mergeRituals,
+    crops:                  _mergeCrops,
+    buildings:              _mergeBuildings,
 };
 
 // Pending sprite manifests consumed by SkinManager.loadModSprites() after skin load.

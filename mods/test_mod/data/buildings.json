@@ -1,0 +1,14 @@
+{
+  "cursed_altar": {
+    "char": "Δ",
+    "color": "#9933cc",
+    "cost": { "void_essence": 4, "stone": 3, "planks": 2 },
+    "work": 40,
+    "hp": 60,
+    "structureType": "furniture",
+    "category": "Arcane",
+    "research": "test_mod_void_weaving_deep",
+    "description": "A cursed altar from the shadow realm. Serves as a crafting station for void-infused gear.",
+    "passable": { "colonist": false, "animal": false, "enemy": false }
+  }
+}

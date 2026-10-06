@@ -1,4 +1,4 @@
-import { getDiscoveredManifests, getLoadWarnings, isModEnabled, setModEnabled, getModsBaseUrl, setModsBaseUrl, saveLocalDirHandle, clearLocalDirHandle, getLocalDirHandle, getModLoadOrder, setModLoadOrder, hasModsBeenInitialized, markModsInitialized } from '../core/mod-registry.js';
+import { getDiscoveredManifests, getLoadWarnings, isModEnabled, setModEnabled, getEnabledMods, getModsBaseUrl, setModsBaseUrl, saveLocalDirHandle, clearLocalDirHandle, getLocalDirHandle, getModLoadOrder, setModLoadOrder, hasModsBeenInitialized, markModsInitialized } from '../core/mod-registry.js';
 
 const PANEL_ID = 'mods-panel';
 let _restartNeeded = false;
@@ -169,6 +169,14 @@ export function openModsPanel() {
     if (!hasModsBeenInitialized()) {
         markModsInitialized();
     }
+
+    // Any mod not yet explicitly toggled starts disabled.
+    const _enabledMap = getEnabledMods();
+    getDiscoveredManifests().forEach(m => {
+        if (!(m.id in _enabledMap)) {
+            setModEnabled(m.id, false);
+        }
+    });
 
     _renderModsList();
 

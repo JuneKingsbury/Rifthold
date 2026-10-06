@@ -1,0 +1,11 @@
+{
+  "voidshroom": {
+    "growthTicks": 280,
+    "harvestYield": 2,
+    "seasons": ["autumn", "winter"],
+    "char": "♦",
+    "readyChar": "◆",
+    "color": "#9933cc",
+    "research": "void_architecture"
+  }
+}
