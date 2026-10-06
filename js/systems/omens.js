@@ -92,16 +92,15 @@ export function getOmens(game) {
         });
     }
 
-    // Seasonal turning. Everyone with the sight feels the wheel turn.
-    if (tier.seasonHint) {
-        const ticksLeft = CONFIG.TICKS_PER_SEASON - game.weather.seasonTick;
-        const nextIdx = (game.weather.seasonIndex + 1) % 4;
-        const nextSeason = ['spring', 'summer', 'autumn', 'winter'][nextIdx];
+    // Foresight: a raidDelay modifier means the spell is actively deferring the next assault.
+    const allMods = game.divinationModifiers || [];
+    const delayMod = allMods.find(m => m.raidDelay);
+    if (delayMod) {
         omens.push({
-            icon: '❂',
-            title: 'The Turning Season',
-            text: `${cap(nextSeason)} approaches, ${describeDelay(ticksLeft, level >= 6)}.`,
-            tone: 'neutral',
+            icon: '✦',
+            title: 'Fate Forestalled',
+            text: 'Mystic influence holds the tide of violence at bay, delaying the next assault.',
+            tone: 'good',
         });
     }
 
@@ -112,8 +111,8 @@ export function getOmens(game) {
         if (biasMod) {
             omens.push({
                 icon: '☀',
-                title: 'Skies Bent to Will',
-                text: `A divination holds the skies ${biasMod.weatherBias} for now.`,
+                title: 'Skies Cleared',
+                text: `Arcane winds coax the skies toward ${biasMod.weatherBias} weather.`,
                 tone: 'good',
             });
         }
@@ -131,6 +130,20 @@ export function getOmens(game) {
             if (m.suppressEvents && m.suppressEvents.length > 0) {
                 omens.push({ icon: '⛨', title: 'Calamity Warded', text: 'Ill fortunes are held at bay by an active ward.', tone: 'good' });
             }
+        }
+
+        // Augury: scan colonists for an active mood aura cast by a spell.
+        const auguryActive = game.colonists.some(c =>
+            c.hp > 0 && !c.golem &&
+            (c.activeEffects || []).some(e => e.type === 'mood' && e.source === 'spell' && e.expiresAt > game.tick)
+        );
+        if (auguryActive) {
+            omens.push({
+                icon: '♦',
+                title: 'Blessed Spirits',
+                text: 'Arcane insight flows through the settlement, lifting the spirits of those nearby.',
+                tone: 'good',
+            });
         }
     }
 
