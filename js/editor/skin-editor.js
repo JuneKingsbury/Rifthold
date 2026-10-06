@@ -15,6 +15,7 @@ const MATERIAL_ITEMS = [
     { key: 'cotton', char: '○', color: '#eeeeee', desc: 'Cotton (farm crop)' },
     { key: 'cloth', char: '≋', color: '#ddaa66', desc: 'Cloth (woven from cotton)' },
     { key: 'void_essence', char: '✦', color: '#9933ff', desc: 'Void essence (from nexus waves)' },
+    { key: 'abyss_sliver', char: '◆', color: '#6600aa', desc: 'Abyss sliver (from deep abyss expeditions)' },
     { key: 'food', char: '♦', color: '#88cc44', desc: 'Cooked food' },
     { key: 'meat', char: '♦', color: '#cc5544', desc: 'Raw meat' },
     { key: 'wheat', char: '|', color: '#ddaa33', desc: 'Wheat (farm crop)' },

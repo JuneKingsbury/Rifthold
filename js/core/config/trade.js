@@ -92,7 +92,7 @@ export const MERCHANTS = [
         weight: 3,
         resourcePool: ['runite', 'void_essence', 'planks'],
         lowTierItems: ['runic_blade', 'runic_crossbow', 'runic_plate', 'runic_helm', 'runic_wand', 'runic_striders', 'runic_buckler'],
-        highTierItems: ['void_blade', 'void_dagger', 'void_staff', 'void_armor', 'void_crown', 'void_hunters_cowl'],
+        highTierItems: ['void_edge', 'void_glaive', 'void_recurve', 'void_wand', 'void_armor', 'void_crown', 'void_hunters_cowl'],
         lowDrawCount: [1, 0.6, 0.4],       // moderate low-tier stock
         highDrawChances: [0.7, 0.4],       // 1 guaranteed void item + up to 2 more (70%, 40%)
         qualityWeights: { poor: 0, normal: 2, fine: 4, superior: 3 },  // heavily skewed toward fine/superior

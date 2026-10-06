@@ -736,7 +736,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} finds an abyss crystal radiating pure primordial essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
                 { chance: 0.03, text: '{name} collects runite that has spent aeons in the abyss. It\'s changed.', loot: { resource: 'runite', amount: [6, 12] } },
-                { chance: 0.015, text: '{name} wrests a blade from the deep dark. It seems to cut through reality!', loot: { item: 'void_blade' } },
+                { chance: 0.015, text: '{name} wrests a blade from the deep dark. It seems to cut through reality!', loot: { item: 'void_edge' } },
                 { chance: 0.02, text: '{name} pries a gem-encrusted gauntlet from an abyss creature\'s withered hand. It pulses with stolen life!', loot: { item: 'bloodstone_gauntlet' } },
                 { chance: 0.01, text: '{name} discovers an orb containing a trapped dimension, incredible power!', loot: { item: 'dimensional_orb' } },
                 { chance: 0.01, text: '{name} finds a charm pulsing with abyss energy, its power barely contained!', loot: { item: 'void_charm' } },
@@ -881,6 +881,7 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 40, amount: [5, 12] },
             { resource: 'runite', weight: 25, amount: [3, 7] },
+            { resource: 'abyss_sliver', weight: 5, amount: [1, 2] },
             { item: 'void_contract', weight: 2 },
             { item: 'arbiters_ledger', weight: 1 },
         ],
@@ -911,6 +912,7 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.04, text: '{name} steals an unclaimed prize from a void broker\'s table!', loot: { resource: 'void_essence', amount: [8, 14] } },
+                { chance: 0.03, text: '{name} finds a crystallized fragment lodged in the sanctum wall.', loot: { resource: 'abyss_sliver', amount: [1, 2] } },
                 { chance: 0.025, text: '{name} finds a ledger detailing a forgotten trade. The rewards are theirs.', loot: { item: 'arbiters_ledger' } },
             ],
         },
@@ -925,6 +927,7 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 40, amount: [6, 14] },
             { resource: 'runite', weight: 25, amount: [4, 8] },
+            { resource: 'abyss_sliver', weight: 5, amount: [1, 2] },
             { item: 'void_contract', weight: 2 },
             { item: 'arbiters_ledger', weight: 2 },
         ],
@@ -956,6 +959,7 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.04, text: '{name} discovers a pre-paid reward awaiting collection!', loot: { resource: 'void_essence', amount: [10, 18] } },
+                { chance: 0.04, text: '{name} pries a razor-thin sliver of hardened abyss from the chamber wall.', loot: { resource: 'abyss_sliver', amount: [1, 2] } },
                 { chance: 0.015, text: '{name} finds a signed contract granting extraordinary boons!', loot: { item: 'void_contract' } },
             ],
         },
@@ -969,7 +973,7 @@ export const REALMS = {
                 { item: 'void_contract', chance: 1.0 },
                 { item: 'arbiters_ledger', chance: 0.7 },
             ],
-            bonusResources: { void_essence: 20, runite: 5 },
+            bonusResources: { void_essence: 20, runite: 5, abyss_sliver: 3 },
             phases: [
                 {
                     name: 'Opening Terms', hp: 320, damage: 20,
@@ -1107,6 +1111,7 @@ export const REALMS = {
             { resource: 'void_essence', weight: 30, amount: [5, 12] },
             { resource: 'runite', weight: 25, amount: [4, 9] },
             { resource: 'gold', weight: 20, amount: [8, 16] },
+            { resource: 'abyss_sliver', weight: 8, amount: [1, 3] },
             { item: 'chaos_shard', weight: 3 },
             { item: 'unravelers_eye', weight: 2 },
         ],
@@ -1139,6 +1144,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} locates the one stable point in the entire realm. It has a lot of void essence.', loot: { resource: 'void_essence', amount: [12, 20] } },
                 { chance: 0.015, text: '{name} pulls a chaos shard directly out of unraveling space.', loot: { item: 'chaos_shard' } },
+                { chance: 0.04, text: '{name} reaches into an unraveled seam and pulls free a razor-thin fragment of hardened abyss.', loot: { resource: 'abyss_sliver', amount: [2, 4] } },
             ],
         },
         boss: {
@@ -1151,7 +1157,7 @@ export const REALMS = {
                 { item: 'chaos_shard', chance: 1.0 },
                 { item: 'unravelers_eye', chance: 0.8 },
             ],
-            bonusResources: { void_essence: 15, runite: 6 },
+            bonusResources: { void_essence: 15, runite: 6, abyss_sliver: 5 },
             isChaosEncounter: true,
             chaosPhaseTransition: true,
             // The Unraveler builds its early phases at spawn as buffed "masks" of

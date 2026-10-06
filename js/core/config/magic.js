@@ -276,6 +276,7 @@ export const RESEARCH = {
     ritual_magic: { name: 'Ritual Magic', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Unlock complex arcane rituals patterns for powerful colony-wide effects' },
     void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands and void staves', requiresTabCount: 2 },
     mana_weaving: { name: 'Mana Weaving', cost: 650, requires: ['arcane_infusion', 'textiles'], tab: 'magic', description: 'Weave mana into protective garb', requiresTabCount: 3 },
+    void_weaving: { name: 'Void Weaving', cost: 700, requires: ['mana_weaving', 'void_forging'], tab: 'magic', description: 'Weave void essence into enchanted garb' },
 
     // Mana
     luminance: { name: 'Luminance', cost: 200, requires: ['ley_channeling'], tab: 'mana', description: 'Mana-powered light' },
@@ -300,12 +301,13 @@ export const RESEARCH = {
     auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions' },
     void_pact: { name: 'Void Pact', cost: 900, requires: ['deep_delving', 'void_forging', 'void_sorcery'], tab: 'rifts', description: 'Broker passage through the deepest void. Those who enter must be willing to pay its price.' },
     unraveling: { name: 'Unraveling Threads', cost: 1100, requires: ['void_pact'], tab: 'rifts', description: 'Some rifts do not lead anywhere stable. The brave, or the foolish, enter anyway.' },
+    abyss_smithing: { name: 'Abyss Forging', cost: 900, requires: ['void_forging', 'void_pact'], tab: 'crafting', description: 'Shape abyss slivers into weapons of immense power. Only those who have ventured deep into the void can master this craft.', requiresMilestone: { stat: 'expeditionsCompleted', min: 5 } },
 };
 
 export const DEMO_LOCKED_RESEARCH = new Set([
     'advanced_arcana', 'void_sorcery', 'masterwork', 'golem_craft', 'mana_weaving',
     'mana_reservoir', 'brilliance', 'pyroclasm', 'void_architecture',
-    'void_forging', 'deep_delving', 'trade_rifts'
+    'void_forging', 'void_weaving', 'deep_delving', 'trade_rifts'
 ]);
 
 // Auto-derive unlocks from the 'research' field on buildings, recipes, and crops.

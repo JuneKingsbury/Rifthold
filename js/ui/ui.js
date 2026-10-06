@@ -248,6 +248,26 @@ export class UI {
                 this.updateCraftPanel();
                 return;
             }
+            const weaponTypeBtn = e.target.closest('[data-craft-weapon-type]');
+            if (weaponTypeBtn) {
+                if (!this._weaponHiddenTypes) this._weaponHiddenTypes = new Set();
+                const t = weaponTypeBtn.dataset.craftWeaponType;
+                if (this._weaponHiddenTypes.has(t)) this._weaponHiddenTypes.delete(t);
+                else this._weaponHiddenTypes.add(t);
+                this._lastCraftHtml = '';
+                this.updateCraftPanel();
+                return;
+            }
+            const armorTypeBtn = e.target.closest('[data-craft-armor-type]');
+            if (armorTypeBtn) {
+                if (!this._armorHiddenTypes) this._armorHiddenTypes = new Set();
+                const t = armorTypeBtn.dataset.craftArmorType;
+                if (this._armorHiddenTypes.has(t)) this._armorHiddenTypes.delete(t);
+                else this._armorHiddenTypes.add(t);
+                this._lastCraftHtml = '';
+                this.updateCraftPanel();
+                return;
+            }
         });
 
         this.elements.researchPanel.addEventListener('click', (e) => {
@@ -3138,6 +3158,28 @@ export class UI {
         html += '</div>';
         const hasEquipTiers = ['Weapons', 'Armor', 'Clothing', 'Tools', 'Trinkets'].includes(this._craftTab);
         const hasTomeFilter = this._craftTab === 'Tomes';
+        const hasWeaponFilter = this._craftTab === 'Weapons';
+        const hasArmorFilter = this._craftTab === 'Armor';
+        function getArmorCategories(def) {
+            const cats = new Set();
+            if (!def) return cats;
+            if (def.spellDamageBonus || def.manaRegen) cats.add('mage');
+            if (def.critChance || def.dodgeChance) cats.add('rogue');
+            if (def.workSpeedBonus || def.skillGrowthBonus || def.moodBonus || def.coldResistance) cats.add('support');
+            if (cats.size === 0) cats.add('tank');
+            if (def.damageReduction >= 0.20 || def.healthRegen || def.targetPriority || def.thornsDamage) cats.add('tank');
+            return cats;
+        }
+        function getWeaponCategories(def) {
+            const cats = new Set();
+            if (!def) return cats;
+            const hasRangedProjectile = def.ranged && def.skinKey !== 'projectile_spell';
+            if (hasRangedProjectile) cats.add('ranged');
+            if (def.spellDamageBonus || def.evocationBonus || def.conjurationBonus ||
+                def.abjurationBonus || def.transmutationBonus || def.divinationBonus) cats.add('magic');
+            if (!def.ranged) cats.add('melee');
+            return cats;
+        }
         if (hasEquipTiers) {
             if (this._craftHiddenTiers === undefined) this._craftHiddenTiers = new Set();
             const tiers = [1, 2, 3, 4];
@@ -3146,6 +3188,37 @@ export class UI {
             for (const t of tiers) {
                 const hidden = this._craftHiddenTiers.has(t);
                 html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tier="${t}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#336633'};color:${hidden ? '#666' : '#ccc'};border:1px solid ${hidden ? '#444' : '#4a4'};border-radius:3px;cursor:pointer;">T${t}</button>`;
+            }
+            html += '</div>';
+        }
+        if (hasWeaponFilter) {
+            if (this._weaponHiddenTypes === undefined) this._weaponHiddenTypes = new Set();
+            const weaponTypes = [
+                { key: 'melee',  label: 'Melee',  color: '#c8a04a' },
+                { key: 'ranged', label: 'Ranged', color: '#4ac8a0' },
+                { key: 'magic',  label: 'Magic',  color: '#a04ac8' },
+            ];
+            html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
+            html += '<span style="color:#888;font-size:0.82em;">Type:</span>';
+            for (const { key, label, color } of weaponTypes) {
+                const hidden = this._weaponHiddenTypes.has(key);
+                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-weapon-type="${key}" style="padding:1px 6px;font-size:0.82em;background:#1a1a2e;color:${hidden ? '#555' : color};border:1px solid ${hidden ? '#444' : color};border-radius:3px;cursor:pointer;">${label}</button>`;
+            }
+            html += '</div>';
+        }
+        if (hasArmorFilter) {
+            if (this._armorHiddenTypes === undefined) this._armorHiddenTypes = new Set();
+            const armorTypes = [
+                { key: 'tank',    label: 'Tank',    color: '#c8a04a' },
+                { key: 'mage',    label: 'Mage',    color: '#a04ac8' },
+                { key: 'rogue',   label: 'Rogue',   color: '#4ac8a0' },
+                { key: 'support', label: 'Support', color: '#c84a4a' },
+            ];
+            html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
+            html += '<span style="color:#888;font-size:0.82em;">Type:</span>';
+            for (const { key, label, color } of armorTypes) {
+                const hidden = this._armorHiddenTypes.has(key);
+                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-armor-type="${key}" style="padding:1px 6px;font-size:0.82em;background:#1a1a2e;color:${hidden ? '#555' : color};border:1px solid ${hidden ? '#444' : color};border-radius:3px;cursor:pointer;">${label}</button>`;
             }
             html += '</div>';
         }
@@ -3176,6 +3249,24 @@ export class UI {
                 const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || BOOTS[outputKey] || TOOLS[outputKey] || TRINKETS[outputKey];
                 if (!def || def.tier === undefined) return true;
                 return !this._craftHiddenTiers.has(def.tier);
+            });
+        }
+        if (hasWeaponFilter && this._weaponHiddenTypes && this._weaponHiddenTypes.size > 0) {
+            filtered = filtered.filter(r => {
+                const outputKey = Object.keys(r.recipe.output)[0];
+                const def = WEAPONS[outputKey];
+                if (!def) return true;
+                const cats = getWeaponCategories(def);
+                return [...cats].some(c => !this._weaponHiddenTypes.has(c));
+            });
+        }
+        if (hasArmorFilter && this._armorHiddenTypes && this._armorHiddenTypes.size > 0) {
+            filtered = filtered.filter(r => {
+                const outputKey = Object.keys(r.recipe.output)[0];
+                const def = ARMORS[outputKey] || HELMETS[outputKey] || BOOTS[outputKey];
+                if (!def) return true;
+                const cats = getArmorCategories(def);
+                return [...cats].some(c => !this._armorHiddenTypes.has(c));
             });
         }
         if (hasTomeFilter) {

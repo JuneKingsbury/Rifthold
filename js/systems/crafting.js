@@ -16,10 +16,15 @@ export function invalidateRecipeCache() {
     _recipeCacheVersion = -1;
 }
 
+function isRecipeResearched(game, research) {
+    if (Array.isArray(research)) return research.every(r => game.research.isResearched(r));
+    return game.research.isResearched(research);
+}
+
 export function queueCraftingOrder(game, recipeKey) {
     const recipe = RECIPES[recipeKey];
     if (!recipe) return false;
-    if (recipe.research && !game.research.isResearched(recipe.research)) return false;
+    if (recipe.research && !isRecipeResearched(game, recipe.research)) return false;
     if (!game.resources.has(recipe.input)) return false;
 
     const stationType = recipe.station;
@@ -101,7 +106,7 @@ export function getAvailableRecipes(game) {
 
     const available = [];
     for (const [key, recipe] of Object.entries(RECIPES)) {
-        if (recipe.research && !game.research.isResearched(recipe.research)) continue;
+        if (recipe.research && !isRecipeResearched(game, recipe.research)) continue;
         const hasResources = game.resources.has(recipe.input);
         const hasStation = findAvailableStation(game, recipe.station) !== null;
         available.push({ key, recipe, hasResources, hasStation, canCraft: hasResources && hasStation });
@@ -154,7 +159,7 @@ export function updateAutoCraft(game) {
 
         const recipe = RECIPES[recipeKey];
         if (!recipe) continue;
-        if (recipe.research && !game.research.isResearched(recipe.research)) continue;
+        if (recipe.research && !isRecipeResearched(game, recipe.research)) continue;
         if (!findAvailableStation(game, recipe.station)) continue;
         if (!game.resources.has(recipe.input)) continue;
 
