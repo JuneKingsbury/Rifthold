@@ -1,0 +1,15 @@
+{
+  "id": "test_mod_alpha",
+  "name": "Test Mod Alpha",
+  "version": "1.0.0",
+  "author": "Rifthold Dev",
+  "description": "Simple test mod for load order testing. Adds one trait.",
+  "gameVersion": ">=1.0.0",
+  "dependencies": [],
+  "conflicts": [],
+  "loadOrder": 10,
+  "defaultEnabled": true,
+  "data": {
+    "traits": "data/traits.json"
+  }
+}

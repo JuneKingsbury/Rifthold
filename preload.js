@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cloudList:   ()               => ipcRenderer.invoke('gdrive:list'),
   },
   writePortrait: (filename, base64Data) => ipcRenderer.invoke('write-portrait', filename, base64Data),
+  scanModsDir: (dirPath) => ipcRenderer.invoke('mods:scan-dir', dirPath),
+  readModFile: (fileUrl) => ipcRenderer.invoke('mods:read-file', fileUrl),
+  getDefaultModsPath: () => ipcRenderer.invoke('mods:default-path'),
+  pickModsFolder: () => ipcRenderer.invoke('mods:pick-folder'),
   steam: {
     available: () => ipcRenderer.invoke('steam:available'),
     getPlayerInfo: () => ipcRenderer.invoke('steam:player-info'),

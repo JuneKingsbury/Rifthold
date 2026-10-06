@@ -3,6 +3,7 @@ import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
 import { recalcMaxMana, invalidateEquipStatCache, TRANSIENT_COLONIST_FIELDS, TRANSIENT_COLONIST_DEFAULTS } from '../entities/colonist.js';
 import * as gdriveWeb from './gdrive-web.js';
+import { getLoadedManifests } from './mod-registry.js';
 
 const SAVE_KEY = 'colony_save';
 const GDRIVE_LAST_SYNC_KEY = 'gdrive_last_sync_ts';
@@ -357,12 +358,14 @@ function _buildSaveData(game) {
 export function extractMeta(data) {
     // CONFIG.TICKS_PER_DAY = 480
     const dayOfSeason = Math.floor((data.weather?.seasonTick || 0) / 480) + 1;
+    const mods = getLoadedManifests().map(m => m.id);
     return {
         colonistCount: (data.colonists || []).length,
         season: data.weather?.season || 'spring',
         year: data.weather?.year || 1,
         dayOfSeason,
         timestamp: Date.now(),
+        mods,
     };
 }
 

@@ -1,0 +1,11 @@
+{
+  "test_mod_cursed_wolf": {
+    "name": "Cursed Wolf",
+    "hp": [35, 55],
+    "damage": [5, 8],
+    "sprite": "test_mod_cursed_wolf",
+    "color": "#9944cc",
+    "attackAnim": "Swing",
+    "lore": "A wolf consumed by the forest's curse. Its bite carries a lingering venom."
+  }
+}

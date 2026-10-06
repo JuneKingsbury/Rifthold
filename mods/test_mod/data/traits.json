@@ -1,0 +1,10 @@
+{
+  "test_mod_cursed_blood": {
+    "name": "Cursed Blood",
+    "weight": 3,
+    "value": -1,
+    "poisonResistance": -0.25,
+    "description": "This colonist carries cursed blood, making them susceptible to poisons.",
+    "expedition": { "fatigueMult": 1.1 }
+  }
+}

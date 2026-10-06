@@ -9,6 +9,7 @@ import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
 import { adventurerLevelTooltip } from './ui-utils.js';
+import { resolvePortraitSrc } from '../core/mod-registry.js';
 
 // Visual glyph + color for an expedition combat status effect. Poison ticks
 // damage, stun skips a turn, slow may cost a turn, weaken reduces output, burn
@@ -522,7 +523,8 @@ const arcaneMethods = {
                 const anyDemoLocked = chainRealms.some(r => expl.isRealmDemoLocked(this.game, r.key));
                 if (!anyVisible && !anyDemoLocked && !chainRealms.some(r => !r.research || this.game.research.isResearched(r.research))) continue;
                 const chainIconKey = chain.toLowerCase().replace(/\s+/g, '_');
-                html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;display:flex;align-items:center;gap:4px;"><img src="portraits/chain_${chainIconKey}.png" class="pixel-art-icon" style="width:16px;height:16px;flex-shrink:0;" onerror="this.style.display='none'">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
+                const chainIconSrc = resolvePortraitSrc(`chain_${chainIconKey}`);
+                html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;display:flex;align-items:center;gap:4px;"><img src="${chainIconSrc}" class="pixel-art-icon" style="width:16px;height:16px;flex-shrink:0;" onerror="this.style.display='none'">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
                 for (const realm of chainRealms) {
                     const available = dims.find(d => d.key === realm.key);
                     const sendable = available && expl.canSend(this.game, realm.key);
@@ -599,7 +601,18 @@ const arcaneMethods = {
     _buildExpeditionSetupHtml(realmKey) {
         const expl = this.game.exploration;
         const available = this.game.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.expeditionPending && !c.drafted && !(c.traits && c.traits.includes('pacifist')));
+        const realmDef = REALMS[realmKey];
         let html = `<div class="arcane-section">`;
+
+        if (realmDef) {
+            const portraitKey = realmDef.portrait || `realm_${realmKey}`;
+            const portraitSrc = resolvePortraitSrc(portraitKey);
+            html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a44;">`;
+            html += `<img src="${portraitSrc}" class="pixel-art" style="width:48px;height:48px;object-fit:cover;border-radius:3px;flex-shrink:0;" onerror="this.style.display='none'">`;
+            html += `<div><div style="color:#33ccff;font-weight:bold;">${realmDef.name}</div>`;
+            if (realmDef.description) html += `<div style="color:#888;font-size:0.85em;margin-top:2px;">${realmDef.description}</div>`;
+            html += `</div></div>`;
+        }
 
         // Party presets
         if (expl.partyPresets.length > 0) {

@@ -86,8 +86,47 @@ export class SkinManager {
             return;
         }
         await this._loadSkin(skinName);
+        await this.loadModSprites();
         this._activeSkin = skinName;
         this._itemDataURLCache = null;
+        this._compositeCache.clear();
+    }
+
+    async loadModSprites() {
+        let pending;
+        try {
+            const mod = await import('../core/mod-loader.js');
+            pending = mod.pendingModSprites;
+        } catch { return; }
+        if (!pending || !pending.length) return;
+
+        const loadPromises = [];
+        for (const { spritesBase, modDirHandle } of pending) {
+            const manifestLoader = modDirHandle
+                ? modDirHandle.getDirectoryHandle('assets').then(d => d.getFileHandle('sprites.json')).then(f => f.getFile()).then(f => f.text()).then(t => JSON.parse(t)).catch(() => null)
+                : fetch(`${spritesBase}.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+
+            loadPromises.push(
+                manifestLoader.then(async manifest => {
+                    if (!manifest) return;
+                    const imgLoads = [];
+                    for (const [category, keys] of Object.entries(manifest)) {
+                        for (const key of keys) {
+                            const urlPromise = modDirHandle
+                                ? modDirHandle.getDirectoryHandle('assets').then(d => d.getDirectoryHandle('sprites')).then(d => d.getDirectoryHandle(category)).then(d => d.getFileHandle(`${key}.png`)).then(f => f.getFile()).then(f => URL.createObjectURL(f)).catch(() => null)
+                                : Promise.resolve(`${spritesBase}/${category}/${key}.png`);
+                            imgLoads.push(
+                                urlPromise.then(url => url ? this._loadImage(url) : null).then(img => {
+                                    if (img) this._sprites.set(`${category}:${key}`, img);
+                                }).catch(() => {})
+                            );
+                        }
+                    }
+                    await Promise.all(imgLoads);
+                }).catch(() => {})
+            );
+        }
+        await Promise.all(loadPromises);
         this._compositeCache.clear();
     }
 
@@ -195,8 +234,14 @@ export class SkinManager {
         else if (race === 'bufos') {
             bodyCount = this._bufosBodyCount;
         }
-        else {
+        else if (race === 'human' || !race) {
             bodyCount = this._humanBodyCount;
+        }
+        else {
+            // Mod race: count body sprites dynamically.
+            let n = 0;
+            while (this._sprites.has(`entities:colonist_${race}_body_${n + 1}`)) n++;
+            bodyCount = n > 0 ? n : this._humanBodyCount;
         }
         if (bodyCount <= 0) return null;
 

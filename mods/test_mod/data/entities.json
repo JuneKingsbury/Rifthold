@@ -1,0 +1,32 @@
+{
+  "test_mod_shadow_fox": {
+    "name": "Shadow Fox",
+    "char": "f",
+    "color": "#663388",
+    "hp": 18,
+    "speed": 0.25,
+    "category": "animal",
+    "tameable": false,
+    "damage": 2,
+    "aggroRange": 5,
+    "hostile": false,
+    "sprite": "test_mod_shadow_fox",
+    "lore": "A fox with unnaturally dark fur. Flees when approached."
+  },
+  "test_mod_cursed_bandit": {
+    "name": "Cursed Bandit",
+    "char": "R",
+    "color": "#9944cc",
+    "hp": 40,
+    "speed": 0.22,
+    "category": "enemy",
+    "hostile": true,
+    "damage": 4,
+    "aggroRange": 30,
+    "roles": [{ "type": "melee_charger" }],
+    "attackAnim": "Swing",
+    "sprite": "test_mod_cursed_bandit",
+    "loot": [],
+    "lore": "A bandit afflicted by the forest's curse. Tougher than ordinary raiders."
+  }
+}

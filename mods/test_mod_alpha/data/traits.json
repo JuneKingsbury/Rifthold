@@ -1,0 +1,9 @@
+{
+  "test_mod_alpha_quick_learner": {
+    "name": "Quick Learner",
+    "weight": 4,
+    "value": 2,
+    "description": "Gains experience faster than most. (Test Mod Alpha)",
+    "xpMult": 1.15
+  }
+}

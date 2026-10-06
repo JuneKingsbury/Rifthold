@@ -1,0 +1,10 @@
+{
+  "test_mod_cursed_raid": {
+    "name": "Cursed Raid",
+    "composition": [
+      { "entity": "raider_brute", "count": [1, 2] },
+      { "entity": "test_mod_cursed_bandit", "count": [1, 3] }
+    ],
+    "scaling": { "hpMult": 0.12, "damageMult": 0.06 }
+  }
+}

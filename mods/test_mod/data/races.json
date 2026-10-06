@@ -1,0 +1,8 @@
+{
+  "test_mod_shadeveil": {
+    "name": "Shadeveil",
+    "description": "A race of shadow-touched humanoids, attuned to darkness and magic.",
+    "statBonuses": { "maxHp": -5, "critChance": 0.05 },
+    "traitWeightOverrides": { "test_mod_cursed_blood": 2 }
+  }
+}

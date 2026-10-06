@@ -1,0 +1,55 @@
+{
+  "weapons": {
+    "test_mod_cursed_blade": {
+      "name": "Cursed Blade",
+      "damage": 14,
+      "tier": 2,
+      "order": 8,
+      "attackAnim": "Swing",
+      "description": "A blade twisted by dark magic. Poisons and slows on hit, and grants a small damage boost to its wielder.",
+      "effects": [
+        { "type": "dot_on_hit", "dotType": "poison", "damage": 2, "ticks": 6, "interval": 8 },
+        { "type": "slow_on_hit", "duration": 40, "moveSpeedMalus": -0.4, "attackSlowMult": 0.75, "rounds": 1 },
+        { "type": "stat_bonus", "stat": "damage", "value": 2 }
+      ],
+      "recipe": {
+        "input": { "iron": 2, "planks": 1 },
+        "ticks": 20,
+        "research": "metalworking",
+        "station": "anvil"
+      }
+    }
+  },
+  "armors": {
+    "test_mod_thornweave": {
+      "name": "Thornweave Vest",
+      "damageReduction": 0.10,
+      "tier": 2,
+      "order": 8,
+      "description": "Armor woven with barbed thorns. Poisons anyone who strikes the wearer.",
+      "effects": [
+        { "type": "dot_on_attacker", "dotType": "poison", "damage": 2, "ticks": 4, "interval": 10 }
+      ],
+      "recipe": {
+        "input": { "leather": 3, "planks": 1 },
+        "ticks": 18,
+        "station": "workbench"
+      }
+    }
+  },
+  "trinkets": {
+    "test_mod_lucky_charm": {
+      "name": "Lucky Charm",
+      "critChance": 0.05,
+      "description": "A small carved token. Slightly increases critical hit chance.",
+      "effects": [
+        { "type": "stat_bonus", "stat": "critChance", "value": 0.05 }
+      ],
+      "recipe": {
+        "input": { "runite": 1, "planks": 1 },
+        "ticks": 12,
+        "station": "workbench"
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "test_mod_dark_crafting": {
+    "name": "Dark Crafting",
+    "tab": "crafting",
+    "cost": 120,
+    "requires": ["metalworking"],
+    "description": "Techniques for infusing weapons and armor with cursed properties."
+  }
+}

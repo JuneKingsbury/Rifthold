@@ -1,0 +1,9 @@
+{
+  "test_mod_beta_night_owl": {
+    "name": "Night Owl",
+    "weight": 3,
+    "value": 1,
+    "description": "Works better during night hours. (Test Mod Beta)",
+    "nightWorkMult": 1.1
+  }
+}

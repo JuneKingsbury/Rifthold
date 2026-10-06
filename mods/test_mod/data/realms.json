@@ -1,0 +1,19 @@
+{
+  "test_mod_cursed_forest": {
+    "name": "Cursed Forest",
+    "difficulty": 2,
+    "chain": "test_mod_cursed",
+    "chainOrder": 1,
+    "research": "metalworking",
+    "duration": [200, 320],
+    "encounters": 5,
+    "combatEncounters": [2, 3],
+    "enemies": { "test_mod_cursed_wolf": 3, "dire_wolf": 1 },
+    "loot": [
+      { "item": "leather", "weight": 4, "amount": [2, 5] },
+      { "item": "test_mod_cursed_blade", "weight": 1, "amount": [1, 1] }
+    ],
+    "description": "A forest twisted by an ancient curse. The wildlife here is unpredictable and dangerous.",
+    "portrait": "realm_cursed_forest"
+  }
+}

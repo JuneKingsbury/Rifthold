@@ -55,8 +55,7 @@
         <h2>Arcane Frontiers</h2>
         <div id="demo-banner-start" style="display:none;">DEMO MODE</div>
         <p>
-            Oversee a growing colony of settlers in a world of magic. Assign priorities, build structures,
-            channel leylines, brew potions, and survive the seasons.
+            Oversee a newly formed colony of strangers in a world of untapped magic. Build homes, make friends, and explore the unknown.
         </p>
         <div class="start-btn-grid">
             <div class="start-btn-row">
@@ -71,8 +70,9 @@
                 <button id="start-glossary" data-modal-open>Glossary</button>
                 <button id="start-credits" data-modal-open>Credits</button>
             </div>
-            <div class="start-btn-row" id="start-quit-row" style="display:none">
-                <button id="start-quit">Quit Game</button>
+            <div class="start-btn-row" id="start-quit-row">
+                <button id="start-mods">Mods</button>
+                <button id="start-quit" style="display:none">Quit Game</button>
             </div>
         </div>
         <details id="start-controls-details" style="font-size:12px; color:#999; max-width:500px; text-align:center;">
@@ -355,6 +355,9 @@
         <div id="colonist-slots-container" style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;"></div>
     </div>
 
+    <div id="mods-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(560px,92vw); max-height:80vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
+    </div>
+
     <div id="save-slots-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(600px,94vw); max-height:82vh; overflow-y:auto; font-size:12px; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Load Game</div>
@@ -486,6 +489,6 @@
 
     <div id="ui-tooltip"></div>
     <script src="lib/jszip.min.js"></script>
-    <script type="module" src="js/core/main.js"></script>
+    <script type="module" src="js/core/boot.js"></script>
 </body>
 </html>

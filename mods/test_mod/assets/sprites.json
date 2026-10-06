@@ -1,0 +1,9 @@
+{
+  "entities": [
+    "test_mod_cursed_wolf",
+    "test_mod_shadow_fox",
+    "test_mod_cursed_bandit",
+    "colonist_test_mod_shadeveil_body_1"
+  ],
+  "items": ["test_mod_cursed_blade", "test_mod_thornweave", "test_mod_lucky_charm"]
+}

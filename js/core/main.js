@@ -1,4 +1,6 @@
 import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS, SEASONS, SEASON_ADVANCE_NOTICE, PRIORITY_PROFILES } from './config.js';
+import { initModsUI } from '../ui/ui-mods.js';
+import { getLoadedManifests, getDiscoveredManifests, setModEnabled, markModsInitialized } from './mod-registry.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
@@ -3285,7 +3287,14 @@ function initPanelOverlay() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function _onDOMReady(fn) {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fn, { once: true });
+    } else {
+        fn();
+    }
+}
+_onDOMReady(() => {
     migrateColonySave();
     syncAllFromCloud();
 
@@ -3427,6 +3436,16 @@ document.addEventListener('DOMContentLoaded', () => {
         startScreen.style.visibility = '';
     }
 
+    function _slotModMismatch(meta) {
+        if (!meta?.mods) return null;
+        const activeMods = getLoadedManifests().map(m => m.id);
+        const savedMods = meta.mods;
+        const missing = savedMods.filter(id => !activeMods.includes(id));
+        const added = activeMods.filter(id => !savedMods.includes(id));
+        if (!missing.length && !added.length) return null;
+        return { missing, added };
+    }
+
     function renderSlotCard(slotKey, meta, isAuto) {
         const isEmpty = !meta;
         const slotIndex = parseInt(slotKey.slice(-1));
@@ -3438,10 +3457,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const thumbHtml = meta?.thumbnail
             ? `<img class="slot-thumbnail" src="${meta.thumbnail}" alt="">`
             : `<div class="slot-thumbnail-placeholder"></div>`;
+        const mismatch = isEmpty ? null : _slotModMismatch(meta);
+        const modsHtml = !isEmpty && meta.mods !== undefined
+            ? (() => {
+                if (!meta.mods.length && !getLoadedManifests().length) return '';
+                if (mismatch) return `<span style="color:#ffaa33;font-size:10px;">&#9888; Mod mismatch</span>`;
+                if (meta.mods.length) return `<span style="color:#666;font-size:10px;">Mods: ${meta.mods.join(', ')}</span>`;
+                return `<span style="color:#666;font-size:10px;">No mods</span>`;
+            })()
+            : '';
         return `<div class="slot-card${isEmpty ? ' slot-empty' : ''}">
             ${thumbHtml}
             <div class="slot-label">${defaultLabel}</div>
-            <div class="slot-meta">${isEmpty ? '<span style="color:#555">Empty</span>' : `<span class="slot-name">${displayName}</span><br>${gameStr}<br><span class="slot-timestamp">${dateStr}</span>`}</div>
+            <div class="slot-meta">${isEmpty ? '<span style="color:#555">Empty</span>' : `<span class="slot-name">${displayName}</span><br>${gameStr}<br><span class="slot-timestamp">${dateStr}</span>${modsHtml ? '<br>' + modsHtml : ''}`}</div>
             <button class="slot-export-btn" ${isEmpty ? 'disabled' : ''} data-slot-export-key="${slotKey}">Export</button>
             <button class="slot-load-btn" ${isEmpty ? 'disabled' : ''} data-slot-key="${slotKey}">Load</button>
         </div>`;
@@ -3464,6 +3492,68 @@ document.addEventListener('DOMContentLoaded', () => {
         window.soundManager?.playSFXPitched('open_close_click', 3);
     }
 
+    function _showModMismatchModal(slotKey, slotMeta, mismatch, onLoadAnyway) {
+        const discovered = getDiscoveredManifests();
+        const discoveredIds = new Set(discovered.map(m => m.id));
+        const canRestore = mismatch.missing.every(id => discoveredIds.has(id));
+
+        const _esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        let detailHtml = '';
+        if (mismatch.missing.length) {
+            detailHtml += `<div style="margin-bottom:8px;">
+                <div style="color:#ffaa33;font-size:11px;margin-bottom:3px;">Needs to be enabled:</div>
+                ${mismatch.missing.map(id => {
+                    const avail = discoveredIds.has(id);
+                    return `<div style="color:${avail ? '#ffcc00' : '#ff6666'};font-size:11px;padding:1px 0;">
+                        ${avail ? '&#9744;' : '&#9888;'} ${_esc(id)}${avail ? '' : ' <span style="color:#888;">(not in mods folder)</span>'}
+                    </div>`;
+                }).join('')}
+            </div>`;
+        }
+        if (mismatch.added.length) {
+            detailHtml += `<div style="margin-bottom:8px;">
+                <div style="color:#88aaff;font-size:11px;margin-bottom:3px;">Currently enabled but not in save:</div>
+                ${mismatch.added.map(id => `<div style="color:#aaa;font-size:11px;padding:1px 0;">&#9745; ${_esc(id)}</div>`).join('')}
+            </div>`;
+        }
+
+        const restoreBtnHtml = canRestore
+            ? `<button id="mod-mismatch-restore" style="padding:4px 14px;background:#2a2a4e;color:#ffcc00;border:1px solid #664400;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">Restore mods &amp; restart</button>`
+            : '';
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML = `
+            <div style="background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:20px 24px;max-width:420px;width:90%;font-family:inherit;box-shadow:0 4px 24px #000;">
+                <div style="color:#ffaa33;font-weight:bold;margin-bottom:10px;">&#9888; Mod Mismatch</div>
+                <div style="color:#aaa;font-size:12px;margin-bottom:14px;">This save was created with a different set of mods. Loading may cause missing content or errors.</div>
+                ${detailHtml}
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:flex-end;">
+                    ${restoreBtnHtml}
+                    <button id="mod-mismatch-load" style="padding:4px 14px;background:#2a3a2a;color:#88cc88;border:1px solid #446644;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">Load anyway</button>
+                    <button id="mod-mismatch-cancel" style="padding:4px 14px;background:#2a2a2a;color:#aaa;border:1px solid #444;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">Cancel</button>
+                </div>
+            </div>`;
+
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#mod-mismatch-cancel').addEventListener('click', () => overlay.remove());
+        overlay.querySelector('#mod-mismatch-load').addEventListener('click', () => { overlay.remove(); onLoadAnyway(); });
+        const restoreEl = overlay.querySelector('#mod-mismatch-restore');
+        if (restoreEl) {
+            restoreEl.addEventListener('click', () => {
+                const savedMods = new Set(slotMeta.mods);
+                markModsInitialized();
+                for (const m of discovered) {
+                    setModEnabled(m.id, savedMods.has(m.id));
+                }
+                overlay.remove();
+                location.reload();
+            });
+        }
+    }
+
     saveSlotsPanel.addEventListener('click', (e) => {
         const exportBtn2 = e.target.closest('.slot-export-btn[data-slot-export-key]');
         if (exportBtn2 && !exportBtn2.disabled) {
@@ -3473,14 +3563,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = e.target.closest('.slot-load-btn[data-slot-key]');
         if (!btn || btn.disabled) return;
         const key = btn.dataset.slotKey;
-        saveSlotsPanel.style.display = 'none';
-        modalBackdropEl.style.display = 'none';
-        window.soundManager?.playSFXPitched('open_close_click', -3);
-        launchGame(async game => {
-            await loadFromSlot(game, key);
-            game.settings.primarySaveSlot = key;
-            game.saveSettingsToStorage();
-        });
+        const slotMeta = getAllSlotsMeta()[key];
+        const mismatch = _slotModMismatch(slotMeta);
+        const doLoad = () => {
+            saveSlotsPanel.style.display = 'none';
+            modalBackdropEl.style.display = 'none';
+            window.soundManager?.playSFXPitched('open_close_click', -3);
+            launchGame(async game => {
+                await loadFromSlot(game, key);
+                game.settings.primarySaveSlot = key;
+                game.saveSettingsToStorage();
+            });
+        };
+        if (mismatch) {
+            _showModMismatchModal(key, slotMeta, mismatch, doLoad);
+            return;
+        }
+        doLoad();
     });
 
     const versionLabel = document.getElementById('version-label');
@@ -3736,6 +3835,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const colonistsPanelEl = document.getElementById('colonists-panel');
         if (colonistsPanelEl) colonistsPanelEl.style.display = 'none';
         saveSlotsPanel.style.display = 'none';
+        const modsPanelEl = document.getElementById('mods-panel');
+        if (modsPanelEl) modsPanelEl.style.display = 'none';
         modalBackdrop.style.display = 'none';
     }
 
@@ -3814,6 +3915,10 @@ document.addEventListener('DOMContentLoaded', () => {
         creditsPanel.style.display = 'none';
         changelogPanel.style.display = 'block';
     });
+
+    // ── Mods Panel ───────────────────────────────────────────────────────────
+
+    initModsUI();
 
     // ── Colonist Customization Panel ─────────────────────────────────────────
 
@@ -4703,7 +4808,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (window.electronAPI?.quit) {
-        document.getElementById('start-quit-row').style.display = '';
+        document.getElementById('start-quit').style.display = '';
         document.getElementById('start-quit').addEventListener('click', () => {
             window.electronAPI.quit();
         });

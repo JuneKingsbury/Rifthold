@@ -3125,6 +3125,25 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
         game.overlays.push({ type: 'floating_text', x: attacker.x, y: attacker.y, text: `-${thornsDamage}`, color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
     }
 
+    // Mod-defined dot_on_attacker effect: applies a DoT to whatever hit this colonist.
+    if (attacker && attacker.hp > 0) {
+        for (const slot of ['armor', 'helmet', 'clothes', 'boots', 'trinket']) {
+            const item = colonist[slot];
+            if (!item?._thornsDoT) continue;
+            const dot = item._thornsDoT;
+            if (!attacker._dotEffects) attacker._dotEffects = [];
+            const existing = attacker._dotEffects.find(d => d.type === dot.dotType);
+            const expiresAt = game.tick + (dot.ticks * dot.interval);
+            if (existing) {
+                existing.expiresAt = Math.max(existing.expiresAt, expiresAt);
+                existing.rounds = Math.max(existing.rounds || 0, dot.ticks);
+                existing.damage = dot.damage;
+            } else {
+                attacker._dotEffects.push({ type: dot.dotType, damage: dot.damage, interval: dot.interval, nextTick: game.tick + dot.interval, expiresAt, rounds: dot.ticks });
+            }
+        }
+    }
+
     if (colonist.state !== 'fighting' && colonist.state !== 'fleeing' && colonist.hp > 0) {
         game.eventLog.add(game, `${colonist.name} is under attack!`, 'danger', { type: 'colonist', id: colonist.id });
     }

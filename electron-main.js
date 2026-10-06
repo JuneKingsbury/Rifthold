@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, net, ipcMain } = require('electron');
+const { app, BrowserWindow, protocol, net, ipcMain, dialog } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -84,6 +84,44 @@ ipcMain.handle('steam:cloud-list', () => steamBridge.cloudList());
 ipcMain.handle('steam:cloud-enabled', () => steamBridge.cloudEnabled());
 ipcMain.handle('steam:overlay-store', () => steamBridge.openOverlayStore());
 ipcMain.handle('steam:overlay-url', (_, url) => steamBridge.openOverlayUrl(url));
+
+ipcMain.handle('mods:default-path', () => {
+  return require('url').pathToFileURL(path.join(app.getPath('userData'), 'mods')).href;
+});
+
+ipcMain.handle('mods:scan-dir', (_, dirPath) => {
+  let dir;
+  try {
+    dir = dirPath.startsWith('file://') ? require('url').fileURLToPath(dirPath) : dirPath;
+  } catch {
+    return [];
+  }
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter(e => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'manifest.json')))
+    .map(e => e.name)
+    .sort();
+});
+
+ipcMain.handle('mods:read-file', (_, fileUrl) => {
+  let filePath;
+  try {
+    filePath = fileUrl.startsWith('file://') ? require('url').fileURLToPath(fileUrl) : fileUrl;
+  } catch {
+    return null;
+  }
+  if (!fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath, 'utf8');
+});
+
+ipcMain.handle('mods:pick-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Mods Folder',
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return require('url').pathToFileURL(result.filePaths[0]).href;
+});
 
 ipcMain.handle('write-portrait', (_, filename, base64Data) => {
   const safe = path.basename(filename);

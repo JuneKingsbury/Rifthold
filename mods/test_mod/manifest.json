@@ -1,0 +1,27 @@
+{
+  "id": "test_mod",
+  "name": "Test Mod",
+  "version": "1.0.0",
+  "author": "Rifthold Dev",
+  "description": "Reference mod covering every moddable data type. Adds a Cursed Forest realm chain, cursed weapons and armor, new wildlife, a new raider type and scenario, a new colonist trait, and a new race.",
+  "gameVersion": ">=1.0.0",
+  "dependencies": [],
+  "conflicts": [],
+  "loadOrder": 1,
+  "defaultEnabled": true,
+  "data": {
+    "items":      "data/items.json",
+    "realms":     "data/realms.json",
+    "research":   "data/research.json",
+    "traits":     "data/traits.json",
+    "enemies":    "data/enemies.json",
+    "entities":   "data/entities.json",
+    "raid_types": "data/raid_types.json",
+    "races":      "data/races.json"
+  },
+  "assets": {
+    "sprites":   "assets/sprites",
+    "portraits": "assets/portraits",
+    "audio":     "assets/audio.json"
+  }
+}
