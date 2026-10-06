@@ -114,6 +114,13 @@ export class UI {
                 this.animateStatBars(0);
             }
         });
+        this.elements.infoPanel.addEventListener('click', (e) => {
+            if (e.target.closest('[data-open-attune]')) {
+                this._prioTab = 'attune';
+                if (!this.priorityPanelVisible) this.togglePriorityPanel();
+                else this.updatePriorityPanel();
+            }
+        });
         // The persistent Colony Summary defers its rebuild while hovered (so a
         // click on an alert row isn't lost to a mid-hover swap), then flushes.
         this.elements.colonySummary.addEventListener('mouseleave', () => {
@@ -1686,6 +1693,10 @@ export class UI {
                 const names = attunedSchools.map(k => `<span style="color:${MAGIC_SKILLS[k].color}">${MAGIC_SKILLS[k].name}</span>`).join(', ');
                 html += `<div class="info-row" style="font-size:0.85em">Attuned: ${names} <span style="color:#666">(only these autocast)</span></div>`;
             }
+            if (attunedSchools.length < MAGIC_STUDY_CONFIG.attunementSlots) {
+                const missing = MAGIC_STUDY_CONFIG.attunementSlots - attunedSchools.length;
+                html += `<div class="info-row" style="color:#ff8844;font-size:0.85em">&#9888; ${missing} attunement slot${missing > 1 ? 's' : ''} unfilled. <span data-open-attune style="text-decoration:underline;cursor:pointer">Set in Priority &gt; Attunement</span></div>`;
+            }
         }
 
         // --- Equipment ---
@@ -1949,8 +1960,8 @@ export class UI {
     // .overview-alert rows jump to the first matching colonist when clicked.
     buildColonyOverviewHtml() {
         let alive = 0, aliveGolems = 0, moodSum = 0;
-        let idle = 0, hungry = 0, lowRest = 0, lowHp = 0, homeless = 0, noTome = 0;
-        let idleId = null, hungryId = null, lowRestId = null, lowHpId = null, homelessId = null, noTomeId = null;
+        let idle = 0, hungry = 0, lowRest = 0, lowHp = 0, homeless = 0, noTome = 0, missingAttune = 0;
+        let idleId = null, hungryId = null, lowRestId = null, lowHpId = null, homelessId = null, noTomeId = null, missingAttuneId = null;
         for (const c of this.game.colonists) {
             if (c.hp <= 0) continue;
             if (c.golem) { aliveGolems++; continue; }
@@ -1962,6 +1973,11 @@ export class UI {
             if (c.maxHp > 0 && c.hp / c.maxHp <= 0.35) { lowHp++; if (lowHpId === null) lowHpId = c.id; }
             if (!c.assignedBed) { homeless++; if (homelessId === null) homelessId = c.id; }
             if (!c.equippedTome) { noTome++; if (noTomeId === null) noTomeId = c.id; }
+            const hasMagic = c.magicSkills && Object.values(c.magicSkills).some(v => v > 0);
+            if (hasMagic) {
+                const attuned = Array.isArray(c.attunedSchools) ? c.attunedSchools : [];
+                if (attuned.length < MAGIC_STUDY_CONFIG.attunementSlots) { missingAttune++; if (missingAttuneId === null) missingAttuneId = c.id; }
+            }
         }
         const avgMood = alive > 0 ? Math.round(moodSum / alive) : 0;
         const moodLevel = getMoodLabel(avgMood);
@@ -1994,6 +2010,7 @@ export class UI {
         if (idle > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${idleId}" style="color:#88aaff;cursor:pointer">${idle} idle</div>`);
         if (homeless > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${homelessId}" style="color:#ccaa44;cursor:pointer">${homeless} without a home</div>`);
         if (noTome > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${noTomeId}" style="color:#88aaff;cursor:pointer">${noTome} without a tome</div>`);
+        if (missingAttune > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${missingAttuneId}" style="color:#bb88ff;cursor:pointer">${missingAttune} missing attunement${missingAttune > 1 ? 's' : ''}</div>`);
         if (pendingTasks > 0) alerts.push(`<div class="info-row" style="color:#ccaa44">${pendingTasks} pending task${pendingTasks > 1 ? 's' : ''}</div>`);
         if (alerts.length === 0) alerts.push('<div class="info-row" style="color:#88cc44">All is well.</div>');
         html += alerts.join('');
@@ -2903,10 +2920,18 @@ export class UI {
 
     updatePriorityPanel() {
         if (!this._prioTab) this._prioTab = 'work';
+        const underAttuned = this.game.colonists.filter(c => {
+            if (c.hp <= 0 || c.golem) return false;
+            const hasMagic = c.magicSkills && Object.values(c.magicSkills).some(v => v > 0);
+            if (!hasMagic) return false;
+            const attuned = Array.isArray(c.attunedSchools) ? c.attunedSchools : [];
+            return attuned.length < MAGIC_STUDY_CONFIG.attunementSlots;
+        }).length;
+        const attuneBadge = underAttuned > 0 ? ` <span style="color:#ff8844;font-size:0.85em">(${underAttuned})</span>` : '';
         const tabs =
             '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
             `<button class="craft-tab${this._prioTab === 'work' ? ' active' : ''}" data-prio-tab="work">Work Priorities</button>` +
-            `<button class="craft-tab${this._prioTab === 'attune' ? ' active' : ''}" data-prio-tab="attune">Attunement</button>` +
+            `<button class="craft-tab${this._prioTab === 'attune' ? ' active' : ''}" data-prio-tab="attune">Attunement${attuneBadge}</button>` +
             `<button class="craft-tab${this._prioTab === 'groups' ? ' active' : ''}" data-prio-tab="groups">Groups</button>` +
             '</div>';
 
@@ -3115,8 +3140,14 @@ export class UI {
 
         for (const c of this.game.colonists) {
             if (c.hp <= 0 || c.golem) continue;
-            html += `<tr><td style="color:${c.nameColor || '#ffff00'}">${c.name}</td>`;
             const attuned = Array.isArray(c.attunedSchools) ? c.attunedSchools : [];
+            const hasMagic = c.magicSkills && Object.values(c.magicSkills).some(v => v > 0);
+            const isUnderAttuned = hasMagic && attuned.length < MAGIC_STUDY_CONFIG.attunementSlots;
+            const nameCellStyle = isUnderAttuned
+                ? `color:${c.nameColor || '#ffff00'};background:#2a1a00;`
+                : `color:${c.nameColor || '#ffff00'}`;
+            const nameLabel = isUnderAttuned ? `${c.name} <span style="color:#ff8844;font-size:0.85em" title="Missing attunement slot(s)">⚠</span>` : c.name;
+            html += `<tr><td style="${nameCellStyle}">${nameLabel}</td>`;
             for (const s of schools) {
                 const level = (c.magicSkills && c.magicSkills[s]) || 0;
                 const isAttuned = attuned.includes(s);
