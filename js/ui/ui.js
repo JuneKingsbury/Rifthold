@@ -4267,6 +4267,7 @@ export class UI {
             general += `<div id="gdrive-status-row" style="min-height:28px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
             general += `<span id="gdrive-status-label" style="color:#aaa;font-size:11px;">Checking…</span>`;
             general += `</div>`;
+            general += `<div style="font-size:10px;color:#888;margin-top:4px;"><a href="privacy.html" target="_blank" rel="noopener" style="color:#bb99dd;">Privacy Policy</a> &#183; <a href="terms.html" target="_blank" rel="noopener" style="color:#bb99dd;">Terms of Service</a></div>`;
             general += `</div>`;
         }
 
