@@ -227,7 +227,7 @@ export class Renderer {
             const floorSprite = sm.getSprite('floors', tile.floor);
             if (floorSprite) return floorSprite;
         }
-        if (tile.snowCovered && tile.terrain === 'grass') {
+        if ((tile.snowCovered || season === 'winter') && tile.terrain === 'grass') {
             return sm.getSprite('effects', 'snow') || sm.getSprite('terrain', tile.terrain);
         }
         if (season === 'autumn' && tile.terrain === 'grass') {
