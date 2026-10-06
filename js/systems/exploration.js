@@ -275,7 +275,7 @@ export class ExplorationSystem {
 
         const formation = options.formation || { front: party.map(c => c.id), back: [] };
 
-        if (durationMult !== 1.0) duration = Math.floor(duration * durationMult);
+        if (durationMult !== 1.0) duration = Math.max(Math.floor(duration * durationMult), Math.floor(duration * 0.4));
         const diffSettings = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
         const { encounters, bossEncounter } = this._generateEncounters(dim, diffSettings, mutators, realmKey);
 
@@ -1629,7 +1629,7 @@ export class ExplorationSystem {
             isBoss: encounter.isBoss || false,
             ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)),
         };
-        exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; });
+        exp.partySnapshot.forEach((m, i) => { m._nextAttackTick = game.tick + i; m._lastMoveTick = game.tick; });
         enemies.forEach((e, i) => { e._nextAttackTick = game.tick + 2 + i * 2; });
         this._attachWarBeasts(exp);
         this._logSynergies(exp, game);
@@ -1813,7 +1813,8 @@ export class ExplorationSystem {
             const voidBlessedBonus = this._combatStatusValue(member, 'void_blessed', 'dmgBonus', 0);
             const vulnerableMult = this._combatStatusValue(target, 'vulnerable', 'damageMult', 1);
             const inspiredMult = this._combatStatusValue(member, 'inspired', 'dmgMult', 1);
-            let dmg = Math.max(1, Math.round((weaponDmg + voidBlessedBonus + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist) * chaosSurgeMult * vulnerableMult * inspiredMult));
+            const postMoveMult = (combat.round === 0) ? 1 + memberItems.reduce((s, it) => s + (it.postMoveAttackBonus || 0), 0) : 1;
+            let dmg = Math.max(1, Math.round((weaponDmg + voidBlessedBonus + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist) * chaosSurgeMult * vulnerableMult * inspiredMult * postMoveMult));
             let critHit = false;
             if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
             if (target.eliteDR) dmg = Math.max(1, Math.floor(dmg * (1 - target.eliteDR)));

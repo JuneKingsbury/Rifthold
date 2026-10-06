@@ -1390,7 +1390,8 @@ function applySpellEffect(colonist, spell, game) {
             const sy = colonist.y + (Math.random() > 0.5 ? 1 : -1);
             const sumHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
             const sumDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
-            spawnSummon(spell.summonType, sx, sy, colonist.id, game, sumHpMult, sumDmgMult);
+            const sumDurMult = 1 + getEquipmentStat(colonist, 'summonDurationBonus');
+            spawnSummon(spell.summonType, sx, sy, colonist.id, game, sumHpMult, sumDmgMult, sumDurMult);
             break;
         }
         case 'divination_modifier': {
@@ -1583,9 +1584,10 @@ function applySpellEffect(colonist, spell, game) {
             const ring = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
             const swarmHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
             const swarmDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
+            const swarmDurMult = 1 + getEquipmentStat(colonist, 'summonDurationBonus');
             for (let i = 0; i < count; i++) {
                 const [ox, oy] = ring[i % ring.length];
-                spawnSummon(spell.summonType, colonist.x + ox, colonist.y + oy, colonist.id, game, swarmHpMult, swarmDmgMult);
+                spawnSummon(spell.summonType, colonist.x + ox, colonist.y + oy, colonist.id, game, swarmHpMult, swarmDmgMult, swarmDurMult);
             }
             window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
             break;

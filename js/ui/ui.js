@@ -1545,9 +1545,12 @@ export class UI {
         const equipped = getItemStatLines(art);
         if (equipped.length) lines.push(`Equipped: ${equipped.join(', ')}`);
         if (art.pedestal) {
-            const r = art.pedestal.radius === 'global' ? 'Colony-wide' : `Radius ${art.pedestal.radius}`;
             const parts = getNestedEffectLines(art.pedestal);
-            if (parts.length) lines.push(`Aura (${r}): ${parts.join(', ')}`);
+            if (art.pedestal.radius === 'global') {
+                if (parts.length) lines.push(`Pedestal only (Colony-wide): ${parts.join(', ')}`);
+            } else {
+                if (parts.length) lines.push(`Aura (Radius ${art.pedestal.radius}, works when carried): ${parts.join(', ')}`);
+            }
             if (art.pedestal.manaCost) lines.push(`Pedestal mana: -${art.pedestal.manaCost}`);
         }
         if (art.expedition) {

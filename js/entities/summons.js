@@ -2,12 +2,12 @@ import { ENTITIES, SUMMON_TYPES, COMBAT_VISUALS } from '../core/config.js';
 import { createEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 
-export function spawnSummon(summonType, x, y, ownerId, game, hpMult = 1, damageMult = 1) {
+export function spawnSummon(summonType, x, y, ownerId, game, hpMult = 1, damageMult = 1, durationMult = 1) {
     const def = SUMMON_TYPES[summonType];
     if (!def) return null;
     const summon = createEntity(summonType, x, y, {
         ownerId,
-        expiresAt: game.tick + def.duration,
+        expiresAt: game.tick + Math.round(def.duration * durationMult),
     });
     if (summon && (hpMult !== 1 || damageMult !== 1)) {
         if (hpMult !== 1) { summon.hp = Math.round(summon.hp * hpMult); summon.maxHp = summon.hp; }

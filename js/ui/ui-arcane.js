@@ -945,7 +945,12 @@ const arcaneMethods = {
             if (fx.thornsDamage) html += `<div>Thorns: ${fx.thornsDamage} dmg</div>`;
             if (fx.autoReviveHp) html += `<div>Auto-Revive: ${Math.round(fx.autoReviveHp * 100)}% HP</div>`;
             if (fx.healthRegen) html += `<div>Regen: +${fx.healthRegen}/tick</div>`;
-            if (fx.durationMult) html += `<div>Duration: x${fx.durationMult.toFixed(2)}</div>`;
+            if (fx.durationMult) {
+                const isCapped = fx.durationMult < 0.4;
+                const displayMult = isCapped ? 0.4 : fx.durationMult;
+                const capNote = isCapped ? ` <span style="color:#ffaa44;" title="Speed cap reached — additional duration bonuses have no effect">(speed capped)</span>` : '';
+                html += `<div>Duration: x${displayMult.toFixed(2)}${capNote}</div>`;
+            }
             html += '</div>';
         }
 

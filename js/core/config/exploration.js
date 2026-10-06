@@ -573,6 +573,7 @@ export const REALMS = {
             { resource: 'runite', weight: 20, amount: [4, 9] },
             { resource: 'void_essence', weight: 15, amount: [2, 6] },
             { item: 'scholars_spectacles', weight: 2 },
+            { item: 'arcane_amplifier', weight: 3 },
         ],
         enemies: { count: [3, 6], types: [
             { key: 'spell_wraith', weight: 15 },
@@ -587,7 +588,7 @@ export const REALMS = {
             approachText: 'A half-finished golem whirrs to life, crackling with unstable magic!',
             defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
             guaranteedLoot: [
-                { item: 'arcane_amplifier', chance: 0.5 },
+                { item: 'arcane_amplifier', chance: 0.7 },
                 { item: 'staff_of_distortion', chance: 0.5 },
             ],
             bonusResources: { runite: 6, void_essence: 5 },
