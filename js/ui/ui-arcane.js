@@ -514,9 +514,18 @@ const arcaneMethods = {
 
         if (dims.length > 0 && this.game.power.powered) {
             html += `<div class="info-row" style="margin-top:8px;font-weight:bold;color:#33ccff;">Send Expedition:</div>`;
-            const allRealms = Object.entries(REALMS).map(([k, r]) => ({ key: k, ...r }));
+            const allRealms = Object.entries(REALMS).map(([k, r], i) => ({ key: k, ...r, _defIdx: i }));
             const chains = [...new Set(allRealms.map(r => r.chain))];
-            for (const chain of chains) {
+            // Sort chains by the difficulty of their first realm (lowest chainOrder), then by definition order as tiebreaker
+            const sortedChains = chains.slice().sort((a, b) => {
+                const aRealms = allRealms.filter(r => r.chain === a).sort((x, y) => x.chainOrder - y.chainOrder);
+                const bRealms = allRealms.filter(r => r.chain === b).sort((x, y) => x.chainOrder - y.chainOrder);
+                const aDiff = aRealms[0]?.difficulty ?? 0;
+                const bDiff = bRealms[0]?.difficulty ?? 0;
+                if (aDiff !== bDiff) return aDiff - bDiff;
+                return (aRealms[0]?._defIdx ?? 0) - (bRealms[0]?._defIdx ?? 0);
+            });
+            for (const chain of sortedChains) {
                 const chainRealms = allRealms.filter(r => r.chain === chain).sort((a, b) => a.chainOrder - b.chainOrder);
                 const completedCount = chainRealms.filter(r => expl.completedRealms.has(r.key)).length;
                 const anyVisible = chainRealms.some(r => dims.find(d => d.key === r.key) || expl.completedRealms.has(r.key));
@@ -544,14 +553,14 @@ const arcaneMethods = {
                         }
                         html += `</div>`;
                     } else if (available && !hasGate && !realm.scoutingMode) {
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — <span style="color:#888;">requires Rift Gate</span></span></div>`;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - <span style="color:#888;">requires Rift Gate</span></span></div>`;
                     } else if (expl.isRealmDemoLocked(this.game, realm.key)) {
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
                     } else if (realm.requiresEvent && !expl._checkEvent(this.game, realm.requiresEvent)) {
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — locked</span></div>`;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - locked</span></div>`;
                     } else if (realm.requiresRealm && !expl.completedRealms.has(realm.requiresRealm) && (!realm.research || this.game.research.isResearched(realm.research))) {
                         const reqName = REALMS[realm.requiresRealm]?.name || realm.requiresRealm;
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} — complete ${reqName} to unlock</span></div>`;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - complete ${reqName} to unlock</span></div>`;
                     }
                 }
             }

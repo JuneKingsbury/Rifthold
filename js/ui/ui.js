@@ -1374,7 +1374,8 @@ export class UI {
         const dims = expl.getAvailableRealms(this.game);
         if (dims.length > 0 && this.game.power.powered) {
             html += `<div class="info-row" style="margin-top:6px;"><b>Send Expedition:</b></div>`;
-            for (const dim of dims) {
+            const sortedDims = dims.slice().sort((a, b) => a.difficulty - b.difficulty);
+            for (const dim of sortedDims) {
                 html += `<div class="info-actions"><button onclick="window.game.showExpeditionSetup('${dim.key}')" style="background:#1a4466;color:#88ddff;">${dim.name} (Diff ${dim.difficulty})</button></div>`;
             }
         } else if (!this.game.power.powered) {
