@@ -46,7 +46,7 @@ export function renderCreditsHTML() {
     <div style="color:#ffcc00; font-size:16px; font-weight:bold; margin-bottom:16px;">Rifthold</div>
     <div style="color:#aaa; margin-bottom:20px;">A magical colony sim and a chance for me to turn game making into a hobby again.</div>
     <div style="color:#ccc; margin-bottom:8px;"><b>Design & Development</b></div>
-    <div style="color:#aaa; margin-bottom:20px;">June "Mars" Kingsbury</div>
+    <div style="color:#aaa; margin-bottom:20px;">Juniper Kingsbury</div>
     <div style="color:#ccc; margin-bottom:8px;"><b>Additional Sprites</b></div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-mini-world-sprites">Mini World</a> by Shade</div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-puny-world">Puny World</a> by Shade</div>
@@ -58,8 +58,8 @@ export function renderCreditsHTML() {
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://not-jam.itch.io/not-jam-music-pack">NOT JAM MUSIC PACK</a> by NOT JAM</div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://www.bfxr.net/">bfxr (custom SFX maker)</a> by increpare</div>
     <div style="color:#aaa; margin-bottom:24px;"><a style="color:#aaa;" href="https://dagurasusk.itch.io/retrosounds">Retro Sounds</a> by DASK</div>
-    <div style="color:#aaa; font-size:10px;"><i>Thank you for playing my game!</i> -Mars</div>
-    <img style="float:none" class="pixel-art" src="portraits/mars.png" alt="A drawing of game dev Mars">
+    <div style="color:#aaa; font-size:10px;"><i>Thank you for playing my game!</i> -Juniper</div>
+    <img style="float:none" class="pixel-art" src="portraits/juniper_heart.png" alt="A drawing of game dev Juniper">
     <div style="margin-top:16px; border-top:1px solid #333; padding-top:12px;">
         <div style="color:#666; font-size:10px; margin-bottom:8px;">Version ${GAME_VERSION}</div>
         <button id="credits-changelog-btn" style="background:#2a2a4e; border:1px solid #555; border-radius:4px; color:#aaccff; padding:6px 16px; cursor:pointer; font-family:inherit; font-size:11px;">View Changelog</button>
