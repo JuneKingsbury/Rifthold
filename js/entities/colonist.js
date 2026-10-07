@@ -3199,6 +3199,11 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
                     }
                 }
             }
+            for (const other of game.colonists) {
+                if (other.id !== colonist.id && other.relationships) {
+                    delete other.relationships[colonist.id];
+                }
+            }
         }
     } else if (colonist.state !== 'fighting' && colonist.state !== 'fleeing') {
         colonist.state = 'fighting';

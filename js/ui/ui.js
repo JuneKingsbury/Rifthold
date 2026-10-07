@@ -1954,7 +1954,10 @@ export class UI {
         const notableRelationships = otherColonists
             .map(c => {
                 const opinion = colonist.opinions?.[c.id] ?? 0;
-                const tier = getRelationshipTier(opinion);
+                const storedKey = colonist.relationships?.[c.id];
+                const tier = storedKey
+                    ? (RELATIONSHIP_TIERS.find(t => t.key === storedKey) ?? getRelationshipTier(opinion))
+                    : getRelationshipTier(opinion);
                 return { colonist: c, tier, opinion };
             })
             .filter(r => r.tier.key !== 'stranger');
