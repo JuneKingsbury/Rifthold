@@ -1781,6 +1781,7 @@ export class ExplorationSystem {
             for (const item of memberItems) { if (item !== member.weapon && item.damage) weaponDmg += item.damage; }
             let critChance = memberItems.reduce((sum, it) => sum + (it.critChance || 0), 0);
             critChance += this._combatStatusValue(member, 'buff_critChance', 'value', 0);
+            critChance = Math.min(1.0, critChance);
             const atkSpeedBuff = 1 + this._combatStatusValue(member, 'buff_attackSpeed', 'value', 0);
             const effCd = Math.max(1, Math.round(member.effectiveCooldown / atkSpeedBuff));
             if (game.tick < (member._nextAttackTick || 0)) continue;
@@ -2148,6 +2149,7 @@ export class ExplorationSystem {
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
                 let dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
                 dodgeChance += this._combatStatusValue(target, 'buff_dodgeChance', 'value', 0);
+                dodgeChance = Math.min(0.75, dodgeChance);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
                     target._lastDodgeTick = game.tick;
                     this._addLog(exp, game, `${target.name} dodges ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');

@@ -97,13 +97,13 @@ export function getItemTradeValue(item) {
 // Which numeric stat fields scale with quality, keyed by item type. Mirrors the
 // per-type branches in the craft/enchant cases of task-executor.js.
 export const STAT_KEYS_BY_TYPE = {
-    weapon: ['damage'],
-    armor: ['damageReduction'],
-    helmet: ['damageReduction'],
+    weapon: ['damage', 'critChance'],
+    armor: ['damageReduction', 'critChance', 'dodgeChance'],
+    helmet: ['damageReduction', 'critChance', 'dodgeChance'],
     tool: ['miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed'],
     clothes: ['workSpeedBonus', 'moodBonus', 'coldResistance', 'heatResistance'],
-    boots: ['moveSpeedBonus', 'damageReduction'],
-    trinket: [],
+    boots: ['moveSpeedBonus', 'damageReduction', 'dodgeChance'],
+    trinket: ['critChance', 'dodgeChance'],
 };
 
 const round2 = (n) => Math.round(n * 100) / 100;

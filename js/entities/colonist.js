@@ -772,11 +772,11 @@ function getEquipmentSpellBonus(colonist) {
     return bonus;
 }
 
-// Total crit chance from equipment plus the Deadeye trait.
+// Total crit chance from equipment plus the Deadeye trait, capped at 1.0.
 function getCritChance(colonist) {
     let crit = getEquipmentStat(colonist, 'critChance');
     if (colonist.traits.includes('deadeye')) crit += TRAITS.deadeye.critChance;
-    return crit;
+    return Math.min(1.0, crit);
 }
 
 // Trait-based multiplier on outgoing melee/ranged damage. Berserker ramps up
@@ -3036,6 +3036,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
     if (colonist.traits.includes('duelist')) dodgeChance += TRAITS.duelist.dodgeChance;
     const evasionEff = colonist.activeEffects?.find(e => e.type === 'evasion' && game.tick < e.expiresAt);
     if (evasionEff) dodgeChance += evasionEff.dodgeChance || 0;
+    dodgeChance = Math.min(0.75, dodgeChance);
     if (dodgeChance > 0 && Math.random() < dodgeChance) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '~', color: '#88ccff', ttl: 4 });
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Block!', color: '#4488ff', fontSize: 11, ttl: 12, maxTtl: 12 });
