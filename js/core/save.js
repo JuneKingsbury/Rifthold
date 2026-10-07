@@ -337,6 +337,7 @@ function _buildSaveData(game) {
         stats: game.stats,
         manaCrystalBonus: game.manaCrystalBonus || 0,
         hearthShrineBonus: game.hearthShrineBonus || 0,
+        hearthShrineMilestonesReached: [...(game.hearthShrineMilestonesReached || [])],
         discoveredLoot: [...(game.discoveredLoot || [])],
 
         story: {
@@ -644,6 +645,7 @@ function _applyLoadData(game, data) {
         }
         game.manaCrystalBonus = data.manaCrystalBonus || 0;
         game.hearthShrineBonus = data.hearthShrineBonus || 0;
+        game.hearthShrineMilestonesReached = new Set(data.hearthShrineMilestonesReached || []);
         game.discoveredLoot = new Set(data.discoveredLoot || []);
 
         if (data.story) {

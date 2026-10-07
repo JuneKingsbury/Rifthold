@@ -1,7 +1,7 @@
 import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, TRINKETS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS,
     EXPEDITION_MUTATORS, EXPEDITION_POTIONS, POTION_CARRY_CONFIG, FORMATION_CONFIG,
     ELITE_MODIFIERS, NODE_MAP_CONFIG, EXPEDITION_XP_CONFIG, BESTIARY_CONFIG,
-    getItemStatLines, RENDER_CONFIG,
+    getItemStatLines, RENDER_CONFIG, HEARTH_SHRINE_MILESTONES,
 } from '../core/config.js';
 import { estimatePartyStrength, getExpeditionSlotItem } from '../systems/exploration.js';
 import { getOmens } from '../systems/omens.js';
@@ -156,7 +156,7 @@ const arcaneMethods = {
             html += `<div class="arcane-section" style="color:#888;padding:20px 0;text-align:center;">`;
             html += `<div style="font-size:1.2em;color:#9933ff;margin-bottom:8px;">Void Nexus Required</div>`;
             html += `<div>Build a Void Nexus to defend your colony against waves of enemies.</div>`;
-            html += `<div style="margin-top:6px;color:#666;">Enemies will attack the nexus — defend it to earn void essence and increase your colonist cap.</div>`;
+            html += `<div style="margin-top:6px;color:#666;">Defend the nexus to earn void essence. Survive waves and conquer realm chains to unlock Hearth Shrine slots and increase your colonist cap.</div>`;
             html += `</div>`;
             return html;
         }
@@ -166,6 +166,11 @@ const arcaneMethods = {
         html += `<div class="info-row" style="color:#9933ff;font-weight:bold;font-size:1.1em;">Wave Defense</div>`;
         html += `<div class="info-row">Highest Wave Completed: <span style="color:#ffcc00">${waves.highestWaveCompleted}</span></div>`;
         html += `<div class="info-row">Colony Cap: <span style="color:#88ff88">${waves.getColonistCap(this.game)}</span></div>`;
+        const _reached = this.game.hearthShrineMilestonesReached || new Set();
+        const _nextMs = HEARTH_SHRINE_MILESTONES.find(ms => !_reached.has(ms.key));
+        if (_nextMs) {
+            html += `<div class="info-row" style="color:#888;font-size:0.9em;">Next shrine slot: ${_nextMs.label}</div>`;
+        }
 
         if (waves.active) {
             html += `<div class="info-row" style="color:#ff4444;font-weight:bold;margin-top:8px;">Wave ${waves.currentWave} In Progress</div>`;

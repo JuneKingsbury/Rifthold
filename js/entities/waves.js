@@ -1,4 +1,4 @@
-import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS } from '../core/config.js';
+import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS, HEARTH_SHRINE_MILESTONES, REALMS, countCompletedChains } from '../core/config.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { colonistTakeDamage, getEquipmentStat } from './colonist.js';
@@ -7,6 +7,40 @@ import { createWaveEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 import { attackStructure, getColonistTargetPriority } from './combat.js';
 
+// Evaluates all unearned Hearth Shrine milestones against the current game state.
+// Grants one extra shrine build slot per newly satisfied milestone.
+// Returns the number of new slots unlocked this call.
+export function checkHearthShrineMilestones(game) {
+    if (!game.hearthShrineMilestonesReached) game.hearthShrineMilestonesReached = new Set();
+    const completedRealms = game.exploration?.completedRealms || new Set();
+    const highestWave = game.waves?.highestWaveCompleted || 0;
+    const chainsDone = countCompletedChains(completedRealms);
+
+    let newSlots = 0;
+    for (const ms of HEARTH_SHRINE_MILESTONES) {
+        if (game.hearthShrineMilestonesReached.has(ms.key)) continue;
+
+        let satisfied = false;
+        if (ms.type === 'wave') {
+            satisfied = highestWave >= ms.threshold;
+        } else if (ms.type === 'realm_order') {
+            for (const [key, def] of Object.entries(REALMS)) {
+                if (def.chainOrder === ms.order && completedRealms.has(key)) { satisfied = true; break; }
+            }
+        } else if (ms.type === 'chains_completed') {
+            satisfied = chainsDone >= ms.count;
+        }
+
+        if (satisfied) {
+            game.hearthShrineMilestonesReached.add(ms.key);
+            game.hearthShrineBonus = game.hearthShrineMilestonesReached.size;
+            game.notifications?.push({ text: `${ms.label}: a new Hearth Shrine slot is available!`, tick: game.tick, type: 'success' });
+            newSlots++;
+        }
+    }
+    if (newSlots > 0) game.ui?.updateBuildPanel?.(game.input);
+    return newSlots;
+}
 
 export class WaveSystem {
     constructor() {
@@ -327,11 +361,9 @@ export class WaveSystem {
                 .reduce((best, c) => Math.max(best, getEquipmentStat(c, 'voidEssenceGainMult') || 1), 1);
             const bonusEssence = Math.round(this.currentWave * WAVE_CONFIG.bonusEssencePerWave * voidMult * (this.forcedWaveBonusMult || 1));
             game.resources.add({ void_essence: bonusEssence });
-            if (!game.hearthShrineBonus) game.hearthShrineBonus = 0;
-            game.hearthShrineBonus++;
-            game.ui?.updateBuildPanel?.(game.input);
-            game.notifications.push({ text: `Wave ${this.currentWave} complete! +${bonusEssence} bonus void essence. A new Hearth Shrine slot is available!`, tick: game.tick, type: 'success' });
-            game.eventLog.add(game, `Wave ${this.currentWave} defeated! You may now build another Hearth Shrine to expand your colony.`, 'success', null);
+            checkHearthShrineMilestones(game);
+            game.notifications.push({ text: `Wave ${this.currentWave} complete! +${bonusEssence} bonus void essence.`, tick: game.tick, type: 'success' });
+            game.eventLog.add(game, `Wave ${this.currentWave} defeated!`, 'success', null);
             game.story.checkMilestone('first_wave_completed', game);
             if (game.stats) game.stats.wavesCompleted++;
             if (game.stats?.wavesCompleted >= 10) game.story.checkMilestone('waves_10_complete', game);

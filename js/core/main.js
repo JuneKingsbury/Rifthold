@@ -170,6 +170,7 @@ class Game {
 
         this.manaCrystalBonus = 0;
         this.hearthShrineBonus = 0;
+        this.hearthShrineMilestonesReached = new Set();
         this.discoveredLoot = new Set();
         this.stats = { raidsDefeated: 0, wavesCompleted: 0, expeditionsCompleted: 0, superiorItemsCrafted: 0, masterworkItemsCrafted: 0, itemsEnchanted: 0 };
 

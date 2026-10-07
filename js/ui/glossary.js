@@ -51,6 +51,13 @@ export const GLOSSARY = [
                     ['Active Effects', 'Temporary buffs from potions and spells appear in the colonist info panel with remaining duration. Effects include speed boosts, damage shields, and healing. Buffed colonists pulse on the map.'],
                 ]
             },
+            {
+                subtitle: 'Colony Population',
+                entries: [
+                    ['Colony Cap', 'Your maximum colonist count is increased by building and powering Hearth Shrines. New shrine slots are earned by completing specific milestones: a mix of surviving Void Nexus waves and conquering realm chain expeditions.'],
+                    ['Hearth Shrine Milestones', 'Shrine slots unlock from completing the following milestones: (1) Survive wave 1, (2) Complete any Tier 1 realm expedition, (3) Survive wave 3, (4) Complete any Tier 2 realm expedition, (5) Defeat a full realm chain boss, (6) Survive wave 6, (7) Conquer two full realm chains, (8) Survive wave 9, (9) Conquer three full realm chains. Reaching the maximum colony cap of 12 requires progress in both wave defense and realm exploration. The number order represents the order in which milestones are hinted at in-game, but you are free to complete them in any order.'],
+                ]
+            },
         ]
     },
     {
@@ -240,7 +247,6 @@ export const GLOSSARY = [
                 entries: [
                     ['Void Nexus', 'Build after researching Unstable Rifts. You can start wave challenges using the Rifts menu (V). During a wave enemies spawn from portals and try to destroy the Nexus. Defend it from these attacks to earn rewards. Don\'t worry, if your Nexus is destroyed you can always build a new one to replace it.'],
                     ['How Waves Work', 'Each successive wave sends tougher and more numerous enemies. Defeat all enemies in a wave to complete it and unlock the next. Waves are strictly player-initiated, not automatic.'],
-                    ['Colony Cap', 'Your maximum colonist count starts small. Completing Void Nexus waves is the primary way to increase it. Buildings like Hearth Shrines also add to the cap in exchange for mana from the grid.'],
                     ['Void Essence', 'Dropped by wave enemies. This rare resource is essential for crafting late-game equipment and advanced defensive structures.'],
                     ['Strategy', 'Build walls and doors to create funnels toward the Nexus. Place turrets at chokepoints. Draft your colonists or set them to Guard mode to protect the Nexus themselves. Upgrade weapons and armor between waves.'],
                 ]

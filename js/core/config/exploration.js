@@ -2724,6 +2724,39 @@ export const WAVE_CONFIG = {
     bonusEssencePerWave: 2,      // multiplied by wave number for completion bonus
 };
 
+// Ordered list of milestones that each unlock one additional Hearth Shrine build slot.
+// type 'wave': fires when game.waves.highestWaveCompleted >= threshold
+// type 'realm_order': fires when any realm with chainOrder === order has been completed
+// type 'chains_completed': fires when countCompletedChains() >= count
+export const HEARTH_SHRINE_MILESTONES = [
+    { key: 'wave_1',        label: 'Survive Wave 1',                  type: 'wave',            threshold: 1 },
+    { key: 'realm_order_1', label: 'Venture into a new realm',        type: 'realm_order',     order: 1 },
+    { key: 'wave_3',        label: 'Survive Wave 3',                  type: 'wave',            threshold: 3 },
+    { key: 'realm_order_2', label: 'Delve deeper into a realm chain', type: 'realm_order',     order: 2 },
+    { key: 'chain_1',       label: 'Conquer a full realm chain',     type: 'chains_completed', count: 1 },
+    { key: 'wave_6',        label: 'Survive Wave 6',                  type: 'wave',            threshold: 6 },
+    { key: 'chain_2',       label: 'Conquer two realm chains',       type: 'chains_completed', count: 2 },
+    { key: 'wave_9',        label: 'Survive Wave 9',                  type: 'wave',            threshold: 9 },
+    { key: 'chain_3',       label: 'Conquer three realm chains',     type: 'chains_completed', count: 3 },
+];
+
+// Returns how many full realm chains (all 3 chainOrder tiers present in completedRealms) have been completed.
+// The 'scouting' chain has only 1 realm and no boss, so it is excluded from the count.
+export function countCompletedChains(completedRealms) {
+    const chains = new Set();
+    for (const def of Object.values(REALMS)) {
+        if (def.chain !== 'scouting') chains.add(def.chain);
+    }
+    let completed = 0;
+    for (const chain of chains) {
+        const allDone = Object.entries(REALMS)
+            .filter(([, def]) => def.chain === chain)
+            .every(([key]) => completedRealms.has(key));
+        if (allDone) completed++;
+    }
+    return completed;
+}
+
 // ============================================================================
 // STORY MILESTONES - SPOILER WARNING!
 // The text below contains narrative spoilers for Rifthold.

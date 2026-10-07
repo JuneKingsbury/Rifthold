@@ -6,6 +6,7 @@ import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFI
     REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS,
 } from '../core/config.js';
 import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit, addThought } from '../entities/colonist.js';
+import { checkHearthShrineMilestones } from '../entities/waves.js';
 import { getBestDivinationLevel, generateRealmScry } from './omens.js';
 
 // Precomputes a per-school equipment bonus map for a colonist so expedition combat can
@@ -2771,6 +2772,7 @@ export class ExplorationSystem {
             this.completedRealms.add(exp.realm);
             game.story.checkMilestone(`realm_${exp.realm}`, game);
             if (game.stats) game.stats.expeditionsCompleted++;
+            checkHearthShrineMilestones(game);
         }
         const gx = exp.gatePos ? exp.gatePos.x : null;
         const gy = exp.gatePos ? exp.gatePos.y : null;
