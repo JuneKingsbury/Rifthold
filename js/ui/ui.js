@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
 import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
@@ -884,7 +884,7 @@ export class UI {
         const resStyle = (key, val) => (alerts[key] && val <= alerts[key]) ? ' style="color:#ff4444;font-weight:bold"' : '';
         const mgr = this.game.skinManager;
         const hasSkin = mgr && mgr.isActive;
-        const RES_ABBR = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', gold: 'Au' };
+        const RES_ABBR = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', gold: 'Au', abyss_sliver: 'Ab' };
         const resIcon = (key, label, color) => {
             if (hasSkin) {
                 const url = mgr.getItemSpriteDataURL(key);
@@ -900,6 +900,7 @@ export class UI {
             { key: 'iron', label: 'Iron', color: '#aaa' },
             { key: 'runite', label: 'Runite', color: '#44ccff' },
             { key: 'void_essence', label: 'Void', color: '#9933ff' },
+            { key: 'abyss_sliver', label: 'Abyss Sliver', color: '#6600cc' },
         ];
         // Resource-counter punch: note which core resources changed value this
         // update so we can replay a quick grow/shrink on their span once the DOM
@@ -1486,6 +1487,11 @@ export class UI {
             }
             return stats;
         };
+        const weaponSummary = (item) => {
+            if (!item?.damage) return null;
+            const cd = item.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
+            return { dps: item.damage / cd, speed: weaponSpeedLabel(cd) };
+        };
         const higherIsBetter = new Set([
             'damageReduction', 'moodBonus', 'workSpeedBonus', 'moveSpeedBonus', 'damage', 'spellDamageBonus',
             'manaRegen', 'maxMana', 'warmth', 'critChance', 'critMultiplier', 'blockChance', 'gatherBonus',
@@ -1493,20 +1499,37 @@ export class UI {
         ]);
         if (!equippedItem && !candidateItem) return slotLabel + ': empty';
         if (!candidateItem) {
-            // Reference view: show equipped item stats.
+            const ws = weaponSummary(equippedItem);
+            const weaponRows = ws
+                ? `<tr><td style="color:#888;padding-right:8px;">Speed</td><td style="color:#aaa;">${ws.speed} (${ws.dps.toFixed(1)} dps)</td></tr>`
+                : '';
             const stats = getStats(equippedItem);
             const rows = Object.entries(stats).map(([k, v]) => {
                 const meta = STAT_META[k];
                 if (!meta) return '';
                 return `<tr><td style="color:#888;padding-right:8px;">${meta.label}</td><td style="color:#aaa;">${formatStatValue(k, v)}</td></tr>`;
             }).filter(Boolean).join('');
+            const onHitRows = getOnHitLines(equippedItem).map(line =>
+                `<tr><td colspan="2" style="color:#ffaa55;">${line}</td></tr>`
+            ).join('');
+            const fallback = !weaponRows && !rows ? '<tr><td style="color:#666;">No stats</td></tr>' : '';
             return `<div style="min-width:160px;"><div style="color:#ffdd88;margin-bottom:4px;font-weight:bold;">${equippedItem.name}</div>` +
                 (equippedItem.description ? `<div style="color:#888;font-size:10px;margin-bottom:4px;">${equippedItem.description}</div>` : '') +
-                `<table style="border-collapse:collapse;font-size:11px;">${rows || '<tr><td style="color:#666;">No stats</td></tr>'}</table></div>`;
+                `<table style="border-collapse:collapse;font-size:11px;">${weaponRows}${rows}${onHitRows}${fallback}</table></div>`;
         }
-        // Comparison view.
+        const eqWs = weaponSummary(equippedItem);
+        const cWs  = weaponSummary(candidateItem);
+        const weaponCompareRows = (eqWs || cWs) ? (() => {
+            const eqStr = eqWs ? `${eqWs.dps.toFixed(1)} dps (${eqWs.speed})` : '-';
+            const cStr  = cWs  ? `${cWs.dps.toFixed(1)} dps (${cWs.speed})`   : '-';
+            let dpsColor = '#aaa';
+            if (eqWs && cWs && eqWs.dps !== cWs.dps) {
+                dpsColor = cWs.dps > eqWs.dps ? '#66cc66' : '#cc6644';
+            }
+            return `<tr><td style="color:#888;padding-right:6px;">DPS</td><td style="color:#aaa;">${eqStr}</td><td style="color:${dpsColor};font-weight:bold;">${cStr}</td></tr>`;
+        })() : '';
         const eqStats = getStats(equippedItem);
-        const cStats = getStats(candidateItem);
+        const cStats  = getStats(candidateItem);
         const allKeys = new Set([...Object.keys(eqStats), ...Object.keys(cStats)]);
         const rowsHtml = [...allKeys].map(k => {
             const meta = STAT_META[k];
@@ -1522,15 +1545,29 @@ export class UI {
             }
             return `<tr><td style="color:#888;padding-right:6px;">${meta.label}</td><td style="color:#aaa;">${eqStr}</td><td style="color:${color};font-weight:bold;">${cStr}</td></tr>`;
         }).filter(Boolean).join('');
+        const eqOnHit = getOnHitLines(equippedItem || {});
+        const cOnHit  = getOnHitLines(candidateItem);
+        const onHitCompareRows = [...new Set([...eqOnHit, ...cOnHit])].map(line => {
+            const inEq = eqOnHit.includes(line);
+            const inC  = cOnHit.includes(line);
+            return `<tr><td style="color:#888;padding-right:6px;">${line}</td>` +
+                `<td style="color:${inEq ? '#ffaa55' : '#444'};">${inEq ? '✓' : '-'}</td>` +
+                `<td style="color:${inC ? '#ffaa55' : '#444'};">${inC ? '✓' : '-'}</td></tr>`;
+        }).join('');
+        const fallbackRow = !weaponCompareRows && !rowsHtml ? `<tr><td colspan="3" style="color:#666;">No stat differences</td></tr>` : '';
         const eqName = equippedItem ? equippedItem.name : 'Empty';
         return `<div style="min-width:200px;"><table style="border-collapse:collapse;font-size:11px;width:100%;">` +
             `<tr><th style="color:#666;text-align:left;padding-bottom:3px;">${slotLabel}</th><th style="color:#aaa;text-align:left;padding-right:6px;">${eqName}</th><th style="color:#ffdd88;text-align:left;">${candidateItem.name}</th></tr>` +
-            (rowsHtml || `<tr><td colspan="3" style="color:#666;">No stat differences</td></tr>`) +
+            weaponCompareRows + rowsHtml + onHitCompareRows + fallbackRow +
             `</table></div>`;
     }
 
-    _buildEquipmentEffectsHtml(colonist) {
-        const items = getEquippedItems(colonist);
+    _buildEquipmentEffectsHtml(colonist, viewingSet) {
+        const SLOTS = ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'trinket', 'boots'];
+        const isViewingInactive = viewingSet && viewingSet !== (colonist.activeSet || 'Colony');
+        const items = isViewingInactive
+            ? SLOTS.map(s => colonist.equipmentSets?.[viewingSet]?.[s] ?? colonist[s]).filter(Boolean)
+            : getEquippedItems(colonist);
         if (items.length === 0) return '';
         const totals = {};
         const expeditionTotals = {};
@@ -1555,10 +1592,25 @@ export class UI {
         const sep = ' <span style="color:#333">|</span> ';
         const sections = [];
         const parts = [];
+        const weaponItem = items.find(i => i.damage);
+        if (weaponItem) {
+            const cd = weaponItem.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
+            const dps = (weaponItem.damage / cd).toFixed(1);
+            parts.push(`<span style="color:#ccc">DPS:</span> ${dps} (${weaponItem.damage}d, ${weaponSpeedLabel(cd)})`);
+        }
         for (const [stat, meta] of Object.entries(STAT_META)) {
+            if (stat === 'damage') continue;
             if (totals[stat]) parts.push(`<span style="color:#ccc">${meta.label}:</span> ${formatStatValue(stat, totals[stat])}`);
         }
-        if (parts.length) sections.push(parts.join(sep));
+        for (const item of items) {
+            for (const line of getOnHitLines(item)) {
+                parts.push(`<span style="color:#ccc">${line}</span>`);
+            }
+        }
+        if (parts.length) {
+            const prefix = isViewingInactive ? `<span style="color:#5566aa">${viewingSet} set:</span> ` : '';
+            sections.push(prefix + parts.join(sep));
+        }
         const expParts = [];
         for (const [stat, meta] of Object.entries(STAT_META)) {
             if (expeditionTotals[stat]) expParts.push(`<span style="color:#ccc">${meta.label}:</span> ${formatStatValue(stat, expeditionTotals[stat])}`);
@@ -1746,10 +1798,10 @@ export class UI {
             const listName = SLOT_LIST[slot];
             if (setItem) {
                 // This set owns a dedicated item for this slot.
-                const tip = `${setItem.name} (${viewingSet} set override)`;
+                const compareHtml = this._buildEquipCompareHtml(`${label} (${viewingSet} override)`, setItem, null).replace(/"/g, '&quot;');
                 const removeBtn = `<span onclick="window.game.removeItemFromSet(${colonist.id},'${viewingSet}','${slot}')" style="position:absolute;top:1px;right:2px;color:#cc4444;font-size:10px;cursor:pointer;z-index:10;" title="Return to inventory">x</span>`;
                 const assignSelect = this._buildSetAssignSelect(colonist, viewingSet, slot, listName);
-                return `<div class="skill-tip" data-tip="${tip}" style="${slotStyle}">${removeBtn}<div style="color:#666;font-size:10px">${label}</div>${this._itemIcon(setItem.key, slot)}${assignSelect}</div>`;
+                return `<div class="skill-tip" data-compare="${compareHtml}" style="${slotStyle}">${removeBtn}<div style="color:#666;font-size:10px">${label}</div>${this._itemIcon(setItem.key, slot)}${assignSelect}</div>`;
             } else {
                 // Shared: dim the currently-equipped item and show chain icon.
                 const inner = sharedItem
@@ -1782,7 +1834,7 @@ export class UI {
         html += `</div>`;
 
         // --- Equipment Effects Summary ---
-        const eqEffects = this._buildEquipmentEffectsHtml(colonist);
+        const eqEffects = this._buildEquipmentEffectsHtml(colonist, viewingSet);
         if (eqEffects) {
             html += `<div style="margin:2px 0;padding:3px 6px;background:#111;border-radius:3px;font-size:11px;color:#aaa;line-height:1.5">${eqEffects}</div>`;
         }
@@ -2065,7 +2117,7 @@ export class UI {
     _buildSlotSelect(colonist, slot) {
         const overlayStyle = 'position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;';
         const SLOT_CONFIG = {
-            weapon: { listName: 'weapons', label: 'Weapon', fallback: 'Fists', equipFn: 'equipWeapon', unequipFn: 'unequipWeapon', statRenderer: w => { const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown; return `${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`; } },
+            weapon: { listName: 'weapons', label: 'Weapon', fallback: 'Fists', equipFn: 'equipWeapon', unequipFn: 'unequipWeapon', statRenderer: w => { const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown; const parts = [`${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`]; parts.push(...getOnHitLines(w)); return parts.join(', '); } },
             armor: { listName: 'armors', label: 'Armor', fallback: 'None', equipFn: 'equipArmor', unequipFn: 'unequipArmor', statRenderer: a => getItemStatLines(a).join(', ') },
             helmet: { listName: 'helmets', label: 'Helmet', fallback: 'None', equipFn: 'equipHelmet', unequipFn: 'unequipHelmet', statRenderer: h => getItemStatLines(h).join(', ') },
             clothes: { listName: 'clothes', label: 'Clothes', fallback: 'None', equipFn: 'equipClothes', unequipFn: 'unequipClothes', statRenderer: c => getItemStatLines(c).join(', ') },
@@ -2345,6 +2397,8 @@ export class UI {
             if (w.ranged) tip += `, range ${w.range}`;
             const extras = getItemStatLines({ ...w, damage: undefined, ranged: undefined, range: undefined });
             if (extras.length) tip += `, ${extras.join(', ')}`;
+            const onHit = getOnHitLines(w);
+            if (onHit.length) tip += `, ${onHit.join(', ')}`;
             return tip;
         }
         if (ARMORS[outputKey]) {
@@ -3851,6 +3905,8 @@ export class UI {
                 const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
                 let stats = `${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`;
                 if (extras.length) stats += `, ${extras.join(', ')}`;
+                const onHitStats = getOnHitLines(w);
+                if (onHitStats.length) stats += `, ${onHitStats.join(', ')}`;
                 const tip = w.description || '';
                 const wec = ENCHANT_COST_BY_TIER[w.tier] ?? { resource: 'runite', amount: 5 };
                 const wecLabel = `${wec.amount} ${wec.resource.replace(/_/g, ' ')}`;
@@ -4805,6 +4861,8 @@ export class UI {
             if (item.ranged) statStr += `, range ${item.range}`;
             const extras = getItemStatLines({ ...item, damage: undefined, ranged: undefined, range: undefined });
             if (extras.length) statStr += `, ${extras.join(', ')}`;
+            const onHit = getOnHitLines(item);
+            if (onHit.length) statStr += `, ${onHit.join(', ')}`;
             lines.push(statStr);
         } else {
             const stats = getItemStatLines(item);
@@ -5497,6 +5555,8 @@ function getWeaponTooltip(colonist) {
     if (w.ranged) tip += `, range ${w.range}`;
     const extras = getItemStatLines({ ...w, damage: undefined, ranged: undefined, range: undefined });
     if (extras.length) tip += `, ${extras.join(', ')}`;
+    const onHit = getOnHitLines(w);
+    if (onHit.length) tip += `, ${onHit.join(', ')}`;
     return tip;
 }
 

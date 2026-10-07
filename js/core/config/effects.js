@@ -77,7 +77,6 @@ export const STAT_META = {
     durationMult:         { label: 'Duration',           format: 'inverse_percent' },
     rallyChance:          { label: 'Rally Chance',       format: 'percent' },
     rallyHeal:            { label: 'Rally Heal',         format: 'plus_percent' },
-    dodgeChanceMod:       { label: 'Dodge',              format: 'plus_percent' },
     xpMult:               { label: 'XP',                 format: 'mult_as_percent' },
     puzzleSuccessBonus:   { label: 'Puzzle Success',     format: 'plus_percent' },
     chaosResistance:      { label: 'Chaos Resist',       format: 'plus_percent' },
@@ -90,6 +89,8 @@ const ITEM_META_KEYS = new Set([
     'trigger', 'hpThreshold', 'effect', 'healAmount', 'duration', 'cooldown',
     'manaThreshold', 'manaAmount', 'moveSpeedBonus_potion', 'workSpeedBonus_potion',
     'recipe', 'type', 'tradeValue', 'textColor', 'quality', 'enchantment', 'enchantTier',
+    'onHit', 'poisonOnHit', 'bleedOnHit', 'burnOnHit', 'cleave',
+    'order', 'attackAnim',
 ]);
 
 export function formatStatValue(statKey, value) {
@@ -123,6 +124,33 @@ export function getItemStatLines(item) {
         if (!meta) continue;
         if (meta.format === 'boolean') { lines.push(meta.text || meta.label); }
         else { lines.push(`${meta.label}: ${formatStatValue(key, value)}`); }
+    }
+    return lines;
+}
+
+export function getOnHitLines(item) {
+    const lines = [];
+    if (item.onHit?.effect === 'slow') {
+        const speedPct = Math.round(Math.abs(item.onHit.moveSpeedMalus) * 100);
+        const atkPct   = item.onHit.attackSlowMult != null ? Math.round((1 - item.onHit.attackSlowMult) * 100) : null;
+        let s = `Slows on hit: -${speedPct}% move`;
+        if (atkPct) s += `, -${atkPct}% atk spd`;
+        lines.push(s);
+    }
+    if (item.poisonOnHit) {
+        const p = item.poisonOnHit;
+        lines.push(`Poisons on hit: ${p.damage} dmg × ${p.ticks} ticks`);
+    }
+    if (item.bleedOnHit) {
+        const b = item.bleedOnHit;
+        lines.push(`Bleeds on hit: ${b.damage} dmg × ${b.ticks} ticks`);
+    }
+    if (item.burnOnHit) {
+        const b = item.burnOnHit;
+        lines.push(`Burns on hit: ${b.damage} dmg × ${b.ticks} ticks`);
+    }
+    if (item.cleave) {
+        lines.push('Cleave: hits all adjacent foes');
     }
     return lines;
 }

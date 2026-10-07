@@ -2147,7 +2147,6 @@ export class ExplorationSystem {
                 }
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
                 let dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
-                dodgeChance += getPartyExpeditionEffect(exp.partySnapshot, 'dodgeChanceMod', exp.realm);
                 dodgeChance += this._combatStatusValue(target, 'buff_dodgeChance', 'value', 0);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
                     target._lastDodgeTick = game.tick;
