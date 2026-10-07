@@ -265,7 +265,7 @@ export const RESEARCH = {
     marksmanship: { name: 'Marksmanship', cost: 250, requires: ['runecraft', 'metalworking'], tab: 'crafting', description: 'Crossbow crafting and +1 range to all ranged weapons' },
     arcane_implements: { name: 'Arcane Implements', cost: 250, requires: ['runecraft'], tab: 'crafting', description: 'Craft wands and staves for spellcasters' },
     artisans_touch: { name: "Artisan's Touch", cost: 450, requires: ['marksmanship'], tab: 'crafting', description: 'Better crafting quality odds; salvage returns 75%' },
-    runeforging: { name: 'Runic Forging', cost: 350, requires: ['arcane_implements'], tab: 'crafting', description: 'Forge weapons using runite at an enchanting table' },
+    runeforging: { name: 'Runic Forging', cost: 350, requires: ['arcane_implements', 'warrior_training'], tab: 'crafting', description: 'Forge weapons using runite at an enchanting table' },
     masterwork: { name: 'Masterwork', cost: 800, requires: ['runeforging', 'arcane_infusion', 'artisans_touch'], tab: 'crafting', description: 'Forge legendary enchanted weapons, and let master crafters rarely produce Masterwork-quality gear', requiresBuildings: { enchanting_table: 1 }, requiresMilestone: { stat: 'superiorItemsCrafted', min: 1 }, requiresTabCount: 3 },
     golem_craft: { name: 'Golem Craft', cost: 1000, requires: ['arcane_infusion', 'void_forging', 'mana_reservoir'], tab: 'crafting', description: 'Animate stone golems to serve as tireless workers', requiresBuildings: { enchanting_table: 1 }, requiresTabCount: 3 },
 
