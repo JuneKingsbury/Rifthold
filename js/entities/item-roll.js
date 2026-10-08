@@ -178,7 +178,7 @@ export function applyEnchantmentEffect(item, type, enchantTier) {
     // multiplicative because they scale a flat base stat (armor DR, weapon damage).
     // weapon effects
     if (effect.damageMultiplier) {
-        item.damage = round2((item.damage || 0) * (effect.damageMultiplier * mult));
+        item.damage = round2((item.damage || 0) * (1 + (effect.damageMultiplier - 1) * mult));
     } else if (effect.spellDamageBonus) {
         item.spellDamageBonus = round2((item.spellDamageBonus || 0) + effect.spellDamageBonus * mult);
     } else if (effect.critChance) {
@@ -187,7 +187,7 @@ export function applyEnchantmentEffect(item, type, enchantTier) {
         item.lifeSteal = round2((item.lifeSteal || 0) + effect.lifeSteal * mult);
     // armor / clothes effects
     } else if (effect.defenseMultiplier) {
-        item.damageReduction = Math.min(0.95, round2((item.damageReduction || 0) * (effect.defenseMultiplier * mult)));
+        item.damageReduction = Math.min(0.95, round2((item.damageReduction || 0) * (1 + (effect.defenseMultiplier - 1) * mult)));
     } else if (effect.manaRegenBonus) {
         // Additive % boost consumed at runtime as ×(1 + Σbonus). Stored as a plain
         // bonus (not a live multiplier field) so getEquipmentStat's summing is correct.
