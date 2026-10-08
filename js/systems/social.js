@@ -146,7 +146,7 @@ function applyInteraction(a, b, interaction, game) {
 
 export class SocialSystem {
     update(game) {
-        const colonists = game.colonists.filter(c => c.hp > 0 && !c.onExpedition);
+        const colonists = game.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.golem);
 
         // Passive opinion decay
         if (game.tick % SOCIAL_CONFIG.opinionDecayInterval === 0) {

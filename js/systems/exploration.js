@@ -1,4 +1,4 @@
-import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, SUMMON_TYPES, SKILLS, ANIMALS,
+import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, TRINKETS, ALL_ITEMS, COLONIST_CONFIG, TRAITS, ENTITIES, SUMMON_TYPES, SKILLS, ANIMALS,
     FORMATION_CONFIG, EXPEDITION_TRAPS, EXPEDITION_ENEMIES, ELITE_MODIFIERS, ELITE_CONFIG,
     EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
     EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
@@ -2351,6 +2351,10 @@ export class ExplorationSystem {
                         ticksRemaining: summonDef.duration,
                         maxDuration: summonDef.duration,
                     });
+                    if (!this.summonsSeen.has(spell.summonType)) {
+                        const entityDef = ENTITIES[spell.summonType];
+                        this.summonsSeen.set(spell.summonType, { name: summonDef.name, char: entityDef?.char || summonDef.char || '?', color: summonDef.color || '#9966ff', sprite: spell.summonType, lore: entityDef?.lore || '' });
+                    }
                     this._addLog(exp, game, `${member.name} summons a ${summonDef.name}!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     window.soundManager?.playExpSFX('summon_arrival');
@@ -2377,6 +2381,10 @@ export class ExplorationSystem {
                             ticksRemaining: summonDef.duration,
                             maxDuration: summonDef.duration,
                         });
+                    }
+                    if (!this.summonsSeen.has(spell.summonType)) {
+                        const entityDef = ENTITIES[spell.summonType];
+                        this.summonsSeen.set(spell.summonType, { name: summonDef.name, char: entityDef?.char || summonDef.char || '?', color: summonDef.color || '#9966ff', sprite: spell.summonType, lore: entityDef?.lore || '' });
                     }
                     this._addLog(exp, game, `${member.name} conjures a swarm of ${count} ${summonDef.name}s!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
@@ -2502,6 +2510,10 @@ export class ExplorationSystem {
                     member.spellCooldowns[spellKey] = game.tick;
                     member._lastCastTick = game.tick;
                     exp.summons.push({ type: 'decoy', name: summonDef.name, hp: summonDef.hp, maxHp: summonDef.hp, damage: 0, char: summonDef.char, color: summonDef.color, ownerId: member.id, ticksRemaining: summonDef.duration, maxDuration: summonDef.duration, threatMult: summonDef.threatMult || 5 });
+                    if (!this.summonsSeen.has('decoy')) {
+                        const entityDef = ENTITIES['decoy'];
+                        this.summonsSeen.set('decoy', { name: summonDef.name, char: entityDef?.char || summonDef.char || '?', color: summonDef.color || '#9966ff', sprite: 'decoy', lore: entityDef?.lore || '' });
+                    }
                     this._addLog(exp, game, `${member.name} conjures a Decoy to draw enemy fire!`, 'combat');
                     game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
                     window.soundManager?.playExpSFX('summon_arrival');

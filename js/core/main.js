@@ -944,7 +944,7 @@ class Game {
 
     toggleDraft(colonistId) {
         const c = this.getColonist(colonistId);
-        if (!c || c.hp <= 0) return;
+        if (!c || c.hp <= 0 || c.golem) return;
         c.drafted = !c.drafted;
         if (c.drafted) {
             c.state = 'drafted';
@@ -2393,13 +2393,13 @@ class Game {
 
     draftAll() {
         for (const c of this.colonists) {
-            if (c.hp > 0 && !c.drafted) this.toggleDraft(c.id);
+            if (c.hp > 0 && !c.golem && !c.drafted) this.toggleDraft(c.id);
         }
     }
 
     undraftAll() {
         for (const c of this.colonists) {
-            if (c.hp > 0 && c.drafted) this.toggleDraft(c.id);
+            if (c.hp > 0 && !c.golem && c.drafted) this.toggleDraft(c.id);
         }
     }
 

@@ -170,6 +170,7 @@ function makeColonistPassability(occupied) {
 function enemyPassability(map, x, y, endX, endY) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     if (isBreakableByEnemies(map, x, y)) return getMoveCost(map, x, y) + PATHFINDING_CONFIG.breakableCostPenalty;
+    if (x === endX && y === endY) return 1; // goal tile always reachable (e.g. void_nexus target)
     if (!isPassableForEnemies(map, x, y)) return false;
     return getMoveCost(map, x, y) + furniturePenalty(map, x, y, endX, endY);
 }

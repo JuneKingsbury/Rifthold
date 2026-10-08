@@ -504,7 +504,7 @@ export class InputHandler {
     }
 
     selectAllColonists() {
-        const alive = this.game.colonists.filter(c => c.hp > 0);
+        const alive = this.game.colonists.filter(c => c.hp > 0 && !c.golem);
         if (alive.length === 0) return;
         this.game.selectedColonist = alive[0];
         this.game.selectedColonists = alive;
