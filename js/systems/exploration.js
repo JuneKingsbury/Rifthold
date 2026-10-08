@@ -4059,7 +4059,7 @@ export function getExpeditionSlotItem(c, slot) {
     return override !== undefined && override !== null ? override : c[slot];
 }
 
-export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, mutators = []) {
+export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, mutators = [], potions = {}, warBeastSnapshots = []) {
     const realm = REALMS[realmKey];
     if (!realm) return null;
     const diff = EXPEDITION_DIFFICULTY[difficulty] || EXPEDITION_DIFFICULTY[1];
@@ -4071,6 +4071,9 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
         if (mut?.effects?.enemyDmgMult) mutEnemyDmgMult *= mut.effects.enemyDmgMult;
         if (mut?.effects?.partyDamageMult) mutPartyDmgMult *= mut.effects.partyDamageMult;
     }
+
+    // Precompute back-row set from the UI state (accessed via game.ui if available)
+    const backRowIds = (game.ui && game.ui._expBackRowIds) ? game.ui._expBackRowIds : new Set();
 
     let totalDmg = 0, totalHp = 0, drProduct = 1, size = 0;
     const members = [];
@@ -4090,7 +4093,19 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
         const atkSpeed = 1 + items.reduce((sum, item) => sum + (item.attackSpeed || 0), 0);
         const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
         const hitsPerRound = Math.max(1, Math.round(baseCd / effCd));
-        const memberDmg = dmg * hitsPerRound;
+
+        // Apply Sharpness (damageMultiplier) from enchantments
+        const dmgMultiplier = items.reduce((prod, item) => item.damageMultiplier ? prod * item.damageMultiplier : prod, 1);
+        // Crit chance increases effective DPS: each crit doubles the hit, net +critChance fraction of DPS
+        const critChance = Math.min(1.0, items.reduce((sum, item) => sum + (item.critChance || 0), 0));
+        // Formation bonus: back-row members deal less with melee weapons (ranged/casters in back are not penalised here)
+        const isBackRow = backRowIds.has(id);
+        const isRanged = expWeapon && expWeapon.ranged;
+        const formDmgMult = isBackRow ? (isRanged ? 1.0 : FORMATION_CONFIG.rows.back.meleeDamageMult) : FORMATION_CONFIG.rows.front.meleeDamageMult;
+        // Adventurer XP level damage bonus
+        const xpDmgMult = game.exploration ? game.exploration._getXpLevelBonus(id, 'expeditionDamageMult') : 1.0;
+
+        const memberDmg = Math.round(dmg * hitsPerRound * dmgMultiplier * (1 + critChance) * formDmgMult * xpDmgMult);
         totalDmg += memberDmg;
         const expMaxHp = COLONIST_CONFIG.maxHp + items.reduce((sum, item) => sum + (item.maxHpBonus || 0), 0);
         totalHp += expMaxHp;
@@ -4201,7 +4216,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
     }
 
     const enemyCount = Math.round(((realm.enemies.count[0] + realm.enemies.count[1]) / 2) * diff.enemyCountMult);
-    let enemyHp, enemyDmg;
+    let enemyHp, enemyDmg, enemySpellDmgBonus = 0, enemyLifeStealFrac = 0, enemyDotDmgPerCombat = 0;
     if (realm.enemies.types && realm.enemies.types.length > 0) {
         const totalWeight = realm.enemies.types.reduce((s, t) => s + t.weight, 0);
         let avgHp = 0, avgDmg = 0;
@@ -4211,6 +4226,20 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
             const w = t.weight / totalWeight;
             avgHp += ((eDef.hp[0] + eDef.hp[1]) / 2) * w;
             avgDmg += ((eDef.damage[0] + eDef.damage[1]) / 2) * w;
+            // Account for enemy spell damage contributions
+            for (const sp of (eDef.spells || [])) {
+                const spAvgDmg = sp.damage ? (sp.damage[0] + sp.damage[1]) / 2 : 0;
+                if (sp.aoe) {
+                    // AoE hits the whole party; treat as extra damage per round scaled by chance
+                    enemySpellDmgBonus += spAvgDmg * (sp.chance || 0) * w;
+                } else if (sp.lifesteal) {
+                    enemyLifeStealFrac += (sp.lifesteal || 0) * (sp.chance || 0) * w;
+                }
+                if (sp.dot) {
+                    const dotAvg = (sp.dot.damage[0] + sp.dot.damage[1]) / 2;
+                    enemyDotDmgPerCombat += dotAvg * sp.dot.ticks * (sp.chance || 0) * w;
+                }
+            }
         }
         enemyHp = avgHp * diff.enemyHpMult * mutEnemyHpMult;
         enemyDmg = avgDmg * diff.enemyDmgMult * mutEnemyDmgMult;
@@ -4218,20 +4247,111 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
         enemyHp = ((realm.enemies.hp?.[0] || 30) + (realm.enemies.hp?.[1] || 60)) / 2 * diff.enemyHpMult * mutEnemyHpMult;
         enemyDmg = ((realm.enemies.damage?.[0] || 5) + (realm.enemies.damage?.[1] || 10)) / 2 * diff.enemyDmgMult * mutEnemyDmgMult;
     }
+    // Apply enemy AoE spell extra pressure (hits all party members)
+    const effectiveEnemyDmg = enemyDmg + enemySpellDmgBonus;
+
     const combatRange = realm.combatEncounters || [1, Math.ceil(realm.encounters * 0.6)];
     const combatEncounters = Math.ceil(((combatRange[0] + combatRange[1]) / 2) + (diff.extraEncounters || 0));
 
+    // --- War beast contribution ---
+    // War beasts add HP pool (absorbs enemy fire 50% of the time as diversion) and DPS
+    // with a 10% miss chance (matching live combat code). Each beast reduces party damage
+    // taken by a fraction: assume beast absorbs one enemy per encounter proportionally.
+    let beastDmgBonus = 0, beastHpBonus = 0, beastDiversionDmgReduction = 0;
+    for (const beast of warBeastSnapshots) {
+        beastHpBonus += beast.hp || 0;
+        beastDmgBonus += (beast.damage || 0) * 0.9; // 10% miss chance
+        // Beast has 50% chance to redirect each enemy attack away from the party
+        // Approximate: 50% / (partySize + 1) reduction in damage each member takes
+        beastDiversionDmgReduction += 0.50 / Math.max(1, size + warBeastSnapshots.length);
+    }
+    beastDiversionDmgReduction = Math.min(0.40, beastDiversionDmgReduction);
+    const effectiveBeastDrMult = 1 - beastDiversionDmgReduction;
+
+    const effectiveDmg = (totalDmg + beastDmgBonus) * mutPartyDmgMult;
+    // Reduce effective party DPS by enemy lifesteal (enemies heal back some of party's damage)
+    const netEffectiveDmg = effectiveDmg * (1 - Math.min(0.5, enemyLifeStealFrac));
+
     const totalEnemyHp = enemyHp * enemyCount * combatEncounters;
-    const effectiveDmg = totalDmg * mutPartyDmgMult;
-    const roundsToKill = totalEnemyHp / Math.max(1, effectiveDmg + 1.5);
-    const totalDmgToParty = roundsToKill * enemyDmg * enemyCount * (1 - avgDR) * 0.85;
-    const ratio = totalHp / Math.max(1, totalDmgToParty);
+    const roundsToKill = totalEnemyHp / Math.max(1, netEffectiveDmg + 1.5);
+    // Damage the party takes over the whole expedition from regular attacks + AoE spells
+    const rawDmgToParty = roundsToKill * effectiveEnemyDmg * enemyCount * (1 - avgDR) * 0.85 * effectiveBeastDrMult;
+    // Add DoT damage per encounter (scaled up by combat encounters; antidotes reduce this)
+    const antidoteCount = potions['antidote'] || 0;
+    const dotDmgTotal = enemyDotDmgPerCombat * size * combatEncounters * Math.max(0, 1 - antidoteCount * 0.25);
+    const totalDmgToParty = rawDmgToParty + dotDmgTotal;
+
+    // --- Boss fight contribution ---
+    // Treat the boss as one additional encounter with summed phase HP and peak phase damage.
+    let bossDmgToParty = 0;
+    if (realm.boss) {
+        const bossPhaseCount = Math.min(diff.bossPhases || 4, realm.boss.phases.length);
+        const bossHpTotal = realm.boss.phases.slice(0, bossPhaseCount).reduce((s, p) => s + (p.hp || 0), 0);
+        const bossPeakDmg = realm.boss.phases.slice(0, bossPhaseCount).reduce((max, p) => Math.max(max, p.damage || 0), 0) * diff.enemyDmgMult;
+        const bossAoeExtra = realm.boss.phases.slice(0, bossPhaseCount).reduce((sum, p) => {
+            for (const ab of (p.abilities || [])) {
+                if (ab.type === 'aoe' && ab.damage) sum += ((ab.damage[0] + ab.damage[1]) / 2) * (ab.chance || 0);
+            }
+            return sum;
+        }, 0);
+        const bossRoundsToKill = bossHpTotal / Math.max(1, netEffectiveDmg + 1.5);
+        bossDmgToParty = bossRoundsToKill * (bossPeakDmg + bossAoeExtra) * size * (1 - avgDR) * 0.85 * effectiveBeastDrMult;
+    }
+
+    // --- Spell healing / mitigation value across the expedition ---
+    // Estimate how much effective HP the party gains from attuned healing spells.
+    const avgEncounterRounds = 8; // approximate rounds per encounter (combatRoundTicks default)
+    let spellHealValue = 0;
+    for (const sr of spellRoster) {
+        const spell = SPELLS[sr.spellKey];
+        if (!spell) continue;
+        const castsPerEncounter = avgEncounterRounds / Math.max(1, spell.cooldown || 3);
+        if (spell.effect === 'heal') {
+            spellHealValue += (spell.healAmount || 0) * castsPerEncounter * combatEncounters;
+        } else if (spell.effect === 'chain_heal') {
+            const bounceAvg = ((spell.chainTargets || 1) + 1) / 2 * (spell.chainFalloff || 0.6);
+            spellHealValue += (spell.healAmount || 0) * (1 + bounceAvg) * castsPerEncounter * combatEncounters;
+        } else if (spell.effect === 'heal_aura') {
+            spellHealValue += (spell.healPerRound || 0) * avgEncounterRounds * combatEncounters;
+        } else if (spell.effect === 'buff_defense') {
+            // Shield blocks a fraction of incoming damage for some rounds
+            const shieldDR = spell.damageReduction || 0.3;
+            spellHealValue += totalDmgToParty * shieldDR * (castsPerEncounter * Math.min(avgEncounterRounds, spell.buffDuration || 3) / avgEncounterRounds);
+        } else if (spell.effect === 'absorb_shield') {
+            spellHealValue += (spell.absorbAmount || 30) * castsPerEncounter * combatEncounters;
+        }
+    }
+
+    // --- Potion buffer ---
+    let potionHpBuffer = 0, potionDmgBonus = 0;
+    const maxHpPerColonist = COLONIST_CONFIG.maxHp;
+    for (const [potKey, count] of Object.entries(potions)) {
+        if (!count || count <= 0) continue;
+        if (potKey === 'health_potion') potionHpBuffer += count * maxHpPerColonist * 0.5;
+        else if (potKey === 'rally_brew') potionHpBuffer += count * maxHpPerColonist * 0.2 * size;
+        else if (potKey === 'lifesteal_elixir') {
+            const approxKills = Math.floor(totalDmg / Math.max(1, enemyHp));
+            potionHpBuffer += count * approxKills * 25;
+        } else if (potKey === 'battle_tonic') potionDmgBonus += effectiveDmg * 0.10 * count;
+        else if (potKey === 'smoke_draught') potionHpBuffer += totalDmgToParty * 0.35 * Math.min(count * 5, avgEncounterRounds) / (avgEncounterRounds * combatEncounters);
+        else if (potKey === 'mana_surge') spellHealValue *= 1 + 0.15 * count;
+    }
+
+    // --- Effective HP pool vs effective damage taken ---
+    const totalEffectiveHp = totalHp + beastHpBonus + spellHealValue + potionHpBuffer;
+    const totalEffectiveDmgToParty = totalDmgToParty + bossDmgToParty - (potionDmgBonus > 0 ? potionDmgBonus * roundsToKill : 0);
+
+    const ratio = totalEffectiveHp / Math.max(1, totalEffectiveDmgToParty);
+
+    // Map ratio to a victory chance percentage via a logistic curve:
+    // ratio 0.4 -> ~10%, ratio 0.8 -> ~40%, ratio 1.5 -> ~70%, ratio 3.0 -> ~90%, ratio 5.0 -> ~97%
+    const victoryChance = Math.round(Math.min(99, Math.max(1, 100 / (1 + Math.exp(-2.2 * (ratio - 1.2))))));
 
     let rating, color;
-    if (ratio > 3.0) { rating = 'Easy'; color = '#44cc44'; }
-    else if (ratio > 1.5) { rating = 'Fair'; color = '#88cc44'; }
-    else if (ratio > 0.8) { rating = 'Tough'; color = '#cccc44'; }
-    else if (ratio > 0.4) { rating = 'Dangerous'; color = '#ff8844'; }
+    if (victoryChance >= 85) { rating = 'Easy'; color = '#44cc44'; }
+    else if (victoryChance >= 65) { rating = 'Fair'; color = '#88cc44'; }
+    else if (victoryChance >= 40) { rating = 'Tough'; color = '#cccc44'; }
+    else if (victoryChance >= 20) { rating = 'Dangerous'; color = '#ff8844'; }
     else { rating = 'Suicidal'; color = '#ff4444'; }
 
     const skillChecks = {};
@@ -4256,5 +4376,5 @@ export function estimatePartyStrength(game, colonistIds, realmKey, difficulty, m
         }
     }
 
-    return { rating, color, totalDmg, totalHp, avgDR: Math.round(avgDR * 100), size, members, partyEffects, spellRoster, skillChecks };
+    return { rating, color, victoryChance, totalDmg, totalHp, avgDR: Math.round(avgDR * 100), size, members, partyEffects, spellRoster, skillChecks };
 }

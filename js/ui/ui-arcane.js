@@ -716,7 +716,7 @@ const arcaneMethods = {
                 const warName = a.name || a.type;
                 const warLvlBadge = animalLevelBadge(a.level || 0);
                 const warLvlTip = animalLevelTooltip(a.level || 0, a.type).replace(/\n/g, '&#10;');
-                html += `<div class="info-row"><label title="${warLvlTip}"><input type="checkbox" class="exp-war-check" value="${a.id}" data-max="2"> ${warName}${warLvlBadge} <span style="color:#888;font-size:0.85em;">HP:${displayHp} Dmg:${displayDmg}</span></label></div>`;
+                html += `<div class="info-row"><label title="${warLvlTip}"><input type="checkbox" class="exp-war-check" value="${a.id}" data-max="2" data-hp="${displayHp}" data-damage="${displayDmg}"> ${warName}${warLvlBadge} <span style="color:#888;font-size:0.85em;">HP:${displayHp} Dmg:${displayDmg}</span></label></div>`;
             }
         }
 
@@ -914,6 +914,7 @@ const arcaneMethods = {
                 let val = parseInt(input.value) || 0;
                 if (val > max) { val = max; input.value = max; }
                 if (val < min) { val = min; input.value = min; }
+                updateStrength();
             });
         });
 
@@ -953,10 +954,26 @@ const arcaneMethods = {
             el.innerHTML = '<span style="color:#666;">Select colonists to see party strength</span>';
             return;
         }
-        const result = estimatePartyStrength(this.game, ids, realmKey, diff);
+
+        // Collect selected potions from the setup panel
+        const potions = {};
+        document.querySelectorAll('.exp-potion').forEach(inp => {
+            const count = parseInt(inp.value) || 0;
+            if (count > 0 && inp.dataset.potion) potions[inp.dataset.potion] = count;
+        });
+
+        // Collect selected war beast snapshots from the setup panel using the
+        // level-adjusted stats embedded as data attributes on each checkbox.
+        const warBeastSnapshots = [...document.querySelectorAll('.exp-war-check:checked')].map(cb => ({
+            hp: parseInt(cb.dataset.hp) || 50,
+            damage: parseInt(cb.dataset.damage) || 8,
+        }));
+
+        const mutators = [...document.querySelectorAll('.exp-mutator:checked')].map(cb => cb.value);
+        const result = estimatePartyStrength(this.game, ids, realmKey, diff, mutators, potions, warBeastSnapshots);
         if (!result) { el.innerHTML = ''; return; }
 
-        let html = `<div style="color:${result.color};font-weight:bold;font-size:1.1em;">${result.rating}</div>`;
+        let html = `<div style="color:${result.color};font-weight:bold;font-size:1.1em;">${result.rating} <span style="font-size:0.85em;opacity:0.85;">(${result.victoryChance}%)</span></div>`;
         html += `<div style="color:#aaa;font-size:0.85em;margin-top:2px;">Dmg/round: ${result.totalDmg} | HP: ${result.totalHp} | DR: ${result.avgDR}%</div>`;
 
         html += '<div style="margin-top:6px;border-top:1px solid #333;padding-top:4px;">';
