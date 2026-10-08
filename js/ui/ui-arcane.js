@@ -1605,7 +1605,7 @@ const arcaneMethods = {
                 out.dy += -Math.abs(Math.sin((opts.swayPhase || 0))) * R.footstepBobPx * speed;
             }
             if (ambient && extras && R.expedTravelLean) out.rot += R.travelLeanRad * facing * speed;
-            if (ambient && extras && R.expedIdleShift && speed < 0.02) {
+            if (ambient && extras && R.expedIdleShift && speed < 0.02 && !opts.celebrating) {
                 const ph = (now / R.idleShiftPeriodMs) * Math.PI * 2 + ((opts.seed || 0) % 1000) / 1000 * 6.28;
                 out.rot += Math.sin(ph) * R.idleShiftRad;
             }
@@ -2237,6 +2237,7 @@ const arcaneMethods = {
                 speed: swayIntensity, swayPhase,
                 extras: extrasEnabled, swing: swingEnabled,
                 reduceMotion,
+                celebrating: isCelebrating,
             });
         };
 
