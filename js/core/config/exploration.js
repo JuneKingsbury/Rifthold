@@ -117,7 +117,7 @@ export const REALMS = {
         },
     },
     crystal_caves: {
-        name: 'Crystal Caves', difficulty: 1,
+        name: 'Crystal Caves', difficulty: 3,
         chain: 'crystal', chainOrder: 1,
         duration: [220, 380], encounters: 5, combatEncounters: [1, 2],
         vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
@@ -126,7 +126,6 @@ export const REALMS = {
             { resource: 'runite', weight: 30, amount: [2, 5] },
             { resource: 'void_essence', weight: 10, amount: [1, 3] },
             { item: 'map_fragment', weight: 3 },
-            { item: 'jewelers_loupe', weight: 2 },
         ],
         enemies: { count: [2, 4], types: [
             { key: 'crystal_bat', weight: 30 },
@@ -155,13 +154,13 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} discovers a resonating crystal chamber full of runite!', loot: { resource: 'runite', amount: [3, 6] } },
                 { chance: 0.03, text: '{name} finds an ancient dwarven cache!', loot: { resource: 'stone', amount: [8, 15] } },
-                { chance: 0.02, text: '{name} finds a strange compass embedded in crystal and feels compelled to take it!', loot: { item: 'compass_of_greed' } },
-                { chance: 0.025, text: '{name} finds a jeweler\'s loupe half-buried in crystal dust, its lens still flawless!', loot: { item: 'jewelers_loupe' } },
+                { chance: 0.005, text: '{name} finds a strange compass embedded in crystal and feels compelled to take it!', loot: { item: 'compass_of_greed' } },
+                { chance: 0.005, text: '{name} finds a jeweler\'s loupe half-buried in crystal dust, its lens still flawless!', loot: { item: 'jewelers_loupe' } },
             ],
         },
     },
     crystal_mines: {
-        name: 'Crystal Mines', difficulty: 2,
+        name: 'Crystal Mines', difficulty: 4,
         chain: 'crystal', chainOrder: 2,
         duration: [350, 550], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
@@ -170,7 +169,6 @@ export const REALMS = {
             { resource: 'runite', weight: 35, amount: [4, 9] },
             { resource: 'stone', weight: 25, amount: [6, 14] },
             { resource: 'void_essence', weight: 15, amount: [2, 5] },
-            { item: 'drum_of_rallying', weight: 3 },
         ],
         enemies: { count: [3, 5], types: [
             { key: 'crystal_bat', weight: 10 },
@@ -202,13 +200,13 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} finds an untouched runite motherlode!', loot: { resource: 'runite', amount: [6, 12] } },
                 { chance: 0.03, text: '{name} discovers a crystallized void pocket deep underground!', loot: { resource: 'void_essence', amount: [4, 8] } },
-                { chance: 0.015, text: '{name} unearths an ancient mining golem battery that still hums with power!', loot: { item: 'ley_battery' } },
-                { chance: 0.015, text: '{name} pries a ward stone from a sealed vault door!', loot: { item: 'ward_of_the_sentinel' } },
+                { chance: 0.005, text: '{name} unearths an ancient mining golem battery that still hums with power!', loot: { item: 'ley_battery' } },
+                { chance: 0.005, text: '{name} pries a ward stone from a sealed vault door!', loot: { item: 'ward_of_the_sentinel' } },
             ],
         },
     },
     crystal_depths: {
-        name: 'Crystal Depths', difficulty: 3,
+        name: 'Crystal Depths', difficulty: 5,
         chain: 'crystal', chainOrder: 3,
         duration: [500, 750], encounters: 8, combatEncounters: [2, 4],
         vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
@@ -217,7 +215,6 @@ export const REALMS = {
             { resource: 'runite', weight: 40, amount: [6, 14] },
             { resource: 'void_essence', weight: 25, amount: [3, 7] },
             { resource: 'stone', weight: 15, amount: [8, 18] },
-            { item: 'ward_of_the_sentinel', weight: 3 },
         ],
         enemies: { count: [4, 7], types: [
             { key: 'shard_spider', weight: 15 },
@@ -285,8 +282,9 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} discovers a massive runite formation in the shape of a heart!', loot: { resource: 'runite', amount: [10, 18] } },
                 { chance: 0.03, text: '{name} finds a sealed primordial chamber full of void-infused crystal!', loot: { resource: 'void_essence', amount: [6, 12] } },
-                { chance: 0.015, text: '{name} pries a crystal-encrusted shield from the cave wall, it shimmers with protective energy!', loot: { item: 'crystal_aegis' } },
-                { chance: 0.01, text: '{name} uncovers an ancient crystalline forge still burning with arcane fire!', loot: { item: 'crystalline_hammer' } },
+                { chance: 0.004, text: '{name} pries a crystal-encrusted shield from the cave wall, it shimmers with protective energy!', loot: { item: 'crystal_aegis' } },
+                { chance: 0.004, text: '{name} uncovers an ancient crystalline forge still burning with arcane fire!', loot: { item: 'crystalline_hammer' } },
+                { chance: 0.005, text: '{name} pulls a charged ward stone from a crumbling crystal vault door!', loot: { item: 'ward_of_the_sentinel' } },
             ],
         },
     },
@@ -327,7 +325,7 @@ export const REALMS = {
             rare: [
                 { chance: 0.06, text: '{name} discovers a fertile seed cache, rare crops!', loot: { resource: 'potatoes', amount: [6, 10] } },
                 { chance: 0.04, text: '{name} finds a druid\'s abandoned herb stash!', loot: { resource: 'berries', amount: [8, 12] } },
-                { chance: 0.02, text: '{name} finds a golden charm shaped like a cornucopia!', loot: { item: 'cornucopia_charm' } },
+                { chance: 0.005, text: '{name} finds a golden charm shaped like a cornucopia!', loot: { item: 'cornucopia_charm' } },
             ],
         },
     },
@@ -341,7 +339,6 @@ export const REALMS = {
             { resource: 'wood', weight: 35, amount: [10, 20] },
             { resource: 'berries', weight: 25, amount: [6, 12] },
             { resource: 'potatoes', weight: 20, amount: [5, 10] },
-            { item: 'cornucopia_charm', weight: 3 },
         ],
         enemies: { count: [2, 5], types: [
             { key: 'vine_creeper', weight: 15 },
@@ -372,8 +369,9 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} discovers a grove of giant truffles, incredibly valuable!', loot: { resource: 'potatoes', amount: [8, 14] } },
                 { chance: 0.04, text: '{name} finds a cache of preserved seeds in a hollow tree!', loot: { resource: 'wheat', amount: [10, 16] } },
-                { chance: 0.02, text: '{name} finds a living staff of intertwined roots that still grows!', loot: { item: 'staff_of_regrowth' } },
-                { chance: 0.015, text: '{name} discovers a symbiotic fungal crown that enhances the mind!', loot: { item: 'mycelium_crown' } },
+                { chance: 0.005, text: '{name} finds a living staff of intertwined roots that still grows!', loot: { item: 'staff_of_regrowth' } },
+                { chance: 0.004, text: '{name} discovers a symbiotic fungal crown that enhances the mind!', loot: { item: 'mycelium_crown' } },
+                { chance: 0.005, text: '{name} finds a golden charm shaped like a cornucopia tucked inside a hollow log!', loot: { item: 'cornucopia_charm' } },
             ],
         },
     },
@@ -388,7 +386,6 @@ export const REALMS = {
             { resource: 'berries', weight: 20, amount: [8, 16] },
             { resource: 'potatoes', weight: 15, amount: [6, 12] },
             { resource: 'void_essence', weight: 10, amount: [2, 5] },
-            { item: 'staff_of_regrowth', weight: 3 },
         ],
         enemies: { count: [3, 6], types: [
             { key: 'thorn_beast', weight: 15 },
@@ -455,13 +452,13 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} discovers the World-Root, a nexus of primal nature energy!', loot: { resource: 'void_essence', amount: [5, 9] } },
                 { chance: 0.03, text: '{name} harvests from the legendary Ever-Fruit tree!', loot: { resource: 'berries', amount: [12, 20] } },
-                { chance: 0.015, text: '{name} bonds with a seed of the World-Tree, it grows into living armor!', loot: { item: 'living_bark_armor' } },
-                { chance: 0.01, text: '{name} discovers an ancient druid\'s heartwood staff, still thrumming with life magic!', loot: { item: 'heartwood_staff' } },
+                { chance: 0.004, text: '{name} finds a staff of living roots still growing in the ancient canopy!', loot: { item: 'staff_of_regrowth' } },
+                { chance: 0.003, text: '{name} finds a talisman pulsing with ancient growth energy, hanging from the World-Root!', loot: { item: 'verdant_talisman' } },
             ],
         },
     },
     arcane_library: {
-        name: 'Arcane Library', difficulty: 2,
+        name: 'Arcane Library', difficulty: 5,
         chain: 'arcane', chainOrder: 1,
         duration: [180, 320], encounters: 4, combatEncounters: [1, 1],
         vis: { wall: 'university_wall', floor: 'university_floor' },
@@ -502,13 +499,13 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} discovers a sealed headmaster\'s vault, rare tome inside!', loot: { resource: 'tome_of_magic_missile', amount: [1, 1] } },
                 { chance: 0.04, text: '{name} finds a cache of enchanting runite!', loot: { resource: 'runite', amount: [3, 5] } },
-                { chance: 0.015, text: '{name} finds a glowing codex that shares its knowledge with all who stand near!', loot: { item: 'tome_of_shared_wisdom' } },
-                { chance: 0.02, text: '{name} discovers a crystalline apparatus in a forgotten research alcove, it amplifies mana storage!', loot: { item: 'crystal_capacitor' } },
+                { chance: 0.005, text: '{name} finds a glowing codex that shares its knowledge with all who stand near!', loot: { item: 'tome_of_shared_wisdom' } },
+                { chance: 0.004, text: '{name} discovers a crystalline apparatus in a forgotten research alcove, it amplifies mana storage!', loot: { item: 'crystal_capacitor' } },
             ],
         },
     },
     ancient_university: {
-        name: 'Ancient University', difficulty: 3,
+        name: 'Ancient University', difficulty: 6,
         chain: 'arcane', chainOrder: 2,
         duration: [320, 500], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'university_wall', floor: 'university_floor' },
@@ -521,7 +518,6 @@ export const REALMS = {
             { resource: 'tome_of_warp', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_circle_of_growth', weight: 10, amount: [1, 1] },
             { resource: 'runite', weight: 25, amount: [3, 7] },
-            { item: 'tome_of_shared_wisdom', weight: 3 },
         ],
         enemies: { count: [2, 5], types: [
             { key: 'arcane_wisp', weight: 15 },
@@ -552,13 +548,13 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} discovers the Dean\'s private vault, advanced tome inside!', loot: { resource: 'tome_of_haste', amount: [1, 1] } },
                 { chance: 0.03, text: '{name} finds an enchanted runite cache in the alchemy wing!', loot: { resource: 'runite', amount: [5, 9] } },
-                { chance: 0.02, text: '{name} finds a set of spectacles that reveal hidden truths!', loot: { item: 'scholars_spectacles' } },
-                { chance: 0.015, text: '{name} discovers a thesis on mana crystallization with a working prototype!', loot: { item: 'crystal_capacitor' } },
+                { chance: 0.005, text: '{name} finds a set of spectacles that reveal hidden truths!', loot: { item: 'scholars_spectacles' } },
+                { chance: 0.004, text: '{name} discovers a shared wisdom codex in the Dean\'s private study!', loot: { item: 'tome_of_shared_wisdom' } },
             ],
         },
     },
     abandoned_laboratory: {
-        name: 'Abandoned Laboratory', difficulty: 4,
+        name: 'Abandoned Laboratory', difficulty: 7,
         chain: 'arcane', chainOrder: 3,
         duration: [450, 680], encounters: 8, combatEncounters: [2, 4],
         vis: { wall: 'university_wall', floor: 'university_floor' },
@@ -572,8 +568,6 @@ export const REALMS = {
             { resource: 'tome_of_circle_of_growth', weight: 12, amount: [1, 1] },
             { resource: 'runite', weight: 20, amount: [4, 9] },
             { resource: 'void_essence', weight: 15, amount: [2, 6] },
-            { item: 'scholars_spectacles', weight: 2 },
-            { item: 'arcane_amplifier', weight: 3 },
         ],
         enemies: { count: [3, 6], types: [
             { key: 'spell_wraith', weight: 15 },
@@ -641,13 +635,14 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} accesses the head researcher\'s personal vault, forbidden knowledge!', loot: { resource: 'tome_of_circle_of_growth', amount: [1, 1] } },
                 { chance: 0.03, text: '{name} finds concentrated void essence in a sealed containment jar!', loot: { resource: 'void_essence', amount: [6, 10] } },
-                { chance: 0.015, text: '{name} recovers an experimental amplification gauntlet, still functional!', loot: { item: 'arcane_amplifier' } },
-                { chance: 0.01, text: '{name} discovers the masterwork of a mad researcher, a staff that bends reality!', loot: { item: 'staff_of_distortion' } },
+                { chance: 0.004, text: '{name} recovers a pair of spectacles from a researcher\'s cluttered desk, lenses still intact!', loot: { item: 'scholars_spectacles' } },
+                { chance: 0.003, text: '{name} discovers a soulbound scepter in a sealed experiment chamber, its spirit-link still active!', loot: { item: 'soulbond_scepter' } },
+                { chance: 0.002, text: '{name} finds a condensed field spellbook in a researcher\'s emergency kit!', loot: { item: 'expedition_spellbook' } },
             ],
         },
     },
     shadow_realm: {
-        name: 'Abyss Gate', difficulty: 3,
+        name: 'Abyss Gate', difficulty: 7,
         chain: 'shadow', chainOrder: 1,
         duration: [400, 650], encounters: 7, combatEncounters: [2, 3],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -655,7 +650,6 @@ export const REALMS = {
             { resource: 'void_essence', weight: 40, amount: [3, 7] },
             { resource: 'runite', weight: 25, amount: [3, 6] },
             { item: 'map_fragment', weight: 3 },
-            { item: 'ghost_step_charm', weight: 2 },
         ],
         enemies: { count: [3, 6], types: [
             { key: 'shadow_imp', weight: 30 },
@@ -686,15 +680,14 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} absorbs a collapsing void crystal, pure essence!', loot: { resource: 'void_essence', amount: [4, 8] } },
                 { chance: 0.02, text: '{name} finds a sealed void reliquary!', loot: { resource: 'void_essence', amount: [6, 10] } },
-                { chance: 0.015, text: '{name} pulls a glowing lantern from the void, it never goes dark!', loot: { item: 'voidwalkers_lantern' } },
-                { chance: 0.015, text: '{name} wraps themselves in living shadow, a cloak of concealment!', loot: { item: 'cloak_of_shadows' } },
-                { chance: 0.02, text: '{name} snatches a charm from an abyss stalker\'s fading corpse, carved with the rune of evasion!', loot: { item: 'ghost_step_charm' } },
-                { chance: 0.02, text: '{name} finds a pulsing crystal device that hums with containment magic!', loot: { item: 'crystal_capacitor' } },
+                { chance: 0.005, text: '{name} pulls a glowing lantern from the void, it never goes dark!', loot: { item: 'voidwalkers_lantern' } },
+                { chance: 0.005, text: '{name} wraps themselves in living shadow, a cloak of concealment!', loot: { item: 'cloak_of_shadows' } },
+                { chance: 0.005, text: '{name} snatches a charm from an abyss stalker\'s fading corpse, carved with the rune of evasion!', loot: { item: 'ghost_step_charm' } },
             ],
         },
     },
     void_abyss: {
-        name: 'Sunken Abyss', difficulty: 4,
+        name: 'Sunken Abyss', difficulty: 8,
         chain: 'shadow', chainOrder: 2,
         duration: [550, 800], encounters: 7, combatEncounters: [3, 5],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -703,8 +696,6 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 45, amount: [5, 10] },
             { resource: 'runite', weight: 20, amount: [4, 8] },
-            { item: 'voidwalkers_lantern', weight: 3 },
-            { item: 'bloodstone_gauntlet', weight: 2 },
         ],
         enemies: { count: [4, 7], types: [
             { key: 'void_stalker', weight: 20 },
@@ -736,15 +727,16 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} finds an abyss crystal radiating pure primordial essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
                 { chance: 0.03, text: '{name} collects runite that has spent aeons in the abyss. It\'s changed.', loot: { resource: 'runite', amount: [6, 12] } },
-                { chance: 0.015, text: '{name} wrests a blade from the deep dark. It seems to cut through reality!', loot: { item: 'void_edge' } },
-                { chance: 0.02, text: '{name} pries a gem-encrusted gauntlet from an abyss creature\'s withered hand. It pulses with stolen life!', loot: { item: 'bloodstone_gauntlet' } },
-                { chance: 0.01, text: '{name} discovers an orb containing a trapped dimension, incredible power!', loot: { item: 'dimensional_orb' } },
-                { chance: 0.01, text: '{name} finds a charm pulsing with abyss energy, its power barely contained!', loot: { item: 'void_charm' } },
+                { chance: 0.004, text: '{name} wrests a blade from the deep dark. It seems to cut through reality!', loot: { item: 'void_edge' } },
+                { chance: 0.005, text: '{name} pries a gem-encrusted gauntlet from an abyss creature\'s withered hand. It pulses with stolen life!', loot: { item: 'bloodstone_gauntlet' } },
+                { chance: 0.002, text: '{name} discovers an orb containing a trapped dimension, incredible power!', loot: { item: 'dimensional_orb' } },
+                { chance: 0.003, text: '{name} finds a charm pulsing with abyss energy, its power barely contained!', loot: { item: 'void_charm' } },
+                { chance: 0.004, text: '{name} finds a lantern drifting in the deep dark, its flame burning against the void!', loot: { item: 'voidwalkers_lantern' } },
             ],
         },
     },
     oblivion_rift: {
-        name: 'Oblivion Rift', difficulty: 5,
+        name: 'Oblivion Rift', difficulty: 9,
         chain: 'shadow', chainOrder: 3,
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -753,7 +745,6 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 50, amount: [7, 14] },
             { resource: 'runite', weight: 20, amount: [5, 10] },
-            { item: 'cloak_of_shadows', weight: 3 },
         ],
         enemies: { count: [4, 8], types: [
             { key: 'shade', weight: 15 },
@@ -821,16 +812,16 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.04, text: '{name} finds a tear in reality leading to a void essence wellspring!', loot: { resource: 'void_essence', amount: [10, 18] } },
-                { chance: 0.02, text: '{name} claims a fragment of pure oblivion, it annihilates anything it touches!', loot: { item: 'shard_of_oblivion' } },
-                { chance: 0.01, text: '{name} binds a fraction of the abyss\'s accumulated weight into their very soul!', loot: { item: 'voidheart' } },
-                { chance: 0.01, text: '{name} finds armor forged from the boundary between existence and nothing!', loot: { item: 'armor_of_the_abyss' } },
-                { chance: 0.008, text: '{name} plucks a charm from the deep dark. It warps the air around it.', loot: { item: 'void_charm' } },
+                { chance: 0.003, text: '{name} plucks a charm from the deep dark. It warps the air around it.', loot: { item: 'void_charm' } },
+                { chance: 0.004, text: '{name} tears a cloak of living shadow from the rift wall. It wraps around them instinctively.', loot: { item: 'cloak_of_shadows' } },
+                { chance: 0.003, text: '{name} pulls a helm of abyssal authority from a collapsed vault, its runes still demanding attention!', loot: { item: 'abyss_wardens_helm' } },
+                { chance: 0.003, text: '{name} wrenches a plate of abyssal iron from the rift wall, barbed with crystallized shadow!', loot: { item: 'abyssal_bramble_plate' } },
             ],
         },
     },
     // ── Void Pact chain ──────────────────────────────────────────────────────
     void_hollow: {
-        name: 'Void Hollow', difficulty: 3,
+        name: 'Void Hollow', difficulty: 9,
         chain: 'void_pact', chainOrder: 1,
         duration: [400, 620], encounters: 6, combatEncounters: [2, 3],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
@@ -838,8 +829,6 @@ export const REALMS = {
         loot: [
             { resource: 'void_essence', weight: 45, amount: [4, 9] },
             { resource: 'runite', weight: 30, amount: [2, 5] },
-            { item: 'ward_of_the_sentinel', weight: 2 },
-            { item: 'void_contract', weight: 1 },
         ],
         enemies: { count: [2, 4], types: [
             { key: 'shade_wraith', weight: 35 },
@@ -867,12 +856,14 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.04, text: '{name} discovers an untapped void essence wellspring!', loot: { resource: 'void_essence', amount: [6, 12] } },
-                { chance: 0.02, text: '{name} finds a ward still charged with defensive power!', loot: { item: 'ward_of_the_sentinel' } },
+                { chance: 0.004, text: '{name} finds a void contract pinned to a crumbling altar, its terms still binding!', loot: { item: 'void_contract' } },
+                { chance: 0.003, text: '{name} finds a crude effigy stuffed with scraps of void-pact bargains!', loot: { item: 'stitched_poppet' } },
+                { chance: 0.003, text: '{name} discovers a glass eye that has clearly been watching this hollow for a very long time!', loot: { item: 'seers_eye' } },
             ],
         },
     },
     void_sanctum: {
-        name: 'Void Sanctum', difficulty: 4,
+        name: 'Void Sanctum', difficulty: 10,
         chain: 'void_pact', chainOrder: 2,
         duration: [500, 750], encounters: 7, combatEncounters: [2, 4],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
@@ -882,8 +873,6 @@ export const REALMS = {
             { resource: 'void_essence', weight: 40, amount: [5, 12] },
             { resource: 'runite', weight: 25, amount: [3, 7] },
             { resource: 'abyss_sliver', weight: 5, amount: [1, 2] },
-            { item: 'void_contract', weight: 2 },
-            { item: 'arbiters_ledger', weight: 1 },
         ],
         enemies: { count: [2, 4], types: [
             { key: 'void_broker', weight: 25 },
@@ -913,12 +902,13 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} steals an unclaimed prize from a void broker\'s table!', loot: { resource: 'void_essence', amount: [8, 14] } },
                 { chance: 0.03, text: '{name} finds a crystallized fragment lodged in the sanctum wall.', loot: { resource: 'abyss_sliver', amount: [1, 2] } },
-                { chance: 0.025, text: '{name} finds a ledger detailing a forgotten trade. The rewards are theirs.', loot: { item: 'arbiters_ledger' } },
+                { chance: 0.005, text: '{name} intercepts an undelivered void contract left on a sanctum counter!', loot: { item: 'void_contract' } },
+                { chance: 0.005, text: '{name} finds a ledger detailing a forgotten trade. The rewards are theirs.', loot: { item: 'arbiters_ledger' } },
             ],
         },
     },
     void_heart: {
-        name: 'Void Heart', difficulty: 5,
+        name: 'Void Heart', difficulty: 11,
         chain: 'void_pact', chainOrder: 3,
         duration: [600, 900], encounters: 8, combatEncounters: [3, 5],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
@@ -928,8 +918,6 @@ export const REALMS = {
             { resource: 'void_essence', weight: 40, amount: [6, 14] },
             { resource: 'runite', weight: 25, amount: [4, 8] },
             { resource: 'abyss_sliver', weight: 5, amount: [1, 2] },
-            { item: 'void_contract', weight: 2 },
-            { item: 'arbiters_ledger', weight: 2 },
         ],
         enemies: { count: [2, 5], types: [
             { key: 'void_broker', weight: 15 },
@@ -960,7 +948,8 @@ export const REALMS = {
             rare: [
                 { chance: 0.04, text: '{name} discovers a pre-paid reward awaiting collection!', loot: { resource: 'void_essence', amount: [10, 18] } },
                 { chance: 0.04, text: '{name} pries a razor-thin sliver of hardened abyss from the chamber wall.', loot: { resource: 'abyss_sliver', amount: [1, 2] } },
-                { chance: 0.015, text: '{name} finds a signed contract granting extraordinary boons!', loot: { item: 'void_contract' } },
+                { chance: 0.005, text: '{name} finds a signed contract granting extraordinary boons!', loot: { item: 'void_contract' } },
+                { chance: 0.004, text: '{name} finds the Arbiter\'s personal ledger, dropped in haste!', loot: { item: 'arbiters_ledger' } },
             ],
         },
         boss: {
@@ -1011,7 +1000,7 @@ export const REALMS = {
 
     // ── Chaos chain ──────────────────────────────────────────────────────────
     fracture_gate: {
-        name: 'Fracture Gate', difficulty: 3,
+        name: 'Fracture Gate', difficulty: 13,
         chain: 'chaos', chainOrder: 1,
         duration: [420, 650], encounters: 6, combatEncounters: [2, 3],
         vis: { wall: 'crystal_wall', floor: 'shadow_floor' },
@@ -1021,7 +1010,6 @@ export const REALMS = {
             { resource: 'void_essence', weight: 30, amount: [3, 7] },
             { resource: 'runite', weight: 25, amount: [2, 5] },
             { resource: 'gold', weight: 20, amount: [4, 10] },
-            { item: 'chaos_shard', weight: 2 },
         ],
         enemies: { count: [2, 4], types: [
             { key: 'fracture_imp', weight: 40 },
@@ -1049,12 +1037,15 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.05, text: '{name} finds a pocket of stable space with unclaimed loot inside!', loot: { resource: 'void_essence', amount: [5, 10] } },
-                { chance: 0.02, text: 'A crack in reality reveals a pristine chaos shard!', loot: { item: 'chaos_shard' } },
+                { chance: 0.005, text: 'A crack in reality reveals a pristine chaos shard!', loot: { item: 'chaos_shard' } },
+                { chance: 0.003, text: '{name} pulls a blade from a fracture in space. It exists in two states simultaneously.', loot: { item: 'fracture_edge' } },
+                { chance: 0.003, text: '{name} finds a plate of iron forged at the fracture point, chaos still humming through it!', loot: { item: 'chaos_wrought_plate' } },
+                { chance: 0.003, text: '{name} seizes a pair of boots from a collapsing pocket dimension, still vibrating with speed!', loot: { item: 'boots_of_haste' } },
             ],
         },
     },
     shifting_labyrinth: {
-        name: 'Shifting Labyrinth', difficulty: 4,
+        name: 'Shifting Labyrinth', difficulty: 14,
         chain: 'chaos', chainOrder: 2,
         duration: [550, 820], encounters: 8, combatEncounters: [3, 5],
         vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
@@ -1065,8 +1056,6 @@ export const REALMS = {
             { resource: 'void_essence', weight: 30, amount: [4, 9] },
             { resource: 'runite', weight: 25, amount: [3, 7] },
             { resource: 'gold', weight: 20, amount: [6, 14] },
-            { item: 'chaos_shard', weight: 3 },
-            { item: 'unravelers_eye', weight: 1 },
         ],
         enemies: { count: [2, 4], types: [
             { key: 'shifting_horror', weight: 30 },
@@ -1095,12 +1084,13 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.04, text: '{name} finds a still point in the chaos, a perfectly calm room with valuable loot.', loot: { resource: 'gold', amount: [10, 18] } },
-                { chance: 0.015, text: '{name} spots an unraveler\'s eye embedded in a wall, watching nothing in particular.', loot: { item: 'unravelers_eye' } },
+                { chance: 0.005, text: 'A seam in the labyrinth wall reveals a chaos shard, perfectly intact despite everything!', loot: { item: 'chaos_shard' } },
+                { chance: 0.004, text: '{name} spots an unraveler\'s eye embedded in a wall, watching nothing in particular.', loot: { item: 'unravelers_eye' } },
             ],
         },
     },
     unraveling_core: {
-        name: 'Unraveling Core', difficulty: 5,
+        name: 'Unraveling Core', difficulty: 15,
         chain: 'chaos', chainOrder: 3,
         duration: [650, 950], encounters: 9, combatEncounters: [4, 6],
         vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
@@ -1112,8 +1102,6 @@ export const REALMS = {
             { resource: 'runite', weight: 25, amount: [4, 9] },
             { resource: 'gold', weight: 20, amount: [8, 16] },
             { resource: 'abyss_sliver', weight: 8, amount: [1, 3] },
-            { item: 'chaos_shard', weight: 3 },
-            { item: 'unravelers_eye', weight: 2 },
         ],
         enemies: { count: [3, 5], types: [
             { key: 'shifting_horror', weight: 20 },
@@ -1143,7 +1131,8 @@ export const REALMS = {
             ],
             rare: [
                 { chance: 0.04, text: '{name} locates the one stable point in the entire realm. It has a lot of void essence.', loot: { resource: 'void_essence', amount: [12, 20] } },
-                { chance: 0.015, text: '{name} pulls a chaos shard directly out of unraveling space.', loot: { item: 'chaos_shard' } },
+                { chance: 0.005, text: '{name} pulls a chaos shard directly out of unraveling space.', loot: { item: 'chaos_shard' } },
+                { chance: 0.003, text: '{name} pries an Unraveler\'s eye from the core wall. It is still watching.', loot: { item: 'unravelers_eye' } },
                 { chance: 0.04, text: '{name} reaches into an unraveled seam and pulls free a razor-thin fragment of hardened abyss.', loot: { resource: 'abyss_sliver', amount: [2, 4] } },
             ],
         },
@@ -1207,7 +1196,7 @@ export const REALMS = {
 
     // ── Kingdom chain ────────────────────────────────────────────────────────
     kingdom_outskirts: {
-        name: 'Kingdom Outskirts', difficulty: 5,
+        name: 'Kingdom Outskirts', difficulty: 11,
         chain: 'kingdom', chainOrder: 1,
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
 
@@ -1218,7 +1207,6 @@ export const REALMS = {
             { resource: 'gold', weight: 35, amount: [5, 12] },
             { resource: 'runite', weight: 25, amount: [3, 7] },
             { resource: 'void_essence', weight: 15, amount: [2, 4] },
-            { item: 'hagglers_coin', weight: 3 },
             { item: 'map_fragment', weight: 3 },
         ],
         enemies: { count: [2, 4], types: [
@@ -1249,13 +1237,13 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} intercepts a crusader pay-chest bound for the front!', loot: { resource: 'gold', amount: [10, 20] } },
                 { chance: 0.03, text: '{name} loots a paymaster\'s strongbox from a toppled wagon!', loot: { resource: 'gold', amount: [8, 16] } },
-                { chance: 0.02, text: '{name} lifts a merchant\'s lucky coin from a captured caravan!', loot: { item: 'hagglers_coin' } },
-                { chance: 0.02, text: '{name} pries a runic charm from a fallen officer\'s effects!', loot: { item: 'amulet_of_fortune' } },
+                { chance: 0.005, text: '{name} lifts a merchant\'s lucky coin from a captured caravan!', loot: { item: 'hagglers_coin' } },
+                { chance: 0.005, text: '{name} pries a runic charm from a fallen officer\'s effects!', loot: { item: 'amulet_of_fortune' } },
             ],
         },
     },
     crusader_barracks: {
-        name: 'Crusader Barracks', difficulty: 7,
+        name: 'Crusader Barracks', difficulty: 12,
         chain: 'kingdom', chainOrder: 2,
         duration: [700, 1000], encounters: 9, combatEncounters: [4, 6],
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
@@ -1265,9 +1253,7 @@ export const REALMS = {
             { resource: 'runite', weight: 30, amount: [5, 10] },
             { resource: 'gold', weight: 30, amount: [8, 16] },
             { resource: 'void_essence', weight: 20, amount: [3, 6] },
-            { item: 'drum_of_rallying', weight: 3 },
             { item: 'map_fragment', weight: 3 },
-            { item: 'rallying_standard', weight: 2 },
         ],
         enemies: { count: [3, 5], types: [
             { key: 'kingdom_guard', weight: 15 },
@@ -1298,14 +1284,14 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} cracks open the garrison paychest, a soldier\'s fortune!', loot: { resource: 'gold', amount: [14, 26] } },
                 { chance: 0.03, text: '{name} clears an armory vault of runic ingots!', loot: { resource: 'runite', amount: [8, 14] } },
-                { chance: 0.02, text: '{name} recovers the drum that once rallied a whole regiment!', loot: { item: 'drum_of_rallying' } },
-                { chance: 0.02, text: '{name} tears a battle standard from the barracks wall, its enchantments still potent!', loot: { item: 'rallying_standard' } },
-                { chance: 0.015, text: '{name} finds a runite warhammer left in the master smith\'s stall!', loot: { item: 'crystalline_hammer' } },
+                { chance: 0.005, text: '{name} recovers the drum that once rallied a whole regiment!', loot: { item: 'drum_of_rallying' } },
+                { chance: 0.005, text: '{name} tears a battle standard from the barracks wall, its enchantments still potent!', loot: { item: 'rallying_standard' } },
+                { chance: 0.004, text: '{name} finds a pair of battle-worn wraps belonging to a legendary berserker, still wrapped around a training post!', loot: { item: 'berserkers_wraps' } },
             ],
         },
     },
     palace_fortress: {
-        name: 'Palace Fortress', difficulty: 9,
+        name: 'Palace Fortress', difficulty: 13,
         chain: 'kingdom', chainOrder: 3,
         duration: [700, 1000], encounters: 9, combatEncounters: [5, 7],
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
@@ -1315,7 +1301,6 @@ export const REALMS = {
             { resource: 'gold', weight: 40, amount: [12, 24] },
             { resource: 'void_essence', weight: 25, amount: [4, 8] },
             { resource: 'runite', weight: 20, amount: [6, 12] },
-            { item: 'lodestone_of_prosperity', weight: 2 },
             { item: 'map_fragment', weight: 3 },
         ],
         enemies: { count: [3, 6], types: [
@@ -1331,8 +1316,9 @@ export const REALMS = {
             approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
             defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
             guaranteedLoot: [
-                { item: 'shard_of_oblivion', chance: 0.5 },
-                { item: 'voidheart', chance: 0.5 },
+                { item: 'sovereign_blade', chance: 0.4 },
+                { item: 'commanders_crown', chance: 0.4 },
+                { item: 'lodestone_of_prosperity', chance: 0.3 },
             ],
             bonusResources: { gold: 50, void_essence: 8 },
             phases: [
@@ -1383,8 +1369,9 @@ export const REALMS = {
             rare: [
                 { chance: 0.05, text: '{name} breaks into the royal war chest, a king\'s ransom in gold!', loot: { resource: 'gold', amount: [20, 36] } },
                 { chance: 0.03, text: '{name} raids the vault of confiscated magic, raw void essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
-                { chance: 0.02, text: '{name} claims a lodestone the crown used to draw wealth to its coffers!', loot: { item: 'lodestone_of_prosperity' } },
-                { chance: 0.015, text: '{name} liberates an abyssal cuirass from the royal armory!', loot: { item: 'armor_of_the_abyss' } },
+                { chance: 0.005, text: '{name} claims a lodestone the crown used to draw wealth to its coffers!', loot: { item: 'lodestone_of_prosperity' } },
+                { chance: 0.003, text: '{name} recovers the High King\'s personal sword from a display case in the war gallery!', loot: { item: 'sovereign_blade' } },
+                { chance: 0.003, text: '{name} lifts the Commander\'s Crown from a pedestal in the throne antechamber!', loot: { item: 'commanders_crown' } },
             ],
         },
     },
@@ -1425,11 +1412,21 @@ export const EXPLORATION_CONFIG = {
 };
 
 export const EXPEDITION_DIFFICULTY = {
-    1: { name: 'Normal', enemyHpMult: 1, enemyDmgMult: 1, enemyCountMult: 1, trapDmgMult: 1, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 0, bossPhases: 2 },
-    2: { name: 'Dangerous', enemyHpMult: 1.3, enemyDmgMult: 1.2, enemyCountMult: 1.25, trapDmgMult: 1.3, lootAmountMult: 1.5, rareLootMult: 1.5, extraEncounters: 1, bossPhases: 2 },
-    3: { name: 'Perilous', enemyHpMult: 1.7, enemyDmgMult: 1.5, enemyCountMult: 1.5, trapDmgMult: 1.7, lootAmountMult: 2.0, rareLootMult: 2.5, extraEncounters: 2, bossPhases: 3 },
-    4: { name: 'Deadly', enemyHpMult: 2.2, enemyDmgMult: 1.8, enemyCountMult: 1.75, trapDmgMult: 2.0, lootAmountMult: 3.0, rareLootMult: 4.0, extraEncounters: 3, bossPhases: 3 },
-    5: { name: 'Suicidal', enemyHpMult: 3.0, enemyDmgMult: 2.2, enemyCountMult: 2.0, trapDmgMult: 2.5, lootAmountMult: 4.0, rareLootMult: 6.0, extraEncounters: 4, bossPhases: 4 },
+    1:  { name: 'Normal',       enemyHpMult: 1,    enemyDmgMult: 1,    enemyCountMult: 1,    trapDmgMult: 1,    lootAmountMult: 1, rareLootMult: 1, extraEncounters: 0,  bossPhases: 2 },
+    2:  { name: 'Dangerous',   enemyHpMult: 1.3,  enemyDmgMult: 1.2,  enemyCountMult: 1.25, trapDmgMult: 1.3,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 1,  bossPhases: 2 },
+    3:  { name: 'Perilous',    enemyHpMult: 1.7,  enemyDmgMult: 1.5,  enemyCountMult: 1.5,  trapDmgMult: 1.7,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 2,  bossPhases: 3 },
+    4:  { name: 'Deadly',      enemyHpMult: 2.2,  enemyDmgMult: 1.8,  enemyCountMult: 1.75, trapDmgMult: 2.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 3,  bossPhases: 3 },
+    5:  { name: 'Suicidal',    enemyHpMult: 3.0,  enemyDmgMult: 2.2,  enemyCountMult: 2.0,  trapDmgMult: 2.5,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 4,  bossPhases: 4 },
+    6:  { name: 'Lethal',      enemyHpMult: 3.9,  enemyDmgMult: 2.7,  enemyCountMult: 2.25, trapDmgMult: 3.2,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 5,  bossPhases: 4 },
+    7:  { name: 'Catastrophic',enemyHpMult: 5.0,  enemyDmgMult: 3.3,  enemyCountMult: 2.5,  trapDmgMult: 4.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 6,  bossPhases: 4 },
+    8:  { name: 'Nightmarish', enemyHpMult: 6.5,  enemyDmgMult: 4.0,  enemyCountMult: 2.75, trapDmgMult: 5.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 7,  bossPhases: 4 },
+    9:  { name: 'Harrowing',   enemyHpMult: 8.5,  enemyDmgMult: 4.8,  enemyCountMult: 3.0,  trapDmgMult: 6.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 8,  bossPhases: 4 },
+    10: { name: 'Dire',        enemyHpMult: 11.0, enemyDmgMult: 5.8,  enemyCountMult: 3.25, trapDmgMult: 7.5,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 9,  bossPhases: 4 },
+    11: { name: 'Crushing',    enemyHpMult: 14.0, enemyDmgMult: 7.0,  enemyCountMult: 3.5,  trapDmgMult: 9.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 10, bossPhases: 4 },
+    12: { name: 'Overwhelming',enemyHpMult: 18.0, enemyDmgMult: 8.5,  enemyCountMult: 3.75, trapDmgMult: 11.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 11, bossPhases: 4 },
+    13: { name: 'Apocalyptic', enemyHpMult: 23.0, enemyDmgMult: 10.0, enemyCountMult: 4.0,  trapDmgMult: 13.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 12, bossPhases: 4 },
+    14: { name: 'Cataclysmic', enemyHpMult: 29.0, enemyDmgMult: 12.0, enemyCountMult: 4.25, trapDmgMult: 16.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 13, bossPhases: 4 },
+    15: { name: 'World-Ending',enemyHpMult: 36.0, enemyDmgMult: 14.5, enemyCountMult: 4.5,  trapDmgMult: 20.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 14, bossPhases: 4 },
 };
 
 export const EXPLORATION_EVENTS = {
