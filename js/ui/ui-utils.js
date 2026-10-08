@@ -1,6 +1,6 @@
 // Small presentation helpers shared across the UI modules (ui.js, ui-arcane.js)
 // and the exploration system. Kept dependency-free so any layer can import them.
-import { EXPEDITION_XP_CONFIG } from '../core/config.js';
+import { EXPEDITION_XP_CONFIG, ANIMAL_XP_CONFIG } from '../core/config.js';
 
 const ADVENTURER_ABILITY_DESCS = {
     scout:   'Scout: Reveals extra info about the next encounter before it starts.',
@@ -27,6 +27,39 @@ export function adventurerLevelTooltip(level) {
     if (trapMult < 1) lines.splice(damageMult > 1 ? 2 : 1, 0, `Trap damage taken: -${Math.round((1 - trapMult) * 100)}%`);
     const needed = EXPEDITION_XP_CONFIG.xpToLevel + level * EXPEDITION_XP_CONFIG.xpScalePerLevel;
     if (level < EXPEDITION_XP_CONFIG.maxLevel) lines.push(`Next level at ${needed} XP.`);
+    else lines.push('Maximum level reached.');
+    return lines.join('\n');
+}
+
+// Returns an HTML badge string like ' <span ...>Lv3</span>' for an animal that
+// has leveled up, or '' for level 0. Used by multiple UI panels.
+export function animalLevelBadge(level) {
+    if (!level || level <= 0) return '';
+    const maxed = level >= ANIMAL_XP_CONFIG.maxLevel;
+    const color = maxed ? '#ffaa22' : '#ffcc44';
+    return ` <span style="color:${color};font-size:0.8em;font-weight:bold;">Lv${level}</span>`;
+}
+
+// Returns a tooltip string listing the cumulative bonuses an animal has earned.
+export function animalLevelTooltip(level, animalType) {
+    if (!level || level <= 0) return 'No Animal levels yet.';
+    const isWarBeast = animalType === 'wolf' || animalType === 'boar';
+    const bonusKey = isWarBeast ? 'warBeast' : 'packAnimal';
+    const bonuses = ANIMAL_XP_CONFIG.levelBonuses[bonusKey];
+    const lines = [`Animal Level ${level}:`];
+    let totalHp = 0, totalDmg = 0, totalSpeed = 0;
+    for (let lv = 1; lv <= level; lv++) {
+        const b = bonuses[lv];
+        if (!b) continue;
+        if (b.hpBonus)        totalHp    += b.hpBonus;
+        if (b.damageBonus)    totalDmg   += b.damageBonus;
+        if (b.speedBonusAdd)  totalSpeed += b.speedBonusAdd;
+    }
+    if (totalHp)    lines.push(`+${totalHp} expedition HP`);
+    if (totalDmg)   lines.push(`+${totalDmg} expedition damage`);
+    if (totalSpeed) lines.push(`+${Math.round(totalSpeed * 100)}% expedition speed`);
+    const needed = ANIMAL_XP_CONFIG.xpToLevel + level * ANIMAL_XP_CONFIG.xpScalePerLevel;
+    if (level < ANIMAL_XP_CONFIG.maxLevel) lines.push(`Next level at ${needed} XP.`);
     else lines.push('Maximum level reached.');
     return lines.join('\n');
 }

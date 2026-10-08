@@ -8,7 +8,7 @@ import { getOmens } from '../systems/omens.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
-import { adventurerLevelTooltip } from './ui-utils.js';
+import { adventurerLevelTooltip, animalLevelBadge, animalLevelTooltip } from './ui-utils.js';
 import { resolvePortraitSrc } from '../core/mod-registry.js';
 
 // Visual glyph + color for an expedition combat status effect. Poison ticks
@@ -693,7 +693,12 @@ const arcaneMethods = {
             html += `<div class="info-row" style="color:#bbaa44;margin-top:6px;"><b>Pack Animals (max 2):</b></div>`;
             for (const a of packAnimals) {
                 const def = TAMED_ANIMALS[a.type];
-                html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${a.id}" data-max="2"> ${a.type} (+${Math.round(def.expeditionSpeedBonus * 100)}% speed)</label></div>`;
+                const packLvlBonus = this.game.exploration._animalPackLevelBonus(a.level || 0);
+                const totalSpeed = Math.round((def.expeditionSpeedBonus + packLvlBonus) * 100);
+                const packName = a.name || a.type;
+                const packLvlBadge = animalLevelBadge(a.level || 0);
+                const packLvlTip = animalLevelTooltip(a.level || 0, a.type).replace(/\n/g, '&#10;');
+                html += `<div class="info-row"><label title="${packLvlTip}"><input type="checkbox" class="exp-pack-check" value="${a.id}" data-max="2"> ${packName}${packLvlBadge} (+${totalSpeed}% speed)</label></div>`;
             }
         }
         const warBeasts = this.game.entities.filter(a => {
@@ -705,7 +710,13 @@ const arcaneMethods = {
             html += `<div class="info-row" style="color:#cc5544;margin-top:6px;"><b>War Beasts (max 2):</b></div>`;
             for (const a of warBeasts) {
                 const def = TAMED_ANIMALS[a.type];
-                html += `<div class="info-row"><label><input type="checkbox" class="exp-war-check" value="${a.id}" data-max="2"> ${a.type} <span style="color:#888;font-size:0.85em;">HP:${def.beastHp} Dmg:${def.beastDamage}</span></label></div>`;
+                const warLvlBonus = this.game.exploration._animalWarBeastLevelBonus(a.level || 0);
+                const displayHp  = def.beastHp  + warLvlBonus.hpBonus;
+                const displayDmg = def.beastDamage + warLvlBonus.damageBonus;
+                const warName = a.name || a.type;
+                const warLvlBadge = animalLevelBadge(a.level || 0);
+                const warLvlTip = animalLevelTooltip(a.level || 0, a.type).replace(/\n/g, '&#10;');
+                html += `<div class="info-row"><label title="${warLvlTip}"><input type="checkbox" class="exp-war-check" value="${a.id}" data-max="2"> ${warName}${warLvlBadge} <span style="color:#888;font-size:0.85em;">HP:${displayHp} Dmg:${displayDmg}</span></label></div>`;
             }
         }
 
@@ -1232,6 +1243,10 @@ const arcaneMethods = {
         if (s.puzzlesSolved > 0) parts.push(`Puzzles: ${s.puzzlesSolved}`);
         if (exp.eliteKills > 0) parts.push(`Elites slain: ${exp.eliteKills}`);
         if (parts.length > 0) html += `<div${_row()}><span style="color:#888;margin-top:3px;">${parts.join(' | ')}</span></div>`;
+
+        if (s.beastsDefeated && s.beastsDefeated.length > 0) {
+            html += `<div${_row()}><span style="color:#ff8844;margin-top:3px;">Fell in battle: ${s.beastsDefeated.join(', ')} (recovered at colony)</span></div>`;
+        }
 
         // MVP
         let mvpId = null, mvpScore = 0;

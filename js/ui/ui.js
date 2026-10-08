@@ -7,7 +7,7 @@ import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
-import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip } from './ui-utils.js';
+import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
@@ -2715,6 +2715,10 @@ export class UI {
             const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
             html += `<div class="info-header" style="color:${color};" data-animal-header="${a.id}">${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">Rename</button></div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
+            if (a.level > 0) {
+                const lvlTip = animalLevelTooltip(a.level, a.type).replace(/\n/g, '&#10;');
+                html += `<div class="info-row" style="color:#ffcc44;" title="${lvlTip}">Animal Level ${a.level}${a.level >= 5 ? ' (Max)' : ''}</div>`;
+            }
             if (a.bondedColonistId) {
                 const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
                 const bondName = bonded ? bonded.name : 'Unknown';
@@ -4126,6 +4130,12 @@ export class UI {
                     html += `<button data-animal-release="${a.id}" style="margin-left:auto;${btnStyle}" title="Release this animal back into the wild">Release</button>`;
                 }
                 html += `</div>`;
+
+                // level
+                if (a.level > 0) {
+                    const lvlTip = animalLevelTooltip(a.level, a.type).replace(/\n/g, '&#10;');
+                    html += `<div class="info-row" style="color:#ffcc44;font-size:0.9em;" title="${lvlTip}">Animal Level ${a.level}${a.level >= 5 ? ' (Max)' : ''}</div>`;
+                }
 
                 // bond
                 if (a.bondedColonistId) {

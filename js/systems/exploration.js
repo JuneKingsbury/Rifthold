@@ -2,7 +2,7 @@ import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFI
     FORMATION_CONFIG, EXPEDITION_TRAPS, EXPEDITION_ENEMIES, ELITE_MODIFIERS, ELITE_CONFIG,
     EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
     EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
-    FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG,
+    FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG, ANIMAL_XP_CONFIG,
     REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS,
 } from '../core/config.js';
 import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit, addThought } from '../entities/colonist.js';
@@ -194,7 +194,9 @@ export class ExplorationSystem {
             if (!a || a.hp <= 0) continue;
             const packRole = a.roles && a.roles.find(r => r.type === 'pack');
             if (packRole) {
-                packAnimals.push({ id: a.id, type: a.type, speedBonus: packRole.expeditionSpeedBonus || 0.25 });
+                const baseSpeed = packRole.expeditionSpeedBonus || 0.25;
+                const speedLvlBonus = this._animalPackLevelBonus(a.level || 0);
+                packAnimals.push({ id: a.id, type: a.type, speedBonus: baseSpeed + speedLvlBonus, level: a.level || 0 });
                 a.onExpedition = true;
             }
         }
@@ -210,12 +212,16 @@ export class ExplorationSystem {
             if (!a || a.hp <= 0 || a.onExpedition) continue;
             const warRole = a.roles && a.roles.find(r => r.type === 'war');
             if (warRole) {
+                const baseHp  = warRole.beastHp  || a.hp;
+                const baseDmg = warRole.beastDamage || a.damage || 8;
+                const lvlBonus = this._animalWarBeastLevelBonus(a.level || 0);
                 warBeasts.push({
                     id: a.id, type: a.type,
                     name: ANIMALS[a.type]?.name || a.type,
-                    hp: warRole.beastHp || a.hp,
-                    damage: warRole.beastDamage || a.damage || 8,
+                    hp:     baseHp  + lvlBonus.hpBonus,
+                    damage: baseDmg + lvlBonus.damageBonus,
                     char: a.char, color: a.color,
+                    level: a.level || 0,
                 });
                 a.onExpedition = true;
             }
@@ -288,7 +294,8 @@ export class ExplorationSystem {
                 const def = EXPEDITION_POTIONS[potionKey];
                 if (!def || count <= 0) continue;
                 const available = game.resources.getPotionCount?.(def.resource) ?? 0;
-                const take = Math.min(count, def.maxCarry, available);
+                const packBonus = packAnimals.length * POTION_CARRY_CONFIG.packAnimalBonus;
+                const take = Math.min(count, def.maxCarry + packBonus, available);
                 for (let i = 0; i < take; i++) game.resources.takePotion(def.resource);
                 if (take > 0) potionSupply[potionKey] = take;
             }
@@ -334,12 +341,14 @@ export class ExplorationSystem {
             pendingDecision: null,
             discoveredEntries: [],
             xpEarned: {},
+            animalXpEarned: {},
             nodeMap,
             autoMode,
             summary: {
                 damageDealt: {}, damageTaken: {}, spellsCast: {},
                 killCount: {}, healingDone: {},
                 potionsUsed: 0, decisionsCount: 0, puzzlesSolved: 0,
+                beastsDefeated: [],
             },
         };
 
@@ -1503,6 +1512,7 @@ export class ExplorationSystem {
         }
 
         this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerEncounter);
+        this._awardAnimalExpeditionXP(exp, ANIMAL_XP_CONFIG.xpPerCombatEncounter);
 
         // Scout (Adventurer Lv3): any member with this ability previews what lies ahead.
         const hasScout = exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 3);
@@ -2107,7 +2117,13 @@ export class ExplorationSystem {
                         targetBeast.hp -= dmg;
                         this._addLog(exp, game, `${attackerLabel} strikes the ${targetBeast.name} for ${dmg}!`, 'combat');
                         if (targetBeast.hp <= 0) {
-                            this._addLog(exp, game, `The ${targetBeast.name} falls in battle!`, 'danger');
+                            this._addLog(exp, game, `The ${targetBeast.name} has fallen! It will recover back at the colony.`, 'danger');
+                            if (exp.summary) {
+                                if (!exp.summary.beastsDefeated) exp.summary.beastsDefeated = [];
+                                if (!exp.summary.beastsDefeated.includes(targetBeast.name)) {
+                                    exp.summary.beastsDefeated.push(targetBeast.name);
+                                }
+                            }
                         }
                     }
                     continue;
@@ -2708,6 +2724,7 @@ export class ExplorationSystem {
                     this._addLog(exp, game, `+${boosted} ${res.replace(/_/g, ' ')} from the boss!`, 'loot');
                 }
                 this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerBossKill);
+                this._awardAnimalExpeditionXP(exp, ANIMAL_XP_CONFIG.xpPerBossKill);
             }
 
             // Elite loot bonus
@@ -2836,6 +2853,25 @@ export class ExplorationSystem {
                 needed = EXPEDITION_XP_CONFIG.xpToLevel + xpData.level * EXPEDITION_XP_CONFIG.xpScalePerLevel;
             }
             this.expeditionXP[snapshot.id] = xpData;
+        }
+
+        // Animal leveling: award XP and level up pack animals and war beasts.
+        for (const animalSnap of [...(exp.packAnimals || []), ...(exp.warBeasts || [])]) {
+            const animal = game.entities.find(a => a.id === animalSnap.id);
+            if (!animal) continue;
+            const earned = exp.animalXpEarned?.[animalSnap.id] || 0;
+            if (!earned) continue;
+            if (animal.level === undefined) animal.level = 0;
+            if (animal.xp    === undefined) animal.xp    = 0;
+            animal.xp += earned;
+            let needed = ANIMAL_XP_CONFIG.xpToLevel + animal.level * ANIMAL_XP_CONFIG.xpScalePerLevel;
+            while (animal.xp >= needed && animal.level < ANIMAL_XP_CONFIG.maxLevel) {
+                animal.xp -= needed;
+                animal.level++;
+                this._addLog(exp, game, `${animal.name || animal.type} reached Animal Level ${animal.level}!`, 'success');
+                window.soundManager?.playExpSFX('magic_levelup');
+                needed = ANIMAL_XP_CONFIG.xpToLevel + animal.level * ANIMAL_XP_CONFIG.xpScalePerLevel;
+            }
         }
 
         if (exp.packAnimals) {
@@ -3557,6 +3593,31 @@ export class ExplorationSystem {
             exp._lastDiscoveryName = data.name || key;
             window.soundManager?.playExpSFX('spell_divination');
         }
+    }
+
+    _awardAnimalExpeditionXP(exp, amount) {
+        if (!exp.animalXpEarned) exp.animalXpEarned = {};
+        for (const a of [...(exp.packAnimals || []), ...(exp.warBeasts || [])]) {
+            exp.animalXpEarned[a.id] = (exp.animalXpEarned[a.id] || 0) + amount;
+        }
+    }
+
+    _animalWarBeastLevelBonus(level) {
+        const bonuses = ANIMAL_XP_CONFIG.levelBonuses.warBeast;
+        let hpBonus = 0, damageBonus = 0;
+        for (let lv = 1; lv <= (level || 0); lv++) {
+            if (bonuses[lv]) { hpBonus += bonuses[lv].hpBonus; damageBonus += bonuses[lv].damageBonus; }
+        }
+        return { hpBonus, damageBonus };
+    }
+
+    _animalPackLevelBonus(level) {
+        const bonuses = ANIMAL_XP_CONFIG.levelBonuses.packAnimal;
+        let speedBonusAdd = 0;
+        for (let lv = 1; lv <= (level || 0); lv++) {
+            if (bonuses[lv]) speedBonusAdd += bonuses[lv].speedBonusAdd;
+        }
+        return speedBonusAdd;
     }
 
     _awardExpeditionXP(exp, game, amount) {

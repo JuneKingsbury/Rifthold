@@ -2604,6 +2604,36 @@ export const EXPEDITION_XP_CONFIG = {
     },
 };
 
+// Animal expedition XP and leveling (pack animals and war beasts).
+export const ANIMAL_XP_CONFIG = {
+    maxLevel: 5,
+    xpToLevel: 5,
+    xpScalePerLevel: 3,     // thresholds: 5, 8, 11, 14, 17 XP (55 total to cap, ~11-18 expeditions)
+    xpPerCombatEncounter: 1,
+    xpPerBossKill: 3,
+
+    levelBonuses: {
+        warBeast: {
+            // Cumulative HP/damage added on top of the reduced base stats in entities.js.
+            // Max: wolf 40+45=65 HP, 7+5=12 dmg; boar 45+45=70 HP, 10+5=15 dmg
+            1: { hpBonus: 5,  damageBonus: 1 },
+            2: { hpBonus: 8,  damageBonus: 1 },
+            3: { hpBonus: 10, damageBonus: 1 },
+            4: { hpBonus: 10, damageBonus: 1 },
+            5: { hpBonus: 12, damageBonus: 1 },
+        },
+        packAnimal: {
+            // Cumulative speed bonus additions.
+            // Max: deer 0.05+0.12=17%, okapi 0.13+0.12=25% (matches old unleveled value)
+            1: { speedBonusAdd: 0.02 },
+            2: { speedBonusAdd: 0.02 },
+            3: { speedBonusAdd: 0.03 },
+            4: { speedBonusAdd: 0.03 },
+            5: { speedBonusAdd: 0.02 },
+        },
+    },
+};
+
 // Realm events.
 export const REALM_EVENTS = {
     crystal_surge: {
