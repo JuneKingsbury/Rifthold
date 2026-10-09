@@ -2085,6 +2085,9 @@ class Game {
         const threshold = this._voidShardsThreshold(vs.ante);
         const cleared = fd >= threshold;
 
+        // Fire battle animation
+        if (window.voidShardsBattleAnim) window.voidShardsBattleAnim(fd, threshold, cleared);
+
         if (cleared) {
             vs.failStreak = 0;
             const clearBonus = DICE_CONFIG.roundClearReward * vs.ante;

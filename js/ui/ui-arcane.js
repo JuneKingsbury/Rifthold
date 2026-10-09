@@ -94,7 +94,15 @@ const arcaneMethods = {
 
         // Don't tear down the dice mat while a roll animation is in flight.
         if (tab === 'shards' && window._voidDiceRenderer?._rolling) {
-            if (tab === 'shards') this._mountDiceRenderer();
+            this._mountDiceRenderer();
+            this._mountShardBattleCanvas();
+            return;
+        }
+
+        // Don't tear down the battle canvas while an attack animation is in flight.
+        if (tab === 'shards' && window._voidShardsBattle?.raf) {
+            this._mountDiceRenderer();
+            this._mountShardBattleCanvas();
             return;
         }
 
@@ -153,7 +161,7 @@ const arcaneMethods = {
         }
 
         if (tab === 'expeditions') this._renderExpeditionVis();
-        if (tab === 'shards') this._mountDiceRenderer();
+        if (tab === 'shards') { this._mountDiceRenderer(); this._mountShardBattleCanvas(); }
     },
 
     _buildNexusTabHtml() {
@@ -3791,6 +3799,12 @@ const arcaneMethods = {
             const threshold = this.game._voidShardsThreshold(vs.ante);
             const rollsMax = this.game._voidShardsRollsPerRound();
 
+            // Node progress bar
+            html += '<canvas id="vs-node-canvas" width="320" height="24" style="display:block;width:100%;margin-bottom:4px;image-rendering:pixelated;"></canvas>';
+
+            // Battle canvas
+            html += '<canvas id="vs-battle-canvas" width="320" height="90" style="display:block;width:100%;border:1px solid #331a44;border-radius:4px;background:#0a0a1a;margin-bottom:8px;image-rendering:pixelated;"></canvas>';
+
             // Status bar
             html += '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">';
             html += `<div style="flex:1;background:#11111e;border:1px solid #332255;border-radius:4px;padding:4px 8px;font-size:10px;">`;
@@ -3873,6 +3887,537 @@ const arcaneMethods = {
         html += '</div>';
 
         return html;
+    },
+
+    _mountShardBattleCanvas() {
+        const canvas = this.elements.arcanePanel.querySelector('#vs-battle-canvas');
+        if (!canvas) return;
+
+        const b = window._voidShardsBattle;
+        if (b && b.canvas === canvas) {
+            // Already mounted on this same canvas element. Only reset HP if no animation is running.
+            if (!b.raf) {
+                b.targetHpFrac = 1.0;
+                b.monsterHpFrac = 1.0;
+                b.cleared = false;
+                const vs2 = this.game.voidShards;
+                if (vs2) {
+                    const n = (vs2.ante - 1) * 3 + vs2.round;
+                    b.nodePos = n;
+                    b.nodeTarget = n;
+                }
+                this._drawShardBattle(performance.now());
+                this._drawShardNodes();
+            }
+            return;
+        }
+
+        // Cancel any lingering loops from a previous canvas
+        if (b && b.raf) { cancelAnimationFrame(b.raf); }
+        if (b && b.nodeRaf) { cancelAnimationFrame(b.nodeRaf); }
+
+        const ctx = canvas.getContext('2d');
+        const nodeCanvas = this.elements.arcanePanel.querySelector('#vs-node-canvas');
+        const nodeCtx = nodeCanvas ? nodeCanvas.getContext('2d') : null;
+        const vs = this.game.voidShards;
+        const totalNodes = 8 * 3;
+        const initNode = vs ? (vs.ante - 1) * 3 + vs.round : 0;
+        const state = {
+            canvas, ctx,
+            nodeCanvas, nodeCtx,
+            raf: null,
+            effects: [],
+            monsterHpFrac: 1.0,
+            targetHpFrac: 1.0,
+            cleared: false,
+            knightX: 75, monsterX: 230, entityY: 48,
+            scrollX: 0,
+            totalNodes,
+            nodePos: initNode,
+            nodeTarget: initNode,
+            nodeRaf: null,
+        };
+        window._voidShardsBattle = state;
+
+        const ui = this;
+        window.voidShardsBattleAnim = function(fd, threshold, cleared) {
+            const bs = window._voidShardsBattle;
+            if (!bs) return;
+            const now = performance.now();
+            bs.cleared = cleared;
+
+            // Determine intensity tier
+            const ratio = fd / threshold;
+            let slashType;
+            if (ratio < 0.25) slashType = 'slash_light';
+            else if (ratio < 0.5) slashType = 'slash_medium';
+            else if (ratio < 1.0) slashType = 'slash_heavy';
+            else slashType = 'slash_kill';
+
+            // Deplete HP bar by ratio, capped at remaining
+            const deplete = Math.min(ratio * 0.28, bs.targetHpFrac);
+            bs.targetHpFrac = Math.max(0, bs.targetHpFrac - deplete);
+
+            const slashDur = slashType === 'slash_kill' ? 500 : slashType === 'slash_heavy' ? 350 : slashType === 'slash_medium' ? 300 : 250;
+            bs.effects.push({ type: 'knight_power', startMs: now, durationMs: 400 });
+            bs.effects.push({ type: 'knight_lunge', startMs: now + 280, durationMs: 320 });
+            bs.effects.push({ type: slashType, startMs: now + 430, durationMs: slashDur });
+            bs.effects.push({ type: 'monster_hit', startMs: now + 430, durationMs: 350 });
+            if (cleared) {
+                bs.effects.push({ type: 'monster_death', startMs: now + 880, durationMs: 700 });
+                bs.effects.push({ type: 'walk', startMs: now + 1580, durationMs: 1100 });
+                bs.nodeTarget = Math.min(bs.totalNodes - 1, bs.nodeTarget + 1);
+                if (!bs.nodeRaf) {
+                    const nodeLoop = function(nowT) {
+                        bs.nodeRaf = requestAnimationFrame(nodeLoop);
+                        ui._drawShardNodes();
+                        if (Math.abs(bs.nodePos - bs.nodeTarget) < 0.005) {
+                            bs.nodePos = bs.nodeTarget;
+                            cancelAnimationFrame(bs.nodeRaf);
+                            bs.nodeRaf = null;
+                            ui._drawShardNodes();
+                        }
+                    };
+                    bs.nodeRaf = requestAnimationFrame(nodeLoop);
+                }
+            }
+
+            if (!bs.raf) {
+                const loop = function(nowT) {
+                    bs.raf = requestAnimationFrame(loop);
+                    ui._drawShardBattle(nowT);
+                    const anyActive = bs.effects.some(e => nowT < e.startMs + e.durationMs);
+                    const hpAnimating = Math.abs(bs.monsterHpFrac - bs.targetHpFrac) > 0.002;
+                    if (!anyActive && !hpAnimating) {
+                        cancelAnimationFrame(bs.raf);
+                        bs.raf = null;
+                        bs.monsterHpFrac = 1.0;
+                        bs.targetHpFrac = 1.0;
+                        bs.scrollX = 0;
+                        bs.effects = [];
+                        ui._drawShardBattle(performance.now());
+                    }
+                };
+                bs.raf = requestAnimationFrame(loop);
+            }
+        };
+
+        this._drawShardBattle(performance.now());
+        this._drawShardNodes();
+    },
+
+    _drawShardNodes() {
+        const bs = window._voidShardsBattle;
+        if (!bs || !bs.nodeCanvas || !bs.nodeCtx) return;
+        const { nodeCanvas: nc, nodeCtx: nctx, totalNodes } = bs;
+
+        // Lerp nodePos toward nodeTarget
+        bs.nodePos += (bs.nodeTarget - bs.nodePos) * 0.08;
+
+        const W = nc.width, H = nc.height;
+        nctx.clearRect(0, 0, W, H);
+
+        const anteCount = 8;
+        const roundsPerAnte = 3;
+        const nodeR = 4;
+        const connH = 2;
+        const groupGap = 10;
+        const nodeGap = 7;
+
+        // Total width of one ante group: 3 nodes + 2 connectors between them
+        const groupW = roundsPerAnte * (nodeR * 2) + (roundsPerAnte - 1) * nodeGap;
+        // Total width of all groups + gaps between antes
+        const totalW = anteCount * groupW + (anteCount - 1) * groupGap;
+        const startX = (W - totalW) / 2;
+        const cy = H / 2;
+
+        // Draw connectors and nodes
+        for (let a = 0; a < anteCount; a++) {
+            for (let r = 0; r < roundsPerAnte; r++) {
+                const nodeIdx = a * roundsPerAnte + r;
+                const nx = startX + a * (groupW + groupGap) + r * (nodeR * 2 + nodeGap) + nodeR;
+
+                // Connector to next node (within same ante)
+                if (r < roundsPerAnte - 1) {
+                    const nx2 = startX + a * (groupW + groupGap) + (r + 1) * (nodeR * 2 + nodeGap) + nodeR;
+                    const prog = Math.max(0, Math.min(1, bs.nodePos - nodeIdx));
+                    nctx.fillStyle = prog > 0 ? '#6644aa' : '#2a1a44';
+                    nctx.fillRect(nx + nodeR, cy - connH / 2, nx2 - nx - nodeR * 2, connH);
+                    if (prog > 0 && prog < 1) {
+                        nctx.fillStyle = '#aa66ff';
+                        nctx.fillRect(nx + nodeR, cy - connH / 2, (nx2 - nx - nodeR * 2) * prog, connH);
+                    }
+                }
+
+                // Connector between antes (gap line)
+                if (r === roundsPerAnte - 1 && a < anteCount - 1) {
+                    const nx2 = startX + (a + 1) * (groupW + groupGap) + nodeR;
+                    const prog = Math.max(0, Math.min(1, bs.nodePos - nodeIdx));
+                    nctx.fillStyle = prog > 0 ? '#6644aa' : '#1a1030';
+                    nctx.fillRect(nx + nodeR, cy - 1, nx2 - nx - nodeR * 2, 2);
+                    if (prog > 0 && prog < 1) {
+                        nctx.fillStyle = '#aa66ff';
+                        nctx.fillRect(nx + nodeR, cy - 1, (nx2 - nx - nodeR * 2) * prog, 2);
+                    }
+                }
+
+                // Node circle
+                const done = bs.nodePos > nodeIdx + 0.5;
+                const active = !done && bs.nodePos > nodeIdx - 0.5;
+                let fillColor, strokeColor;
+                if (done) { fillColor = '#6644aa'; strokeColor = '#aa66ff'; }
+                else if (active) { fillColor = '#331a55'; strokeColor = '#cc88ff'; }
+                else { fillColor = '#110d1e'; strokeColor = '#2a1a44'; }
+
+                nctx.beginPath();
+                nctx.arc(nx, cy, nodeR, 0, Math.PI * 2);
+                nctx.fillStyle = fillColor;
+                nctx.fill();
+                nctx.strokeStyle = strokeColor;
+                nctx.lineWidth = 1.5;
+                nctx.stroke();
+
+                // Ante separator dot above the first node of each ante (except first)
+                if (r === 0 && a > 0) {
+                    nctx.beginPath();
+                    nctx.arc(nx - groupGap / 2, cy, 1, 0, Math.PI * 2);
+                    nctx.fillStyle = '#443366';
+                    nctx.fill();
+                }
+            }
+        }
+    },
+
+    _drawShardBattle(now) {
+        const bs = window._voidShardsBattle;
+        if (!bs) return;
+        const { canvas, ctx, effects, knightX, monsterX, entityY } = bs;
+        const W = canvas.width, H = canvas.height;
+        const skinMgr = this.game.skinManager;
+        const useSkins = skinMgr && skinMgr.isActive;
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, W, H);
+
+        const getEff = (type) => effects.find(e => e.type === type && now >= e.startMs && now < e.startMs + e.durationMs);
+        const getEffT = (eff) => eff ? Math.min(1, (now - eff.startMs) / eff.durationMs) : 0;
+
+        const walkEff = getEff('walk');
+        const walkT = getEffT(walkEff);
+
+        // Advance scrollX during walk
+        if (walkEff) {
+            // Ease-in-out: accelerate then decelerate
+            const ease = walkT < 0.5 ? 2 * walkT * walkT : 1 - Math.pow(-2 * walkT + 2, 2) / 2;
+            bs.scrollX = ease * W;
+        } else {
+            bs.scrollX = 0;
+        }
+        const scrollX = bs.scrollX;
+
+        // Background: tile the dungeon corridor and scroll it
+        ctx.fillStyle = '#0a0a1a';
+        ctx.fillRect(0, 0, W, H);
+
+        // Scrolling floor strips
+        const stoneColors = ['#13131f', '#111120', '#0f0f1c', '#121220'];
+        for (let i = 0; i < 5; i++) {
+            ctx.fillStyle = stoneColors[i % stoneColors.length];
+            ctx.fillRect(0, H - 30 + i * 6, W, 6);
+        }
+
+        // Scrolling wall blocks: tile across 2x width and offset by scrollX mod 24
+        ctx.fillStyle = '#0d0d1a';
+        ctx.fillRect(0, 0, W, 22);
+        ctx.fillStyle = '#181825';
+        const wallTile = 24;
+        const wallOff = scrollX % wallTile;
+        for (let x = -wallOff; x < W; x += wallTile) {
+            ctx.fillRect(x, 0, wallTile - 2, 20);
+        }
+
+        ctx.fillStyle = '#222235';
+        ctx.fillRect(0, H - 32, W, 2);
+
+        // Scrolling floor seam lines
+        const seamTile = 40;
+        const seamOff = scrollX % seamTile;
+        ctx.fillStyle = '#1a1a2e';
+        for (let x = -seamOff; x < W; x += seamTile) {
+            ctx.fillRect(x, H - 32, 1, 30);
+        }
+
+        // Torch flicker glow: torches scroll with wall blocks
+        const torchSpacing = 120;
+        const torchOff = scrollX % torchSpacing;
+        const torchAlpha = 0.18 + 0.08 * Math.sin(now * 0.004);
+        ctx.save();
+        ctx.globalAlpha = torchAlpha;
+        ctx.fillStyle = '#ffaa44';
+        for (let x = -torchOff; x < W + torchSpacing; x += torchSpacing) {
+            ctx.beginPath(); ctx.arc(x, 14, 8, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+
+        // Smooth HP lerp
+        bs.monsterHpFrac += (bs.targetHpFrac - bs.monsterHpFrac) * 0.1;
+
+        const powerEff = getEff('knight_power');
+        const lungeEff = getEff('knight_lunge');
+        const hitEff = getEff('monster_hit');
+        const deathEff = getEff('monster_death');
+        const slashEff = getEff('slash_light') || getEff('slash_medium') || getEff('slash_heavy') || getEff('slash_kill');
+
+        // Screen flash on heavy/kill hits
+        const flashEff = effects.find(e => (e.type === 'slash_heavy' || e.type === 'slash_kill') && now >= e.startMs && now < e.startMs + e.durationMs * 0.3);
+        if (flashEff) {
+            const ft = (now - flashEff.startMs) / (flashEff.durationMs * 0.3);
+            ctx.save();
+            ctx.globalAlpha = 0.18 * (1 - ft);
+            ctx.fillStyle = flashEff.type === 'slash_kill' ? '#ff6622' : '#ffcc44';
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+
+        const knightSprite = useSkins ? skinMgr.getSprite('entities', 'knight') : null;
+        const sprW = 32, sprH = 32;
+
+        // Knight: walk bob during walk effect, lunge during attack
+        let kx = knightX;
+        let ky = entityY;
+        const lungeT = getEffT(lungeEff);
+        if (lungeEff) {
+            const lungeArc = lungeT < 0.5 ? lungeT * 2 : (1 - lungeT) * 2;
+            kx += lungeArc * 28;
+        }
+        if (walkEff) {
+            // Bob up and down with each step
+            ky += Math.sin(walkT * Math.PI * 5) * 3;
+        }
+
+        const powerT = getEffT(powerEff);
+        const knightScale = powerEff ? 1 + 0.12 * Math.sin(powerT * Math.PI) : 1;
+        const knightGlow = powerEff ? powerT * (1 - powerT) * 4 : 0;
+
+        ctx.save();
+        ctx.translate(kx, ky);
+        ctx.scale(knightScale, knightScale);
+        if (knightGlow > 0) {
+            ctx.shadowColor = '#ffdd44';
+            ctx.shadowBlur = knightGlow * 18;
+        }
+        if (knightSprite) {
+            ctx.drawImage(knightSprite, -sprW / 2, -sprH / 2, sprW, sprH);
+        } else {
+            ctx.fillStyle = '#8899cc';
+            ctx.fillRect(-sprW / 2, -sprH / 2, sprW, sprH);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('K', 0, 4);
+        }
+        ctx.restore();
+
+        // Score preview above knight
+        if (!walkEff) {
+            const vs = this.game.voidShards;
+            let scoreLabel = '';
+            if (vs && vs.dice && vs.dice[0] !== 0 && !vs.rolling) {
+                const { fd } = this.game._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers);
+                const threshold = this.game._voidShardsThreshold(vs.ante);
+                const clears = fd >= threshold;
+                ctx.save();
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = clears ? '#88ff88' : '#ffcc44';
+                ctx.globalAlpha = 0.9;
+                ctx.fillText(fd + ' Fd', kx, ky - sprH / 2 - 6);
+                ctx.restore();
+            }
+        }
+
+        // Monster sprite
+        const monsterSprite = useSkins ? skinMgr.getSprite('entities', 'monster') : null;
+        const deathT = getEffT(deathEff);
+
+        // During walk, the new monster slides in from the right, fading in during the last 30% of the walk
+        const walkMonsterT = walkEff ? Math.max(0, (walkT - 0.7) / 0.3) : 0;
+        // Standard monster is hidden once walk starts (the defeated one has already vanished)
+        const monsterVisible = !walkEff && (!deathEff || deathT < 0.99);
+
+        if (monsterVisible) {
+            let mx = monsterX;
+            let mAlpha = 1;
+            let mRot = 0;
+
+            if (hitEff) {
+                const ht = getEffT(hitEff);
+                mx += Math.sin(ht * Math.PI * 3) * 6;
+            }
+            if (deathEff) {
+                mRot = deathT * Math.PI * 0.6;
+                mAlpha = 1 - deathT;
+                mx += deathT * 20;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = mAlpha;
+            ctx.translate(mx, entityY);
+            ctx.rotate(mRot);
+            if (monsterSprite) {
+                ctx.drawImage(monsterSprite, -sprW / 2, -sprH / 2, sprW, sprH);
+            } else {
+                ctx.fillStyle = '#cc4444';
+                ctx.fillRect(-sprW / 2, -sprH / 2, sprW, sprH);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('M', 0, 4);
+            }
+            ctx.restore();
+
+            // HP bar above monster
+            const barW = 56, barH = 5, barX = monsterX - barW / 2, barY = entityY - sprH / 2 - 10;
+            ctx.fillStyle = '#331111';
+            ctx.fillRect(barX, barY, barW, barH);
+            const hpW = Math.max(0, bs.monsterHpFrac * barW);
+            const hpPct = bs.monsterHpFrac;
+            let hpColor;
+            if (hpPct > 0.5) hpColor = 'hsl(' + Math.round(80 + hpPct * 40) + ',80%,40%)';
+            else if (hpPct > 0.25) hpColor = '#dd8833';
+            else hpColor = '#cc3333';
+            ctx.fillStyle = hpColor;
+            ctx.fillRect(barX, barY, hpW, barH);
+            ctx.strokeStyle = '#443333';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barW, barH);
+
+            // HP % label above bar
+            const vs2 = this.game.voidShards;
+            const threshold2 = vs2 ? this.game._voidShardsThreshold(vs2.ante) : 0;
+            ctx.save();
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = hpColor;
+            ctx.globalAlpha = 0.85;
+            ctx.fillText(Math.round(bs.monsterHpFrac * threshold2) + ' hp', monsterX, barY - 3);
+            ctx.restore();
+        }
+
+        // Incoming monster slides in from right during walk
+        if (walkEff && walkMonsterT > 0) {
+            const slideX = monsterX + (1 - walkMonsterT) * (W - monsterX + sprW);
+            ctx.save();
+            ctx.globalAlpha = walkMonsterT;
+            ctx.translate(slideX, entityY);
+            if (monsterSprite) {
+                ctx.drawImage(monsterSprite, -sprW / 2, -sprH / 2, sprW, sprH);
+            } else {
+                ctx.fillStyle = '#cc4444';
+                ctx.fillRect(-sprW / 2, -sprH / 2, sprW, sprH);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('M', 0, 4);
+            }
+            ctx.restore();
+            // HP bar on incoming monster
+            if (walkMonsterT > 0.3) {
+                const barAlpha = (walkMonsterT - 0.3) / 0.7;
+                const barW = 56, barH = 5, barX = slideX - barW / 2, barY = entityY - sprH / 2 - 10;
+                ctx.save();
+                ctx.globalAlpha = barAlpha;
+                ctx.fillStyle = '#331111';
+                ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = 'hsl(120,80%,40%)';
+                ctx.fillRect(barX, barY, barW, barH);
+                ctx.strokeStyle = '#443333';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(barX, barY, barW, barH);
+                ctx.restore();
+            }
+        }
+
+        // "DEFEATED" rising text
+        if (deathEff && deathT < 1) {
+            const rise = deathT * 22;
+            ctx.save();
+            ctx.globalAlpha = Math.sin(deathT * Math.PI);
+            ctx.font = 'bold 13px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ff4444';
+            ctx.fillText('DEFEATED', monsterX, entityY - 30 - rise);
+            ctx.restore();
+        }
+
+        // Slash effects
+        if (slashEff) {
+            const st = (now - slashEff.startMs) / slashEff.durationMs;
+            const type = slashEff.type;
+            const cx = monsterX - 8, cy = entityY - 4;
+
+            const slashCount = type === 'slash_light' ? 1 : type === 'slash_medium' ? 2 : type === 'slash_heavy' ? 3 : 5;
+            const sparkCount = type === 'slash_light' ? 0 : type === 'slash_medium' ? 4 : type === 'slash_heavy' ? 8 : 16;
+            const baseColor = type === 'slash_kill' ? '#ff6633' : type === 'slash_heavy' ? '#ffaa22' : type === 'slash_medium' ? '#ffee66' : '#ffffff';
+            const lineAlpha = Math.sin(st * Math.PI);
+
+            for (let i = 0; i < slashCount; i++) {
+                const angle = -0.6 + i * 0.28;
+                const len = 28 + i * 8;
+                const xOff = i * 5 - (slashCount - 1) * 2.5;
+                ctx.save();
+                ctx.globalAlpha = lineAlpha * (1 - i * 0.15);
+                ctx.strokeStyle = i === 0 ? baseColor : '#ffffff';
+                ctx.lineWidth = 3 - i * 0.5;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(cx + xOff + Math.cos(angle + Math.PI) * len * 0.3, cy + Math.sin(angle + Math.PI) * len * 0.3);
+                ctx.lineTo(cx + xOff + Math.cos(angle) * len * 0.7, cy + Math.sin(angle) * len * 0.7);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Spark dots at stable angular positions
+            for (let i = 0; i < sparkCount; i++) {
+                const angle = (i / sparkCount) * Math.PI * 2 + 0.4;
+                const dist = (14 + (i % 3) * 8) * st;
+                const sx2 = cx + Math.cos(angle) * dist;
+                const sy2 = cy + Math.sin(angle) * dist;
+                ctx.save();
+                ctx.globalAlpha = lineAlpha * (1 - st * 0.6);
+                ctx.fillStyle = i % 2 === 0 ? baseColor : '#ffffff';
+                ctx.beginPath();
+                ctx.arc(sx2, sy2, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Extra star burst for kill tier
+            if (type === 'slash_kill') {
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const dist = 20 + st * 30;
+                    const px = cx + Math.cos(angle) * dist;
+                    const py = cy + Math.sin(angle) * dist;
+                    ctx.save();
+                    ctx.globalAlpha = lineAlpha * 0.8;
+                    ctx.fillStyle = '#ffdd00';
+                    ctx.font = '12px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('*', px, py);
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Faint VS label
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = '#886699';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('VS', W / 2, entityY + 4);
+        ctx.restore();
     },
 
     _findDiceMod(key) {

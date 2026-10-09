@@ -503,32 +503,44 @@ window.voidShardsScoreAnim = function(chips, mult, fd) {
     if (!matEl || !chipsEl || !fdEl) return;
 
     const matRect = matEl.getBoundingClientRect();
-    const chipsRect = chipsEl.getBoundingClientRect();
-    const multRect = multEl ? multEl.getBoundingClientRect() : chipsRect;
-    const fdRect = fdEl.getBoundingClientRect();
 
-    // Chip particles (blue, fly toward chips counter)
+    // Resolve knight screen position from the battle canvas if available
+    const battleCanvas = document.getElementById('vs-battle-canvas');
+    let knightScreenX, knightScreenY;
+    if (battleCanvas) {
+        const br = battleCanvas.getBoundingClientRect();
+        const scaleX = br.width / battleCanvas.width;
+        const scaleY = br.height / battleCanvas.height;
+        knightScreenX = br.left + 75 * scaleX;
+        knightScreenY = br.top + 48 * scaleY;
+    } else {
+        const chipsRect = chipsEl.getBoundingClientRect();
+        knightScreenX = chipsRect.left + chipsRect.width / 2;
+        knightScreenY = chipsRect.top + chipsRect.height / 2;
+    }
+
+    // Chip particles (blue, fly toward knight)
     const chipCount = Math.min(chips, 12);
     for (let i = 0; i < chipCount; i++) {
         _spawnParticle(
             matRect.left + Math.random() * matRect.width,
             matRect.top + Math.random() * matRect.height,
-            chipsRect.left + chipsRect.width / 2,
-            chipsRect.top + chipsRect.height / 2,
+            knightScreenX,
+            knightScreenY,
             '#88aaff', '+' + Math.ceil(chips / chipCount),
             i * 40
         );
     }
 
-    // Mult particles (purple, fly toward mult counter)
+    // Mult particles (purple, fly toward knight)
     if (mult > 1) {
         const multCount = Math.min(mult, 6);
         for (let i = 0; i < multCount; i++) {
             _spawnParticle(
                 matRect.left + Math.random() * matRect.width,
                 matRect.top + Math.random() * matRect.height,
-                multRect.left + multRect.width / 2,
-                multRect.top + multRect.height / 2,
+                knightScreenX,
+                knightScreenY,
                 '#dd88ff', 'x' + mult,
                 chipCount * 40 + i * 50
             );
