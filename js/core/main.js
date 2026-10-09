@@ -50,6 +50,31 @@ import { TutorialSystem } from '../systems/tutorial.js';
 import { SoundManager } from './sound.js';
 import { TickProfiler } from './perf-probe.js';
 import { keybindingRowsHtml, beginRebindCapture, clearStoredBindings, resetStoredBinding, formatKeyLabel } from '../ui/keybindings-ui.js';
+import { DICE_CONFIG } from './config/dice.js';
+import '../ui/ui-dice.js';
+
+const _SIPHON_CONFIG = {
+    clickBase: 5,
+    resonanceBonus: 4,       // +4 charge per click per Resonance level
+    holdClickRateBase: 1,    // base clicks/s while holding the Channel button
+    holdClickRateBonus: 0.5, // +0.5 clicks/s per Resonance level
+    passiveBase: 0.15,       // base passive charge/tick (at TICK_RATE=200ms, ~0.75/s)
+    seepageBonus: 0.10,      // +0.1/tick per Seepage level
+    essenceBase: 1,
+    crystallizationMult: 0.6, // +60% burst yield per Crystallization level
+    convergenceGold: [0, 1, 2, 5],
+    voidHeartMaxCharge: 200,
+    critEvery: 10,           // every 10th click is a Resonant Strike (3x power)
+    autoBurstUnlockLevel: 3, // Crystallization level that unlocks Auto-Burst
+    upgradeCosts: {
+        resonance:       [2, 5, 10, 20, 40],
+        seepage:         [3, 7, 14, 28, 56],
+        crystallization: [4, 9, 18, 36, 72],
+        convergence:     [15, 30, 60],
+        voidHeart:       [100],
+    },
+    pulseCooldownTicks: 900,
+};
 
 function _setFullscreen(enabled) {
     if (window.Capacitor?.isNativePlatform()) return;
@@ -167,6 +192,44 @@ class Game {
         this.eventLog = new EventLog();
         this.story = new StorySystem();
         this.tutorial = new TutorialSystem();
+
+        this.voidSiphon = {
+            charge: 0,
+            maxCharge: 100,
+            totalClicks: 0,
+            totalBursts: 0,
+            totalEssenceProduced: 0,
+            totalGoldProduced: 0,
+            upgrades: { resonance: 0, seepage: 0, crystallization: 0, convergence: 0, voidHeart: 0 },
+            voidPulseActive: false,
+            voidPulseCooldownTick: 0,
+            lastBurstTick: 0,
+            lastBurstMs: 0,      // real-time ms stamp of last burst for glyph animation
+            clicksSinceCrit: 0,  // counts toward next Resonant Strike
+            autoBurst: false,    // player-toggled auto-burst
+            _nextPulseMs: _SIPHON_CONFIG.pulseCooldownTicks * 200,
+        };
+
+        this.voidShards = {
+            active: false,
+            ante: 1,
+            round: 0,
+            rollsLeft: DICE_CONFIG.rollsPerRound,
+            dice: [0, 0, 0, 0, 0],
+            locked: [false, false, false, false, false],
+            lastScore: 0,
+            lastChips: 0,
+            lastMult: 0,
+            lastCategory: '',
+            modifiers: [],
+            failStreak: 0,
+            shopPhase: false,
+            shopOffers: [],
+            earnedFd: 0,
+            permanentUpgrades: { extra_roll: 0, ante_cushion: 0, shop_slots: 0, failure_return: 0, base_chips: 0 },
+            rolling: false,
+            runResult: null, // 'win' | 'loss' | null
+        };
 
         this.manaCrystalBonus = 0;
         this.hearthShrineBonus = 0;
@@ -424,6 +487,30 @@ class Game {
                         }
                     }).catch(e => console.error('Auto-save failed:', e));
                 }
+            }
+        }
+
+        // Void Siphon passive tick runs even while paused.
+        // Rate is in charge/tick; CONFIG.TICK_RATE ms per tick converts to charge/ms.
+        if (this.voidSiphon) {
+            const vs = this.voidSiphon;
+            const chargePerMs = (_SIPHON_CONFIG.passiveBase + vs.upgrades.seepage * _SIPHON_CONFIG.seepageBonus) / CONFIG.TICK_RATE;
+            vs._passiveAccum = (vs._passiveAccum || 0) + chargePerMs * dt;
+            if (vs._passiveAccum >= 1) {
+                const gain = Math.floor(vs._passiveAccum);
+                vs._passiveAccum -= gain;
+                vs.charge = Math.min(vs.maxCharge, vs.charge + gain);
+            }
+            vs._pulseAccum = (vs._pulseAccum || 0) + dt;
+            if (!vs.voidPulseActive && vs._pulseAccum > vs._nextPulseMs) {
+                vs._pulseAccum = 0;
+                vs._nextPulseMs = _SIPHON_CONFIG.pulseCooldownTicks * CONFIG.TICK_RATE + Math.random() * _SIPHON_CONFIG.pulseCooldownTicks * CONFIG.TICK_RATE;
+                vs.voidPulseActive = true;
+                this.notifications.push({ text: '&#10022; A Void Pulse surges through the Fracture Bloom!', tick: this.tick, type: 'event' });
+            }
+            // Auto-Burst: fire whenever charge is full if unlocked and toggled on
+            if (vs.autoBurst && vs.charge >= vs.maxCharge) {
+                this.voidSiphonBurst();
             }
         }
 
@@ -1763,6 +1850,355 @@ class Game {
         } else {
             this.notifications.push({ text: 'Build a Void Nexus first!', tick: this.tick, type: 'danger' });
         }
+    }
+
+    voidSiphonClick() {
+        const vs = this.voidSiphon;
+        if (!vs) return;
+        const cfg = _SIPHON_CONFIG;
+        vs.clicksSinceCrit = (vs.clicksSinceCrit || 0) + 1;
+        const isCrit = vs.clicksSinceCrit >= cfg.critEvery;
+        if (isCrit) vs.clicksSinceCrit = 0;
+        const basePower = cfg.clickBase + vs.upgrades.resonance * cfg.resonanceBonus;
+        const power = isCrit ? basePower * 3 : basePower;
+        vs.charge = Math.min(vs.maxCharge, vs.charge + power);
+        vs.totalClicks++;
+        if (isCrit && this.ui) {
+            this.notifications.push({ text: `&#9670; Resonant Strike! +${power} charge`, tick: this.tick, type: 'event' });
+        }
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidSiphonBurst() {
+        const vs = this.voidSiphon;
+        if (!vs || vs.charge < vs.maxCharge) return;
+        const cfg = _SIPHON_CONFIG;
+        const mult = (1 + vs.upgrades.crystallization * cfg.crystallizationMult)
+            * (vs.upgrades.voidHeart ? 1.5 : 1)
+            * (vs.voidPulseActive ? 2 : 1);
+        const essenceReward = Math.max(1, Math.round(cfg.essenceBase * mult));
+        const goldReward = cfg.convergenceGold[vs.upgrades.convergence] || 0;
+        this.resources.add({ fracture_dust: essenceReward });
+        if (goldReward > 0) this.resources.add({ gold: goldReward });
+        vs.charge = 0;
+        vs.totalBursts++;
+        vs.totalEssenceProduced += essenceReward;
+        vs.totalGoldProduced += goldReward;
+        vs.lastBurstTick = this.tick;
+        vs.lastBurstMs = performance.now();
+        if (vs.voidPulseActive) vs.voidPulseActive = false;
+        const goldStr = goldReward > 0 ? ` + ${goldReward} gold` : '';
+        this.notifications.push({ text: `&#10070; Fracture Bloom burst! +${essenceReward} fracture dust${goldStr}`, tick: this.tick, type: 'success' });
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidSiphonUpgrade(key) {
+        const vs = this.voidSiphon;
+        if (!vs) return;
+        const cfg = _SIPHON_CONFIG;
+        const costs = cfg.upgradeCosts[key];
+        if (!costs) return;
+        const currentLevel = vs.upgrades[key];
+        if (currentLevel >= costs.length) return;
+        const cost = costs[currentLevel];
+        if (!this.resources.has({ fracture_dust: cost })) {
+            this.notifications.push({ text: `Not enough fracture dust (need ${cost})`, tick: this.tick, type: 'danger' });
+            return;
+        }
+        this.resources.deduct({ fracture_dust: cost });
+        vs.upgrades[key]++;
+        if (key === 'voidHeart') vs.maxCharge = cfg.voidHeartMaxCharge;
+        const labels = { resonance: 'Resonance', seepage: 'Seepage', crystallization: 'Crystallization', convergence: 'Convergence', voidHeart: 'Void Heart' };
+        this.notifications.push({ text: `&#10022; Void Siphon upgraded: ${labels[key] || key} Lv${vs.upgrades[key]}`, tick: this.tick, type: 'success' });
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidSiphonToggleAutoBurst() {
+        const vs = this.voidSiphon;
+        if (!vs) return;
+        vs.autoBurst = !vs.autoBurst;
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    // --- Void Shards roguelike dice game ---
+
+    _voidShardsThreshold(ante) {
+        const cfg = DICE_CONFIG;
+        const reduction = 1 - (this.voidShards.permanentUpgrades.ante_cushion * 0.10);
+        return Math.round(cfg.anteBaseThreshold * Math.pow(cfg.anteScaling, ante - 1) * reduction);
+    }
+
+    _voidShardsRollsPerRound() {
+        return DICE_CONFIG.rollsPerRound + this.voidShards.permanentUpgrades.extra_roll;
+    }
+
+    _voidShardsScoreDice(dice, locked, modifiers) {
+        const cfg = DICE_CONFIG;
+        let workDice = [...dice];
+
+        if (modifiers.includes('null_weight')) {
+            const nonSix = workDice.filter(v => v !== 6);
+            const cnts = {};
+            for (const v of nonSix) cnts[v] = (cnts[v] || 0) + 1;
+            let bestFace = 1, bestCount = 0;
+            for (const [face, cnt] of Object.entries(cnts)) {
+                if (cnt > bestCount) { bestCount = cnt; bestFace = Number(face); }
+            }
+            workDice = workDice.map(v => v === 6 ? bestFace : v);
+        }
+
+        const counts = {};
+        for (const v of workDice) counts[v] = (counts[v] || 0) + 1;
+        const vals = Object.values(counts).sort((a, b) => b - a);
+        const sum = workDice.reduce((a, b) => a + b, 0);
+        const sorted = workDice.slice().sort((a, b) => a - b);
+        const isStr1 = sorted.join(',') === '1,2,3,4,5';
+        const isStr2 = sorted.join(',') === '2,3,4,5,6';
+
+        let category = 'chance';
+        if (vals[0] === 5) {
+            category = 'void_convergence';
+        } else if (isStr1 || isStr2) {
+            category = 'shard_straight';
+        } else if (vals[0] === 4) {
+            category = 'void_bloom';
+        } else if (vals[0] === 3 && vals[1] === 2) {
+            category = 'full_fracture';
+        } else if (vals[0] === 3) {
+            category = 'shard_cluster';
+        } else if (vals[0] === 2 && vals[1] === 2) {
+            category = modifiers.includes('twin_rift') ? 'full_fracture' : 'two_rifts';
+        } else if (vals[0] === 2) {
+            category = modifiers.includes('shard_magnet') ? 'shard_cluster' : 'rift_pair';
+        }
+
+        const catEntry = cfg.scoring.find(s => s.key === category);
+        // chips = base combo chips + sum of all dice faces
+        let chips = (catEntry?.chips ?? 0) + sum;
+        let mult  = catEntry?.mult ?? 1;
+
+        // Permanent upgrade: base chips bonus
+        const baseChipsLevel = this.voidShards?.permanentUpgrades?.base_chips || 0;
+        chips += baseChipsLevel * 5;
+
+        // Modifier: void_eye: +4 chips on 3-of-a-kind or better
+        const strongCombos = ['shard_cluster', 'void_bloom', 'void_convergence', 'full_fracture'];
+        if (modifiers.includes('void_eye') && strongCombos.includes(category)) chips += 4;
+
+        // Modifier: echo_bloom: Void Bloom also adds Rift Pair chips
+        if (modifiers.includes('echo_bloom') && category === 'void_bloom') {
+            chips += cfg.scoring.find(s => s.key === 'rift_pair')?.chips ?? 0;
+        }
+
+        // Modifier: locked_light: +2 chips per locked die
+        if (modifiers.includes('locked_light')) chips += locked.filter(Boolean).length * 2;
+
+        // Modifier: entropy_spike: +3 mult on Chance
+        if (modifiers.includes('entropy_spike') && category === 'chance') mult += 3;
+
+        // Modifier: void_prism: +1 mult per unique face value
+        if (modifiers.includes('void_prism')) mult += Object.keys(counts).length;
+
+        // Modifier: fracture_surge: +2 mult when all 5 dice contribute (no stragglers = straight or 5oak)
+        if (modifiers.includes('fracture_surge') && (category === 'void_convergence' || isStr1 || isStr2)) mult += 2;
+
+        return { category, chips, mult, fd: chips * mult };
+    }
+
+    voidShardsStartRun() {
+        const vs = this.voidShards;
+        vs.active = true;
+        vs.ante = 1;
+        vs.round = 0;
+        vs.rollsLeft = this._voidShardsRollsPerRound();
+        vs.dice = [0, 0, 0, 0, 0];
+        vs.locked = [false, false, false, false, false];
+        vs.lastScore = 0;
+        vs.lastCategory = '';
+        vs.modifiers = [];
+        vs.failStreak = 0;
+        vs.shopPhase = false;
+        vs.shopOffers = [];
+        vs.earnedFd = 0;
+        vs.rolling = false;
+        vs.runResult = null;
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidShardsRoll() {
+        const vs = this.voidShards;
+        if (!vs.active || vs.rolling || vs.shopPhase || vs.runResult) return;
+        if (vs.rollsLeft <= 0) return;
+
+        vs.rolling = true;
+        vs.rollsLeft--;
+
+        const targetValues = vs.dice.map((v, i) => {
+            if (vs.locked[i]) return v;
+            return Math.floor(Math.random() * 6) + 1;
+        });
+
+        // Animate, then commit values. Do NOT clear _lastArcaneHtml before
+        // roll() starts: that would tear down #vd-mat mid-animation.
+        const renderer = window._voidDiceRenderer;
+        if (renderer && renderer.isAttached()) {
+            renderer.roll(targetValues, [...vs.locked], () => {
+                vs.dice = targetValues;
+                vs.rolling = false;
+                renderer.syncUnrolled(vs.dice.map(v => v > 0));
+                renderer.syncCombo(vs.dice);
+                if (this.ui) this.ui._lastArcaneHtml = '';
+            });
+        } else {
+            // No renderer visible, commit immediately
+            vs.dice = targetValues;
+            vs.rolling = false;
+            if (this.ui) this.ui._lastArcaneHtml = '';
+        }
+    }
+
+    voidShardsToggleLock(index) {
+        const vs = this.voidShards;
+        if (!vs.active || vs.rolling || vs.shopPhase) return;
+        if (vs.dice[index] === 0) return;
+        vs.locked[index] = !vs.locked[index];
+        const renderer = window._voidDiceRenderer;
+        if (renderer) renderer.syncLocked(vs.locked);
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidShardsScore() {
+        const vs = this.voidShards;
+        if (!vs.active || vs.rolling || vs.shopPhase || vs.runResult) return;
+        if (vs.dice[0] === 0) return;
+
+        const { category, chips, mult, fd } = this._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers);
+        vs.lastScore = fd;
+        vs.lastChips = chips;
+        vs.lastMult = mult;
+        vs.lastCategory = category;
+        vs.earnedFd += fd;
+
+        // Fire particle + counter animation before the panel re-renders
+        if (window.voidShardsScoreAnim) window.voidShardsScoreAnim(chips, mult, fd);
+
+        const threshold = this._voidShardsThreshold(vs.ante);
+        const cleared = fd >= threshold;
+
+        if (cleared) {
+            vs.failStreak = 0;
+            const clearBonus = DICE_CONFIG.roundClearReward * vs.ante;
+            vs.earnedFd += clearBonus;
+            this.notifications.push({ text: `&#10022; Void Shards: ${this._voidShardsLabel(category)} (${fd} Fd)! Round cleared! (+${clearBonus} bonus)`, tick: this.tick, type: 'success' });
+        } else {
+            vs.failStreak++;
+            this.notifications.push({ text: `&#9670; Void Shards: ${this._voidShardsLabel(category)} (${fd} Fd, needed ${threshold})`, tick: this.tick, type: 'event' });
+        }
+
+        if (vs.failStreak >= 3) {
+            this._voidShardsEndRun(false);
+            return;
+        }
+
+        vs.round++;
+
+        if (vs.round >= DICE_CONFIG.roundsPerAnte) {
+            // Ante cleared
+            if (vs.ante >= DICE_CONFIG.antesPerRun) {
+                this._voidShardsEndRun(true);
+                return;
+            }
+            vs.round = 0;
+            vs.ante++;
+            vs.shopPhase = true;
+            vs.shopOffers = this._voidShardsGenerateShop();
+        }
+
+        vs.rollsLeft = this._voidShardsRollsPerRound();
+        vs.locked = [false, false, false, false, false];
+        vs.dice = [0, 0, 0, 0, 0];
+
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    _voidShardsLabel(categoryKey) {
+        const entry = DICE_CONFIG.scoring.find(s => s.key === categoryKey);
+        return entry ? entry.label : categoryKey;
+    }
+
+    _voidShardsGenerateShop() {
+        const owned = new Set(this.voidShards.modifiers);
+        const available = DICE_CONFIG.modifiers.filter(m => !owned.has(m.key));
+        const numOffers = 3 + this.voidShards.permanentUpgrades.shop_slots;
+        for (let i = available.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [available[i], available[j]] = [available[j], available[i]];
+        }
+        return available.slice(0, numOffers).map(m => m.key);
+    }
+
+    voidShardsShopBuy(modifierKey) {
+        const vs = this.voidShards;
+        if (!vs.shopPhase) return;
+        const mod = DICE_CONFIG.modifiers.find(m => m.key === modifierKey);
+        if (!mod) return;
+        if (vs.earnedFd < mod.cost) {
+            this.notifications.push({ text: `Need ${mod.cost} Fd for ${mod.label}`, tick: this.tick, type: 'danger' });
+            return;
+        }
+        if (vs.modifiers.length >= DICE_CONFIG.maxModifiers) {
+            this.notifications.push({ text: 'Modifier slots full (max 4)', tick: this.tick, type: 'danger' });
+            return;
+        }
+        vs.earnedFd -= mod.cost;
+        vs.modifiers.push(modifierKey);
+        vs.shopPhase = false;
+        vs.shopOffers = [];
+        this.notifications.push({ text: `&#10022; Equipped: ${mod.label}`, tick: this.tick, type: 'success' });
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidShardsShopSkip() {
+        const vs = this.voidShards;
+        if (!vs.shopPhase) return;
+        vs.shopPhase = false;
+        vs.shopOffers = [];
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    _voidShardsEndRun(won) {
+        const vs = this.voidShards;
+        const failReturn = DICE_CONFIG.failureReturnRate + vs.permanentUpgrades.failure_return * 0.15;
+        const reward = won ? vs.earnedFd : Math.floor(vs.earnedFd * failReturn);
+        this.resources.add({ fracture_dust: reward });
+        vs.active = false;
+        vs.runResult = won ? 'win' : 'loss';
+        vs.rolling = false;
+        vs.shopPhase = false;
+        if (won) {
+            this.notifications.push({ text: `&#10022; Void Shards run complete! +${reward} Fd`, tick: this.tick, type: 'success' });
+        } else {
+            this.notifications.push({ text: `&#9670; Void Shards run ended. Recovered ${reward} Fd`, tick: this.tick, type: 'event' });
+        }
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidShardsBuyPermUpgrade(key) {
+        const vs = this.voidShards;
+        if (vs.active) return;
+        const upg = DICE_CONFIG.permanentUpgrades.find(u => u.key === key);
+        if (!upg) return;
+        const level = vs.permanentUpgrades[key] || 0;
+        if (level >= upg.maxLevel) return;
+        const cost = upg.costs[level];
+        if (!this.resources.has({ fracture_dust: cost })) {
+            this.notifications.push({ text: `Need ${cost} Fd for ${upg.label}`, tick: this.tick, type: 'danger' });
+            return;
+        }
+        this.resources.deduct({ fracture_dust: cost });
+        vs.permanentUpgrades[key]++;
+        this.notifications.push({ text: `&#10022; Void Shards: ${upg.label} Lv${vs.permanentUpgrades[key]}`, tick: this.tick, type: 'success' });
+        if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
     communeWithVoid() {

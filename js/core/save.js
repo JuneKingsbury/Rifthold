@@ -351,6 +351,40 @@ function _buildSaveData(game) {
             flags: { ...game.tutorial.flags },
         } : { currentStep: 0, completed: [], flags: {} },
 
+        voidSiphon: game.voidSiphon ? {
+            charge: game.voidSiphon.charge,
+            maxCharge: game.voidSiphon.maxCharge,
+            totalClicks: game.voidSiphon.totalClicks,
+            totalBursts: game.voidSiphon.totalBursts,
+            totalEssenceProduced: game.voidSiphon.totalEssenceProduced,
+            totalGoldProduced: game.voidSiphon.totalGoldProduced,
+            upgrades: { ...game.voidSiphon.upgrades },
+            voidPulseActive: game.voidSiphon.voidPulseActive,
+            voidPulseCooldownTick: game.voidSiphon.voidPulseCooldownTick,
+            lastBurstTick: game.voidSiphon.lastBurstTick,
+            clicksSinceCrit: game.voidSiphon.clicksSinceCrit,
+            autoBurst: game.voidSiphon.autoBurst,
+            _nextPulseMs: game.voidSiphon._nextPulseMs,
+        } : null,
+
+        voidShards: game.voidShards ? {
+            active: game.voidShards.active,
+            ante: game.voidShards.ante,
+            round: game.voidShards.round,
+            rollsLeft: game.voidShards.rollsLeft,
+            dice: [...game.voidShards.dice],
+            locked: [...game.voidShards.locked],
+            lastScore: game.voidShards.lastScore,
+            lastCategory: game.voidShards.lastCategory,
+            modifiers: [...game.voidShards.modifiers],
+            failStreak: game.voidShards.failStreak,
+            shopPhase: game.voidShards.shopPhase,
+            shopOffers: [...game.voidShards.shopOffers],
+            earnedFd: game.voidShards.earnedFd,
+            permanentUpgrades: { ...game.voidShards.permanentUpgrades },
+            runResult: game.voidShards.runResult,
+        } : null,
+
         tasks: game.taskQueue.getAll(),
         eventLog: game.eventLog.entries,
     };
@@ -657,6 +691,45 @@ function _applyLoadData(game, data) {
             game.tutorial.currentStep = data.tutorial.currentStep || 0;
             game.tutorial.completed = new Set(data.tutorial.completed || []);
             game.tutorial.flags = data.tutorial.flags || {};
+        }
+
+        if (data.voidSiphon && game.voidSiphon) {
+            const vs = game.voidSiphon;
+            const saved = data.voidSiphon;
+            vs.charge = saved.charge ?? 0;
+            vs.maxCharge = saved.maxCharge ?? 100;
+            vs.totalClicks = saved.totalClicks ?? 0;
+            vs.totalBursts = saved.totalBursts ?? 0;
+            vs.totalEssenceProduced = saved.totalEssenceProduced ?? 0;
+            vs.totalGoldProduced = saved.totalGoldProduced ?? 0;
+            if (saved.upgrades) Object.assign(vs.upgrades, saved.upgrades);
+            vs.voidPulseActive = saved.voidPulseActive ?? false;
+            vs.voidPulseCooldownTick = saved.voidPulseCooldownTick ?? 0;
+            vs.lastBurstTick = saved.lastBurstTick ?? 0;
+            vs.clicksSinceCrit = saved.clicksSinceCrit ?? 0;
+            vs.autoBurst = saved.autoBurst ?? false;
+            vs._nextPulseMs = saved._nextPulseMs ?? (900 * 200);
+        }
+
+        if (data.voidShards && game.voidShards) {
+            const src = data.voidShards;
+            const dst = game.voidShards;
+            dst.active = src.active ?? false;
+            dst.ante = src.ante ?? 1;
+            dst.round = src.round ?? 0;
+            dst.rollsLeft = src.rollsLeft ?? 3;
+            dst.dice = src.dice ?? [0, 0, 0, 0, 0];
+            dst.locked = src.locked ?? [false, false, false, false, false];
+            dst.lastScore = src.lastScore ?? 0;
+            dst.lastCategory = src.lastCategory ?? '';
+            dst.modifiers = src.modifiers ?? [];
+            dst.failStreak = src.failStreak ?? 0;
+            dst.shopPhase = src.shopPhase ?? false;
+            dst.shopOffers = src.shopOffers ?? [];
+            dst.earnedFd = src.earnedFd ?? 0;
+            dst.rolling = false;
+            dst.runResult = src.runResult ?? null;
+            if (src.permanentUpgrades) Object.assign(dst.permanentUpgrades, src.permanentUpgrades);
         }
 
         game.taskQueue.tasks = data.tasks || [];

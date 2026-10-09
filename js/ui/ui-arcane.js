@@ -8,6 +8,7 @@ import { getOmens } from '../systems/omens.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
+import { DICE_CONFIG } from '../core/config/dice.js';
 import { adventurerLevelTooltip, animalLevelBadge, animalLevelTooltip } from './ui-utils.js';
 import { resolvePortraitSrc } from '../core/mod-registry.js';
 
@@ -73,6 +74,8 @@ const arcaneMethods = {
         html += `<button class="arcane-tab${tab === 'nexus' ? ' active' : ''}" data-arcane-tab="nexus">Nexus</button>`;
         html += `<button class="arcane-tab${tab === 'requests' ? ' active' : ''}" data-arcane-tab="requests">Requests</button>`;
         html += `<button class="arcane-tab${tab === 'omens' ? ' active' : ''}" data-arcane-tab="omens">Omens</button>`;
+        html += `<button class="arcane-tab${tab === 'siphon' ? ' active' : ''}" data-arcane-tab="siphon">Siphon (minigame)</button>`;
+        html += `<button class="arcane-tab${tab === 'shards' ? ' active' : ''}" data-arcane-tab="shards">Shards (minigame)</button>`;
         html += '</div>';
 
         if (tab === 'nexus') {
@@ -81,8 +84,18 @@ const arcaneMethods = {
             html += this._buildRequestsTabHtml();
         } else if (tab === 'omens') {
             html += this._buildOmensTabHtml();
+        } else if (tab === 'siphon') {
+            html += this._buildSiphonTabHtml();
+        } else if (tab === 'shards') {
+            html += this._buildShardsTabHtml();
         } else {
             html += this._buildExpeditionsTabHtml();
+        }
+
+        // Don't tear down the dice mat while a roll animation is in flight.
+        if (tab === 'shards' && window._voidDiceRenderer?._rolling) {
+            if (tab === 'shards') this._mountDiceRenderer();
+            return;
         }
 
         if (html !== this._lastArcaneHtml) {
@@ -140,6 +153,7 @@ const arcaneMethods = {
         }
 
         if (tab === 'expeditions') this._renderExpeditionVis();
+        if (tab === 'shards') this._mountDiceRenderer();
     },
 
     _buildNexusTabHtml() {
@@ -3426,6 +3440,496 @@ const arcaneMethods = {
         if (POTIONS[itemKey]) return 'potion';
         if (SPELL_TOMES[itemKey]) return 'tome';
         return ALL_ITEMS[itemKey]?.type || null;
+    },
+
+    _buildSiphonUpgradeColumn(vs, key, label, cfg) {
+        const lvl = vs.upgrades[key];
+        const costs = cfg.upgradeCosts[key];
+        const maxLvl = costs.length;
+        const dust = this.game.resources.stockpile.fracture_dust || 0;
+        const canAfford = lvl < maxLvl && dust >= costs[lvl];
+
+        // Build human-readable current value and next-level value for each upgrade
+        let currentVal = '', nextVal = '', unit = '';
+        if (key === 'resonance') {
+            const base = cfg.clickBase + lvl * cfg.resonanceBonus;
+            const next = cfg.clickBase + (lvl + 1) * cfg.resonanceBonus;
+            const rateNow = (cfg.holdClickRateBase + lvl * cfg.holdClickRateBonus).toFixed(1);
+            const rateNext = (cfg.holdClickRateBase + (lvl + 1) * cfg.holdClickRateBonus).toFixed(1);
+            currentVal = `+${base}/click, ${rateNow}/s hold`;
+            nextVal = lvl < maxLvl ? `+${next}/click, ${rateNext}/s hold` : '';
+            unit = '';
+        } else if (key === 'seepage') {
+            const rateNow = ((cfg.passiveBase + lvl * cfg.seepageBonus) / cfg.tickRateMs * 1000).toFixed(2);
+            const rateNext = lvl < maxLvl ? ((cfg.passiveBase + (lvl + 1) * cfg.seepageBonus) / cfg.tickRateMs * 1000).toFixed(2) : null;
+            currentVal = `${rateNow}/s`;
+            nextVal = rateNext ? `${rateNext}/s` : '';
+        } else if (key === 'crystallization') {
+            const yieldNow = Math.max(1, Math.round(cfg.essenceBase * (1 + lvl * cfg.crystallizationMult)));
+            const yieldNext = lvl < maxLvl ? Math.max(1, Math.round(cfg.essenceBase * (1 + (lvl + 1) * cfg.crystallizationMult))) : null;
+            currentVal = `${yieldNow} Fd/burst`;
+            nextVal = yieldNext !== null ? `${yieldNext} Fd/burst` : '';
+        }
+
+        let col = `<div class="void-siphon-upgrade-col">`;
+        col += `<div style="color:#aa88cc;font-weight:bold;font-size:0.85em;margin-bottom:2px;">${label}</div>`;
+        col += `<div style="color:#7a55aa;font-size:0.8em;margin-bottom:3px;">${currentVal}</div>`;
+        if (lvl < maxLvl) {
+            col += `<div style="color:#443355;font-size:0.72em;margin-bottom:4px;">Next: <span style="color:#9966bb;">${nextVal}</span></div>`;
+            const cost = costs[lvl];
+            col += `<div style="color:#443355;font-size:0.72em;margin-bottom:3px;">Lv ${lvl} &rarr; ${lvl + 1}</div>`;
+            col += `<div class="info-actions"><button onclick="window.game.voidSiphonUpgrade('${key}')"${canAfford ? '' : ' disabled'} style="font-size:0.8em;padding:3px 8px;">${cost} Fd</button></div>`;
+        } else {
+            col += `<div style="color:#664488;font-size:0.72em;margin-bottom:4px;">Lv ${lvl}/${maxLvl}</div>`;
+            col += `<div style="color:#554466;font-size:0.8em;">&#10004; Maxed</div>`;
+        }
+        col += `</div>`;
+        return col;
+    },
+
+    _buildSiphonTabHtml() {
+        const vs = this.game.voidSiphon;
+        if (!vs) return '<div class="arcane-section" style="color:#888;padding:16px;text-align:center;">Void Siphon not initialized.</div>';
+
+        const TICK_RATE_MS = 200;
+        const cfg = {
+            clickBase: 5, resonanceBonus: 4,
+            holdClickRateBase: 1, holdClickRateBonus: 0.5,
+            passiveBase: 0.15, seepageBonus: 0.10,
+            essenceBase: 1, crystallizationMult: 0.6,
+            convergenceGold: [0, 1, 2, 5],
+            voidHeartMaxCharge: 200,
+            critEvery: 10,
+            autoBurstUnlockLevel: 3,
+            tickRateMs: TICK_RATE_MS,
+            upgradeCosts: {
+                resonance:       [2, 5, 10, 20, 40],
+                seepage:         [3, 7, 14, 28, 56],
+                crystallization: [4, 9, 18, 36, 72],
+                convergence:     [15, 30, 60],
+                voidHeart:       [100],
+            },
+        };
+
+        const chargePct = Math.min(100, (vs.charge / vs.maxCharge) * 100);
+        const chargeFull = vs.charge >= vs.maxCharge;
+        const chargeColor = chargeFull ? '#ff88ff' : chargePct >= 80 ? '#cc66ff' : chargePct >= 40 ? '#9944cc' : '#661199';
+        const clickPower = cfg.clickBase + vs.upgrades.resonance * cfg.resonanceBonus;
+        const critPower = clickPower * 3;
+        const clicksUntilCrit = cfg.critEvery - (vs.clicksSinceCrit || 0);
+        const passivePerSec = ((cfg.passiveBase + vs.upgrades.seepage * cfg.seepageBonus) / TICK_RATE_MS * 1000);
+        const burstMult = (1 + vs.upgrades.crystallization * cfg.crystallizationMult)
+            * (vs.upgrades.voidHeart ? 1.5 : 1)
+            * (vs.voidPulseActive ? 2 : 1);
+        const essenceReward = Math.max(1, Math.round(cfg.essenceBase * burstMult));
+        const goldReward = cfg.convergenceGold[vs.upgrades.convergence] || 0;
+        const dust = this.game.resources.stockpile.fracture_dust || 0;
+        const autoBurstUnlocked = vs.upgrades.crystallization >= cfg.autoBurstUnlockLevel;
+
+        // ETA: how many seconds at current passive rate to fill from here
+        const chargeRemaining = vs.maxCharge - vs.charge;
+        const etaSec = passivePerSec > 0 && !chargeFull ? (chargeRemaining / passivePerSec) : 0;
+        const etaStr = chargeFull ? 'READY' : etaSec < 60
+            ? `${Math.ceil(etaSec)}s`
+            : `${Math.floor(etaSec / 60)}m ${Math.ceil(etaSec % 60)}s`;
+
+        // Burst animation: use real-time ms diff
+        const recentBurst = vs.lastBurstMs && (performance.now() - vs.lastBurstMs) < 600;
+        const glowLevel = chargeFull ? 'full' : chargePct >= 80 ? 'high' : chargePct >= 40 ? 'mid' : 'low';
+
+        let html = `<div class="arcane-section void-siphon-root">`;
+
+        // Header with Fd balance
+        html += `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">`;
+        html += `<div style="color:#aa44ff;font-weight:bold;font-size:1.1em;">&#10070; Void Siphon</div>`;
+        html += `<div style="color:#aa55cc;font-size:0.9em;font-weight:bold;">&#10070; ${dust} <span style="color:#664488;font-size:0.8em;">Fd</span></div>`;
+        html += `</div>`;
+        html += `<div style="color:#4a3360;font-size:0.82em;margin-bottom:8px;">Channel void energy through the Fracture Bloom. Release it as a burst to harvest fracture dust.</div>`;
+
+        // Void Pulse banner
+        if (vs.voidPulseActive) {
+            html += `<div class="void-siphon-pulse-banner">`;
+            html += `<span style="color:#ff88ff;font-weight:bold;font-size:1.05em;">&#10022; VOID PULSE ACTIVE &#10022;</span>`;
+            html += `<div style="color:#cc88ff;font-size:0.8em;margin-top:2px;">Next burst reward is doubled!</div>`;
+            html += `</div>`;
+        }
+
+        // Fracture Bloom glyph
+        html += `<div style="text-align:center;margin:10px 0 4px;position:relative;">`;
+        html += `<div id="void-siphon-glyph" class="void-siphon-glyph void-siphon-glyph--${glowLevel}${recentBurst ? ' void-siphon-glyph--burst' : ''}${chargeFull ? ' void-siphon-glyph--ready' : ''}">`;
+        html += `<span class="void-siphon-orbit void-siphon-orbit--1">&#9679;</span>`;
+        html += `<span class="void-siphon-orbit void-siphon-orbit--2">&#9679;</span>`;
+        html += `<span class="void-siphon-orbit void-siphon-orbit--3">&#9679;</span>`;
+        html += `&#10070;`;
+        html += `</div>`;
+        html += `<div style="color:#6a4488;font-size:0.78em;margin-top:3px;letter-spacing:1px;">FRACTURE BLOOM</div>`;
+        html += `</div>`;
+
+        // Charge bar with ETA
+        html += `<div style="margin:4px 16px 10px;">`;
+        html += `<div style="display:flex;justify-content:space-between;font-size:0.8em;color:#7a5599;margin-bottom:3px;">`;
+        html += `<span>Charge &nbsp;<span style="color:#4a3360;">${passivePerSec.toFixed(2)}/s passive</span></span>`;
+        html += `<span><span style="color:#554466;font-size:0.9em;">${chargeFull ? '' : `ETA: ${etaStr} &nbsp;`}</span><span style="color:${chargeColor};font-weight:bold;">${Math.floor(vs.charge)} / ${vs.maxCharge}</span></span>`;
+        html += `</div>`;
+        html += `<div class="void-siphon-charge-bar">`;
+        html += `<div class="void-siphon-charge-fill${chargeFull ? ' void-siphon-charge-fill--full' : ''}" style="width:${chargePct.toFixed(1)}%;background:${chargeColor};"></div>`;
+        html += `</div>`;
+        html += `</div>`;
+
+        // Resonant Strike progress pip row
+        const critPips = [];
+        for (let i = 0; i < cfg.critEvery; i++) {
+            const filled = i < (vs.clicksSinceCrit || 0);
+            const isLast = i === cfg.critEvery - 1;
+            critPips.push(`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 1px;background:${filled ? '#cc66ff' : '#221133'};border:1px solid ${isLast ? '#cc66ff' : '#331144'};vertical-align:middle;"></span>`);
+        }
+        html += `<div style="text-align:center;margin-bottom:6px;" title="Every ${cfg.critEvery}th click is a Resonant Strike (3x power)">`;
+        html += `<span style="color:#553366;font-size:0.72em;margin-right:4px;">Resonant Strike:</span>`;
+        html += critPips.join('');
+        html += `<span style="color:#7744aa;font-size:0.72em;margin-left:5px;">${clicksUntilCrit} away</span>`;
+        html += `</div>`;
+
+        // Action buttons
+        html += `<div style="text-align:center;margin:4px 0 10px;display:flex;flex-direction:column;align-items:center;gap:5px;">`;
+
+        const burstDisabled = chargeFull ? '' : ' disabled';
+        const burstLabel = vs.voidPulseActive
+            ? `&#9733; Bloom Burst &nbsp;<span style="color:#ffaaff;font-size:0.85em;">(2x!)</span>`
+            : `&#10022; Bloom Burst`;
+        html += `<button onclick="window.game.voidSiphonBurst()" class="void-siphon-btn-burst"${burstDisabled}>`;
+        html += burstLabel;
+        html += `</button>`;
+        html += `<div style="color:#4a3360;font-size:0.75em;">Yields <span style="color:#aa55cc;">${essenceReward} Fd</span>${goldReward > 0 ? ` + <span style="color:#ccaa44;">${goldReward} gold</span>` : ''}</div>`;
+
+        const holdRate = (cfg.holdClickRateBase + vs.upgrades.resonance * cfg.holdClickRateBonus).toFixed(1);
+        html += `<button id="void-siphon-channel-btn" class="void-siphon-btn-channel" onmousedown="window.voidSiphonHoldStart(event)" onmouseup="window.voidSiphonHoldStop()" onmouseleave="window.voidSiphonHoldStop()" ontouchstart="window.voidSiphonHoldStart(event)" ontouchend="window.voidSiphonHoldStop()" ontouchcancel="window.voidSiphonHoldStop()">`;
+        html += `&#9670; Hold to Channel`;
+        if (clicksUntilCrit === 1) {
+            html += ` &nbsp;<span style="color:#ff88ff;font-size:0.82em;">CRIT NEXT! (+${critPower})</span>`;
+        } else {
+            html += ` &nbsp;<span style="color:#7744aa;font-size:0.82em;">(+${clickPower}, ${holdRate}/s)</span>`;
+        }
+        html += `</button>`;
+
+        // Auto-Burst toggle
+        if (autoBurstUnlocked) {
+            const abOn = vs.autoBurst;
+            html += `<button onclick="window.game.voidSiphonToggleAutoBurst()" style="background:${abOn ? '#1a2a0a' : '#0e0e1a'};color:${abOn ? '#88ff66' : '#554466'};padding:4px 14px;border:1px solid ${abOn ? '#44aa22' : '#2a1a44'};border-radius:3px;cursor:pointer;font-size:0.8em;font-family:inherit;">`;
+            html += abOn ? '&#9646;&#9646; Auto-Burst: ON' : '&#9654; Auto-Burst: OFF';
+            html += `</button>`;
+        } else if (vs.upgrades.crystallization < cfg.autoBurstUnlockLevel) {
+            html += `<div style="color:#332244;font-size:0.72em;">Auto-Burst unlocks at Crystallization Lv${cfg.autoBurstUnlockLevel}</div>`;
+        }
+
+        html += `</div>`;
+
+        // Stats strip
+        html += `<div class="void-siphon-stats">`;
+        html += `<span title="Passive charge per second">&#9675; ${passivePerSec.toFixed(2)}/s</span>`;
+        html += `<span title="Total bursts">&#10022; ${vs.totalBursts} bursts</span>`;
+        html += `<span title="Total fracture dust produced" style="color:#aa55cc;">&#10070; ${vs.totalEssenceProduced} Fd total</span>`;
+        if (vs.totalGoldProduced > 0) {
+            html += `<span title="Total gold produced" style="color:#ccaa44;">&#9733; ${vs.totalGoldProduced} gold</span>`;
+        }
+        html += `</div>`;
+
+        // Upgrade section
+        html += `<div style="color:#aa66cc;font-weight:bold;font-size:0.9em;margin:10px 0 5px;border-top:1px solid #251535;padding-top:8px;letter-spacing:1px;">UPGRADES</div>`;
+        html += `<div style="display:flex;gap:6px;margin-bottom:8px;">`;
+        html += this._buildSiphonUpgradeColumn(vs, 'resonance', '&#9670; Resonance', cfg);
+        html += this._buildSiphonUpgradeColumn(vs, 'seepage', '&#9762; Seepage', cfg);
+        html += this._buildSiphonUpgradeColumn(vs, 'crystallization', '&#10022; Crystallization', cfg);
+        html += `</div>`;
+
+        // Convergence (unlocks at Resonance >= 2)
+        if (vs.upgrades.resonance >= 2) {
+            const convLvl = vs.upgrades.convergence;
+            const convMax = cfg.upgradeCosts.convergence.length;
+            if (convLvl < convMax) {
+                const cost = cfg.upgradeCosts.convergence[convLvl];
+                const canAfford = dust >= cost;
+                const goldNow = cfg.convergenceGold[convLvl];
+                const goldNext = cfg.convergenceGold[convLvl + 1];
+                html += `<div style="padding:7px 10px;background:#0d0a18;border-radius:4px;border-left:3px solid #cc6633;margin-bottom:6px;">`;
+                html += `<div style="color:#dd8855;font-weight:bold;font-size:0.88em;">&#9654; Convergence Lv${convLvl + 1} <span style="color:#7a5533;font-weight:normal;font-size:0.85em;">${goldNow > 0 ? `${goldNow}` : '0'} &rarr; ${goldNext} gold/burst</span></div>`;
+                html += `<div class="info-actions"><button onclick="window.game.voidSiphonUpgrade('convergence')"${canAfford ? '' : ' disabled'}>${cost} Fd</button></div>`;
+                html += `</div>`;
+            } else {
+                html += `<div style="color:#5a3322;font-size:0.8em;margin-bottom:6px;">&#10004; Convergence maxed. Gold flows with every burst.</div>`;
+            }
+        }
+
+        // Void Heart (all 3 paths >= 3)
+        if (vs.upgrades.resonance >= 3 && vs.upgrades.seepage >= 3 && vs.upgrades.crystallization >= 3) {
+            if (vs.upgrades.voidHeart < 1) {
+                const cost = cfg.upgradeCosts.voidHeart[0];
+                const canAfford = dust >= cost;
+                const yieldBase = Math.max(1, Math.round(cfg.essenceBase * (1 + vs.upgrades.crystallization * cfg.crystallizationMult)));
+                const yieldAfter = Math.max(1, Math.round(cfg.essenceBase * (1 + vs.upgrades.crystallization * cfg.crystallizationMult) * 1.5));
+                html += `<div style="padding:10px;background:#0a0816;border-radius:5px;border:1px solid #8833bb;margin-bottom:8px;text-align:center;">`;
+                html += `<div style="color:#cc88ff;font-weight:bold;font-size:1.0em;margin-bottom:3px;">&#10070; Void Heart</div>`;
+                html += `<div style="color:#6a4488;font-size:0.8em;margin-bottom:2px;">Max charge: ${vs.maxCharge} &rarr; <span style="color:#aa66cc;">200</span> &nbsp;|&nbsp; Burst yield: ${yieldBase} &rarr; <span style="color:#aa66cc;">${yieldAfter} Fd</span></div>`;
+                html += `<div class="info-actions"><button onclick="window.game.voidSiphonUpgrade('voidHeart')"${canAfford ? '' : ' disabled'} style="background:${canAfford ? '#2a1044' : ''};color:${canAfford ? '#cc88ff' : ''};border-color:${canAfford ? '#7733aa' : ''};">Forge (${cost} Fd)</button></div>`;
+                html += `</div>`;
+            } else {
+                html += `<div style="color:#6633aa;font-size:0.85em;text-align:center;margin-bottom:6px;font-style:italic;">&#10070; The Void Heart pulses within the Bloom.</div>`;
+            }
+        }
+
+        html += `</div>`;
+
+        // Inline script: click flash animation + hold-to-channel loop.
+        // Hold start fires one click immediately, then schedules repeated clicks
+        // at the current hold rate. Rate is read live from the game state so it
+        // picks up any Resonance upgrade bought mid-hold. Stopping clears the
+        // interval immediately. The global-mouseup listener is a safety net for
+        // when the pointer leaves the button without triggering onmouseleave
+        // (e.g. the button re-renders while held).
+        html += `<script>
+(function() {
+    function _doClick() {
+        if (!window.game || !window.game.voidSiphon) return;
+        window.game.voidSiphonClick();
+        var g = document.getElementById('void-siphon-glyph');
+        if (g) {
+            g.classList.add('void-siphon-glyph--click');
+            setTimeout(function() { g.classList.remove('void-siphon-glyph--click'); }, 180);
+        }
+    }
+    function _reschedule() {
+        if (!window._voidSiphonHolding) return;
+        var vs = window.game && window.game.voidSiphon;
+        var resonance = vs ? (vs.upgrades.resonance || 0) : 0;
+        var rate = 1 + resonance * 0.5;
+        window._voidSiphonHoldTimer = setTimeout(function() {
+            if (!window._voidSiphonHolding) return;
+            _doClick();
+            _reschedule();
+        }, Math.round(1000 / rate));
+    }
+    window.voidSiphonHoldStart = function(e) {
+        e.preventDefault();
+        if (window._voidSiphonHolding) return;
+        window._voidSiphonHolding = true;
+        _doClick();
+        _reschedule();
+    };
+    window.voidSiphonHoldStop = function() {
+        window._voidSiphonHolding = false;
+        if (window._voidSiphonHoldTimer) { clearTimeout(window._voidSiphonHoldTimer); window._voidSiphonHoldTimer = null; }
+    };
+    // Register global safety-net listeners only once.
+    if (!window._voidSiphonListenersAdded) {
+        window._voidSiphonListenersAdded = true;
+        document.addEventListener('mouseup',     window.voidSiphonHoldStop);
+        document.addEventListener('touchend',    window.voidSiphonHoldStop);
+        document.addEventListener('touchcancel', window.voidSiphonHoldStop);
+    }
+})();
+</script>`;
+
+        return html;
+    },
+
+    _buildShardsTabHtml() {
+        const vs = this.game.voidShards;
+        const cfg = window.DICE_CONFIG_REF || null;
+        const fd = this.game.resources?.stockpile?.fracture_dust || 0;
+        let html = '<div class="arcane-section void-shards-root">';
+
+        // Header
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">';
+        html += '<span style="color:#aa44ff;font-weight:bold;font-size:13px;">&#9671; Void Shards</span>';
+        html += `<span style="color:#bb88ff;font-size:11px;">&#9670; ${fd} Fd</span>`;
+        html += '</div>';
+        html += '<div style="color:#8866bb;font-size:10px;margin-bottom:8px;">Roguelike dice game. Roll combos, beat thresholds, earn Fracture Dust.</div>';
+
+        if (!vs.active && !vs.runResult) {
+            // Pre-run: show permanent upgrades + start button
+            html += this._buildShardsPermUpgrades(vs, fd);
+            html += `<button onclick="window.game.voidShardsStartRun()" style="width:100%;padding:8px;background:#2a1a4a;border:1px solid #6644aa;border-radius:4px;color:#cc99ff;font-family:inherit;font-size:12px;cursor:pointer;margin-top:8px;">&#9671; Start New Run</button>`;
+
+        } else if (vs.runResult) {
+            // Run ended
+            const isWin = vs.runResult === 'win';
+            const color = isWin ? '#88cc88' : '#cc8866';
+            const icon = isWin ? '&#10022;' : '&#9670;';
+            html += `<div style="text-align:center;padding:12px;border:1px solid ${color}44;border-radius:6px;background:#11111e;margin-bottom:8px;">`;
+            html += `<div style="color:${color};font-size:14px;font-weight:bold;margin-bottom:4px;">${icon} Run ${isWin ? 'Complete' : 'Failed'}</div>`;
+            html += `<div style="color:#aaa;font-size:11px;">Reached Ante ${vs.ante}, Round ${vs.round}</div>`;
+            html += '</div>';
+            html += this._buildShardsPermUpgrades(vs, fd);
+            html += `<button onclick="window.game.voidShardsStartRun()" style="width:100%;padding:8px;background:#2a1a4a;border:1px solid #6644aa;border-radius:4px;color:#cc99ff;font-family:inherit;font-size:12px;cursor:pointer;margin-top:8px;">&#9671; Start New Run</button>`;
+
+        } else if (vs.shopPhase) {
+            // Shop phase
+            html += '<div style="color:#ffcc00;font-size:11px;font-weight:bold;text-align:center;margin-bottom:8px;">&#9670; Between Antes: Choose a Modifier</div>';
+            html += `<div style="color:#aaa;font-size:10px;text-align:center;margin-bottom:10px;">Run Fd: ${vs.earnedFd} | Modifiers: ${vs.modifiers.length}/${4}</div>`;
+            html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+            for (const key of vs.shopOffers) {
+                const mod = this._findDiceMod(key);
+                if (!mod) continue;
+                const canAfford = vs.earnedFd >= mod.cost;
+                const alreadyFull = vs.modifiers.length >= 4;
+                const disabled = !canAfford || alreadyFull ? 'disabled' : '';
+                html += `<div style="border:1px solid #443366;border-radius:5px;padding:8px;background:#11111e;">`;
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                html += `<span style="color:#cc99ff;font-size:11px;font-weight:bold;">${mod.label}</span>`;
+                html += `<button onclick="window.game.voidShardsShopBuy('${mod.key}')" ${disabled} style="padding:3px 10px;font-size:10px;background:${canAfford && !alreadyFull ? '#2a1a4a' : '#1a1a2e'};border:1px solid ${canAfford && !alreadyFull ? '#6644aa' : '#333'};border-radius:3px;color:${canAfford && !alreadyFull ? '#cc99ff' : '#555'};font-family:inherit;cursor:${canAfford && !alreadyFull ? 'pointer' : 'default'};">${mod.cost} Fd</button>`;
+                html += '</div>';
+                html += `<div style="color:#886699;font-size:10px;margin-top:3px;">${mod.desc}</div>`;
+                html += '</div>';
+            }
+            if (!vs.shopOffers.length) {
+                html += '<div style="color:#555;font-size:11px;text-align:center;padding:10px;">No more modifiers available</div>';
+            }
+            html += '</div>';
+            html += `<button onclick="window.game.voidShardsShopSkip()" style="width:100%;padding:6px;background:#1a1a2e;border:1px solid #444;border-radius:4px;color:#777;font-family:inherit;font-size:11px;cursor:pointer;margin-top:8px;">Skip</button>`;
+
+        } else {
+            // Active run
+            const threshold = this.game._voidShardsThreshold(vs.ante);
+            const rollsMax = this.game._voidShardsRollsPerRound();
+
+            // Status bar
+            html += '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">';
+            html += `<div style="flex:1;background:#11111e;border:1px solid #332255;border-radius:4px;padding:4px 8px;font-size:10px;">`;
+            html += `<div style="color:#886699;">Ante</div><div style="color:#cc99ff;font-weight:bold;">${vs.ante} / ${8}</div>`;
+            html += '</div>';
+            html += `<div style="flex:1;background:#11111e;border:1px solid #332255;border-radius:4px;padding:4px 8px;font-size:10px;">`;
+            html += `<div style="color:#886699;">Round</div><div style="color:#cc99ff;font-weight:bold;">${vs.round + 1} / 3</div>`;
+            html += '</div>';
+            html += `<div style="flex:1;background:#11111e;border:1px solid #332255;border-radius:4px;padding:4px 8px;font-size:10px;">`;
+            html += `<div style="color:#886699;">Rolls Left</div><div style="color:${vs.rollsLeft > 0 ? '#88ccff' : '#cc6644'};font-weight:bold;">${vs.rollsLeft} / ${rollsMax}</div>`;
+            html += '</div>';
+            html += `<div style="flex:1;background:#11111e;border:1px solid #553322;border-radius:4px;padding:4px 8px;font-size:10px;">`;
+            html += `<div style="color:#886699;">Target</div><div style="color:#ffcc00;font-weight:bold;">${threshold} Fd</div>`;
+            html += '</div>';
+            html += '</div>';
+
+            // Fail streak indicator
+            if (vs.failStreak > 0) {
+                const dots = '&#9670;'.repeat(vs.failStreak) + '&#9671;'.repeat(3 - vs.failStreak);
+                html += `<div style="text-align:center;font-size:11px;color:#cc6644;margin-bottom:6px;">Fails: ${dots}</div>`;
+            }
+
+            // Dice mat container
+            html += '<div id="vd-mat-container" style="margin-bottom:8px;"></div>';
+
+            // Score display: chips x mult = fd
+            html += '<div id="vd-score-display" style="position:relative;margin-bottom:6px;">';
+            if (vs.dice[0] !== 0 && !vs.rolling) {
+                const { category, chips, mult, fd: previewFd } = this.game._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers);
+                const label = this.game._voidShardsLabel(category);
+                const clears = previewFd >= threshold;
+                const fdColor = clears ? '#88cc88' : '#cc8866';
+                html += `<div style="font-size:10px;color:#886699;text-align:center;margin-bottom:3px;">${label}</div>`;
+                html += `<div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:bold;">`;
+                html += `<span id="vd-chips-val" style="background:#1a1e2e;border:1px solid #4488ff;border-radius:4px;padding:2px 8px;color:#88aaff;">${chips}</span>`;
+                html += `<span style="color:#886699;">&#215;</span>`;
+                html += `<span id="vd-mult-val" style="background:#221a2e;border:1px solid #aa44ff;border-radius:4px;padding:2px 8px;color:#dd88ff;">${mult}</span>`;
+                html += `<span style="color:#886699;">=</span>`;
+                html += `<span id="vd-fd-val" style="background:#11111e;border:1px solid ${fdColor};border-radius:4px;padding:2px 8px;color:${fdColor};">${previewFd} Fd</span>`;
+                if (clears) html += `<span style="color:#88cc88;font-size:11px;">&#10022;</span>`;
+                html += `</div>`;
+            } else {
+                html += `<div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:bold;opacity:0.3;">`;
+                html += `<span style="background:#1a1e2e;border:1px solid #333;border-radius:4px;padding:2px 8px;color:#555;">0</span>`;
+                html += `<span style="color:#444;">&#215;</span>`;
+                html += `<span style="background:#221a2e;border:1px solid #333;border-radius:4px;padding:2px 8px;color:#555;">1</span>`;
+                html += `<span style="color:#444;">=</span>`;
+                html += `<span style="background:#11111e;border:1px solid #333;border-radius:4px;padding:2px 8px;color:#555;">0 Fd</span>`;
+                html += `</div>`;
+            }
+            html += '</div>';
+
+            // Buttons
+            html += '<div style="display:flex;gap:6px;margin-bottom:8px;">';
+            const hasRolled = vs.dice[0] !== 0;
+            const canRoll = vs.rollsLeft > 0 && !vs.rolling;
+            const rollLabel = !hasRolled ? 'Roll' : 'Reroll';
+            html += `<button onclick="window.game.voidShardsRoll()" ${canRoll ? '' : 'disabled'} style="flex:2;padding:8px;background:${canRoll ? '#1a1a4a' : '#111'};border:1px solid ${canRoll ? '#5544cc' : '#333'};border-radius:4px;color:${canRoll ? '#99aaff' : '#555'};font-family:inherit;font-size:12px;cursor:${canRoll ? 'pointer' : 'default'};">&#9671; ${rollLabel}${vs.rollsLeft > 0 ? ` (${vs.rollsLeft})` : ''}</button>`;
+            const canScore = hasRolled && !vs.rolling;
+            html += `<button onclick="window.game.voidShardsScore()" ${canScore ? '' : 'disabled'} style="flex:2;padding:8px;background:${canScore ? '#1a3a1a' : '#111'};border:1px solid ${canScore ? '#446644' : '#333'};border-radius:4px;color:${canScore ? '#88cc88' : '#555'};font-family:inherit;font-size:12px;cursor:${canScore ? 'pointer' : 'default'};">&#10022; Score</button>`;
+            html += '</div>';
+
+            // Active modifiers
+            if (vs.modifiers.length > 0) {
+                html += '<div style="margin-bottom:6px;">';
+                html += '<div style="color:#886699;font-size:10px;margin-bottom:4px;">Active Modifiers</div>';
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+                for (const key of vs.modifiers) {
+                    const mod = this._findDiceMod(key);
+                    if (!mod) continue;
+                    html += `<div title="${mod.desc}" style="padding:2px 7px;background:#1e1230;border:1px solid #5533aa;border-radius:10px;font-size:10px;color:#bb88ff;">${mod.label}</div>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Run Fd tracker
+            html += `<div style="color:#8866bb;font-size:10px;text-align:right;">Run Fd: ${vs.earnedFd}</div>`;
+        }
+
+        html += '</div>';
+
+        return html;
+    },
+
+    _findDiceMod(key) {
+        return DICE_CONFIG.modifiers.find(m => m.key === key) || null;
+    },
+
+    _buildShardsPermUpgrades(vs, fd) {
+        let html = '<div style="margin-top:8px;">';
+        html += '<div style="color:#886699;font-size:10px;margin-bottom:4px;">Permanent Upgrades</div>';
+        html += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        for (const upg of DICE_CONFIG.permanentUpgrades) {
+            const level = vs.permanentUpgrades[upg.key] || 0;
+            const maxed = level >= upg.maxLevel;
+            const cost = maxed ? null : upg.costs[level];
+            const canAfford = cost !== null && fd >= cost;
+            html += `<div style="display:flex;align-items:center;justify-content:space-between;background:#11111e;border:1px solid #331a44;border-radius:4px;padding:5px 8px;">`;
+            html += `<div>`;
+            html += `<span style="color:#aa88cc;font-size:11px;">${upg.label}</span>`;
+            html += `<span style="color:#554466;font-size:10px;margin-left:6px;">${upg.desc}</span>`;
+            html += `</div>`;
+            html += `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">`;
+            html += `<span style="color:#776699;font-size:10px;">${level}/${upg.maxLevel}</span>`;
+            if (maxed) {
+                html += `<span style="font-size:10px;color:#446644;padding:2px 8px;border:1px solid #334433;border-radius:3px;">MAX</span>`;
+            } else {
+                html += `<button onclick="window.game.voidShardsBuyPermUpgrade('${upg.key}')" ${canAfford ? '' : 'disabled'} style="padding:2px 8px;font-size:10px;background:${canAfford ? '#1e1030' : '#111'};border:1px solid ${canAfford ? '#5544aa' : '#333'};border-radius:3px;color:${canAfford ? '#bb88ff' : '#555'};font-family:inherit;cursor:${canAfford ? 'pointer' : 'default'};">${cost} Fd</button>`;
+            }
+            html += '</div></div>';
+        }
+        html += '</div></div>';
+        return html;
+    },
+
+    _mountDiceRenderer() {
+        const cont = this.elements.arcanePanel.querySelector('#vd-mat-container');
+        if (!cont) return;
+        // If the mat is already mounted and alive, just sync state.
+        if (cont.querySelector('#vd-mat')) {
+            const r = window._voidDiceRenderer;
+            if (r && !r._rolling) {
+                const vs = this.game.voidShards;
+                r.syncLocked(vs?.locked || [false, false, false, false, false]);
+                r.syncUnrolled((vs?.dice || []).map(v => v > 0));
+            }
+            return;
+        }
+        if (!window.VoidDiceRenderer) return;
+        const r = new window.VoidDiceRenderer();
+        r.init(cont, 5);
+        window._voidDiceRenderer = r;
+        const vs = this.game.voidShards;
+        if (vs) {
+            r.syncUnrolled((vs.dice || []).map(v => v > 0));
+            if (vs.dice && vs.dice[0] !== 0) {
+                r.showStatic([...vs.dice], [...vs.locked]);
+            }
+        }
     },
 
     getColonistTaskDescription(colonist) {
