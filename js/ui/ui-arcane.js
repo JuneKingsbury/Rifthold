@@ -65,13 +65,13 @@ const arcaneMethods = {
     },
 
     updateArcanePanel() {
-        const tab = this._arcaneTab || 'nexus';
+        const tab = this._arcaneTab || 'expeditions';
         let html = '<div class="panel-close" data-panel-close="arcane">&times;</div>';
         html += '<h3 style="color:#aa44ff">Rifts</h3>';
         html += '<div class="arcane-tabs">';
+        html += `<button class="arcane-tab${tab === 'expeditions' ? ' active' : ''}" data-arcane-tab="expeditions">Expeditions</button>`;
         html += `<button class="arcane-tab${tab === 'nexus' ? ' active' : ''}" data-arcane-tab="nexus">Nexus</button>`;
         html += `<button class="arcane-tab${tab === 'requests' ? ' active' : ''}" data-arcane-tab="requests">Requests</button>`;
-        html += `<button class="arcane-tab${tab === 'expeditions' ? ' active' : ''}" data-arcane-tab="expeditions">Expeditions</button>`;
         html += `<button class="arcane-tab${tab === 'omens' ? ' active' : ''}" data-arcane-tab="omens">Omens</button>`;
         html += '</div>';
 

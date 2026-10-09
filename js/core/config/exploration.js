@@ -3561,7 +3561,7 @@ export const STORY_MILESTONES = {
         text: `TODO`,
     },
     waves_10_complete: {
-        tab: 'combat',
+        tab: 'colony',
         title: 'The Entity Watches',
         trigger: 'waves_10_complete',
         text: `TODO`,
