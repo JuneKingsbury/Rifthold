@@ -1138,7 +1138,7 @@ export const REALMS = {
         },
         boss: {
             name: 'The Unraveler',
-            lore: `TODO`,
+            lore: `A giant floating eyeball that seems to be a master of illusion. Using the chaotic energies of the labyrinth, it is able to mask itself as other powerful entities that it pulls from the minds of the colonists. It makes chaotic use of our previous foes' abilities, though it thankfully cannot hold these forms for long while being attacked.`,
             attackAnim: 'Swing',
             approachText: 'Something at the center of the core shifts. Parts of it are in different places than other parts. It has too many edges. It turns toward the party, and the turning takes longer than it should.',
             defeatText: 'The Unraveler disperses. Each thread of it unwinds back into the labyrinth it came from. Somewhere, something subtle changes.',
@@ -1311,7 +1311,7 @@ export const REALMS = {
         ] },
         boss: {
             name: 'The High King',
-            lore: `TODO`,
+            lore: `The leader of the human kingdoms and commander of the Crusader armies. He is a master swordsman and tactician, using his combat experience to protect his throne himself. He liberally uses his arsenal of legendary weaponry, as well as the lives of his soldiers, to keep his enemies at bay. When pushed to the brink he may even break his own oaths and call upon the power of magic to turn the tide. His defeat will be a major blow to the Crusader forces, leaving our colonists safe to return to their old homes.`,
             attackAnim: 'Swing',
             approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
             defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
