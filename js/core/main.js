@@ -3756,9 +3756,8 @@ _onDOMReady(() => {
         if (splashDone) return;
         splashDone = true;
         if (splashFreezeTimer) clearTimeout(splashFreezeTimer);
-        document.removeEventListener('click', skipSplash);
+        document.removeEventListener('pointerdown', skipSplash);
         document.removeEventListener('keydown', skipSplash);
-        document.removeEventListener('touchstart', skipSplash);
         startScreen.style.visibility = '';
         splashOverlay.classList.add('hidden');
         splashOverlay.addEventListener('transitionend', () => {
@@ -3766,7 +3765,16 @@ _onDOMReady(() => {
         }, { once: true });
     }
 
-    function skipSplash() {
+    function skipSplash(e) {
+        // When skipping via a pointer gesture, swallow the trailing/synthesized
+        // click so it can't fall through onto a now-visible start-menu button.
+        if (e && e.type === 'pointerdown') {
+            if (e.cancelable) e.preventDefault();
+            window.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                ev.preventDefault();
+            }, { once: true, capture: true });
+        }
         endSplash();
     }
 
@@ -3821,9 +3829,8 @@ _onDOMReady(() => {
 
     if (splashOverlay) {
         startScreen.style.visibility = 'hidden';
-        document.addEventListener('click', skipSplash);
+        document.addEventListener('pointerdown', skipSplash);
         document.addEventListener('keydown', skipSplash);
-        document.addEventListener('touchstart', skipSplash);
 
         const splashSrc = splashImage.src;
         const isGif = splashSrc && splashSrc.match(/\.gif(\?|$)/i);

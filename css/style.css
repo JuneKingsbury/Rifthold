@@ -80,6 +80,8 @@ body {
     z-index: 20000;
     transition: opacity 1s ease;
     overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 #splash-bg {
@@ -123,6 +125,10 @@ body {
     object-fit: contain;
     position: relative;
     z-index: 2;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
 }
 
 #splash-image.visible, #splash-studio.visible {
