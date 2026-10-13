@@ -56,6 +56,7 @@ const PORTRAIT_ITEMS = [
     { key: 'first_love',                 size: 64,  desc: 'Achievement: Love on the Frontier' },
     { key: 'first_winter_feast',         size: 64,  desc: 'Achievement: Winter Celebration' },
     { key: 'first_wave_complete',        size: 64,  desc: 'Achievement: Horrors from the Void' },
+    { key: 'realm_wild_frontiers',        size: 64,  desc: 'Achievement: Wild Frontiers realm' },
     { key: 'realm_crystal_caves',        size: 64,  desc: 'Achievement: Crystal Caves realm' },
     { key: 'realm_crystal_mines',        size: 64,  desc: 'Achievement: Crystal Mines realm' },
     { key: 'realm_crystal_depths',       size: 64,  desc: 'Achievement: Crystal Depths realm' },

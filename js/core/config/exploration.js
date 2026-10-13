@@ -3338,6 +3338,13 @@ export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
     // Realms tab: exploration journals from other worlds
     // -----------------------------------------------------------------------
+    realm_wild_frontiers: {
+        tab: 'realms',
+        realmGroup: 'The Wild Frontiers',
+        title: 'The Wild Frontiers',
+        trigger: 'realm_wild_frontiers',
+        text: `<img class="pixel-art" src="portraits/realm_wild_frontiers.png" alt="A drawing depicting the Wild Frontiers">TODO: Write lore text for scouting the Wild Frontiers.`,
+    },
     realm_crystal_caves: {
         tab: 'realms',
         realmGroup: 'Crystal Caverns',
