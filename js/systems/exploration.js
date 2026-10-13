@@ -3911,6 +3911,7 @@ export class ExplorationSystem {
             if (!exp.summons) exp.summons = [];
             exp.summons.push({
                 type: 'npc_ally', name: reward.ally.name,
+                sprite: reward.ally.sprite || 'npc_ally',
                 hp: reward.ally.hp, maxHp: reward.ally.hp,
                 damage: reward.ally.damage,
                 char: reward.ally.char || 'A', color: reward.ally.color || '#ccaa44',

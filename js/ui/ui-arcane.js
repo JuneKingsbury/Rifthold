@@ -2539,7 +2539,7 @@ const arcaneMethods = {
             }
             this._maybeSpawnGain(summon, sx, sy, extrasEnabled, reduceMotion);
             if (useSkins) {
-                const sumSprite = skinMgr.getSprite('entities', summon.type);
+                const sumSprite = skinMgr.getSprite('entities', summon.sprite || summon.type);
                 if (sumSprite) {
                     this._drawEntityWithAnim(ctx, sumSprite, sx - 16, sy - 16 - sumGrow, 32, 32 + sumGrow, sx, sy + 16, sumAnim);
                 } else {

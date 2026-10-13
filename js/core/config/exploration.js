@@ -2230,6 +2230,7 @@ export const NPC_ENCOUNTERS = {
     wounded_traveler: {
         name: 'Wounded Traveler',
         lore: `A common traveler found in all parts of the world. They're always willing to chat with our explorers after getting offered a helping hand.`,
+        sprite: 'npc_wounded_traveler',
         text: 'A wounded traveler lies beside the path.',
         triggerWeight: 6,
         realmFilter: null,
@@ -2254,7 +2255,7 @@ export const NPC_ENCOUNTERS = {
     mercenary: {
         name: 'Mercenary',
         lore: `A hardened sellsword found throughout the world. They are willing to fight in even the most dangerous places, for the right price.`,
-        sprite: 'npc_ally',
+        sprite: 'npc_mercenary',
         text: 'A sellsword offers their blade, for a price.',
         triggerWeight: 4,
         realmFilter: null,
@@ -2264,7 +2265,7 @@ export const NPC_ENCOUNTERS = {
                 cost: { loot: { resource: 'runite', amount: 3 } },
                 result: {
                     text: 'The mercenary joins for the next 2 combats.',
-                    reward: { type: 'temp_ally', ally: { name: 'Mercenary', hp: 80, damage: 12, char: 'M', color: '#ccaa44', duration: 2 } },
+                    reward: { type: 'temp_ally', ally: { name: 'Mercenary', hp: 80, damage: 12, char: 'M', color: '#ccaa44', duration: 2, sprite: 'npc_mercenary' } },
                 },
             },
             {
@@ -2276,6 +2277,7 @@ export const NPC_ENCOUNTERS = {
     lost_scholar: {
         name: 'Lost Scholar',
         lore: `A scholar seemingly trapped in a haze within the university. His research is highly valuable for our community, but he never seems to remember our explorers when encountered and always insists on staying at the university despite its dangers.`,
+        sprite: 'npc_lost_scholar',
         text: 'A disoriented scholar clutches a bundle of notes.',
         triggerWeight: 5,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -2301,6 +2303,7 @@ export const NPC_ENCOUNTERS = {
     shadow_merchant: {
         name: 'Shadow Merchant',
         lore: `A mysterious figure that appears in the shadows, offering deals that seem too good to be true.`,
+        sprite: 'npc_shadow_merchant',
         text: 'A cloaked figure materializes from the darkness, wares floating around them.',
         triggerWeight: 3,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
@@ -2324,7 +2327,7 @@ export const NPC_ENCOUNTERS = {
     defecting_soldier: {
         name: 'Defecting Soldier',
         lore: `A young soldier who has grown disillusioned with the war and seeks refuge with the party. They're never able to find the courage to leave their home and truly join the colony, though no one can blame them for it.`,
-        sprite: 'npc_ally',
+        sprite: 'npc_defecting_soldier',
         text: 'A young crusader lowers their blade. "I never wanted this war," they whisper.',
         triggerWeight: 5,
         realmFilter: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
@@ -2335,7 +2338,7 @@ export const NPC_ENCOUNTERS = {
                 cost: { potionSlots: 1 },
                 result: {
                     text: 'The soldier sheds their tabard and joins the party for the next 2 combats.',
-                    reward: { type: 'temp_ally', ally: { name: 'Defector', hp: 90, damage: 13, char: 'D', color: '#ccaa44', duration: 2 } },
+                    reward: { type: 'temp_ally', ally: { name: 'Defector', hp: 90, damage: 13, char: 'D', color: '#ccaa44', duration: 2, sprite: 'npc_defecting_soldier' } },
                 },
             },
             {
@@ -2353,7 +2356,7 @@ export const NPC_ENCOUNTERS = {
     trapped_miner: {
         name: 'Trapped Miner',
         lore: `A miner who had been trapped in a cave-in within the crystal mines. They seem to be unrelated to the ancient miners that built the tunnels, but they have a good knowledge of the veins and passages in the mines. They are grateful for any help, sharing their knowledge or battling alongside our colonists for a time. They seem to always disappear after being rescued, often muttering about a shortcut home that they know. The colonists suspect that the miner must live somewhere inside the caverns and has no interest in leaving any time soon.`,
-        sprite: 'npc_ally',
+        sprite: 'npc_trapped_miner',
         text: 'A muffled voice calls from behind a cave-in. A miner, pinned but alive.',
         triggerWeight: 5,
         realmFilter: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
@@ -2364,7 +2367,7 @@ export const NPC_ENCOUNTERS = {
                 cost: { potionSlots: 1 },
                 result: {
                     text: 'The freed miner hefts a pickaxe and joins the party for the next 2 combats.',
-                    reward: { type: 'temp_ally', ally: { name: 'Miner', hp: 85, damage: 11, char: 'M', color: '#88bbcc', duration: 2 } },
+                    reward: { type: 'temp_ally', ally: { name: 'Miner', hp: 85, damage: 11, char: 'M', color: '#88bbcc', duration: 2, sprite: 'npc_trapped_miner' } },
                 },
             },
             {
@@ -2381,6 +2384,7 @@ export const NPC_ENCOUNTERS = {
     wandering_druid: {
         name: 'Wandering Druid',
         lore: `A druid found meditating in the depths of the verdant forests. This kind soul is always willing to share the gifts of the forest with those who show respect for the natural world. Our colonists find that our home-grown berries are often a welcome trade for the druid's blessing, seeing their healthy state as a sign of our stewardship.`,
+        sprite: 'npc_wandering_druid',
         text: 'A druid sits cross-legged among the roots, offering to share the forest\'s gifts.',
         triggerWeight: 5,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
@@ -2404,6 +2408,7 @@ export const NPC_ENCOUNTERS = {
     spectral_professor: {
         name: 'Spectral Professor',
         lore: `A ghostly scholar who roams the halls of the ancient university. He adores a good riddle and will always stop our colonists to test their wits. Winners are rewarded with rare texts, while losers are left to ponder the riddle for their next visit.`,
+        sprite: 'npc_spectral_professor',
         text: 'A translucent scholar hovers by a lectern. "A riddle for a reward, if you please."',
         triggerWeight: 4,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -2427,6 +2432,7 @@ export const NPC_ENCOUNTERS = {
     strange_totem: {
         name: 'Strange Totem',
         lore: `A weathered totem found at a crossroads. It is said that those who leave offerings at its base are granted strength for the trials ahead, while those who take from it risk angering protective spirits.`,
+        sprite: 'npc_strange_totem',
         text: 'A weathered totem stands at a crossroads, a hollow at its base worn smooth by offerings.',
         triggerWeight: 4,
         realmFilter: null,
@@ -3343,7 +3349,8 @@ export const STORY_MILESTONES = {
         realmGroup: 'The Wild Frontiers',
         title: 'The Wild Frontiers',
         trigger: 'realm_wild_frontiers',
-        text: `<img class="pixel-art" src="portraits/realm_wild_frontiers.png" alt="A drawing depicting the Wild Frontiers">TODO: Write lore text for scouting the Wild Frontiers.`,
+        text: `<img class="pixel-art" src="portraits/realm_wild_frontiers.png" alt="A drawing depicting the Wild Frontiers">
+        TODO: Write lore text for scouting the Wild Frontiers.`,
     },
     realm_crystal_caves: {
         tab: 'realms',
