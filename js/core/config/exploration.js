@@ -2403,7 +2403,7 @@ export const NPC_ENCOUNTERS = {
     },
     spectral_professor: {
         name: 'Spectral Professor',
-        lore: `TODO`,
+        lore: `A ghostly scholar who roams the halls of the ancient university. He adores a good riddle and will always stop our colonists to test their wits. Winners are rewarded with rare texts, while losers are left to ponder the riddle for their next visit.`,
         text: 'A translucent scholar hovers by a lectern. "A riddle for a reward, if you please."',
         triggerWeight: 4,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
@@ -2426,7 +2426,7 @@ export const NPC_ENCOUNTERS = {
     },
     strange_totem: {
         name: 'Strange Totem',
-        lore: `TODO`,
+        lore: `A weathered totem found at a crossroads. It is said that those who leave offerings at its base are granted strength for the trials ahead, while those who take from it risk angering protective spirits.`,
         text: 'A weathered totem stands at a crossroads, a hollow at its base worn smooth by offerings.',
         triggerWeight: 4,
         realmFilter: null,
