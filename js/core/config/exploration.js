@@ -2352,7 +2352,7 @@ export const NPC_ENCOUNTERS = {
     },
     trapped_miner: {
         name: 'Trapped Miner',
-        lore: `TODO`,
+        lore: `A miner who had been trapped in a cave-in within the crystal mines. They seem to be unrelated to the ancient miners that built the tunnels, but they have a good knowledge of the veins and passages in the mines. They are grateful for any help, sharing their knowledge or battling alongside our colonists for a time. They seem to always disappear after being rescued, often muttering about a shortcut home that they know. The colonists suspect that the miner must live somewhere inside the caverns and has no interest in leaving any time soon.`,
         sprite: 'npc_ally',
         text: 'A muffled voice calls from behind a cave-in. A miner, pinned but alive.',
         triggerWeight: 5,
@@ -2380,7 +2380,7 @@ export const NPC_ENCOUNTERS = {
     },
     wandering_druid: {
         name: 'Wandering Druid',
-        lore: `TODO`,
+        lore: `A druid found meditating in the depths of the verdant forests. This kind soul is always willing to share the gifts of the forest with those who show respect for the natural world. Our colonists find that our home-grown berries are often a welcome trade for the druid's blessing, seeing their healthy state as a sign of our stewardship.`,
         text: 'A druid sits cross-legged among the roots, offering to share the forest\'s gifts.',
         triggerWeight: 5,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
