@@ -1298,6 +1298,7 @@ export class ExplorationSystem {
                 bossPhases: phases,
                 enemies: [{
                     hp: bossHp, maxHp: bossHp, damage: bossDmg,
+                    damageReduction: phase0.damageReduction || 0,
                     isBoss: true, name: (boss.dynamicMasks && phase0.displayName) ? phase0.displayName : boss.name,
                     enraged: false,
                     color: phase0.color,
@@ -1384,6 +1385,7 @@ export class ExplorationSystem {
                 displayName: mask ? mask.displayName : null,
                 hp: slot.hp,
                 damage: Math.round(slot.damage * buff),
+                damageReduction: slot.damageReduction || 0,
                 color: mask ? mask.color : slot.color,
                 sprite: mask ? mask.sprite : slot.sprite,
                 abilities: mask ? mask.abilities : (slot.abilities || []),
@@ -1391,6 +1393,7 @@ export class ExplorationSystem {
                 transitionText: isLastMask
                     ? 'The borrowed faces slough away all at once. What is left underneath wears nothing but itself.'
                     : 'The stolen shape destabilizes, and the Unraveler drags a different face over itself.',
+                armorText: slot.armorText || null,
             });
         }
         // Finale: the true, undisguised Unraveler. Uses the finale SLOT's stats (the
@@ -3337,6 +3340,7 @@ export class ExplorationSystem {
         bossEnemy.hp = Math.round(nextPhase.hp * (exp.diffSettings?.enemyHpMult || 1));
         bossEnemy.maxHp = bossEnemy.hp;
         bossEnemy.damage = Math.round(nextPhase.damage * (exp.diffSettings?.enemyDmgMult || 1));
+        bossEnemy.damageReduction = nextPhase.damageReduction || 0;
         // Void pact damage reduction expires when the protected phase ends.
         exp._voidPactBossDmgMult = null;
         if (nextPhase.color) bossEnemy.color = nextPhase.color;
@@ -3351,6 +3355,9 @@ export class ExplorationSystem {
         if (nextPhase.displayName) bossEnemy.name = nextPhase.displayName;
 
         this._addLog(exp, game, `${bossEnemy.name} enters phase: ${nextPhase.name}!`, 'danger');
+        if (nextPhase.armorText && bossEnemy.damageReduction > 0) {
+            this._addLog(exp, game, nextPhase.armorText, 'info');
+        }
 
         // Chaos phase transition: apply a random chaos effect when entering new phase
         const dim = REALMS[exp.realm];

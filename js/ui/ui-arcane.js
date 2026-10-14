@@ -2671,13 +2671,30 @@ const arcaneMethods = {
                 }
                 if (enemy.maxHp) {
                     const eHpPct = enemy.hp / enemy.maxHp;
-                    const eBarW = enemy.isBoss ? 30 : 18;
-                    const eBarH = enemy.isBoss ? 3 : 2;
+                    const eBarW = enemy.isBoss ? 50 : 18;
+                    const eBarH = enemy.isBoss ? 5 : 2;
                     const eBarY = enemy.isBoss ? ey - 32 : ey - 18;
-                    ctx.fillStyle = '#222';
-                    ctx.fillRect(ex - eBarW / 2, eBarY, eBarW, eBarH);
-                    ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
-                    ctx.fillRect(ex - eBarW / 2, eBarY, eBarW * eHpPct, eBarH);
+                    if (enemy.isBoss && activeExp.bossPhaseData && activeExp.bossPhaseData.phases.length > 1) {
+                        const currentIdx = activeExp.bossPhaseData.currentPhaseIndex;
+                        const remainingCount = activeExp.bossPhaseData.phases.length - currentIdx;
+                        const phaseColors = ['#aa44ff', '#ffdd00', '#ff8800'];
+                        const phaseColorsDark = ['#551f88', '#887200', '#884400'];
+                        const bx = ex - eBarW / 2;
+                        ctx.fillStyle = '#1a0a0a';
+                        ctx.fillRect(bx, eBarY, eBarW, eBarH);
+                        for (let i = remainingCount - 2; i >= 0; i--) {
+                            const ci = Math.min(i, phaseColors.length - 1);
+                            ctx.fillStyle = (i === 0) ? phaseColorsDark[ci] : phaseColors[ci];
+                            ctx.fillRect(bx, eBarY, eBarW, eBarH);
+                        }
+                        ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
+                        ctx.fillRect(bx, eBarY, eBarW * eHpPct, eBarH);
+                    } else {
+                        ctx.fillStyle = '#222';
+                        ctx.fillRect(ex - eBarW / 2, eBarY, eBarW, eBarH);
+                        ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
+                        ctx.fillRect(ex - eBarW / 2, eBarY, eBarW * eHpPct, eBarH);
+                    }
                     // Status glyphs (poison/stun/slow/…) sit just above the HP bar so a
                     // player can see afflictions land on individual enemies on the canvas.
                     if (enemy.statusEffects && enemy.statusEffects.length > 0) {

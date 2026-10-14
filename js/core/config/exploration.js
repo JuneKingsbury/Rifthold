@@ -235,21 +235,24 @@ export const REALMS = {
             bonusResources: { runite: 8, void_essence: 4 },
             phases: [
                 {
-                    name: 'Crystalline Form', hp: 300, damage: 20,
+                    name: 'Crystalline Form', hp: 300, damage: 20, damageReduction: 0.35,
                     color: '#4488ff', sprite: 'boss_crystal_colossus',
                     transitionText: 'The Crystal Colossus cracks and glows red!',
+                    armorText: 'The Crystal Colossus\'s outer shell deflects much of the damage!',
                 },
                 {
-                    name: 'Enraged', hp: 250, damage: 30,
+                    name: 'Enraged', hp: 250, damage: 30, damageReduction: 0.20,
                     color: '#ff2222', sprite: 'boss_crystal_colossus_enraged',
                     abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10], text: 'Orbiting crystal shards slice through the party!' }],
                     transitionText: 'The Colossus fractures! Shards orbit its now molten core!',
+                    armorText: 'Shards still coat the Colossus, but cracks are showing!',
                 },
                 {
-                    name: 'Storm of Shards', hp: 200, damage: 38,
+                    name: 'Storm of Shards', hp: 200, damage: 38, damageReduction: 0.10,
                     color: '#ff6644', sprite: 'boss_crystal_colossus_shattered',
                     abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14], text: 'Crystal shards rain down on the party!' }],
                     transitionText: 'The Colossus reforms around a pulsing crystal heart!',
+                    armorText: 'The Colossus\'s armor is nearly broken!',
                 },
                 {
                     name: 'Crystal Heart', hp: 150, damage: 45,
@@ -406,21 +409,24 @@ export const REALMS = {
             bonusResources: { wood: 15, berries: 10 },
             phases: [
                 {
-                    name: 'Rooted', hp: 270, damage: 18,
+                    name: 'Rooted', hp: 270, damage: 18, damageReduction: 0.35,
                     color: '#22aa66', sprite: 'boss_ancient_treant',
                     transitionText: 'The Ancient Treant roars! Roots erupt from the ground!',
+                    armorText: 'Ancient bark and dense wood deflect many of your strikes!',
                 },
                 {
-                    name: 'Enraged', hp: 220, damage: 28,
+                    name: 'Enraged', hp: 220, damage: 28, damageReduction: 0.20,
                     color: '#ff4400', sprite: 'boss_ancient_treant_enraged',
                     abilities: [{ type: 'aoe', chance: 0.15, damage: [4, 9], text: 'The Treant stomps the ground, roots burst up beneath the party!' }],
                     transitionText: 'The Treant tears free from the earth, now mobile and furious!',
+                    armorText: 'The Treant\'s bark is splintering!',
                 },
                 {
-                    name: 'Uprooted', hp: 180, damage: 35,
+                    name: 'Uprooted', hp: 180, damage: 35, damageReduction: 0.10,
                     color: '#cc3300', sprite: 'boss_ancient_treant_uprooted',
                     abilities: [{ type: 'aoe', chance: 0.2, damage: [6, 12], text: 'Massive roots sweep through the party!' }],
                     transitionText: 'The Treant splits apart, its heartwood pulses with primal fury!',
+                    armorText: 'Only strips of bark remain clinging to the Treant\'s frame!',
                 },
                 {
                     name: 'Heartwood', hp: 130, damage: 42,
@@ -588,21 +594,24 @@ export const REALMS = {
             bonusResources: { runite: 6, void_essence: 5 },
             phases: [
                 {
-                    name: 'Awakened', hp: 290, damage: 20,
+                    name: 'Awakened', hp: 290, damage: 20, damageReduction: 0.35,
                     color: '#ff8844', sprite: 'boss_arcane_construct',
                     transitionText: 'The Arcane Construct accelerates! Sparks fly wildly!',
+                    armorText: 'Arcane shielding deflects much of your damage!',
                 },
                 {
-                    name: 'Enraged', hp: 240, damage: 30,
+                    name: 'Enraged', hp: 240, damage: 30, damageReduction: 0.20,
                     color: '#ff0000', sprite: 'boss_arcane_construct_enraged',
                     abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10], text: 'Absorbed magic discharges in a shockwave!' }],
                     transitionText: 'The Construct absorbs ambient magic, warping the air around it!',
+                    armorText: 'The Construct\'s arcane shell is beginning to crack!',
                 },
                 {
-                    name: 'Overcharged', hp: 190, damage: 38,
+                    name: 'Overcharged', hp: 190, damage: 38, damageReduction: 0.10,
                     color: '#ff4400', sprite: 'boss_arcane_construct_overcharged',
                     abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14], text: 'Arcane bolts discharge in every direction!' }],
                     transitionText: 'The Construct begins to destabilize! Raw energy leaks from its core!',
+                    armorText: 'Flickering shields still resist some blows!',
                 },
                 {
                     name: 'Meltdown', hp: 140, damage: 46,
@@ -765,21 +774,24 @@ export const REALMS = {
             bonusResources: { void_essence: 10 },
             phases: [
                 {
-                    name: 'Manifest', hp: 350, damage: 25,
+                    name: 'Manifest', hp: 350, damage: 25, damageReduction: 0.35,
                     color: '#7722cc', sprite: 'boss_void_sovereign',
                     transitionText: 'The Sovereign\'s accumulated mass begins to churn. It is becoming more.',
+                    armorText: 'The Sovereign\'s void energy absorbs much of the impact!',
                 },
                 {
-                    name: 'Surging', hp: 300, damage: 38,
+                    name: 'Surging', hp: 300, damage: 38, damageReduction: 0.20,
                     color: '#ff0000', sprite: 'boss_void_sovereign_enraged',
                     abilities: [{ type: 'aoe', chance: 0.15, damage: [6, 12], text: 'The Sovereign exhales abyss-dark across the chamber!' }],
                     transitionText: 'Something ancient and heavy shifts at its core. It stops holding back.',
+                    armorText: 'Void energy still cushions the Sovereign\'s form!',
                 },
                 {
-                    name: 'Unbound', hp: 250, damage: 48,
+                    name: 'Unbound', hp: 250, damage: 48, damageReduction: 0.10,
                     color: '#aa00ff', sprite: 'boss_void_sovereign_unbound',
                     abilities: [{ type: 'aoe', chance: 0.25, damage: [10, 18], text: 'The abyss presses inward from all directions!' }],
                     transitionText: 'The Sovereign sheds its shape. What remains beneath is older.',
+                    armorText: 'Thin tendrils of void still deflect some blows!',
                 },
                 {
                     name: 'The Deep', hp: 200, damage: 58,
@@ -965,9 +977,10 @@ export const REALMS = {
             bonusResources: { void_essence: 20, runite: 5, abyss_sliver: 3 },
             phases: [
                 {
-                    name: 'Opening Terms', hp: 320, damage: 20,
+                    name: 'Opening Terms', hp: 320, damage: 20, damageReduction: 0.35,
                     color: '#8844bb', sprite: 'boss_void_arbiter',
                     transitionText: 'The Arbiter pauses. "An adjustment to the terms. Accept, and the cost of Phase Two is halved. Refuse, and we continue at full price."',
+                    armorText: 'The Arbiter\'s contractual wards deflect much of the damage!',
                     voidPactChoice: {
                         promptText: 'The Arbiter offers adjusted terms: the whole party takes 20 HP damage, but Phase Two deals half damage. Accept or refuse?',
                         acceptEffect: { partyDamage: 20, nextPhaseDmgMult: 0.5 },
@@ -976,9 +989,10 @@ export const REALMS = {
                     },
                 },
                 {
-                    name: 'Amended Contract', hp: 260, damage: 26,
+                    name: 'Amended Contract', hp: 260, damage: 26, damageReduction: 0.10,
                     color: '#6622aa', sprite: 'boss_void_arbiter',
                     transitionText: 'The Arbiter sets down its quill. "Final offer. One of you accepts significant personal cost. The proceedings end more quickly."',
+                    armorText: 'Residual wards still absorb some of your attacks!',
                     voidPactChoice: {
                         promptText: 'The Arbiter\'s final offer: the weakest party member takes 40 HP damage and becomes Void-Drained, but the Arbiter loses 60 HP and is stunned for 2 rounds. Accept or refuse?',
                         acceptEffect: { weakestMemberDamage: 40, applyVoidDrained: true, bossDamage: 60, bossStun: 2 },
@@ -987,9 +1001,10 @@ export const REALMS = {
                     },
                 },
                 {
-                    name: 'Breach of Contract', hp: 220, damage: 32,
+                    name: 'Breach of Contract', hp: 220, damage: 32, damageReduction: 0.20,
                     color: '#440088', sprite: 'boss_void_arbiter_enraged',
                     transitionText: 'The Arbiter closes its ledger with finality. There are no more offers.',
+                    armorText: 'The Arbiter\'s wards continue to deflect your attacks!',
                     abilities: [
                         { type: 'aoe', chance: 0.2, damage: [12, 20], text: 'The Arbiter stamps its seal. Void energy erupts outward!' },
                     ],
@@ -1155,26 +1170,29 @@ export const REALMS = {
             dynamicMasks: true,
             phases: [
                 {
-                    name: 'Incoherent', hp: 280, damage: 18,
+                    name: 'Incoherent', hp: 280, damage: 18, damageReduction: 0.35,
                     color: '#cc33cc', sprite: 'boss_unraveler',
                     transitionText: 'The Unraveler fractures into shards then snaps back together. It looks a little different.',
+                    armorText: 'Chaos energy refracts your attacks, absorbing your damage!',
                     abilities: [
                         { type: 'aoe', chance: 0.25, damage: [8, 14], text: 'A chaos pulse detonates outward from the Unraveler!' },
                     ],
                 },
                 {
-                    name: 'Fracturing', hp: 240, damage: 24,
+                    name: 'Fracturing', hp: 240, damage: 24, damageReduction: 0.20,
                     color: '#ff33aa', sprite: 'boss_unraveler',
                     transitionText: 'The Unraveler sheds one version of itself. What remains is faster and angrier.',
+                    armorText: 'The chaos field is thinning but still deflects some blows!',
                     abilities: [
                         { type: 'aoe', chance: 0.30, damage: [10, 18], text: 'A chaos pulse detonates outward from the Unraveler!' },
                         { type: 'summon_adds', chance: 0.2, hp: 30, damage: 8, count: 1, text: 'A fragment splits off and takes shape!' },
                     ],
                 },
                 {
-                    name: 'Unbound', hp: 200, damage: 30,
+                    name: 'Unbound', hp: 200, damage: 30, damageReduction: 0.10,
                     color: '#ff6600', sprite: 'boss_unraveler',
                     transitionText: 'The Unraveler stops pretending to have a stable form. Every round from here is different.',
+                    armorText: 'Flickering chaos energy still absorbs a fraction of your damage!',
                     autoChaosTick: true,
                     abilities: [
                         { type: 'aoe', chance: 0.25, damage: [12, 20], text: 'Chaos erupts from the Unraveler!' },
@@ -1412,10 +1430,10 @@ export const EXPLORATION_CONFIG = {
 };
 
 export const EXPEDITION_DIFFICULTY = {
-    1:  { name: 'Normal',       enemyHpMult: 1,    enemyDmgMult: 1,    enemyCountMult: 1,    trapDmgMult: 1,    lootAmountMult: 1, rareLootMult: 1, extraEncounters: 0,  bossPhases: 2 },
-    2:  { name: 'Dangerous',   enemyHpMult: 1.3,  enemyDmgMult: 1.2,  enemyCountMult: 1.25, trapDmgMult: 1.3,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 1,  bossPhases: 2 },
-    3:  { name: 'Perilous',    enemyHpMult: 1.7,  enemyDmgMult: 1.5,  enemyCountMult: 1.5,  trapDmgMult: 1.7,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 2,  bossPhases: 3 },
-    4:  { name: 'Deadly',      enemyHpMult: 2.2,  enemyDmgMult: 1.8,  enemyCountMult: 1.75, trapDmgMult: 2.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 3,  bossPhases: 3 },
+    1:  { name: 'Normal',       enemyHpMult: 1,    enemyDmgMult: 1,    enemyCountMult: 1,    trapDmgMult: 1,    lootAmountMult: 1, rareLootMult: 1, extraEncounters: 0,  bossPhases: 3 },
+    2:  { name: 'Dangerous',   enemyHpMult: 1.3,  enemyDmgMult: 1.2,  enemyCountMult: 1.25, trapDmgMult: 1.3,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 1,  bossPhases: 3 },
+    3:  { name: 'Perilous',    enemyHpMult: 1.7,  enemyDmgMult: 1.5,  enemyCountMult: 1.5,  trapDmgMult: 1.7,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 2,  bossPhases: 4 },
+    4:  { name: 'Deadly',      enemyHpMult: 2.2,  enemyDmgMult: 1.8,  enemyCountMult: 1.75, trapDmgMult: 2.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 3,  bossPhases: 4 },
     5:  { name: 'Suicidal',    enemyHpMult: 3.0,  enemyDmgMult: 2.2,  enemyCountMult: 2.0,  trapDmgMult: 2.5,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 4,  bossPhases: 4 },
     6:  { name: 'Lethal',      enemyHpMult: 3.9,  enemyDmgMult: 2.7,  enemyCountMult: 2.25, trapDmgMult: 3.2,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 5,  bossPhases: 4 },
     7:  { name: 'Catastrophic',enemyHpMult: 5.0,  enemyDmgMult: 3.3,  enemyCountMult: 2.5,  trapDmgMult: 4.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 6,  bossPhases: 4 },
