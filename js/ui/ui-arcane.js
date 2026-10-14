@@ -7,8 +7,9 @@ import { estimatePartyStrength, getExpeditionSlotItem } from '../systems/explora
 import { getOmens } from '../systems/omens.js';
 import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
+import { drawBarFill, advanceGhost, drawGhostBar } from './bar-fx.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
-import { DICE_CONFIG } from '../core/config/dice.js';
+import { DICE_CONFIG, DICE_FACE_SETS, SHARD_BOSS_EFFECTS, RELICS } from '../core/config/dice.js';
 import { adventurerLevelTooltip, animalLevelBadge, animalLevelTooltip } from './ui-utils.js';
 import { resolvePortraitSrc } from '../core/mod-registry.js';
 
@@ -2027,6 +2028,10 @@ const arcaneMethods = {
         const floorBottom = H - 16;
         const diagSlope = 0.4;
         const _now = performance.now();
+        // Frame delta for the HP ghost-recede bars below, clamped so a tab-blur
+        // stall doesn't make the next frame snap the ghost instantly to rest.
+        const _ghostDt = this._expVisState._lastGhostMs != null ? Math.min(_now - this._expVisState._lastGhostMs, 100) : 16.67;
+        this._expVisState._lastGhostMs = _now;
         // Reduced-motion umbrella (accessibility): damp ambient breathing/sway and
         // the continuous exped channels, while one-shot combat beats still play.
         const reduceMotion = !!this.game.settings.reduceMotion;
@@ -2174,9 +2179,8 @@ const arcaneMethods = {
         const barProgress = (activeExp.status === 'returning' && !activeExp.retreatTick) ? 1 : progress;
         ctx.fillStyle = '#222';
         ctx.fillRect(0, H - 16, W, 16);
-        ctx.fillStyle = isRetreating ? '#ff4444' : barProgress >= 1 ? '#44cc44' : colors.accent;
         ctx.globalAlpha = 0.6;
-        ctx.fillRect(0, H - 16, isRetreating ? W : W * barProgress, 16);
+        drawBarFill(ctx, 0, H - 16, isRetreating ? W : W * barProgress, 16, isRetreating ? '#ff4444' : barProgress >= 1 ? '#44cc44' : colors.accent);
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#ccc';
         ctx.font = '10px monospace';
@@ -2380,16 +2384,13 @@ const arcaneMethods = {
                 const barW = 16, barH = 2;
                 const barX = px - barW / 2;
                 const barY = py + bounceY - 15;
-                ctx.fillStyle = '#222';
-                ctx.fillRect(barX, barY, barW, barH);
-                ctx.fillStyle = hpPct > 0.6 ? '#44ff44' : hpPct > 0.3 ? '#ffaa44' : '#ff4444';
-                ctx.fillRect(barX, barY, barW * hpPct, barH);
+                p._hpGhost = advanceGhost(p._hpGhost, hpPct * 100, p.maxHp, _ghostDt);
+                drawGhostBar(ctx, barX, barY, barW, barH, p._hpGhost, hpPct > 0.6 ? '#44ff44' : hpPct > 0.3 ? '#ffaa44' : '#ff4444', '#222');
                 if (p.maxMana > 0) {
                     const manaPct = p.mana / p.maxMana;
                     ctx.fillStyle = '#222';
                     ctx.fillRect(barX, barY + 3, barW, barH);
-                    ctx.fillStyle = '#4466ff';
-                    ctx.fillRect(barX, barY + 3, barW * manaPct, barH);
+                    drawBarFill(ctx, barX, barY + 3, barW * manaPct, barH, '#4466ff');
                 }
                 // Enemy-applied status glyphs above the party member's bars.
                 if (p.statusEffects && p.statusEffects.length > 0) {
@@ -2564,16 +2565,13 @@ const arcaneMethods = {
             }
             const sHpPct = summon.hp / summon.maxHp;
             const sBarW = 18, sBarH = 2;
-            ctx.fillStyle = '#222';
-            ctx.fillRect(sx - sBarW / 2, sy - 13, sBarW, sBarH);
-            ctx.fillStyle = sHpPct > 0.6 ? '#44ff44' : sHpPct > 0.3 ? '#ffaa44' : '#ff4444';
-            ctx.fillRect(sx - sBarW / 2, sy - 13, sBarW * sHpPct, sBarH);
+            summon._hpGhost = advanceGhost(summon._hpGhost, sHpPct * 100, summon.maxHp, _ghostDt);
+            drawGhostBar(ctx, sx - sBarW / 2, sy - 13, sBarW, sBarH, summon._hpGhost, sHpPct > 0.6 ? '#44ff44' : sHpPct > 0.3 ? '#ffaa44' : '#ff4444', '#222');
             if (summon.maxDuration) {
                 const dPct = summon.ticksRemaining / summon.maxDuration;
                 ctx.fillStyle = '#222';
                 ctx.fillRect(sx - sBarW / 2, sy - 10, sBarW, sBarH);
-                ctx.fillStyle = '#ddcc44';
-                ctx.fillRect(sx - sBarW / 2, sy - 10, sBarW * dPct, sBarH);
+                drawBarFill(ctx, sx - sBarW / 2, sy - 10, sBarW * dPct, sBarH, '#ddcc44');
             }
         }
 
@@ -2680,6 +2678,8 @@ const arcaneMethods = {
                     const eBarW = enemy.isBoss ? 50 : 18;
                     const eBarH = enemy.isBoss ? 5 : 2;
                     const eBarY = enemy.isBoss ? ey - 32 : ey - 18;
+                    enemy._hpGhost = advanceGhost(enemy._hpGhost, eHpPct * 100, enemy.maxHp, _ghostDt);
+                    const eColor = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
                     if (enemy.isBoss && activeExp.bossPhaseData && activeExp.bossPhaseData.phases.length > 1) {
                         const currentIdx = activeExp.bossPhaseData.currentPhaseIndex;
                         const remainingCount = activeExp.bossPhaseData.phases.length - currentIdx;
@@ -2693,13 +2693,9 @@ const arcaneMethods = {
                             ctx.fillStyle = (i === 0) ? phaseColorsDark[ci] : phaseColors[ci];
                             ctx.fillRect(bx, eBarY, eBarW, eBarH);
                         }
-                        ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
-                        ctx.fillRect(bx, eBarY, eBarW * eHpPct, eBarH);
+                        drawGhostBar(ctx, bx, eBarY, eBarW, eBarH, enemy._hpGhost, eColor, null);
                     } else {
-                        ctx.fillStyle = '#222';
-                        ctx.fillRect(ex - eBarW / 2, eBarY, eBarW, eBarH);
-                        ctx.fillStyle = eHpPct > 0.6 ? '#ff6666' : eHpPct > 0.3 ? '#ff4444' : '#cc2222';
-                        ctx.fillRect(ex - eBarW / 2, eBarY, eBarW * eHpPct, eBarH);
+                        drawGhostBar(ctx, ex - eBarW / 2, eBarY, eBarW, eBarH, enemy._hpGhost, eColor, '#222');
                     }
                     // Status glyphs (poison/stun/slow/…) sit just above the HP bar so a
                     // player can see afflictions land on individual enemies on the canvas.
@@ -3827,14 +3823,20 @@ const arcaneMethods = {
 
         } else if (vs.shopPhase) {
             // Shop phase
-            html += '<div style="color:#ffcc00;font-size:11px;font-weight:bold;text-align:center;margin-bottom:8px;">&#9670; Between Antes: Choose a Modifier</div>';
-            html += `<div style="color:#aaa;font-size:10px;text-align:center;margin-bottom:10px;">Run Fd: ${vs.earnedFd} | Modifiers: ${vs.modifiers.length}/${4}</div>`;
+            const maxMods = this.game._voidShardsMaxModifiers();
+            html += '<div style="color:#ffcc00;font-size:11px;font-weight:bold;text-align:center;margin-bottom:4px;">&#9670; Between Antes: Choose ONE Item Below</div>';
+            html += '<div style="color:#998855;font-size:10px;text-align:center;margin-bottom:8px;">Buying anything (a modifier, reforge, or relic) immediately moves you to the next round. Pick one.</div>';
+            html += `<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;background:#0e1a0e;border:1px solid #336633;border-radius:4px;padding:6px 10px;">`;
+            html += `<span style="color:#aaa;font-size:11px;">Spendable this shop:</span>`;
+            html += `<span id="vs-run-fd-shop" style="color:#88ff88;font-size:14px;font-weight:bold;">${vs.earnedFd} Fd</span>`;
+            html += `<span style="color:#aaa;font-size:11px;">| Modifiers: ${vs.modifiers.length}/${maxMods}</span>`;
+            html += '</div>';
             html += '<div style="display:flex;flex-direction:column;gap:6px;">';
             for (const key of vs.shopOffers) {
                 const mod = this._findDiceMod(key);
                 if (!mod) continue;
                 const canAfford = vs.earnedFd >= mod.cost;
-                const alreadyFull = vs.modifiers.length >= 4;
+                const alreadyFull = vs.modifiers.length >= maxMods;
                 const disabled = !canAfford || alreadyFull ? 'disabled' : '';
                 html += `<div style="border:1px solid #443366;border-radius:5px;padding:8px;background:#11111e;">`;
                 html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
@@ -3848,11 +3850,102 @@ const arcaneMethods = {
                 html += '<div style="color:#555;font-size:11px;text-align:center;padding:10px;">No more modifiers available</div>';
             }
             html += '</div>';
+
+            // Die Reforges, a separate offer row (own currency pool, own die slots)
+            html += '<div style="color:#88bbcc;font-size:11px;font-weight:bold;text-align:center;margin:12px 0 6px;">&#9672; Die Reforges</div>';
+            html += `<div style="color:#aaa;font-size:10px;text-align:center;margin-bottom:8px;">Reforged: ${vs.diceFacePresetKeys.filter(k => k !== 'standard').length}/${vs.diceFacePresetKeys.length}</div>`;
+            html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+            const dieSlotsFull = !vs.diceFacePresetKeys.includes('standard');
+            for (const key of vs.reforgeOffers) {
+                const preset = DICE_FACE_SETS[key];
+                if (!preset) continue;
+                const canAfford = vs.earnedFd >= preset.cost;
+                const disabled = !canAfford || dieSlotsFull ? 'disabled' : '';
+                html += `<div style="border:1px solid #335566;border-radius:5px;padding:8px;background:#0e1a1e;">`;
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
+                html += `<span style="color:#88ddee;font-size:11px;font-weight:bold;">${preset.label}</span>`;
+                if (key !== 'singular') {
+                    html += `<button onclick="window.game.voidShardsBuyReforge('${key}')" ${disabled} style="padding:3px 10px;font-size:10px;background:${canAfford && !dieSlotsFull ? '#163844' : '#1a1a2e'};border:1px solid ${canAfford && !dieSlotsFull ? '#2a8899' : '#333'};border-radius:3px;color:${canAfford && !dieSlotsFull ? '#88ddee' : '#555'};font-family:inherit;cursor:${canAfford && !dieSlotsFull ? 'pointer' : 'default'};">${preset.cost} Fd</button>`;
+                } else {
+                    html += `<span style="color:#88ddee;font-size:10px;">${preset.cost} Fd</span>`;
+                }
+                html += '</div>';
+                html += `<div style="color:#669988;font-size:10px;margin-top:3px;">${preset.desc}</div>`;
+                if (key === 'singular') {
+                    html += '<div style="display:flex;gap:4px;margin-top:5px;">';
+                    for (let n = 1; n <= 6; n++) {
+                        html += `<button onclick="window.game.voidShardsBuyReforge('singular', ${n})" ${disabled} style="flex:1;padding:3px 0;font-size:10px;background:${canAfford && !dieSlotsFull ? '#163844' : '#1a1a2e'};border:1px solid ${canAfford && !dieSlotsFull ? '#2a8899' : '#333'};border-radius:3px;color:${canAfford && !dieSlotsFull ? '#88ddee' : '#555'};font-family:inherit;cursor:${canAfford && !dieSlotsFull ? 'pointer' : 'default'};">${n}</button>`;
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+            if (!vs.reforgeOffers.length) {
+                html += '<div style="color:#555;font-size:11px;text-align:center;padding:10px;">No reforges available</div>';
+            }
+            html += '</div>';
+
+            // Relics, rarer and pricier, one offer per visit
+            html += '<div style="color:#ffcc66;font-size:11px;font-weight:bold;text-align:center;margin:12px 0 6px;">&#9733; Relics</div>';
+            html += `<div style="color:#aaa;font-size:10px;text-align:center;margin-bottom:8px;">Relics: ${vs.relics.length}/${DICE_CONFIG.maxRelics}</div>`;
+            if (vs.relicOffer) {
+                const relic = RELICS[vs.relicOffer];
+                if (relic) {
+                    const relicSlotsFull = vs.relics.length >= DICE_CONFIG.maxRelics;
+                    const canAffordRelic = vs.earnedFd >= relic.cost;
+                    const atDiceBound = (vs.relicOffer === 'overflow_core' && vs.dice.length >= DICE_CONFIG.maxDice)
+                        || (vs.relicOffer === 'fracture_weight' && vs.dice.length <= DICE_CONFIG.minDice);
+                    const relicDisabled = !canAffordRelic || relicSlotsFull || atDiceBound ? 'disabled' : '';
+                    const relicOk = canAffordRelic && !relicSlotsFull && !atDiceBound;
+                    html += `<div style="border:1px solid #665522;border-radius:5px;padding:8px;background:#1a1608;">`;
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">`;
+                    html += `<span style="display:flex;align-items:center;gap:6px;">${this._buildRelicIconHtml(vs.relicOffer, 20)}<span style="color:#ffcc66;font-size:11px;font-weight:bold;">${relic.label}</span></span>`;
+                    html += `<button onclick="window.game.voidShardsBuyRelic('${vs.relicOffer}')" ${relicDisabled} style="padding:3px 10px;font-size:10px;background:${relicOk ? '#3a2e10' : '#1a1a2e'};border:1px solid ${relicOk ? '#aa8822' : '#333'};border-radius:3px;color:${relicOk ? '#ffcc66' : '#555'};font-family:inherit;cursor:${relicOk ? 'pointer' : 'default'};">${relic.cost} Fd</button>`;
+                    html += '</div>';
+                    html += `<div style="color:#998855;font-size:10px;margin-top:3px;">${relic.desc}</div>`;
+                    html += '</div>';
+                }
+            } else {
+                html += '<div style="color:#555;font-size:11px;text-align:center;padding:10px;">No relic available</div>';
+            }
+
+            if (vs.relics.includes('prism_shard')) {
+                const previewBoss = vs.bossSchedule[vs.ante];
+                if (previewBoss) {
+                    html += `<div style="color:#998855;font-size:10px;text-align:center;margin-top:6px;">&#9733; Prism Shard: ante ${vs.ante + 1}'s boss is ${this._voidShardsEnemyLabel(previewBoss.spriteKey)}</div>`;
+                }
+            }
+
             html += `<button onclick="window.game.voidShardsShopSkip()" style="width:100%;padding:6px;background:#1a1a2e;border:1px solid #444;border-radius:4px;color:#777;font-family:inherit;font-size:11px;cursor:pointer;margin-top:8px;">Skip</button>`;
+
+        } else if (vs.bossIntroPending) {
+            // Boss round incoming, telegraph the twist before the player commits to rolling
+            const boss = vs.bossSchedule[vs.ante - 1];
+            const effects = boss ? boss.effects : [];
+            const bossThreshold = this.game._voidShardsThreshold(vs.ante, true);
+            html += '<canvas id="vs-node-canvas" width="320" height="24" style="display:block;width:100%;margin-bottom:8px;image-rendering:pixelated;"></canvas>';
+            html += '<div class="vd-boss-slam" style="text-align:center;border:1px solid #aa4422;border-radius:6px;background:#1a0e0e;padding:12px;">';
+            html += '<div style="color:#ff8844;font-size:12px;font-weight:bold;letter-spacing:1px;margin-bottom:6px;">&#9760; BOSS INCOMING &#9760;</div>';
+            html += this._buildShardsEnemyPortraitHtml(boss ? boss.spriteKey : 'monster', 48);
+            html += `<div style="color:#ffaa66;font-size:13px;font-weight:bold;margin:8px 0 2px;">${this._voidShardsEnemyLabel(boss ? boss.spriteKey : 'monster')}</div>`;
+            html += `<div style="color:#cc8866;font-size:10px;margin-bottom:8px;">Target: ${bossThreshold} Fd</div>`;
+            html += '<div style="display:flex;flex-direction:column;gap:4px;text-align:left;margin-bottom:10px;">';
+            for (const eff of effects) {
+                const def = SHARD_BOSS_EFFECTS[eff.key];
+                if (!def) continue;
+                html += `<div style="background:#241414;border:1px solid #663322;border-radius:4px;padding:5px 8px;">`;
+                html += `<div style="color:#ffaa66;font-size:10px;font-weight:bold;">${def.label}</div>`;
+                html += `<div style="color:#cc9977;font-size:10px;margin-top:2px;">${def.desc(eff.face)}</div>`;
+                html += '</div>';
+            }
+            html += '</div>';
+            html += `<button onclick="window.game.voidShardsAcknowledgeBoss()" style="width:100%;padding:8px;background:#2a1410;border:1px solid #aa4422;border-radius:4px;color:#ffaa66;font-family:inherit;font-size:12px;font-weight:bold;cursor:pointer;">&#9876; Engage</button>`;
+            html += '</div>';
 
         } else {
             // Active run
-            const threshold = this.game._voidShardsThreshold(vs.ante);
+            const isBossRound = this.game._voidShardsIsBossRound(vs.round);
+            const threshold = this.game._voidShardsThreshold(vs.ante, isBossRound);
             const rollsMax = this.game._voidShardsRollsPerRound();
 
             // Node progress bar
@@ -3875,25 +3968,62 @@ const arcaneMethods = {
             html += `<div style="flex:1;background:#11111e;border:1px solid #553322;border-radius:4px;padding:4px 8px;font-size:10px;">`;
             html += `<div style="color:#886699;">Target</div><div style="color:#ffcc00;font-weight:bold;">${threshold} Fd</div>`;
             html += '</div>';
+            html += `<div style="flex:1;background:#11111e;border:1px solid #336633;border-radius:4px;padding:4px 8px;font-size:10px;">`;
+            html += `<div style="color:#886699;">Run Fd</div><div id="vs-run-fd-active" style="color:#88ff88;font-weight:bold;">${vs.earnedFd}</div>`;
+            html += '</div>';
             html += '</div>';
 
-            // Fail streak indicator
-            if (vs.failStreak > 0) {
+            // Fail streak indicator, always visible so the 3-strikes rule
+            // (fail a round and you just move on, 3 in a row ends the run,
+            // any clear resets it to 0) is never a surprise.
+            {
                 const dots = '&#9670;'.repeat(vs.failStreak) + '&#9671;'.repeat(3 - vs.failStreak);
-                html += `<div style="text-align:center;font-size:11px;color:#cc6644;margin-bottom:6px;">Fails: ${dots}</div>`;
+                const atRisk = vs.failStreak === 2;
+                const color = atRisk ? '#ff4444' : vs.failStreak === 1 ? '#cc8844' : '#776688';
+                const warnCls = atRisk ? ' vd-fail-warn' : '';
+                html += `<div class="${warnCls.trim()}" data-vd-tooltip="A failed round doesn't end the run by itself, it just moves on. 3 fails in a row ends the run. Clearing a round resets this to 0." style="text-align:center;font-size:11px;color:${color};font-weight:${atRisk ? 'bold' : 'normal'};margin-bottom:6px;cursor:help;">Fails: ${dots}${atRisk ? ' &#9888; ONE MORE ENDS THE RUN' : ''}</div>`;
+            }
+
+            // Active boss twist reminder, visible for the whole boss round
+            const bossEffects = isBossRound ? this.game._voidShardsActiveBossEffects() : [];
+            if (bossEffects.length) {
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">';
+                for (const eff of bossEffects) {
+                    const def = SHARD_BOSS_EFFECTS[eff.key];
+                    if (!def) continue;
+                    html += `<div data-vd-tooltip="${this._escapeAttr(def.desc(eff.face))}" style="padding:2px 7px;background:#241414;border:1px solid #aa4422;border-radius:10px;font-size:10px;color:#ffaa66;">&#9760; ${def.label}</div>`;
+                }
+                html += '</div>';
             }
 
             // Dice mat container
-            html += '<div id="vd-mat-container" style="margin-bottom:8px;"></div>';
+            html += '<div id="vd-mat-container" style="margin-bottom:4px;"></div>';
+
+            // Die reforge legend, one short label per die that isn't standard
+            if (vs.diceFacePresetKeys.some(k => k !== 'standard')) {
+                html += '<div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;">';
+                for (let i = 0; i < vs.diceFacePresetKeys.length; i++) {
+                    const key = vs.diceFacePresetKeys[i];
+                    if (key === 'standard') continue;
+                    const preset = DICE_FACE_SETS[key];
+                    html += `<span data-vd-tooltip="${this._escapeAttr(preset ? preset.desc : '')}" style="font-size:9px;color:#88ddee;background:#0e1a1e;border:1px solid #2a5566;border-radius:3px;padding:1px 5px;">D${i + 1}: ${preset ? preset.label : key}</span>`;
+                }
+                html += '</div>';
+            } else {
+                html += '<div style="margin-bottom:8px;"></div>';
+            }
+
+            const hasRolled = vs.hasRolledThisRound;
 
             // Score display: chips x mult = fd
             html += '<div id="vd-score-display" style="position:relative;margin-bottom:6px;">';
-            if (vs.dice[0] !== 0 && !vs.rolling) {
-                const { category, chips, mult, fd: previewFd } = this.game._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers);
+            if (hasRolled && !vs.rolling) {
+                const { category, chips, mult, fd: previewFd } = this.game._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers, bossEffects, threshold);
                 const label = this.game._voidShardsLabel(category);
+                const categoryDesc = DICE_CONFIG.scoring.find(s => s.key === category)?.desc || '';
                 const clears = previewFd >= threshold;
                 const fdColor = clears ? '#88cc88' : '#cc8866';
-                html += `<div style="font-size:10px;color:#886699;text-align:center;margin-bottom:3px;">${label}</div>`;
+                html += `<div data-vd-tooltip="${this._escapeAttr(categoryDesc)}" style="font-size:10px;color:#886699;text-align:center;margin-bottom:3px;cursor:help;">${label}</div>`;
                 html += `<div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:bold;">`;
                 html += `<span id="vd-chips-val" style="background:#1a1e2e;border:1px solid #4488ff;border-radius:4px;padding:2px 8px;color:#88aaff;">${chips}</span>`;
                 html += `<span style="color:#886699;">&#215;</span>`;
@@ -3915,7 +4045,6 @@ const arcaneMethods = {
 
             // Buttons
             html += '<div style="display:flex;gap:6px;margin-bottom:8px;">';
-            const hasRolled = vs.dice[0] !== 0;
             const canRoll = vs.rollsLeft > 0 && !vs.rolling;
             const rollLabel = !hasRolled ? 'Roll' : 'Reroll';
             html += `<button onclick="window.game.voidShardsRoll()" ${canRoll ? '' : 'disabled'} style="flex:2;padding:8px;background:${canRoll ? '#1a1a4a' : '#111'};border:1px solid ${canRoll ? '#5544cc' : '#333'};border-radius:4px;color:${canRoll ? '#99aaff' : '#555'};font-family:inherit;font-size:12px;cursor:${canRoll ? 'pointer' : 'default'};">&#9671; ${rollLabel}${vs.rollsLeft > 0 ? ` (${vs.rollsLeft})` : ''}</button>`;
@@ -3931,13 +4060,23 @@ const arcaneMethods = {
                 for (const key of vs.modifiers) {
                     const mod = this._findDiceMod(key);
                     if (!mod) continue;
-                    html += `<div title="${mod.desc}" style="padding:2px 7px;background:#1e1230;border:1px solid #5533aa;border-radius:10px;font-size:10px;color:#bb88ff;">${mod.label}</div>`;
+                    html += `<div data-vd-tooltip="${this._escapeAttr(mod.desc)}" style="padding:2px 7px;background:#1e1230;border:1px solid #5533aa;border-radius:10px;font-size:10px;color:#bb88ff;">${mod.label}</div>`;
                 }
                 html += '</div></div>';
             }
 
-            // Run Fd tracker
-            html += `<div style="color:#8866bb;font-size:10px;text-align:right;">Run Fd: ${vs.earnedFd}</div>`;
+            // Active relics
+            if (vs.relics.length > 0) {
+                html += '<div style="margin-bottom:6px;">';
+                html += '<div style="color:#998855;font-size:10px;margin-bottom:4px;">Active Relics</div>';
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+                for (const key of vs.relics) {
+                    const relic = RELICS[key];
+                    if (!relic) continue;
+                    html += `<div data-vd-tooltip="${this._escapeAttr(relic.desc)}" style="display:flex;align-items:center;gap:4px;padding:2px 7px;background:#302410;border:1px solid #aa8822;border-radius:10px;font-size:10px;color:#ffcc66;">${this._buildRelicIconHtml(key, 14)}${relic.label}</div>`;
+                }
+                html += '</div></div>';
+            }
         }
 
         html += '</div>';
@@ -3947,7 +4086,34 @@ const arcaneMethods = {
 
     _mountShardBattleCanvas() {
         const canvas = this.elements.arcanePanel.querySelector('#vs-battle-canvas');
-        if (!canvas) return;
+
+        // The boss-intro banner renders the node track but not the battle
+        // canvas. Keep the node track alive and drawn even then, instead of
+        // bailing out before reaching _drawShardNodes() below.
+        if (!canvas) {
+            const nodeCanvas = this.elements.arcanePanel.querySelector('#vs-node-canvas');
+            if (!nodeCanvas) return;
+            let bs = window._voidShardsBattle;
+            if (!bs) {
+                const vs0 = this.game.voidShards;
+                const totalNodes = 8 * 3;
+                const initNode = vs0 ? (vs0.ante - 1) * 3 + vs0.round : 0;
+                bs = window._voidShardsBattle = {
+                    canvas: null, ctx: null,
+                    nodeCanvas, nodeCtx: nodeCanvas.getContext('2d'),
+                    raf: null, effects: [],
+                    monsterHpFrac: 1.0, targetHpFrac: 1.0, cleared: false,
+                    knightX: 75, monsterX: 230, entityY: 48, scrollX: 0,
+                    totalNodes, nodePos: initNode, nodeTarget: initNode, nodeRaf: null,
+                    deathShards: [], nodeSparkles: [],
+                };
+            } else if (bs.nodeCanvas !== nodeCanvas) {
+                bs.nodeCanvas = nodeCanvas;
+                bs.nodeCtx = nodeCanvas.getContext('2d');
+            }
+            this._drawShardNodes();
+            return;
+        }
 
         const b = window._voidShardsBattle;
         if (b && b.canvas === canvas) {
@@ -3992,6 +4158,8 @@ const arcaneMethods = {
             nodePos: initNode,
             nodeTarget: initNode,
             nodeRaf: null,
+            deathShards: [],
+            nodeSparkles: [],
         };
         window._voidShardsBattle = state;
 
@@ -4001,6 +4169,19 @@ const arcaneMethods = {
             if (!bs) return;
             const now = performance.now();
             bs.cleared = cleared;
+
+            // Snapshot who/what is being fought right now, before this call
+            // returns and voidShardsScore() advances vs.currentEnemyKey/
+            // round/ante to the next one. The hit/death animation plays out
+            // over ~2.7s of real time, well after that synchronous advance,
+            // so _drawShardBattle must render the dying monster from this
+            // frozen snapshot rather than re-reading the (already-advanced)
+            // live state, or the kill animation visually plays on the next
+            // enemy instead of the one that was actually just defeated.
+            const vsNow = ui.game.voidShards;
+            bs.fightingEnemyKey = vsNow ? vsNow.currentEnemyKey : null;
+            bs.fightingIsBoss = vsNow ? ui.game._voidShardsIsBossRound(vsNow.round) : false;
+            bs.fightingAnte = vsNow ? vsNow.ante : 1;
 
             // Determine intensity tier
             const ratio = fd / threshold;
@@ -4019,9 +4200,34 @@ const arcaneMethods = {
             bs.effects.push({ type: 'knight_lunge', startMs: now + 280, durationMs: 320 });
             bs.effects.push({ type: slashType, startMs: now + 430, durationMs: slashDur });
             bs.effects.push({ type: 'monster_hit', startMs: now + 430, durationMs: 350 });
+
+            // Hit-tier SFX, scaled to how decisively the threshold was beaten
+            if (window.soundManager) {
+                const hitSfx = slashType === 'slash_kill' ? 'critical_hit' : slashType === 'slash_heavy' ? 'colonist_damaged' : 'shield_block';
+                setTimeout(() => window.soundManager?.playSFXPitched(hitSfx, slashType === 'slash_light' ? -2 : 0), 430);
+            }
             if (cleared) {
                 bs.effects.push({ type: 'monster_death', startMs: now + 880, durationMs: 700 });
                 bs.effects.push({ type: 'walk', startMs: now + 1580, durationMs: 1100 });
+
+                // Shard-shatter burst on death, bigger for a boss kill.
+                const vsForDeath = ui.game.voidShards;
+                const isBossDeath = vsForDeath && ui.game._voidShardsIsBossRound(vsForDeath.round);
+                const shardCount = isBossDeath ? 18 : 8;
+                bs.deathShards = [];
+                for (let i = 0; i < shardCount; i++) {
+                    bs.deathShards.push({
+                        startMs: now + 880,
+                        angle: Math.random() * Math.PI * 2,
+                        speed: (isBossDeath ? 1.4 : 1.0) * (40 + Math.random() * 60),
+                        size: 3 + Math.random() * (isBossDeath ? 5 : 3),
+                        spin: (Math.random() - 0.5) * 10,
+                        color: Math.random() < 0.5 ? '#cc99ff' : '#ffffff',
+                    });
+                }
+
+                if (!bs.nodeSparkles) bs.nodeSparkles = [];
+                bs.nodeSparkles.push({ nodeIdx: bs.nodeTarget, startMs: now });
                 bs.nodeTarget = Math.min(bs.totalNodes - 1, bs.nodeTarget + 1);
                 if (!bs.nodeRaf) {
                     const nodeLoop = function(nowT) {
@@ -4051,6 +4257,12 @@ const arcaneMethods = {
                         bs.targetHpFrac = 1.0;
                         bs.scrollX = 0;
                         bs.effects = [];
+                        bs.deathShards = [];
+                        // The walk transition (if any) has fully revealed
+                        // the new enemy by now, drop the hit-time snapshot
+                        // so static re-renders go back to live state instead
+                        // of being stuck showing the just-defeated enemy.
+                        bs.fightingEnemyKey = null;
                         ui._drawShardBattle(performance.now());
                     }
                 };
@@ -4072,6 +4284,9 @@ const arcaneMethods = {
 
         const W = nc.width, H = nc.height;
         nctx.clearRect(0, 0, W, H);
+
+        const nowSpark = performance.now();
+        bs.nodeSparkles = (bs.nodeSparkles || []).filter(sp => nowSpark - sp.startMs < 500);
 
         const anteCount = 8;
         const roundsPerAnte = 3;
@@ -4112,26 +4327,73 @@ const arcaneMethods = {
                     nctx.fillStyle = prog > 0 ? '#6644aa' : '#1a1030';
                     nctx.fillRect(nx + nodeR, cy - 1, nx2 - nx - nodeR * 2, 2);
                     if (prog > 0 && prog < 1) {
-                        nctx.fillStyle = '#aa66ff';
-                        nctx.fillRect(nx + nodeR, cy - 1, (nx2 - nx - nodeR * 2) * prog, 2);
+                        drawBarFill(nctx, nx + nodeR, cy - 1, (nx2 - nx - nodeR * 2) * prog, 2, '#aa66ff');
                     }
                 }
 
-                // Node circle
+                // Node circle. The last node of each ante group is a Boss node.
+                const isBossNode = r === roundsPerAnte - 1;
                 const done = bs.nodePos > nodeIdx + 0.5;
                 const active = !done && bs.nodePos > nodeIdx - 0.5;
                 let fillColor, strokeColor;
-                if (done) { fillColor = '#6644aa'; strokeColor = '#aa66ff'; }
-                else if (active) { fillColor = '#331a55'; strokeColor = '#cc88ff'; }
-                else { fillColor = '#110d1e'; strokeColor = '#2a1a44'; }
+                if (isBossNode) {
+                    if (done) { fillColor = '#884422'; strokeColor = '#ff8844'; }
+                    else if (active) { fillColor = '#552211'; strokeColor = '#ffaa66'; }
+                    else {
+                        // Glow intensifies as the player approaches this boss node.
+                        const distToNode = Math.max(0, nodeIdx - bs.nodePos);
+                        const proximity = Math.max(0, Math.min(1, 1 - distToNode / 3));
+                        const g = Math.round(16 + 70 * proximity);
+                        fillColor = `rgb(${30 + g}, ${18 + Math.round(g * 0.5)}, 16)`;
+                        strokeColor = `rgb(${102 + Math.round(90 * proximity)}, ${51 + Math.round(60 * proximity)}, ${34 + Math.round(20 * proximity)})`;
+                    }
+                } else {
+                    if (done) { fillColor = '#6644aa'; strokeColor = '#aa66ff'; }
+                    else if (active) { fillColor = '#331a55'; strokeColor = '#cc88ff'; }
+                    else { fillColor = '#110d1e'; strokeColor = '#2a1a44'; }
+                }
 
                 nctx.beginPath();
-                nctx.arc(nx, cy, nodeR, 0, Math.PI * 2);
+                nctx.arc(nx, cy, isBossNode ? nodeR + 1 : nodeR, 0, Math.PI * 2);
                 nctx.fillStyle = fillColor;
                 nctx.fill();
                 nctx.strokeStyle = strokeColor;
                 nctx.lineWidth = 1.5;
                 nctx.stroke();
+
+                if (isBossNode) {
+                    nctx.save();
+                    nctx.font = '7px monospace';
+                    nctx.textAlign = 'center';
+                    nctx.textBaseline = 'middle';
+                    nctx.fillStyle = strokeColor;
+                    nctx.fillText('☠', nx, cy + 0.5);
+                    nctx.restore();
+                }
+
+                // Sparkle burst at a node the instant it completes
+                for (const sp of bs.nodeSparkles) {
+                    if (sp.nodeIdx !== nodeIdx) continue;
+                    const t = (nowSpark - sp.startMs) / 500;
+                    if (t >= 1) continue;
+                    const sparkAlpha = 1 - t;
+                    const burstR = nodeR + t * 10;
+                    nctx.save();
+                    nctx.globalAlpha = sparkAlpha;
+                    nctx.strokeStyle = '#ffffff';
+                    nctx.lineWidth = 1.2;
+                    nctx.beginPath();
+                    nctx.arc(nx, cy, burstR, 0, Math.PI * 2);
+                    nctx.stroke();
+                    for (let k = 0; k < 5; k++) {
+                        const ang = (k / 5) * Math.PI * 2 + t * 2;
+                        nctx.fillStyle = '#ffffff';
+                        nctx.beginPath();
+                        nctx.arc(nx + Math.cos(ang) * burstR, cy + Math.sin(ang) * burstR, 1, 0, Math.PI * 2);
+                        nctx.fill();
+                    }
+                    nctx.restore();
+                }
 
                 // Ante separator dot above the first node of each ante (except first)
                 if (r === 0 && a > 0) {
@@ -4215,6 +4477,37 @@ const arcaneMethods = {
         }
         ctx.restore();
 
+        // Ambient drifting dust/embers for atmosphere. Lazily created once
+        // per battle-state object and drifts continuously while visible.
+        if (!bs.ambientMotes) {
+            bs.ambientMotes = [];
+            for (let i = 0; i < 12; i++) {
+                bs.ambientMotes.push({
+                    x: Math.random() * W, y: Math.random() * H,
+                    vx: (Math.random() - 0.5) * 4, vy: -4 - Math.random() * 6,
+                    size: 0.6 + Math.random() * 1.2,
+                    alpha: 0.08 + Math.random() * 0.1,
+                });
+            }
+            bs._lastMoteMs = now;
+        }
+        const moteDt = Math.min(50, now - (bs._lastMoteMs || now));
+        bs._lastMoteMs = now;
+        for (const m of bs.ambientMotes) {
+            m.x += m.vx * moteDt / 1000;
+            m.y += m.vy * moteDt / 1000;
+            if (m.y < -5) { m.y = H + 5; m.x = Math.random() * W; }
+            if (m.x < -5) m.x = W + 5;
+            if (m.x > W + 5) m.x = -5;
+            ctx.save();
+            ctx.globalAlpha = m.alpha;
+            ctx.fillStyle = '#ffcc88';
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, m.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
         // Smooth HP lerp
         bs.monsterHpFrac += (bs.targetHpFrac - bs.monsterHpFrac) * 0.1;
 
@@ -4278,9 +4571,11 @@ const arcaneMethods = {
         if (!walkEff) {
             const vs = this.game.voidShards;
             let scoreLabel = '';
-            if (vs && vs.dice && vs.dice[0] !== 0 && !vs.rolling) {
-                const { fd } = this.game._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers);
-                const threshold = this.game._voidShardsThreshold(vs.ante);
+            if (vs && vs.hasRolledThisRound && !vs.rolling) {
+                const isBossRound = this.game._voidShardsIsBossRound(vs.round);
+                const bossEffects = isBossRound ? this.game._voidShardsActiveBossEffects() : [];
+                const threshold = this.game._voidShardsThreshold(vs.ante, isBossRound);
+                const { fd } = this.game._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers, bossEffects, threshold);
                 const clears = fd >= threshold;
                 ctx.save();
                 ctx.font = 'bold 10px monospace';
@@ -4292,8 +4587,19 @@ const arcaneMethods = {
             }
         }
 
-        // Monster sprite
-        const monsterSprite = useSkins ? skinMgr.getSprite('entities', 'monster') : null;
+        // Monster sprite. The dying/fighting monster renders from the
+        // frozen snapshot taken at hit-time (voidShardsBattleAnim), since
+        // vs.currentEnemyKey/round/ante have already synchronously advanced
+        // to the next encounter by the time this animation plays out, only
+        // the "incoming" monster sliding in during walk reflects live state.
+        const vs2 = this.game.voidShards;
+        const liveEnemyKey = (vs2 && vs2.currentEnemyKey) || 'monster';
+        const liveIsBoss = vs2 ? this.game._voidShardsIsBossRound(vs2.round) : false;
+        const enemyKey = bs.fightingEnemyKey || liveEnemyKey;
+        const isBossRound2 = bs.fightingEnemyKey ? bs.fightingIsBoss : liveIsBoss;
+        const fightingAnte = bs.fightingEnemyKey ? bs.fightingAnte : (vs2 ? vs2.ante : 1);
+        const monsterSprite = useSkins ? (skinMgr.getSprite('entities', enemyKey) || skinMgr.getSprite('entities', 'monster')) : null;
+        const incomingSprite = useSkins ? (skinMgr.getSprite('entities', liveEnemyKey) || skinMgr.getSprite('entities', 'monster')) : null;
         const deathT = getEffT(deathEff);
 
         // During walk, the new monster slides in from the right, fading in during the last 30% of the walk
@@ -4316,12 +4622,47 @@ const arcaneMethods = {
                 mx += deathT * 20;
             }
 
+            // Pulsing aura ring behind boss enemies only
+            if (isBossRound2) {
+                const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
+                ctx.save();
+                ctx.globalAlpha = mAlpha * (0.25 + 0.2 * pulse);
+                ctx.strokeStyle = '#ff6633';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(mx, entityY, sprW / 2 + 4 + pulse * 3, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
             ctx.save();
             ctx.globalAlpha = mAlpha;
             ctx.translate(mx, entityY);
             ctx.rotate(mRot);
             if (monsterSprite) {
                 ctx.drawImage(monsterSprite, -sprW / 2, -sprH / 2, sprW, sprH);
+                // Flinch-flash: a white silhouette of the sprite (masked via
+                // source-atop so it respects transparency) fading out over
+                // the hit effect's duration.
+                if (hitEff) {
+                    const flashAlpha = Math.max(0, 1 - getEffT(hitEff)) * 0.7;
+                    if (flashAlpha > 0.01) {
+                        if (!this._shardFlashCanvas) this._shardFlashCanvas = document.createElement('canvas');
+                        const fc = this._shardFlashCanvas;
+                        fc.width = sprW; fc.height = sprH;
+                        const fctx = fc.getContext('2d');
+                        fctx.clearRect(0, 0, sprW, sprH);
+                        fctx.imageSmoothingEnabled = false;
+                        fctx.drawImage(monsterSprite, 0, 0, sprW, sprH);
+                        fctx.globalCompositeOperation = 'source-atop';
+                        fctx.fillStyle = '#ffffff';
+                        fctx.fillRect(0, 0, sprW, sprH);
+                        ctx.save();
+                        ctx.globalAlpha = flashAlpha;
+                        ctx.drawImage(fc, -sprW / 2, -sprH / 2, sprW, sprH);
+                        ctx.restore();
+                    }
+                }
             } else {
                 ctx.fillStyle = '#cc4444';
                 ctx.fillRect(-sprW / 2, -sprH / 2, sprW, sprH);
@@ -4330,6 +4671,33 @@ const arcaneMethods = {
                 ctx.textAlign = 'center';
                 ctx.fillText('M', 0, 4);
             }
+            ctx.restore();
+
+            // Orbiting motes around boss enemies only
+            if (isBossRound2) {
+                for (let i = 0; i < 4; i++) {
+                    const ang = now * 0.002 + (i / 4) * Math.PI * 2;
+                    const orbitR = sprW / 2 + 10;
+                    const px = mx + Math.cos(ang) * orbitR;
+                    const py = entityY + Math.sin(ang) * orbitR * 0.6;
+                    ctx.save();
+                    ctx.globalAlpha = mAlpha * 0.7;
+                    ctx.fillStyle = '#ff8844';
+                    ctx.beginPath();
+                    ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // Name label above the HP bar
+            const nameColor = isBossRound2 ? '#ff8844' : '#aa88cc';
+            ctx.save();
+            ctx.font = 'bold 9px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = nameColor;
+            ctx.globalAlpha = 0.9;
+            ctx.fillText(this._voidShardsEnemyLabel(enemyKey) + (isBossRound2 ? ' (BOSS)' : ''), monsterX, entityY - sprH / 2 - 18);
             ctx.restore();
 
             // HP bar above monster
@@ -4342,15 +4710,13 @@ const arcaneMethods = {
             if (hpPct > 0.5) hpColor = 'hsl(' + Math.round(80 + hpPct * 40) + ',80%,40%)';
             else if (hpPct > 0.25) hpColor = '#dd8833';
             else hpColor = '#cc3333';
-            ctx.fillStyle = hpColor;
-            ctx.fillRect(barX, barY, hpW, barH);
+            drawBarFill(ctx, barX, barY, hpW, barH, hpColor);
             ctx.strokeStyle = '#443333';
             ctx.lineWidth = 1;
             ctx.strokeRect(barX, barY, barW, barH);
 
             // HP % label above bar
-            const vs2 = this.game.voidShards;
-            const threshold2 = vs2 ? this.game._voidShardsThreshold(vs2.ante) : 0;
+            const threshold2 = this.game._voidShardsThreshold(fightingAnte, isBossRound2);
             ctx.save();
             ctx.font = '9px monospace';
             ctx.textAlign = 'center';
@@ -4366,8 +4732,8 @@ const arcaneMethods = {
             ctx.save();
             ctx.globalAlpha = walkMonsterT;
             ctx.translate(slideX, entityY);
-            if (monsterSprite) {
-                ctx.drawImage(monsterSprite, -sprW / 2, -sprH / 2, sprW, sprH);
+            if (incomingSprite) {
+                ctx.drawImage(incomingSprite, -sprW / 2, -sprH / 2, sprW, sprH);
             } else {
                 ctx.fillStyle = '#cc4444';
                 ctx.fillRect(-sprW / 2, -sprH / 2, sprW, sprH);
@@ -4385,8 +4751,7 @@ const arcaneMethods = {
                 ctx.globalAlpha = barAlpha;
                 ctx.fillStyle = '#331111';
                 ctx.fillRect(barX, barY, barW, barH);
-                ctx.fillStyle = 'hsl(120,80%,40%)';
-                ctx.fillRect(barX, barY, barW, barH);
+                drawBarFill(ctx, barX, barY, barW, barH, 'hsl(120,80%,40%)');
                 ctx.strokeStyle = '#443333';
                 ctx.lineWidth = 1;
                 ctx.strokeRect(barX, barY, barW, barH);
@@ -4406,6 +4771,25 @@ const arcaneMethods = {
             ctx.restore();
         }
 
+        // Shard-shatter burst, spawned once on death in voidShardsBattleAnim
+        if (bs.deathShards && bs.deathShards.length) {
+            for (const sh of bs.deathShards) {
+                if (now < sh.startMs) continue;
+                const t = (now - sh.startMs) / 1000;
+                const alpha = Math.max(0, 1 - t / 0.7);
+                if (alpha <= 0) continue;
+                const dx = Math.cos(sh.angle) * sh.speed * t;
+                const dy = Math.sin(sh.angle) * sh.speed * t;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(monsterX + dx, entityY + dy);
+                ctx.rotate(sh.spin * t);
+                ctx.fillStyle = sh.color;
+                ctx.fillRect(-sh.size / 2, -sh.size / 2, sh.size, sh.size);
+                ctx.restore();
+            }
+        }
+
         // Slash effects
         if (slashEff) {
             const st = (now - slashEff.startMs) / slashEff.durationMs;
@@ -4414,7 +4798,10 @@ const arcaneMethods = {
 
             const slashCount = type === 'slash_light' ? 1 : type === 'slash_medium' ? 2 : type === 'slash_heavy' ? 3 : 5;
             const sparkCount = type === 'slash_light' ? 0 : type === 'slash_medium' ? 4 : type === 'slash_heavy' ? 8 : 16;
-            const baseColor = type === 'slash_kill' ? '#ff6633' : type === 'slash_heavy' ? '#ffaa22' : type === 'slash_medium' ? '#ffee66' : '#ffffff';
+            // Elemental tint by enemy family, except the kill tier which is
+            // always a bright universal flash for climax impact.
+            const elementColor = this._voidShardsEnemyElementColor(enemyKey);
+            const baseColor = type === 'slash_kill' ? '#ffffff' : elementColor;
             const lineAlpha = Math.sin(st * Math.PI);
 
             for (let i = 0; i < slashCount; i++) {
@@ -4480,6 +4867,80 @@ const arcaneMethods = {
         return DICE_CONFIG.modifiers.find(m => m.key === key) || null;
     },
 
+    // Escapes a description string for safe embedding in a double-quoted
+    // HTML attribute (data-vd-tooltip="..."). Only `"` needs escaping here
+    // since these strings are always wrapped in double quotes.
+    _escapeAttr(str) {
+        return String(str == null ? '' : str).replace(/"/g, '&quot;');
+    },
+
+    _voidShardsEnemyLabel(key) {
+        if (!key) return 'Unknown';
+        return key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    },
+
+    // Rough "element family" color per enemy sprite key, used to tint hit
+    // effects (slashes, flinch flash) so different enemy types feel distinct.
+    _voidShardsEnemyElementColor(key) {
+        if (!key) return '#ffffff';
+        if (key.startsWith('crystal_') || key === 'shard_spider' || key === 'crystal_wurm' || key === 'crystal_beast' || key === 'crystal_bat') return '#66eeff';
+        if (key.startsWith('void_') || key === 'oblivion_spawn' || key === 'hollow_sentinel' || key === 'reality_shred' || key === 'glitch_beast' || key === 'mirror_twin' || key === 'echo_beast') return '#aa66ff';
+        if (key.startsWith('shade') || key.startsWith('shadow_') || key === 'fracture_imp' || key === 'chaos_hound') return '#ff5566';
+        return '#ffee66';
+    },
+
+    _voidShardsEnemySpriteDataURL(key) {
+        if (!this._shardEnemySpriteCache) this._shardEnemySpriteCache = new Map();
+        if (this._shardEnemySpriteCache.has(key)) return this._shardEnemySpriteCache.get(key);
+        const skinMgr = this.game.skinManager;
+        const sprite = skinMgr ? skinMgr.getSprite('entities', key) : null;
+        if (!sprite) { this._shardEnemySpriteCache.set(key, null); return null; }
+        const c = document.createElement('canvas');
+        c.width = sprite.width || sprite.naturalWidth || 32;
+        c.height = sprite.height || sprite.naturalHeight || 32;
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sprite, 0, 0);
+        const url = c.toDataURL('image/png');
+        this._shardEnemySpriteCache.set(key, url);
+        return url;
+    },
+
+    // Flavor icon per relic, reusing existing trinket item sprites from the
+    // main game (skins/*.skin.zip items/) rather than drawing new art.
+    _voidShardsRelicIconKey(relicKey) {
+        return {
+            overflow_core: 'dimensional_orb',
+            fracture_weight: 'unravelers_eye',
+            shard_capacitor: 'charmweave_band',
+            second_chance: 'rallying_standard',
+            prism_shard: 'seers_eye',
+            chip_battery: 'burnished_relic',
+            mult_engine: 'compass_of_greed',
+            null_compass: 'jewelers_loupe',
+        }[relicKey] || null;
+    },
+
+    _buildRelicIconHtml(relicKey, size) {
+        const skinMgr = this.game.skinManager;
+        const iconKey = this._voidShardsRelicIconKey(relicKey);
+        const url = (skinMgr && skinMgr.isActive && iconKey) ? skinMgr.getItemSpriteDataURL(iconKey) : null;
+        if (url) {
+            return `<img src="${url}" width="${size}" height="${size}" style="image-rendering:pixelated;display:inline-block;vertical-align:middle;" />`;
+        }
+        return `<span style="display:inline-block;width:${size}px;height:${size}px;vertical-align:middle;text-align:center;line-height:${size}px;color:#ffcc66;">&#9733;</span>`;
+    },
+
+    _buildShardsEnemyPortraitHtml(key, size) {
+        const skinMgr = this.game.skinManager;
+        const url = (skinMgr && skinMgr.isActive) ? this._voidShardsEnemySpriteDataURL(key) : null;
+        if (url) {
+            return `<img src="${url}" width="${size}" height="${size}" style="image-rendering:pixelated;display:inline-block;" />`;
+        }
+        const letter = (key || '?').charAt(0).toUpperCase();
+        return `<div style="width:${size}px;height:${size}px;background:#552222;border:1px solid #aa4422;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:${Math.round(size * 0.4)}px;margin:0 auto;">${letter}</div>`;
+    },
+
     _buildShardsPermUpgrades(vs, fd) {
         let html = '<div style="margin-top:8px;">';
         html += '<div style="color:#886699;font-size:10px;margin-bottom:4px;">Permanent Upgrades</div>';
@@ -4503,8 +4964,47 @@ const arcaneMethods = {
             }
             html += '</div></div>';
         }
-        html += '</div></div>';
+        html += '</div>';
+
+        if (vs.permanentUpgrades.starting_reforge >= 1) {
+            const meta = this.game.voidShardsMeta;
+            html += '<div style="margin-top:8px;background:#0e1a1e;border:1px solid #2a5566;border-radius:4px;padding:6px 8px;">';
+            html += '<div style="color:#88ddee;font-size:10px;margin-bottom:4px;">Attuned Shard: starting reforge for every run</div>';
+            html += '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">';
+            html += '<span style="color:#669988;font-size:10px;">Die:</span>';
+            for (let i = 0; i < DICE_CONFIG.numDice; i++) {
+                const sel = meta.startingReforgeDie === i;
+                html += `<button onclick="window.game.voidShardsSetStartingReforge(${i}, document.getElementById('vs-start-reforge-preset').value, parseInt(document.getElementById('vs-start-reforge-value')?.value || '1', 10))" style="padding:2px 7px;font-size:10px;background:${sel ? '#163844' : '#111'};border:1px solid ${sel ? '#2a8899' : '#333'};border-radius:3px;color:${sel ? '#88ddee' : '#777'};font-family:inherit;cursor:pointer;">D${i + 1}</button>`;
+            }
+            html += `<select id="vs-start-reforge-preset" style="font-size:10px;background:#111;border:1px solid #333;border-radius:3px;color:#88ddee;font-family:inherit;">`;
+            for (const key of Object.keys(DICE_FACE_SETS)) {
+                const preset = DICE_FACE_SETS[key];
+                const sel = meta.startingReforgePreset === key ? 'selected' : '';
+                html += `<option value="${key}" ${sel}>${preset.label}</option>`;
+            }
+            html += '</select>';
+            html += `<input id="vs-start-reforge-value" type="number" min="1" max="6" value="${meta.startingReforgeValue || 1}" style="width:32px;font-size:10px;background:#111;border:1px solid #333;border-radius:3px;color:#88ddee;font-family:inherit;" />`;
+            html += '</div>';
+            if (meta.startingReforgeDie != null && meta.startingReforgePreset) {
+                const preset = DICE_FACE_SETS[meta.startingReforgePreset];
+                html += `<div style="color:#669988;font-size:10px;margin-top:4px;">Currently: Die ${meta.startingReforgeDie + 1} -> ${preset ? preset.label : meta.startingReforgePreset}</div>`;
+            }
+            html += '</div>';
+        }
+
+        html += '</div>';
         return html;
+    },
+
+    _voidShardsSyncRendererBossMarks(r) {
+        const vs = this.game.voidShards;
+        if (!vs) return;
+        const isBoss = this.game._voidShardsIsBossRound(vs.round);
+        const effects = isBoss ? this.game._voidShardsActiveBossEffects() : [];
+        const cursed = effects.find(e => e.key === 'cursed_face');
+        r.markCursedFace((cursed && !vs.relics.includes('null_compass')) ? cursed.face : null);
+        r.markForcedLock(vs.forcedLockIndex != null ? vs.forcedLockIndex : -1);
+        r.markFogged(effects.some(e => e.key === 'the_fog'));
     },
 
     _mountDiceRenderer() {
@@ -4515,21 +5015,25 @@ const arcaneMethods = {
             const r = window._voidDiceRenderer;
             if (r && !r._rolling) {
                 const vs = this.game.voidShards;
-                r.syncLocked(vs?.locked || [false, false, false, false, false]);
-                r.syncUnrolled((vs?.dice || []).map(v => v > 0));
+                r.syncLocked(vs?.locked || []);
+                r.syncUnrolled((vs?.dice || []).map(v => v !== 0));
+                r.setFaceSets(vs?.diceFaces || undefined);
+                this._voidShardsSyncRendererBossMarks(r);
             }
             return;
         }
         if (!window.VoidDiceRenderer) return;
-        const r = new window.VoidDiceRenderer();
-        r.init(cont, 5);
-        window._voidDiceRenderer = r;
         const vs = this.game.voidShards;
+        const r = new window.VoidDiceRenderer();
+        r.init(cont, (vs && vs.diceFaces.length) || DICE_CONFIG.numDice);
+        window._voidDiceRenderer = r;
         if (vs) {
-            r.syncUnrolled((vs.dice || []).map(v => v > 0));
-            if (vs.dice && vs.dice[0] !== 0) {
+            r.setFaceSets(vs.diceFaces);
+            r.syncUnrolled((vs.dice || []).map(v => v !== 0));
+            if (vs.dice && vs.dice.some(v => v !== 0)) {
                 r.showStatic([...vs.dice], [...vs.locked]);
             }
+            this._voidShardsSyncRendererBossMarks(r);
         }
     },
 

@@ -52,7 +52,7 @@ import { TutorialSystem } from '../systems/tutorial.js';
 import { SoundManager } from './sound.js';
 import { TickProfiler } from './perf-probe.js';
 import { keybindingRowsHtml, beginRebindCapture, clearStoredBindings, resetStoredBinding, formatKeyLabel } from '../ui/keybindings-ui.js';
-import { DICE_CONFIG } from './config/dice.js';
+import { DICE_CONFIG, SHARD_ENEMIES, SHARD_BOSS_SPRITES, SHARD_BOSS_EFFECTS, SHARD_BOSS_CONFIG, DICE_FACE_SETS, RELICS } from './config/dice.js';
 import '../ui/ui-dice.js';
 
 const _SIPHON_CONFIG = {
@@ -224,13 +224,38 @@ class Game {
             lastMult: 0,
             lastCategory: '',
             modifiers: [],
+            relics: [],
             failStreak: 0,
             shopPhase: false,
             shopOffers: [],
+            reforgeOffers: [],
+            relicOffer: null,
             earnedFd: 0,
-            permanentUpgrades: { extra_roll: 0, ante_cushion: 0, shop_slots: 0, failure_return: 0, base_chips: 0 },
+            permanentUpgrades: { extra_roll: 0, ante_cushion: 0, shop_slots: 0, failure_return: 0, base_chips: 0, starting_reforge: 0, modifier_memory: 0 },
             rolling: false,
             runResult: null, // 'win' | 'loss' | null
+            bossSchedule: [],
+            currentEnemyKey: null,
+            bossIntroPending: false,
+            forcedLockIndex: -1,
+            hasRolledThisRound: false,
+            secondChanceUsed: false,
+            bonusRolls: 0,
+            anchoredDieIndex: -1,
+            diceFaces: [
+                [...DICE_FACE_SETS.standard.faces],
+                [...DICE_FACE_SETS.standard.faces],
+                [...DICE_FACE_SETS.standard.faces],
+                [...DICE_FACE_SETS.standard.faces],
+                [...DICE_FACE_SETS.standard.faces],
+            ],
+            diceFacePresetKeys: ['standard', 'standard', 'standard', 'standard', 'standard'],
+        };
+
+        this.voidShardsMeta = {
+            startingReforgeDie: null,
+            startingReforgePreset: null,
+            startingReforgeValue: null,
         };
 
         this.manaCrystalBonus = 0;
@@ -1924,54 +1949,241 @@ class Game {
 
     // --- Void Shards roguelike dice game ---
 
-    _voidShardsThreshold(ante) {
+    _voidShardsIsBossRound(round) {
+        return round === DICE_CONFIG.roundsPerAnte - 1;
+    }
+
+    _voidShardsTierForAnte(ante) {
+        return ante <= 3 ? 'tier1' : ante <= 6 ? 'tier2' : 'tier3';
+    }
+
+    _voidShardsThreshold(ante, isBossRound) {
         const cfg = DICE_CONFIG;
         const reduction = 1 - (this.voidShards.permanentUpgrades.ante_cushion * 0.10);
-        return Math.round(cfg.anteBaseThreshold * Math.pow(cfg.anteScaling, ante - 1) * reduction);
+        let threshold = cfg.anteBaseThreshold * Math.pow(cfg.anteScaling, ante - 1) * reduction;
+        if (isBossRound) threshold *= SHARD_BOSS_CONFIG.thresholdMult;
+        return Math.round(threshold);
     }
 
     _voidShardsRollsPerRound() {
-        return DICE_CONFIG.rollsPerRound + this.voidShards.permanentUpgrades.extra_roll;
+        const vs = this.voidShards;
+        let rolls = DICE_CONFIG.rollsPerRound + vs.permanentUpgrades.extra_roll + vs.bonusRolls;
+        if (this._voidShardsIsBossRound(vs.round)) {
+            if (this._voidShardsActiveBossEffects().some(e => e.key === 'the_shackle')) rolls -= 1;
+        }
+        return Math.max(1, rolls);
     }
 
-    _voidShardsScoreDice(dice, locked, modifiers) {
+    _voidShardsActiveBossEffects() {
+        const vs = this.voidShards;
+        const boss = vs.bossSchedule[vs.ante - 1];
+        return boss ? boss.effects : [];
+    }
+
+    _voidShardsRollBossSchedule() {
+        const schedule = [];
+        for (let ante = 1; ante <= DICE_CONFIG.antesPerRun; ante++) {
+            const tier = this._voidShardsTierForAnte(ante);
+            const spritePool = SHARD_BOSS_SPRITES[tier];
+            const spriteKey = spritePool[Math.floor(Math.random() * spritePool.length)];
+            const effectCount = SHARD_BOSS_CONFIG.effectCountByAnte(ante);
+            const keys = Object.keys(SHARD_BOSS_EFFECTS);
+            for (let i = keys.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [keys[i], keys[j]] = [keys[j], keys[i]];
+            }
+            const effects = keys.slice(0, effectCount).map(key => {
+                const def = SHARD_BOSS_EFFECTS[key];
+                const rolled = def.roll ? def.roll() : {};
+                return { key, ...rolled };
+            });
+            schedule.push({ spriteKey, effects });
+        }
+        return schedule;
+    }
+
+    _voidShardsPickEnemy(ante, isBoss) {
+        const vs = this.voidShards;
+        if (isBoss) {
+            const boss = vs.bossSchedule[ante - 1];
+            return boss ? boss.spriteKey : 'monster';
+        }
+        const pool = SHARD_ENEMIES[this._voidShardsTierForAnte(ante)];
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    // Grows/shrinks the run's die count by delta, clamped to [3, 7].
+    // vs.dice.length is the single source of truth for "how many dice";
+    // every parallel array (locked, diceFaces, diceFacePresetKeys) is kept
+    // in lockstep here so nothing can desync. Only ever called from a Relic
+    // purchase in the shop phase, between rounds with dice already zeroed.
+    _voidShardsResizeDice(delta) {
+        const vs = this.voidShards;
+        if (delta > 0) {
+            for (let k = 0; k < delta && vs.dice.length < DICE_CONFIG.maxDice; k++) {
+                vs.dice.push(0);
+                vs.locked.push(false);
+                vs.diceFaces.push([...DICE_FACE_SETS.standard.faces]);
+                vs.diceFacePresetKeys.push('standard');
+            }
+        } else if (delta < 0) {
+            for (let k = 0; k < -delta && vs.dice.length > DICE_CONFIG.minDice; k++) {
+                vs.dice.pop();
+                vs.locked.pop();
+                vs.diceFaces.pop();
+                vs.diceFacePresetKeys.pop();
+                if (vs.anchoredDieIndex === vs.dice.length) vs.anchoredDieIndex = -1;
+            }
+        }
+        // No dice mat is mounted during the shop phase this is called from;
+        // the next render mounts a fresh renderer sized to vs.dice.length.
+    }
+
+    _voidShardsApplyStaticOne() {
+        const vs = this.voidShards;
+        if (!this._voidShardsIsBossRound(vs.round)) return;
+        if (!this._voidShardsActiveBossEffects().some(e => e.key === 'static_one')) return;
+        const idx = Math.floor(Math.random() * vs.dice.length);
+        const faces = vs.diceFaces[idx] || DICE_FACE_SETS.standard.faces;
+        vs.dice[idx] = faces[Math.floor(Math.random() * 6)];
+        vs.locked[idx] = true;
+        vs.forcedLockIndex = idx;
+    }
+
+    _voidShardsResetRoundState() {
+        const vs = this.voidShards;
+        vs.rollsLeft = this._voidShardsRollsPerRound();
+        // Preserve the current die count across rounds, a Relic may have
+        // resized it mid-run, this must not snap back to the base 5.
+        vs.locked = new Array(vs.locked.length).fill(false);
+        vs.dice = new Array(vs.dice.length).fill(0);
+        vs.forcedLockIndex = -1;
+        vs.hasRolledThisRound = false;
+        // Anchor Die reforge: permanently locked for the rest of the run. A
+        // locked die is never included in a roll, so it needs a value set
+        // directly here each round (same reasoning as the boss "Static One"
+        // forced lock just below) or it would stay at 0 forever.
+        if (vs.anchoredDieIndex >= 0 && vs.anchoredDieIndex < vs.locked.length) {
+            const idx = vs.anchoredDieIndex;
+            const faces = vs.diceFaces[idx] || DICE_FACE_SETS.standard.faces;
+            vs.dice[idx] = faces[Math.floor(Math.random() * 6)];
+            vs.locked[idx] = true;
+        }
+        this._voidShardsApplyStaticOne();
+    }
+
+    _voidShardsBeginRound() {
+        const vs = this.voidShards;
+        const isBoss = this._voidShardsIsBossRound(vs.round);
+        vs.currentEnemyKey = this._voidShardsPickEnemy(vs.ante, isBoss);
+        if (isBoss) {
+            vs.bossIntroPending = true;
+            return;
+        }
+        this._voidShardsResetRoundState();
+    }
+
+    voidShardsAcknowledgeBoss() {
+        const vs = this.voidShards;
+        if (!vs.bossIntroPending) return;
+        vs.bossIntroPending = false;
+        this._voidShardsResetRoundState();
+        // The dice mat isn't in the DOM during the boss-intro banner (the
+        // panel's innerHTML is swapped wholesale), so the next render pass
+        // mounts a fresh VoidDiceRenderer and picks up vs.dice/vs.locked then.
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    // True if the sorted scored values contain any run of 5+ consecutive
+    // integers (duplicates collapsed first), independent of how many dice
+    // are actually in play. Replaces the old two-string exact-match check,
+    // which only ever worked for exactly 5 dice.
+    _voidShardsHasStraightRun(sortedValues) {
+        const unique = [...new Set(sortedValues)];
+        let run = 1;
+        for (let i = 1; i < unique.length; i++) {
+            run = (unique[i] === unique[i - 1] + 1) ? run + 1 : 1;
+            if (run >= 5) return true;
+        }
+        return run >= 5;
+    }
+
+    _voidShardsScoreDice(dice, locked, modifiers, bossEffects, threshold) {
+        bossEffects = bossEffects || [];
+        const vsRef = this.voidShards;
+        const relics = vsRef?.relics || [];
         const cfg = DICE_CONFIG;
         let workDice = [...dice];
 
-        if (modifiers.includes('null_weight')) {
-            const nonSix = workDice.filter(v => v !== 6);
+        // Unified wild resolution: null_weight treats natural 6s as wild,
+        // a reforged Wildcard Die rolls the literal 'W' sentinel. Both resolve
+        // to whichever non-wild face value currently appears most often.
+        const wildAsSix = modifiers.includes('null_weight');
+        const isWild = (v) => v === 'W' || (wildAsSix && v === 6);
+        if (workDice.some(isWild)) {
+            const nonWild = workDice.filter(v => !isWild(v));
             const cnts = {};
-            for (const v of nonSix) cnts[v] = (cnts[v] || 0) + 1;
+            for (const v of nonWild) cnts[v] = (cnts[v] || 0) + 1;
             let bestFace = 1, bestCount = 0;
             for (const [face, cnt] of Object.entries(cnts)) {
                 if (cnt > bestCount) { bestCount = cnt; bestFace = Number(face); }
             }
-            workDice = workDice.map(v => v === 6 ? bestFace : v);
+            workDice = workDice.map(v => isWild(v) ? bestFace : v);
         }
 
-        const counts = {};
-        for (const v of workDice) counts[v] = (counts[v] || 0) + 1;
-        const vals = Object.values(counts).sort((a, b) => b - a);
-        const sum = workDice.reduce((a, b) => a + b, 0);
-        const sorted = workDice.slice().sort((a, b) => a - b);
-        const isStr1 = sorted.join(',') === '1,2,3,4,5';
-        const isStr2 = sorted.join(',') === '2,3,4,5,6';
+        // Boss: The Devourer, the single highest die is removed before anything else
+        if (bossEffects.some(e => e.key === 'the_devourer')) {
+            let maxIdx = 0;
+            for (let i = 1; i < workDice.length; i++) if (workDice[i] > workDice[maxIdx]) maxIdx = i;
+            workDice[maxIdx] = null;
+        }
 
+        // Boss: The Inverter, the single lowest die is removed, sibling to the Devourer
+        if (bossEffects.some(e => e.key === 'the_inverter')) {
+            let minIdx = 0;
+            for (let i = 1; i < workDice.length; i++) if (workDice[i] !== null && (workDice[minIdx] === null || workDice[i] < workDice[minIdx])) minIdx = i;
+            workDice[minIdx] = null;
+        }
+
+        // Boss: Cursed Face, dice showing the cursed value are removed, unless
+        // the Null Compass relic grants outright immunity to this effect.
+        const cursed = !relics.includes('null_compass') ? bossEffects.find(e => e.key === 'cursed_face') : null;
+        if (cursed) {
+            workDice = workDice.map(v => v === cursed.face ? null : v);
+        }
+
+        const scored = workDice.filter(v => v !== null);
+        const counts = {};
+        for (const v of scored) counts[v] = (counts[v] || 0) + 1;
+        const vals = Object.values(counts).sort((a, b) => b - a);
+        const sum = scored.reduce((a, b) => a + b, 0);
+        const sorted = scored.slice().sort((a, b) => a - b);
+        const hasStraight = this._voidShardsHasStraightRun(sorted);
+
+        // >= rather than === so extra dice (Overflow Core) make these easier
+        // (a 6-of-a-kind still reads as Void Convergence, just a bigger sum)
+        // and fewer dice (Fracture Weight) make them impossible, with no
+        // special-casing either way.
         let category = 'chance';
-        if (vals[0] === 5) {
+        if (vals[0] >= 5) {
             category = 'void_convergence';
-        } else if (isStr1 || isStr2) {
+        } else if (hasStraight) {
             category = 'shard_straight';
-        } else if (vals[0] === 4) {
+        } else if (vals[0] >= 4) {
             category = 'void_bloom';
-        } else if (vals[0] === 3 && vals[1] === 2) {
+        } else if (vals[0] >= 3 && vals[1] >= 2) {
             category = 'full_fracture';
-        } else if (vals[0] === 3) {
+        } else if (vals[0] >= 3) {
             category = 'shard_cluster';
-        } else if (vals[0] === 2 && vals[1] === 2) {
+        } else if (vals[0] >= 2 && vals[1] >= 2) {
             category = modifiers.includes('twin_rift') ? 'full_fracture' : 'two_rifts';
-        } else if (vals[0] === 2) {
+        } else if (vals[0] >= 2) {
             category = modifiers.includes('shard_magnet') ? 'shard_cluster' : 'rift_pair';
+        }
+
+        // Boss: The Splitter, pairs don't count, falls back to Chance
+        if (bossEffects.some(e => e.key === 'the_splitter') && (category === 'rift_pair' || category === 'two_rifts')) {
+            category = 'chance';
         }
 
         const catEntry = cfg.scoring.find(s => s.key === category);
@@ -1982,6 +2194,10 @@ class Game {
         // Permanent upgrade: base chips bonus
         const baseChipsLevel = this.voidShards?.permanentUpgrades?.base_chips || 0;
         chips += baseChipsLevel * 5;
+
+        // Relic: Chip Battery / Mult Engine, flat bonuses on every score
+        if (relics.includes('chip_battery')) chips += 15;
+        if (relics.includes('mult_engine')) mult += 2;
 
         // Modifier: void_eye: +4 chips on 3-of-a-kind or better
         const strongCombos = ['shard_cluster', 'void_bloom', 'void_convergence', 'full_fracture'];
@@ -2002,9 +2218,27 @@ class Game {
         if (modifiers.includes('void_prism')) mult += Object.keys(counts).length;
 
         // Modifier: fracture_surge: +2 mult when all 5 dice contribute (no stragglers = straight or 5oak)
-        if (modifiers.includes('fracture_surge') && (category === 'void_convergence' || isStr1 || isStr2)) mult += 2;
+        if (modifiers.includes('fracture_surge') && (category === 'void_convergence' || hasStraight)) mult += 2;
 
-        return { category, chips, mult, fd: chips * mult };
+        // Boss: The Null Zone, Chance scores x0 mult
+        if (bossEffects.some(e => e.key === 'null_zone') && category === 'chance') mult = 0;
+
+        // Relic: Fracture Weight, +25% mult (the run's compensation for one
+        // fewer die). Applied last, multiplicatively, after every additive
+        // chip/mult bonus above, so it scales the whole hand rather than
+        // competing with the additive modifiers for the same bonus.
+        if (relics.includes('fracture_weight')) mult *= 1.25;
+
+        let fd = chips * mult;
+
+        // Modifier: shard_loop: +1 Fd per point the score clears the
+        // threshold by. A function of the clear itself, so it's added to fd
+        // directly rather than folded into chips/mult.
+        if (modifiers.includes('shard_loop') && threshold != null && fd > threshold) {
+            fd += Math.floor(fd - threshold);
+        }
+
+        return { category, chips, mult, fd };
     }
 
     voidShardsStartRun() {
@@ -2012,33 +2246,97 @@ class Game {
         vs.active = true;
         vs.ante = 1;
         vs.round = 0;
-        vs.rollsLeft = this._voidShardsRollsPerRound();
         vs.dice = [0, 0, 0, 0, 0];
         vs.locked = [false, false, false, false, false];
         vs.lastScore = 0;
         vs.lastCategory = '';
         vs.modifiers = [];
+        vs.relics = [];
+        vs.relicOffer = null;
         vs.failStreak = 0;
         vs.shopPhase = false;
         vs.shopOffers = [];
+        vs.reforgeOffers = [];
         vs.earnedFd = 0;
         vs.rolling = false;
         vs.runResult = null;
+        vs.bossSchedule = this._voidShardsRollBossSchedule();
+        vs.bossIntroPending = false;
+        vs.forcedLockIndex = -1;
+        vs.hasRolledThisRound = false;
+        vs.secondChanceUsed = false;
+        vs.bonusRolls = 0;
+        vs.anchoredDieIndex = -1;
+
+        vs.diceFaces = [
+            [...DICE_FACE_SETS.standard.faces],
+            [...DICE_FACE_SETS.standard.faces],
+            [...DICE_FACE_SETS.standard.faces],
+            [...DICE_FACE_SETS.standard.faces],
+            [...DICE_FACE_SETS.standard.faces],
+        ];
+        vs.diceFacePresetKeys = ['standard', 'standard', 'standard', 'standard', 'standard'];
+
+        const meta = this.voidShardsMeta;
+        if (vs.permanentUpgrades.starting_reforge >= 1 && meta.startingReforgeDie != null && meta.startingReforgePreset) {
+            const preset = DICE_FACE_SETS[meta.startingReforgePreset];
+            if (preset) {
+                let faces = preset.faces;
+                if (meta.startingReforgePreset === 'singular') {
+                    const n = (meta.startingReforgeValue >= 1 && meta.startingReforgeValue <= 6) ? meta.startingReforgeValue : 1;
+                    faces = [n, n, n, n, n, n];
+                }
+                const idx = Math.max(0, Math.min(DICE_CONFIG.numDice - 1, meta.startingReforgeDie));
+                vs.diceFaces[idx] = [...faces];
+                vs.diceFacePresetKeys[idx] = meta.startingReforgePreset;
+                if (meta.startingReforgePreset === 'anchor_die') {
+                    vs.anchoredDieIndex = idx;
+                    vs.locked[idx] = true;
+                }
+            }
+        }
+
+        if (vs.permanentUpgrades.modifier_memory >= 1) {
+            const freeMod = DICE_CONFIG.modifiers[Math.floor(Math.random() * DICE_CONFIG.modifiers.length)];
+            vs.modifiers.push(freeMod.key);
+        }
+
+        vs.rollsLeft = this._voidShardsRollsPerRound();
+        vs.currentEnemyKey = this._voidShardsPickEnemy(vs.ante, false);
+
+        // No dice mat is mounted on the pre-run/run-result screens this is
+        // called from; the next render mounts a fresh renderer and reads
+        // vs.diceFaces then (see _mountDiceRenderer).
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
     voidShardsRoll() {
         const vs = this.voidShards;
-        if (!vs.active || vs.rolling || vs.shopPhase || vs.runResult) return;
+        if (!vs.active || vs.rolling || vs.shopPhase || vs.runResult || vs.bossIntroPending) return;
         if (vs.rollsLeft <= 0) return;
 
         vs.rolling = true;
         vs.rollsLeft--;
+        vs.hasRolledThisRound = true;
 
         const targetValues = vs.dice.map((v, i) => {
             if (vs.locked[i]) return v;
-            return Math.floor(Math.random() * 6) + 1;
+            const faces = vs.diceFaces[i] || DICE_FACE_SETS.standard.faces;
+            return faces[Math.floor(Math.random() * 6)];
         });
+
+        // Boss: The Twin, two random unlocked dice are forced to match
+        if (this._voidShardsIsBossRound(vs.round) && this._voidShardsActiveBossEffects().some(e => e.key === 'the_twin')) {
+            const unlockedIdx = [];
+            for (let i = 0; i < vs.locked.length; i++) if (!vs.locked[i]) unlockedIdx.push(i);
+            if (unlockedIdx.length >= 2) {
+                for (let i = unlockedIdx.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [unlockedIdx[i], unlockedIdx[j]] = [unlockedIdx[j], unlockedIdx[i]];
+                }
+                targetValues[unlockedIdx[1]] = targetValues[unlockedIdx[0]];
+            }
+        }
 
         // Animate, then commit values. Do NOT clear _lastArcaneHtml before
         // roll() starts: that would tear down #vd-mat mid-animation.
@@ -2047,8 +2345,8 @@ class Game {
             renderer.roll(targetValues, [...vs.locked], () => {
                 vs.dice = targetValues;
                 vs.rolling = false;
-                renderer.syncUnrolled(vs.dice.map(v => v > 0));
-                renderer.syncCombo(vs.dice);
+                renderer.syncUnrolled(vs.dice.map(v => v !== 0));
+                renderer.syncCombo(vs.dice.map(v => v === 0 ? 1 : v));
                 if (this.ui) this.ui._lastArcaneHtml = '';
             });
         } else {
@@ -2061,8 +2359,10 @@ class Game {
 
     voidShardsToggleLock(index) {
         const vs = this.voidShards;
-        if (!vs.active || vs.rolling || vs.shopPhase) return;
+        if (!vs.active || vs.rolling || vs.shopPhase || vs.bossIntroPending) return;
         if (vs.dice[index] === 0) return;
+        if (index === vs.forcedLockIndex) return;
+        if (index === vs.anchoredDieIndex) return;
         vs.locked[index] = !vs.locked[index];
         const renderer = window._voidDiceRenderer;
         if (renderer) renderer.syncLocked(vs.locked);
@@ -2071,44 +2371,73 @@ class Game {
 
     voidShardsScore() {
         const vs = this.voidShards;
-        if (!vs.active || vs.rolling || vs.shopPhase || vs.runResult) return;
-        if (vs.dice[0] === 0) return;
+        if (!vs.active || vs.rolling || vs.shopPhase || vs.runResult || vs.bossIntroPending) return;
+        if (!vs.hasRolledThisRound) return;
 
-        const { category, chips, mult, fd } = this._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers);
+        const isBossRound = this._voidShardsIsBossRound(vs.round);
+        const bossEffects = isBossRound ? this._voidShardsActiveBossEffects() : [];
+        const threshold = this._voidShardsThreshold(vs.ante, isBossRound);
+        const { category, chips, mult, fd } = this._voidShardsScoreDice(vs.dice, vs.locked, vs.modifiers, bossEffects, threshold);
         vs.lastScore = fd;
         vs.lastChips = chips;
         vs.lastMult = mult;
         vs.lastCategory = category;
         vs.earnedFd += fd;
 
-        // Fire particle + counter animation before the panel re-renders
-        if (window.voidShardsScoreAnim) window.voidShardsScoreAnim(chips, mult, fd);
-
-        const threshold = this._voidShardsThreshold(vs.ante);
         const cleared = fd >= threshold;
+
+        // Fire particle + counter animation before the panel re-renders
+        if (window.voidShardsScoreAnim) window.voidShardsScoreAnim(chips, mult, fd, category, threshold > 0 ? fd / threshold : 0);
 
         // Fire battle animation
         if (window.voidShardsBattleAnim) window.voidShardsBattleAnim(fd, threshold, cleared);
 
+        const sm = window.soundManager;
         if (cleared) {
             vs.failStreak = 0;
-            const clearBonus = DICE_CONFIG.roundClearReward * vs.ante;
+            const isStarveling = bossEffects.some(e => e.key === 'the_starveling');
+            const clearBonus = isStarveling ? 0 : DICE_CONFIG.roundClearReward * vs.ante * (isBossRound ? 2 : 1);
             vs.earnedFd += clearBonus;
-            this.notifications.push({ text: `&#10022; Void Shards: ${this._voidShardsLabel(category)} (${fd} Fd)! Round cleared! (+${clearBonus} bonus)`, tick: this.tick, type: 'success' });
+            if (vs.modifiers.includes('chain_reaction') && category === 'shard_straight') vs.bonusRolls++;
+            if (sm) sm.playSFXPitched(isBossRound ? 'research_complete' : 'craft_complete', 0);
+            const label = isBossRound ? `Boss defeated! ${this._voidShardsLabel(category)}` : this._voidShardsLabel(category);
+            this.notifications.push({ text: `&#10022; Void Shards: ${label} (${fd} Fd)! Round cleared! (+${clearBonus} bonus)`, tick: this.tick, type: 'success' });
         } else {
             vs.failStreak++;
+            if (vs.modifiers.includes('fracture_insurance')) {
+                const insurance = Math.floor((threshold - fd) * 0.5);
+                vs.earnedFd += insurance;
+            }
+            if (sm) sm.playSFXPitched('shield_block', 0);
             this.notifications.push({ text: `&#9670; Void Shards: ${this._voidShardsLabel(category)} (${fd} Fd, needed ${threshold})`, tick: this.tick, type: 'event' });
+            if (vs.failStreak === 2) {
+                // One more fail ends the run, a failed round is otherwise
+                // silent/low-stakes, so this needs to stand out on its own.
+                if (sm) sm.playSFXPitched('wave_alert', 2);
+                this.notifications.push({ text: '&#9888; One more failed round ends this run!', tick: this.tick, type: 'danger' });
+            }
         }
 
+        // Write the new total directly into the DOM now, the panel itself
+        // won't rebuild until the hit/death/walk animation finishes (see
+        // voidShardsSyncFdDisplay's doc comment), up to ~2.7s from now.
+        if (window.voidShardsSyncFdDisplay) window.voidShardsSyncFdDisplay(vs.earnedFd);
+
         if (vs.failStreak >= 3) {
-            this._voidShardsEndRun(false);
-            return;
+            if (vs.relics.includes('second_chance') && !vs.secondChanceUsed) {
+                vs.secondChanceUsed = true;
+                vs.failStreak = 2;
+                this.notifications.push({ text: '&#10022; Second Chance: fail streak reset!', tick: this.tick, type: 'success' });
+            } else {
+                this._voidShardsEndRun(false);
+                return;
+            }
         }
 
         vs.round++;
 
         if (vs.round >= DICE_CONFIG.roundsPerAnte) {
-            // Ante cleared
+            // Ante cleared, advance regardless of pass/fail (matches original design)
             if (vs.ante >= DICE_CONFIG.antesPerRun) {
                 this._voidShardsEndRun(true);
                 return;
@@ -2117,11 +2446,12 @@ class Game {
             vs.ante++;
             vs.shopPhase = true;
             vs.shopOffers = this._voidShardsGenerateShop();
+            vs.reforgeOffers = this._voidShardsGenerateReforgeOffers();
+            vs.relicOffer = this._voidShardsGenerateRelicOffer();
+            if (sm) sm.playSFXPitched('spell_divination', 0);
         }
 
-        vs.rollsLeft = this._voidShardsRollsPerRound();
-        vs.locked = [false, false, false, false, false];
-        vs.dice = [0, 0, 0, 0, 0];
+        this._voidShardsBeginRound();
 
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
@@ -2142,6 +2472,29 @@ class Game {
         return available.slice(0, numOffers).map(m => m.key);
     }
 
+    _voidShardsGenerateReforgeOffers() {
+        const owned = new Set(this.voidShards.diceFacePresetKeys);
+        const available = Object.keys(DICE_FACE_SETS).filter(k => k !== 'standard' && !owned.has(k));
+        for (let i = available.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [available[i], available[j]] = [available[j], available[i]];
+        }
+        return available.slice(0, 2);
+    }
+
+    // +1 modifier slot while the Shard Capacitor relic is owned.
+    _voidShardsMaxModifiers() {
+        const vs = this.voidShards;
+        return DICE_CONFIG.maxModifiers + (vs.relics.includes('shard_capacitor') ? 1 : 0);
+    }
+
+    _voidShardsGenerateRelicOffer() {
+        const owned = new Set(this.voidShards.relics);
+        const available = Object.keys(RELICS).filter(k => !owned.has(k));
+        if (!available.length) return null;
+        return available[Math.floor(Math.random() * available.length)];
+    }
+
     voidShardsShopBuy(modifierKey) {
         const vs = this.voidShards;
         if (!vs.shopPhase) return;
@@ -2151,15 +2504,100 @@ class Game {
             this.notifications.push({ text: `Need ${mod.cost} Fd for ${mod.label}`, tick: this.tick, type: 'danger' });
             return;
         }
-        if (vs.modifiers.length >= DICE_CONFIG.maxModifiers) {
-            this.notifications.push({ text: 'Modifier slots full (max 4)', tick: this.tick, type: 'danger' });
+        if (vs.modifiers.length >= this._voidShardsMaxModifiers()) {
+            this.notifications.push({ text: 'Modifier slots full', tick: this.tick, type: 'danger' });
             return;
         }
         vs.earnedFd -= mod.cost;
+        if (window.voidShardsSyncFdDisplay) window.voidShardsSyncFdDisplay(vs.earnedFd);
         vs.modifiers.push(modifierKey);
         vs.shopPhase = false;
         vs.shopOffers = [];
+        vs.reforgeOffers = [];
+        vs.relicOffer = null;
+        if (window.voidShardsPurchasePoof) window.voidShardsPurchasePoof('#bb88ff');
         this.notifications.push({ text: `&#10022; Equipped: ${mod.label}`, tick: this.tick, type: 'success' });
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidShardsBuyReforge(presetKey, chosenValue) {
+        const vs = this.voidShards;
+        if (!vs.shopPhase) return;
+        const preset = DICE_FACE_SETS[presetKey];
+        if (!preset || presetKey === 'standard') return;
+        if (vs.earnedFd < preset.cost) {
+            this.notifications.push({ text: `Need ${preset.cost} Fd for ${preset.label}`, tick: this.tick, type: 'danger' });
+            return;
+        }
+        const idx = vs.diceFacePresetKeys.findIndex(k => k === 'standard');
+        if (idx === -1) {
+            this.notifications.push({ text: 'All dice already reforged', tick: this.tick, type: 'danger' });
+            return;
+        }
+        let faces = preset.faces;
+        if (presetKey === 'singular') {
+            const n = (chosenValue >= 1 && chosenValue <= 6) ? chosenValue : 1;
+            faces = [n, n, n, n, n, n];
+        }
+        vs.earnedFd -= preset.cost;
+        if (window.voidShardsSyncFdDisplay) window.voidShardsSyncFdDisplay(vs.earnedFd);
+        vs.diceFaces[idx] = [...faces];
+        vs.diceFacePresetKeys[idx] = presetKey;
+        if (presetKey === 'anchor_die') {
+            vs.anchoredDieIndex = idx;
+            vs.locked[idx] = true;
+            // The round's dice were already reset to 0 before the shop opened
+            // this visit, give the newly-anchored die a value now too, or
+            // it would sit locked at 0 for the rest of this round.
+            vs.dice[idx] = faces[Math.floor(Math.random() * 6)];
+        }
+        vs.shopPhase = false;
+        vs.shopOffers = [];
+        vs.reforgeOffers = [];
+        vs.relicOffer = null;
+        if (window.soundManager) window.soundManager.playSFXPitched('enchant_complete', 2);
+        const reforgeColor = window.voidShardsReforgeColor ? window.voidShardsReforgeColor(faces) : '#44ddee';
+        if (window.voidShardsPurchasePoof) window.voidShardsPurchasePoof(reforgeColor);
+        if (window.voidShardsColorFlash) window.voidShardsColorFlash(reforgeColor);
+        // No dice mat is mounted during the shop phase this is called from;
+        // the next render mounts a fresh renderer and reads vs.diceFaces then.
+        this.notifications.push({ text: `&#10022; Die ${idx + 1} reforged: ${preset.label}`, tick: this.tick, type: 'success' });
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidShardsBuyRelic(key) {
+        const vs = this.voidShards;
+        if (!vs.shopPhase) return;
+        const relic = RELICS[key];
+        if (!relic) return;
+        if (vs.earnedFd < relic.cost) {
+            this.notifications.push({ text: `Need ${relic.cost} Fd for ${relic.label}`, tick: this.tick, type: 'danger' });
+            return;
+        }
+        if (vs.relics.length >= DICE_CONFIG.maxRelics) {
+            this.notifications.push({ text: 'Relic slots full', tick: this.tick, type: 'danger' });
+            return;
+        }
+        if (key === 'overflow_core' && vs.dice.length >= DICE_CONFIG.maxDice) {
+            this.notifications.push({ text: 'Already at max dice', tick: this.tick, type: 'danger' });
+            return;
+        }
+        if (key === 'fracture_weight' && vs.dice.length <= DICE_CONFIG.minDice) {
+            this.notifications.push({ text: 'Already at min dice', tick: this.tick, type: 'danger' });
+            return;
+        }
+        vs.earnedFd -= relic.cost;
+        if (window.voidShardsSyncFdDisplay) window.voidShardsSyncFdDisplay(vs.earnedFd);
+        vs.relics.push(key);
+        if (key === 'overflow_core') this._voidShardsResizeDice(1);
+        if (key === 'fracture_weight') this._voidShardsResizeDice(-1);
+        vs.shopPhase = false;
+        vs.shopOffers = [];
+        vs.reforgeOffers = [];
+        vs.relicOffer = null;
+        if (window.soundManager) window.soundManager.playSFXPitched('summon_arrival', 0);
+        if (window.voidShardsPurchasePoof) window.voidShardsPurchasePoof('#ffcc66');
+        this.notifications.push({ text: `&#10022; Relic acquired: ${relic.label}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2168,6 +2606,8 @@ class Game {
         if (!vs.shopPhase) return;
         vs.shopPhase = false;
         vs.shopOffers = [];
+        vs.reforgeOffers = [];
+        vs.relicOffer = null;
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2180,11 +2620,16 @@ class Game {
         vs.runResult = won ? 'win' : 'loss';
         vs.rolling = false;
         vs.shopPhase = false;
+        vs.bossIntroPending = false;
+        const sm = window.soundManager;
         if (won) {
+            if (sm) sm.playSFXPitched('research_complete', 0);
             this.notifications.push({ text: `&#10022; Void Shards run complete! +${reward} Fd`, tick: this.tick, type: 'success' });
         } else {
+            if (sm) sm.playSFXPitched('colonist_death', 0);
             this.notifications.push({ text: `&#9670; Void Shards run ended. Recovered ${reward} Fd`, tick: this.tick, type: 'event' });
         }
+        if (window.voidShardsRunEndEffect) window.voidShardsRunEndEffect(won);
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2202,7 +2647,21 @@ class Game {
         }
         this.resources.deduct({ fracture_dust: cost });
         vs.permanentUpgrades[key]++;
+        if (window.soundManager) window.soundManager.playSFXPitched('build_complete', 0);
+        if (window.voidShardsPurchasePoof) window.voidShardsPurchasePoof('#cc99ff');
         this.notifications.push({ text: `&#10022; Void Shards: ${upg.label} Lv${vs.permanentUpgrades[key]}`, tick: this.tick, type: 'success' });
+        if (this.ui) this.ui._lastArcaneHtml = '';
+    }
+
+    voidShardsSetStartingReforge(dieIndex, presetKey, value) {
+        if ((this.voidShards.permanentUpgrades.starting_reforge || 0) < 1) return;
+        if (presetKey && presetKey !== 'standard' && !DICE_FACE_SETS[presetKey]) return;
+        const idx = Math.max(0, Math.min(DICE_CONFIG.numDice - 1, dieIndex | 0));
+        this.voidShardsMeta.startingReforgeDie = idx;
+        this.voidShardsMeta.startingReforgePreset = presetKey || null;
+        this.voidShardsMeta.startingReforgeValue = value || null;
+        const label = presetKey ? DICE_FACE_SETS[presetKey].label : 'Standard';
+        this.notifications.push({ text: `&#10022; Starting reforge set: Die ${idx + 1} -> ${label}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 

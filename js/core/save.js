@@ -377,13 +377,28 @@ function _buildSaveData(game) {
             lastScore: game.voidShards.lastScore,
             lastCategory: game.voidShards.lastCategory,
             modifiers: [...game.voidShards.modifiers],
+            relics: [...(game.voidShards.relics || [])],
+            relicOffer: game.voidShards.relicOffer,
             failStreak: game.voidShards.failStreak,
             shopPhase: game.voidShards.shopPhase,
             shopOffers: [...game.voidShards.shopOffers],
+            reforgeOffers: [...(game.voidShards.reforgeOffers || [])],
             earnedFd: game.voidShards.earnedFd,
             permanentUpgrades: { ...game.voidShards.permanentUpgrades },
             runResult: game.voidShards.runResult,
+            bossSchedule: JSON.parse(JSON.stringify(game.voidShards.bossSchedule || [])),
+            currentEnemyKey: game.voidShards.currentEnemyKey,
+            bossIntroPending: game.voidShards.bossIntroPending,
+            forcedLockIndex: game.voidShards.forcedLockIndex,
+            hasRolledThisRound: game.voidShards.hasRolledThisRound,
+            secondChanceUsed: game.voidShards.secondChanceUsed,
+            bonusRolls: game.voidShards.bonusRolls,
+            anchoredDieIndex: game.voidShards.anchoredDieIndex,
+            diceFaces: (game.voidShards.diceFaces || []).map(f => [...f]),
+            diceFacePresetKeys: [...(game.voidShards.diceFacePresetKeys || [])],
         } : null,
+
+        voidShardsMeta: game.voidShardsMeta ? { ...game.voidShardsMeta } : null,
 
         tasks: game.taskQueue.getAll(),
         eventLog: game.eventLog.entries,
@@ -723,13 +738,30 @@ function _applyLoadData(game, data) {
             dst.lastScore = src.lastScore ?? 0;
             dst.lastCategory = src.lastCategory ?? '';
             dst.modifiers = src.modifiers ?? [];
+            dst.relics = src.relics ?? [];
+            dst.relicOffer = src.relicOffer ?? null;
             dst.failStreak = src.failStreak ?? 0;
             dst.shopPhase = src.shopPhase ?? false;
             dst.shopOffers = src.shopOffers ?? [];
+            dst.reforgeOffers = src.reforgeOffers ?? [];
             dst.earnedFd = src.earnedFd ?? 0;
             dst.rolling = false;
             dst.runResult = src.runResult ?? null;
             if (src.permanentUpgrades) Object.assign(dst.permanentUpgrades, src.permanentUpgrades);
+            dst.bossSchedule = src.bossSchedule ?? [];
+            dst.currentEnemyKey = src.currentEnemyKey ?? null;
+            dst.bossIntroPending = src.bossIntroPending ?? false;
+            dst.forcedLockIndex = src.forcedLockIndex ?? -1;
+            dst.hasRolledThisRound = src.hasRolledThisRound ?? false;
+            dst.secondChanceUsed = src.secondChanceUsed ?? false;
+            dst.bonusRolls = src.bonusRolls ?? 0;
+            dst.anchoredDieIndex = src.anchoredDieIndex ?? -1;
+            dst.diceFaces = src.diceFaces ?? dst.diceFaces;
+            dst.diceFacePresetKeys = src.diceFacePresetKeys ?? dst.diceFacePresetKeys;
+        }
+
+        if (data.voidShardsMeta && game.voidShardsMeta) {
+            Object.assign(game.voidShardsMeta, data.voidShardsMeta);
         }
 
         game.taskQueue.tasks = data.tasks || [];

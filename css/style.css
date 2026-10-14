@@ -1583,6 +1583,8 @@ img.pixel-art-icon {
 /* Rifts Panel */
 #arcane-panel {
     min-width: min(780px, 92vw);
+    height: 85vh;
+    max-height: 85vh;
 }
 
 .arcane-tabs {
@@ -1755,6 +1757,7 @@ img.pixel-art-icon {
 }
 
 .void-siphon-charge-fill {
+    position: relative;
     height: 14px;
     border-radius: 4px;
     transition: width 0.12s ease-out, background 0.3s;
@@ -1873,6 +1876,7 @@ img.pixel-art-icon {
 }
 
 .arcane-hp-bar {
+    position: relative;
     display: inline-block;
     height: 12px;
     border-radius: 3px;
@@ -1920,6 +1924,32 @@ img.pixel-art-icon {
     top: 0;
     height: 100%;
     border-radius: 3px;
+}
+
+/* Shared pixel-art dithered sheen for every bar fill in the game: an
+   ordered-dither highlight strip along the top edge and a dither shadow strip
+   along the bottom, layered over the live inline fill color via a
+   pseudo-element, so it survives JS setting `style.background` directly on
+   these elements (which would wipe out a `background-image` set here). The two
+   dither tiles are generated once by js/ui/bar-fx.js (installBarDitherCss) and
+   injected as the --bar-dither-top / --bar-dither-bottom custom properties, so
+   these DOM bars render the exact same sheen as the canvas bars. */
+.stat-bar-fill::after,
+.arcane-hp-bar::after,
+.void-siphon-charge-fill::after,
+.research-tab-pill-fill::after,
+.research-node-progress-fill::after,
+.gate-bar-fill::after,
+.trade-meter-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image: var(--bar-dither-top), var(--bar-dither-bottom);
+    background-repeat: repeat-x, repeat-x;
+    background-position: top left, bottom left;
+    image-rendering: pixelated;
+    pointer-events: none;
 }
 
 .exp-vis-canvas {
@@ -2356,6 +2386,7 @@ img.pixel-art-icon {
 }
 
 .research-node-progress-fill {
+    position: relative;
     background: #aa88ff;
     height: 100%;
     border-radius: 3px;
@@ -2396,6 +2427,7 @@ img.pixel-art-icon {
 }
 
 .gate-bar-fill {
+    position: relative;
     height: 100%;
     background: #cc8844;
     border-radius: 2px;
@@ -2747,6 +2779,7 @@ img.pixel-art-icon {
 }
 
 .trade-meter-fill {
+    position: relative;
     height: 100%;
     border-radius: 4px;
     transition: width 0.15s, background-color 0.15s;
@@ -3394,6 +3427,11 @@ details.settings-debug > summary::marker {
         border-top: 2px solid #555;
     }
 
+    #arcane-panel {
+        height: 88vh;
+        max-height: 88vh;
+    }
+
     #research-panel {
         overflow-x: hidden;
         overflow-y: hidden;
@@ -3575,6 +3613,10 @@ details.settings-debug > summary::marker {
     padding: 12px 10px; max-height: 70vh;
     border-radius: 12px 12px 0 0; border: none; border-top: 2px solid #555;
 }
+.force-tabbed #arcane-panel {
+    height: 88vh;
+    max-height: 88vh;
+}
 .force-tabbed .research-node { min-width: 100px; max-width: 150px; padding: 6px 6px; }
 .force-tabbed .research-layer { gap: 10px; }
 .force-tabbed .research-tree { max-height: calc(70vh - 110px); }
@@ -3627,6 +3669,10 @@ details.settings-debug > summary::marker {
         max-width: 90vw; width: auto; min-width: auto;
         padding: 16px; max-height: 80vh;
         border-radius: 6px; border: 2px solid #555; border-top: 2px solid #555;
+    }
+    .force-separate #arcane-panel {
+        height: 85vh;
+        max-height: 85vh;
     }
     .force-separate .research-node { min-width: 120px; max-width: 180px; padding: 8px 10px; }
     .force-separate .research-layer { gap: 16px; }

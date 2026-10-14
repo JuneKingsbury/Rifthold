@@ -1,4 +1,5 @@
 import { CONFIG, RENDER_CONFIG, BUILDINGS, ALL_ITEMS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS } from '../core/config.js';
+import { drawBarFill } from './bar-fx.js';
 
 // Pre-built O(1) tier-key → index maps so _renderRoomOverlay avoids a
 // findIndex scan (O(n) per visible tile) on every frame.
@@ -482,8 +483,7 @@ export class OverlayRenderer {
         ctx.fillStyle = overlay.bgColor || '#333333';
         ctx.fillRect(barX, barY, barWidth, barHeight);
 
-        ctx.fillStyle = overlay.color || '#00ff00';
-        ctx.fillRect(barX, barY, barWidth * Math.max(0, Math.min(1, overlay.progress)), barHeight);
+        drawBarFill(ctx, barX, barY, barWidth * Math.max(0, Math.min(1, overlay.progress)), barHeight, overlay.color || '#00ff00');
     }
 
     _renderBeam(ctx, overlay, cw, ch, camera) {
@@ -519,8 +519,8 @@ export class OverlayRenderer {
         ctx.fillStyle = '#333333';
         ctx.fillRect(barX, barY, barWidth, barHeight);
 
-        ctx.fillStyle = overlay.color || (pct > RENDER_CONFIG.healthBarGreenThreshold ? colors.green : pct > RENDER_CONFIG.healthBarYellowThreshold ? colors.yellow : colors.red);
-        ctx.fillRect(barX, barY, barWidth * Math.max(0, Math.min(1, pct)), barHeight);
+        const hbColor = overlay.color || (pct > RENDER_CONFIG.healthBarGreenThreshold ? colors.green : pct > RENDER_CONFIG.healthBarYellowThreshold ? colors.yellow : colors.red);
+        drawBarFill(ctx, barX, barY, barWidth * Math.max(0, Math.min(1, pct)), barHeight, hbColor);
     }
 
     _renderGlow(ctx, overlay, cw, ch, camera) {
