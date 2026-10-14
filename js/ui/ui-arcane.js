@@ -75,7 +75,7 @@ const arcaneMethods = {
         html += `<button class="arcane-tab${tab === 'nexus' ? ' active' : ''}" data-arcane-tab="nexus">Nexus</button>`;
         html += `<button class="arcane-tab${tab === 'requests' ? ' active' : ''}" data-arcane-tab="requests">Requests</button>`;
         html += `<button class="arcane-tab${tab === 'omens' ? ' active' : ''}" data-arcane-tab="omens">Omens</button>`;
-        html += `<button class="arcane-tab${tab === 'siphon' ? ' active' : ''}" data-arcane-tab="siphon">Siphon (minigame)</button>`;
+        //html += `<button class="arcane-tab${tab === 'siphon' ? ' active' : ''}" data-arcane-tab="siphon">Siphon (minigame)</button>`;
         html += `<button class="arcane-tab${tab === 'shards' ? ' active' : ''}" data-arcane-tab="shards">Shards (minigame)</button>`;
         html += '</div>';
 
