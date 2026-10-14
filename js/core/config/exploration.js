@@ -3637,7 +3637,10 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'The Entity Watches',
         trigger: 'waves_10_complete',
-        text: `TODO`,
+        text: `
+        Your colony has become proficient in battling the monsterous creatures from the Void, holding back all of their attacks whenever the 
+        realms were connected. Perhaps your colonists are ready to venture into the Void themselves instead of always letting it come to them. 
+        You only hope that the entity from the Void will not keep too close of an eye on your colony as you venture into its realm.`,
     },
     // ── Void Pact realms ────────────────────────────────────────────────────
     realm_void_hollow: {
