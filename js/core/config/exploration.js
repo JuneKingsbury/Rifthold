@@ -3368,7 +3368,25 @@ export const STORY_MILESTONES = {
         title: 'The Wild Frontiers',
         trigger: 'realm_wild_frontiers',
         text: `<img class="pixel-art" src="portraits/realm_wild_frontiers.png" alt="A drawing depicting the Wild Frontiers">
-        TODO: Write lore text for scouting the Wild Frontiers.`,
+        The Wild Frontiers are a vast expanse of untamed wilderness that lie just beyond the 
+        borders of your colony. This made it an enticing place to explore, especially as colony 
+        resources ran low.
+        <br><br>
+        You anticipated that the wilds would be dangerous and prepared accordingly. You and a small team 
+        of colonists began your trek into the woods, bags packed with essential supplies and weaponry. 
+        It was only a short walk before you found yourself almost lost in the dense forest, trees towering 
+        high above you and nearly blocking out the sun. These woods were loud with wildlife, overwhelming 
+        your senses with the sounds of birds singing and critters scurrying at your approach.
+        <br><br>
+        Just as you began to feel comfortable with all of the noise, the woods suddenly went completely silent. 
+        Your team stopped in their tracks, unsure of what may have happened to scare all of these animals. Just 
+        as quickly your team found themselves surrounded on all sides by a gang of bandits armed with spears and 
+        bows. It was an ambush!
+        <br><br>
+        It was a close fight, but your team was able to fend off the attackers, though a handful of the 
+        bandits managed to escape into the woods. You collect what you can from the fallen bandits and 
+        return to the colony to treat your wounds. You now know that the Wild Frontiers are not a place 
+        to be taken lightly. Your expedition team will be more cautious from here on out.`,
     },
     realm_crystal_caves: {
         tab: 'realms',
