@@ -73,7 +73,7 @@ export class UI {
         this.settingsPanelVisible = false;
         this.saveSlotPanelVisible = false;
         this.arcanePanelVisible = false;
-        this._arcaneTab = 'nexus';
+        this._arcaneTab = 'expeditions';
         this._arcaneExpSetup = null;
         this._lastArcaneHtml = '';
         this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, _prevExpStatus: null, _arriveFrame: 0, _seenDiscoveryTick: 0, _seenResolutionTick: 0, _seenFatigueTick: 0, _seenRallyTick: 0, summonLastPos: {} };
