@@ -473,7 +473,9 @@ const arcaneMethods = {
                 for (let li = exp.log.length - 1; li >= 0; li--) {
                     const entry = exp.log[li];
                     const color = this._expLogColor(entry.type);
-                    html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
+                    const st = this._expLogStyle(entry.type);
+                    const styleAttr = [`color:${color}`, st.bold ? 'font-weight:bold' : '', st.italic ? 'font-style:italic' : ''].filter(Boolean).join(';');
+                    html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
                 }
                 html += `</div>`;
             }
@@ -625,7 +627,9 @@ const arcaneMethods = {
             for (let li = last.log.length - 1; li >= 0; li--) {
                 const entry = last.log[li];
                 const color = this._expLogColor(entry.type);
-                html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
+                const st = this._expLogStyle(entry.type);
+                const styleAttr = [`color:${color}`, st.bold ? 'font-weight:bold' : '', st.italic ? 'font-style:italic' : ''].filter(Boolean).join(';');
+                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
             }
             html += `</div>`;
         }
@@ -1358,7 +1362,9 @@ const arcaneMethods = {
         for (let li = exp.log.length - 1; li >= 0; li--) {
             const entry = exp.log[li];
             const color = this._expLogColor(entry.type);
-            html += `<div style="color:${color};font-size:0.85em;">${entry.text}</div>`;
+            const st = this._expLogStyle(entry.type);
+            const styleAttr = [`color:${color}`, 'font-size:0.85em', st.bold ? 'font-weight:bold' : '', st.italic ? 'font-style:italic' : ''].filter(Boolean).join(';');
+            html += `<div style="${styleAttr};">${st.prefix}${entry.text}</div>`;
         }
         html += `</div></details>`;
 
@@ -2324,7 +2330,7 @@ const arcaneMethods = {
                 const grow = p.hp > 0 ? _breathe(p.id || i) * _lowHpBreathMult(p) : 0;
                 // Compose all animation channels (sway, attack/crit swing, recoil,
                 // dodge, cast, death topple, status body-language, bob/lean/idle).
-                const swayAngle = p.hp > 0 ? _walkSway(p.id || i) : 0;
+                const swayAngle = (isCelebrating && p.hp > 0) ? 0 : (p.hp > 0 ? _walkSway(p.id || i) : 0);
                 const anim = _animFor(p, 1, p.id || i, swayAngle);
                 // Victory flourish: a per-member weapon-raise tilt during celebration.
                 if (isCelebrating && p.hp > 0 && extrasEnabled && RENDER_CONFIG.expedVictoryFlourish) {
@@ -2729,6 +2735,37 @@ const arcaneMethods = {
 
         }
 
+        if (activeExp.pendingDecision?.type === 'npc') {
+            const npcSpriteKey = activeExp.pendingDecision.sprite;
+            const ex = partyX + 80;
+            const ey = H / 2;
+            ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.005) * 0.15;
+            ctx.strokeStyle = '#88aacc';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(ex, ey, 16, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            if (useSkins && npcSpriteKey) {
+                const npcSprite = skinMgr.getSprite('entities', npcSpriteKey);
+                if (npcSprite) {
+                    this._drawEntityWithAnim(ctx, npcSprite, ex - 16, ey - 16, 32, 32, ex, ey + 16, { rot: 0, sx: -1, sy: 1, ox: 0, oy: 0 });
+                } else {
+                    ctx.font = 'bold 18px monospace';
+                    ctx.fillStyle = '#88aacc';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('?', ex, ey);
+                }
+            } else {
+                ctx.font = 'bold 18px monospace';
+                ctx.fillStyle = '#88aacc';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', ex, ey);
+            }
+        }
+
         const logLen = activeExp.log.length;
         if (logLen > this._expVisState.lastLogLen) {
             const newEntries = activeExp.log.slice(this._expVisState.lastLogLen);
@@ -2800,11 +2837,10 @@ const arcaneMethods = {
                     const isPartyKill = partyNames.some(n => text.startsWith(n));
                     const deathX = isPartyKill ? (partyX + 70 + Math.random() * 20) : (partyX + Math.random() * 15);
                     this._expVisState.effects.push({ type: 'death_anim', x: deathX, y: H / 2 - 5 + Math.random() * 10, frame: 0, maxFrames: 30, color: isPartyKill ? '#ff4444' : '#888888' });
-                    if (!isPartyKill) {
-                        this._expVisState.effects.push({ type: 'loot', x: deathX, y: H / 2 - 5 + Math.random() * 10, tx: partyX + 40 + Math.random() * 20, ty: H / 2 - 24, frame: 0, maxFrames: 40 });
-                    }
                 } else if (entry.type === 'loot' || entry.type === 'success') {
-                    this._expVisState.effects.push({ type: 'loot', x: partyX + 60 + Math.random() * 20, y: H / 2 + Math.random() * 10, tx: partyX + 40 + Math.random() * 20, ty: H / 2 - 24, frame: 0, maxFrames: 40 });
+                    if (entry.itemKey) {
+                        this._expVisState.effects.push({ type: 'loot', x: partyX + 44 + Math.random() * 16, y: H / 2 + Math.random() * 10, tx: partyX + 4 + Math.random() * 16, ty: H / 2 - 24, frame: 0, maxFrames: 60, itemKey: entry.itemKey });
+                    }
                 } else if (entry.type === 'danger') {
                     this._expVisState.effects.push({ type: 'danger', x: partyX - 5 + Math.random() * 30, y: H / 2, frame: 0, maxFrames: 20 });
                     this._expVisState.shakeFrames = 6;
@@ -2904,19 +2940,22 @@ const arcaneMethods = {
             const alpha = 1 - eff.frame / eff.maxFrames;
             ctx.globalAlpha = alpha;
             if (eff.type === 'loot') {
-                const lootSprite = useSkins ? skinMgr.getSprite('effects', 'loot') : null;
+                const itemSprite = (useSkins && eff.itemKey) ? (skinMgr.getItemSprite(eff.itemKey) || skinMgr.getMaterialSprite(eff.itemKey)) : null;
+                const lootSprite = (!itemSprite && useSkins) ? skinMgr.getSprite('effects', 'loot') : null;
                 // Arc the loot toward the party (tx/ty) with a parabolic hop when the
                 // extras feature is on. Otherwise fall back to the old straight rise.
                 let lx, ly;
                 if (extrasEnabled && RENDER_CONFIG.expedLootArc && eff.tx != null) {
                     const p = eff.frame / eff.maxFrames;
                     lx = eff.x + (eff.tx - eff.x) * p;
-                    ly = eff.y + (eff.ty - eff.y) * p - Math.sin(p * Math.PI) * 14; // hop apex mid-flight
+                    ly = eff.y + (eff.ty - eff.y) * p - Math.sin(p * Math.PI) * 28; // hop apex mid-flight
                 } else {
                     lx = eff.x;
                     ly = eff.y - eff.frame * 0.5;
                 }
-                if (lootSprite) {
+                if (itemSprite) {
+                    ctx.drawImage(itemSprite, lx - 8, ly - 8, 16, 16);
+                } else if (lootSprite) {
                     ctx.drawImage(lootSprite, lx - 8, ly - 8, 16, 16);
                 } else {
                     ctx.fillStyle = '#ffcc44';

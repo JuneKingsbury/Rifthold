@@ -538,7 +538,18 @@ export const LOG_COLORS = {
     danger: '#ff5555',
     combat: '#ff8844',
     success: '#88ff88',
-    loot: '#ffcc44',
-    ambient: '#777777',
+    loot: '#ffdd55',
+    event: '#cc99ff',
+    ambient: '#8888aa',
     default: '#aaddff',
+};
+
+export const LOG_STYLES = {
+    combat:  { bold: true,  italic: false, prefix: ''   },
+    danger:  { bold: true,  italic: false, prefix: '! ' },
+    success: { bold: true,  italic: false, prefix: ''   },
+    loot:    { bold: false, italic: true,  prefix: ''   },
+    event:   { bold: false, italic: true,  prefix: ''   },
+    info:    { bold: false, italic: false, prefix: ''   },
+    ambient: { bold: false, italic: true,  prefix: ''   },
 };

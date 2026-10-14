@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
+import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
 import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
@@ -1377,7 +1377,13 @@ export class UI {
                     const logSlice = exp.log.slice(-25);
                     for (const entry of logSlice) {
                         const color = this._expLogColor(entry.type);
-                        html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
+                        const st = this._expLogStyle(entry.type);
+                        const styleAttr = [
+                            `color:${color}`,
+                            st.bold   ? 'font-weight:bold'  : '',
+                            st.italic ? 'font-style:italic' : '',
+                        ].filter(Boolean).join(';');
+                        html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
                     }
                     html += `</div>`;
                 }
@@ -1406,7 +1412,13 @@ export class UI {
             const logSlice = last.log.slice(-10);
             for (const entry of logSlice) {
                 const color = this._expLogColor(entry.type);
-                html += `<div class="exp-log-entry" style="color:${color};">${entry.text}</div>`;
+                const st = this._expLogStyle(entry.type);
+                const styleAttr = [
+                    `color:${color}`,
+                    st.bold   ? 'font-weight:bold'  : '',
+                    st.italic ? 'font-style:italic' : '',
+                ].filter(Boolean).join(';');
+                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
             }
             html += `</div>`;
         }
@@ -1416,6 +1428,10 @@ export class UI {
 
     _expLogColor(type) {
         return LOG_COLORS[type] || LOG_COLORS.default;
+    }
+
+    _expLogStyle(type) {
+        return LOG_STYLES[type] || LOG_STYLES.info;
     }
 
     _spellTooltip(spell) {

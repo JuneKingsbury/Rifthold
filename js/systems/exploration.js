@@ -939,9 +939,11 @@ export class ExplorationSystem {
         return value;
     }
 
-    _addLog(exp, game, text, type = 'info') {
+    _addLog(exp, game, text, type = 'info', meta = null) {
         const tick = game ? game.tick : 0;
-        exp.log.push({ tick, text, type });
+        const entry = { tick, text, type };
+        if (meta) Object.assign(entry, meta);
+        exp.log.push(entry);
     }
 
     _checkExpeditionRevive(exp, member, game) {
@@ -1443,11 +1445,11 @@ export class ExplorationSystem {
                         if (!exp.loot._items) exp.loot._items = [];
                         exp.loot._items.push(rare.loot.item);
                         const itemName = ALL_ITEMS[rare.loot.item]?.name || rare.loot.item;
-                        this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
+                        this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: rare.loot.item });
                     } else {
                         const amount = Math.round(randInt(rare.loot.amount[0], rare.loot.amount[1]) * ds.lootAmountMult);
                         exp.loot[rare.loot.resource] = (exp.loot[rare.loot.resource] || 0) + amount;
-                        this._addLog(exp, game, `${msg} (+${amount} ${rare.loot.resource.replace(/_/g, ' ')})`, 'loot');
+                        this._addLog(exp, game, `${msg} (+${amount} ${rare.loot.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: rare.loot.resource });
                     }
                     window.soundManager?.playExpSFX('loot_drop');
                     return;
@@ -1481,11 +1483,11 @@ export class ExplorationSystem {
                     if (!exp.loot._items) exp.loot._items = [];
                     exp.loot._items.push(lootEntry.item);
                     const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
-                    this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
+                    this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: lootEntry.item });
                 } else {
                     const boostedAmount = Math.floor(lootEntry.amount * lootMult);
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + boostedAmount;
-                    this._addLog(exp, game, `${msg} (+${boostedAmount} ${lootEntry.resource.replace(/_/g, ' ')})`, 'loot');
+                    this._addLog(exp, game, `${msg} (+${boostedAmount} ${lootEntry.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: lootEntry.resource });
                 }
                 window.soundManager?.playExpSFX('loot_drop');
             }
@@ -1553,6 +1555,7 @@ export class ExplorationSystem {
             exp.pendingDecision = {
                 type: 'npc',
                 npcKey: encounter.npcKey,
+                sprite: encounter.sprite || null,
                 text: encounter.text,
                 choices: encounter.choices,
                 encounterIndex: exp.currentEncounter,
@@ -1571,12 +1574,12 @@ export class ExplorationSystem {
                 if (!exp.loot._items) exp.loot._items = [];
                 exp.loot._items.push(encounter.item);
                 const itemName = ALL_ITEMS[encounter.item]?.name || encounter.item;
-                this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot');
+                this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: encounter.item });
             } else {
                 const streakMult = exp.streakMultiplier || 1.0;
                 const amount = Math.floor(encounter.amount * streakMult);
                 exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + amount;
-                this._addLog(exp, game, `${msg} (+${amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot');
+                this._addLog(exp, game, `${msg} (+${amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: encounter.resource });
             }
             window.soundManager?.playExpSFX('loot_drop');
             if (exp.nodeMap) {
@@ -2717,14 +2720,14 @@ export class ExplorationSystem {
                     if (Math.random() < lootEntry.chance) {
                         exp.loot._items.push(lootEntry.item);
                         const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
-                        this._addLog(exp, game, `Found ${itemName}!`, 'loot');
+                        this._addLog(exp, game, `Found ${itemName}!`, 'loot', { itemKey: lootEntry.item });
                         break;
                     }
                 }
                 for (const [res, amt] of Object.entries(boss.bonusResources)) {
                     const boosted = Math.floor(amt * lootAmountMutMult) + lootBonusFlat;
                     exp.loot[res] = (exp.loot[res] || 0) + boosted;
-                    this._addLog(exp, game, `+${boosted} ${res.replace(/_/g, ' ')} from the boss!`, 'loot');
+                    this._addLog(exp, game, `+${boosted} ${res.replace(/_/g, ' ')} from the boss!`, 'loot', { itemKey: res });
                 }
                 this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerBossKill);
                 this._awardAnimalExpeditionXP(exp, ANIMAL_XP_CONFIG.xpPerBossKill);
@@ -3785,11 +3788,11 @@ export class ExplorationSystem {
                 if (lootEntry.item) {
                     if (!exp.loot._items) exp.loot._items = [];
                     exp.loot._items.push(lootEntry.item);
-                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
+                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot', { itemKey: lootEntry.item });
                 } else {
                     const amount = Math.floor(lootEntry.amount * mult);
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot', { itemKey: lootEntry.resource });
                 }
                 window.soundManager?.playExpSFX('loot_drop');
             }
@@ -3884,11 +3887,11 @@ export class ExplorationSystem {
                 if (lootEntry.item) {
                     if (!exp.loot._items) exp.loot._items = [];
                     exp.loot._items.push(lootEntry.item);
-                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot');
+                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot', { itemKey: lootEntry.item });
                 } else {
                     const amount = Math.floor(lootEntry.amount * (reward.mult || 1.0));
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot');
+                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot', { itemKey: lootEntry.resource });
                 }
                 window.soundManager?.playExpSFX('loot_drop');
             }
