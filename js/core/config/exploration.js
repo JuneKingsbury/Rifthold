@@ -3584,31 +3584,54 @@ export const STORY_MILESTONES = {
         tab: 'colony',
         title: 'The Nexus Stirs',
         trigger: 'void_nexus_placed',
-        text: `TODO`,
+        text: `
+        The Nexus is a magical device built to connect your colony to the Void. As soon as it was supplied with mana 
+        it began to hum with energy, emitting a small amount of black fog that rolls from the Nexus to the ground. 
+        The fog seems to be harmless, but the thinning of the veil between your realm and the Void is clearly noticeable 
+        throughout the colony. You feel a need to exercise caution when using this device as the consequences of opening 
+        a line of communication, let alone a doorway, to the Void are unknown.`,
     },
     void_whisper_first_accepted: {
         tab: 'colony',
         title: 'The First Exchange',
         trigger: 'void_whisper_first_accepted',
-        text: `TODO`,
+        text: `
+        Something powerful from the Void has taken notice of your colony and the thin veil between your realms. It seems 
+        to be an entity of extreme lawfulness, offering pacts and bargains to your colony for completing very specific requests. 
+        <br><br>
+        Thankfully it does not appear to be able to cross over into our realm, but its pacts are not without consequence. What it 
+        asks for is what it will get, threatening exteme punishment if your colony fails to deliver. You must be careful in your 
+        dealings with this entity, though some of its deals may be too good to pass up.`,
     },
     void_whisper_refused_3: {
         tab: 'colony',
         title: 'Displeasure',
         trigger: 'void_whisper_refused_3',
-        text: `TODO`,
+        text: `
+        The entity from the Void seems displeased with your colony's refusal to work with it. It seems understanding of your hesitation, 
+        but it is clear that it will not be so forgiving if you continue to refuse its requests. You must be careful in your dealings 
+        to keep this entity occupied.`,
     },
     void_whisper_accepted_5: {
         tab: 'colony',
         title: 'The Fluent Colony',
         trigger: 'void_whisper_accepted_5',
-        text: `TODO`,
+        text: `
+        The entity from the Void seems to now see your colony as a reliable business partner. Communication channels are open and the entity 
+        has no issues reaching out whenever it needs something from us, offering fair payment in return. You feel a lot more confident in 
+        your dealings, but it still occasionally asks for something far too outlandish to accept. You must continue to be cautious of this thing.`,
     },
     void_whisper_veil_parted: {
         tab: 'colony',
         title: 'A Glimpse',
         trigger: 'void_whisper_veil_parted',
-        text: `TODO`,
+        text: `
+        The entity from the Void has offered to show the colony a glimpse of what we've been working with all this time. Upon receiving payment, 
+        it seemed to beam images directly into the minds of your colonists. Everyone was shocked by the sights, with many describing the Void and 
+        this entity as horrific, something that may have been better left unseen.
+        <br><br>
+        Its clear that this entity holds your colony in high regard, but making deals with something so alien and unknowable is difficult to justify. 
+        As your colonists recover from the invasion of their minds, you must decide if working with with entity is worth the risk of further exposure.`,
     },
     waves_10_complete: {
         tab: 'colony',
