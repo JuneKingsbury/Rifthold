@@ -3342,12 +3342,18 @@ class Game {
             const fullKey = `boss:${realm.boss.name}`;
             if (!exp.bestiary.has(fullKey)) {
                 const lastPhase = realm.boss.phases?.[realm.boss.phases.length - 1] || {};
+                const bossPhases = (realm.boss.phases || []).map(p => ({
+                    name: p.name || p.displayName || '',
+                    sprite: p.sprite || null,
+                    color: p.color || null,
+                }));
                 exp.bestiary.set(fullKey, {
                     key: fullKey, category: 'boss',
                     name: realm.boss.name, realm: realmKey,
                     sprite: lastPhase.sprite || realm.boss.sprite || null,
                     color: lastPhase.color || realm.boss.color || '#ffcc44',
                     lore: realm.boss.lore || '', count: 1,
+                    phases: bossPhases.length ? bossPhases : undefined,
                 });
             }
         }

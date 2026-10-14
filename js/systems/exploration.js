@@ -1601,7 +1601,7 @@ export class ExplorationSystem {
             const bestiaryName = trueFinale ? dim.boss.name : bossEnemy.name;
             const bestiarySprite = trueFinale ? (trueFinale.sprite || dim.boss?.sprite) : (bossEnemy.sprite || dim.boss?.sprite);
             const bestiaryColor = trueFinale ? (trueFinale.color || dim.boss?.color) : (bossEnemy.color || dim.boss?.color);
-            this._updateBestiary(exp, 'boss', bestiaryName, { name: bestiaryName, sprite: bestiarySprite, color: bestiaryColor, lore: dim.boss?.lore || '' }, game);
+            this._updateBestiary(exp, 'boss', bestiaryName, { name: bestiaryName, sprite: bestiarySprite, color: bestiaryColor, lore: dim.boss?.lore || '', bossPhases: encounter.bossPhases || [] }, game);
 
             if (encounter.bossPhases) {
                 exp.bossPhaseData = {
@@ -2895,17 +2895,27 @@ export class ExplorationSystem {
         this.realmHistory.push(exp.realm);
         if (this.realmHistory.length > STREAK_CONFIG.historyLength) this.realmHistory.shift();
 
+        // How many boss phases did the player reach this run?
+        const bossDepth = exp.bossPhaseData
+            ? exp.bossPhaseData.currentPhaseIndex + 1
+            : 0;
+
         for (const entry of exp.discoveredEntries) {
             const multiRealm = entry.category === 'regular' || entry.category === 'npc';
             if (!this.bestiary.has(entry.key)) {
                 const newEntry = { ...entry, count: 1 };
                 delete newEntry.eliteModifier;
                 delete newEntry.eliteName;
+                delete newEntry.bossPhases;
                 if (entry.eliteModifier) {
                     newEntry.eliteCounts = { [entry.eliteModifier]: { name: entry.eliteName, count: 1 } };
                 }
                 if (!newEntry.lore) newEntry.lore = '';
                 if (multiRealm) newEntry.realms = [entry.realm];
+                if (entry.category === 'boss' && entry.bossPhases?.length) {
+                    newEntry.phases = entry.bossPhases.slice(0, Math.max(1, bossDepth))
+                        .map(p => ({ name: p.name || p.displayName || '', sprite: p.sprite || null, color: p.color || null }));
+                }
                 this.bestiary.set(entry.key, newEntry);
             } else {
                 const existing = this.bestiary.get(entry.key);
@@ -2915,6 +2925,17 @@ export class ExplorationSystem {
                 if (multiRealm) {
                     if (!existing.realms) existing.realms = [existing.realm];
                     if (!existing.realms.includes(entry.realm)) existing.realms.push(entry.realm);
+                }
+                if (entry.category === 'boss' && entry.bossPhases?.length && bossDepth > 0) {
+                    const seen = entry.bossPhases.slice(0, bossDepth)
+                        .map(p => ({ name: p.name || p.displayName || '', sprite: p.sprite || null, color: p.color || null }));
+                    if (!existing.phases) {
+                        existing.phases = seen;
+                    } else {
+                        for (let i = existing.phases.length; i < seen.length; i++) {
+                            existing.phases.push(seen[i]);
+                        }
+                    }
                 }
                 if (entry.eliteModifier) {
                     if (!existing.eliteCounts) existing.eliteCounts = {};
@@ -3593,6 +3614,7 @@ export class ExplorationSystem {
             lore: data.lore || '',
             eliteModifier: data.eliteModifier || null,
             eliteName: data.eliteName || null,
+            bossPhases: data.bossPhases || null,
         });
         if (!already && game) {
             exp._lastDiscoveryTick = game.tick;

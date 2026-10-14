@@ -81,6 +81,7 @@ export class UI {
         this._storyTab = 'colony';
         this._collapsedRealmGroups = new Set();
         this._collapsedBestiarySections = new Set();
+        this._bossPhaseView = new Map();
         this._lastStoryHtml = '';
         this._storyNewAtOpen = new Set();
         this._lastStoryHasNew = false;
@@ -198,6 +199,21 @@ export class UI {
                 this._lastStoryHtml = '';
                 this.updateStoryPanel();
                 window.soundManager?.playSFXPitched('button_click', wasCollapsed ? 3 : -3);
+            }
+            const phaseNav = e.target.closest('[data-boss-phase-nav]');
+            if (phaseNav) {
+                e.stopPropagation();
+                const key = phaseNav.dataset.bossPhaseNav;
+                const dir = parseInt(phaseNav.dataset.bossPhaseDir, 10);
+                const entry = this.game.exploration?.bestiary?.get(key);
+                if (entry?.phases?.length) {
+                    const cur = this._bossPhaseView.get(key) || 0;
+                    const next = Math.max(0, Math.min(entry.phases.length - 1, cur + dir));
+                    this._bossPhaseView.set(key, next);
+                    this._lastStoryHtml = '';
+                    this.updateStoryPanel();
+                    window.soundManager?.playSFXPitched('button_click', dir > 0 ? 2 : -2);
+                }
             }
         });
 
@@ -5333,9 +5349,26 @@ export class UI {
                     const symbol = catKey === 'boss' ? '&#9650;' : catKey === 'npc' ? '&#9786;' : '&#9668;';
                     spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${color};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
                 }
-                let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
+                let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div style="flex:1;">`;
                 h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
                 h += `<div class="story-entry-text" style="font-size:0.8em;">Found in: ${realmName} | Encountered: ${entry.count}x</div>`;
+                if (entry.category === 'boss' && entry.phases?.length > 1) {
+                    const phaseIdx = this._bossPhaseView.get(entry.key) || 0;
+                    const phase = entry.phases[phaseIdx];
+                    const canPrev = phaseIdx > 0;
+                    const canNext = phaseIdx < entry.phases.length - 1;
+                    const btnStyle = 'background:none;border:1px solid #555;color:#ccc;cursor:pointer;padding:1px 6px;border-radius:3px;font-size:0.85em;';
+                    const disabledStyle = 'background:none;border:1px solid #333;color:#555;padding:1px 6px;border-radius:3px;font-size:0.85em;';
+                    h += `<div style="font-size:0.8em;color:#aaa;margin-top:2px;display:flex;align-items:center;gap:6px;">`;
+                    h += canPrev
+                        ? `<button style="${btnStyle}" data-boss-phase-nav="${entry.key}" data-boss-phase-dir="-1">&#9664;</button>`
+                        : `<span style="${disabledStyle}">&#9664;</span>`;
+                    h += `<span style="color:#ffcc44;">Phase ${phaseIdx + 1}/${entry.phases.length}: ${phase.name || ''}</span>`;
+                    h += canNext
+                        ? `<button style="${btnStyle}" data-boss-phase-nav="${entry.key}" data-boss-phase-dir="1">&#9654;</button>`
+                        : `<span style="${disabledStyle}">&#9654;</span>`;
+                    h += `</div>`;
+                }
                 if (entry.eliteCounts && Object.keys(entry.eliteCounts).length > 0) {
                     const eliteParts = Object.values(entry.eliteCounts).map(e => `${e.name} ×${e.count}`);
                     h += `<div class="story-entry-text" style="font-size:0.75em;color:#ff8844;">Elites: ${eliteParts.join(', ')}</div>`;
@@ -5399,7 +5432,12 @@ export class UI {
                         html += _emptyHint(catHints[catKey]);
                     } else {
                         for (const entry of catEntries) {
-                            html += _bestiaryEntryHtml(entry, _getSpriteHtml(entry.sprite));
+                            let viewSprite = entry.sprite;
+                            if (entry.category === 'boss' && entry.phases?.length) {
+                                const phaseIdx = this._bossPhaseView.get(entry.key) || 0;
+                                viewSprite = entry.phases[phaseIdx]?.sprite || entry.sprite;
+                            }
+                            html += _bestiaryEntryHtml(entry, _getSpriteHtml(viewSprite));
                         }
                     }
                 }
