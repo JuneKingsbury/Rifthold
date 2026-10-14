@@ -2896,6 +2896,7 @@ export class ExplorationSystem {
         if (this.realmHistory.length > STREAK_CONFIG.historyLength) this.realmHistory.shift();
 
         for (const entry of exp.discoveredEntries) {
+            const multiRealm = entry.category === 'regular' || entry.category === 'npc';
             if (!this.bestiary.has(entry.key)) {
                 const newEntry = { ...entry, count: 1 };
                 delete newEntry.eliteModifier;
@@ -2904,12 +2905,17 @@ export class ExplorationSystem {
                     newEntry.eliteCounts = { [entry.eliteModifier]: { name: entry.eliteName, count: 1 } };
                 }
                 if (!newEntry.lore) newEntry.lore = '';
+                if (multiRealm) newEntry.realms = [entry.realm];
                 this.bestiary.set(entry.key, newEntry);
             } else {
                 const existing = this.bestiary.get(entry.key);
                 existing.count++;
                 if (!existing.sprite && entry.sprite) existing.sprite = entry.sprite;
                 if (!existing.color && entry.color) existing.color = entry.color;
+                if (multiRealm) {
+                    if (!existing.realms) existing.realms = [existing.realm];
+                    if (!existing.realms.includes(entry.realm)) existing.realms.push(entry.realm);
+                }
                 if (entry.eliteModifier) {
                     if (!existing.eliteCounts) existing.eliteCounts = {};
                     if (!existing.eliteCounts[entry.eliteModifier]) {

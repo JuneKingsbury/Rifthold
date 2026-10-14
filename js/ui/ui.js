@@ -4572,6 +4572,7 @@ export class UI {
         general += `<span style="color:#666;font-size:10px;">(300=1 day)</span>`;
         general += `</div>`;
         general += `<button onclick="window.game.cheatUnlockAllStory()" class="settings-btn settings-btn-danger">Unlock All Story Milestones</button>`;
+        general += `<button onclick="window.game.cheatUnlockAllBestiary()" class="settings-btn settings-btn-danger">Unlock All Bestiary Entries</button>`;
         const curMax = this.game.debugMaxSpeed || 3;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;align-items:center;">`;
         general += `<label for="debug-max-speed">Max speed:</label>`;
@@ -5320,7 +5321,9 @@ export class UI {
         if (tab === 'bestiary') {
             const bestiary = this.game.exploration?.bestiary;
             const _bestiaryEntryHtml = (entry, spriteHtml) => {
-                const realmName = REALMS[entry.realm]?.name || entry.realm;
+                const realmName = entry.realms
+                    ? entry.realms.map(r => REALMS[r]?.name || r).join(', ')
+                    : (REALMS[entry.realm]?.name || entry.realm);
                 const entryTypeKey = entry.key?.split(':')[1];
                 const lore = entry.lore || EXPEDITION_ENEMIES[entryTypeKey]?.lore || NPC_ENCOUNTERS[entryTypeKey]?.lore || '';
                 const catColors = { regular: '#ff4444', boss: '#ffcc44', npc: '#44ccff' };
@@ -5328,7 +5331,7 @@ export class UI {
                 if (!spriteHtml) {
                     const color = entry.color || catColors[catKey] || '#ff4444';
                     const symbol = catKey === 'boss' ? '&#9650;' : catKey === 'npc' ? '&#9786;' : '&#9668;';
-                    spriteHtml = `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${color};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
+                    spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${color};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
                 }
                 let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
                 h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
@@ -5342,7 +5345,7 @@ export class UI {
             };
             const _killEntryHtml = (entry, spriteHtml, lore, showTamed) => {
                 if (!spriteHtml) {
-                    spriteHtml = `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${entry.color};vertical-align:middle;margin-right:6px;">${entry.char}</span>`;
+                    spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${entry.color};vertical-align:middle;margin-right:6px;">${entry.char}</span>`;
                 }
                 let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
                 h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
@@ -5361,7 +5364,7 @@ export class UI {
                         c.width = img.width || img.naturalWidth || 16;
                         c.height = img.height || img.naturalHeight || 16;
                         c.getContext('2d').drawImage(img, 0, 0);
-                        return `<img src="${c.toDataURL('image/png')}" style="width:24px;height:24px;image-rendering:pixelated;vertical-align:middle;margin-right:6px;">`;
+                        return `<img src="${c.toDataURL('image/png')}" style="width:48px;height:48px;image-rendering:pixelated;vertical-align:middle;margin-right:6px;">`;
                     }
                 }
                 return '';

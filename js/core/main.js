@@ -28,6 +28,8 @@ import { CROPS, WINTER_FEAST_CONFIG } from './config.js';
 import { syncEntityIdCounter, createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { PowerSystem } from '../systems/power.js';
 import { ExplorationSystem } from '../systems/exploration.js';
+import { EXPEDITION_ENEMIES, NPC_ENCOUNTERS, REALMS } from './config/exploration.js';
+import { ENTITIES } from './config/entities.js';
 import { TradeRiftSystem } from '../systems/traderift.js';
 import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
@@ -3299,6 +3301,109 @@ class Game {
             }
         }
         this.notifications.push({ text: '[DEBUG] All story milestones unlocked', tick: this.tick, type: 'success' });
+    }
+
+    cheatUnlockAllBestiary() {
+        const exp = this.exploration;
+
+        // Build reverse maps: enemy key -> all realm keys that spawn it,
+        // npc key -> all realm keys it can appear in (realmFilter or all non-scouting realms).
+        const enemyToRealms = {};
+        const npcToRealms = {};
+        const allNonScoutingRealms = Object.keys(REALMS).filter(k => !REALMS[k].scoutingMode);
+        for (const [realmKey, realm] of Object.entries(REALMS)) {
+            if (realm.enemies?.types) {
+                for (const { key } of realm.enemies.types) {
+                    if (!enemyToRealms[key]) enemyToRealms[key] = [];
+                    enemyToRealms[key].push(realmKey);
+                }
+            }
+        }
+        for (const [npcKey, def] of Object.entries(NPC_ENCOUNTERS)) {
+            npcToRealms[npcKey] = def.realmFilter?.length ? def.realmFilter : allNonScoutingRealms;
+        }
+
+        for (const [key, def] of Object.entries(EXPEDITION_ENEMIES)) {
+            const fullKey = `regular:${key}`;
+            if (!exp.bestiary.has(fullKey)) {
+                const realms = enemyToRealms[key] || allNonScoutingRealms.slice(0, 1);
+                exp.bestiary.set(fullKey, {
+                    key: fullKey, category: 'regular',
+                    name: def.name, realm: realms[0],
+                    realms,
+                    sprite: def.sprite || null, color: def.color || '#ff3333',
+                    lore: def.lore || '', count: 1,
+                });
+            }
+        }
+
+        for (const [realmKey, realm] of Object.entries(REALMS)) {
+            if (!realm.boss?.name) continue;
+            const fullKey = `boss:${realm.boss.name}`;
+            if (!exp.bestiary.has(fullKey)) {
+                const lastPhase = realm.boss.phases?.[realm.boss.phases.length - 1] || {};
+                exp.bestiary.set(fullKey, {
+                    key: fullKey, category: 'boss',
+                    name: realm.boss.name, realm: realmKey,
+                    sprite: lastPhase.sprite || realm.boss.sprite || null,
+                    color: lastPhase.color || realm.boss.color || '#ffcc44',
+                    lore: realm.boss.lore || '', count: 1,
+                });
+            }
+        }
+
+        for (const [key, def] of Object.entries(NPC_ENCOUNTERS)) {
+            const fullKey = `npc:${key}`;
+            if (!exp.bestiary.has(fullKey)) {
+                const realms = npcToRealms[key];
+                exp.bestiary.set(fullKey, {
+                    key: fullKey, category: 'npc',
+                    name: def.name, realm: realms[0],
+                    realms,
+                    sprite: def.sprite || null, color: '#88ccff',
+                    lore: def.lore || '', count: 1,
+                });
+            }
+        }
+
+        for (const [key, def] of Object.entries(ENTITIES)) {
+            if (def.category !== 'animal') continue;
+            if (!exp.wildlifeKills.has(key)) {
+                const drops = [];
+                if (def.meatYield) drops.push(`${def.meatYield} meat`);
+                if (def.hideYield) drops.push(`${def.hideYield} hides`);
+                if (def.woolYield) drops.push(`${def.woolYield} wool`);
+                exp.wildlifeKills.set(key, {
+                    name: key.charAt(0).toUpperCase() + key.slice(1),
+                    char: def.char || '?', color: def.color || '#888888',
+                    sprite: key, drops: drops.length ? drops.join(', ') : 'Nothing',
+                    count: 1,
+                });
+            }
+        }
+
+        for (const [key, def] of Object.entries(ENTITIES)) {
+            if (def.category !== 'enemy') continue;
+            if (!exp.raiderKills.has(key)) {
+                exp.raiderKills.set(key, {
+                    name: def.name || key, char: def.char || 'R',
+                    color: def.color || '#ff3333', sprite: key,
+                    drops: 'Nothing', count: 1,
+                });
+            }
+        }
+
+        for (const [key, def] of Object.entries(ENTITIES)) {
+            if (def.category !== 'summon') continue;
+            if (!exp.summonsSeen.has(key)) {
+                exp.summonsSeen.set(key, {
+                    name: def.name || key, char: def.char || '?',
+                    color: def.color || '#9966ff', sprite: key, lore: def.lore || '',
+                });
+            }
+        }
+
+        this.notifications.push({ text: '[DEBUG] All bestiary entries unlocked', tick: this.tick, type: 'success' });
     }
 
     // Attach an opt-in profiler and auto-report every
