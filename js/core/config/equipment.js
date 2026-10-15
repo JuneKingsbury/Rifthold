@@ -209,7 +209,7 @@ export const HELMETS = {
 
 export const CLOTHES = {
     // ── Tier 1 ──
-    leather_cloak: { name: 'Leather Cloak', tier: 1, order: 0, coldResistance: 0.25, description: 'A rough cloak stitched from cured hides. Not elegant, but keeps out the cold.', recipe: { input: { leather: 3 }, ticks: 14 } },
+    leather_cloak: { name: 'Leather Cloak', tier: 1, order: 0, coldResistance: 0.25, description: 'A rough cloak stitched from cured hides. Not elegant, but keeps out the cold.', recipe: { input: { leather: 3 }, ticks: 14, station: 'workbench' } },
     cotton_shirt: { name: 'Cotton Shirt', tier: 1, order: 1, coldResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.05, description: 'A light cotton shirt. Comfortable for work.', recipe: { input: { cloth: 3 }, ticks: 14, research: 'textiles', station: 'loom' } },
     wool_tunic: { name: 'Wool Tunic', tier: 1, order: 2, coldResistance: 0.5, moodBonus: 3, description: 'A warm wool tunic. Good protection from the cold.', recipe: { input: { wool: 4, cloth: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
     cotton_tunic: { name: 'Cotton Tunic', tier: 1, order: 3, coldResistance: 0.3, moodBonus: 2, description: 'A tunic woven from thick cotton. Warmer than a shirt, lighter than wool.', recipe: { input: { cotton: 4 }, ticks: 18, research: 'textiles', station: 'loom' } },
