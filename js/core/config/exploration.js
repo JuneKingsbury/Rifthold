@@ -3388,6 +3388,27 @@ export const STORY_MILESTONES = {
         return to the colony to treat your wounds. You now know that the Wild Frontiers are not a place 
         to be taken lightly. Your expedition team will be more cautious from here on out.`,
     },
+    realm_verdant_depths: {
+        tab: 'realms',
+        realmGroup: 'Verdant Wilds',
+        title: 'Verdant Depths',
+        trigger: 'realm_verdant_depths',
+        text: `<img class="pixel-art" src="portraits/realm_verdant_depths.png" alt="A drawing depicting the Verdant Depths">TODO: Write lore text for exploring the Verdant Depths.`,
+    },
+    realm_fungal_hollows: {
+        tab: 'realms',
+        realmGroup: 'Verdant Wilds',
+        title: 'Fungal Hollows',
+        trigger: 'realm_fungal_hollows',
+        text: `<img class="pixel-art" src="portraits/realm_fungal_hollows.png" alt="A drawing depicting the Fungal Hollows">TODO: Write lore text for exploring the Fungal Hollows.`,
+    },
+    realm_primeval_canopy: {
+        tab: 'realms',
+        realmGroup: 'Verdant Wilds',
+        title: 'Primeval Canopy',
+        trigger: 'realm_primeval_canopy',
+        text: `<img class="pixel-art" src="portraits/realm_primeval_canopy.png" alt="A drawing depicting the Primeval Canopy">TODO: Write lore text for exploring the Primeval Canopy.`,
+    },
     realm_crystal_caves: {
         tab: 'realms',
         realmGroup: 'Crystal Caverns',
@@ -3450,27 +3471,6 @@ export const STORY_MILESTONES = {
         title: 'Crystal Depths',
         trigger: 'realm_crystal_depths',
         text: `<img class="pixel-art" src="portraits/realm_crystal_depths.png" alt="A drawing depicting the Crystal Depths">TODO: Write lore text for exploring the Crystal Depths.`,
-    },
-    realm_verdant_depths: {
-        tab: 'realms',
-        realmGroup: 'Verdant Wilds',
-        title: 'Verdant Depths',
-        trigger: 'realm_verdant_depths',
-        text: `<img class="pixel-art" src="portraits/realm_verdant_depths.png" alt="A drawing depicting the Verdant Depths">TODO: Write lore text for exploring the Verdant Depths.`,
-    },
-    realm_fungal_hollows: {
-        tab: 'realms',
-        realmGroup: 'Verdant Wilds',
-        title: 'Fungal Hollows',
-        trigger: 'realm_fungal_hollows',
-        text: `<img class="pixel-art" src="portraits/realm_fungal_hollows.png" alt="A drawing depicting the Fungal Hollows">TODO: Write lore text for exploring the Fungal Hollows.`,
-    },
-    realm_primeval_canopy: {
-        tab: 'realms',
-        realmGroup: 'Verdant Wilds',
-        title: 'Primeval Canopy',
-        trigger: 'realm_primeval_canopy',
-        text: `<img class="pixel-art" src="portraits/realm_primeval_canopy.png" alt="A drawing depicting the Primeval Canopy">TODO: Write lore text for exploring the Primeval Canopy.`,
     },
     realm_arcane_library: {
         tab: 'realms',
