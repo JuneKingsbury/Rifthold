@@ -138,6 +138,36 @@ export class SkinManager {
         return this._sprites.get('items:' + itemKey) || null;
     }
 
+    // Composites a transparent floor sprite (e.g. a gravel/brick path) over the
+    // ground sprite it sits on, so the terrain shows through the parts of the
+    // path PNG that are left transparent. groundKey distinguishes ground variants
+    // (terrain type, season, snow) that would otherwise collide in the cache
+    // under the same floorKey. Returns null if the floor has no sprite art,
+    // matching the plain getSprite('floors', ...) miss behavior.
+    getFloorOverGroundSprite(floorKey, groundKey, groundSprite) {
+        const floorSprite = this.getSprite('floors', floorKey);
+        if (!floorSprite) return null;
+        if (!groundSprite) return floorSprite;
+
+        const cacheKey = `floorover:${floorKey}:${groundKey}`;
+        const cached = this._compositeCache.get(cacheKey);
+        if (cached) return cached;
+
+        const w = floorSprite.width || floorSprite.naturalWidth || 16;
+        const h = floorSprite.height || floorSprite.naturalHeight || 16;
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(groundSprite, 0, 0, w, h);
+        ctx.drawImage(floorSprite, 0, 0, w, h);
+
+        if (this._compositeCache.size > 200) this._compositeCache.clear();
+        this._compositeCache.set(cacheKey, canvas);
+        return canvas;
+    }
+
     getMaterialSprite(materialKey) {
         return this._sprites.get('materials:' + materialKey) || null;
     }

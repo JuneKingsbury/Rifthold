@@ -213,7 +213,7 @@ export class Renderer {
             if (seasonal) return seasonal;
             return sm.getSprite('resources', tile.resource.type);
         }
-        if (tile.floor) return sm.getSprite('floors', tile.floor);
+        if (tile.floor) return this._resolveFloorSprite(tile, season);
         if (tile.snowCovered && tile.terrain === 'grass') return sm.getSprite('effects', 'snow');
         if (season === 'autumn' && tile.terrain === 'grass') {
             return sm.getSprite('terrain', 'grass_autumn') || sm.getSprite('terrain', tile.terrain);
@@ -222,11 +222,17 @@ export class Renderer {
     }
 
     _resolveGroundSprite(tile, season) {
-        const sm = this.skinManager;
         if (tile.floor) {
-            const floorSprite = sm.getSprite('floors', tile.floor);
+            const floorSprite = this._resolveFloorSprite(tile, season);
             if (floorSprite) return floorSprite;
         }
+        return this._resolveTerrainBaseSprite(tile, season);
+    }
+
+    // The bare terrain sprite a tile would show with no floor/structure/resource
+    // on it (terrain itself, or its seasonal snow/autumn variant for grass).
+    _resolveTerrainBaseSprite(tile, season) {
+        const sm = this.skinManager;
         if ((tile.snowCovered || season === 'winter') && tile.terrain === 'grass') {
             return sm.getSprite('effects', 'snow') || sm.getSprite('terrain', tile.terrain);
         }
@@ -234,6 +240,21 @@ export class Renderer {
             return sm.getSprite('terrain', 'grass_autumn') || sm.getSprite('terrain', tile.terrain);
         }
         return sm.getSprite('terrain', tile.terrain);
+    }
+
+    // A floor flagged transparentFloor (e.g. gravel/brick paths) only partially
+    // covers its tile, so its sprite is composited over the terrain beneath it
+    // rather than replacing it outright. Non-transparent floors (wood/stone/
+    // brick) behave exactly as before: a plain lookup that fully replaces the
+    // ground when present.
+    _resolveFloorSprite(tile, season) {
+        const fDef = BUILDINGS[tile.floor];
+        if (!fDef || !fDef.transparentFloor) {
+            return this.skinManager.getSprite('floors', tile.floor);
+        }
+        const groundSprite = this._resolveTerrainBaseSprite(tile, season);
+        const groundKey = tile.terrain + (tile.snowCovered ? ':snow' : (season ? ':' + season : ''));
+        return this.skinManager.getFloorOverGroundSprite(tile.floor, groundKey, groundSprite);
     }
 
     _resolveMaterialSprite(tile, season) {

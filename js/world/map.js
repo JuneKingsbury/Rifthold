@@ -407,8 +407,14 @@ export function isPassable(map, x, y) {
 
 export function getMoveCost(map, x, y) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return Infinity;
-    const tDef = TERRAIN[map[y][x].terrain];
-    return tDef ? tDef.moveCost : 1;
+    const tile = map[y][x];
+    const tDef = TERRAIN[tile.terrain];
+    const terrainCost = tDef ? tDef.moveCost : 1;
+    const fDef = tile.floor ? BUILDINGS[tile.floor] : null;
+    if (fDef && typeof fDef.moveCost === 'number') {
+        return Math.min(terrainCost, fDef.moveCost);
+    }
+    return terrainCost;
 }
 
 export function isPassableForAnimals(map, x, y) {
