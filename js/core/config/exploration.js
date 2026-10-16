@@ -1430,21 +1430,21 @@ export const EXPLORATION_CONFIG = {
 };
 
 export const EXPEDITION_DIFFICULTY = {
-    1:  { name: 'Normal',       enemyHpMult: 1,    enemyDmgMult: 1,    enemyCountMult: 1,    trapDmgMult: 1,    lootAmountMult: 1, rareLootMult: 1, extraEncounters: 0,  bossPhases: 3 },
-    2:  { name: 'Dangerous',   enemyHpMult: 1.3,  enemyDmgMult: 1.2,  enemyCountMult: 1.25, trapDmgMult: 1.3,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 1,  bossPhases: 3 },
-    3:  { name: 'Perilous',    enemyHpMult: 1.7,  enemyDmgMult: 1.5,  enemyCountMult: 1.5,  trapDmgMult: 1.7,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 2,  bossPhases: 4 },
-    4:  { name: 'Deadly',      enemyHpMult: 2.2,  enemyDmgMult: 1.8,  enemyCountMult: 1.75, trapDmgMult: 2.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 3,  bossPhases: 4 },
-    5:  { name: 'Suicidal',    enemyHpMult: 3.0,  enemyDmgMult: 2.2,  enemyCountMult: 2.0,  trapDmgMult: 2.5,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 4,  bossPhases: 4 },
-    6:  { name: 'Lethal',      enemyHpMult: 3.9,  enemyDmgMult: 2.7,  enemyCountMult: 2.25, trapDmgMult: 3.2,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 5,  bossPhases: 4 },
-    7:  { name: 'Catastrophic',enemyHpMult: 5.0,  enemyDmgMult: 3.3,  enemyCountMult: 2.5,  trapDmgMult: 4.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 6,  bossPhases: 4 },
-    8:  { name: 'Nightmarish', enemyHpMult: 6.5,  enemyDmgMult: 4.0,  enemyCountMult: 2.75, trapDmgMult: 5.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 7,  bossPhases: 4 },
-    9:  { name: 'Harrowing',   enemyHpMult: 8.5,  enemyDmgMult: 4.8,  enemyCountMult: 3.0,  trapDmgMult: 6.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 8,  bossPhases: 4 },
-    10: { name: 'Dire',        enemyHpMult: 11.0, enemyDmgMult: 5.8,  enemyCountMult: 3.25, trapDmgMult: 7.5,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 9,  bossPhases: 4 },
-    11: { name: 'Crushing',    enemyHpMult: 14.0, enemyDmgMult: 7.0,  enemyCountMult: 3.5,  trapDmgMult: 9.0,  lootAmountMult: 1, rareLootMult: 1, extraEncounters: 10, bossPhases: 4 },
-    12: { name: 'Overwhelming',enemyHpMult: 18.0, enemyDmgMult: 8.5,  enemyCountMult: 3.75, trapDmgMult: 11.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 11, bossPhases: 4 },
-    13: { name: 'Apocalyptic', enemyHpMult: 23.0, enemyDmgMult: 10.0, enemyCountMult: 4.0,  trapDmgMult: 13.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 12, bossPhases: 4 },
-    14: { name: 'Cataclysmic', enemyHpMult: 29.0, enemyDmgMult: 12.0, enemyCountMult: 4.25, trapDmgMult: 16.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 13, bossPhases: 4 },
-    15: { name: 'World-Ending',enemyHpMult: 36.0, enemyDmgMult: 14.5, enemyCountMult: 4.5,  trapDmgMult: 20.0, lootAmountMult: 1, rareLootMult: 1, extraEncounters: 14, bossPhases: 4 },
+    1:  { name: 'Normal',       enemyHpMult: 1,    enemyDmgMult: 1,    enemyCountMult: 1,    trapDmgMult: 1,    lootAmountMult: 1.00, rareLootMult: 1.00, extraEncounters: 0,  bossPhases: 3 },
+    2:  { name: 'Dangerous',   enemyHpMult: 1.3,  enemyDmgMult: 1.2,  enemyCountMult: 1.25, trapDmgMult: 1.3,  lootAmountMult: 1.15, rareLootMult: 1.10, extraEncounters: 1,  bossPhases: 3 },
+    3:  { name: 'Perilous',    enemyHpMult: 1.7,  enemyDmgMult: 1.5,  enemyCountMult: 1.5,  trapDmgMult: 1.7,  lootAmountMult: 1.30, rareLootMult: 1.20, extraEncounters: 2,  bossPhases: 4 },
+    4:  { name: 'Deadly',      enemyHpMult: 2.2,  enemyDmgMult: 1.8,  enemyCountMult: 1.75, trapDmgMult: 2.0,  lootAmountMult: 1.45, rareLootMult: 1.30, extraEncounters: 3,  bossPhases: 4 },
+    5:  { name: 'Suicidal',    enemyHpMult: 3.0,  enemyDmgMult: 2.2,  enemyCountMult: 2.0,  trapDmgMult: 2.5,  lootAmountMult: 1.60, rareLootMult: 1.40, extraEncounters: 4,  bossPhases: 4 },
+    6:  { name: 'Lethal',      enemyHpMult: 3.9,  enemyDmgMult: 2.7,  enemyCountMult: 2.25, trapDmgMult: 3.2,  lootAmountMult: 1.75, rareLootMult: 1.50, extraEncounters: 5,  bossPhases: 4 },
+    7:  { name: 'Catastrophic',enemyHpMult: 5.0,  enemyDmgMult: 3.3,  enemyCountMult: 2.5,  trapDmgMult: 4.0,  lootAmountMult: 1.90, rareLootMult: 1.60, extraEncounters: 6,  bossPhases: 4 },
+    8:  { name: 'Nightmarish', enemyHpMult: 6.5,  enemyDmgMult: 4.0,  enemyCountMult: 2.75, trapDmgMult: 5.0,  lootAmountMult: 2.05, rareLootMult: 1.70, extraEncounters: 7,  bossPhases: 4 },
+    9:  { name: 'Harrowing',   enemyHpMult: 8.5,  enemyDmgMult: 4.8,  enemyCountMult: 3.0,  trapDmgMult: 6.0,  lootAmountMult: 2.20, rareLootMult: 1.80, extraEncounters: 8,  bossPhases: 4 },
+    10: { name: 'Dire',        enemyHpMult: 11.0, enemyDmgMult: 5.8,  enemyCountMult: 3.25, trapDmgMult: 7.5,  lootAmountMult: 2.35, rareLootMult: 1.90, extraEncounters: 9,  bossPhases: 4 },
+    11: { name: 'Crushing',    enemyHpMult: 14.0, enemyDmgMult: 7.0,  enemyCountMult: 3.5,  trapDmgMult: 9.0,  lootAmountMult: 2.50, rareLootMult: 2.00, extraEncounters: 10, bossPhases: 4 },
+    12: { name: 'Overwhelming',enemyHpMult: 18.0, enemyDmgMult: 8.5,  enemyCountMult: 3.75, trapDmgMult: 11.0, lootAmountMult: 2.65, rareLootMult: 2.10, extraEncounters: 11, bossPhases: 4 },
+    13: { name: 'Apocalyptic', enemyHpMult: 23.0, enemyDmgMult: 10.0, enemyCountMult: 4.0,  trapDmgMult: 13.0, lootAmountMult: 2.80, rareLootMult: 2.20, extraEncounters: 12, bossPhases: 4 },
+    14: { name: 'Cataclysmic', enemyHpMult: 29.0, enemyDmgMult: 12.0, enemyCountMult: 4.25, trapDmgMult: 16.0, lootAmountMult: 2.95, rareLootMult: 2.30, extraEncounters: 13, bossPhases: 4 },
+    15: { name: 'World-Ending',enemyHpMult: 36.0, enemyDmgMult: 14.5, enemyCountMult: 4.5,  trapDmgMult: 20.0, lootAmountMult: 3.10, rareLootMult: 2.40, extraEncounters: 14, bossPhases: 4 },
 };
 
 export const EXPLORATION_EVENTS = {

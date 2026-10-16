@@ -923,10 +923,14 @@ const arcaneMethods = {
                 label.textContent = `${lvl} - ${d.name}`;
                 const lootPct = Math.round((d.lootAmountMult - 1) * 100);
                 const rarePct = Math.round((d.rareLootMult - 1) * 100);
+                const dmgPct = Math.round((d.enemyDmgMult - 1) * 100);
+                const hpPct = Math.round((d.enemyHpMult - 1) * 100);
+                const trapPct = Math.round((d.trapDmgMult - 1) * 100);
                 if (lvl === 1) {
                     desc.textContent = 'Standard difficulty. No bonuses.';
                 } else {
-                    desc.textContent = `+${lootPct}% loot, +${rarePct}% rare find chance. Enemies & traps hit harder.`;
+                    const bossNote = d.bossPhases > EXPEDITION_DIFFICULTY[1].bossPhases ? ` Bosses gain an extra phase (${d.bossPhases} total).` : '';
+                    desc.textContent = `+${lootPct}% loot, +${rarePct}% rare find chance. Enemies have +${hpPct}% health and deal +${dmgPct}% damage, traps deal +${trapPct}% damage.${bossNote}`;
                 }
                 updateStrength();
             };
