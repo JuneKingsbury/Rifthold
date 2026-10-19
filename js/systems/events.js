@@ -1,4 +1,4 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS } from '../core/config.js';
+import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
@@ -41,6 +41,19 @@ function weightedQuality(weights) {
     return entries[entries.length - 1][0];
 }
 
+// Returns the average sell-value multiplier for selling `amount` units of `key`
+// in this visit, accounting for units already sold (tradeData.saturation).
+// Each unit sold in a visit reduces its value by 8%, floored at 40%.
+function _saturationMult(tradeData, key, amount) {
+    if (!tradeData) return 1;
+    const sold = tradeData.saturation?.[key] || 0;
+    let total = 0;
+    for (let i = 0; i < amount; i++) {
+        total += Math.max(0.4, 1.0 - (sold + i) * 0.05);
+    }
+    return total / amount;
+}
+
 /**
  * Calculates gold values for a trade offer and request.
  * Gold is always valued 1:1. Resources use base value × rate.
@@ -72,7 +85,7 @@ export function computeTradeValues(offer, request, goldOffer, rates, tradeData, 
             const key = res.slice('__potion_'.length);
             equipOfferVal += getItemTradeValue(ALL_ITEMS[key]) * amt * rates.discount;
         } else {
-            resourceOfferVal += (TRADE_VALUES[res] || 1) * amt * rates.discount;
+            resourceOfferVal += (TRADE_VALUES[res] || 1) * amt * rates.discount * _saturationMult(tradeData, res, amt);
         }
     }
 
@@ -81,9 +94,11 @@ export function computeTradeValues(offer, request, goldOffer, rates, tradeData, 
         if (amt <= 0) continue;
         if (res.startsWith('__exclusive_')) {
             const slotIdx = parseInt(res.split('_')[3], 10);
-            // Slots hold rolled instances, so the price reflects the rolled quality.
-            // Exclusives are priced at face value (no markup), matching prior behavior.
-            reqVal += getItemTradeValue(tradeData.exclusiveItems?.[slotIdx]);
+            const exclusiveItem = tradeData.exclusiveItems?.[slotIdx];
+            const itemDef = (exclusiveItem?.key && ALL_ITEMS[exclusiveItem.key]) || exclusiveItem;
+            const tierMarkup = TIER_BUY_MARKUP[itemDef?.tier || 0] || 1.0;
+            // Tier markup applied on top of base markup to price high-tier gear appropriately.
+            reqVal += getItemTradeValue(exclusiveItem) * rates.markup * tierMarkup;
         } else if (res.startsWith('__buypotion_')) {
             // Player buys a stack of potions from the merchant's potion stock.
             const key = res.slice('__buypotion_'.length);
@@ -565,7 +580,7 @@ export class EventSystem {
             type: 'trade',
             text: `${'aeiouAEIOU'.includes(merchant.name[0]) ? 'An' : 'A'} ${merchant.name} arrives! Barter resources with the merchant.`,
             choices: ['Open Trade', 'Dismiss'],
-            data: { traderResources, exclusiveItems, traderPotions, traderGold, merchantName: merchant.name, buyCategories: merchant.buyCategories || null, merchantResourcePool: merchant.resourcePool || null },
+            data: { traderResources, exclusiveItems, traderPotions, traderGold, merchantName: merchant.name, buyCategories: merchant.buyCategories || null, merchantResourcePool: merchant.resourcePool || null, saturation: {} },
         };
         game.notifications.push({ text: `${merchant.name} arrived!`, tick: game.tick, type: 'event' });
         game.eventLog.add(game, `${merchant.name} arrived`, 'event', null);
@@ -660,6 +675,9 @@ export class EventSystem {
                 for (let n = 0; n < amt; n++) game.resources.takePotion(key);
             } else {
                 game.resources.deduct({ [res]: amt });
+                // Track saturation for this visit so repeated sales of the same resource pay less.
+                if (!data.saturation) data.saturation = {};
+                data.saturation[res] = (data.saturation[res] || 0) + amt;
             }
         }
 

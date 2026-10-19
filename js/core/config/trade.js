@@ -146,6 +146,11 @@ export const TRADE_VALUES = {
 export const TRADER_MARKUP = 1.2;
 export const TRADER_DISCOUNT = 0.8;
 
+// Extra buy-price multiplier for high-tier exclusive equipment from merchants.
+// Applied on top of TRADER_MARKUP, only affects buying, not selling.
+// Index = item tier (0–5).
+export const TIER_BUY_MARKUP = [1.0, 1.0, 1.0, 1.3, 1.6, 2.0];
+
 // Trade Rift request board. The board holds two independent groups of requests
 // on different refresh cadences:
 //   - 'season' requests refresh on every season change (easier, cheaper, lower tier).

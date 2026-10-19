@@ -246,8 +246,7 @@ export const RESEARCH = {
     metalworking: { name: 'Metalworking', cost: 100, requires: [], tab: 'foundations', description: 'Smelting metal and crafting gear at anvils' },
     ley_channeling: { name: 'Ley Channeling', cost: 175, requires: ['runecraft', 'metalworking'], tab: 'mana', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
     alchemy: { name: 'Alchemy', cost: 150, requires: ['runecraft'], tab: 'foundations', description: 'Learn how to brew potions and unlock corn and potatoes' },
-    trade_routes: { name: 'Trade Routes', cost: 300, requires: ['alchemy'], tab: 'foundations', description: 'Caravans arrive more often and offer better prices' },
-    trade_rifts: { name: 'Trade Rifts', cost: 450, requires: ['trade_routes', 'void_summoning'], tab: 'foundations', description: 'Open Trade Rifts to barter materials with far-off traders for mystery goods' },
+    trade_routes: { name: 'Trade Routes', cost: 300, requires: ['alchemy'], tab: 'foundations', description: 'Caravans arrive more often and offer better prices. Unlocks the Trade Rift barter board.' },
     domestic_alchemy: { name: 'Domestic Alchemy', cost: 280, requires: ['alchemy'], tab: 'foundations', description: 'Brew tonics for use around the colony' },
     battle_brewing: { name: 'Battle Brewing', cost: 500, requires: ['domestic_alchemy', 'herbalism'], tab: 'foundations', description: 'Brew potions for expeditions, making it easier for your colonists to go further' },
 
@@ -307,7 +306,7 @@ export const RESEARCH = {
 export const DEMO_LOCKED_RESEARCH = new Set([
     'advanced_arcana', 'void_sorcery', 'masterwork', 'golem_craft', 'mana_weaving',
     'mana_reservoir', 'brilliance', 'pyroclasm', 'void_architecture',
-    'void_forging', 'void_weaving', 'deep_delving', 'trade_rifts'
+    'void_forging', 'void_weaving', 'deep_delving'
 ]);
 
 // Auto-derive unlocks from the 'research' field on buildings, recipes, and crops.
