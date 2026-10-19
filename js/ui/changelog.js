@@ -55,6 +55,7 @@ export function renderCreditsHTML() {
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-effect-and-bullet-16x16">Free Effect and Bullet 16x16</a> by BDragon1727</div>
     <div style="color:#aaa; margin-bottom:20px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-smoke-fx-pixel-2">Free Smoke Fx Pixel 2</a> by BDragon1727</div>
     <div style="color:#ccc; margin-bottom:8px;"><b>Music & SFX</b></div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://flowerheadmusic.itch.io/somewhat-good-lofi">Somewhat Good Lofi</a> by Flowerhead</div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://not-jam.itch.io/not-jam-music-pack">NOT JAM MUSIC PACK</a> by NOT JAM</div>
     <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://www.bfxr.net/">bfxr (custom SFX maker)</a> by increpare</div>
     <div style="color:#aaa; margin-bottom:24px;"><a style="color:#aaa;" href="https://dagurasusk.itch.io/retrosounds">Retro Sounds</a> by DASK</div>
