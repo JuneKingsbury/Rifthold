@@ -21,6 +21,9 @@ class SoundManagerClass {
         this.currentMusic = null;
         this.currentMusicName = null;
         this.currentMusicGain = null;
+        this.currentMusicStartTime = null;
+        this.currentMusicStartOffset = 0;
+        this.seasonTrackPositions = {};
     }
 
     init() {
@@ -32,7 +35,7 @@ class SoundManagerClass {
             this.musicGain.connect(this.ctx.destination);
             this.sfxGain.connect(this.ctx.destination);
             this.expeditionSfxGain.connect(this.ctx.destination);
-            this.musicGain.gain.value = this.musicVolume / 100;
+            this.musicGain.gain.value = 1.0;
             this.sfxGain.gain.value = this.sfxVolume / 100;
             this.expeditionSfxGain.gain.value = this.sfxVolume / 100;
             if (this.ctx.state === 'suspended') {
@@ -43,8 +46,8 @@ class SoundManagerClass {
 
     setMusicVolume(val) {
         this.musicVolume = val;
-        if (this.currentMusicGain) {
-            this.currentMusicGain.gain.value = val / 100;
+        if (this.musicGain) {
+            this.musicGain.gain.value = val / 100;
         }
     }
 
@@ -207,6 +210,8 @@ class SoundManagerClass {
             const fadeTime = CROSSFADE_MS / 1000;
             const now = this.ctx.currentTime;
 
+            this._saveSeasonPosition();
+
             if (this.currentMusic && this.currentMusicGain) {
                 const oldGain = this.currentMusicGain;
                 const oldSource = this.currentMusic;
@@ -220,23 +225,28 @@ class SoundManagerClass {
             const trackGain = this.ctx.createGain();
             trackGain.connect(this.musicGain);
             trackGain.gain.setValueAtTime(0, now);
-            trackGain.gain.linearRampToValueAtTime(this.musicVolume / 100, now + fadeTime);
+            trackGain.gain.linearRampToValueAtTime(1.0, now + fadeTime);
 
             const source = this.ctx.createBufferSource();
             source.buffer = buffer;
             source.loop = true;
             source.connect(trackGain);
-            source.start(0);
+
+            const offset = name.startsWith('season_') ? (this.seasonTrackPositions[name] || 0) : 0;
+            source.start(0, offset);
 
             this.currentMusic = source;
             this.currentMusicGain = trackGain;
             this.currentMusicName = name;
+            this.currentMusicStartTime = this.ctx.currentTime;
+            this.currentMusicStartOffset = offset;
         } catch (e) { /* silent */ }
     }
 
     stopMusic(fadeMs = 1000) {
         try {
             if (!this.ctx || !this.currentMusic || !this.currentMusicGain) return;
+            this._saveSeasonPosition();
             const now = this.ctx.currentTime;
             const fadeTime = fadeMs / 1000;
             this.currentMusicGain.gain.setValueAtTime(this.currentMusicGain.gain.value, now);
@@ -248,7 +258,21 @@ class SoundManagerClass {
             this.currentMusic = null;
             this.currentMusicGain = null;
             this.currentMusicName = null;
+            this.currentMusicStartTime = null;
+            this.currentMusicStartOffset = 0;
         } catch (e) { /* silent */ }
+    }
+
+    _saveSeasonPosition() {
+        if (this.currentMusicName && this.currentMusicName.startsWith('season_')
+                && this.currentMusic && this.currentMusicStartTime !== null) {
+            const elapsed = this.ctx.currentTime - this.currentMusicStartTime;
+            const buffer = this.currentMusic.buffer;
+            if (buffer) {
+                this.seasonTrackPositions[this.currentMusicName] =
+                    (this.currentMusicStartOffset + elapsed) % buffer.duration;
+            }
+        }
     }
 
     // Returns the first candidate music name whose file is actually available,

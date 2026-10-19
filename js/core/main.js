@@ -634,7 +634,7 @@ class Game {
         const prof = this._profiler;
         if (prof) { prof.countTick(); prof.begin(); }
 
-        if (this.tick % 30 === 0 && window.soundManager) {
+        if (this.tick % 5 === 0 && window.soundManager) {
             if (!this._gameOver) window.soundManager.updateMusicState(this);
             window.soundManager.setMusicVolume(this.settings.musicVolume);
             window.soundManager.setSFXVolume(this.settings.sfxVolume);
