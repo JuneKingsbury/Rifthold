@@ -909,8 +909,8 @@ class Game {
         if (!this._gameOver && this.colonists.length > 0 && this.colonists.every(c => c.hp <= 0)) {
             this._gameOver = true;
             this.paused = true;
-            this.notifications.push({ text: 'All colonists have died. Game Over.', tick: this.tick, type: 'danger' });
-            this.eventLog.add(this, 'All colonists have died. Game Over.', 'danger', null);
+            this.notifications.push({ text: 'All colonists have died.', tick: this.tick, type: 'danger' });
+            this.eventLog.add(this, 'All colonists have died. You can load a previous save or wait for a new colonist to wander in.', 'danger', null);
         }
 
         if (prof && this.tick % this._profilerReportEvery === 0) prof.report();
