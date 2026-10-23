@@ -159,6 +159,8 @@ class Game {
             ditherQuality: 'medium',
             showColonistHighlight: false,
             showTutorial: true,
+            tutorialLevel: 'some',
+            showTutorialArrows: true,
             fpsCap: 60,
             enableFullscreen: false,
             keyBindings: {},
@@ -193,7 +195,7 @@ class Game {
         this.tradeRift = new TradeRiftSystem();
         this.eventLog = new EventLog();
         this.story = new StorySystem();
-        this.tutorial = new TutorialSystem();
+        this.tutorial = new TutorialSystem(this.settings.tutorialLevel);
 
         this.voidSiphon = {
             charge: 0,
@@ -3538,7 +3540,7 @@ class Game {
             notificationDuration: 100, showDamageFlash: true, showCombatParticles: true, showProjectiles: true,
             showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, showActionAnimations: true, showTreeSway: true, showTerrainDetail: true, showExpeditionExtras: true, reduceMotion: false, layoutMode: 'auto',
             musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
-            ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true,
+            ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true, showTutorialArrows: true,
             enableFullscreen: false,
         });
         this.settings.keyBindings = keep;
@@ -6025,7 +6027,37 @@ _onDOMReady(() => {
         if (btn) SoundManager.playSFXPitched('open_close_click', -3);
     });
 
-    document.getElementById('start-game').addEventListener('click', () => {
+    // Asks how familiar the player is with colony sims so the tutorial can fit them.
+    // `onChoose(level)` gets 'none' | 'some' | 'veteran', or null to leave tutorial settings as they are.
+    function promptTutorialLevel(onChoose) {
+        let stored = {};
+        try { stored = JSON.parse(localStorage.getItem('colony_settings')) || {}; } catch (e) { /* use defaults */ }
+        const modal = document.getElementById('tutorial-level-modal');
+        if (stored.showTutorial === false || !modal) {
+            onChoose(null);
+            return;
+        }
+        const current = stored.tutorialLevel || 'some';
+        modal.querySelectorAll('[data-tut-level]').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.tutLevel === current);
+        });
+        modal.style.display = 'flex';
+        const close = () => { modal.style.display = 'none'; modal.onclick = null; };
+        modal.onclick = (e) => {
+            const choice = e.target.closest('[data-tut-level]');
+            if (choice) {
+                close();
+                onChoose(choice.dataset.tutLevel);
+            } else if (e.target.closest('[data-tut-skip]')) {
+                close();
+                onChoose('off');
+            } else if (e.target.closest('[data-tut-cancel]') || e.target === modal) {
+                close();
+            }
+        };
+    }
+
+    const beginNewGame = (tutorialLevel) => {
         CONFIG.PEACEFUL_MODE = document.getElementById('start-peaceful-check').checked;
         const startSettings = {
             autoPauseHostile: document.getElementById('start-autopause-hostile').checked,
@@ -6077,12 +6109,28 @@ _onDOMReady(() => {
             sfxVolume: parseInt(document.getElementById('start-sfx-vol').value),// || 50,
             temperatureUnit: document.getElementById('start-temp-unit').value || 'F',
         };
+        if (tutorialLevel === 'off') {
+            startSettings.showTutorial = false;
+        } else if (tutorialLevel) {
+            startSettings.showTutorial = true;
+            startSettings.tutorialLevel = tutorialLevel;
+        }
+        if (tutorialLevel) {
+            // Remember the choice so the next New Game pre-selects it.
+            try {
+                const stored = JSON.parse(localStorage.getItem('colony_settings') || '{}');
+                if (startSettings.tutorialLevel) stored.tutorialLevel = startSettings.tutorialLevel;
+                stored.showTutorial = startSettings.showTutorial;
+                localStorage.setItem('colony_settings', JSON.stringify(stored));
+            } catch (e) { /* settings are best-effort */ }
+        }
         setUIFontScale(startSettings.uiFontScale || 1);
         localStorage.setItem('convocation_skin', startSettings.activeSkin);
         RENDER_CONFIG.terrainDithering = document.getElementById('start-dither-dist').value !== 'none';
         const customDefs = readCustomColonistDefs();
         launchGame(game => {
             Object.assign(game.settings, startSettings);
+            game.tutorial.setLevel(game.settings.tutorialLevel);
             game.settings.primarySaveSlot = null;
             if (startSettings.colorblindMode !== 'none') {
                 document.getElementById('game-container').setAttribute('data-colorblind', startSettings.colorblindMode);
@@ -6095,7 +6143,9 @@ _onDOMReady(() => {
             }
             game._pendingCustomColonists = customDefs;
         });
-    });
+    };
+
+    document.getElementById('start-game').addEventListener('click', () => promptTutorialLevel(beginNewGame));
 
     loadBtn.addEventListener('click', () => {
         openSaveSlotScreen();

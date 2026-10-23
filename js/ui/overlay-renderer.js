@@ -238,6 +238,10 @@ export class OverlayRenderer {
             this._renderRadiusHighlight(ctx, game.radiusHighlight, cw, ch, camera);
         }
 
+        if (game.tutorialMapHint) {
+            this._renderTutorialMapHint(ctx, game.tutorialMapHint, cw, ch, camera, now);
+        }
+
         if (game.worldParticles) {
             const dt = this._lastParticleTime ? Math.min((now - this._lastParticleTime) / 1000, 0.1) : 0.016;
             this._lastParticleTime = now;
@@ -1043,6 +1047,97 @@ export class OverlayRenderer {
         ctx.save();
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+    }
+
+    // Tutorial pointer for map targets: a dashed box over the suggested tiles with a
+    // bobbing arrow. If the tiles are off screen, an arrow on the screen edge points toward them.
+    _renderTutorialMapHint(ctx, hint, cw, ch, camera, now) {
+        const W = this.canvas.width;
+        const H = this.canvas.height;
+        const still = hint.reduceMotion;
+        const pulse = still ? 0.5 : (Math.sin(now / 250) + 1) / 2;
+        const bob = still ? 0 : Math.sin(now / 200) * 6;
+        const sx = (hint.x - camera.x) * cw;
+        const sy = (hint.y - camera.y) * ch;
+        const sw = hint.w * cw;
+        const sh = hint.h * ch;
+        const cx = sx + sw / 2;
+        const cy = sy + sh / 2;
+        const onScreen = sx + sw > 0 && sx < W && sy + sh > 0 && sy < H;
+
+        ctx.save();
+        if (onScreen) {
+            ctx.fillStyle = `rgba(255, 204, 0, ${0.12 + 0.12 * pulse})`;
+            ctx.fillRect(sx, sy, sw, sh);
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 5]);
+            ctx.lineDashOffset = still ? 0 : -((now / 60) % 13);
+            ctx.strokeRect(sx, sy, sw, sh);
+            ctx.setLineDash([]);
+
+            const above = sy - 60 > 0;
+            const tipY = above ? sy - 6 + bob : sy + sh + 6 - bob;
+            this._drawTutorialArrow(ctx, cx, tipY, above ? 0 : Math.PI);
+            this._drawTutorialLabel(ctx, hint.label, cx, above ? tipY - 52 : tipY + 52, W);
+        } else {
+            // Clamp the arrow to the screen edge along the line from screen center to the target.
+            const mx = W / 2;
+            const my = H / 2;
+            const dx = cx - mx;
+            const dy = cy - my;
+            const inset = 40;
+            const k = Math.min((mx - inset) / Math.max(Math.abs(dx), 1), (my - inset) / Math.max(Math.abs(dy), 1));
+            const ex = mx + dx * k;
+            const ey = my + dy * k;
+            const len = Math.hypot(dx, dy) || 1;
+            const nx = dx / len;
+            const ny = dy / len;
+            this._drawTutorialArrow(ctx, ex + nx * bob, ey + ny * bob, Math.atan2(ny, nx) - Math.PI / 2);
+            this._drawTutorialLabel(ctx, hint.label, Math.min(Math.max(ex - nx * 70, 80), W - 80), Math.min(Math.max(ey - ny * 70, 20), H - 20), W);
+        }
+        ctx.restore();
+    }
+
+    // Draws a thick arrow whose tip is at (x, y). angle 0 points the tip down the screen.
+    _drawTutorialArrow(ctx, x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-16, -20);
+        ctx.lineTo(-7, -20);
+        ctx.lineTo(-7, -44);
+        ctx.lineTo(7, -44);
+        ctx.lineTo(7, -20);
+        ctx.lineTo(16, -20);
+        ctx.closePath();
+        ctx.shadowColor = 'rgba(255, 204, 0, 0.9)';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#ffcc00';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#2a2a1e';
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    _drawTutorialLabel(ctx, text, x, y, canvasWidth) {
+        if (!text) return;
+        ctx.save();
+        ctx.font = 'bold 13px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const padX = 8;
+        const w = ctx.measureText(text).width + padX * 2;
+        const bx = Math.min(Math.max(x - w / 2, 4), canvasWidth - w - 4);
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillRect(bx, y - 11, w, 22);
+        ctx.fillStyle = '#2a2a1e';
+        ctx.fillText(text, bx + w / 2, y);
         ctx.restore();
     }
 

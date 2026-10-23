@@ -345,11 +345,7 @@ function _buildSaveData(game) {
             viewed: [...game.story.viewed],
         },
 
-        tutorial: game.tutorial ? {
-            currentStep: game.tutorial.currentStep,
-            completed: [...game.tutorial.completed],
-            flags: { ...game.tutorial.flags },
-        } : { currentStep: 0, completed: [], flags: {} },
+        tutorial: game.tutorial ? game.tutorial.serialize() : { level: 'some', completedIds: [], flags: {} },
 
         voidSiphon: game.voidSiphon ? {
             charge: game.voidSiphon.charge,
@@ -703,9 +699,7 @@ function _applyLoadData(game, data) {
         }
 
         if (data.tutorial && game.tutorial) {
-            game.tutorial.currentStep = data.tutorial.currentStep || 0;
-            game.tutorial.completed = new Set(data.tutorial.completed || []);
-            game.tutorial.flags = data.tutorial.flags || {};
+            game.tutorial.restore(data.tutorial);
         }
 
         if (data.voidSiphon && game.voidSiphon) {

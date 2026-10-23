@@ -111,6 +111,15 @@ export const RAID_TYPES = {
         ],
         scaling: { hpMult: 0.15, damageMult: 0.08 },
     },
+    // Fired once by the tutorial to teach drafting. Scripted, so it never joins the random raid pool.
+    training_raid: {
+        name: 'Bandit Scouts',
+        scripted: true,
+        composition: [
+            { entity: 'raider_brute', count: [2, 2] },
+        ],
+        scaling: { hpMult: 0.1, damageMult: 0.05 },
+    },
     warband_raid: {
         name: 'Warband Raid',
         composition: [

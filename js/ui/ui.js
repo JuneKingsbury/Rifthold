@@ -1821,7 +1821,7 @@ export class UI {
                 const tipAttr = item
                     ? `data-compare="${compareHtml}"`
                     : `data-tip="${tipText}"`;
-                return `<div class="skill-tip" ${tipAttr} style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
+                return `<div class="skill-tip" data-tut-slot="${slot}" ${tipAttr} style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
             }
             // Inactive set: show set-specific override or shared fallback.
             const setItem = (colonist.equipmentSets?.[viewingSet])?.[slot] || null;
@@ -1848,7 +1848,7 @@ export class UI {
         html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:4px 0 0 0;text-align:center;">`;
         // Row 1: Tome | Helmet | Armor | Trinket
         // Tome always uses the normal select (not part of equipment sets).
-        html += `<div class="skill-tip" data-tip="${tomeTip}" style="${slotStyle}">`;
+        html += `<div class="skill-tip" data-tut-slot="tome" data-tip="${tomeTip}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Tome</div>`;
         html += colonist.equippedTome ? `${this._itemIcon(colonist.equippedTome, 'tome')}` : `<span style="color:#333;font-size:14px">~</span>`;
         html += this._buildSlotSelect(colonist, 'tome');
@@ -3491,7 +3491,7 @@ export class UI {
             const ct = this.game.settings.craftTargets[key] || {};
             const repeatCls = ct.repeat ? 'craft-repeat active' : 'craft-repeat';
             html += `<div class="craft-row ${cls}">`;
-            html += `<button ${canCraft ? '' : 'disabled'} onclick="window.game.craft('${key}')">${key.replace(/_/g, ' ')}</button>`;
+            html += `<button ${canCraft ? '' : 'disabled'} data-craft-recipe="${key}" onclick="window.game.craft('${key}')">${key.replace(/_/g, ' ')}</button>`;
             html += `<button ${canCraft ? '' : 'disabled'} onclick="window.game.craftMultiple('${key}',5)" class="craft-multi">x5</button>`;
             html += `<button onclick="window.game.toggleCraftRepeat('${key}')" class="craft-multi ${repeatCls}" title="Auto-repeat">&#x27F3;</button>`;
             html += `<input type="number" min="0" max="999" value="${ct.target || 0}" onchange="window.game.setCraftTarget('${key}',this.value)" title="Maintain stock target (0=off)" style="width:35px;background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:3px;padding:1px 2px;text-align:center;font-size:0.85em;">`;
@@ -4438,6 +4438,12 @@ export class UI {
         general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
         general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', 'Peaceful mode (no raids/hostile animals)');
         general += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', 'Show tutorial hints');
+        const tutLevel = this.game.tutorial.level;
+        general += `<div class="settings-row"><label for="set-tutorial-level">Tutorial style:</label><select id="set-tutorial-level" onchange="window.game.tutorial.changeLevel(window.game,this.value)" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`
+            + [['none', 'New to colony sims'], ['some', 'Some experience'], ['veteran', "I've played Rifthold"]]
+                .map(([v, t]) => `<option value="${v}"${tutLevel === v ? ' selected' : ''}>${t}</option>`).join('')
+            + `</select></div>`;
+        general += this._settingsCheck('set-tutorial-arrows', s.showTutorialArrows !== false, 'window.game.settings.showTutorialArrows=this.checked;window.game.saveSettingsToStorage()', 'Show tutorial arrows');
         general += `</div>`;
 
         general += `<div class="settings-section"><div class="settings-section-title">Accessibility</div>`;

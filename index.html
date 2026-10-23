@@ -49,6 +49,30 @@
         <img id="splash-image" src="icons/splash.gif" alt="" draggable="false">
         <div id="splash-studio">berry branch games</div>
     </div>
+    <div id="tutorial-level-modal" style="display:none;">
+        <div class="tut-level-box">
+            <h2>How familiar are you with colony sims?</h2>
+            <p>This sets how much the tutorial explains. You can change it later in Settings.</p>
+            <div class="tut-level-cards">
+                <button class="tut-level-card" data-tut-level="none">
+                    <span class="tut-level-name">No Experience</span>
+                    <span class="tut-level-desc">I've never played a game like this. Walk me through the basics and show me where to click.</span>
+                </button>
+                <button class="tut-level-card" data-tut-level="some">
+                    <span class="tut-level-name">Some Experience</span>
+                    <span class="tut-level-desc">I've played games like RimWorld or Dwarf Fortress. Just show me how Rifthold works.</span>
+                </button>
+                <button class="tut-level-card" data-tut-level="veteran">
+                    <span class="tut-level-name">I've Played Rifthold</span>
+                    <span class="tut-level-desc">No walkthrough, just a short list of goals to work toward.</span>
+                </button>
+            </div>
+            <div class="tut-level-footer">
+                <span class="tut-level-link" data-tut-skip>Skip the tutorial</span>
+                <span class="tut-level-link" data-tut-cancel>Back</span>
+            </div>
+        </div>
+    </div>
     <div id="start-screen" style="visibility:hidden">
         <canvas id="start-bg-canvas"></canvas>
         <h1>Rifthold</h1>
