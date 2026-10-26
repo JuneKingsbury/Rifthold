@@ -237,7 +237,9 @@ export class EventSystem {
             const count = randRange(entry.count);
             for (let i = 0; i < count; i++) {
                 const edge = getRandomEdge();
-                game.entities.push(createWildAnimal(entry.type, edge.x, edge.y));
+                const migrAnimal = createWildAnimal(entry.type, edge.x, edge.y);
+                game.entities.push(migrAnimal);
+                game.wildAnimals.push(migrAnimal);
             }
             totalCount += count;
         }

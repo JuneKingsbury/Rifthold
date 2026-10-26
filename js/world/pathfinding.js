@@ -2,7 +2,8 @@ import { isPassable, getMoveCost, isPassableForEnemies, isBreakableByEnemies, is
 import { CONFIG, PATHFINDING_CONFIG } from '../core/config.js';
 
 const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];//, [-1, -1], [1, 1], [1, -1], [-1, 1]];
-const MAX_NODES = PATHFINDING_CONFIG.maxNodes;
+// Read live from config so runtime preset changes (world size selection) take effect.
+function getMaxNodes() { return PATHFINDING_CONFIG.maxNodes; }
 
 // Binary min-heap keyed on f-score for A* open set.
 // Duplicate entries are allowed: when a node's g-score improves, we push a new
@@ -94,7 +95,7 @@ function findPathGeneric(map, startX, startY, endX, endY, passabilityFn) {
     open.push({ x: startX, y: startY, f: manhattanDist(startX, startY, endX, endY) });
 
     let iterations = 0;
-    while (open.length > 0 && iterations < MAX_NODES) {
+    while (open.length > 0 && iterations < getMaxNodes()) {
         iterations++;
         const current = open.pop();
         const currentKey = tileKey(current.x, current.y);

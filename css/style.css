@@ -5713,8 +5713,9 @@ details.settings-debug > summary::marker {
     50% { opacity: 0.55; box-shadow: 0 0 16px 4px rgba(255, 204, 0, 0.9); }
 }
 
-/* Tutorial familiarity picker (New Game) */
-#tutorial-level-modal {
+/* New-game picker modals (world size + tutorial familiarity) */
+#tutorial-level-modal,
+#world-size-modal {
     position: fixed;
     inset: 0;
     z-index: 2000;
@@ -5723,7 +5724,8 @@ details.settings-debug > summary::marker {
     background: rgba(0, 0, 0, 0.75);
 }
 
-#tutorial-level-modal .tut-level-box {
+#tutorial-level-modal .tut-level-box,
+#world-size-modal .tut-level-box {
     width: min(760px, 92vw);
     padding: 22px 26px;
     background: #1c1c2a;
@@ -5734,15 +5736,19 @@ details.settings-debug > summary::marker {
     text-align: center;
 }
 
-#tutorial-level-modal h2 { margin: 0 0 6px; color: #ffcc00; font-size: 18px; }
-#tutorial-level-modal p { margin: 0 0 16px; color: #999; font-size: 12px; }
+#tutorial-level-modal h2,
+#world-size-modal h2 { margin: 0 0 6px; color: #ffcc00; font-size: 18px; }
+#tutorial-level-modal p,
+#world-size-modal p { margin: 0 0 16px; color: #999; font-size: 12px; }
 
-#tutorial-level-modal .tut-level-cards {
+#tutorial-level-modal .tut-level-cards,
+#world-size-modal .tut-level-cards {
     display: flex;
     gap: 12px;
 }
 
-#tutorial-level-modal .tut-level-card {
+#tutorial-level-modal .tut-level-card,
+#world-size-modal .tut-level-card {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -5759,28 +5765,37 @@ details.settings-debug > summary::marker {
 }
 
 #tutorial-level-modal .tut-level-card:hover,
-#tutorial-level-modal .tut-level-card:focus-visible {
+#tutorial-level-modal .tut-level-card:focus-visible,
+#world-size-modal .tut-level-card:hover,
+#world-size-modal .tut-level-card:focus-visible {
     border-color: #ffcc00;
     background: #30304a;
     outline: none;
 }
 
-#tutorial-level-modal .tut-level-card.selected { border-color: #887733; }
-#tutorial-level-modal .tut-level-name { color: #ffcc00; font-size: 14px; font-weight: bold; }
-#tutorial-level-modal .tut-level-desc { font-size: 11px; line-height: 1.5; }
+#tutorial-level-modal .tut-level-card.selected,
+#world-size-modal .tut-level-card.selected { border-color: #887733; }
+#tutorial-level-modal .tut-level-name,
+#world-size-modal .tut-level-name { color: #ffcc00; font-size: 14px; font-weight: bold; }
+#tutorial-level-modal .tut-level-desc,
+#world-size-modal .tut-level-desc { font-size: 11px; line-height: 1.5; }
 
-#tutorial-level-modal .tut-level-footer {
+#tutorial-level-modal .tut-level-footer,
+#world-size-modal .tut-level-footer {
     display: flex;
     justify-content: space-between;
     margin-top: 16px;
     font-size: 11px;
 }
 
-#tutorial-level-modal .tut-level-link { color: #888; cursor: pointer; }
-#tutorial-level-modal .tut-level-link:hover { color: #ddd; text-decoration: underline; }
+#tutorial-level-modal .tut-level-link,
+#world-size-modal .tut-level-link { color: #888; cursor: pointer; }
+#tutorial-level-modal .tut-level-link:hover,
+#world-size-modal .tut-level-link:hover { color: #ddd; text-decoration: underline; }
 
 @media (max-width: 640px) {
-    #tutorial-level-modal .tut-level-cards { flex-direction: column; }
+    #tutorial-level-modal .tut-level-cards,
+    #world-size-modal .tut-level-cards { flex-direction: column; }
 }
 
 /* Outro / credits overlay */

@@ -211,6 +211,8 @@ export function finalizeTame(game, wildAnimalId, colonistId, penX, penY) {
 
 function _finalizeTame(game, wildIdx, wildAnimal, spawnX, spawnY, colonistId) {
     game.entities.splice(wildIdx, 1);
+    const waIdx = game.wildAnimals.indexOf(wildAnimal);
+    if (waIdx >= 0) game.wildAnimals.splice(waIdx, 1);
     const tamed = createTamedEntity(wildAnimal.type, spawnX, spawnY);
     if (colonistId) tamed.bondedColonistId = colonistId;
     game.entities.push(tamed);

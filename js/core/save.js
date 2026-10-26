@@ -1,4 +1,5 @@
-import { CONFIG, ENTITIES } from './config.js';
+import { CONFIG, ENTITIES, WILDLIFE_CONFIG, PATHFINDING_CONFIG } from './config.js';
+import { createTile } from '../world/map.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
 import { recalcMaxMana, invalidateEquipStatCache, TRANSIENT_COLONIST_FIELDS, TRANSIENT_COLONIST_DEFAULTS } from '../entities/colonist.js';
@@ -231,6 +232,8 @@ function _buildSaveData(game) {
         speed: game.speed,
         settings: game.settings,
         peaceful: CONFIG.PEACEFUL_MODE,
+        mapWidth: CONFIG.MAP_WIDTH,
+        mapHeight: CONFIG.MAP_HEIGHT,
         layout,
 
         map: serializeMap(game.map),
@@ -579,16 +582,35 @@ function _applyLoadData(game, data) {
         }
 
         CONFIG.PEACEFUL_MODE = data.peaceful;
+
+        // Restore map dimensions from the save so the game runs at the size it
+        // was created with, regardless of the current default CONFIG values.
+        if (data.mapWidth && data.mapHeight) {
+            CONFIG.MAP_WIDTH  = data.mapWidth;
+            CONFIG.MAP_HEIGHT = data.mapHeight;
+            // Restore per-preset dependent values keyed on width.
+            // Sizes map to: 128=small, 256=medium, 384+=large.
+            const w = data.mapWidth;
+            if (w >= 384) {
+                WILDLIFE_CONFIG.maxCount = 150; WILDLIFE_CONFIG.animalSearchRadius = 40;
+                PATHFINDING_CONFIG.maxNodes = 60000; PATHFINDING_CONFIG.raiderSearchRadius = 200;
+            } else if (w >= 256) {
+                WILDLIFE_CONFIG.maxCount = 80;  WILDLIFE_CONFIG.animalSearchRadius = 30;
+                PATHFINDING_CONFIG.maxNodes = 40000; PATHFINDING_CONFIG.raiderSearchRadius = 150;
+            } else {
+                WILDLIFE_CONFIG.maxCount = 30;  WILDLIFE_CONFIG.animalSearchRadius = 20;
+                PATHFINDING_CONFIG.maxNodes = 20000; PATHFINDING_CONFIG.raiderSearchRadius = 100;
+            }
+        }
+
         game.tick = data.tick;
         game.timeOfDay = data.timeOfDay;
         game.speed = data.speed;
         game.settings = { ...game.settings, ...data.settings };
 
-        deserializeMap(game.map, data.map);
-        // deserializeMap rebuilds tiles but never touches mapIndex. Rebuild it
-        // explicitly so the index reflects the loaded map. Previously the index
-        // was only repopulated as a side effect of the periodic roomsDirty
-        // rebuild, which has been removed from the recompute hot path.
+        game.map = deserializeMap(data.map);
+        // deserializeMap returns a fresh array sized to the save's dimensions.
+        // Rebuild mapIndex explicitly so it reflects the loaded map.
         if (game.mapIndex) game.mapIndex.rebuild(game.map);
 
         game.colonistGroups = data.colonistGroups || [];
@@ -602,6 +624,7 @@ function _applyLoadData(game, data) {
         game.entities = data.entities || [];
         game.raiders = data.raiders || [];
         for (const e of game.entities) _restoreTransient(e, TRANSIENT_ENTITY_DEFAULTS);
+        game.wildAnimals = game.entities.filter(e => e.category === 'animal' && !e.tamed);
         for (const r of game.raiders) _restoreTransient(r, TRANSIENT_ENTITY_DEFAULTS);
 
         game.resources.stockpile = data.resources.stockpile;
@@ -916,16 +939,21 @@ function serializeMap(map) {
     return rows;
 }
 
-function deserializeMap(map, data) {
+// Builds and returns a fresh map array from serialized data. Building fresh
+// (rather than writing into a pre-allocated map) lets the map be any size
+// regardless of what CONFIG.MAP_WIDTH/HEIGHT was when the Game object was
+// constructed, which matters when loading a save made on a different world size.
+function deserializeMap(data) {
+    const map = [];
     for (let y = 0; y < data.length; y++) {
+        const row = [];
         for (let x = 0; x < data[y].length; x++) {
             const t = data[y][x];
-            const tile = map[y][x];
-            tile.terrain = t.t;
+            const tile = createTile(t.t);
             tile.passable = t.p === 1;
             tile.structure = t.s || null;
             tile.floor = t.fl || null;
-            tile.structureHp = t.shp !== undefined ? t.shp : undefined;
+            if (t.shp !== undefined) tile.structureHp = t.shp;
             tile.resource = t.r || null;
             tile.designation = t.d || null;
             tile.zone = t.z || null;
@@ -935,8 +963,11 @@ function deserializeMap(map, data) {
             tile.pedestalArtifact = t.pa || null;
             tile.roomId = null;
             tile.items = [];
+            row.push(tile);
         }
+        map.push(row);
     }
+    return map;
 }
 
 function captureLayout() {

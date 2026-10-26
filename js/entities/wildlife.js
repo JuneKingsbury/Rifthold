@@ -9,13 +9,13 @@ export function updateWildlife(game) {
     maybeSpawnAnimal(game);
     syncAnimalTasks(game);
 
-    for (let i = game.entities.length - 1; i >= 0; i--) {
-        const animal = game.entities[i];
-        if (animal.category !== 'animal') continue;
+    // Iterate the dedicated wild-animal subset to avoid scanning all entities.
+    for (let i = game.wildAnimals.length - 1; i >= 0; i--) {
+        const animal = game.wildAnimals[i];
+
         if (animal.tamed) {
-            if (animal.hp <= 0) {
-                game.entities.splice(i, 1);
-            }
+            // Animal was just tamed: evict from wildAnimals only (entities handled by taming.js).
+            game.wildAnimals.splice(i, 1);
             continue;
         }
 
@@ -57,7 +57,9 @@ export function updateWildlife(game) {
                     }
                 }
             }
-            game.entities.splice(i, 1);
+            const entIdx = game.entities.indexOf(animal);
+            if (entIdx >= 0) game.entities.splice(entIdx, 1);
+            game.wildAnimals.splice(i, 1);
             continue;
         }
         updateAnimal(animal, game);
@@ -67,7 +69,8 @@ export function updateWildlife(game) {
 function maybeSpawnAnimal(game) {
     const spawnRate = SEASON_EFFECTS[game.weather.season].animalSpawnRate;
     if (Math.random() > spawnRate) return;
-    const wildCount = game.entities.filter(e => e.category === 'animal' && !e.tamed && !e.pendingTame).length;
+    // Count using the dedicated subset — avoids scanning all entities.
+    const wildCount = game.wildAnimals.filter(e => !e.pendingTame).length;
     if (wildCount >= WILDLIFE_CONFIG.maxCount) return;
 
     let edge;
@@ -86,6 +89,7 @@ function maybeSpawnAnimal(game) {
 
     const animal = createWildAnimal(type, edge.x, edge.y);
     game.entities.push(animal);
+    game.wildAnimals.push(animal);
 }
 
 const _spawnTable = (() => {

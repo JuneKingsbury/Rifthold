@@ -1,4 +1,6 @@
 import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS, SEASONS, SEASON_ADVANCE_NOTICE, PRIORITY_PROFILES } from './config.js';
+import { WILDLIFE_CONFIG } from './config.js';
+import { PATHFINDING_CONFIG } from './config.js';
 import { initModsUI } from '../ui/ui-mods.js';
 import { getLoadedManifests, getDiscoveredManifests, setModEnabled, markModsInitialized } from './mod-registry.js';
 import { generateMap, getTileVisuals } from '../world/map.js';
@@ -270,6 +272,7 @@ class Game {
         this.colonistGroups = [];
         this._colonistById = new Map();
         this.entities = [];
+        this.wildAnimals = [];
         this.raiders = [];
         this.combatEffects = [];
         this.projectiles = [];
@@ -395,7 +398,9 @@ class Game {
                 const y = Math.floor(Math.random() * CONFIG.MAP_HEIGHT);
                 const tile = this.map[y][x];
                 if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock' || tile.resource) continue;
-                this.entities.push(createWildAnimal(type, x, y));
+                const wa = createWildAnimal(type, x, y);
+                this.entities.push(wa);
+                this.wildAnimals.push(wa);
                 break;
             }
         }
@@ -1851,6 +1856,7 @@ class Game {
         if (CONFIG.PEACEFUL_MODE) {
             this.raiders = [];
             this.entities = this.entities.filter(e => !(e.category === 'animal' && !e.tamed && e.hostile));
+            this.wildAnimals = this.wildAnimals.filter(e => !(e.category === 'animal' && !e.tamed && e.hostile));
         }
     }
 
@@ -6029,6 +6035,65 @@ _onDOMReady(() => {
 
     // Asks how familiar the player is with colony sims so the tutorial can fit them.
     // `onChoose(level)` gets 'none' | 'some' | 'veteran', or null to leave tutorial settings as they are.
+    const WORLD_PRESETS = {
+        small: {
+            mapWidth: 128, mapHeight: 128,
+            maxAnimals: 30, animalSearchRadius: 20,
+            maxNodes: 20000, raiderSearchRadius: 100,
+        },
+        medium: {
+            mapWidth: 256, mapHeight: 256,
+            maxAnimals: 80, animalSearchRadius: 30,
+            maxNodes: 40000, raiderSearchRadius: 150,
+        },
+        large: {
+            mapWidth: 384, mapHeight: 384,
+            maxAnimals: 150, animalSearchRadius: 40,
+            maxNodes: 60000, raiderSearchRadius: 200,
+        },
+    };
+
+    function applyWorldPreset(size) {
+        const p = WORLD_PRESETS[size] || WORLD_PRESETS.large;
+        CONFIG.MAP_WIDTH           = p.mapWidth;
+        CONFIG.MAP_HEIGHT          = p.mapHeight;
+        WILDLIFE_CONFIG.maxCount   = p.maxAnimals;
+        WILDLIFE_CONFIG.animalSearchRadius = p.animalSearchRadius;
+        PATHFINDING_CONFIG.maxNodes         = p.maxNodes;
+        PATHFINDING_CONFIG.raiderSearchRadius = p.raiderSearchRadius;
+    }
+
+    function promptWorldSize(onChoose) {
+        const modal = document.getElementById('world-size-modal');
+        if (!modal) { onChoose(); return; }
+
+        let stored = {};
+        try { stored = JSON.parse(localStorage.getItem('colony_settings')) || {}; } catch (e) { /* ignore */ }
+        const current = stored.worldSize || 'large';
+        modal.querySelectorAll('[data-world-size]').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.worldSize === current);
+        });
+
+        modal.style.display = 'flex';
+        const close = () => { modal.style.display = 'none'; modal.onclick = null; };
+        modal.onclick = (e) => {
+            const choice = e.target.closest('[data-world-size]');
+            if (choice) {
+                close();
+                const size = choice.dataset.worldSize;
+                try {
+                    const s = JSON.parse(localStorage.getItem('colony_settings') || '{}');
+                    s.worldSize = size;
+                    localStorage.setItem('colony_settings', JSON.stringify(s));
+                } catch (e2) { /* best-effort */ }
+                applyWorldPreset(size);
+                onChoose();
+            } else if (e.target.closest('[data-world-cancel]') || e.target === modal) {
+                close();
+            }
+        };
+    }
+
     function promptTutorialLevel(onChoose) {
         let stored = {};
         try { stored = JSON.parse(localStorage.getItem('colony_settings')) || {}; } catch (e) { /* use defaults */ }
@@ -6145,7 +6210,9 @@ _onDOMReady(() => {
         });
     };
 
-    document.getElementById('start-game').addEventListener('click', () => promptTutorialLevel(beginNewGame));
+    document.getElementById('start-game').addEventListener('click', () => {
+        promptWorldSize(() => promptTutorialLevel(beginNewGame));
+    });
 
     loadBtn.addEventListener('click', () => {
         openSaveSlotScreen();
