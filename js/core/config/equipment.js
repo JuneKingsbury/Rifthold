@@ -30,7 +30,7 @@ export const MATERIALS = {
 
 const BASE_RECIPES = {
     repair_trinket: { input: { runite: 1 }, output: {}, skill: 'crafting', ticks: 40, station: 'anvil', category: 'Materials', special: 'repair' },
-    cook_meal: { input: { foodstuffs: 5 }, output: { food: 4 }, skill: 'cooking', ticks: 8, station: 'cooking_pot', category: 'Food & Potions' },
+    cook_meal: { input: { foodstuffs: 6 }, output: { food: 3 }, skill: 'cooking', ticks: 8, station: 'cooking_pot', category: 'Food & Potions' },
 
     // Evocation
     craft_tome_of_spark: { input: { planks: 2, stone: 1 }, output: { tome_of_spark: 1 }, skill: 'crafting', ticks: 12, station: 'workbench', category: 'Tomes' },
