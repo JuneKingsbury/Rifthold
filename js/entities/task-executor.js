@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, INDESTRUCTIBLE_STRUCTURES, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
 import { spawnParticle, spawnYieldFloaty } from '../ui/overlay-renderer.js';
 import { completeTame, finalizeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
@@ -618,6 +618,7 @@ export function completeTask(colonist, task, game) {
         }
         case 'deconstruct': {
             const tile = game.map[task.y][task.x];
+            if (INDESTRUCTIBLE_STRUCTURES.has(tile.structure)) { tile.designation = null; break; }
             const target = tile.structure || tile.floor;
             if (target) {
                 const def = BUILDINGS[target];

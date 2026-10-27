@@ -1,4 +1,4 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS } from '../core/config.js';
+import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS, INDESTRUCTIBLE_STRUCTURES } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
@@ -1117,7 +1117,7 @@ export function updateFires(game) {
             game.mapIndex.removeFire(x, y);
             if (tile.resource?.type === 'tree') {
                 tile.resource = null;
-            } else if (tile.structure && tile.structure !== 'wall') {
+            } else if (tile.structure && tile.structure !== 'wall' && !INDESTRUCTIBLE_STRUCTURES.has(tile.structure)) {
                 const oldStructure = tile.structure;
                 if (oldStructure === 'bed') {
                     for (const c of game.colonists) {
@@ -1187,7 +1187,7 @@ function _updateFiresFallback(game) {
                 tile.onFire = false;
                 if (tile.resource?.type === 'tree') {
                     tile.resource = null;
-                } else if (tile.structure && tile.structure !== 'wall') {
+                } else if (tile.structure && tile.structure !== 'wall' && !INDESTRUCTIBLE_STRUCTURES.has(tile.structure)) {
                     // Keep mapIndex in sync, matching the primary fire path
                     // (~line 1109). Without this the index retains a burned-out
                     // structure key and drifts from a fresh rebuild.

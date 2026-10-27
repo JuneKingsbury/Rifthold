@@ -28,7 +28,7 @@ export class InputHandler {
 
         this.buildCategories = BUILD_CATEGORIES;
         this.buildCategory = BUILD_CATEGORIES[0];
-        this.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === this.buildCategory);
+        this.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === this.buildCategory && !BUILDINGS[k].noBuild);
         this.dragBuildTypes = DRAG_BUILD_TYPES;
         this.cropOptions = Object.keys(CROPS);
         this.designateMode = 'chop';
@@ -558,7 +558,7 @@ export class InputHandler {
 
     setBuildCategory(cat) {
         this.buildCategory = cat;
-        this.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === cat);
+        this.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === cat && !BUILDINGS[k].noBuild);
         if (this.buildOptions.length > 0 && !this.buildOptions.includes(this.buildType)) {
             this.buildType = this.buildOptions[0];
         }

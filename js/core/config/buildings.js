@@ -61,7 +61,7 @@ export const BUILDINGS = {
     trade_rift:        { char: '⇄', color: '#66ccaa', cost: { runite: 3, stone: 6, planks: 4 }, work: 45, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'trade_routes', maxCount: 1, power: { consumes: 3 }, description: 'A rift-linked request board. Far-off traders post barters for mystery goods, with new offers each season. Consumes 3 mana.' },
     beacon:            { char: '☀', color: '#ffffaa', cost: { stone: 4, runite: 3, planks: 2 }, work: 35, structureType: 'furniture', category: 'Arcane', lightRadius: 15, research: 'brilliance', power: { consumes: 4, radius: 10 }, description: 'Radiant beacon. Massive light radius 15. Consumes 4 mana.' },
     ritual_chalk:      { char: '◌', color: '#cc99ff', bg: '#2a1a3a', cost: { void_essence: 1 }, work: 8, structureType: 'furniture', category: 'Arcane', dragPlace: true, noShadow: true, research: 'ritual_magic', description: 'Arcane chalk markings. Lay around an Arcane Core in the correct shape to activate a complex structure. Walkable.' },
-    arcane_core:       { char: '◎', color: '#aa66ff', cost: { runite: 4, void_essence: 2, planks: 3 }, work: 45, structureType: 'furniture', category: 'Arcane', research: 'ritual_magic', description: 'Arcane focus point. Draw Ritual Chalk in the correct pattern around it to activate a complex structure. See the Glossary for patterns.' },
+    arcane_core:       { char: '◎', color: '#aa66ff', cost: {}, work: 0, structureType: 'furniture', category: 'Arcane', noBuild: true, indestructible: true, description: 'Arcane focus point found only in ancient ruins. It cannot be built or destroyed. Draw Ritual Chalk in the correct pattern around it to activate a complex structure. See the Glossary for patterns.' },
     rift_gate:         { char: 'Ω', color: '#33ccff', cost: { runite: 4, stone: 6, planks: 4, void_essence: 8 }, work: 60, structureType: 'furniture', category: 'Arcane', passable: { colonist: false, animal: false, enemy: false }, research: 'planar_rift', maxCount: 1, power: { consumes: 6 }, description: 'Send exploration parties to other realms. Consumes 6 mana.' },
 };
 
@@ -85,6 +85,11 @@ export const IMPASSABLE_STRUCTURES = new Set(
 );
 export const ENEMY_BLOCKED_STRUCTURES = new Set(
     Object.entries(BUILDINGS).filter(([, b]) => b.passable && !b.passable.enemy).map(([k]) => k)
+);
+// Structures the player can neither place nor remove (e.g. the Arcane Core, which only
+// exists in pre-generated ruins). Guards deconstruction, replacement and fire.
+export const INDESTRUCTIBLE_STRUCTURES = new Set(
+    Object.entries(BUILDINGS).filter(([, b]) => b.indestructible).map(([k]) => k)
 );
 export const BREAKABLE_STRUCTURES = new Set(
     Object.entries(BUILDINGS).filter(([, b]) => b.breakable).map(([k]) => k)

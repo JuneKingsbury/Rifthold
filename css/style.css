@@ -5779,6 +5779,7 @@ details.settings-debug > summary::marker {
 #world-size-modal .tut-level-name { color: #ffcc00; font-size: 14px; font-weight: bold; }
 #tutorial-level-modal .tut-level-desc,
 #world-size-modal .tut-level-desc { font-size: 11px; line-height: 1.5; }
+#world-size-modal .tut-level-stats { font-size: 11px; line-height: 1.5; color: #bb99ff; margin-top: auto; }
 
 #tutorial-level-modal .tut-level-footer,
 #world-size-modal .tut-level-footer {

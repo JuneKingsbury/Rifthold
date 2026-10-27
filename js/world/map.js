@@ -29,6 +29,7 @@ const GENERATOR_FUNCTIONS = {
 };
 
 export function generateMap() {
+    placedLandmarks = [];
     const map = [];
     for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
         map[y] = [];
@@ -44,6 +45,7 @@ export function generateMap() {
     }
 
     clearStartingArea(map);
+    restoreLandmarkRituals(map);
     // Last, so nothing painted above (start-area clearing, landmark and ruin floors)
     // can leave water touching normal terrain.
     generateWaterShores(map);
@@ -704,45 +706,112 @@ function _placeOases(map, biomeMap, W, H, seed, params) {
     }
 }
 
-// Places one landmark ruin per biome using the LANDMARK_BLUEPRINTS library.
-// Each landmark is placed at a random position within its biome's territory.
+// Landmarks placed by the current generateMap run, so restoreLandmarkRituals can
+// re-stamp their cores after the later generators have had their say.
+let placedLandmarks = [];
+
+// True for the authored pieces that must always survive generation.
+function isRitualPiece(type) {
+    return type === 'arcane_core' || type === 'ritual_chalk';
+}
+
+// Stamps one blueprint piece onto the map. Core and chalk are authored, never
+// decayed, and override water: Arcane Cores exist only in these landmarks, so
+// losing one would remove it from the world for good.
+function _stampLandmarkPiece(map, W, H, blueprint, ox, oy, piece, decayChance, floorDecayChance) {
+    const wx = ox + piece.x, wy = oy + piece.y;
+    if (wx < 0 || wx >= W || wy < 0 || wy >= H) return;
+    const tile = map[wy][wx];
+    const ritual = isRitualPiece(piece.type);
+    if (isWaterTerrain(tile.terrain)) {
+        if (!ritual) return;
+        tile.terrain = blueprint.floorTerrain || 'dirt';
+    }
+    const isFloor = BUILDINGS[piece.type] && BUILDINGS[piece.type].structureType === 'floor';
+    const decay = isFloor ? floorDecayChance : decayChance;
+    if (!ritual && Math.random() < decay) return;
+    if (isFloor) {
+        tile.floor = piece.type;
+    } else {
+        tile.structure = piece.type;
+        tile.passable = !(IMPASSABLE_STRUCTURES.has(piece.type));
+        if (BUILDINGS[piece.type] && BUILDINGS[piece.type].hp) {
+            tile.structureHp = BUILDINGS[piece.type].hp;
+        }
+    }
+    tile.resource = null;
+}
+
+// Places every LANDMARK_BLUEPRINTS ruin (one per ritual shape, each holding an
+// Arcane Core) on every map, whatever its size. Each goes at a random position
+// inside its blueprint's `biome`. Cores cannot be rebuilt, so placement must not
+// fail: candidate positions are filtered exhaustively against earlier landmarks and
+// the start area, widening from sampled in-biome spots, to every in-biome spot, to
+// anywhere on the map (nearest the biome when it has any territory). Largest
+// blueprints go first so the big ones are not squeezed out.
 function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
     const placed = [];
+    placedLandmarks = [];
     const padding = 4;
-    const maxAttempts = 40;
     const decayChance = 0.25;
     const floorDecayChance = 0.10;
+    const startCx = Math.floor(W / 2), startCy = Math.floor(H / 2), startKeepOut = 7;
 
-    for (const [biomeKey, biomeDef] of Object.entries(BIOMES)) {
-        const blueprintKey = biomeDef.landmark;
-        const blueprint = LANDMARK_BLUEPRINTS[blueprintKey];
-        if (!blueprint) continue;
+    const blueprints = Object.values(LANDMARK_BLUEPRINTS)
+        .sort((a, b) => b.width * b.height - a.width * a.height);
 
-        // Collect candidate tile positions inside this biome (not too close to edge).
-        // Sample sparsely for speed then pick randomly.
+    for (const blueprint of blueprints) {
+        const biomeKey = blueprint.biome;
+
+        // clearStartingArea runs last and wipes structures there, which would erase
+        // the landmark's Arcane Core.
+        const isFree = (x, y) =>
+            !(x < startCx + startKeepOut + 1 && x + blueprint.width > startCx - startKeepOut &&
+              y < startCy + startKeepOut + 1 && y + blueprint.height > startCy - startKeepOut) &&
+            !placed.some(r =>
+                x < r.x + r.w + padding && x + blueprint.width  + padding > r.x &&
+                y < r.y + r.h + padding && y + blueprint.height + padding > r.y);
+
         const margin = blueprint.width + 4;
-        const candidates = [];
-        for (let y = margin; y < H - margin; y += 3) {
-            for (let x = margin; x < W - margin; x += 3) {
-                if (biomeMap[y][x] === biomeKey) candidates.push({ x, y });
+        const collect = (step, inBiomeOnly) => {
+            const out = [];
+            for (let y = margin; y < H - margin; y += step) {
+                for (let x = margin; x < W - margin; x += step) {
+                    if (inBiomeOnly && biomeMap[y][x] !== biomeKey) continue;
+                    if (isFree(x, y)) out.push({ x, y });
+                }
+            }
+            return out;
+        };
+
+        let candidates = collect(3, true);
+        if (candidates.length === 0) candidates = collect(1, true);
+        if (candidates.length === 0) {
+            // Biome too small or crowded: take the free spot closest to its territory.
+            const anywhere = collect(1, false);
+            const biomeTiles = [];
+            for (let y = 0; y < H; y += 3) {
+                for (let x = 0; x < W; x += 3) if (biomeMap[y][x] === biomeKey) biomeTiles.push({ x, y });
+            }
+            if (biomeTiles.length > 0) {
+                const target = biomeTiles[Math.floor(Math.random() * biomeTiles.length)];
+                anywhere.sort((a, b) =>
+                    Math.abs(a.x - target.x) + Math.abs(a.y - target.y) -
+                    (Math.abs(b.x - target.x) + Math.abs(b.y - target.y)));
+                candidates = anywhere.slice(0, 1);
+            } else {
+                candidates = anywhere;
             }
         }
-        if (candidates.length === 0) continue;
+        if (candidates.length === 0) {
+            console.warn(`Landmark ${blueprint.name} could not be placed: no free space on the map`);
+            continue;
+        }
 
-        let cx2, cy2, overlaps;
-        let attempts = 0;
-        do {
-            const pick = candidates[Math.floor(Math.random() * candidates.length)];
-            cx2 = pick.x; cy2 = pick.y;
-            overlaps = placed.some(r =>
-                cx2 < r.x + r.w + padding && cx2 + blueprint.width  + padding > r.x &&
-                cy2 < r.y + r.h + padding && cy2 + blueprint.height + padding > r.y
-            );
-            attempts++;
-        } while (overlaps && attempts < maxAttempts);
-        if (overlaps) continue;
-
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        const cx2 = pick.x, cy2 = pick.y;
         placed.push({ x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
+        placedLandmarks.push({ blueprint, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
 
         // Paint floor terrain under the footprint.
         if (blueprint.floorTerrain) {
@@ -760,23 +829,20 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
 
         // Place structures from the layout with decay.
         for (const piece of blueprint.layout) {
-            const wx = cx2 + piece.x, wy = cy2 + piece.y;
-            if (wx < 0 || wx >= W || wy < 0 || wy >= H) continue;
-            const tile = map[wy][wx];
-            if (isWaterTerrain(tile.terrain)) continue;
-            const isFloor = BUILDINGS[piece.type] && BUILDINGS[piece.type].structureType === 'floor';
-            const decay = isFloor ? floorDecayChance : decayChance;
-            if (Math.random() < decay) continue;
-            if (isFloor) {
-                tile.floor = piece.type;
-            } else {
-                tile.structure = piece.type;
-                tile.passable = !(IMPASSABLE_STRUCTURES.has(piece.type));
-                if (BUILDINGS[piece.type] && BUILDINGS[piece.type].hp) {
-                    tile.structureHp = BUILDINGS[piece.type].hp;
-                }
-            }
-            tile.resource = null;
+            _stampLandmarkPiece(map, W, H, blueprint, cx2, cy2, piece, decayChance, floorDecayChance);
+        }
+    }
+}
+
+// Re-stamps every landmark's Arcane Core and chalk. Generators that run after
+// biome_layout (rivers, rock and mountain passes, generic ruins, the start-area
+// clear) can paint over them; this runs after all of those so the world always
+// ends up with one intact core per landmark.
+function restoreLandmarkRituals(map) {
+    const W = CONFIG.MAP_WIDTH, H = CONFIG.MAP_HEIGHT;
+    for (const { blueprint, x, y } of placedLandmarks) {
+        for (const piece of blueprint.layout) {
+            if (isRitualPiece(piece.type)) _stampLandmarkPiece(map, W, H, blueprint, x, y, piece, 0, 0);
         }
     }
 }
@@ -1030,11 +1096,16 @@ function generateRiver(map, params) {
     }
 }
 
+// Generic (core-less) ruins. How many scales with map area (params.tilesPer), and
+// each is placed only where it fits: they keep clear of the landmark ruins and each
+// other, and a ruin that finds no room is skipped rather than forced.
 function generateRuins(map, params) {
-    const count = params.count || 1;
-    const placed = [];
+    const count = params.tilesPer
+        ? Math.max(params.minCount ?? 1, Math.round(CONFIG.MAP_WIDTH * CONFIG.MAP_HEIGHT / params.tilesPer))
+        : (params.count || 1);
+    const placed = placedLandmarks.map(l => ({ x: l.x, y: l.y, w: l.w, h: l.h }));
     const padding = 2;
-    const maxAttempts = 20;
+    const maxAttempts = 60;
 
     for (let i = 0; i < count; i++) {
         if (Math.random() > (params.chance ?? 1.0)) continue;
