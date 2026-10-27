@@ -1,4 +1,4 @@
-import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, BIOMES, LANDMARK_BLUEPRINTS, CROPS } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, BIOMES, BIOME_TRANSITIONS, GRASS_TERRAIN, LANDMARK_BLUEPRINTS, CROPS } from '../core/config.js';
 
 export function createTile(terrain) {
     return {
@@ -44,6 +44,9 @@ export function generateMap() {
     }
 
     clearStartingArea(map);
+    // Last, so nothing painted above (start-area clearing, landmark and ruin floors)
+    // can leave water touching normal terrain.
+    generateWaterShores(map);
     return map;
 }
 
@@ -56,6 +59,25 @@ function valueNoise(x, y, seed) {
     h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
     h = h ^ (h >>> 16);
     return (h >>> 0) / 0xffffffff;
+}
+
+// Smooth value noise in [0,1): valueNoise on an integer lattice `cell` tiles
+// apart, bilinearly interpolated with a smoothstep. Unlike raw valueNoise, nearby
+// tiles get nearby values, so thresholding it yields coherent patches.
+function smoothNoise(x, y, seed, cell) {
+    const gx = x / cell, gy = y / cell;
+    const x0 = Math.floor(gx), y0 = Math.floor(gy);
+    const fx = gx - x0, fy = gy - y0;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = valueNoise(x0,     y0,     seed), b = valueNoise(x0 + 1, y0,     seed);
+    const c = valueNoise(x0,     y0 + 1, seed), d = valueNoise(x0 + 1, y0 + 1, seed);
+    return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
+}
+
+// Two octaves of smoothNoise (the second at half the cell size) for ragged,
+// natural-looking edges on top of the broad shape. Result stays in [0,1).
+function fbmNoise(x, y, seed, cell) {
+    return (smoothNoise(x, y, seed, cell) + 0.5 * smoothNoise(x, y, seed + 1, cell / 2)) / 1.5;
 }
 
 // Weighted random pick from {key: weight} table using a [0,1) value.
@@ -83,7 +105,7 @@ function fisherYates(arr, rngFn) {
 //
 // Biome assignment uses domain-warped Voronoi: scatter N seed points per biome
 // across the map (outside the center grassland reserve), then for each tile
-// displace its lookup coordinates with low-frequency noise before finding the
+// displace its lookup coordinates with smooth low-frequency noise before finding the
 // nearest seed. This produces organic blob-shaped biomes that can appear
 // anywhere on the map (Terraria-style) rather than fixed angular wedges.
 function generateBiomeLayout(map, params) {
@@ -100,7 +122,7 @@ function generateBiomeLayout(map, params) {
     const outerBiomeKeys = ['forest', 'mountain', 'swamp', 'desert', 'tundra'];
     const N = params.seedsPerBiome;
     const minSeedDist = Math.min(W, H) / 6;
-    const innerGuard = maxR * params.innerRadius * 1.5; // keep seeds away from center
+    const innerGuard = maxR * params.innerRadius * (1 + params.innerJitter) * 1.2; // keep seeds clear of the widest lobe
     const seeds = []; // [{x, y, biome}]
 
     let rngState = seed;
@@ -108,6 +130,18 @@ function generateBiomeLayout(map, params) {
         rngState = (rngState * 1664525 + 1013904223) | 0;
         return (rngState >>> 0) / 0x100000000;
     };
+
+    // Extra grassland regions sit on a ring around the centre, spread out by angle.
+    // Placed first so the outer biomes' seeds keep clear of them.
+    const grassCount = params.grasslandSeeds || 0;
+    const grassAngle0 = lcg() * Math.PI * 2;
+    for (let k = 0; k < grassCount; k++) {
+        const a = grassAngle0 + k * (Math.PI * 2 / grassCount) + (lcg() - 0.5);
+        const r = (0.38 + lcg() * 0.22) * maxR;
+        const gx = Math.max(8, Math.min(W - 9, Math.round(cx + Math.cos(a) * r)));
+        const gy = Math.max(8, Math.min(H - 9, Math.round(cy + Math.sin(a) * r)));
+        seeds.push({ x: gx, y: gy, biome: 'grassland' });
+    }
 
     for (const biomeKey of outerBiomeKeys) {
         let placed = 0;
@@ -133,65 +167,126 @@ function generateBiomeLayout(map, params) {
         biomeMap[y] = [];
         for (let x = 0; x < W; x++) {
             const distCenter = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-            if (distCenter < maxR * params.innerRadius) {
+            // The central grassland's edge wanders in and out with smooth noise
+            // rather than following a perfect circle. fbmNoise clusters around 0.5,
+            // so the (n - 0.5) * 2 term is scaled up to use the full jitter range.
+            const edgeNoise = (fbmNoise(x, y, seed + 303, params.innerCell) - 0.5) * 2;
+            const innerR = maxR * params.innerRadius * (1 + params.innerJitter * edgeNoise * 1.6);
+            if (distCenter < innerR) {
                 biomeMap[y][x] = 'grassland';
                 continue;
             }
 
             // Domain warp: displace lookup coords with two noise samples.
-            const wx = x + (valueNoise(x, y, seed)           - 0.5) * 2 * warp;
-            const wy = y + (valueNoise(x + 7919, y + 4999, seed) - 0.5) * 2 * warp;
+            // Smooth noise (not per-tile hash noise) so neighbouring tiles are
+            // displaced together; otherwise biome borders dissolve into speckle.
+            const wx = x + (fbmNoise(x, y, seed + 101, params.warpCell) - 0.5) * 2 * warp;
+            const wy = y + (fbmNoise(x, y, seed + 202, params.warpCell) - 0.5) * 2 * warp;
 
             // Nearest Voronoi seed in warped space.
             let nearestBiome = 'grassland';
             let nearestDist = Infinity;
             for (const s of seeds) {
-                const d = (wx - s.x) ** 2 + (wy - s.y) ** 2;
+                // Dividing by areaWeight^2 makes heavier biomes win more of the map.
+                const w = BIOMES[s.biome].areaWeight ?? 1;
+                const d = ((wx - s.x) ** 2 + (wy - s.y) ** 2) / (w * w);
                 if (d < nearestDist) { nearestDist = d; nearestBiome = s.biome; }
             }
             biomeMap[y][x] = nearestBiome;
         }
     }
 
-    // Transition smoothing: for tiles near a biome boundary, blend terrain by
-    // using the neighbor's biome terrain choice probabilistically.
-    // (We do this implicitly during terrain painting below by sampling neighboring
-    // biome assignment with a falloff, so no extra pass needed.)
+    // Guarantee every sizeable grassland region is attached to the centre. The
+    // Voronoi cells (plus the warp) can leave a region, or a fragment of one, cut
+    // off, so for each such region carve a wandering corridor from the centre to its
+    // nearest tile. Fragments under MIN_REGION tiles are left as they are.
+    const MIN_REGION = 80;
+    for (let pass = 0; pass < 8; pass++) {
+        const connected = _floodBiome(biomeMap, W, H, Math.round(cx), Math.round(cy), 'grassland');
+        let target = null;
+        for (let y = 0; y < H && !target; y++) {
+            for (let x = 0; x < W && !target; x++) {
+                if (biomeMap[y][x] !== 'grassland' || connected.has(y * W + x)) continue;
+                const region = _floodBiome(biomeMap, W, H, x, y, 'grassland');
+                if (region.size < MIN_REGION) {
+                    // Too small to matter: mark seen by treating it as handled this pass.
+                    for (const k of region) connected.add(k);
+                    continue;
+                }
+                let best = Infinity;
+                for (const k of region) {
+                    const rx = k % W, ry = (k - rx) / W;
+                    const d = (rx - cx) ** 2 + (ry - cy) ** 2;
+                    if (d < best) { best = d; target = { x: rx, y: ry }; }
+                }
+            }
+        }
+        if (!target) break;
+        _carveGrasslandCorridor(biomeMap, W, H, cx, cy, target.x, target.y, seed + pass);
+    }
 
-    // Paint terrain based on biome assignment.
+    // Paint terrain as coherent patches. Each tile gets a smooth noise value from
+    // its own biome's field; within a biome the values are ranked and split at the
+    // cumulative terrainWeights, so the mix matches the weights exactly while
+    // each terrain forms contiguous patches rather than per-tile speckle.
+    const biomeKeys = Object.keys(BIOMES);
+    const field = [];
+    const valuesByBiome = {};
+    for (let y = 0; y < H; y++) {
+        field[y] = [];
+        for (let x = 0; x < W; x++) {
+            const biome = biomeMap[y][x];
+            const v = fbmNoise(x, y, seed + 500 * (biomeKeys.indexOf(biome) + 1), BIOMES[biome].patchScale);
+            field[y][x] = v;
+            (valuesByBiome[biome] ||= []).push(v);
+        }
+    }
+    const bandCutoffs = {}; // biome -> [{terrain, max}], ascending
+    for (const [biome, values] of Object.entries(valuesByBiome)) {
+        values.sort((p, q) => p - q);
+        const weights = BIOMES[biome].terrainWeights;
+        const total = Object.values(weights).reduce((p, q) => p + q, 0);
+        let cum = 0;
+        bandCutoffs[biome] = Object.entries(weights).map(([terrain, w]) => {
+            cum += w / total;
+            return { terrain, max: values[Math.min(values.length - 1, Math.floor(cum * values.length))] };
+        });
+        bandCutoffs[biome][bandCutoffs[biome].length - 1].max = Infinity;
+    }
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             const tile = map[y][x];
             const biome = biomeMap[y][x];
-            const biomeDef = BIOMES[biome];
+            const terrainKey = bandCutoffs[biome].find(band => field[y][x] <= band.max).terrain;
+            tile.terrain = terrainKey;
+            tile.passable = TERRAIN[terrainKey].passable.colonist;
+            tile.biome = biome;
+        }
+    }
 
-            // Near-boundary blending: tiles adjacent to a different biome have a
-            // chance to take that neighbor's terrain weights for organic edges.
-            let effectiveBiomeDef = biomeDef;
-            let neighborBiome = null;
-            let neighborCount = 0;
-            for (let ny = y - 1; ny <= y + 1; ny++) {
-                for (let nx = x - 1; nx <= x + 1; nx++) {
-                    if (nx === x && ny === y) continue;
-                    if (ny < 0 || ny >= H || nx < 0 || nx >= W) continue;
-                    const nb = biomeMap[ny][nx];
-                    if (nb !== biome) { neighborBiome = nb; neighborCount++; }
+    // Neutral strip between clashing biomes (see BIOME_TRANSITIONS). Width varies
+    // per tile so the strip's edges stay ragged. Reads biomeMap only, so the
+    // result doesn't depend on scan order.
+    const tw = params.transitionWidth;
+    if (tw > 0) {
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                const biome = biomeMap[y][x];
+                const reach = 1 + Math.floor(valueNoise(x + 20000, y + 20000, seed) * tw);
+                let strip = null;
+                for (let ny = Math.max(0, y - reach); ny <= Math.min(H - 1, y + reach) && !strip; ny++) {
+                    for (let nx = Math.max(0, x - reach); nx <= Math.min(W - 1, x + reach); nx++) {
+                        const nb = biomeMap[ny][nx];
+                        if (nb === biome) continue;
+                        strip = BIOME_TRANSITIONS[[biome, nb].sort().join('|')];
+                        if (strip) break;
+                    }
+                }
+                if (strip) {
+                    map[y][x].terrain = strip;
+                    map[y][x].passable = TERRAIN[strip].passable.colonist;
                 }
             }
-            if (neighborCount >= 2 && neighborBiome) {
-                const blendChance = neighborCount / 8;
-                if (valueNoise(x + 20000, y + 20000, seed) < blendChance) {
-                    effectiveBiomeDef = BIOMES[neighborBiome];
-                }
-            }
-
-            const terrainKey = weightedPick(effectiveBiomeDef.terrainWeights, valueNoise(x + 30000, y + 30000, seed));
-            const terrainDef = TERRAIN[terrainKey];
-            if (terrainDef) {
-                tile.terrain = terrainKey;
-                tile.passable = terrainDef.passable.colonist;
-            }
-            tile.biome = biomeMap[y][x];
         }
     }
 
@@ -199,7 +294,7 @@ function generateBiomeLayout(map, params) {
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             const tile = map[y][x];
-            if (tile.terrain !== 'grass') continue;
+            if (!GRASS_TERRAIN.has(tile.terrain)) continue;
             const biomeDef = BIOMES[tile.biome];
             if (!biomeDef || !biomeDef.treeDensity) continue;
             if (valueNoise(x + 40000, y + 40000, seed) < biomeDef.treeDensity) {
@@ -261,8 +356,56 @@ function generateBiomeLayout(map, params) {
     // Scatter ponds weighted by biome.
     _placePonds(map, biomeMap, W, H, seed);
 
+    // Desert oases (water, grass, and trees in the sand).
+    _placeOases(map, biomeMap, W, H, seed, params);
+
     // Place one landmark ruin per biome.
     _placeBiomeLandmarks(map, biomeMap, W, H, seed);
+}
+
+// Returns the set of tile indices (y * W + x) 4-connected to (sx, sy) that hold `biome`.
+function _floodBiome(biomeMap, W, H, sx, sy, biome) {
+    const seen = new Set();
+    if (biomeMap[sy]?.[sx] !== biome) return seen;
+    const stack = [sy * W + sx];
+    seen.add(stack[0]);
+    while (stack.length) {
+        const idx = stack.pop();
+        const x = idx % W, y = (idx - x) / W;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+            const k = ny * W + nx;
+            if (seen.has(k) || biomeMap[ny][nx] !== biome) continue;
+            seen.add(k);
+            stack.push(k);
+        }
+    }
+    return seen;
+}
+
+// Paints a grassland corridor, about 6-9 tiles wide, from (x0, y0) to (x1, y1).
+// The path wobbles sideways with smooth noise (zero at both ends) and its width
+// varies, so it reads as a natural neck between two grassy areas, not a road.
+function _carveGrasslandCorridor(biomeMap, W, H, x0, y0, x1, y1, seed) {
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    const nx = -(y1 - y0) / len, ny = (x1 - x0) / len; // unit normal to the path
+    const steps = Math.ceil(len * 2);
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const taper = Math.sin(t * Math.PI);
+        const wobble = (smoothNoise(t * len, 0, seed + 404, 14) - 0.5) * 2 * 10 * taper;
+        const px = x0 + (x1 - x0) * t + nx * wobble;
+        const py = y0 + (y1 - y0) * t + ny * wobble;
+        const r = 3.2 + smoothNoise(t * len, 7, seed + 505, 8) * 1.8;
+        for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++) {
+            for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
+                const tx = Math.round(px) + dx, ty = Math.round(py) + dy;
+                if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
+                if (dx * dx + dy * dy <= r * r) biomeMap[ty][tx] = 'grassland';
+            }
+        }
+    }
 }
 
 // Computes the approximate centroid (x,y) of a biome region on the map.
@@ -341,6 +484,7 @@ function _placeBiomeRiver(map, biomeMap, W, H, cx, cy, sourceBiome = 'mountain',
             const py = ry + (horizontal ? 0 : dw);
             if (px >= 0 && px < W && py >= 0 && py < H) {
                 map[py][px] = createTile('water');
+                map[py][px].biome = biomeMap[py][px];
                 visited.add((py << 16) | px);
             }
         }
@@ -361,25 +505,29 @@ function _placeBiomeRiver(map, biomeMap, W, H, cx, cy, sourceBiome = 'mountain',
     }
     // Ensure we actually reach the exit tile.
     map[end.y][end.x] = createTile('water');
+    map[end.y][end.x].biome = biomeMap[end.y][end.x];
     visited.add((end.y << 16) | end.x);
 
-    // River banks: sand adjacent to water, gravel one step further.
+    // River banks, innermost first: a shallow-water rim hugging the deep channel,
+    // then the biome's inner shore terrain, then its optional outer ring.
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             const tile = map[y][x];
             if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock' ||
                 tile.terrain === 'mud' || tile.terrain === 'shallow_water') continue;
             let minDist = Infinity;
-            for (let dy2 = -2; dy2 <= 2; dy2++) {
-                for (let dx2 = -2; dx2 <= 2; dx2++) {
+            for (let dy2 = -3; dy2 <= 3; dy2++) {
+                for (let dx2 = -3; dx2 <= 3; dx2++) {
                     if (visited.has(((y + dy2) << 16) | (x + dx2))) {
                         const d = Math.abs(dx2) + Math.abs(dy2);
                         if (d < minDist) minDist = d;
                     }
                 }
             }
-            if (minDist === 1 && Math.random() < 0.85) { tile.terrain = 'sand'; tile.resource = null; }
-            else if (minDist === 2 && Math.random() < 0.5) { tile.terrain = 'gravel'; tile.resource = null; }
+            const shore = BIOMES[biomeMap[y][x]].shore;
+            if (minDist === 1 && Math.random() < 0.9) { tile.terrain = 'shallow_water'; tile.resource = null; }
+            else if (minDist === 2 && Math.random() < 0.85) { tile.terrain = shore.inner; tile.resource = null; }
+            else if (minDist === 3 && shore.outer && Math.random() < 0.5) { tile.terrain = shore.outer; tile.resource = null; }
         }
     }
 }
@@ -394,6 +542,43 @@ const POND_BIOME_CHANCE = {
     mountain:  0.08,
     desert:    0.05,
 };
+
+// Paints one organic body of deep water centred on (cx2, cy2) and returns the tiles
+// it covers plus how far (in tiles) it can reach from the centre. `i` varies the
+// shape between bodies of water.
+function _paintOrganicWater(map, W, H, cx2, cy2, radius, i, seed) {
+    // Organic outline: each pond is a circle stretched into an ellipse (random
+    // angle, up to ~1.7:1), whose edge is then pushed in and out by smooth noise
+    // so it forms lobes and bays. A little per-tile jitter keeps the rim ragged.
+    const angle = valueNoise(i, 4, seed + 95000) * Math.PI;
+    const squash = Math.sqrt(1 + valueNoise(i, 5, seed + 96000) * 0.7);
+    const cosA = Math.cos(angle), sinA = Math.sin(angle);
+    const lobeSeed = seed + 97000 + i * 13;
+    const extent = Math.ceil(radius * 1.9) + 1;
+    const waterTiles = [];
+    for (let dy = -extent; dy <= extent; dy++) {
+        for (let dx = -extent; dx <= extent; dx++) {
+            const nx = cx2 + dx, ny = cy2 + dy;
+            if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+            const u = dx * cosA + dy * sinA;
+            const v = -dx * sinA + dy * cosA;
+            const dist = Math.sqrt((u / squash) ** 2 + (v * squash) ** 2);
+            const lobe = (smoothNoise(nx, ny, lobeSeed, 5) + 0.5 * smoothNoise(nx, ny, lobeSeed + 1, 2.5)) / 1.5;
+            // Same -0.5 .. -0.75 average shrink the old circular ponds had, so
+            // pond size stays about where it was.
+            const edge = radius * (1 + 0.6 * (lobe - 0.5) * 2) - 0.5 - valueNoise(nx + 94000, ny + 94000, seed) * 0.5;
+            if (dist > edge) continue;
+            // Don't overwrite hard terrain.
+            const t = map[ny][nx];
+            if (t.terrain === 'tall_rock') continue;
+            t.terrain = 'water';
+            t.passable = TERRAIN.water.passable.colonist;
+            t.resource = null;
+            waterTiles.push({ x: nx, y: ny });
+        }
+    }
+    return { waterTiles, extent };
+}
 
 function _placePonds(map, biomeMap, W, H, seed) {
     // Pond count scales with map area; base rate ~1 per 800 tiles.
@@ -410,40 +595,110 @@ function _placePonds(map, biomeMap, W, H, seed) {
 
         const radius = 2 + Math.floor(valueNoise(i, 3, seed + 93000) * 4); // 2–5 tiles
 
-        // Reject if too close to another pond.
-        if (placed.some(p => Math.sqrt((p.cx - cx2) ** 2 + (p.cy - cy2) ** 2) < p.r + radius + 4)) continue;
-        placed.push({ cx: cx2, cy: cy2, r: radius });
+        // Reject if too close to another pond. `r` is the pond's reach, which
+        // allows for the stretch and lobes below (up to ~1.5x the base radius).
+        const reach = Math.ceil(radius * 1.5);
+        if (placed.some(p => Math.sqrt((p.cx - cx2) ** 2 + (p.cy - cy2) ** 2) < p.r + reach + 4)) continue;
+        placed.push({ cx: cx2, cy: cy2, r: reach });
 
-        // Paint water in an irregular circle using per-tile noise to roughen the edge.
-        for (let dy = -radius; dy <= radius; dy++) {
-            for (let dx = -radius; dx <= radius; dx++) {
-                const nx = cx2 + dx, ny = cy2 + dy;
-                if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                // Roughen edge: shrink effective radius slightly with noise.
-                const jitter = valueNoise(nx + 94000, ny + 94000, seed) * 1.5;
-                if (dist > radius - jitter) continue;
-                // Don't overwrite existing water or hard terrain.
-                const t = map[ny][nx];
-                if (t.terrain === 'tall_rock') continue;
-                t.terrain = 'water';
-                t.passable = TERRAIN.water.passable.colonist;
-                t.resource = null;
+        const { waterTiles, extent } = _paintOrganicWater(map, W, H, cx2, cy2, radius, i, seed);
+        if (waterTiles.length === 0) continue;
+
+        // Shore rings, innermost first: shallow water hugging the deep pond, then the
+        // biome's inner shore terrain, then its optional outer ring. Measured from the
+        // nearest pond water tile (not the pond centre) so the rings follow the shape.
+        const ring = extent + 4;
+        for (let ny = Math.max(0, cy2 - ring); ny <= Math.min(H - 1, cy2 + ring); ny++) {
+            for (let nx = Math.max(0, cx2 - ring); nx <= Math.min(W - 1, cx2 + ring); nx++) {
+                const terrain = map[ny][nx].terrain;
+                if (terrain === 'water' || terrain === 'shallow_water' || terrain === 'tall_rock') continue;
+                let best = Infinity;
+                for (const w of waterTiles) {
+                    const d = (w.x - nx) ** 2 + (w.y - ny) ** 2;
+                    if (d < best) best = d;
+                }
+                const dist = Math.sqrt(best);
+                if (dist > 4) continue;
+                const shore = BIOMES[biomeMap[ny][nx]].shore;
+                if (dist <= 2) {
+                    // Mostly shallow; the odd gap falls back to plain shore for a ragged rim.
+                    map[ny][nx].terrain = Math.random() < 0.85 ? 'shallow_water' : shore.inner;
+                    map[ny][nx].resource = null;
+                } else if (dist <= 3 && Math.random() < 0.8) {
+                    map[ny][nx].terrain = shore.inner; map[ny][nx].resource = null;
+                } else if (shore.outer && Math.random() < 0.5) {
+                    map[ny][nx].terrain = shore.outer; map[ny][nx].resource = null;
+                }
             }
         }
+    }
+}
 
-        // Shore ring: sand at dist radius, gravel at radius+1.
-        for (let dy = -(radius + 2); dy <= radius + 2; dy++) {
-            for (let dx = -(radius + 2); dx <= radius + 2; dx++) {
-                const nx = cx2 + dx, ny = cy2 + dy;
-                if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
-                if (map[ny][nx].terrain === 'water' || map[ny][nx].terrain === 'tall_rock') continue;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist <= radius + 1.2 && Math.random() < 0.8) {
-                    map[ny][nx].terrain = 'sand'; map[ny][nx].resource = null;
-                } else if (dist <= radius + 2.2 && Math.random() < 0.5) {
-                    map[ny][nx].terrain = 'gravel'; map[ny][nx].resource = null;
+// Desert oases: a small pond ringed by a thin shallow-water and sand rim, then a
+// patch of grass dotted with trees. Roughly one per params.oasisTilesPer desert
+// tiles (the fractional part is a chance of one more), so small deserts may get none.
+function _placeOases(map, biomeMap, W, H, seed, params) {
+    const desertTiles = [];
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) if (biomeMap[y][x] === 'desert') desertTiles.push({ x, y });
+    }
+    const expected = desertTiles.length / params.oasisTilesPer;
+    const count = Math.floor(expected) + (Math.random() < expected - Math.floor(expected) ? 1 : 0);
+    const placed = [];
+    const margin = 7;                 // keeps the whole oasis (water + grass) on the map
+    const clearRadius = 8;            // oasis footprint must be desert, dry, and clear of other oases
+
+    for (let n = 0; n < count; n++) {
+        let spot = null;
+        for (let attempt = 0; attempt < 40 && !spot; attempt++) {
+            const c = desertTiles[Math.floor(Math.random() * desertTiles.length)];
+            if (c.x < margin || c.x >= W - margin || c.y < margin || c.y >= H - margin) continue;
+            if (placed.some(p => Math.hypot(p.x - c.x, p.y - c.y) < 20)) continue;
+            let ok = true;
+            for (let dy = -clearRadius; dy <= clearRadius && ok; dy += 2) {
+                for (let dx = -clearRadius; dx <= clearRadius && ok; dx += 2) {
+                    const t = map[c.y + dy]?.[c.x + dx];
+                    if (!t || t.biome !== 'desert' || t.terrain === 'water' || t.terrain === 'shallow_water' || t.terrain === 'tall_rock') ok = false;
                 }
+            }
+            if (ok) spot = c;
+        }
+        if (!spot) continue;
+        placed.push(spot);
+
+        const radius = 2 + Math.floor(Math.random() * 2); // 2-3 tiles
+        const { waterTiles, extent } = _paintOrganicWater(map, W, H, spot.x, spot.y, radius, 1000 + n, seed);
+        if (waterTiles.length === 0) continue;
+
+        // Rings measured from the nearest water tile: shallow, a sand strip (the
+        // final water_shores pass would force one anyway), then irregular grass
+        // with trees. Anything beyond is left as the surrounding desert.
+        const ring = extent + 6;
+        for (let ny = Math.max(0, spot.y - ring); ny <= Math.min(H - 1, spot.y + ring); ny++) {
+            for (let nx = Math.max(0, spot.x - ring); nx <= Math.min(W - 1, spot.x + ring); nx++) {
+                const tile = map[ny][nx];
+                if (tile.terrain === 'water' || tile.terrain === 'shallow_water' || tile.terrain === 'tall_rock') continue;
+                let best = Infinity;
+                for (const w of waterTiles) {
+                    const d = (w.x - nx) ** 2 + (w.y - ny) ** 2;
+                    if (d < best) best = d;
+                }
+                const dist = Math.sqrt(best);
+                // Grass reach wobbles with smooth noise so the green patch isn't a clean band.
+                const grassReach = 4.2 + (smoothNoise(nx, ny, seed + 98000 + n, 4) - 0.5) * 2 * 2.2;
+                if (dist <= 1.5) {
+                    tile.terrain = Math.random() < 0.9 ? 'shallow_water' : 'sand';
+                    tile.resource = null;
+                } else if (dist <= 2.5) {
+                    tile.terrain = 'sand';
+                    tile.resource = null;
+                } else if (dist <= grassReach) {
+                    tile.terrain = 'grass';
+                    tile.resource = Math.random() < 0.3
+                        ? { type: 'tree', amount: 3 + Math.floor(Math.random() * 3) }
+                        : null;
+                }
+                tile.passable = TERRAIN[tile.terrain].passable.colonist;
             }
         }
     }
@@ -496,7 +751,7 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
                     const wx = cx2 + dx, wy = cy2 + dy;
                     if (wx < 0 || wx >= W || wy < 0 || wy >= H) continue;
                     const tile = map[wy][wx];
-                    if (tile.terrain === 'water') continue;
+                    if (isWaterTerrain(tile.terrain)) continue;
                     tile.terrain = blueprint.floorTerrain;
                     tile.resource = null;
                 }
@@ -508,7 +763,7 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
             const wx = cx2 + piece.x, wy = cy2 + piece.y;
             if (wx < 0 || wx >= W || wy < 0 || wy >= H) continue;
             const tile = map[wy][wx];
-            if (tile.terrain === 'water') continue;
+            if (isWaterTerrain(tile.terrain)) continue;
             const isFloor = BUILDINGS[piece.type] && BUILDINGS[piece.type].structureType === 'floor';
             const decay = isFloor ? floorDecayChance : decayChance;
             if (Math.random() < decay) continue;
@@ -521,6 +776,43 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
                     tile.structureHp = BUILDINGS[piece.type].hp;
                 }
             }
+            tile.resource = null;
+        }
+    }
+}
+
+function isWaterTerrain(terrain) {
+    return terrain === 'water' || terrain === 'shallow_water';
+}
+
+// Final safety net for water bodies (ponds, rivers, swamp pools): any land tile
+// directly beside (up/down/left/right) water or shallow water must be a transition tile, so water never meets
+// "normal" terrain (grass, dirt, snow, rock, ...) directly. The transition is the
+// tile's biome shore terrain (sand, gravel, mud). Existing sand/gravel/mud is kept
+// as is. tall_rock is left alone: it is an impassable cliff, and converting it
+// would open a path through it. Called last from generateMap, after every pass that
+// can paint terrain over a shoreline (dirt patches, rock formations, mountain
+// ranges, start-area clearing, landmark and ruin floors).
+function generateWaterShores(map) {
+    if (map[0][0].biome === undefined) return; // non-biome fallback has its own banks
+    const H = CONFIG.MAP_HEIGHT, W = CONFIG.MAP_WIDTH;
+    const transition = new Set(['sand', 'gravel', 'mud']);
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const tile = map[y][x];
+            const terrain = tile.terrain;
+            if (isWaterTerrain(terrain) || terrain === 'tall_rock' || transition.has(terrain)) continue;
+            // Orthogonal neighbours only: also converting diagonals squares off
+            // the shoreline, so a tile touching water only at a corner is left alone.
+            const touchesWater = (y > 0 && isWaterTerrain(map[y - 1][x].terrain))
+                || (y < H - 1 && isWaterTerrain(map[y + 1][x].terrain))
+                || (x > 0 && isWaterTerrain(map[y][x - 1].terrain))
+                || (x < W - 1 && isWaterTerrain(map[y][x + 1].terrain));
+            if (!touchesWater) continue;
+            const shore = BIOMES[tile.biome]?.shore;
+            if (!shore) continue;
+            tile.terrain = shore.inner;
+            tile.passable = TERRAIN[shore.inner].passable.colonist;
             tile.resource = null;
         }
     }
@@ -542,6 +834,7 @@ function generateDirtPatches(map, params) {
                 const nx = cx + dx, ny = cy + dy;
                 if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
                     if (biomeActive && !dirtBiomes.has(map[ny][nx].biome)) continue;
+                    if (isWaterTerrain(map[ny][nx].terrain)) continue;
                     if (Math.random() < params.fillChance) {
                         map[ny][nx].terrain = 'dirt';
                     }
@@ -565,6 +858,7 @@ function generateRockFormations(map, params) {
                 const nx = cx + dx, ny = cy + dy;
                 if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
                     if (Math.abs(dx) + Math.abs(dy) <= size && Math.random() < params.fillChance) {
+                        if (isWaterTerrain(map[ny][nx].terrain)) continue;
                         map[ny][nx].terrain = 'rock';
                         map[ny][nx].passable = TERRAIN.rock.passable.colonist;
                         if (Math.random() < params.resourceChance) {
@@ -600,10 +894,23 @@ function generateMountainRanges(map, params) {
     const length = params.lengthRange[0] + Math.floor(Math.random() * (params.lengthRange[1] - params.lengthRange[0] + 1));
     const width = params.widthRange[0] + Math.floor(Math.random() * (params.widthRange[1] - params.widthRange[0] + 1));
 
-    // Pick a random start point away from center
+    // Pick a random start point away from center. With biomes active it must lie
+    // in the mountain biome, and the range is clipped to that biome below so
+    // mountains never poke out into grassland, desert, or tundra.
     const margin = 20;
+    const biomeActive = map[0][0].biome !== undefined;
     let sx = margin + Math.floor(Math.random() * (CONFIG.MAP_WIDTH - 2 * margin));
     let sy = margin + Math.floor(Math.random() * (CONFIG.MAP_HEIGHT - 2 * margin));
+    if (biomeActive) {
+        const starts = [];
+        for (let y = margin; y < CONFIG.MAP_HEIGHT - margin; y += 3) {
+            for (let x = margin; x < CONFIG.MAP_WIDTH - margin; x += 3) {
+                if (map[y][x].biome === 'mountain') starts.push({ x, y });
+            }
+        }
+        if (starts.length === 0) return;
+        ({ x: sx, y: sy } = starts[Math.floor(Math.random() * starts.length)]);
+    }
 
     // Random direction for the spine
     const angle = Math.random() * Math.PI * 2;
@@ -618,6 +925,8 @@ function generateMountainRanges(map, params) {
             for (let dx = -width; dx <= width; dx++) {
                 const nx = cx + dx, ny = cy + dy;
                 if (nx < 0 || nx >= CONFIG.MAP_WIDTH || ny < 0 || ny >= CONFIG.MAP_HEIGHT) continue;
+                if (biomeActive && map[ny][nx].biome !== 'mountain') continue;
+                if (isWaterTerrain(map[ny][nx].terrain)) continue;
 
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist > width) continue;
@@ -758,7 +1067,7 @@ function generateRuins(map, params) {
                     const wx = cx + dx, wy = cy + dy;
                     if (wx < 0 || wx >= CONFIG.MAP_WIDTH || wy < 0 || wy >= CONFIG.MAP_HEIGHT) continue;
                     const tile = map[wy][wx];
-                    if (tile.terrain === 'water') continue;
+                    if (isWaterTerrain(tile.terrain)) continue;
                     tile.terrain = blueprint.floorTerrain;
                     tile.resource = null;
                 }
@@ -770,7 +1079,7 @@ function generateRuins(map, params) {
             const wx = cx + piece.x, wy = cy + piece.y;
             if (wx < 0 || wx >= CONFIG.MAP_WIDTH || wy < 0 || wy >= CONFIG.MAP_HEIGHT) continue;
             const tile = map[wy][wx];
-            if (tile.terrain === 'water') continue;
+            if (isWaterTerrain(tile.terrain)) continue;
 
             const isFloor = BUILDINGS[piece.type] && BUILDINGS[piece.type].structureType === 'floor';
             const decay = isFloor ? floorDecayChance : decayChance;
@@ -856,7 +1165,7 @@ export function writeTileVisuals(tile, season, out) {
         const fDef = BUILDINGS[tile.floor];
         if (fDef && fDef.bg) bg = fDef.bg;
     }
-    else if (tile.snowCovered && tile.terrain === 'grass') {
+    else if (tile.snowCovered && GRASS_TERRAIN.has(tile.terrain)) {
         char = TILE_CHARS.snow;
         color = TILE_COLORS.snow;
         bg = TILE_COLORS.snowBg

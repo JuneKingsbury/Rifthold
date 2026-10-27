@@ -1,4 +1,4 @@
-import { CONFIG, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
+import { CONFIG, GRASS_TERRAIN, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
 import { writeTileVisuals } from '../world/map.js';
 import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
 import { CrtRenderer } from './crt-renderer.js';
@@ -214,9 +214,10 @@ export class Renderer {
             return sm.getSprite('resources', tile.resource.type);
         }
         if (tile.floor) return this._resolveFloorSprite(tile, season);
-        if (tile.snowCovered && tile.terrain === 'grass') return sm.getSprite('effects', 'snow');
-        if (season === 'autumn' && tile.terrain === 'grass') {
-            return sm.getSprite('terrain', 'grass_autumn') || sm.getSprite('terrain', tile.terrain);
+        const grassy = GRASS_TERRAIN.has(tile.terrain);
+        if (tile.snowCovered && grassy) return sm.getSprite('effects', 'snow');
+        if (season === 'autumn' && grassy) {
+            return sm.getSprite('terrain', tile.terrain + '_autumn') || sm.getSprite('terrain', tile.terrain);
         }
         return sm.getSprite('terrain', tile.terrain);
     }
@@ -233,11 +234,12 @@ export class Renderer {
     // on it (terrain itself, or its seasonal snow/autumn variant for grass).
     _resolveTerrainBaseSprite(tile, season) {
         const sm = this.skinManager;
-        if ((tile.snowCovered || season === 'winter') && tile.terrain === 'grass') {
+        const grassy = GRASS_TERRAIN.has(tile.terrain);
+        if ((tile.snowCovered || season === 'winter') && grassy) {
             return sm.getSprite('effects', 'snow') || sm.getSprite('terrain', tile.terrain);
         }
-        if (season === 'autumn' && tile.terrain === 'grass') {
-            return sm.getSprite('terrain', 'grass_autumn') || sm.getSprite('terrain', tile.terrain);
+        if (season === 'autumn' && grassy) {
+            return sm.getSprite('terrain', tile.terrain + '_autumn') || sm.getSprite('terrain', tile.terrain);
         }
         return sm.getSprite('terrain', tile.terrain);
     }
@@ -480,9 +482,17 @@ export class Renderer {
     // its base) for one tile. Shared by bare-grass tiles and tree tiles (where the
     // tree sprite is later drawn on top). No-ops gracefully when the art is absent.
     // Returns true if a tuft was drawn.
-    _drawGrassTuft(ctx, now, tileKey, wind, px, py, cw, ch, season) {
-        const tuft = (season === 'autumn' && this.skinManager.getSprite('effects', 'grass_tuft_autumn'))
-            || this.skinManager.getSprite('effects', 'grass_tuft');
+    // Each grass terrain can have its own tuft art: `<terrain>_tuft` (and
+    // `<terrain>_tuft_autumn` in autumn), e.g. swamp_grass_tuft, forest_grass_tuft.
+    // When the skin lacks it the tuft falls back to the regular grass art, so every
+    // grass terrain animates without new art.
+    _drawGrassTuft(ctx, now, tileKey, wind, px, py, cw, ch, season, terrain) {
+        const sm = this.skinManager;
+        const own = terrain && terrain !== 'grass';
+        const tuft = (own && season === 'autumn' && sm.getSprite('effects', terrain + '_tuft_autumn'))
+            || (own && sm.getSprite('effects', terrain + '_tuft'))
+            || (season === 'autumn' && sm.getSprite('effects', 'grass_tuft_autumn'))
+            || sm.getSprite('effects', 'grass_tuft');
         if (!tuft) return false;
         const boostEntry = this._grassBoost.get(tileKey);
         let boostAdd = 0;
@@ -572,8 +582,12 @@ export class Renderer {
     // one water tile. Shared by bare-water tiles and water tiles that hold a swimming
     // entity (drawn behind the entity in that case). No-ops gracefully when the art
     // is absent. Returns true if the waves were drawn.
-    _drawWaterWaves(ctx, now, tileKey, px, py, cw, ch) {
-        const waves = this.skinManager.getSprite('effects', 'water_waves');
+    // Shallow water uses its own `shallow_water_waves` art when the skin has it and
+    // otherwise falls back to the regular water waves.
+    _drawWaterWaves(ctx, now, tileKey, px, py, cw, ch, terrain) {
+        const sm = this.skinManager;
+        const waves = (terrain === 'shallow_water' && sm.getSprite('effects', 'shallow_water_waves'))
+            || sm.getSprite('effects', 'water_waves');
         if (!waves) return false;
         const w = getWaterWave(now, tileKey);
         ctx.globalAlpha = w.alpha < 0 ? 0 : (w.alpha > 1 ? 1 : w.alpha);
@@ -1280,8 +1294,8 @@ export class Renderer {
                         // Grass tufts also sprout under trees on grass terrain: draw the
                         // swaying tuft here so the tree sprite (drawn below) covers it.
                         if (showTerrainDetail && tile.resource.type === 'tree'
-                            && tile.terrain === 'grass' && !tile.snowCovered && !tile.onFire) {
-                            this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season);
+                            && GRASS_TERRAIN.has(tile.terrain) && !tile.snowCovered && !tile.onFire) {
+                            this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season, tile.terrain);
                         }
                     } else if (tile.zone) {
                         // Farm plots sit on terrain: draw the seasonal ground first so the
@@ -1298,10 +1312,10 @@ export class Renderer {
                         // (drawn after the sprite), giving a swimmer both effects.
                         if (showTerrainDetail && !tile.structure && !tile.resource
                             && !tile.zone && !tile.floor && !tile.onFire) {
-                            if (tile.terrain === 'grass' && !tile.snowCovered) {
-                                this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season);
-                            } else if (tile.terrain === 'water') {
-                                this._drawWaterWaves(ctx, now, tileKey, px, py, cw1, ch1);
+                            if (GRASS_TERRAIN.has(tile.terrain) && !tile.snowCovered) {
+                                this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season, tile.terrain);
+                            } else if (tile.terrain === 'water' || tile.terrain === 'shallow_water') {
+                                this._drawWaterWaves(ctx, now, tileKey, px, py, cw1, ch1, tile.terrain);
                             }
                         }
                         // Farm tiles are drawn behind the entity here so colonists
@@ -1575,12 +1589,12 @@ export class Renderer {
                     // sprites and skip gracefully when the art is absent.
                     if (showTerrainDetail && !entity && !tile.structure && !tile.resource
                         && !tile.zone && !tile.floor && !tile.onFire) {
-                        if (tile.terrain === 'grass' && !tile.snowCovered) {
-                            if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season)) {
+                        if (GRASS_TERRAIN.has(tile.terrain) && !tile.snowCovered) {
+                            if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season, tile.terrain)) {
                                 spriteDrawn = true;
                             }
-                        } else if (tile.terrain === 'water') {
-                            if (this._drawWaterWaves(ctx, now, tileKey, px, py, cw1, ch1)) {
+                        } else if (tile.terrain === 'water' || tile.terrain === 'shallow_water') {
+                            if (this._drawWaterWaves(ctx, now, tileKey, px, py, cw1, ch1, tile.terrain)) {
                                 spriteDrawn = true;
                                 // Spawn rain ripples on water tiles during rain/thunderstorm
                                 const rainChance = weather.currentWeather === 'thunderstorm' ? 0.04 : weather.currentWeather === 'rain' ? 0.02 : 0;
@@ -1916,7 +1930,7 @@ export class Renderer {
             // Water splash: fire at movement START (destination tile is ent.x/y once lerp begins)
             if (isEntityMoving(ent) && !ent._lastWasMoving) {
                 const destTile = game.map[ent.y]?.[ent.x];
-                if (destTile && destTile.terrain === 'water') {
+                if (destTile && (destTile.terrain === 'water' || destTile.terrain === 'shallow_water')) {
                     const numSplash = 4 + Math.floor(Math.random() * 3);
                     for (let sp = 0; sp < numSplash; sp++) {
                         const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.6;
@@ -1944,7 +1958,7 @@ export class Renderer {
                     const destTile = game.map[ent.y]?.[ent.x];
                     if (destTile) {
                         const destKey = ent.y * CONFIG.MAP_WIDTH + ent.x;
-                        if (destTile.terrain === 'grass' && !destTile.snowCovered) {
+                        if (GRASS_TERRAIN.has(destTile.terrain) && !destTile.snowCovered) {
                             this._grassBoost.set(destKey, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.13 });
                             for (const [ndx, ndy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
                                 const nx = ent.x + ndx, ny = ent.y + ndy;
@@ -1997,9 +2011,9 @@ export class Renderer {
                 const destTile = game.map[ent.y]?.[ent.x];
                 if (destTile) {
                     const destKey = ent.y * CONFIG.MAP_WIDTH + ent.x;
-                    if (destTile.terrain === 'water') {
+                    if (destTile.terrain === 'water' || destTile.terrain === 'shallow_water') {
                         this._spawnWaterRipple(ent.x, ent.y, cw, 1.5);
-                    } else if (destTile.terrain === 'grass' && !destTile.snowCovered) {
+                    } else if (GRASS_TERRAIN.has(destTile.terrain) && !destTile.snowCovered) {
                         this._grassBoost.set(destKey, { startTime: now, duration: 500, amp: (Math.random() < 0.5 ? 1 : -1) * 0.13 });
                         for (const [ndx, ndy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
                             const nx = ent.x + ndx, ny = ent.y + ndy;

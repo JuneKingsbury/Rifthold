@@ -91,7 +91,10 @@ export const RENDER_CONFIG = {
     //   * water waves on water: bob slowly up and down (rise/fall) with a gentle
     //     alpha shimmer, independent of wind (water motion is its own rhythm).
     // Both are procedural transforms on new `effects` sprites (`grass_tuft`,
-    // `water_waves`). Missing art simply skips the overlay. Per-tile seed
+    // `water_waves`). Forest/swamp grass and shallow water reuse the same
+    // animations, preferring their own art (`forest_grass_tuft`,
+    // `swamp_grass_tuft`, `shallow_water_waves`) and falling back to the regular
+    // sprites. Missing art simply skips the overlay. Per-tile seed
     // decorrelates phase. Driven by performance.now() (smooth, runs while paused).
     // Gated by the `showTerrainDetail` setting. Composed in entity-animation.js.
     terrainDetail: {

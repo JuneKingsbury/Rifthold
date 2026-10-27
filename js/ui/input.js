@@ -1,4 +1,4 @@
-import { CONFIG, CROPS, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
+import { CONFIG, CROPS, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { isPassable } from '../world/map.js';
@@ -142,7 +142,7 @@ export class InputHandler {
                 if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) continue;
                 const tile = this.game.map[y][x];
                 const key = y * CONFIG.MAP_WIDTH + x;
-                if (tile.resource || tile.terrain === 'water' || tile.terrain === 'tall_rock' || !tile.passable) {
+                if (tile.resource || UNBUILDABLE_TERRAIN.has(tile.terrain) || !tile.passable) {
                     blocked.add(key);
                     continue;
                 }
@@ -177,7 +177,7 @@ export class InputHandler {
                 if (this._rightDrag) {
                     // Right-drag removes farm zones: flag existing zones as the removal target.
                     if (tile.zone) blocked.add(key);
-                } else if ((tile.terrain !== 'grass' && tile.terrain !== 'dirt') || tile.structure || tile.resource || tile.zone) {
+                } else if (!FARMABLE_TERRAIN.has(tile.terrain) || tile.structure || tile.resource || tile.zone) {
                     blocked.add(key);
                 } else {
                     affordable.add(key);

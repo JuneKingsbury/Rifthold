@@ -3,7 +3,7 @@
  * crop growth/blight. updateFarming is called from simulationTick every 5th
  * tick; ready crops become harvest tasks for colonists.
  */
-import { CONFIG, CROPS, TERRAIN, WORK_CONFIG, BLIGHT_CONFIG } from '../core/config.js';
+import { CONFIG, CROPS, TERRAIN, FARMABLE_TERRAIN, WORK_CONFIG, BLIGHT_CONFIG } from '../core/config.js';
 import { getFoodProductionMult } from './complexBuildings.js';
 
 // Derived from the 'research' field on each crop entry
@@ -28,7 +28,7 @@ export function designateFarmZone(game, x1, y1, x2, y2, cropType) {
     for (let y = minY; y <= maxY; y++) {
         for (let x = minX; x <= maxX; x++) {
             const tile = game.map[y][x];
-            if (tile.terrain !== 'grass' && tile.terrain !== 'dirt') continue;
+            if (!FARMABLE_TERRAIN.has(tile.terrain)) continue;
             if (tile.structure || tile.resource || tile.zone) continue;
 
             tile.zone = {
@@ -161,7 +161,7 @@ function isAdjacentToWater(game, x, y) {
     for (const [dx, dy] of dirs) {
         const nx = x + dx, ny = y + dy;
         if (ny >= 0 && ny < game.map.length && nx >= 0 && nx < game.map[0].length) {
-            if (game.map[ny][nx].terrain === 'water') return true;
+            if (game.map[ny][nx].terrain === 'water' || game.map[ny][nx].terrain === 'shallow_water') return true;
         }
     }
     return false;

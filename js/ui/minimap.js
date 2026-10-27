@@ -179,6 +179,8 @@ export class Minimap {
         if (tile.snowCovered) return [200, 200, 210];
         switch (tile.terrain) {
             case 'grass': return [50, 100, 40];
+            case 'forest_grass': return [40, 105, 35];
+            case 'swamp_grass': return [60, 95, 45];
             case 'dirt': return [120, 80, 40];
             case 'rock': return [80, 80, 80];
             case 'tall_rock': return [55, 55, 55];

@@ -4,7 +4,7 @@
  * queues the resulting build/gather tasks. Driven by player input, not the tick
  * loop. Colonists later execute the queued tasks.
  */
-import { BUILDINGS, RESOURCES, WORK_CONFIG } from '../core/config.js';
+import { BUILDINGS, RESOURCES, UNBUILDABLE_TERRAIN, WORK_CONFIG } from '../core/config.js';
 
 // Extra maxCount slots a building gets beyond its base def.maxCount: a
 // research-driven bonus stored on game[maxCountBonusKey], plus a special-case
@@ -19,7 +19,7 @@ export function getMaxCountBonus(def, buildType, game) {
 export function designateBuild(game, x, y, buildType) {
     const tile = game.map[y][x];
     if (tile.resource) return false;
-    if (tile.terrain === 'water' || tile.terrain === 'tall_rock') return false;
+    if (UNBUILDABLE_TERRAIN.has(tile.terrain)) return false;
 
     const def = BUILDINGS[buildType];
     if (!def) return false;

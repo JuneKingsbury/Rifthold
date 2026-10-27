@@ -59,7 +59,7 @@ export function detectRooms(map) {
             if (visitedGlobal[idx]) continue;
             const tile = row[x];
             if (isWall(tile)) continue;
-            if (tile.terrain === 'water' || tile.terrain === 'tall_rock') continue;
+            if (tile.terrain === 'water' || tile.terrain === 'shallow_water' || tile.terrain === 'tall_rock') continue;
             if (!tile.passable) continue;
 
             const fillId = ++scratch.fillId;
@@ -136,7 +136,7 @@ function floodFill(map, startX, startY, W, H, visitedGlobal, visitedLocal, fillI
                 tiles[count++] = nk;
                 continue;
             }
-            if (neighbor.terrain === 'water') continue;
+            if (neighbor.terrain === 'water' || neighbor.terrain === 'shallow_water') continue;
             // Rock terrain is walkable ground, not a wall: it is traversed like
             // grass/dirt, so it can be enclosed within a room (and floored over)
             // but never forms a room boundary on its own.

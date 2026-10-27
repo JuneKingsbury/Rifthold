@@ -1,6 +1,8 @@
 // Picks suggested map locations for tutorial pointers. Hints are tile-space
 // rectangles { x, y, w, h, kind } drawn by OverlayRenderer.
 
+import { FARMABLE_TERRAIN } from '../core/config.js';
+
 const MAX_SEARCH_RADIUS = 30;
 
 function colonyCenter(game) {
@@ -15,7 +17,7 @@ function colonyCenter(game) {
 function isOpenTile(game, x, y) {
     const tile = game.map[y]?.[x];
     if (!tile) return false;
-    return (tile.terrain === 'grass' || tile.terrain === 'dirt')
+    return FARMABLE_TERRAIN.has(tile.terrain)
         && !tile.structure && !tile.resource && !tile.zone && !tile.designation;
 }
 

@@ -228,6 +228,11 @@ const EFFECT_ITEMS = [
     { key: 'grass_tuft', char: '"', color: '#6aad44', desc: 'Grass tuft overlay (sways in wind on grass tiles)' },
     { key: 'grass_tuft_autumn', char: '"', color: '#cc8822', desc: 'Grass tuft overlay, autumn variant (sways in wind on autumn grass tiles)' },
     { key: 'water_waves', char: '≈', color: '#55aaff', desc: 'Water wave overlay (bobs up/down on water tiles)' },
+    { key: 'forest_grass_tuft_autumn', char: '"', color: '#c8751c', desc: 'Forest grass tuft overlay, autumn variant (falls back to grass_tuft_autumn)' },
+    { key: 'forest_grass_tuft', char: '"', color: '#4f9a3a', desc: 'Forest grass tuft overlay (sways in wind on forest grass tiles; falls back to grass_tuft)' },
+    { key: 'swamp_grass_tuft_autumn', char: '"', color: '#b8801f', desc: 'Swamp grass tuft overlay, autumn variant (falls back to swamp_grass_tuft)' },
+    { key: 'swamp_grass_tuft', char: '"', color: '#5a8a3a', desc: 'Swamp grass tuft overlay (sways in wind on swamp grass tiles; falls back to grass_tuft)' },
+    { key: 'shallow_water_waves', char: '≈', color: '#4499cc', desc: 'Shallow water wave overlay (bobs up/down on shallow water tiles; falls back to water_waves)' },
 ];
 
 let editorInstance = null;
@@ -577,6 +582,8 @@ class SkinEditor {
                     items.push({ key, char: def.char, color: def.color, desc: key, category: 'terrain' });
                 }
                 items.push({ key: 'grass_autumn', char: '.', color: '#cc8822', desc: 'Grass terrain (autumn)', category: 'terrain' });
+                items.push({ key: 'forest_grass_autumn', char: '.', color: '#c8751c', desc: 'Forest grass terrain (autumn; falls back to forest_grass)', category: 'terrain' });
+                items.push({ key: 'swamp_grass_autumn', char: '"', color: '#a8781f', desc: 'Swamp grass terrain (autumn; falls back to swamp_grass)', category: 'terrain' });
                 break;
             case 'Resources':
                 for (const [key, def] of Object.entries(RESOURCES)) {

@@ -50,7 +50,7 @@ export const EVENTS = {
     windfall: {
         weight: 5, minTick: 800, cooldown: 1920,
         effect: 'deposit',
-        location: 'anywhere', radius: 1, terrain: ['grass'], fillChance: 0.6,
+        location: 'anywhere', radius: 1, terrain: ['grass', 'forest_grass'], fillChance: 0.6,
         deposits: [{ type: 'stone', amount: [3, 5] }],
         notification: 'Mineral vein discovered! {count} new stone deposits.',
         logMessage: 'Mineral windfall: {count} new stone deposits', logType: 'event',
@@ -58,7 +58,7 @@ export const EVENTS = {
     meteorite: {
         weight: 5, minTick: 960, cooldown: 2400,
         effect: 'deposit',
-        location: 'edge', radius: 2, terrain: ['grass', 'dirt'], fillChance: 0.5,
+        location: 'edge', radius: 2, terrain: ['grass', 'forest_grass', 'dirt'], fillChance: 0.5,
         deposits: [
             { type: 'runite_ore', weight: 3, amount: [2, 3] },
             { type: 'stone', weight: 7, amount: [4, 7] },
@@ -69,7 +69,7 @@ export const EVENTS = {
     forest_growth: {
         weight: 7, minTick: 640, cooldown: 1600,
         effect: 'deposit',
-        location: 'edge', radius: 3, terrain: ['grass'], fillChance: 0.55,
+        location: 'edge', radius: 3, terrain: ['grass', 'forest_grass'], fillChance: 0.55,
         deposits: [{ type: 'tree', amount: [3, 5] }],
         notification: 'Forest growth! {count} new trees appeared.',
         logMessage: 'Forest growth: {count} new trees near map edge', logType: 'event',

@@ -38,7 +38,20 @@ export const TERRAIN = {
     shallow_water:{ char: '~', color: '#4499cc', bg: '#0a1825', moveCost: 12,      passable: { colonist: true, animal: true,  enemy: true  } },
     red_rock:    { char: '#', color: '#cc5533', bg: '#2a1008', moveCost: 18,       passable: { colonist: true, animal: false, enemy: true  } },
     snow_ground: { char: '.', color: '#ddeeff', bg: '#1a2030', moveCost: 10,       passable: { colonist: true, animal: true,  enemy: true  } },
+    forest_grass:{ char: '.', color: '#4f9a3a', bg: '#16260f', moveCost: 8,        passable: { colonist: true, animal: true,  enemy: true  } },
+    swamp_grass: { char: '"', color: '#5a8a3a', bg: '#141f10', moveCost: 10,       passable: { colonist: true, animal: true,  enemy: true  } },
 };
+
+// Terrain nothing can be built on: deep and shallow water, and impassable cliffs.
+// Every other terrain (rock included) is buildable.
+export const UNBUILDABLE_TERRAIN = new Set(['water', 'shallow_water', 'tall_rock']);
+
+// Terrain a farm zone can be designated on.
+export const FARMABLE_TERRAIN = new Set(['grass', 'forest_grass', 'dirt', 'swamp_grass']);
+
+// The grass terrains: all get animated tufts, autumn variants, winter snow cover,
+// trees, and the disturbed-when-walked-through sway.
+export const GRASS_TERRAIN = new Set(['grass', 'forest_grass', 'swamp_grass']);
 
 export const RESOURCES = {
     tree:       { char: 'T', color: '#8B6B3A', springColor: '#55cc44', summerColor: '#338822', autumnColor: '#cc8822', winterColor: '#667788', designation: 'chop', work: 12, yield: { wood: 1 }, perAmount: true },
@@ -76,42 +89,84 @@ export const SEASON_WEATHER = {
     ],
 };
 
-// Biome definitions: terrain weights, resource density, and which landmark ruin
-// to guarantee inside that biome. Consumed by generateBiomeLayout in map.js.
+// Biome definitions: terrain mix, resource density, shoreline terrain, and which
+// landmark ruin to guarantee inside that biome. Consumed by generateBiomeLayout
+// in map.js.
+//
+// terrainWeights are the target share of each terrain within the biome. Terrain
+// is painted as coherent patches from a smooth noise field, so KEY ORDER MATTERS:
+// neighbouring keys are neighbouring bands of the field and end up touching each
+// other on the map (swamp_grass -> mud -> shallow_water reads as a bog edge).
+// patchScale is the approximate patch size in tiles.
+//
+// areaWeight (default 1) scales how much of the map the biome claims when the
+// regions are carved up: above 1 grows its territory, below 1 shrinks it.
+//
+// shore is what ponds and rivers paint around their water: `inner` hugs the
+// water, `outer` is an optional sparser ring beyond it (null = none).
 export const BIOMES = {
     grassland: {
         landmark: 'waystone_shrine',
         terrainWeights: { grass: 0.80, dirt: 0.20 },
+        patchScale: 14,
+        areaWeight: 0.98,
         treeDensity: 0.10,
+        shore: { inner: 'sand', outer: 'gravel' },
     },
     forest: {
         landmark: 'woodcutters_lodge',
-        terrainWeights: { grass: 0.70, dirt: 0.30 },
+        terrainWeights: { forest_grass: 0.70, dirt: 0.30 },
+        patchScale: 12,
+        areaWeight: 1.23,
         treeDensity: 0.35,
+        shore: { inner: 'sand', outer: 'gravel' },
     },
     mountain: {
         landmark: 'dwarven_vault',
-        terrainWeights: { rock: 0.55, tall_rock: 0.25, gravel: 0.20 },
+        terrainWeights: { gravel: 0.20, rock: 0.55, tall_rock: 0.25 },
+        patchScale: 10,
+        areaWeight: 0.76,
         treeDensity: 0.01,
         rockResources: true,
+        shore: { inner: 'gravel', outer: null },
     },
     swamp: {
         landmark: 'witchs_hut',
-        terrainWeights: { mud: 0.50, shallow_water: 0.25, grass: 0.25 },
+        terrainWeights: { swamp_grass: 0.25, mud: 0.50, shallow_water: 0.25 },
+        patchScale: 9,
+        areaWeight: 1.17,
         treeDensity: 0.05,
+        shore: { inner: 'mud', outer: null },
     },
     desert: {
         landmark: 'desert_obelisk',
-        terrainWeights: { sand: 0.60, red_rock: 0.25, gravel: 0.15 },
+        terrainWeights: { sand: 0.60, gravel: 0.15, red_rock: 0.25 },
+        patchScale: 16,
+        areaWeight: 1.05,
         treeDensity: 0.0,
         desertResources: true,
+        shore: { inner: 'sand', outer: null },
     },
     tundra: {
         landmark: 'frozen_cairn',
-        terrainWeights: { snow_ground: 0.65, rock: 0.20, gravel: 0.15 },
+        terrainWeights: { snow_ground: 0.65, gravel: 0.15, rock: 0.20 },
+        patchScale: 14,
+        areaWeight: 0.81,
         treeDensity: 0.03,
         tundraResources: true,
+        shore: { inner: 'gravel', outer: null },
     },
+};
+
+// Terrain used as a narrow neutral strip where two clashing biomes meet, so e.g.
+// sand never butts directly against snow. Keys are the two biome names sorted
+// alphabetically and joined with '|'. Pairs not listed meet in a plain ragged
+// line (the terrain-sprite blending softens those).
+export const BIOME_TRANSITIONS = {
+    'desert|tundra': 'gravel',
+    'desert|swamp':  'gravel',
+    'desert|forest': 'dirt',
+    'swamp|tundra':  'gravel',
 };
 
 export const MAP_GENERATORS = [
@@ -119,9 +174,15 @@ export const MAP_GENERATORS = [
         name: 'biome_layout',
         enabled: true,
         params: {
-            innerRadius: 0.18,    // normalized radius of central guaranteed grassland
+            innerRadius: 0.22,    // average normalized radius of central guaranteed grassland
+            grasslandSeeds: 3,    // extra grassland regions around the centre, each joined to it
+            innerJitter: 0.30,    // how far the grassland edge wanders in/out (fraction of innerRadius)
+            innerCell: 14,        // size in tiles of the lobes along that edge (higher = broader)
             seedsPerBiome: 2,     // Voronoi seed points per outer biome
             warpScale: 28,        // domain-warp displacement in tiles (higher = blobier)
+            warpCell: 32,         // size in tiles of the smooth noise that drives the warp
+            oasisTilesPer: 1800,  // roughly one desert oasis per this many desert tiles
+            transitionWidth: 2,   // max half-width in tiles of the strip between clashing biomes
         },
     },
     {
