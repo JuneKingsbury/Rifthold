@@ -1,4 +1,5 @@
 import { CONFIG, TILE_COLORS, BUILDINGS } from '../core/config.js';
+import { resolvePortraitSrc } from '../core/mod-registry.js';
 
 const SCALE_X = 2;
 const SCALE_Y = 2;
@@ -31,6 +32,13 @@ const ORE_COLORS = {
     runite_ore: [68, 204, 204],
 };
 
+// Marker sizes are in canvas pixels and scale with map size: the canvas is fitted
+// into a fixed panel, so on a 384-tile map every canvas pixel is shown smaller.
+const BASE_MAP_WIDTH = 128;
+const DOT_SIZE = 4;
+const FRAME_WIDTH = 2;
+const CRYPT_ICON_SIZE = 12;
+
 const mix = (a, b, t) => [
     Math.round(a[0] + (b[0] - a[0]) * t),
     Math.round(a[1] + (b[1] - a[1]) * t),
@@ -58,6 +66,7 @@ export class Minimap {
         this._lastCamX = -1;
         this._lastCamY = -1;
         this._lastSeason = null;
+        this._chainIcons = new Map();
 
         canvas.addEventListener('mousedown', (e) => { e.stopPropagation(); this.onClick(e); });
         canvas.addEventListener('mousemove', (e) => {
@@ -65,6 +74,22 @@ export class Minimap {
         });
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false });
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false });
+    }
+
+    // Pixel multiplier that keeps markers a similar on-screen size across map sizes.
+    markerScale() {
+        return Math.max(1, CONFIG.MAP_WIDTH / BASE_MAP_WIDTH);
+    }
+
+    // Lazily loaded realm chain icon, or null while loading / if it failed to load.
+    getChainIcon(chain) {
+        let img = this._chainIcons.get(chain);
+        if (!img) {
+            img = new Image();
+            img.src = resolvePortraitSrc(`chain_${chain}`);
+            this._chainIcons.set(chain, img);
+        }
+        return img.complete && img.naturalWidth > 0 ? img : null;
     }
 
     markTerrainDirty() {
@@ -140,30 +165,23 @@ export class Minimap {
         this._compositeImageData.data.set(this._terrainImageData.data);
         const data = this._compositeImageData.data;
 
+        const scale = this.markerScale();
+        const dotSize = Math.round(DOT_SIZE * scale);
         for (const c of colonists) {
             if (c.hp <= 0) continue;
-            this.drawDot(data, c.x, c.y, [255, 255, 0]);
+            this.drawDot(data, c.x, c.y, [255, 255, 0], dotSize);
         }
         for (const e of entities) {
             if (e.hp <= 0) continue;
             if (e.tamed) {
-                this.drawDot(data, e.x, e.y, [100, 200, 100]);
+                this.drawDot(data, e.x, e.y, [100, 200, 100], dotSize);
             } else if (e.category === 'animal') {
-                this.drawDot(data, e.x, e.y, e.hostile ? [180, 50, 50] : [150, 120, 80]);
+                this.drawDot(data, e.x, e.y, e.hostile ? [180, 50, 50] : [150, 120, 80], dotSize);
             }
         }
         for (const r of raiders) {
             if (r.hp <= 0) continue;
-            this.drawDot(data, r.x, r.y, [255, 50, 50]);
-        }
-
-        // Discovered crypts: a small cross at the centre, coloured by state
-        // (sealed, breached and guarded, plundered).
-        for (const ruin of this.game.ruins.list) {
-            if (ruin.kind !== 'crypt' || !ruin.discovered) continue;
-            const color = ruin.ward ? [110, 130, 200] : ruin.state === 'sealed' ? [190, 160, 230] : ruin.state === 'cleared' ? [90, 170, 90] : [230, 90, 90];
-            const mx = ruin.x + Math.floor(ruin.w / 2), my = ruin.y + Math.floor(ruin.h / 2);
-            for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) this.drawDot(data, mx + dx, my + dy, color);
+            this.drawDot(data, r.x, r.y, [255, 50, 50], dotSize);
         }
 
         ctx.putImageData(this._compositeImageData, 0, 0);
@@ -171,23 +189,51 @@ export class Minimap {
         this._lastCamX = camX;
         this._lastCamY = camY;
 
+        // Discovered crypts, drawn after the pixel layer: the realm chain icon on a
+        // backing disc coloured by state (sealed, warded, breached, plundered). Crypts
+        // with no chain fall back to the plain disc.
+        const iconSize = CRYPT_ICON_SIZE * scale;
+        for (const ruin of this.game.ruins.list) {
+            if (ruin.kind !== 'crypt' || !ruin.discovered) continue;
+            const color = ruin.ward ? [110, 130, 200] : ruin.state === 'sealed' ? [190, 160, 230] : ruin.state === 'cleared' ? [90, 170, 90] : [230, 90, 90];
+            const cx = (ruin.x + Math.floor(ruin.w / 2) + 0.5) * SCALE_X;
+            const cy = (ruin.y + Math.floor(ruin.h / 2) + 0.5) * SCALE_Y;
+            ctx.beginPath();
+            ctx.arc(cx, cy, iconSize / 2 + scale, 0, Math.PI * 2);
+            ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+            ctx.fill();
+            ctx.lineWidth = Math.max(1, scale * 0.75);
+            ctx.strokeStyle = '#000000';
+            ctx.stroke();
+            const icon = ruin.chain ? this.getChainIcon(ruin.chain) : null;
+            if (icon) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(icon, cx - iconSize / 2, cy - iconSize / 2, iconSize, iconSize);
+            }
+        }
+
+        // Camera rectangle, stroked inside its bounds so the thicker line isn't clipped.
+        const frame = FRAME_WIDTH * scale;
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = frame;
         ctx.strokeRect(
-            camX * SCALE_X + 0.5,
-            camY * SCALE_Y + 0.5,
-            CONFIG.VIEWPORT_WIDTH * SCALE_X - 1,
-            CONFIG.VIEWPORT_HEIGHT * SCALE_Y - 1
+            camX * SCALE_X + frame / 2,
+            camY * SCALE_Y + frame / 2,
+            CONFIG.VIEWPORT_WIDTH * SCALE_X - frame,
+            CONFIG.VIEWPORT_HEIGHT * SCALE_Y - frame
         );
     }
 
-    drawDot(data, x, y, color) {
+    // Square dot of `size` canvas pixels centred on the tile.
+    drawDot(data, x, y, color, size = SCALE_X) {
         const w = CONFIG.MAP_WIDTH * SCALE_X;
         const h = CONFIG.MAP_HEIGHT * SCALE_Y;
-        for (let dy = 0; dy < SCALE_Y; dy++) {
-            for (let dx = 0; dx < SCALE_X; dx++) {
-                const px = x * SCALE_X + dx;
-                const py = y * SCALE_Y + dy;
+        const x0 = Math.round((x + 0.5) * SCALE_X - size / 2);
+        const y0 = Math.round((y + 0.5) * SCALE_Y - size / 2);
+        for (let dy = 0; dy < size; dy++) {
+            for (let dx = 0; dx < size; dx++) {
+                const px = x0 + dx;
+                const py = y0 + dy;
                 if (px < 0 || px >= w || py < 0 || py >= h) continue;
                 const idx = (py * w + px) * 4;
                 data[idx] = color[0];
