@@ -3,6 +3,40 @@ import { CONFIG, TILE_COLORS, BUILDINGS } from '../core/config.js';
 const SCALE_X = 2;
 const SCALE_Y = 2;
 
+// One distinct colour per terrain, chosen so each biome reads at a glance:
+// grassland bright yellow-green, forest deep emerald, swamp olive/brown/teal,
+// desert pale sand and rust, mountain cool grey, tundra white-blue. Water is
+// saturated blue so it stands out against all of them.
+const TERRAIN_COLORS = {
+    grass:          [110, 160, 62],
+    forest_grass:   [38, 105, 50],
+    swamp_grass:    [98, 118, 58],
+    dirt:           [134, 96, 58],
+    mud:            [88, 72, 50],
+    sand:           [228, 200, 124],
+    red_rock:       [178, 84, 52],
+    gravel:         [150, 144, 134],
+    rock:           [112, 112, 120],
+    tall_rock:      [62, 62, 72],
+    snow_ground:    [226, 236, 247],
+    water:          [34, 82, 172],
+    shallow_water:  [82, 150, 172],
+};
+const UNKNOWN_TERRAIN_COLOR = [30, 30, 30];
+
+// Ore colours follow the resource colours in the config (stone, iron, runite).
+const ORE_COLORS = {
+    stone:      [158, 158, 164],
+    iron_ore:   [196, 124, 78],
+    runite_ore: [68, 204, 204],
+};
+
+const mix = (a, b, t) => [
+    Math.round(a[0] + (b[0] - a[0]) * t),
+    Math.round(a[1] + (b[1] - a[1]) * t),
+    Math.round(a[2] + (b[2] - a[2]) * t),
+];
+
 export class Minimap {
     constructor(canvas, game) {
         this.canvas = canvas;
@@ -172,20 +206,18 @@ export class Minimap {
             if (tile.zone.state === 'growing') return [60, 150, 30];
             return [80, 60, 0];
         }
+        const base = TERRAIN_COLORS[tile.terrain] || UNKNOWN_TERRAIN_COLOR;
         if (tile.resource) {
-            if (tile.resource.type === 'tree') return season === 'autumn' ? [180, 120, 30] : [30, 100, 30];
-            return [130, 130, 130];
+            if (tile.resource.type === 'tree') {
+                // Darkened terrain tinted leaf-green (or orange in autumn), so trees
+                // keep a hint of their biome instead of all looking the same.
+                const dark = base.map(c => Math.round(c * 0.55));
+                return mix(dark, season === 'autumn' ? [190, 115, 30] : [24, 92, 30], 0.55);
+            }
+            return ORE_COLORS[tile.resource.type] || [130, 130, 130];
         }
-        if (tile.snowCovered) return [200, 200, 210];
-        switch (tile.terrain) {
-            case 'grass': return [50, 100, 40];
-            case 'forest_grass': return [40, 105, 35];
-            case 'swamp_grass': return [60, 95, 45];
-            case 'dirt': return [120, 80, 40];
-            case 'rock': return [80, 80, 80];
-            case 'tall_rock': return [55, 55, 55];
-            case 'water': return [40, 80, 180];
-            default: return [30, 30, 30];
-        }
+        // Snow cover is near-white but keeps a faint tint of the ground beneath.
+        if (tile.snowCovered) return mix([208, 214, 226], base, 0.18);
+        return base;
     }
 }

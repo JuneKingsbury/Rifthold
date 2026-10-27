@@ -208,11 +208,7 @@ export class Renderer {
             }
             return sm.getSprite('farms', 'farm_' + state);
         }
-        if (tile.resource) {
-            const seasonal = sm.getSprite('resources', tile.resource.type + '_' + season);
-            if (seasonal) return seasonal;
-            return sm.getSprite('resources', tile.resource.type);
-        }
+        if (tile.resource) return this._resolveResourceSprite(tile, season);
         if (tile.floor) return this._resolveFloorSprite(tile, season);
         const grassy = GRASS_TERRAIN.has(tile.terrain);
         if (tile.snowCovered && grassy) return sm.getSprite('effects', 'snow');
@@ -261,11 +257,27 @@ export class Renderer {
 
     _resolveMaterialSprite(tile, season) {
         const sm = this.skinManager;
-        if (tile.resource) {
-            const resourceSprite = sm.getSprite('resources', tile.resource.type + '_' + season);
-            return resourceSprite ? resourceSprite : sm.getSprite('resources', tile.resource.type);
-        }
+        if (tile.resource) return this._resolveResourceSprite(tile, season);
         return null;
+    }
+
+    // Resource sprite for a tile, preferring a variant for where it stands:
+    //   * trees in the swamp biome  -> `tree_swamp`  (and `tree_swamp_<season>`)
+    //   * any resource on red rock  -> `<type>_red_rock`, e.g. `iron_ore_red_rock`
+    // Each tries the season-specific art first, then the plain variant, and finally
+    // falls back to the regular `<type>_<season>` / `<type>` sprite, so a skin
+    // without the variant art looks exactly as before.
+    _resolveResourceSprite(tile, season) {
+        const sm = this.skinManager;
+        const type = tile.resource.type;
+        const variants = [];
+        if (type === 'tree' && tile.biome === 'swamp') variants.push('tree_swamp');
+        if (tile.terrain === 'red_rock') variants.push(type + '_red_rock');
+        for (const key of variants) {
+            const sprite = sm.getSprite('resources', key + '_' + season) || sm.getSprite('resources', key);
+            if (sprite) return sprite;
+        }
+        return sm.getSprite('resources', type + '_' + season) || sm.getSprite('resources', type);
     }
 
     // A tile bakes into the static ground cache only when its ground layer is

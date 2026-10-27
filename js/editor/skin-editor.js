@@ -594,6 +594,16 @@ class SkinEditor {
                         }
                     }
                 }
+                // Context variants. Each falls back to the regular sprite when absent.
+                const tree = RESOURCES.tree;
+                items.push({ key: 'tree_swamp', char: tree.char, color: '#4a6b3a', desc: 'Swamp tree (trees in the swamp biome; falls back to tree)', category: 'resources' });
+                for (const season of ['spring', 'summer', 'autumn', 'winter']) {
+                    items.push({ key: 'tree_swamp_' + season, char: tree.char, color: tree[season + 'Color'], desc: `Swamp tree (${season}; falls back to tree_swamp)`, category: 'resources' });
+                }
+                for (const ore of ['stone', 'iron_ore', 'runite_ore']) {
+                    const def = RESOURCES[ore];
+                    items.push({ key: ore + '_red_rock', char: def.char, color: def.color, desc: `${ore} on red rock (falls back to ${ore})`, category: 'resources' });
+                }
                 break;
             case 'Entities':
                 for (let i = 1; i <= this.humanBodyVariants; i++) {
