@@ -21,6 +21,8 @@ import { installTutorialPanel } from './ui-tutorial.js';
 import { installMapPanel } from './ui-map.js';
 import { getAllSlotsMeta, exportSlot, getLastSyncTime, forceSyncNow } from '../core/save.js';
 
+// How long the cursor must rest on a tile before its info tooltip appears.
+const TILE_TOOLTIP_DELAY_MS = 600;
 const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '❄', blizzard: '❅', heatwave: '♨' };
 
 // Skill/magic XP tooltip text, shared by the colonist tooltip refresh and the
@@ -4806,7 +4808,30 @@ export class UI {
         }
     }
 
+    // The tooltip only appears after the cursor rests on one tile for
+    // TILE_TOOLTIP_DELAY_MS; moving to another tile hides it and restarts the wait.
     updateTileTooltip(x, y, e) {
+        const tooltip = document.getElementById('tile-tooltip');
+        const pos = { left: (e.offsetX + 12) + 'px', top: (e.offsetY - 24) + 'px' };
+        if (this._tipTile?.x === x && this._tipTile?.y === y) {
+            // Same tile: follow the cursor if already visible, else keep waiting.
+            this._tipPos = pos;
+            if (tooltip.style.display === 'block') {
+                tooltip.style.left = pos.left;
+                tooltip.style.top = pos.top;
+            }
+            return;
+        }
+        this.hideTileTooltip();
+        this._tipTile = { x, y };
+        this._tipPos = pos;
+        this._tipTimer = setTimeout(() => {
+            this._tipTimer = null;
+            this._showTileTooltip(x, y);
+        }, TILE_TOOLTIP_DELAY_MS);
+    }
+
+    _showTileTooltip(x, y) {
         const tooltip = document.getElementById('tile-tooltip');
         const tile = this.game.map[y][x];
         const parts = [tile.sealed ? `(${x},${y}) unexplored` : `(${x},${y}) ${tile.terrain}`];
@@ -4821,11 +4846,14 @@ export class UI {
         }
         tooltip.textContent = parts.join(' | ');
         tooltip.style.display = 'block';
-        tooltip.style.left = (e.offsetX + 12) + 'px';
-        tooltip.style.top = (e.offsetY - 24) + 'px';
+        tooltip.style.left = this._tipPos.left;
+        tooltip.style.top = this._tipPos.top;
     }
 
     hideTileTooltip() {
+        clearTimeout(this._tipTimer);
+        this._tipTimer = null;
+        this._tipTile = null;
         document.getElementById('tile-tooltip').style.display = 'none';
     }
 
