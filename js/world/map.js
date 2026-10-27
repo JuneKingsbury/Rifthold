@@ -1114,14 +1114,16 @@ function generateRiver(map, params) {
 }
 
 // Generic (core-less) ruins. How many scales with map area (params.tilesPer), and
-// each is placed only where it fits: they keep clear of the landmark ruins and each
+// each is placed only where it fits: they keep clear of the landmark ruins, crypts and each
 // other, and a ruin that finds no room is skipped rather than forced.
 function generateRuins(map, params) {
     const count = params.tilesPer
         ? Math.max(params.minCount ?? 1, Math.round(CONFIG.MAP_WIDTH * CONFIG.MAP_HEIGHT / params.tilesPer))
         : (params.count || 1);
+    // Crypts are placed before generic ruins, so keep clear of everything already registered.
     const placed = placedLandmarks.map(l => ({ x: l.x, y: l.y, w: l.w, h: l.h }));
-    const padding = 2;
+    for (const r of generatedRuins) placed.push({ x: r.x, y: r.y, w: r.w, h: r.h });
+    const padding = params.padding ?? 2;
     const maxAttempts = 60;
 
     for (let i = 0; i < count; i++) {

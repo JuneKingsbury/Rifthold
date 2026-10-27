@@ -236,14 +236,19 @@ export const MAP_GENERATORS = [
             gravelChance: 0.5,
         },
     },
+    // Sealed crypts: counts, tiers and placement rules live in CRYPT_CONFIG. Placed
+    // before the generic 'ruins' so crypts get first pick of the map; generic ruins
+    // then fill whatever room is left around them and the landmarks.
+    { name: 'crypts', enabled: true, params: {} },
     {
         name: 'ruins',
         enabled: true,
         params: {
-            tilesPer: 4000,       // one generic ruin per this many map tiles (small 4, medium 16, large 37)
+            tilesPer: 4000,       // target: one generic ruin per this many map tiles (small 4, medium 16, large 37); fewer if room runs out
             minCount: 2,          // floor on generic ruins per map
             chance: 1,
             margin: 30,
+            padding: 4,           // min empty tiles between a ruin and any landmark or other ruin
             decayChance: 0.33,
             floorDecayChance: 0.15,
             blueprints: [
@@ -282,9 +287,6 @@ export const MAP_GENERATORS = [
             ],
         },
     },
-    // Sealed crypts: counts, tiers and placement rules live in CRYPT_CONFIG. Must run
-    // after 'ruins' so crypts keep clear of generic ruins as well as landmarks.
-    { name: 'crypts', enabled: true, params: {} },
 ];
 
 // Landmark blueprint library: the ruins that hold the world's Arcane Cores. There

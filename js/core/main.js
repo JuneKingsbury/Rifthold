@@ -1,5 +1,5 @@
 import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS, SEASONS, SEASON_ADVANCE_NOTICE, PRIORITY_PROFILES } from './config.js';
-import { WILDLIFE_CONFIG, LANDMARK_BLUEPRINTS } from './config.js';
+import { WILDLIFE_CONFIG, LANDMARK_BLUEPRINTS, MAP_GENERATORS, CRYPT_CONFIG } from './config.js';
 import { PATHFINDING_CONFIG } from './config.js';
 import { initModsUI } from '../ui/ui-mods.js';
 import { getLoadedManifests, getDiscoveredManifests, setModEnabled, markModsInitialized } from './mod-registry.js';
@@ -6078,14 +6078,36 @@ _onDOMReady(() => {
             btn.classList.toggle('selected', btn.dataset.worldSize === current);
         });
 
-        // Figures come from the same presets and blueprint library used to build the
-        // world, so the dialog cannot drift from what the player actually gets. Every
-        // map gets every core ruin, so the core count is the same for all sizes.
+        // Figures come from the same presets, generator params and blueprint library used
+        // to build the world, so the dialog cannot drift from what the player actually gets.
+        // Every map gets every core ruin, so the core count is the same for all sizes.
         const cores = Object.keys(LANDMARK_BLUEPRINTS).length;
+        const ruinParams = MAP_GENERATORS.find(g => g.name === 'ruins')?.params;
         modal.querySelectorAll('[data-world-stats]').forEach(el => {
             const p = WORLD_PRESETS[el.dataset.worldStats];
             if (!p) return;
-            el.textContent = `Max wildlife: ${p.maxAnimals}`;
+
+            // Mirrors generateRuins / generateCrypts in map.js.
+            const area = p.mapWidth * p.mapHeight;
+            const ruins = ruinParams?.tilesPer
+                ? Math.max(ruinParams.minCount ?? 1, Math.round(area / ruinParams.tilesPer))
+                : (ruinParams?.count || 1);
+            const crypts = CRYPT_CONFIG.anchors.length + (CRYPT_CONFIG.extras[p.mapWidth]?.length
+                ?? Math.max(0, Math.round(area / CRYPT_CONFIG.fallbackTilesPer) - CRYPT_CONFIG.anchors.length));
+            const rivers = p.mapWidth >= 384 ? 2 : 1;
+
+            const lines = [
+                `Max wildlife: ${p.maxAnimals}`,
+                `Sealed crypts: ${crypts}`,
+                `Ritual core ruins: ${cores}`,
+                `Other ruins: ~${ruins}`,
+                `Major rivers: ${rivers}`,
+            ];
+            el.replaceChildren(...lines.map(text => {
+                const row = document.createElement('div');
+                row.textContent = text;
+                return row;
+            }));
         });
 
         modal.style.display = 'flex';
