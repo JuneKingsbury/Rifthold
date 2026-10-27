@@ -3,7 +3,8 @@ import { WILDLIFE_CONFIG, LANDMARK_BLUEPRINTS } from './config.js';
 import { PATHFINDING_CONFIG } from './config.js';
 import { initModsUI } from '../ui/ui-mods.js';
 import { getLoadedManifests, getDiscoveredManifests, setModEnabled, markModsInitialized } from './mod-registry.js';
-import { generateMap, getTileVisuals } from '../world/map.js';
+import { generateMap, getTileVisuals, takeGeneratedRuins } from '../world/map.js';
+import { RuinSystem } from '../systems/ruins.js';
 import { generateStartMap } from '../ui/start-map.js';
 import { Camera } from '../ui/camera.js';
 import { Renderer } from '../ui/renderer.js';
@@ -183,6 +184,7 @@ class Game {
         this._fpsDisplay = 0;
 
         this.map = generateMap();
+        this.ruins = new RuinSystem(takeGeneratedRuins());
         this.camera = new Camera();
         this.taskQueue = new TaskQueue();
         this.resources = new ResourceManager();
@@ -397,7 +399,7 @@ class Game {
                 const x = Math.floor(Math.random() * CONFIG.MAP_WIDTH);
                 const y = Math.floor(Math.random() * CONFIG.MAP_HEIGHT);
                 const tile = this.map[y][x];
-                if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock' || tile.resource) continue;
+                if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'tall_rock' || tile.resource || tile.sealed || tile.structure) continue;
                 const wa = createWildAnimal(type, x, y);
                 this.entities.push(wa);
                 this.wildAnimals.push(wa);
@@ -654,6 +656,8 @@ class Game {
         this.spatial.hostiles.rebuild(hostileEntities);
         this.spatial.colonists.rebuild(this.colonists);
         if (prof) prof.mark('spatial.rebuild');
+
+        this.ruins.update(this);
 
         const prevSeason = this.weather.season;
         const prevWeather = this.weather.currentWeather;
@@ -3847,7 +3851,7 @@ class Game {
                 if (def.hideYield) drops.push(`${def.hideYield} hides`);
                 if (def.woolYield) drops.push(`${def.woolYield} wool`);
                 exp.wildlifeKills.set(key, {
-                    name: key.charAt(0).toUpperCase() + key.slice(1),
+                    name: def.name || key.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()),
                     char: def.char || '?', color: def.color || '#888888',
                     sprite: key, drops: drops.length ? drops.join(', ') : 'Nothing',
                     count: 1,

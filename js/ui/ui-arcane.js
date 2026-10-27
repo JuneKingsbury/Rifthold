@@ -1,4 +1,4 @@
-import { BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, TRINKETS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS,
+import { CRYPT_CONFIG, BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, TRINKETS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS,
     EXPEDITION_MUTATORS, EXPEDITION_POTIONS, POTION_CARRY_CONFIG, FORMATION_CONFIG,
     ELITE_MODIFIERS, NODE_MAP_CONFIG, EXPEDITION_XP_CONFIG, BESTIARY_CONFIG,
     getItemStatLines, RENDER_CONFIG, HEARTH_SHRINE_MILESTONES,
@@ -337,8 +337,10 @@ const arcaneMethods = {
             if (hasGate) break;
         }
 
+        // A portal is a legacy Rift Gate or any attuned rift anchor.
+        const hasPortal = hasGate || this.game.ruins.list.some(r => r.anchor?.attuned);
         const hasWayfinding = this.game.research.isResearched('wayfinding');
-        if (!hasGate && !hasWayfinding) {
+        if (!hasPortal && !hasWayfinding) {
             html += `<div class="arcane-section" style="color:#888;padding:20px 0;text-align:center;">`;
             html += `<div style="font-size:1.2em;color:#33ccff;margin-bottom:8px;">Wayfinding Required</div>`;
             html += `<div>Research Wayfinding to send scouting parties into the wilderness.</div>`;
@@ -582,8 +584,17 @@ const arcaneMethods = {
                             html += `<button onclick="window.game.showExpeditionSetupInPanel('${realm.key}', true)" style="background:#1a3322;color:#66dd99;padding:6px 10px;border:1px solid #336644;border-radius:3px;cursor:pointer;margin:2px 0;font-size:0.85em;">Auto</button>`;
                         }
                         html += `</div>`;
-                    } else if (available && !hasGate && !realm.scoutingMode) {
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - <span style="color:#888;">requires Rift Gate</span></span></div>`;
+                    } else if (available && !realm.scoutingMode && (!expl.findLaunchPosition(this.game, realm) || (this.game.ruins.getAnchor(realm.chain) && !this.game.research.isResearched('planar_rift')))) {
+                        const anchor = this.game.ruins.getAnchor(realm.chain);
+                        let need;
+                        if (!expl.findLaunchPosition(this.game, realm)) {
+                            need = anchor
+                                ? `attune the rift anchor of a crypt in the ${CRYPT_CONFIG.themes[realm.chain]?.biome ? CRYPT_CONFIG.themes[realm.chain].biome + 's' : 'wilds'}`
+                                : 'requires Rift Gate';
+                        } else {
+                            need = 'requires Planar Rifts research';
+                        }
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - <span style="color:#888;">${need}</span></span></div>`;
                     } else if (expl.isRealmDemoLocked(this.game, realm.key)) {
                         html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
                     } else if (realm.requiresEvent && !expl._checkEvent(this.game, realm.requiresEvent)) {
@@ -600,8 +611,11 @@ const arcaneMethods = {
             html += `<div class="info-row" style="color:#888;margin-top:8px;">No realms available yet</div>`;
         }
 
-        if (!hasGate && hasWayfinding) {
-            html += `<div class="info-row" style="color:#666;margin-top:10px;font-size:0.85em;border-top:1px solid #333;padding-top:8px;">Build a <span style="color:#888;">Rift Gate</span> to unlock expeditions to other realms.</div>`;
+        if (!hasPortal && hasWayfinding) {
+            const hint = this.game.ruins.hasAnchors()
+                ? 'Find an ancient crypt, breach it, and attune its <span style="color:#888;">rift anchor</span> to open expeditions to other realms.'
+                : 'Build a <span style="color:#888;">Rift Gate</span> to unlock expeditions to other realms.';
+            html += `<div class="info-row" style="color:#666;margin-top:10px;font-size:0.85em;border-top:1px solid #333;padding-top:8px;">${hint}</div>`;
         }
 
         // Active realm events
@@ -5054,6 +5068,8 @@ const arcaneMethods = {
             case 'mine': label = 'Mining'; break;
             case 'chop': label = 'Chopping tree'; break;
             case 'deconstruct': label = 'Deconstructing'; break;
+            case 'loot_chest': label = 'Looting chest'; break;
+            case 'attune_anchor': label = 'Attuning rift anchor'; break;
             case 'plant': label = 'Planting'; break;
             case 'harvest': label = 'Harvesting'; break;
             case 'craft': label = `Crafting ${task.recipe?.name || 'item'}`; break;

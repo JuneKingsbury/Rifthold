@@ -1,4 +1,4 @@
-import { CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
+import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
 import { ROOM_SCORE_CAPS } from '../world/rooms.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
@@ -1053,7 +1053,7 @@ export class UI {
             html += '<span class="mode-opt mode-back" data-mode-action="back">[Esc]Back</span>';
             const deconActive = input.deconstructMode ? ' active' : '';
             html += `<span class="mode-opt${deconActive}" data-mode-action="deconstruct" style="margin-left:8px;color:#ff6666">[X]Deconstruct</span>`;
-            html += '<span class="mode-hint">[Tab]Cycle category | Right-click to deconstruct</span>';
+            html += '<span class="mode-hint">[Tab]Cycle category | Right-click to deconstruct or loot chests</span>';
             this._updateBuildPanel(input);
         } else if (input.mode === 'zone') {
             html += '<span class="mode-opt mode-back" data-mode-action="back">[Esc]Back</span>';
@@ -1331,13 +1331,41 @@ export class UI {
         return html;
     }
 
+    // Records which realm chain the selected portal serves (null for the legacy Rift
+    // Gate, which serves all of them) and returns whether a portal is selected.
+    // Short help lines for the crypt structures (chest, anchor, ward) on a selected tile.
+    _buildCryptInfoHtml(tile, x, y) {
+        if (tile.sealed) return '';
+        const ruin = this.game.ruins.getRuinAt(x, y);
+        if (!ruin) return '';
+        let text = '';
+        if (tile.structure === 'ancient_chest') {
+            text = tile.designation ? 'Marked for looting.' : 'A sealed chest. In Build mode, right-click it to have a colonist loot it.';
+        } else if (tile.structure === 'rift_anchor') {
+            const name = CRYPT_CONFIG.chainNames[ruin.anchor?.chain] || 'a';
+            text = tile.designation
+                ? 'Marked for attuning.'
+                : `A dormant rift anchor to the ${name} realms. In Build mode, right-click it to have a colonist attune it.`;
+        } else if (tile.structure === 'warded_wall' && ruin.ward) {
+            text = `Warded wall. ${this.game.ruins.wardText(ruin)}`;
+        }
+        return text ? `<div class="info-row" style="color:#d4a84a;">${text}</div>` : '';
+    }
+
+    _setRiftPortal(tile, x, y) {
+        this._riftPortalChain = tile.structure === 'rift_anchor_active'
+            ? (this.game.ruins.getRuinAt(x, y)?.anchor?.chain || null)
+            : null;
+        return tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active';
+    }
+
     _buildRiftGateHtml() {
         return `<div data-rift-info="1">${this._buildRiftGateInnerHtml()}</div>`;
     }
 
     _buildRiftGateInnerHtml() {
         const expl = this.game.exploration;
-        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">Rift Gate</div>`;
+        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalChain ? 'Rift Anchor' : 'Rift Gate'}</div>`;
 
         const watchedExps = expl.expeditions.filter(e => !e.autoMode);
         const autoRunning = expl.expeditions.filter(e => e.autoMode).length;
@@ -1394,7 +1422,8 @@ export class UI {
             html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${autoRunning} auto expedition${autoRunning > 1 ? 's' : ''} running${pendingCollect > 0 ? ` — <span style="color:#44ff88">${pendingCollect} ready to collect</span>` : ''}</div>`;
         }
 
-        const dims = expl.getAvailableRealms(this.game);
+        const dims = expl.getAvailableRealms(this.game)
+            .filter(d => expl.canSend(this.game, d.key) && (!this._riftPortalChain || d.chain === this._riftPortalChain));
         if (dims.length > 0 && this.game.power.powered) {
             html += `<div class="info-row" style="margin-top:6px;"><b>Send Expedition:</b></div>`;
             const sortedDims = dims.slice().sort((a, b) => a.difficulty - b.difficulty);
@@ -2391,7 +2420,7 @@ export class UI {
 
     _buildRiftGateInfoHtml() {
         let html = '';
-        html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">Rift Gate</div>`;
+        html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalChain ? 'Rift Anchor' : 'Rift Gate'}</div>`;
         const expl = this.game.exploration;
         const watchedExp = expl.expeditions.find(e => !e.autoMode);
         const autoCount = expl.expeditions.filter(e => e.autoMode).length;
@@ -2492,12 +2521,19 @@ export class UI {
         return null;
     }
 
+    // Display name for a wild animal type: its configured name (crypt guardians have
+    // one, e.g. "Crypt Warden"), else the type with underscores read as spaces.
+    _animalDisplayName(type) {
+        const name = ANIMALS[type]?.name || type.replace(/_/g, ' ');
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+
     showAnimalInfo(animal) {
         this._switchToInfoTab();
         this._viewingColonistId = null;
         this.setSummaryVisible(false);
         const def = ANIMALS[animal.type];
-        let html = `<div class="info-header">${animal.type}</div>`;
+        let html = `<div class="info-header">${this._animalDisplayName(animal.type)}</div>`;
         html += `<div class="info-row">HP: ${animal.hp}/${animal.maxHp}</div>`;
         html += `<div class="info-row">${animal.hostile ? 'Hostile' : 'Passive'}</div>`;
         if (def?.meatYield) html += `<div class="info-row">Meat yield: ${def.meatYield}</div>`;
@@ -2555,7 +2591,7 @@ export class UI {
         this._lastTileInfo = { tile, x, y };
         this._viewingColonistId = null;
         this.setSummaryVisible(true);
-        this._viewingRiftGate = (tile.structure === 'rift_gate');
+        this._viewingRiftGate = this._setRiftPortal(tile, x, y);
         let html = `<div class="info-header">Tile (${x},${y})</div>`;
         html += `<div class="info-row">Terrain: ${tile.terrain}</div>`;
         if (tile.structure) {
@@ -2597,9 +2633,10 @@ export class UI {
             html += this._buildPedestalInfoHtml(tile, x, y);
         }
 
-        if (tile.structure === 'rift_gate') {
+        if (tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active') {
             html += this._buildRiftGateInfoHtml();
         }
+        html += this._buildCryptInfoHtml(tile, x, y);
 
         if (tile.structure === 'trade_rift') {
             html += this._buildTradeRiftInfoHtml(tile, x, y);
@@ -2679,7 +2716,7 @@ export class UI {
         const hasEntities = colonists.length > 0 || animals.length > 0 || raiders.length > 0
             || tamedAnimals.length > 0 || summons.length > 0;
         this.setSummaryVisible(!hasEntities);
-        this._viewingRiftGate = (tile.structure === 'rift_gate');
+        this._viewingRiftGate = this._setRiftPortal(tile, x, y);
         this._viewingColonistId = (colonists.length === 1 && animals.length === 0 && raiders.length === 0 && tamedAnimals.length === 0 && summons.length === 0)
             ? colonists[0].id : null;
         let html = '';
@@ -2708,7 +2745,7 @@ export class UI {
             const def = ANIMALS[a.type];
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            html += `<div class="info-header" style="color:${color};">${a.type.charAt(0).toUpperCase() + a.type.slice(1)}${a.hostile ? ' (hostile)' : ''}</div>`;
+            html += `<div class="info-header" style="color:${color};">${this._animalDisplayName(a.type)}${a.hostile ? ' (hostile)' : ''}</div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
             if (def?.meatYield) html += `<div class="info-row">Meat yield: ${def.meatYield}</div>`;
             if (def?.hideYield) html += `<div class="info-row">Hide yield: ${def.hideYield}</div>`;
@@ -2899,9 +2936,10 @@ export class UI {
             html += this._buildPedestalInfoHtml(tile, x, y);
         }
 
-        if (tile.structure === 'rift_gate') {
+        if (tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active') {
             html += this._buildRiftGateInfoHtml();
         }
+        html += this._buildCryptInfoHtml(tile, x, y);
 
         if (tile.structure === 'trade_rift') {
             html += this._buildTradeRiftInfoHtml(tile, x, y);
@@ -4760,8 +4798,8 @@ export class UI {
     updateTileTooltip(x, y, e) {
         const tooltip = document.getElementById('tile-tooltip');
         const tile = this.game.map[y][x];
-        const parts = [`(${x},${y}) ${tile.terrain}`];
-        if (tile.structure) parts.push(`Structure: ${tile.structure.replace(/_/g, ' ')}`);
+        const parts = [tile.sealed ? `(${x},${y}) unexplored` : `(${x},${y}) ${tile.terrain}`];
+        if (tile.structure && !tile.sealed) parts.push(`Structure: ${tile.structure.replace(/_/g, ' ')}`);
         if (tile.resource) parts.push(`Resource: ${tile.resource.type}${tile.resource.amount > 1 ? ' x' + tile.resource.amount : ''}`);
         if (tile.designation) parts.push(`[${tile.designation.type}]`);
         if (tile.zone) parts.push(`Farm: ${tile.zone.crop}`);
@@ -5405,13 +5443,13 @@ export class UI {
                 if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
                 return h + `</div></div>`;
             };
-            const _killEntryHtml = (entry, spriteHtml, lore, showTamed) => {
+            const _killEntryHtml = (entry, spriteHtml, lore, showTamed, hideDrops) => {
                 if (!spriteHtml) {
                     spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${entry.color};vertical-align:middle;margin-right:6px;">${entry.char}</span>`;
                 }
                 let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
                 h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
-                let statLine = `Killed: ${entry.count}x | Drops: ${entry.drops || 'Nothing'}`;
+                let statLine = hideDrops ? `Defeated: ${entry.count}x` : `Killed: ${entry.count}x | Drops: ${entry.drops || 'Nothing'}`;
                 if (showTamed && entry.tameCount) statLine += ` | Tamed: ${entry.tameCount}x`;
                 h += `<div class="story-entry-text" style="font-size:0.8em;">${statLine}</div>`;
                 if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
@@ -5473,7 +5511,12 @@ export class UI {
             }
 
             // Wildlife section
-            const wildlifeKills = [...(this.game.exploration?.wildlifeKills?.values() || [])];
+            // Kills of every wild-animal type share one record. Crypt guardians are
+            // animals to the AI, but belong in their own bestiary section.
+            const animalKills = [...(this.game.exploration?.wildlifeKills?.values() || [])];
+            const isGuardianKill = e => !!ANIMALS[e.sprite]?.guardian;
+            const wildlifeKills = animalKills.filter(e => !isGuardianKill(e));
+            const guardianKills = animalKills.filter(isGuardianKill);
             html += _sectionHeader('wildlife', 'Wildlife', '#88cc44', wildlifeKills.length);
             if (!this._collapsedBestiarySections.has('wildlife')) {
                 if (wildlifeKills.length === 0) {
@@ -5481,6 +5524,18 @@ export class UI {
                 } else {
                     for (const entry of wildlifeKills) {
                         html += _killEntryHtml(entry, _getSpriteHtml(entry.sprite), ANIMALS[entry.sprite]?.lore || entry.lore || '', true);
+                    }
+                }
+            }
+
+            // Crypt guardians section
+            html += _sectionHeader('crypt_guardians', 'Crypt Guardians', '#bba0e0', guardianKills.length);
+            if (!this._collapsedBestiarySections.has('crypt_guardians')) {
+                if (guardianKills.length === 0) {
+                    html += _emptyHint('Breach an ancient crypt and defeat its guardians to add them here.');
+                } else {
+                    for (const entry of guardianKills) {
+                        html += _killEntryHtml(entry, _getSpriteHtml(entry.sprite), ANIMALS[entry.sprite]?.lore || entry.lore || '', false, true);
                     }
                 }
             }

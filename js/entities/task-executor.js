@@ -667,6 +667,16 @@ export function completeTask(colonist, task, game) {
             }
             break;
         }
+        case 'attune_anchor': {
+            game.map[task.y][task.x].designation = null;
+            game.ruins.attuneAnchor(game, task.x, task.y);
+            break;
+        }
+        case 'loot_chest': {
+            game.map[task.y][task.x].designation = null;
+            game.ruins.lootChest(game, task.x, task.y);
+            break;
+        }
         case 'deconstruct_floor': {
             const tile = game.map[task.y][task.x];
             const target = tile.floor;

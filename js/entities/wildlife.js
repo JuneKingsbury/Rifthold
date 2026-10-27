@@ -47,7 +47,7 @@ export function updateWildlife(game) {
                         if (d?.hideYield) drops.push(`${d.hideYield} hides`);
                         if (d?.woolYield) drops.push(`${d.woolYield} wool`);
                         game.exploration.wildlifeKills.set(animal.type, {
-                            name: animal.type.charAt(0).toUpperCase() + animal.type.slice(1),
+                            name: d?.name || animal.type.charAt(0).toUpperCase() + animal.type.slice(1),
                             char: d?.char || '?',
                             color: d?.color || '#888888',
                             sprite: animal.type,
@@ -70,7 +70,7 @@ function maybeSpawnAnimal(game) {
     const spawnRate = SEASON_EFFECTS[game.weather.season].animalSpawnRate;
     if (Math.random() > spawnRate) return;
     // Count using the dedicated subset — avoids scanning all entities.
-    const wildCount = game.wildAnimals.filter(e => !e.pendingTame).length;
+    const wildCount = game.wildAnimals.filter(e => !e.pendingTame && !e.guardian).length;
     if (wildCount >= WILDLIFE_CONFIG.maxCount) return;
 
     let edge;
@@ -224,10 +224,23 @@ function updatePassiveAnimal(animal, def, game, dur) {
     }
 }
 
+// Crypt guardians drift back to their post when idle, so a woken guardian does not
+// wander the map once its prey is out of range.
+const GUARDIAN_LEASH = 5;
+
+function idleMove(animal, game, dur) {
+    if (animal.home && manhattanDist(animal.x, animal.y, animal.home.x, animal.home.y) > GUARDIAN_LEASH) {
+        moveToward(animal, animal.home, game, dur);
+    } else if (Math.random() < WILDLIFE_CONFIG.hostileIdleMoveChance) {
+        randomMove(animal, game, dur);
+    }
+}
+
 function updateHostileAnimal(animal, def, game, dur) {
     const nearestColonist = findNearestColonist(animal, game);
     if (!nearestColonist) {
-        randomMove(animal, game, dur);
+        if (animal.home) idleMove(animal, game, dur);
+        else randomMove(animal, game, dur);
         return;
     }
 
@@ -238,18 +251,22 @@ function updateHostileAnimal(animal, def, game, dur) {
     } else if (dist <= def.aggroRange) {
         moveToward(animal, nearestColonist, game, dur);
     } else {
-        if (Math.random() < WILDLIFE_CONFIG.hostileIdleMoveChance) randomMove(animal, game, dur);
+        idleMove(animal, game, dur);
     }
 }
 
+// Colonists on an expedition keep their old map position but are away, so animals
+// (and crypt guardians waiting beside a rift anchor) must not target them.
+const notOnExpedition = c => !c.onExpedition;
+
 function findNearestColonist(animal, game) {
     if (game.spatial) {
-        return game.spatial.colonists.findNearest(animal.x, animal.y, WILDLIFE_CONFIG.animalSearchRadius, null);
+        return game.spatial.colonists.findNearest(animal.x, animal.y, WILDLIFE_CONFIG.animalSearchRadius, notOnExpedition);
     }
     let nearest = null;
     let minDist = Infinity;
     for (const c of game.colonists) {
-        if (c.hp <= 0) continue;
+        if (c.hp <= 0 || c.onExpedition) continue;
         const dist = manhattanDist(animal.x, animal.y, c.x, c.y);
         if (dist < minDist) {
             minDist = dist;

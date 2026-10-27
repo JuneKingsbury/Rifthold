@@ -29,7 +29,7 @@ export function designateFarmZone(game, x1, y1, x2, y2, cropType) {
         for (let x = minX; x <= maxX; x++) {
             const tile = game.map[y][x];
             if (!FARMABLE_TERRAIN.has(tile.terrain)) continue;
-            if (tile.structure || tile.resource || tile.zone) continue;
+            if (tile.sealed || tile.structure || tile.resource || tile.zone) continue;
 
             tile.zone = {
                 type: 'growing',

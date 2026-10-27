@@ -1,4 +1,4 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS, INDESTRUCTIBLE_STRUCTURES } from '../core/config.js';
+import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS, INDESTRUCTIBLE_STRUCTURES, TERRAIN } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
@@ -835,7 +835,7 @@ export class EventSystem {
                     outer: for (let y = 0; y < g.map.length; y++) {
                         for (let x = 0; x < g.map[y].length; x++) {
                             const s = g.map[y][x].structure;
-                            if (s === 'void_wall' || (s === 'wall' && !found)) {
+                            if ((s === 'void_wall' || (s === 'wall' && !found)) && !g.ruins.getRuinAt(x, y)) {
                                 g.map[y][x].structure = null;
                                 if (g.mapIndex) g.mapIndex.removeStructure(x, y, s);
                                 found = true;
@@ -1018,7 +1018,7 @@ export class EventSystem {
             const x = Math.floor(Math.random() * CONFIG.MAP_WIDTH);
             const y = Math.floor(Math.random() * CONFIG.MAP_HEIGHT);
             const tile = game.map[y][x];
-            if (tile.resource?.type === 'tree' || (tile.structure && tile.structure !== 'wall')) {
+            if (!tile.sealed && (tile.resource?.type === 'tree' || (tile.structure && tile.structure !== 'wall'))) {
                 fireX = x; fireY = y;
                 break;
             }
@@ -1127,6 +1127,7 @@ export function updateFires(game) {
                     }
                 }
                 tile.structure = null;
+                tile.passable = TERRAIN[tile.terrain]?.passable.colonist ?? true;
                 game.mapIndex.removeStructure(x, y, oldStructure);
             }
         }
@@ -1137,7 +1138,7 @@ export function updateFires(game) {
             const nx = x + dir[0], ny = y + dir[1];
             if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
                 const neighbor = game.map[ny][nx];
-                if (!neighbor.onFire && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
+                if (!neighbor.onFire && !neighbor.sealed && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
                     neighbor.onFire = true;
                     neighbor.fireTimer = FIRE_CONFIG.spreadTimerMin + Math.floor(Math.random() * (FIRE_CONFIG.spreadTimerMax - FIRE_CONFIG.spreadTimerMin));
                     game.mapIndex.addFire(nx, ny);
@@ -1193,6 +1194,7 @@ function _updateFiresFallback(game) {
                     // structure key and drifts from a fresh rebuild.
                     const oldStructure = tile.structure;
                     tile.structure = null;
+                    tile.passable = TERRAIN[tile.terrain]?.passable.colonist ?? true;
                     if (game.mapIndex) game.mapIndex.removeStructure(x, y, oldStructure);
                 }
             }
@@ -1203,7 +1205,7 @@ function _updateFiresFallback(game) {
                 const nx = x + dir[0], ny = y + dir[1];
                 if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
                     const neighbor = game.map[ny][nx];
-                    if (!neighbor.onFire && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
+                    if (!neighbor.onFire && !neighbor.sealed && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
                         neighbor.onFire = true;
                         neighbor.fireTimer = FIRE_CONFIG.spreadTimerMin + Math.floor(Math.random() * (FIRE_CONFIG.spreadTimerMax - FIRE_CONFIG.spreadTimerMin));
                         game.combatEffects.push({ x: nx, y: ny, char: COMBAT_VISUALS.fireIgniteChar, color: COMBAT_VISUALS.fireIgniteColor, ttl: COMBAT_VISUALS.fireIgniteTtl });

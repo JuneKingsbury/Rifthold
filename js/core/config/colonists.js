@@ -295,6 +295,8 @@ export const WORK_CONFIG = {
     harvestWork: 8,
     researchWork: 60,
     deconstructWork: 10,
+    lootChestWork: 8,
+    attuneAnchorWork: 20,
     tameWork: 20,
     dangerousTameWork: 30,
     tameSkillChanceBonus: 0.06,

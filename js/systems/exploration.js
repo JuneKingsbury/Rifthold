@@ -103,8 +103,10 @@ export class ExplorationSystem {
         if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) return false;
         if (dim.scoutingMode) return true;
         if (!game.power || !game.power.powered) return false;
-        if (!game.mapIndex || game.mapIndex.getStructurePositions('rift_gate').size === 0) return false;
-        return true;
+        // Anchors skip the Rift Gate (which needed Planar Rifts to build), so the
+        // research gate moves to the launch itself and early chains don't open on day one.
+        if (game.ruins.getAnchor(dim.chain) && !game.research.isResearched('planar_rift')) return false;
+        return !!this.findLaunchPosition(game, dim);
     }
 
     getAvailableRealms(game) {
@@ -185,7 +187,7 @@ export class ExplorationSystem {
 
         if (party.length === 0) return null;
 
-        let gatePos = dim.scoutingMode ? null : this._findRiftGatePosition(game);
+        let gatePos = dim.scoutingMode ? null : this.findLaunchPosition(game, dim);
         if (!dim.scoutingMode && !gatePos) return null;
 
         const packAnimals = [];
@@ -323,8 +325,8 @@ export class ExplorationSystem {
             loot: {},
             defeated: [],
             log: packAnimals.length > 0
-                ? [{ tick: 0, text: `Party heading to Rift Gate (${packAnimals.length} pack animal${packAnimals.length > 1 ? 's' : ''})`, type: 'info' }]
-                : [{ tick: 0, text: `Party heading to Rift Gate`, type: 'info' }],
+                ? [{ tick: 0, text: `Party heading to the rift (${packAnimals.length} pack animal${packAnimals.length > 1 ? 's' : ''})`, type: 'info' }]
+                : [{ tick: 0, text: `Party heading to the rift`, type: 'info' }],
             combat: null,
             summons: [],
             lastMicroEventTick: 0,
@@ -360,6 +362,21 @@ export class ExplorationSystem {
         const mutLabel = mutators.length > 0 ? ` [${mutators.map(k => EXPEDITION_MUTATORS[k]?.name || k).join(', ')}]` : '';
         game.eventLog.add(game, `Expedition assembling for ${dim.name}${diffLabel}${mutLabel}`, 'event', null);
         return expedition;
+    }
+
+    /**
+     * Where a party for this realm gathers and departs: the attuned rift anchor of the
+     * realm's chain. Chains with no anchor on the map (saves from before anchors, or a
+     * modded chain) fall back to the legacy Rift Gate.
+     *
+     * @param {object} game Game instance.
+     * @param {object} dim Realm definition from REALMS.
+     * @return {{x: number, y: number}|null} The launch tile, or null if the chain is locked.
+     */
+    findLaunchPosition(game, dim) {
+        const anchor = game.ruins.getAnchor(dim.chain);
+        if (anchor) return anchor.attuned ? { x: anchor.x, y: anchor.y } : null;
+        return this._findRiftGatePosition(game);
     }
 
     _findRiftGatePosition(game) {

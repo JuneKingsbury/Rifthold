@@ -157,6 +157,15 @@ export class Minimap {
             this.drawDot(data, r.x, r.y, [255, 50, 50]);
         }
 
+        // Discovered crypts: a small cross at the centre, coloured by state
+        // (sealed, breached and guarded, plundered).
+        for (const ruin of this.game.ruins.list) {
+            if (ruin.kind !== 'crypt' || !ruin.discovered) continue;
+            const color = ruin.ward ? [110, 130, 200] : ruin.state === 'sealed' ? [190, 160, 230] : ruin.state === 'cleared' ? [90, 170, 90] : [230, 90, 90];
+            const mx = ruin.x + Math.floor(ruin.w / 2), my = ruin.y + Math.floor(ruin.h / 2);
+            for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) this.drawDot(data, mx + dx, my + dy, color);
+        }
+
         ctx.putImageData(this._compositeImageData, 0, 0);
 
         this._lastCamX = camX;
@@ -190,6 +199,7 @@ export class Minimap {
     }
 
     getTileColor(tile, season) {
+        if (tile.sealed) return [8, 8, 12];
         if (tile.onFire) return [255, 68, 0];
         if (tile.structure) {
             const bDef = BUILDINGS[tile.structure];

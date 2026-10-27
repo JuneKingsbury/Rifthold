@@ -1,4 +1,7 @@
-import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, BIOMES, BIOME_TRANSITIONS, GRASS_TERRAIN, LANDMARK_BLUEPRINTS, CROPS } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, BIOMES, BIOME_TRANSITIONS, GRASS_TERRAIN, LANDMARK_BLUEPRINTS, CRYPT_CONFIG, CRYPT_BLUEPRINTS, RUIN_LOOT, CROPS } from '../core/config.js';
+
+// Background of a sealed (unexplored) crypt tile, shared by the renderer.
+export const SEALED_BG = '#050507';
 
 export function createTile(terrain) {
     return {
@@ -26,10 +29,23 @@ const GENERATOR_FUNCTIONS = {
     trees: generateTrees,
     river: generateRiver,
     ruins: generateRuins,
+    crypts: generateCrypts,
 };
+
+// Footprints of every ruin the current generateMap run placed (landmarks and generic
+// ruins). generateMap returns only the tile grid, so the game takes these through
+// takeGeneratedRuins() to seed its saved ruin registry.
+let generatedRuins = [];
+
+export function takeGeneratedRuins() {
+    const out = generatedRuins;
+    generatedRuins = [];
+    return out;
+}
 
 export function generateMap() {
     placedLandmarks = [];
+    generatedRuins = [];
     const map = [];
     for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
         map[y] = [];
@@ -812,6 +828,7 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
         const cx2 = pick.x, cy2 = pick.y;
         placed.push({ x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
         placedLandmarks.push({ blueprint, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
+        generatedRuins.push({ kind: 'landmark', blueprint: blueprint.name, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
 
         // Paint floor terrain under the footprint.
         if (blueprint.floorTerrain) {
@@ -1127,6 +1144,7 @@ function generateRuins(map, params) {
         if (overlaps) continue;
 
         placed.push({ x: cx, y: cy, w: blueprint.width, h: blueprint.height });
+        generatedRuins.push({ kind: blueprint.name, blueprint: blueprint.name, x: cx, y: cy, w: blueprint.width, h: blueprint.height });
 
         const decayChance = params.decayChance ?? 0.33;
         const floorDecayChance = params.floorDecayChance ?? 0.15;
@@ -1170,6 +1188,188 @@ function generateRuins(map, params) {
     }
 }
 
+// Rolls one chest's contents from RUIN_LOOT[tier] plus the crypt theme's own
+// materials: a few weighted picks that merge into {resource: amount}. Stored on the
+// ruin so a reload never rerolls.
+function rollChestLoot(tier, themeLoot) {
+    const entries = [...RUIN_LOOT[tier].entries, ...themeLoot];
+    const [minRolls, maxRolls] = RUIN_LOOT[tier].rolls;
+    const totalWeight = entries.reduce((sum, e) => sum + e.weight, 0);
+    const rolls = minRolls + Math.floor(Math.random() * (maxRolls - minRolls + 1));
+    const contents = {};
+    for (let i = 0; i < rolls; i++) {
+        let pick = Math.random() * totalWeight;
+        const entry = entries.find(e => (pick -= e.weight) < 0) || entries[0];
+        const amount = entry.amount[0] + Math.floor(Math.random() * (entry.amount[1] - entry.amount[0] + 1));
+        contents[entry.resource] = (contents[entry.resource] || 0) + amount;
+    }
+    return contents;
+}
+
+// Sealed crypts (see CRYPT_CONFIG). Each is a door-less wall ring whose interior is
+// flagged tile.sealed, so the renderer shows it dark until the ring is breached. Never
+// decayed, and never placed on or beside water or near the start area or a landmark,
+// so a crypt can neither start open nor stand between a player and an Arcane Core.
+//
+// Every gated realm chain gets one anchor crypt, placed in the chain's biome and
+// dressed in its theme (walls, floor, guardians, loot). If a chain's biome has no room
+// the crypt is placed elsewhere rather than dropped, since its chain would be locked.
+function generateCrypts(map) {
+    const W = CONFIG.MAP_WIDTH, H = CONFIG.MAP_HEIGHT;
+    const cfg = CRYPT_CONFIG;
+    const cx = Math.floor(W / 2), cy = Math.floor(H / 2);
+
+    const extras = cfg.extras[W]
+        ?? new Array(Math.max(0, Math.round(W * H / cfg.fallbackTilesPer) - cfg.anchors.length)).fill(1);
+
+    // The starter is whichever tier 1 anchor chain has its biome nearest the start.
+    const biomeDistToStart = (biome) => {
+        let best = Infinity;
+        for (let y = 0; y < H; y += 3) {
+            for (let x = 0; x < W; x += 3) {
+                if (map[y][x].biome === biome) best = Math.min(best, Math.max(Math.abs(x - cx), Math.abs(y - cy)));
+            }
+        }
+        return best;
+    };
+    const tierOne = cfg.anchors.filter(a => a.tier === 1);
+    const starterChain = tierOne.length
+        ? tierOne.reduce((a, b) => biomeDistToStart(cfg.themes[a.chain].biome) <= biomeDistToStart(cfg.themes[b.chain].biome) ? a : b).chain
+        : null;
+
+    const plan = [
+        ...cfg.anchors.map(a => ({ tier: a.tier, chain: a.chain, starter: a.chain === starterChain })),
+        ...extras.map(tier => ({ tier })),
+    ].sort((a, b) => b.tier - a.tier);
+
+    const placed = placedLandmarks.map(l => ({ x: l.x, y: l.y, w: l.w, h: l.h }));
+    for (const r of generatedRuins) placed.push({ x: r.x, y: r.y, w: r.w, h: r.h });
+
+    const startDist = (x, y, bp) => Math.max(Math.abs(x + bp.width / 2 - cx), Math.abs(y + bp.height / 2 - cy));
+    const fits = (x, y, bp) => {
+        if (x < cfg.margin || y < cfg.margin || x + bp.width > W - cfg.margin || y + bp.height > H - cfg.margin) return false;
+        if (startDist(x, y, bp) < cfg.startKeepOut + Math.max(bp.width, bp.height) / 2) return false;
+        if (placed.some(r =>
+            x < r.x + r.w + cfg.padding && x + bp.width + cfg.padding > r.x &&
+            y < r.y + r.h + cfg.padding && y + bp.height + cfg.padding > r.y)) return false;
+        // The ring and a one-tile border must be dry, open ground.
+        for (let dy = -1; dy <= bp.height; dy++) {
+            for (let dx = -1; dx <= bp.width; dx++) {
+                const t = map[y + dy][x + dx];
+                if (isWaterTerrain(t.terrain) || t.terrain === 'tall_rock') return false;
+            }
+        }
+        return true;
+    };
+
+    // Every legal spot for this blueprint, narrowed by `want`. Sampled every 2 tiles.
+    const collect = (bp, want) => {
+        const out = [];
+        for (let y = cfg.margin; y < H - bp.height - cfg.margin; y += 2) {
+            for (let x = cfg.margin; x < W - bp.width - cfg.margin; x += 2) {
+                if (!want(x, y) || !fits(x, y, bp)) continue;
+                out.push({ x, y });
+            }
+        }
+        return out;
+    };
+
+    for (const { tier, chain, starter } of plan) {
+        const theme = cfg.themes[chain] || cfg.themes.default;
+        const options = CRYPT_BLUEPRINTS[tier];
+        const bp = options[Math.floor(Math.random() * options.length)];
+        const minDist = tier === 3 ? cfg.deepVaultMinDist * Math.min(W, H) : 0;
+
+        const inBiome = (x, y) => !theme.biome || map[y + Math.floor(bp.height / 2)][x + Math.floor(bp.width / 2)].biome === theme.biome;
+        const farEnough = (x, y) => startDist(x, y, bp) >= minDist;
+        const nearStart = (x, y) => { const d = startDist(x, y, bp); return d >= cfg.starterRange[0] && d <= cfg.starterRange[1]; };
+
+        // Widen the search until something fits: ideal rules first, then drop the
+        // start-distance rules, then drop the biome.
+        const attempts = [
+            (x, y) => inBiome(x, y) && farEnough(x, y) && (!starter || nearStart(x, y)),
+            (x, y) => inBiome(x, y) && farEnough(x, y),
+            (x, y) => inBiome(x, y),
+            () => true,
+        ];
+        let candidates = [];
+        for (const want of attempts) {
+            candidates = collect(bp, want);
+            if (candidates.length > 0) break;
+        }
+        if (candidates.length === 0) {
+            console.warn(`Crypt ${bp.name}${chain ? ' (' + chain + ' anchor)' : ''} could not be placed: no free space`);
+            continue;
+        }
+        const spot = candidates[Math.floor(Math.random() * candidates.length)];
+
+        placed.push({ x: spot.x, y: spot.y, w: bp.width, h: bp.height });
+
+        // Only the crypt's own tiles change terrain, so a round crypt leaves the corners
+        // of its bounding box as natural ground.
+        for (const t of [...bp.ring, ...bp.interior]) {
+            const tile = map[spot.y + t.y][spot.x + t.x];
+            tile.terrain = theme.terrain;
+            tile.resource = null;
+        }
+        // Blueprints are authored in stone: swap in the theme's wall and floor.
+        const themed = { stone_wall: theme.wall, stone_floor: theme.floor };
+        for (const piece of bp.layout) {
+            const type = themed[piece.type] || piece.type;
+            const tile = map[spot.y + piece.y][spot.x + piece.x];
+            if (BUILDINGS[type].structureType === 'floor') {
+                tile.floor = type;
+            } else {
+                tile.structure = type;
+                tile.passable = !(IMPASSABLE_STRUCTURES.has(type));
+                tile.structureHp = BUILDINGS[type].hp;
+            }
+        }
+        for (const t of bp.interior) map[spot.y + t.y][spot.x + t.x].sealed = true;
+
+        // Warded crypts get an unbreakable ring until their prerequisite chain is
+        // completed (RuinSystem swaps the theme's wall back in).
+        const wardChain = chain ? cfg.wardedBy[chain] : cfg.extraWardedBy[tier];
+        if (wardChain) {
+            for (const t of bp.ring) {
+                const tile = map[spot.y + t.y][spot.x + t.x];
+                tile.structure = 'warded_wall';
+                tile.structureHp = BUILDINGS.warded_wall.hp;
+            }
+        }
+
+        const loot = [];
+        for (const c of bp.chests) {
+            const tile = map[spot.y + c.y][spot.x + c.x];
+            tile.structure = 'ancient_chest';
+            tile.passable = !(IMPASSABLE_STRUCTURES.has('ancient_chest'));
+            loot.push({ x: spot.x + c.x, y: spot.y + c.y, contents: rollChestLoot(tier, theme.loot), taken: false });
+        }
+
+        let anchor = null;
+        if (chain) {
+            const a = map[spot.y + bp.anchor.y][spot.x + bp.anchor.x];
+            a.structure = 'rift_anchor';
+            a.passable = !(IMPASSABLE_STRUCTURES.has('rift_anchor'));
+            anchor = { x: spot.x + bp.anchor.x, y: spot.y + bp.anchor.y, chain, attuned: false };
+        }
+
+        // Blueprint guardian slots are 'crypt_warden' (light) and 'bone_sentinel' (heavy).
+        const guardianType = (slot) => slot === 'bone_sentinel' ? theme.guardians.heavy : theme.guardians.light;
+
+        generatedRuins.push({
+            kind: 'crypt', blueprint: bp.name, tier, chain: chain || null, anchor,
+            x: spot.x, y: spot.y, w: bp.width, h: bp.height,
+            shape: bp.shape, innerRadius: bp.innerRadius ?? null,
+            starter: !!starter,
+            ward: wardChain ? { chain: wardChain, wall: theme.wall } : null,
+            loot,
+            traps: bp.traps.map(t => ({ x: spot.x + t.x, y: spot.y + t.y, armed: true })),
+            guardians: bp.guardians.map(g => ({ type: guardianType(g.type), x: spot.x + g.x, y: spot.y + g.y })),
+        });
+    }
+}
+
 // --- Always runs last to ensure spawn area is clear ---
 function clearStartingArea(map) {
     const cx = Math.floor(CONFIG.MAP_WIDTH / 2);
@@ -1204,6 +1404,13 @@ export function writeTileVisuals(tile, season, out) {
     let char = '';
     let color = '';
     let bg = '';
+    if (tile.sealed) {
+        // Unexplored crypt interior: reveals nothing about what is inside.
+        out.char = ' ';
+        out.color = SEALED_BG;
+        out.bg = SEALED_BG;
+        return out;
+    }
     if (tile.onFire) {
         char = '^';
         color = '#ff4400';
@@ -1272,7 +1479,7 @@ export function getTileVisuals(tile, season) {
 export function isPassable(map, x, y) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     const tile = map[y][x];
-    if (!tile.passable) return false;
+    if (!tile.passable || tile.sealed) return false;
     if (IMPASSABLE_STRUCTURES.has(tile.structure)) return false;
     return true;
 }
@@ -1292,7 +1499,7 @@ export function getMoveCost(map, x, y) {
 export function isPassableForAnimals(map, x, y) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     const tile = map[y][x];
-    if (!tile.passable) return false;
+    if (!tile.passable || tile.sealed) return false;
     const tDef = TERRAIN[tile.terrain];
     if (tDef && !tDef.passable.animal) return false;
     if (tile.structure) {
@@ -1305,7 +1512,7 @@ export function isPassableForAnimals(map, x, y) {
 export function isPassableForEnemies(map, x, y) {
     if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) return false;
     const tile = map[y][x];
-    if (!tile.passable) return false;
+    if (!tile.passable || tile.sealed) return false;
     const tDef = TERRAIN[tile.terrain];
     if (tDef && !tDef.passable.enemy) return false;
     if (ENEMY_BLOCKED_STRUCTURES.has(tile.structure)) return false;

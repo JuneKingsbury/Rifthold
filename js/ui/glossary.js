@@ -110,7 +110,7 @@ export const GLOSSARY = [
                     ['Resource Costs', 'Each building requires specific resources. Costs are shown in the build menu before placement and are taken from the stockpile automatically when queued.'],
                     ['Structure HP', 'Walls, doors, and fences have health points. Enemies with no clear path to their target must break through these buildings by attacking them. Damaged structures automatically queue repair tasks when threats are gone.'],
                     ['Rooms', 'Place floors inside walled areas to create rooms. A room needs walls on all sides, at least one door, and floor tiles inside. Rooms provide quality-based bonuses to sleeping, crafting, or socializing based on the room\'s furnishings.'],
-                    ['Deconstruction', 'While in Build mode you can right-click in the game world to deconstruct buildings and recover a portion of their materials. You can also press X from Build mode to turn toggle Destruction mode. This is useful for reorganizing your colony layout as you expand. Colonists with Building skill handle destruction tasks.'],
+                    ['Deconstruction', 'While in Build mode you can right-click in the game world to deconstruct buildings and recover a portion of their materials. You can also press X from Build mode to turn toggle Destruction mode. This is useful for reorganizing your colony layout as you expand. Colonists with Building skill handle destruction tasks. Right-clicking a chest inside an ancient crypt marks it for looting instead.'],
                     ['Research-Gated Buildings', 'Many advanced buildings require specific research to unlock. Hover over locked buildings in the build menu to see their prerequisites, or browse the research tree to plan ahead.'],
                 ]
             },
@@ -207,7 +207,7 @@ export const GLOSSARY = [
                 subtitle: 'Complex Structures',
                 entries: [
                     ['Pattern Activation', 'Certain multi-tile building patterns activate powerful colony-wide bonuses when completed. Find an Arcane Core in an ancient ruin, then lay Ritual Chalk around it in the required shape. Every structure uses the same core: the chalk pattern alone determines which structure activates. Destroying or removing any part of the pattern deactivates the bonus.'],
-                    ['Arcane Core', 'The universal anchor for all complex structures. Arcane Cores cannot be built or destroyed; the only ones in the world sit at the heart of the ancient ruins scattered across each biome, each ringed by a half-finished chalk symbol. Complete or reshape the Ritual Chalk around a core to activate a structure. Ritual Chalk is unlocked with Ritual Magic research. Check the individual structure entries below for each pattern.'],
+                    ['Arcane Core', 'The universal anchor for all complex structures. Arcane Cores cannot be built or destroyed; the only ones in the world sit at the heart of the ancient ruins scattered across each biome, each ringed by a half-finished chalk symbol. These ruins are never sealed, warded or guarded, so a core is always safe to reach. Complete or reshape the Ritual Chalk around a core to activate a structure. Ritual Chalk is unlocked with Ritual Magic research. Check the individual structure entries below for each pattern.'],
                     ['Great Forge', 'All 8 adjacent tiles around the Arcane Core filled with Ritual Chalk (3x3 ring). Greatly increases crafting speed and crafting quality colony-wide. Requires Masterwork research.\n  C C C\n  C * C\n  C C C\n\n  * = Arcane Core    C = Ritual Chalk'],
                     ['Ritual Circle', 'Ritual Chalk in a diamond pattern around the Arcane Core: cardinal distance 2 (up/down/left/right) and diagonal distance 1 (all four corners). Significantly reduces spell cooldowns colony-wide. Requires Advanced Arcana research.\n  . . C . .\n  . C . C .\n  C . * . C\n  . C . C .\n  . . C . .\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
                     ['Anvil Shrine', 'Ritual Chalk in an anvil shape: 3 chalk above the Arcane Core, 1 chalk below. Greatly increases gathering speed for chopping and mining colony-wide. Requires Irrigation research.\n  C C C\n  . * .\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
@@ -254,7 +254,7 @@ export const GLOSSARY = [
             {
                 subtitle: 'Exploration',
                 entries: [
-                    ['Rift Gate', 'Build after researching Planar Rift. Click to open the expedition panel and send parties to other realms for loot. The gate consumes mana while active.'],
+                    ['Rift Gate', 'A legacy launch point. In worlds where every realm chain has a rift anchor (every new world) the Rift Gate can no longer be built and expeditions leave from attuned Rift Anchors instead (see Ancient Crypts). Worlds created before anchors existed keep using the gate: build it after researching Planar Rifts, click it to open the expedition panel, and send parties to other realms for loot. The gate consumes mana while active.'],
                     ['Expedition Parties', 'Select up to five colonists, two pack animals, and two war beasts. Choose a realm and difficulty level. Higher difficulty means tougher enemies but significantly better loot and rare item chances.'],
                     ['Formation', 'When building an expedition party, assign colonists to the front or back row. Front-row fighters absorb more incoming attacks while back-row members benefit from cover. Placing your toughest warriors up front and your spellcasters or archers in the back is generally the most effective approach.'],
                     ['Party Synergy', 'Colonists who share a strong relationship fight better together. Friends, close friends, and lovers in the same expedition party gain a damage bonus, while rivals and adversaries in the party can undercut each other. The relationship thoughts you invest in at home carry real weight in the field.'],
@@ -263,9 +263,21 @@ export const GLOSSARY = [
                     ['War Beasts', 'Tamed wolves and boars can join expeditions as war beasts, fighting alongside your party in combat encounters. Unlike pack animals, war beasts actively participate in battle and can take damage. They always return home safely even if the party is defeated.'],
                     ['Party Presets', 'Save your favorite party configurations as named presets from the expedition panel. Presets store the colonist lineup, formation, and carried potions, letting you quickly re-field a proven team without rebuilding it each time.'],
                     ['Auto-Expedition', 'Research the Auto-Expedition tech chain to allow saved party presets to embark automatically when all members are rested and ready. Higher tiers of the research allow more presets to run simultaneously, enabling hands-off farming of multiple realms at once.'],
-                    ['Realms', 'Multiple expedition chains, each with increasing depth. Deeper realms require completing the previous one first. Later chains require additional research to unlock.'],
+                    ['Realms', 'Multiple expedition chains, each with increasing depth. Deeper realms require completing the previous one first. Later chains require additional research to unlock. Except for the Wild Frontiers, a chain can only be launched once you have researched Planar Rifts and attuned its rift anchor in an ancient crypt.'],
                     ['Encounters', 'During expeditions, your party faces combat encounters, traps, and discoveries. Combat resolves in real-time rounds. Even on defeat, you keep items found before the loss. Colonists defeated during an expedition will always survive their retreat, re-joining the colony at extremely low health.'],
                     ['Pack Animals', 'Tamed okapi can join expeditions as pack animals, reducing expedition duration. Bring them for faster completion and more efficient loot runs. Pack animals do not participate in combat and always return home safely.'],
+                ]
+            },
+            {
+                subtitle: 'Ancient Crypts',
+                entries: [
+                    ['Ancient Crypts', 'Sealed, door-less tombs scattered across the map, some round and some square. Their interior stays dark and unexplored until a wall is broken. Seven crypts hold a rift anchor, one for each realm chain beyond the Wild Frontiers, and each sits in the biome that suits its realm. Larger maps also hold extra crypts with loot only. Crypts you have discovered show on the minimap as a small cross: purple while sealed, blue while warded, red once breached and green once plundered.'],
+                    ['Breaching a Crypt', 'Deconstruct any wall of a crypt\'s outer ring in Build mode (right-click, or X for Deconstruct mode). The moment the ring is open the crypt wakes: its guardians rise and its traps arm, so bring armed colonists. The sealed interior cannot be entered, built on or designated until then. Ordinary ruins and the ruins that hold Arcane Cores are never sealed or guarded.'],
+                    ['Crypt Wards', 'Some crypts are warded. Their walls are indestructible warded stone (▦) until the realm chain they are bound to has been completed by clearing its final boss realm. Verdant and Crystal crypts are always open. After that the order is Arcane (after Crystal), Shadow (after Arcane), Void Pact (after Shadow), Kingdom (after Void Pact) and Chaos (after Kingdom). Loot-only crypts follow the same rule: tier 2 after Crystal and tier 3 after Void Pact. You are notified when a ward fades, and discovering a warded crypt tells you what to clear.'],
+                    ['Crypt Guardians & Traps', 'Breaching a crypt wakes guardians themed to its realm. They chase colonists who come within range and return to their post when nothing is near. Deeper crypts have tougher guardians. Hidden spike traps lie on the floor and hurt the first colonist to step on each one. A trap, once sprung, is spent.'],
+                    ['Crypt Chests', 'In Build mode, right-click a chest to mark it for looting (the same way you deconstruct a wall) and a colonist will open it. Contents depend on the crypt\'s tier and include materials from its realm. A crypt counts as plundered once every chest is looted.'],
+                    ['Rift Anchors', 'Each anchor crypt holds a dormant rift anchor (✧). Once the crypt is open, right-click the anchor in Build mode to have a colonist attune it (✦). An attuned anchor is the portal for its realm chain: parties gather there, depart from it and return to it. Launching also needs Planar Rifts research and mana power, and each realm keeps its own research and prerequisite requirements. The Wild Frontiers need no anchor. Worlds created before anchors existed use the Rift Gate instead.'],
+                    ['Crypt Themes', 'Each anchor crypt is dressed for its realm. Verdant: forest, wooden walls, briar guardians. Crystal: mountains, stone walls, crystal guardians. Arcane: grassland, brick walls, rune constructs. Shadow: swamp, stone walls, shades. Void Pact: tundra, void walls, void servants. Chaos: desert, brick walls, fracture horrors. Kingdom: grassland, stone and brick, risen palace guards.'],
                 ]
             },
             {
@@ -353,6 +365,11 @@ export const GLOSSARY = [
                     ['▓', 'Void Wall', '#6622aa'],
                     ['Y', 'Void Turret', '#aa33ff'],
                     ['Ω', 'Rift Gate', '#66aaff'],
+                    ['✧', 'Dormant Rift Anchor', '#66c8ff'],
+                    ['✦', 'Attuned Rift Anchor', '#aaf0ff'],
+                    ['▣', 'Crypt Chest', '#d4a84a'],
+                    ['▢', 'Looted Chest', '#7a6a44'],
+                    ['▦', 'Warded Wall', '#9d7fe0'],
                     ['Ğ', 'Golem Forge', '#cc8833'],
                     ['⚒', 'Forge Core', '#ff8844'],
                     ['◎', 'Ritual Core', '#aa44ff'],

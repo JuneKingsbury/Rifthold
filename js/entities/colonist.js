@@ -1788,7 +1788,7 @@ function applySpellEffect(colonist, spell, game) {
                     const tx = colonist.x + dx;
                     const ty = colonist.y + dy;
                     const tile = game.map[ty]?.[tx];
-                    if (!tile || !tile.passable) continue;
+                    if (!tile || !tile.passable || tile.sealed) continue;
                     if (game._occupiedTiles?.has((ty << 16) | tx)) continue;
                     const dToTarget = teleTarget
                         ? manhattanDist(tx, ty, teleTarget.x, teleTarget.y)

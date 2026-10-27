@@ -282,6 +282,9 @@ export const MAP_GENERATORS = [
             ],
         },
     },
+    // Sealed crypts: counts, tiers and placement rules live in CRYPT_CONFIG. Must run
+    // after 'ruins' so crypts keep clear of generic ruins as well as landmarks.
+    { name: 'crypts', enabled: true, params: {} },
 ];
 
 // Landmark blueprint library: the ruins that hold the world's Arcane Cores. There
@@ -442,7 +445,230 @@ export const LANDMARK_BLUEPRINTS = {
     },
 };
 
-export const FOODSTUFFS = ['wheat', 'berries', 'corn', 'potatoes', 'moonbloom', 'meat', 'eggs', 'milk'];
+// Sealed crypts: walled blocks with no door. The interior stays dark (tile.sealed)
+// until a wall ring tile is opened, which wakes the guardians and exposes the
+// chests and traps. They are separate from the generic ruins and landmarks so that
+// danger never stands between a player and an Arcane Core.
+//
+// Every map gets one anchor crypt per gated realm chain. Its rift anchor, once
+// attuned by a colonist, unlocks that chain for the Rift Gate (see RuinSystem.
+// isChainAttuned). `tier` is the crypt's danger, so deeper chains sit behind harder
+// crypts, and the one `starter` crypt (the first chain a player is likely to want)
+// is placed near the start. `extras` adds loot-only crypts, keyed by map width
+// (small / medium / large), as tier numbers. Any other width gets extras up to one
+// crypt per `fallbackTilesPer` tiles. Larger tiers are placed first.
+export const CRYPT_CONFIG = {
+    anchors: [
+        { chain: 'crystal',   tier: 1, starter: true },
+        { chain: 'verdant',   tier: 1 },
+        { chain: 'arcane',    tier: 2 },
+        { chain: 'shadow',    tier: 2 },
+        { chain: 'void_pact', tier: 2 },
+        { chain: 'chaos',     tier: 3 },
+        { chain: 'kingdom',   tier: 3 },
+    ],
+    extras: {
+        128: [],
+        256: [1, 1],
+        384: [1, 1, 1, 2, 2],
+    },
+    chainNames: {
+        crystal: 'Crystal', verdant: 'Verdant', arcane: 'Arcane', shadow: 'Shadow',
+        void_pact: 'Void Pact', chaos: 'Chaos', kingdom: 'Kingdom',
+    },
+    // Per-chain look and contents of an anchor crypt. `biome` is where it is placed
+    // (falling back to anywhere on the map if the biome has no room). `wall` and
+    // `floor` replace the blueprint's stone ones. `guardians` fill the blueprint's
+    // light (crypt_warden) and heavy (bone_sentinel) slots. `loot` entries are added
+    // to the tier's chest table so the chain's own materials show up. Crypts without
+    // a chain (the extras) use `default`.
+    themes: {
+        default:   { wall: 'stone_wall', floor: 'stone_floor', terrain: 'dirt', guardians: { light: 'crypt_warden', heavy: 'bone_sentinel' }, loot: [] },
+        verdant:   { biome: 'forest',    wall: 'wood_wall',  floor: 'wood_floor',  terrain: 'forest_grass', guardians: { light: 'thorn_warden',    heavy: 'briar_sentinel' },   loot: [{ resource: 'planks', weight: 25, amount: [4, 8] }, { resource: 'leather', weight: 20, amount: [2, 5] }] },
+        crystal:   { biome: 'mountain',  wall: 'stone_wall', floor: 'stone_floor', terrain: 'gravel',       guardians: { light: 'crystal_warden',  heavy: 'crystal_sentinel' }, loot: [{ resource: 'runite_ore', weight: 25, amount: [3, 6] }, { resource: 'fracture_dust', weight: 15, amount: [1, 3] }] },
+        arcane:    { biome: 'grassland', wall: 'brick_wall', floor: 'brick_floor', terrain: 'dirt',         guardians: { light: 'rune_automaton',  heavy: 'arcane_sentinel' },  loot: [{ resource: 'runite', weight: 25, amount: [1, 3] }, { resource: 'cloth', weight: 20, amount: [3, 6] }] },
+        shadow:    { biome: 'swamp',     wall: 'stone_wall', floor: 'stone_floor', terrain: 'mud',          guardians: { light: 'shade_warden',    heavy: 'gloom_sentinel' },   loot: [{ resource: 'void_essence', weight: 25, amount: [1, 3] }, { resource: 'gold', weight: 20, amount: [3, 6] }] },
+        void_pact: { biome: 'tundra',    wall: 'void_wall',  floor: 'stone_floor', terrain: 'snow_ground',  guardians: { light: 'void_acolyte',    heavy: 'void_sentinel' },    loot: [{ resource: 'void_essence', weight: 35, amount: [2, 5] }, { resource: 'runite', weight: 15, amount: [1, 3] }] },
+        chaos:     { biome: 'desert',    wall: 'brick_wall', floor: 'brick_floor', terrain: 'red_rock',     guardians: { light: 'fracture_wraith', heavy: 'fracture_horror' },  loot: [{ resource: 'fracture_dust', weight: 35, amount: [2, 5] }, { resource: 'void_essence', weight: 15, amount: [1, 2] }] },
+        kingdom:   { biome: 'grassland', wall: 'stone_wall', floor: 'brick_floor', terrain: 'grass',        guardians: { light: 'palace_husk',     heavy: 'revenant_knight' },  loot: [{ resource: 'gold', weight: 30, amount: [4, 9] }, { resource: 'iron', weight: 20, amount: [3, 6] }] },
+    },
+    fallbackTilesPer: 14700,
+    // Crypts are warded (ring walls indestructible) until the named chain's boss realm
+    // has been completed, which makes the crypts a straight progression ladder from the
+    // two open starters (verdant, crystal). `wardedBy` is keyed by an anchor crypt's
+    // chain, `extraWardedBy` by a loot-only crypt's tier. A missing key means no ward.
+    wardedBy: { arcane: 'crystal', shadow: 'arcane', void_pact: 'shadow', kingdom: 'void_pact', chaos: 'kingdom' },
+    extraWardedBy: { 2: 'crystal', 3: 'void_pact' },
+    startKeepOut: 12,        // tiles from map centre where no crypt may stand
+    starterRange: [16, 45],  // the starter crypt sits this far from map centre when its biome allows
+    deepVaultMinDist: 0.25,  // tier 3 stands at least this fraction of the map's short side from centre
+    padding: 3,
+    margin: 8,
+    guardianHpMult: { 1: 1, 2: 1.4, 3: 1.9 },
+    trapDamage: { 1: 8, 2: 12, 3: 16 },
+};
+
+// Weighted chest contents per tier, rolled once at generation and stored on the
+// ruin (a reload must not reroll). `amount` is [min, max].
+export const RUIN_LOOT = {
+    1: {
+        rolls: [2, 3],
+        entries: [
+            { resource: 'iron', weight: 30, amount: [3, 6] },
+            { resource: 'gold', weight: 20, amount: [2, 4] },
+            { resource: 'bricks', weight: 20, amount: [6, 12] },
+            { resource: 'runite_ore', weight: 20, amount: [2, 4] },
+            { resource: 'fracture_dust', weight: 10, amount: [1, 2] },
+        ],
+    },
+    2: {
+        rolls: [3, 4],
+        entries: [
+            { resource: 'iron', weight: 20, amount: [5, 9] },
+            { resource: 'gold', weight: 25, amount: [4, 8] },
+            { resource: 'runite', weight: 25, amount: [2, 4] },
+            { resource: 'fracture_dust', weight: 15, amount: [2, 4] },
+            { resource: 'void_essence', weight: 15, amount: [1, 3] },
+        ],
+    },
+    3: {
+        rolls: [3, 5],
+        entries: [
+            { resource: 'gold', weight: 25, amount: [8, 14] },
+            { resource: 'runite', weight: 30, amount: [4, 7] },
+            { resource: 'fracture_dust', weight: 15, amount: [3, 6] },
+            { resource: 'void_essence', weight: 30, amount: [3, 6] },
+        ],
+    },
+};
+
+/**
+ * Tiles of a crypt's wall ring and sealed interior, relative to its bounding box.
+ * A rect crypt is the box's perimeter around a rectangular interior. A circle crypt
+ * (w == h == diameter, odd) has every tile within `innerRadius` of the centre as
+ * interior, and its ring is every other tile that touches the interior, including
+ * diagonally, so the interior is closed even against diagonal movement.
+ *
+ * @param {string} shape 'rect' or 'circle'.
+ * @param {number} w Bounding box width in tiles.
+ * @param {number} h Bounding box height in tiles.
+ * @param {number} [innerRadius] Circle only: interior radius in tiles.
+ * @return {{ring: Array<{x: number, y: number}>, interior: Array<{x: number, y: number}>}}
+ */
+export function getCryptTiles(shape, w, h, innerRadius = 0) {
+    const ring = [], interior = [];
+    if (shape === 'circle') {
+        const c = (w - 1) / 2;
+        const inside = (x, y) => Math.hypot(x - c, y - c) <= innerRadius;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                if (inside(x, y)) { interior.push({ x, y }); continue; }
+                let touches = false;
+                for (let dy = -1; dy <= 1 && !touches; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) if (inside(x + dx, y + dy)) { touches = true; break; }
+                }
+                if (touches) ring.push({ x, y });
+            }
+        }
+        return { ring, interior };
+    }
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            (x === 0 || y === 0 || x === w - 1 || y === h - 1 ? ring : interior).push({ x, y });
+        }
+    }
+    return { ring, interior };
+}
+
+// Builds a crypt blueprint: a door-less wall ring around a stone-floored interior,
+// optional interior pillars, and the chest, guardian and trap positions (relative
+// to the blueprint origin), plus the `anchor` spot used only by anchor crypts. Chests, guardians, traps and the anchor are stamped by
+// generateCrypts, not by `layout`, so they are never lost to decay.
+function makeCrypt({ name, tier, width, height, pillars = [], chests, guardians, traps, anchor }) {
+    const layout = [];
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const ring = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+            layout.push({ x, y, type: ring ? 'stone_wall' : 'stone_floor' });
+        }
+    }
+    for (const p of pillars) layout.push({ x: p.x, y: p.y, type: 'stone_wall' });
+    return {
+        name, tier, width, height, floorTerrain: 'dirt', layout, shape: 'rect',
+        ...getCryptTiles('rect', width, height),
+        chests, guardians, traps, anchor,
+    };
+}
+
+// Round variant of makeCrypt. `diameter` is the bounding box side and `innerRadius`
+// the interior radius (see getCryptTiles). Every chest, guardian, trap, pillar and
+// the anchor must sit on an interior tile, checked here so a typo fails at load.
+function makeCircleCrypt({ name, tier, diameter, innerRadius, pillars = [], chests, guardians, traps, anchor }) {
+    const { ring, interior } = getCryptTiles('circle', diameter, diameter, innerRadius);
+    const isInterior = new Set(interior.map(t => `${t.x},${t.y}`));
+    for (const p of [...pillars, ...chests, ...guardians, ...traps, anchor]) {
+        if (!isInterior.has(`${p.x},${p.y}`)) throw new Error(`${name}: (${p.x},${p.y}) is not on an interior tile`);
+    }
+    const layout = [
+        ...ring.map(t => ({ ...t, type: 'stone_wall' })),
+        ...interior.map(t => ({ ...t, type: 'stone_floor' })),
+        ...pillars.map(p => ({ x: p.x, y: p.y, type: 'stone_wall' })),
+    ];
+    return {
+        name, tier, width: diameter, height: diameter, floorTerrain: 'dirt', layout,
+        shape: 'circle', innerRadius, ring, interior,
+        chests, guardians, traps, anchor,
+    };
+}
+
+export const CRYPT_BLUEPRINTS = {
+    1: [makeCrypt({
+        name: 'barrow_crypt', tier: 1, width: 7, height: 7,
+        pillars: [{ x: 2, y: 3 }, { x: 4, y: 3 }],
+        chests: [{ x: 1, y: 1 }, { x: 5, y: 1 }],
+        guardians: [{ x: 3, y: 3, type: 'crypt_warden' }],
+        traps: [{ x: 3, y: 1 }, { x: 3, y: 5 }],
+        anchor: { x: 3, y: 2 },
+    }), makeCircleCrypt({
+        name: 'round_barrow', tier: 1, diameter: 9, innerRadius: 3.2,
+        chests: [{ x: 2, y: 5 }, { x: 6, y: 5 }],
+        guardians: [{ x: 4, y: 4, type: 'crypt_warden' }],
+        traps: [{ x: 4, y: 3 }, { x: 4, y: 6 }],
+        anchor: { x: 4, y: 2 },
+    })],
+    2: [makeCrypt({
+        name: 'bone_vault', tier: 2, width: 9, height: 7,
+        pillars: [{ x: 3, y: 2 }, { x: 5, y: 2 }, { x: 3, y: 4 }, { x: 5, y: 4 }],
+        chests: [{ x: 1, y: 1 }, { x: 7, y: 1 }, { x: 4, y: 5 }],
+        guardians: [{ x: 4, y: 3, type: 'bone_sentinel' }, { x: 2, y: 3, type: 'crypt_warden' }],
+        traps: [{ x: 4, y: 1 }, { x: 2, y: 5 }, { x: 6, y: 5 }],
+        anchor: { x: 4, y: 2 },
+    }), makeCircleCrypt({
+        name: 'moon_vault', tier: 2, diameter: 11, innerRadius: 4.2,
+        pillars: [{ x: 3, y: 3 }, { x: 7, y: 3 }],
+        chests: [{ x: 2, y: 6 }, { x: 8, y: 6 }, { x: 5, y: 8 }],
+        guardians: [{ x: 5, y: 5, type: 'bone_sentinel' }, { x: 3, y: 5, type: 'crypt_warden' }],
+        traps: [{ x: 5, y: 3 }, { x: 3, y: 7 }, { x: 7, y: 7 }],
+        anchor: { x: 5, y: 2 },
+    })],
+    3: [makeCrypt({
+        name: 'deep_vault', tier: 3, width: 11, height: 9,
+        pillars: [{ x: 3, y: 3 }, { x: 7, y: 3 }, { x: 3, y: 5 }, { x: 7, y: 5 }],
+        chests: [{ x: 1, y: 1 }, { x: 9, y: 1 }, { x: 5, y: 7 }],
+        guardians: [{ x: 5, y: 4, type: 'bone_sentinel' }, { x: 3, y: 4, type: 'bone_sentinel' }, { x: 7, y: 4, type: 'crypt_warden' }],
+        traps: [{ x: 5, y: 1 }, { x: 2, y: 7 }, { x: 8, y: 7 }, { x: 5, y: 6 }],
+        anchor: { x: 5, y: 2 },
+    }), makeCircleCrypt({
+        name: 'great_rotunda', tier: 3, diameter: 13, innerRadius: 5.2,
+        pillars: [{ x: 4, y: 4 }, { x: 8, y: 4 }, { x: 4, y: 8 }, { x: 8, y: 8 }],
+        chests: [{ x: 2, y: 6 }, { x: 10, y: 6 }, { x: 6, y: 10 }],
+        guardians: [{ x: 6, y: 6, type: 'bone_sentinel' }, { x: 4, y: 6, type: 'bone_sentinel' }, { x: 8, y: 6, type: 'crypt_warden' }],
+        traps: [{ x: 6, y: 3 }, { x: 3, y: 9 }, { x: 9, y: 9 }, { x: 6, y: 8 }],
+        anchor: { x: 6, y: 2 },
+    })],
+};
+
+export const FOODSTUFFS =['wheat', 'berries', 'corn', 'potatoes', 'moonbloom', 'meat', 'eggs', 'milk'];
 
 export const NON_FOOD_CROPS = ['cotton'];
 

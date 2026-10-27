@@ -28,7 +28,7 @@ export class InputHandler {
 
         this.buildCategories = BUILD_CATEGORIES;
         this.buildCategory = BUILD_CATEGORIES[0];
-        this.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === this.buildCategory && !BUILDINGS[k].noBuild);
+        this.buildOptions = this._listBuildOptions(this.buildCategory);
         this.dragBuildTypes = DRAG_BUILD_TYPES;
         this.cropOptions = Object.keys(CROPS);
         this.designateMode = 'chop';
@@ -556,9 +556,22 @@ export class InputHandler {
         this.setBuildCategory(this.buildCategories[next]);
     }
 
+    // Buildable types in a category. The legacy Rift Gate drops out once every realm
+    // chain has a rift anchor (see RuinSystem.needsLegacyGate).
+    _listBuildOptions(cat) {
+        return Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === cat && !BUILDINGS[k].noBuild
+            && !(BUILDINGS[k].legacy && !this.game.ruins.needsLegacyGate()));
+    }
+
+    // Rebuilds the current category's list, e.g. after a save replaces the ruin registry.
+    refreshBuildOptions() {
+        this.buildOptions = this._listBuildOptions(this.buildCategory);
+        if (!this.buildOptions.includes(this.buildType)) this.buildType = this.buildOptions[0] ?? null;
+    }
+
     setBuildCategory(cat) {
         this.buildCategory = cat;
-        this.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === cat && !BUILDINGS[k].noBuild);
+        this.buildOptions = this._listBuildOptions(cat);
         if (this.buildOptions.length > 0 && !this.buildOptions.includes(this.buildType)) {
             this.buildType = this.buildOptions[0];
         }

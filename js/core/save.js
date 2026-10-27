@@ -12,7 +12,7 @@ const GDRIVE_LAST_SYNC_KEY = 'gdrive_last_sync_ts';
 // versions below 11 predate the ladder and are discarded one final time on load
 // (see _applyLoadData). From v11 onward, schema changes add a MIGRATIONS step and
 // bump SAVE_VERSION instead of invalidating saves.
-const SAVE_VERSION = 11;
+const SAVE_VERSION = 12;
 const SLOT_META_KEY = 'colony_slot_meta';
 const SLOT_AUTO_NEXT_KEY = 'colony_slot_auto_next';
 
@@ -289,6 +289,8 @@ function _buildSaveData(game) {
         ritualCooldowns: game.ritualCooldowns || {},
         lastFeastYear: game.lastFeastYear || 0,
 
+        ruins: game.ruins.serialize(),
+
         waves: {
             highestWaveCompleted: game.waves.highestWaveCompleted,
             active: game.waves.active,
@@ -530,7 +532,10 @@ export async function saveGame(game) {
 //
 // Example (when adding v12):
 //   12: (d) => { d.someNewField = d.someNewField || []; },
-const MIGRATIONS = {};
+const MIGRATIONS = {
+    // v12 adds the ruin registry. Older maps keep their ruins as plain tiles.
+    12: (d) => { d.ruins = d.ruins || []; },
+};
 
 // Walk `data` up the migration ladder to SAVE_VERSION, applying each step in
 // order. A missing step is a no-op (versions with no schema change). Returns the
@@ -662,6 +667,8 @@ function _applyLoadData(game, data) {
         game.divinationModifiers = data.divinationModifiers || [];
         game.ritualCooldowns = data.ritualCooldowns || {};
         game.lastFeastYear = data.lastFeastYear || 0;
+        game.ruins.deserialize(data.ruins);
+        game.input?.refreshBuildOptions();
 
         game.events.cooldowns = data.events.cooldowns || {};
 
@@ -933,6 +940,7 @@ function serializeMap(map) {
             if (tile.snowCovered) t.sn = 1;
             if (tile.pedestalArtifact) t.pa = tile.pedestalArtifact;
             if (tile.biome) t.b = tile.biome;
+            if (tile.sealed) t.sl = 1;
             row.push(t);
         }
         rows.push(row);
@@ -963,6 +971,7 @@ function deserializeMap(data) {
             tile.snowCovered = t.sn === 1;
             tile.pedestalArtifact = t.pa || null;
             if (t.b) tile.biome = t.b;
+            if (t.sl === 1) tile.sealed = true;
             tile.roomId = null;
             tile.items = [];
             row.push(tile);

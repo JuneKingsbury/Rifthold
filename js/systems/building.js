@@ -18,11 +18,14 @@ export function getMaxCountBonus(def, buildType, game) {
 
 export function designateBuild(game, x, y, buildType) {
     const tile = game.map[y][x];
+    if (tile.sealed) return false;
     if (tile.resource) return false;
     if (UNBUILDABLE_TERRAIN.has(tile.terrain)) return false;
 
     const def = BUILDINGS[buildType];
     if (!def || def.noBuild) return false;
+    // The Rift Gate is legacy: maps where every chain has a rift anchor launch from those instead.
+    if (def.legacy && !game.ruins.needsLegacyGate()) return false;
 
     // Building over an existing tile replaces its structure, so protected
     // structures (the Arcane Core) must be refused here rather than overwritten.
@@ -78,7 +81,7 @@ export function designateBuild(game, x, y, buildType) {
 
 export function designateGather(game, x, y) {
     const tile = game.map[y][x];
-    if (!tile.resource || tile.designation) return false;
+    if (tile.sealed || !tile.resource || tile.designation) return false;
 
     const rDef = RESOURCES[tile.resource.type];
     if (!rDef) return false;
@@ -111,6 +114,7 @@ export function designateMine(game, x, y) {
 
 export function cancelDesignation(game, x, y) {
     const tile = game.map[y][x];
+    if (tile.sealed) return;
 
     if (tile.designation) {
         if (tile.designation.type === 'build') {
@@ -120,6 +124,30 @@ export function cancelDesignation(game, x, y) {
         const task = game.taskQueue.getByPosition(x, y);
         if (task) game.taskQueue.remove(task.id);
         tile.designation = null;
+        return;
+    }
+
+    // Right-click on a dormant rift anchor marks it for attuning (it can't be deconstructed).
+    if (tile.structure === 'rift_anchor' && !tile.designation) {
+        tile.designation = { type: 'attune_anchor' };
+        game.taskQueue.add({
+            type: 'attune_anchor',
+            skillRequired: 'building',
+            x, y,
+            workAmount: WORK_CONFIG.attuneAnchorWork,
+        });
+        return;
+    }
+
+    // Right-click on an unlooted crypt chest marks it for looting (it can't be deconstructed).
+    if (tile.structure === 'ancient_chest' && !tile.designation) {
+        tile.designation = { type: 'loot_chest' };
+        game.taskQueue.add({
+            type: 'loot_chest',
+            skillRequired: 'building',
+            x, y,
+            workAmount: WORK_CONFIG.lootChestWork,
+        });
         return;
     }
 

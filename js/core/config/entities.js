@@ -11,6 +11,12 @@ export const ENTITIES = {
     goose:   { char: 'n', color: '#e0e0cc', hp: 20, speed: 0.18, category: 'animal', hostile: false, meatYield: 1, fleeRange: 6, spawnWeight: 11, lore: 'A large, ill-tempered waterfowl common near the rivers of the Frontier. Their honking carries far and wide, warning of any who approach.', tameable: true, tamed: { foodToTame: 2, roles: [{ type: 'guard', guardRadius: 12, guardDamage: 3 }, { type: 'wander' }], effects: [] } },
     boar:    { char: 'b', color: '#7a5c44', hp: 70, speed: 0.18, category: 'animal', hostile: false, meatYield: 3, hideYield: 1, fleeRange: 5, spawnWeight: 10, lore: 'A stocky and ill-tempered wild pig found throughout the Frontier. Though it flees at first, it does not forget an intrusion.', tameable: true, tamed: { foodToTame: 5, dangerousTame: true, baseTameChance: 0.55, retaliationDamage: 10, courage: 0.8, petDamage: 6, roles: [{ type: 'war', beastHp: 45, beastDamage: 10 }], effects: [] } },
 
+    // === Crypt guardians ===
+    // Hostile "animals" so the wildlife AI drives them (chase colonists inside aggroRange).
+    // spawnWeight 0 keeps them out of the wild spawn table: only a breached crypt makes them.
+    crypt_warden:    { name: 'Crypt Warden', char: 'W', color: '#9988aa', hp: 45, speed: 0.2, category: 'animal', hostile: true, guardian: true, meatYield: 0, damage: 6, aggroRange: 5, spawnWeight: 0, lore: 'A shambling watcher bound to a tomb long after its charge was forgotten.' },
+    bone_sentinel:   { name: 'Bone Sentinel', char: 'S', color: '#ddd8c4', hp: 85, speed: 0.22, category: 'animal', hostile: true, guardian: true, meatYield: 0, damage: 11, aggroRange: 6, spawnWeight: 0, lore: 'Old bones wired with ritual script. It does not tire and does not bargain.' },
+
     // === Summons ===
     familiar: { name: 'Familiar', char: 'f', color: '#9966ff', hp: 40, speed: 0.5, category: 'summon', damage: 8, summonDuration: 60, lore: 'A creature bound by novice conjurers. It lives to serve its new master.', roles: [{ type: 'guard', guardRadius: 6, patrolRadius: 3 }, { type: 'summoned' }] },
     ghost:    { name: 'Ghost',    char: 'g', color: '#88ccff', hp: 25, speed: 0.7, category: 'summon', damage: 14, summonDuration: 80, lore: 'Ancestral spirits called upon to protect their kin.', roles: [{ type: 'guard', guardRadius: 8, patrolRadius: 4 }, { type: 'summoned' }] },
@@ -46,6 +52,33 @@ export const ENTITIES = {
     boss_high_king:                 { name: 'The High King',             char: '▲', color: '#ddaa22', category: 'boss' },
     boss_high_king_enraged:         { name: 'The High King (Enraged)',   char: '▲', color: '#ff2200', category: 'boss' },
 };
+
+// Themed crypt guardians, two per realm chain (see CRYPT_CONFIG.themes). Same stats
+// as crypt_warden (light) and bone_sentinel (heavy), so the chain only changes the
+// look and lore. Hostile "animals" so the wildlife AI drives them.
+const GUARDIAN_STATS = {
+    light: { hp: 45, speed: 0.2, damage: 6, aggroRange: 5 },
+    heavy: { hp: 85, speed: 0.22, damage: 11, aggroRange: 6 },
+};
+const CHAIN_GUARDIANS = {
+    thorn_warden:     ['light', 'Thorn Warden',     'T', '#6fbf5a', 'A tangle of living briar that guards the roots of a forgotten grove.'],
+    briar_sentinel:   ['heavy', 'Briar Sentinel',   'B', '#3f8f3a', 'Old heartwood grown into a hulking guardian. It does not forget trespassers.'],
+    crystal_warden:   ['light', 'Crystal Warden',   'c', '#8fd8ff', 'A shard-bodied watcher that hums when the deep stone is disturbed.'],
+    crystal_sentinel: ['heavy', 'Crystal Sentinel', 'C', '#58b8ee', 'A towering facet of living crystal, slow to wake and slower to fall.'],
+    rune_automaton:   ['light', 'Rune Automaton',   'r', '#ffaa66', 'A scribe-built construct still following its last instruction.'],
+    arcane_sentinel:  ['heavy', 'Arcane Sentinel',  'A', '#ff8844', 'A warding engine, rune-etched and wound tight with old spells.'],
+    shade_warden:     ['light', 'Shade Warden',     's', '#8877bb', 'A shadow with weight to it. It lingers where the light never reached.'],
+    gloom_sentinel:   ['heavy', 'Gloom Sentinel',   'G', '#5d4f99', 'Something tall and patient, made of the dark between torches.'],
+    void_acolyte:     ['light', 'Void Acolyte',     'v', '#aa66ee', 'A hollowed servant of the pact, still murmuring its vows.'],
+    void_sentinel:    ['heavy', 'Void Sentinel',    'V', '#7722cc', 'A bound horror kept awake by the pact it sealed.'],
+    fracture_wraith:  ['light', 'Fracture Wraith',  'f', '#ff7766', 'A flickering thing that is never quite where you struck it.'],
+    fracture_horror:  ['heavy', 'Fracture Horror',  'F', '#ee3355', 'A body torn and stitched wrong by the rift. It hits like it knows you.'],
+    palace_husk:      ['light', 'Palace Husk',      'p', '#ddc060', 'The ghost of a palace guard, drilling its last watch.'],
+    revenant_knight:  ['heavy', 'Revenant Knight',  'K', '#c9a227', 'A knight of the old crown, risen and still loyal.'],
+};
+for (const [key, [weight, name, char, color, lore]] of Object.entries(CHAIN_GUARDIANS)) {
+    ENTITIES[key] = { name, char, color, ...GUARDIAN_STATS[weight], category: 'animal', hostile: true, guardian: true, meatYield: 0, spawnWeight: 0, lore };
+}
 
 export const ANIMALS = Object.fromEntries(
     Object.entries(ENTITIES).filter(([, e]) => e.category === 'animal')

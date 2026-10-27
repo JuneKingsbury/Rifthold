@@ -618,7 +618,7 @@ const TUTORIAL_STEPS = [
         id: 'finish',
         levels: ['none'],
         title: "You're On Your Own",
-        description: 'Your colony is up and running. Keep an eye on food, mood and defenses, and stock up before the seasons change. Story [J] tracks your goals, and Rifts [V] has more realms to explore as your research grows.',
+        description: 'Your colony is up and running. Keep an eye on food, mood and defenses, and stock up before the seasons change. Story [J] tracks your goals. Beyond the Wild Frontiers, other realms open through ancient crypts: find one on the map, break in (right-click a wall in Build mode), and attune the rift anchor inside. Rifts [V] lists what you can reach.',
         pointer: () => modeBtn('story', 'Story goals'),
     }),
 ];

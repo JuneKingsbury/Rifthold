@@ -1,5 +1,5 @@
 import { CONFIG, GRASS_TERRAIN, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
-import { writeTileVisuals } from '../world/map.js';
+import { writeTileVisuals, SEALED_BG } from '../world/map.js';
 import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
 import { CrtRenderer } from './crt-renderer.js';
 import { SkinManager } from './skin-manager.js';
@@ -1136,6 +1136,14 @@ export class Renderer {
 
                 // Get ASCII info for this tile.
                 const tile = map[wy][wx];
+
+                // Unexplored crypt interior: paint over the baked ground and draw nothing else.
+                if (tile.sealed) {
+                    ctx.fillStyle = SEALED_BG;
+                    ctx.fillRect(px, py, cw1, ch1);
+                    lastColor = '';
+                    continue;
+                }
                 const tv = writeTileVisuals(tile, season, this._tileVisuals);
                 let char = tv.char, color = tv.color, bg = tv.bg;
 
@@ -1156,7 +1164,7 @@ export class Renderer {
                 }
 
                 // Update tile color if this tile has a Rift Gate and it is actively being used.
-                if (tile.structure === 'rift_gate' && game.exploration && game.exploration.expeditions.length > 0) {
+                if ((tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active') && game.exploration && game.exploration.expeditions.length > 0) {
                     color = game.tick % RENDER_CONFIG.riftPulsePeriod < RENDER_CONFIG.riftPulseDuty ? '#33ccff' : '#1a6688';
                 }
 
