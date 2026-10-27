@@ -27,13 +27,17 @@ export const WINTER_FEAST_CONFIG = {
 };
 
 export const TERRAIN = {
-    grass:  { char: '.', color: '#6aad44', bg: '#1a2a12', moveCost: 8, passable: { colonist: true, animal: true, enemy: true } },
-    dirt:   { char: ',', color: '#bb8850', bg: '#2a1e14', moveCost: 8, passable: { colonist: true, animal: true, enemy: true } },
-    sand:   { char: '∙', color: '#e0c878', bg: '#2a2618', moveCost: 12, passable: { colonist: true, animal: true, enemy: true } },
-    gravel: { char: ':', color: '#a09888', bg: '#1e1c1a', moveCost: 10, passable: { colonist: true, animal: true, enemy: true } },
-    rock:      { char: '#', color: '#999', bg: '#222', moveCost: 20, passable: { colonist: true, animal: false, enemy: true } },
-    tall_rock: { char: '▲', color: '#777', bg: '#1a1a1a', moveCost: Infinity, passable: { colonist: false, animal: false, enemy: false } },
-    water:     { char: '~', color: '#55aaff', bg: '#0a1a2e', moveCost: 16, passable: { colonist: true, animal: false, enemy: true } },
+    grass:       { char: '.', color: '#6aad44', bg: '#1a2a12', moveCost: 8,        passable: { colonist: true, animal: true,  enemy: true  } },
+    dirt:        { char: ',', color: '#bb8850', bg: '#2a1e14', moveCost: 8,        passable: { colonist: true, animal: true,  enemy: true  } },
+    sand:        { char: '∙', color: '#e0c878', bg: '#2a2618', moveCost: 12,       passable: { colonist: true, animal: true,  enemy: true  } },
+    gravel:      { char: ':', color: '#a09888', bg: '#1e1c1a', moveCost: 10,       passable: { colonist: true, animal: true,  enemy: true  } },
+    rock:        { char: '#', color: '#999999', bg: '#222222', moveCost: 20,       passable: { colonist: true, animal: false, enemy: true  } },
+    tall_rock:   { char: '▲', color: '#777777', bg: '#1a1a1a', moveCost: Infinity, passable: { colonist: false, animal: false, enemy: false } },
+    water:       { char: '~', color: '#55aaff', bg: '#0a1a2e', moveCost: 16,       passable: { colonist: true, animal: false, enemy: true  } },
+    mud:          { char: '≈', color: '#7a6040', bg: '#1a140a', moveCost: 14,      passable: { colonist: true, animal: true,  enemy: true  } },
+    shallow_water:{ char: '~', color: '#4499cc', bg: '#0a1825', moveCost: 12,      passable: { colonist: true, animal: true,  enemy: true  } },
+    red_rock:    { char: '#', color: '#cc5533', bg: '#2a1008', moveCost: 18,       passable: { colonist: true, animal: false, enemy: true  } },
+    snow_ground: { char: '.', color: '#ddeeff', bg: '#1a2030', moveCost: 10,       passable: { colonist: true, animal: true,  enemy: true  } },
 };
 
 export const RESOURCES = {
@@ -72,7 +76,54 @@ export const SEASON_WEATHER = {
     ],
 };
 
+// Biome definitions: terrain weights, resource density, and which landmark ruin
+// to guarantee inside that biome. Consumed by generateBiomeLayout in map.js.
+export const BIOMES = {
+    grassland: {
+        landmark: 'waystone_shrine',
+        terrainWeights: { grass: 0.80, dirt: 0.20 },
+        treeDensity: 0.10,
+    },
+    forest: {
+        landmark: 'woodcutters_lodge',
+        terrainWeights: { grass: 0.70, dirt: 0.30 },
+        treeDensity: 0.35,
+    },
+    mountain: {
+        landmark: 'dwarven_vault',
+        terrainWeights: { rock: 0.55, tall_rock: 0.25, gravel: 0.20 },
+        treeDensity: 0.01,
+        rockResources: true,
+    },
+    swamp: {
+        landmark: 'witchs_hut',
+        terrainWeights: { mud: 0.50, shallow_water: 0.25, grass: 0.25 },
+        treeDensity: 0.05,
+    },
+    desert: {
+        landmark: 'desert_obelisk',
+        terrainWeights: { sand: 0.60, red_rock: 0.25, gravel: 0.15 },
+        treeDensity: 0.0,
+        desertResources: true,
+    },
+    tundra: {
+        landmark: 'frozen_cairn',
+        terrainWeights: { snow_ground: 0.65, rock: 0.20, gravel: 0.15 },
+        treeDensity: 0.03,
+        tundraResources: true,
+    },
+};
+
 export const MAP_GENERATORS = [
+    {
+        name: 'biome_layout',
+        enabled: true,
+        params: {
+            innerRadius: 0.18,    // normalized radius of central guaranteed grassland
+            seedsPerBiome: 2,     // Voronoi seed points per outer biome
+            warpScale: 28,        // domain-warp displacement in tiles (higher = blobier)
+        },
+    },
     {
         name: 'dirt_patches',
         enabled: true,
@@ -176,6 +227,110 @@ export const MAP_GENERATORS = [
         },
     },
 ];
+
+// Landmark blueprint library — one per biome, placed by generateBiomeLayout.
+// Keyed by the landmark name in BIOMES above.
+export const LANDMARK_BLUEPRINTS = {
+    // Grassland: Waystone Shrine — 5×5 stone ring, open center, pedestal
+    waystone_shrine: {
+        name: 'Waystone Shrine',
+        width: 5, height: 5,
+        floorTerrain: 'dirt',
+        layout: (() => {
+            const l = [];
+            for (let x = 0; x < 5; x++) { l.push({ x, y: 0, type: 'stone_wall' }); l.push({ x, y: 4, type: 'stone_wall' }); }
+            for (let y = 1; y < 4; y++) { l.push({ x: 0, y, type: 'stone_wall' }); l.push({ x: 4, y, type: 'stone_wall' }); }
+            l.push({ x: 2, y: 4, type: 'door' });
+            for (let y = 1; y < 4; y++) { for (let x = 1; x < 4; x++) { l.push({ x, y, type: 'stone_floor' }); } }
+            l.push({ x: 2, y: 2, type: 'artifact_pedestal' });
+            return l;
+        })(),
+    },
+    // Forest: Woodcutter's Lodge — 7×5 wood cabin, door, workbench inside
+    woodcutters_lodge: {
+        name: "Woodcutter's Lodge",
+        width: 7, height: 5,
+        floorTerrain: 'dirt',
+        layout: (() => {
+            const l = [];
+            for (let x = 0; x < 7; x++) { l.push({ x, y: 0, type: 'wood_wall' }); l.push({ x, y: 4, type: 'wood_wall' }); }
+            for (let y = 1; y < 4; y++) { l.push({ x: 0, y, type: 'wood_wall' }); l.push({ x: 6, y, type: 'wood_wall' }); }
+            l.push({ x: 3, y: 4, type: 'door' });
+            for (let y = 1; y < 4; y++) { for (let x = 1; x < 6; x++) { l.push({ x, y, type: 'stone_floor' }); } }
+            l.push({ x: 2, y: 2, type: 'workbench' });
+            return l;
+        })(),
+    },
+    // Mountain: Dwarven Vault — 11×9, stone outer wall, brick inner vault, reinforced door, anvil
+    dwarven_vault: {
+        name: 'Dwarven Vault',
+        width: 11, height: 9,
+        floorTerrain: 'gravel',
+        layout: (() => {
+            const l = [];
+            for (let x = 0; x < 11; x++) { l.push({ x, y: 0, type: 'stone_wall' }); l.push({ x, y: 8, type: 'stone_wall' }); }
+            for (let y = 1; y < 8; y++) { l.push({ x: 0, y, type: 'stone_wall' }); l.push({ x: 10, y, type: 'stone_wall' }); }
+            l.push({ x: 5, y: 8, type: 'door' });
+            for (let y = 1; y < 8; y++) { for (let x = 1; x < 10; x++) { l.push({ x, y, type: 'stone_floor' }); } }
+            for (let x = 3; x < 8; x++) { l.push({ x, y: 2, type: 'brick_wall' }); l.push({ x, y: 6, type: 'brick_wall' }); }
+            for (let y = 3; y < 6; y++) { l.push({ x: 3, y, type: 'brick_wall' }); l.push({ x: 7, y, type: 'brick_wall' }); }
+            l.push({ x: 5, y: 6, type: 'reinforced_door' });
+            l.push({ x: 5, y: 4, type: 'anvil' });
+            return l;
+        })(),
+    },
+    // Swamp: Witch's Hut — 7×7 wood hut, irregular shape, alchemy table
+    witchs_hut: {
+        name: "Witch's Hut",
+        width: 7, height: 7,
+        floorTerrain: 'mud',
+        layout: (() => {
+            const l = [];
+            for (let x = 1; x < 6; x++) { l.push({ x, y: 0, type: 'wood_wall' }); l.push({ x, y: 6, type: 'wood_wall' }); }
+            for (let y = 1; y < 6; y++) { l.push({ x: 0, y, type: 'wood_wall' }); l.push({ x: 6, y, type: 'wood_wall' }); }
+            l.push({ x: 0, y: 0, type: 'wood_wall' }); l.push({ x: 6, y: 0, type: 'wood_wall' });
+            l.push({ x: 0, y: 6, type: 'wood_wall' }); l.push({ x: 6, y: 6, type: 'wood_wall' });
+            l.push({ x: 3, y: 6, type: 'door' });
+            for (let y = 1; y < 6; y++) { for (let x = 1; x < 6; x++) { l.push({ x, y, type: 'stone_floor' }); } }
+            l.push({ x: 3, y: 2, type: 'alchemy_table' });
+            return l;
+        })(),
+    },
+    // Desert: Desert Obelisk — 5×9 brick tower, ritual chalk at base
+    desert_obelisk: {
+        name: 'Desert Obelisk',
+        width: 5, height: 9,
+        floorTerrain: 'sand',
+        layout: (() => {
+            const l = [];
+            for (let x = 0; x < 5; x++) { l.push({ x, y: 0, type: 'brick_wall' }); l.push({ x, y: 8, type: 'brick_wall' }); }
+            for (let y = 1; y < 8; y++) { l.push({ x: 0, y, type: 'brick_wall' }); l.push({ x: 4, y, type: 'brick_wall' }); }
+            l.push({ x: 2, y: 8, type: 'door' });
+            for (let y = 1; y < 8; y++) { for (let x = 1; x < 4; x++) { l.push({ x, y, type: 'stone_floor' }); } }
+            l.push({ x: 2, y: 4, type: 'artifact_pedestal' });
+            l.push({ x: 1, y: 3, type: 'ritual_chalk' }); l.push({ x: 2, y: 3, type: 'ritual_chalk' }); l.push({ x: 3, y: 3, type: 'ritual_chalk' });
+            l.push({ x: 1, y: 5, type: 'ritual_chalk' }); l.push({ x: 2, y: 5, type: 'ritual_chalk' }); l.push({ x: 3, y: 5, type: 'ritual_chalk' });
+            return l;
+        })(),
+    },
+    // Tundra: Frozen Cairn — 7×5 stone ruin, open roof feel, pedestal center
+    frozen_cairn: {
+        name: 'Frozen Cairn',
+        width: 7, height: 5,
+        floorTerrain: 'gravel',
+        layout: (() => {
+            const l = [];
+            for (let x = 0; x < 7; x++) { l.push({ x, y: 0, type: 'stone_wall' }); l.push({ x, y: 4, type: 'stone_wall' }); }
+            for (let y = 1; y < 4; y++) { l.push({ x: 0, y, type: 'stone_wall' }); l.push({ x: 6, y, type: 'stone_wall' }); }
+            l.push({ x: 3, y: 4, type: 'door' });
+            for (let y = 1; y < 4; y++) { for (let x = 1; x < 6; x++) { l.push({ x, y, type: 'stone_floor' }); } }
+            l.push({ x: 3, y: 2, type: 'artifact_pedestal' });
+            l.push({ x: 1, y: 1, type: 'stone_wall' }); l.push({ x: 5, y: 1, type: 'stone_wall' });
+            l.push({ x: 1, y: 3, type: 'stone_wall' }); l.push({ x: 5, y: 3, type: 'stone_wall' });
+            return l;
+        })(),
+    },
+};
 
 export const FOODSTUFFS = ['wheat', 'berries', 'corn', 'potatoes', 'moonbloom', 'meat', 'eggs', 'milk'];
 

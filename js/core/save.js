@@ -932,6 +932,7 @@ function serializeMap(map) {
             if (tile.onFire) { t.f = 1; t.ft = tile.fireTimer; }
             if (tile.snowCovered) t.sn = 1;
             if (tile.pedestalArtifact) t.pa = tile.pedestalArtifact;
+            if (tile.biome) t.b = tile.biome;
             row.push(t);
         }
         rows.push(row);
@@ -961,6 +962,7 @@ function deserializeMap(data) {
             tile.fireTimer = t.ft || 0;
             tile.snowCovered = t.sn === 1;
             tile.pedestalArtifact = t.pa || null;
+            if (t.b) tile.biome = t.b;
             tile.roomId = null;
             tile.items = [];
             row.push(tile);
