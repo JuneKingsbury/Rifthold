@@ -4306,6 +4306,7 @@ function initPanelOverlay() {
         if (ui.inventoryVisible) ui.toggleInventoryPanel();
         if (ui.settingsPanelVisible) ui.toggleSettingsPanel();
         if (ui.storyPanelVisible) ui.toggleStoryPanel();
+        if (ui.mapPanelVisible) ui.toggleMapPanel();
     });
 }
 

@@ -222,6 +222,7 @@ export class InputHandler {
                 }
             },
             toggleStory: () => this.game.ui.toggleStoryPanel(),
+            toggleMap: () => this.game.ui.toggleMapPanel(),
             toggleWarmthOverlay: () => {
                 this.game.settings.showWarmthOverlay = !this.game.settings.showWarmthOverlay;
                 this.game.notifications.push({ text: `Warmth overlay ${this.game.settings.showWarmthOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
@@ -279,7 +280,7 @@ export class InputHandler {
             'status-bar', 'game-footer', 'bottom-bar', 'build-panel',
             'info-panel', 'panel-overlay', 'notifications', 'touch-toolbar',
             'priority-panel', 'craft-panel', 'event-panel', 'research-panel',
-            'inventory-panel', 'settings-panel', 'story-panel',
+            'inventory-panel', 'settings-panel', 'story-panel', 'map-panel',
         ];
         for (const id of uiIds) {
             const el = document.getElementById(id);
@@ -465,7 +466,7 @@ export class InputHandler {
         const hadPanel = ui.priorityPanelVisible || ui.craftPanelVisible ||
             ui.researchPanelVisible || ui.inventoryVisible ||
             ui.settingsPanelVisible ||
-            ui.arcanePanelVisible || ui.storyPanelVisible;
+            ui.arcanePanelVisible || ui.storyPanelVisible || ui.mapPanelVisible;
         if (hadPanel) {
             if (ui.priorityPanelVisible) ui.togglePriorityPanel();
             if (ui.craftPanelVisible) ui.toggleCraftPanel();
@@ -474,6 +475,7 @@ export class InputHandler {
             if (ui.settingsPanelVisible) ui.toggleSettingsPanel();
             if (ui.arcanePanelVisible) ui.toggleArcanePanel();
             if (ui.storyPanelVisible) ui.toggleStoryPanel();
+            if (ui.mapPanelVisible) ui.toggleMapPanel();
         } else if (this.mode !== 'normal') {
             this.setMode('normal');
         } else {

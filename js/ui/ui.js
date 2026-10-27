@@ -18,6 +18,7 @@ import { installArcanePanel } from './ui-arcane.js';
 import { getGdriveAPI } from '../core/gdrive-web.js';
 import { installResearchPanel } from './ui-research.js';
 import { installTutorialPanel } from './ui-tutorial.js';
+import { installMapPanel } from './ui-map.js';
 import { getAllSlotsMeta, exportSlot, getLastSyncTime, forceSyncNow } from '../core/save.js';
 
 const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '❄', blizzard: '❅', heatwave: '♨' };
@@ -78,6 +79,7 @@ export class UI {
         this._lastArcaneHtml = '';
         this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, _prevExpStatus: null, _arriveFrame: 0, _seenDiscoveryTick: 0, _seenResolutionTick: 0, _seenFatigueTick: 0, _seenRallyTick: 0, summonLastPos: {} };
         this.storyPanelVisible = false;
+        this.mapPanelVisible = false;
         this._storyTab = 'colony';
         this._collapsedRealmGroups = new Set();
         this._collapsedBestiarySections = new Set();
@@ -161,6 +163,7 @@ export class UI {
         this.elements.settingsPanel = document.getElementById('settings-panel');
         this.elements.arcanePanel = document.getElementById('arcane-panel');
         this.elements.storyPanel = document.getElementById('story-panel');
+        this.elements.mapPanel = document.getElementById('map-panel');
         this.elements.saveSlotPanel = document.getElementById('save-slot-ingame-panel');
 
         this.initTutorialNote();
@@ -456,6 +459,7 @@ export class UI {
                     case 'settings': this.toggleSettingsPanel(); break;
                     case 'arcane': this.toggleArcanePanel(); break;
                     case 'story': this.toggleStoryPanel(); break;
+                    case 'map': this.toggleMapPanel(); break;
                 }
                 return;
             }
@@ -763,6 +767,7 @@ export class UI {
                 case 'settings': this.toggleSettingsPanel(); break;
                 case 'arcane': this.toggleArcanePanel(); break;
                 case 'story': this.toggleStoryPanel(); break;
+                case 'map': this.toggleMapPanel(); break;
             }
         });
 
@@ -820,6 +825,7 @@ export class UI {
         if (this.inventoryVisible) this.updateInventoryPanel();
         if (this.arcanePanelVisible && !skipArcane) this.updateArcanePanel();
         if (this.storyPanelVisible) this.updateStoryPanel();
+        if (this.mapPanelVisible) this.updateMapPanel();
         if (this._viewingRiftGate) this._refreshRiftGateInfo();
         if (this._viewingColonistId != null) this._refreshColonistInfo();
         if (this._viewingRitualAltar) this._refreshRitualAltarInfo();
@@ -1080,6 +1086,7 @@ export class UI {
             const arcaneStyle = pendingAutoCount > 0 ? ' style="color:#44ff88"' : '';
             const arcaneBadge = pendingAutoCount > 0 ? ` <span style="background:#44ff88;color:#000;border-radius:8px;padding:0 4px;font-size:0.75em;">${pendingAutoCount}</span>` : '';
             html += `<span class="mode-opt" data-mode-action="arcane"${arcaneStyle}>[V]Rifts${arcaneBadge}</span>`;
+            html += `<span class="mode-opt" data-mode-action="map">[M]Map</span>`;
             html += '</span>';
         }
         if (input.mode !== 'build' && input.mode !== 'zone' && input.mode !== 'designate') this._hideBuildPanel();
@@ -2986,7 +2993,7 @@ export class UI {
         const anyOpen = this.priorityPanelVisible || this.craftPanelVisible ||
             this.researchPanelVisible || this.inventoryVisible ||
             this.settingsPanelVisible || this.saveSlotPanelVisible ||
-            this.arcanePanelVisible || this.storyPanelVisible;
+            this.arcanePanelVisible || this.storyPanelVisible || this.mapPanelVisible;
         const overlay = document.getElementById('panel-overlay');
         if (overlay) overlay.classList.toggle('visible', anyOpen);
     }
@@ -3019,6 +3026,10 @@ export class UI {
         if (this.storyPanelVisible) {
             this.storyPanelVisible = false;
             this.elements.storyPanel.style.display = 'none';
+        }
+        if (this.mapPanelVisible) {
+            this.mapPanelVisible = false;
+            this.elements.mapPanel.style.display = 'none';
         }
         if (this.saveSlotPanelVisible) {
             this.saveSlotPanelVisible = false;
@@ -5701,3 +5712,4 @@ function getWeaponTooltip(colonist) {
 installArcanePanel(UI);
 installResearchPanel(UI);
 installTutorialPanel(UI);
+installMapPanel(UI);
