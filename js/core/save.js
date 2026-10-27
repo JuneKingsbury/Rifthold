@@ -598,10 +598,10 @@ function _applyLoadData(game, data) {
             const w = data.mapWidth;
             if (w >= 384) {
                 WILDLIFE_CONFIG.maxCount = 150; WILDLIFE_CONFIG.animalSearchRadius = 40;
-                PATHFINDING_CONFIG.maxNodes = 60000; PATHFINDING_CONFIG.raiderSearchRadius = 200;
+                PATHFINDING_CONFIG.maxNodes = 180000; PATHFINDING_CONFIG.raiderSearchRadius = 200;
             } else if (w >= 256) {
                 WILDLIFE_CONFIG.maxCount = 80;  WILDLIFE_CONFIG.animalSearchRadius = 30;
-                PATHFINDING_CONFIG.maxNodes = 40000; PATHFINDING_CONFIG.raiderSearchRadius = 150;
+                PATHFINDING_CONFIG.maxNodes = 80000; PATHFINDING_CONFIG.raiderSearchRadius = 150;
             } else {
                 WILDLIFE_CONFIG.maxCount = 30;  WILDLIFE_CONFIG.animalSearchRadius = 20;
                 PATHFINDING_CONFIG.maxNodes = 20000; PATHFINDING_CONFIG.raiderSearchRadius = 100;

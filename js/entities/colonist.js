@@ -1,7 +1,7 @@
 import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, RACES, COLONIST_APPEARANCE, COLONIST_CONFIG, TRAITS, TRAIT_EXCLUSIONS, NEED_DECAY, MOOD_THRESHOLDS, MOOD_SPEED_MULT, WEAPONS, POTIONS, SKILLS, MAGIC_SKILLS, MANA_CONFIG, MAGIC_STUDY_CONFIG, SPELLS, THOUGHTS, COMBAT_VISUALS, WORK_CONFIG, TASK_CONFIG, GOLEM_TYPES, SUMMON_TYPES, TASK_SPEED_STATS, DAY_NIGHT, SOCIAL_CONFIG } from '../core/config.js';
 import { spawnParticle, spawnDamageText, spawnImpactSpray } from '../ui/overlay-renderer.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
-import { findPath, findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
+import { findPath, findPathAdjacent, manhattanDist, wasLastSearchExhausted } from '../world/pathfinding.js';
 import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture } from '../world/map.js';
 import { moveEntity, computeMoveDuration, computeMoveCooldown, teleportEntity } from '../systems/movement-lerp.js';
 import { FOODSTUFFS } from '../systems/resources.js';
@@ -1950,11 +1950,21 @@ function updateIdle(colonist, game) {
                 if (!colonist._failedTasks) colonist._failedTasks = {};
                 colonist._failedTasks[task.id] = game.tick;
 
-                if (!task._unreachableFailers) task._unreachableFailers = {};
-                task._unreachableFailers[colonist.id] = true;
-
-                const failCount = Object.keys(task._unreachableFailers).length;
-                if (failCount >= TASK_CONFIG.unreachableFailThreshold) {
+                // A search that ran out of node budget is inconclusive (the target may
+                // just be far away), so it doesn't count as an "unreachable" vote. It
+                // still has to terminate eventually, though: a walled-in target also
+                // exhausts the budget. Count those attempts separately against a higher
+                // threshold; the 30-tick per-colonist cooldown above spaces them out.
+                let cancel = false;
+                if (wasLastSearchExhausted()) {
+                    task._budgetFails = (task._budgetFails || 0) + 1;
+                    cancel = task._budgetFails >= TASK_CONFIG.budgetFailThreshold;
+                } else {
+                    if (!task._unreachableFailers) task._unreachableFailers = {};
+                    task._unreachableFailers[colonist.id] = true;
+                    cancel = Object.keys(task._unreachableFailers).length >= TASK_CONFIG.unreachableFailThreshold;
+                }
+                if (cancel) {
                     game.taskQueue.remove(task.id);
                     const tile = game.map[task.y] && game.map[task.y][task.x];
                     if (tile) {

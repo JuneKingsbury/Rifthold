@@ -334,6 +334,10 @@ export const MAGIC_STUDY_CONFIG = {
 
 export const TASK_CONFIG = {
     unreachableFailThreshold: 3,
+    // Path attempts that ran out of search budget before a task is cancelled as
+    // unreachable. Higher than the definitive-failure threshold because running out
+    // of budget can just mean the target is far away.
+    budgetFailThreshold: 9,
     unreachableCheckInterval: 60,
 };
 

@@ -6048,12 +6048,12 @@ _onDOMReady(() => {
         medium: {
             mapWidth: 256, mapHeight: 256,
             maxAnimals: 80, animalSearchRadius: 30,
-            maxNodes: 40000, raiderSearchRadius: 150,
+            maxNodes: 80000, raiderSearchRadius: 150,
         },
         large: {
             mapWidth: 384, mapHeight: 384,
             maxAnimals: 150, animalSearchRadius: 40,
-            maxNodes: 60000, raiderSearchRadius: 200,
+            maxNodes: 180000, raiderSearchRadius: 200,
         },
     };
 

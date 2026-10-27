@@ -1,9 +1,34 @@
 import { isPassable, getMoveCost, isPassableForEnemies, isBreakableByEnemies, isWalkableFurniture } from './map.js';
-import { CONFIG, PATHFINDING_CONFIG } from '../core/config.js';
+import { CONFIG, PATHFINDING_CONFIG, TERRAIN, BUILDINGS } from '../core/config.js';
 
 const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];//, [-1, -1], [1, 1], [1, -1], [-1, 1]];
 // Read live from config so runtime preset changes (world size selection) take effect.
 function getMaxNodes() { return PATHFINDING_CONFIG.maxNodes; }
+
+// Cheapest per-tile move cost anywhere in the game (terrain or floor). Terrain costs
+// are 8+ per tile, so a raw Manhattan heuristic (1 per tile) is far below the true
+// remaining cost and A* degenerates into Dijkstra, flooding a diamond of tiles as
+// wide as the route is long. Scaling the heuristic by this lower bound keeps it
+// admissible (paths stay optimal) while steering the search toward the goal.
+let minMoveCost = null;
+function getMinMoveCost() {
+    if (minMoveCost !== null) return minMoveCost;
+    let min = Infinity;
+    for (const t of Object.values(TERRAIN)) {
+        if (typeof t.moveCost === 'number' && t.moveCost > 0) min = Math.min(min, t.moveCost);
+    }
+    for (const b of Object.values(BUILDINGS)) {
+        if (typeof b.moveCost === 'number' && b.moveCost > 0) min = Math.min(min, b.moveCost);
+    }
+    minMoveCost = Number.isFinite(min) ? min : 1;
+    return minMoveCost;
+}
+
+// Set by every search: true when the last search gave up because it hit the node
+// budget rather than because the goal is genuinely unreachable. Callers use it to
+// avoid treating "too far to search" as "blocked" (see wasLastSearchExhausted).
+let lastSearchExhausted = false;
+export function wasLastSearchExhausted() { return lastSearchExhausted; }
 
 // Binary min-heap keyed on f-score for A* open set.
 // Duplicate entries are allowed: when a node's g-score improves, we push a new
@@ -80,22 +105,35 @@ export function manhattanDist(x1, y1, x2, y2) {
 // (see colonistPassability): we always want to reach the requested goal even
 // if it happens to be occupied, and the penalty is only meant to bias the
 // intermediate route around other entities.
-function findPathGeneric(map, startX, startY, endX, endY, passabilityFn) {
-    if (startX === endX && startY === endY) return [];
+//
+// `goalKeys` (optional): Set of packed tile keys. When supplied the search ends at
+// the first of them reached, and (endX, endY) is only the heuristic anchor: it
+// must lie within 1 tile of every goal so `distance - 1` stays admissible.
+function findPathGeneric(map, startX, startY, endX, endY, passabilityFn, goalKeys) {
+    lastSearchExhausted = false;
+    const start = tileKey(startX, startY);
+    if (goalKeys ? goalKeys.has(start) : (startX === endX && startY === endY)) return [];
 
     const open = new MinHeap();
     const closed = new Set();
     const cameFrom = new Map();
     const gScore = new Map();
 
-    const start = tileKey(startX, startY);
     const end = tileKey(endX, endY);
+    const hScale = getMinMoveCost();
+    const slack = goalKeys ? 1 : 0;
+    const heuristic = (x, y) => Math.max(0, manhattanDist(x, y, endX, endY) - slack) * hScale;
 
     gScore.set(start, 0);
-    open.push({ x: startX, y: startY, f: manhattanDist(startX, startY, endX, endY) });
+    open.push({ x: startX, y: startY, f: heuristic(startX, startY) });
 
+    const maxNodes = getMaxNodes();
     let iterations = 0;
-    while (open.length > 0 && iterations < getMaxNodes()) {
+    while (open.length > 0) {
+        if (iterations >= maxNodes) {
+            lastSearchExhausted = true;
+            return null;
+        }
         iterations++;
         const current = open.pop();
         const currentKey = tileKey(current.x, current.y);
@@ -103,7 +141,7 @@ function findPathGeneric(map, startX, startY, endX, endY, passabilityFn) {
         // Skip stale duplicates that remained in the heap after a g-score update
         if (closed.has(currentKey)) continue;
 
-        if (currentKey === end) {
+        if (goalKeys ? goalKeys.has(currentKey) : currentKey === end) {
             return reconstructPath(cameFrom, current.x, current.y, startX, startY);
         }
 
@@ -123,8 +161,7 @@ function findPathGeneric(map, startX, startY, endX, endY, passabilityFn) {
             if (tentativeG < (gScore.get(nKey) ?? Infinity)) {
                 cameFrom.set(nKey, currentKey);
                 gScore.set(nKey, tentativeG);
-                const f = tentativeG + manhattanDist(nx, ny, endX, endY);
-                open.push({ x: nx, y: ny, f });
+                open.push({ x: nx, y: ny, f: tentativeG + heuristic(nx, ny) });
             }
         }
     }
@@ -180,34 +217,35 @@ function enemyPassability(map, x, y, endX, endY) {
 // other entities. When supplied, occupied tiles get a soft cost penalty so the
 // route avoids them where possible, stepping through only as a last resort.
 export function findPath(map, startX, startY, endX, endY, occupied) {
-    if (!isPassable(map, endX, endY)) return null;
+    if (!isPassable(map, endX, endY)) {
+        lastSearchExhausted = false;
+        return null;
+    }
     return findPathGeneric(map, startX, startY, endX, endY, makeColonistPassability(occupied));
 }
 
-// `occupied` (optional): see findPath. Applied both when scoring candidate
-// adjacent tiles (an occupied standing tile is a worse goal) and when routing to
-// them, so colonists spread across distinct adjacent tiles rather than stacking.
+// `occupied` (optional): see findPath. One search runs to the nearest passable
+// neighbour of the target (rather than one search per neighbour, which multiplied
+// the cost of every failure by 4). The goal tiles get no endpoint exemption, so
+// occupied or furniture-filled standing tiles pay their normal soft penalty and
+// colonists spread across distinct adjacent tiles rather than stacking.
+// Returns null when no neighbour is reachable; check wasLastSearchExhausted() to
+// tell "blocked" from "search budget exhausted".
 export function findPathAdjacent(map, startX, startY, targetX, targetY, occupied) {
-    let bestPath = null;
-    let bestCost = Infinity;
+    const goalKeys = new Set();
     for (const [dx, dy] of DIRS) {
         const ax = targetX + dx;
         const ay = targetY + dy;
-        if (!isPassable(map, ax, ay)) continue;
-        const path = findPath(map, startX, startY, ax, ay, occupied);
-        if (!path) continue;
-        // Bias the choice of standing tile away from occupied ones so multiple
-        // colonists working the same target don't all pick the same neighbor.
-        const occupiedPenalty = occupied && occupied.has(tileKey(ax, ay))
-            ? PATHFINDING_CONFIG.occupiedCostPenalty
-            : 0;
-        const cost = path.length + occupiedPenalty;
-        if (cost < bestCost) {
-            bestCost = cost;
-            bestPath = path;
-        }
+        if (isPassable(map, ax, ay)) goalKeys.add(tileKey(ax, ay));
     }
-    return bestPath;
+    if (goalKeys.size === 0) {
+        lastSearchExhausted = false;
+        return null;
+    }
+    // (-1, -1) as the passability "endpoint" disables the endpoint exemption.
+    const passability = makeColonistPassability(occupied);
+    return findPathGeneric(map, startX, startY, targetX, targetY,
+        (m, x, y) => passability(m, x, y, -1, -1), goalKeys);
 }
 
 export function findPathForEnemies(map, startX, startY, endX, endY) {
