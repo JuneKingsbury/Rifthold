@@ -183,14 +183,40 @@ function advanceTomeStudy(colonist, game, rate) {
     }
 }
 
+// Refunds the deconstruct-recovery share of a floor/structure that a finished
+// build just replaced, matching what deconstructing it would have returned.
+function recoverReplaced(game, type) {
+    const def = BUILDINGS[type];
+    if (!def) return;
+    const partial = {};
+    for (const [res, amt] of Object.entries(def.cost)) {
+        partial[res] = Math.ceil(amt * COLONIST_CONFIG.deconstructRecovery);
+    }
+    game.resources.add(partial);
+}
+
 export function completeTask(colonist, task, game) {
     switch (task.type) {
         case 'build': {
             const tile = game.map[task.y][task.x];
             const bDef = BUILDINGS[task.buildType];
             if (bDef && bDef.structureType === 'floor') {
+                // Replacing an existing floor: it was kept in place until now.
+                if (tile.floor) recoverReplaced(game, tile.floor);
                 tile.floor = task.buildType;
             } else {
+                // Replacing an existing structure: it was kept in place until now.
+                if (tile.structure) {
+                    if (tile.structure === 'bed') {
+                        for (const c of game.colonists) {
+                            if (c.assignedBed && c.assignedBed.x === task.x && c.assignedBed.y === task.y) {
+                                c.assignedBed = null;
+                            }
+                        }
+                    }
+                    if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.structure);
+                    recoverReplaced(game, tile.structure);
+                }
                 tile.structure = task.buildType;
                 tile.passable = !IMPASSABLE_STRUCTURES.has(task.buildType);
                 // Only index tiles whose type lands in tile.structure. Floors are

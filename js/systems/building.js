@@ -47,23 +47,32 @@ export function designateBuild(game, x, y, buildType) {
         if (count >= def.maxCount + bonus) return false;
     }
 
-    if (def.structureType === 'floor') {
-        if (tile.floor) {
-            if (!(tile && (tile.type === 'deconstruct' || tile.type === 'deconstruct_floor'))) {
-                if (game.mapIndex) game.mapIndex.removeStructure(x, y, tile.floor);
-                tile.floor = null;
-            }
-        }
-    } else {
-        if (tile.structure) {
-            if (!(tile && tile.type === 'deconstruct')) {
-                if (game.mapIndex) game.mapIndex.removeStructure(x, y, tile.structure);
-                tile.structure = null;
-                tile.passable = true;
-            }
-        }
+    const isFloor = def.structureType === 'floor';
+    // The existing floor/structure stays until a colonist completes the build
+    // (completeTask swaps it and refunds its recovery share); cancelling the
+    // order therefore leaves the original untouched.
+    const existing = isFloor ? tile.floor : tile.structure;
+    if (existing === buildType) return false;
+
+    // A pending deconstruct on this tile converts into the replacement, but only
+    // when it targets the same layer we are building on (deconstruct removes the
+    // structure first, else the floor).
+    let supersededDeconstruct = false;
+    if (tile.designation) {
+        const dType = tile.designation.type;
+        const targetsOurLayer = isFloor ? (!tile.structure && tile.floor) : tile.structure;
+        if (dType !== 'deconstruct' || !targetsOurLayer) return false;
+        supersededDeconstruct = true;
     }
-    if (!tile.passable) return false;
+
+    // Walls and other impassable structures block the tile, so only the structure
+    // being replaced may account for impassability on a structure build.
+    if (!tile.passable && !(!isFloor && tile.structure)) return false;
+
+    if (supersededDeconstruct) {
+        const task = game.taskQueue.getByPosition(x, y);
+        if (task && task.type === 'deconstruct') game.taskQueue.remove(task.id);
+    }
 
     game.resources.deduct(def.cost);
     tile.designation = { type: 'build', buildType };
