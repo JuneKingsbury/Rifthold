@@ -35,7 +35,7 @@ export function designateBuild(game, x, y, buildType) {
 
     if (def.research && !game.research.isResearched(def.research)) return false;
 
-    if (def.maxCount) {
+    if (def.maxCount !== undefined) {
         let count = 0;
         for (const row of game.map) {
             for (const t of row) {

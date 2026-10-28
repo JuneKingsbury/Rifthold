@@ -31,7 +31,7 @@ import { CROPS, WINTER_FEAST_CONFIG } from './config.js';
 import { syncEntityIdCounter, createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { PowerSystem } from '../systems/power.js';
 import { ExplorationSystem } from '../systems/exploration.js';
-import { EXPEDITION_ENEMIES, NPC_ENCOUNTERS, REALMS } from './config/exploration.js';
+import { EXPEDITION_ENEMIES, NPC_ENCOUNTERS, REALMS, WORLD_SIZE_COLONY } from './config/exploration.js';
 import { ENTITIES } from './config/entities.js';
 import { TradeRiftSystem } from '../systems/traderift.js';
 import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
@@ -6096,6 +6096,7 @@ _onDOMReady(() => {
             const crypts = CRYPT_CONFIG.anchors.length + (CRYPT_CONFIG.extras[p.mapWidth]?.length
                 ?? Math.max(0, Math.round(area / CRYPT_CONFIG.fallbackTilesPer) - CRYPT_CONFIG.anchors.length));
             const rivers = p.mapWidth >= 384 ? 2 : 1;
+            const colony = WORLD_SIZE_COLONY[p.mapWidth];
 
             const lines = [
                 `Max wildlife: ${p.maxAnimals}`,
@@ -6103,6 +6104,7 @@ _onDOMReady(() => {
                 `Ritual core ruins: ${cores}`,
                 `Other ruins: ~${ruins}`,
                 `Major rivers: ${rivers}`,
+                `Max colonists: ${colony.capMax} (Hearth Shrines +${colony.shrineCapMultiplier} each)`,
             ];
             el.replaceChildren(...lines.map(text => {
                 const row = document.createElement('div');

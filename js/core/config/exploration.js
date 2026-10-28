@@ -2765,7 +2765,7 @@ export const WAVE_CONFIG = {
     nexusHpPerWave: 0,           // additional nexus HP per wave (0 = static)
     colonistCapBase: 3,          // starting colonist cap before any waves
     colonistCapScale: 0,          // waves no longer directly grant cap (use hearth shrines)
-    colonistCapMax: 12,          // maximum colonist cap
+    colonistCapMax: 12,          // fallback maximum colonist cap (used when the map width has no entry below)
     enemySpeed: 0.45,            // wave enemy movement speed (lower = slower)
     enemyChar: 'E',              // character displayed for wave enemies
     enemyColor: '#ff2222',       // color of wave enemies
@@ -2773,6 +2773,16 @@ export const WAVE_CONFIG = {
     spawnDistance: { near: 25, far: 50, offsetRange: 10 }, // portal spawn distances from nexus
     maxPathNodes: 2000,          // A* node limit for wave enemy pathfinding
     bonusEssencePerWave: 2,      // multiplied by wave number for completion bonus
+};
+
+// Per-world-size colony tuning, keyed by map width (matches the world-size presets).
+// shrineCapMultiplier scales a building's colonistCapBonus (Hearth Shrine: +1 / +1.5 / +2 each);
+// the summed cap is floored, so fractional bonuses never yield a fractional colonist.
+// capMax is the world's colonist ceiling: base 3 + 9 shrines (one per milestone, no free slot) at the size's bonus, floored.
+export const WORLD_SIZE_COLONY = {
+    128: { shrineCapMultiplier: 1,   capMax: 12 },
+    256: { shrineCapMultiplier: 1.5, capMax: 16 },
+    384: { shrineCapMultiplier: 2,   capMax: 21 },
 };
 
 // Ordered list of milestones that each unlock one additional Hearth Shrine build slot.

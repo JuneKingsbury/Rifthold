@@ -55,7 +55,7 @@ export const GLOSSARY = [
                 subtitle: 'Colony Population',
                 entries: [
                     ['Colony Cap', 'Your maximum colonist count is increased by building and powering Hearth Shrines. New shrine slots are earned by completing specific milestones: a mix of surviving Void Nexus waves and conquering realm chain expeditions.'],
-                    ['Hearth Shrine Milestones', 'Shrine slots unlock from completing the following milestones: (1) Survive wave 1, (2) Complete any Tier 1 realm expedition, (3) Survive wave 3, (4) Complete any Tier 2 realm expedition, (5) Defeat a full realm chain boss, (6) Survive wave 6, (7) Conquer two full realm chains, (8) Survive wave 9, (9) Conquer three full realm chains. Reaching the maximum colony cap of 12 requires progress in both wave defense and realm exploration. The number order represents the order in which milestones are hinted at in-game, but you are free to complete them in any order.'],
+                    ['Hearth Shrine Milestones', 'Shrine slots unlock from completing the following milestones: (1) Survive wave 1, (2) Complete any Tier 1 realm expedition, (3) Survive wave 3, (4) Complete any Tier 2 realm expedition, (5) Defeat a full realm chain boss, (6) Survive wave 6, (7) Conquer two full realm chains, (8) Survive wave 9, (9) Conquer three full realm chains. Each shrine adds +1 colonist on small worlds, +1.5 on medium and +2 on large, for a maximum colony cap of 12, 16 and 21 respectively. Reaching it requires progress in both wave defense and realm exploration. The number order represents the order in which milestones are hinted at in-game, but you are free to complete them in any order.'],
                 ]
             },
         ]

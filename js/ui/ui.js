@@ -1518,7 +1518,7 @@ export class UI {
         if (def.description) {
             html += `<div class="info-row" style="color:#999;font-size:11px;">${def.description}</div>`;
         }
-        if (def.maxCount) {
+        if (def.maxCount !== undefined) {
             const limit = def.maxCount + getMaxCountBonus(def, structure, this.game);
             let placed = 0;
             for (const row of this.game.map) for (const t of row) if (t.structure === structure) placed++;
@@ -3946,7 +3946,7 @@ export class UI {
             if (def.power.consumes) html += `<div class="build-tip-meta" style="color:#ff8844">Consumes ${def.power.consumes} mana</div>`;
             if (def.power.damage) html += `<div class="build-tip-meta" style="color:#ff4444">Damage: ${def.power.damage} (range ${def.power.range || '?'})</div>`;
         }
-        if (def.maxCount) {
+        if (def.maxCount !== undefined) {
             html += `<div class="build-tip-meta" style="color:#aaa">Max: ${def.maxCount + getMaxCountBonus(def, buildType, this.game)}</div>`;
         }
         this._buildTooltip.innerHTML = html;
@@ -4864,7 +4864,7 @@ export class UI {
 
     isBuildingAtMax(buildType) {
         const def = BUILDINGS[buildType];
-        if (!def || !def.maxCount) return false;
+        if (!def || def.maxCount === undefined) return false;
         let count = 0;
         for (const row of this.game.map) {
             for (const t of row) {

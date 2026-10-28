@@ -1,4 +1,4 @@
-import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS, HEARTH_SHRINE_MILESTONES, REALMS, countCompletedChains } from '../core/config.js';
+import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS, HEARTH_SHRINE_MILESTONES, WORLD_SIZE_COLONY, REALMS, countCompletedChains } from '../core/config.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { colonistTakeDamage, getEquipmentStat } from './colonist.js';
@@ -61,6 +61,10 @@ export class WaveSystem {
 
     getColonistCap(game) {
         let base = WAVE_CONFIG.colonistCapBase;
+        // Derive world size from the live map so loaded saves match the world they were made on.
+        const worldWidth = game?.map?.[0]?.length ?? CONFIG.MAP_WIDTH;
+        const world = WORLD_SIZE_COLONY[worldWidth];
+        const bonusScale = world?.shrineCapMultiplier ?? 1;
         if (game && game.mapIndex) {
             for (const [key, def] of Object.entries(BUILDINGS)) {
                 if (def.colonistCapBonus) {
@@ -71,12 +75,12 @@ export class WaveSystem {
                         const manaAvailableForShrines = Math.max(0, game.power.totalGenerated - otherConsumption);
                         count = Math.min(count, Math.floor(manaAvailableForShrines / def.power.consumes));
                     }
-                    base += def.colonistCapBonus * count;
+                    base += def.colonistCapBonus * bonusScale * count;
                 }
             }
         }
-        const max = game?.settings?.demoMode ? 8 : WAVE_CONFIG.colonistCapMax;
-        return Math.min(max, base);
+        const max = game?.settings?.demoMode ? 8 : (world?.capMax ?? WAVE_CONFIG.colonistCapMax);
+        return Math.floor(Math.min(max, base));
     }
 
     canStartWave(game) {
