@@ -22,7 +22,6 @@ export const DAY_NIGHT = { nightStart: 0.7, dayStart: 0.2 };
 export const EVENTS = {
     wanderer: { weight: 10, minTick: 480, cooldown: 1280, effect: 'custom' },
     caravan: { weight: 6, minTick: 640, cooldown: 1600, effect: 'custom' },
-    fire: { weight: 4, minTick: 320, cooldown: 640, seasons: ['summer'], effect: 'custom' },
     blight: {
         weight: 7, minTick: 400, cooldown: 1200, seasons: ['spring', 'summer'],
         effect: 'creeping_miasma',
@@ -114,13 +113,6 @@ export const EVENTS = {
         weight: 4, minTick: 2400, cooldown: 2400,
         effect: 'custom',
     },
-};
-
-export const FIRE_CONFIG = {
-    initialLifespan: 20,
-    spreadChance: 0.05,
-    spreadTimerMin: 15,
-    spreadTimerMax: 25,
 };
 
 export const BLIGHT_CONFIG = {

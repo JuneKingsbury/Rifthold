@@ -36,12 +36,11 @@ export function designateBuild(game, x, y, buildType) {
     if (def.research && !game.research.isResearched(def.research)) return false;
 
     if (def.maxCount !== undefined) {
-        let count = 0;
-        for (const row of game.map) {
-            for (const t of row) {
-                if (t.structure === buildType) count++;
-                if (t.designation && t.designation.type === 'build' && t.designation.buildType === buildType) count++;
-            }
+        // Built copies plus pending build orders (each build designation has a
+        // matching 'build' task), without scanning the whole map.
+        let count = game.mapIndex.getStructurePositions(buildType).size;
+        for (const t of game.taskQueue.getAll()) {
+            if (t.type === 'build' && t.buildType === buildType) count++;
         }
         const bonus = getMaxCountBonus(def, buildType, game);
         if (count >= def.maxCount + bonus) return false;
@@ -70,8 +69,8 @@ export function designateBuild(game, x, y, buildType) {
     if (!tile.passable && !(!isFloor && tile.structure)) return false;
 
     if (supersededDeconstruct) {
-        const task = game.taskQueue.getByPosition(x, y);
-        if (task && task.type === 'deconstruct') game.taskQueue.remove(task.id);
+        const task = game.taskQueue.getAllByPosition(x, y).find(t => t.type === 'deconstruct');
+        if (task) game.taskQueue.remove(task.id);
     }
 
     game.resources.deduct(def.cost);
@@ -130,7 +129,9 @@ export function cancelDesignation(game, x, y) {
             const def = BUILDINGS[tile.designation.buildType];
             if (def) game.resources.add(def.cost);
         }
-        const task = game.taskQueue.getByPosition(x, y);
+        // Each designation has a same-typed task. Other tasks can share the tile
+        // (e.g. crafting at a station), so remove only the designation's own.
+        const task = game.taskQueue.getAllByPosition(x, y).find(t => t.type === tile.designation.type);
         if (task) game.taskQueue.remove(task.id);
         tile.designation = null;
         return;
@@ -162,8 +163,7 @@ export function cancelDesignation(game, x, y) {
 
     if ((tile.structure || tile.floor) && !tile.designation) {
         if (INDESTRUCTIBLE_STRUCTURES.has(tile.structure)) return;
-        const existing = game.taskQueue.getByPosition(x, y);
-        if (existing && existing.type === 'deconstruct') return;
+        if (game.taskQueue.hasTaskTypeAt(x, y, 'deconstruct')) return;
 
         tile.designation = { type: 'deconstruct' };
         game.taskQueue.add({

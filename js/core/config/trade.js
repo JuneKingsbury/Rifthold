@@ -47,7 +47,7 @@ export const MERCHANTS = [
         // potionStock: { key: [minQty, maxQty] }, stackable potions the merchant sells.
         potionStock: { health_potion: [2, 5] },
         goldRange: [20, 49],
-        buyCategories: ['weapon', 'armor', 'helmet', 'tool', 'tome', 'consumable', 'potion'],
+        buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'tome', 'consumable', 'potion'],
     },
     {
         name: 'Arms Dealer',               // weapons/armor specialist: better quality odds
@@ -77,7 +77,7 @@ export const MERCHANTS = [
         name: 'Wandering Alchemist',       // nature/utility: farm tools, warm clothing, relics
         weight: 7,
         resourcePool: ['berries', 'wheat', 'moonbloom', 'corn', 'potatoes', 'food'],
-        lowTierItems: ['stone_sickle', 'stone_mattock', 'wool_parka', 'leather_vest', 'wool_tunic'],
+        lowTierItems: ['stone_sickle', 'stone_mattock', 'leather_cloak', 'leather_vest', 'wool_tunic'],
         highTierItems: ['hourglass_of_diligence', 'lodestone_of_prosperity', 'crystal_capacitor'],
         lowDrawCount: [1, 0.6, 0.3],
         highDrawChances: [0.3],
@@ -85,7 +85,7 @@ export const MERCHANTS = [
         // The alchemist deals in potions, the widest brewed stock.
         potionStock: { health_potion: [2, 6], speed_potion: [1, 4], mana_potion: [1, 4], resistance_potion: [1, 3] },
         goldRange: [20, 45],
-        buyCategories: ['weapon', 'armor', 'helmet', 'tool', 'tome', 'potion'],
+        buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'tome', 'potion'],
     },
     {
         name: 'Rare Goods Broker',         // late-game specialist: runic and void-tier gear
@@ -111,7 +111,7 @@ export const MERCHANTS = [
         // Sells expedition-only brews that are hard to research early.
         potionStock: { antidote: [1, 3], battle_tonic: [1, 3], smoke_draught: [1, 2], loot_elixir: [1, 2] },
         goldRange: [25, 55],
-        buyCategories: ['weapon', 'armor', 'helmet', 'boots', 'potion'],
+        buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'potion'],
     },
     {
         name: 'Clothier',                  // clothing and boots: comfort, warmth, and utility wear
@@ -124,7 +124,7 @@ export const MERCHANTS = [
         qualityWeights: { poor: 1, normal: 4, fine: 3, superior: 1 },
         potionStock: { morale_tonic: [1, 4], warmth_elixir: [1, 4] },
         goldRange: [15, 40],
-        buyCategories: ['weapon', 'armor', 'helmet', 'trinket'],
+        buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'trinket'],
     },
 ];
 

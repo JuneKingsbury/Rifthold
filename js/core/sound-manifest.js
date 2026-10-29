@@ -35,7 +35,6 @@ export const SOUND_MANIFEST = {
         footstep: 'audio/sfx/environment/footstep.ogg',
 
         // Environment — file paths are wired up; add .ogg files to audio/sfx/environment/ to activate
-        fire_ignite: 'audio/sfx/environment/fire_ignite.ogg',
         freezing: 'audio/sfx/environment/freezing.ogg',
         rain_start: 'audio/sfx/environment/rain_start.ogg',
         thunder_crack: 'audio/sfx/environment/thunder_crack.ogg',
@@ -51,8 +50,6 @@ export const SOUND_MANIFEST = {
         mental_break: 'audio/sfx/ui/mental_break.ogg',
     },
     music: {
-        ambient_day: 'audio/music/ambient_day.ogg',
-        ambient_night: 'audio/music/ambient_night.ogg',
         combat: 'audio/music/combat.ogg',
         menu_theme: 'audio/music/menu_theme.ogg',
         credits: 'audio/music/credits.ogg',
@@ -84,16 +81,16 @@ export const SOUND_MANIFEST = {
         expedition_crusader_barracks: 'audio/music/expedition_crusader_barracks.ogg',
         expedition_palace_fortress:   'audio/music/expedition_palace_fortress.ogg',
 
-        // Optional weather tracks. Fall back to season/day-night if the file is absent.
+        // Optional weather tracks. Fall back to the season track if the file is absent.
         // Keys are 'weather_' + Weather.currentWeather (see WEATHER_TYPES in config/world.js).
-        // No weather_clear: "clear" uses the season/day-night fallback.
+        // No weather_clear: "clear" uses the season fallback.
         weather_rain: 'audio/music/weather_rain.ogg',
         weather_thunderstorm: 'audio/music/weather_thunderstorm.ogg',
         weather_snow: 'audio/music/weather_snow.ogg',
         weather_blizzard: 'audio/music/weather_blizzard.ogg',
         weather_heatwave: 'audio/music/weather_heatwave.ogg',
 
-        // Optional season tracks. Fall back to day/night if the file is absent.
+        // Season tracks: the final fallback for colony music.
         // Keys are 'season_' + Weather.season (see SEASONS in config/world.js).
         season_spring: 'audio/music/season_spring.ogg',
         season_summer: 'audio/music/season_summer.ogg',

@@ -38,7 +38,7 @@ export const GLOSSARY = [
                     ['Magic Traits', 'Attuned (bonus mana regen and max mana), Spellsword (bonus spell damage), Magically Inept (much slower magic XP but slightly faster mundane XP). These affect a colonist\'s relationship with spellcasting.'],
                     ['Expedition Traits', 'Trailblazer, Treasure Hunter, Trapsmith, Inspiring, Void-Touched, Night Owl, Green Thumb (certain traits can also have realm-specific bonuses on expeditions). These traits give bonuses during expeditions such as reduced duration, better loot, or party-wide buffs.'],
                     ['Trade Traits', 'Silver Tongue (better trade prices), Merchant\'s Eye (Trade Rift rewards arrive at higher quality), Scavenger (chance to find bonus materials while gathering).'],
-                    ['Rare Traits', 'Lucky (better crafting quality on all items), Pyromaniac (rare chance to start fires), Prodigy (gains all XP faster), Magically Gifted (starts with experience in a random magic school and its starter spell). These are uncommon to very rare and have powerful effects.'],
+                    ['Rare Traits', 'Lucky (better crafting quality on all items), Prodigy (gains all XP faster), Magically Gifted (starts with experience in a random magic school and its starter spell). These are uncommon to very rare and have powerful effects.'],
                 ]
             },
             {
@@ -300,10 +300,10 @@ export const GLOSSARY = [
                 entries: [
                     ['Season Cycle', 'Four seasons rotate continuously: Spring, Summer, Autumn, Winter. Each season affects temperature, crop growth rates, animal spawns, and which events can occur.'],
                     ['Spring', 'Moderate temperatures and normal crop growth. Wild animals appear more frequently. A good season for expanding farms and taming animals.'],
-                    ['Summer', 'The hottest season with the fastest crop growth, but food also spoils faster. Risk of heat waves and fire events. Plan extra food storage.'],
+                    ['Summer', 'The hottest season with the fastest crop growth, but food also spoils faster. Risk of heat waves. Plan extra food storage.'],
                     ['Autumn', 'Cooling temperatures with slightly slower crop growth. Animal migrations commonly pass through, providing hunting opportunities.'],
                     ['Winter', 'Cold temperatures halt most outdoor crop growth. Snow covers the ground. Colonists need warmth from Campfires, Ember Heaters, or Inferno Wards to avoid freezing. Freezing colonists will seek out nearby heat sources on their own. Press H to toggle the warmth overlay and see each source\'s coverage.'],
-                    ['Weather Effects', 'Rain boosts crop growth and extinguishes fires. Thunderstorms can start fires via lightning. Blizzards halt all crop growth entirely. Weather varies by season.'],
+                    ['Weather Effects', 'Rain boosts crop growth. Blizzards halt all crop growth entirely. Weather varies by season.'],
                     ['Winter Feast', 'Once each year, when winter arrives, the colony holds a feast if it has stored a comfortable surplus of food. The feast eats into that stockpile and grants every colonist a lasting mood buff, a warm beat in the coldest season. A lean winter with too little food stored simply passes without one, so keep a cushion of food heading into the cold.'],
                 ]
             },
@@ -330,9 +330,9 @@ export const GLOSSARY = [
             {
                 subtitle: 'Events',
                 entries: [
-                    ['Random Events', 'Various events trigger as your colony grows: new colonists arriving, trade caravans, crop blights, mineral windfalls, fires, cold snaps, animal migrations, and inspiration.'],
+                    ['Random Events', 'Various events trigger as your colony grows: new colonists arriving, trade caravans, crop blights, mineral windfalls, cold snaps, animal migrations, and inspiration.'],
                     ['Wanderers', 'New colonists occasionally ask to join your colony. Wanderers are more likely when colony mood is high. Accept or reject based on their traits and skills. Once a wanderer joins your colony you will have no simple way to remove them from their new community.'],
-                    ['Destructive Events', 'Fires spread to adjacent flammable tiles (colonists auto-extinguish). Creeping miasma infects and decays crops in spring/summer. Blight blooms erupt on crops and destroy them in summer/autumn. Cold snaps kill all outdoor crops in winter.'],
+                    ['Destructive Events', 'Creeping miasma infects and decays crops in spring/summer. Blight blooms erupt on crops and destroy them in summer/autumn. Cold snaps kill all outdoor crops in winter.'],
                 ]
             },
             {

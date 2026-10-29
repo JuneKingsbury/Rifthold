@@ -122,7 +122,7 @@ export const SPELLS = {
     ill_omen: { name: 'Ill Omen', school: 'divination', minLevel: 2, manaCost: 8, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'debuff_accuracy', weakenMult: 0.7, weakenDuration: 90, weakenRounds: 3, range: 6, projectileColor: '#884488', projectileChar: '☽' },
     fair_winds: { name: 'Fair Winds', school: 'divination', minLevel: 2, manaCost: 10, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { weatherBias: 'clear' }, duration: 200 },
     merchants_omen: { name: "Merchant's Omen", school: 'divination', minLevel: 3, manaCost: 15, cooldown: 600, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'caravan', eventMult: 3.0 }, duration: 400 },
-    ward_of_calamity: { name: 'Ward of Calamity', school: 'divination', minLevel: 4, manaCost: 20, cooldown: 800, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { suppressEvents: ['blight_bloom', 'cold_snap', 'fire'], blightSpreadSuppressed: true }, duration: 500 },
+    ward_of_calamity: { name: 'Ward of Calamity', school: 'divination', minLevel: 4, manaCost: 20, cooldown: 800, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { suppressEvents: ['blight_bloom', 'cold_snap'], blightSpreadSuppressed: true }, duration: 500 },
     fortunate_discovery: { name: 'Fortunate Discovery', school: 'divination', minLevel: 5, manaCost: 25, cooldown: 1000, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'meteorite', eventMult: 5.0 }, duration: 600 },
 };
 
@@ -242,7 +242,7 @@ export const RESEARCH_TABS = [
 
 export const RESEARCH = {
     // Foundations
-    runecraft: { name: 'Runecraft', cost: 80, requires: [], tab: 'foundations', description: 'Etch runes into stone weapons'},
+    runecraft: { name: 'Runecraft', cost: 80, requires: [], tab: 'foundations', description: 'Etch runes into stone weapons and picks (+25% mining speed)'},
     metalworking: { name: 'Metalworking', cost: 100, requires: [], tab: 'foundations', description: 'Smelting metal and crafting gear at anvils' },
     ley_channeling: { name: 'Ley Channeling', cost: 175, requires: ['runecraft', 'metalworking'], tab: 'mana', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
     alchemy: { name: 'Alchemy', cost: 150, requires: ['runecraft'], tab: 'foundations', description: 'Learn how to brew potions and unlock corn and potatoes' },
@@ -269,7 +269,7 @@ export const RESEARCH = {
     golem_craft: { name: 'Golem Craft', cost: 1000, requires: ['arcane_infusion', 'void_forging', 'mana_reservoir'], tab: 'crafting', description: 'Animate stone golems to serve as tireless workers', requiresBuildings: { enchanting_table: 1 }, requiresTabCount: 3 },
 
     // Spells
-    arcane_studies: { name: 'Arcane Studies', cost: 100, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes. Also lets you launch the Arcane realm chain once its crypt anchor is attuned' },
+    arcane_studies: { name: 'Arcane Studies', cost: 100, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
     arcane_infusion: { name: 'Arcane Infusion', cost: 400, requires: ['arcane_studies', 'ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
     advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
     ritual_magic: { name: 'Ritual Magic', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Unlock complex arcane rituals patterns for powerful colony-wide effects' },
@@ -294,19 +294,16 @@ export const RESEARCH = {
     void_forging: { name: 'Void Shaping', cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
     wayfinding: { name: 'Wayfinding', cost: 120, requires: [], tab: 'rifts', description: 'Scout the wild lands beyond the colony. Send small scouting parties to forage and explore nearby wilderness.' },
     planar_rift: { name: 'Planar Rifts', cost: 400, requires: ['arcane_infusion', 'wayfinding'], tab: 'rifts', description: 'Stabilize rifts so expeditions can launch from attuned rift anchors, which are found inside ancient crypts' },
-    deep_delving: { name: 'Deep Delving', cost: 1200, requires: ['auto_expedition'], tab: 'rifts', description: 'Access deeper, more dangerous realms: launch the Shadow and Kingdom chains once their crypt anchors are attuned' },
     auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually', requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, },
-    auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['deep_delving'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
+    auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['auto_expedition'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
     auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions' },
-    void_pact: { name: 'Void Pact', cost: 900, requires: ['deep_delving', 'void_forging', 'void_sorcery'], tab: 'rifts', description: 'Broker passage through the deepest void. Opens the Void Pact realm chain, reached through its crypt anchor. Those who enter must be willing to pay its price.' },
-    unraveling: { name: 'Unraveling Threads', cost: 1100, requires: ['void_pact'], tab: 'rifts', description: 'Some rifts do not lead anywhere stable. Opens the Chaos realm chain, reached through its crypt anchor. The brave, or the foolish, enter anyway.' },
-    abyss_smithing: { name: 'Abyss Forging', cost: 900, requires: ['void_forging', 'void_pact'], tab: 'crafting', description: 'Shape abyss slivers into weapons of immense power. Only those who have ventured deep into the void can master this craft.', requiresMilestone: { stat: 'expeditionsCompleted', min: 5 } },
+    abyss_smithing: { name: 'Abyss Forging', cost: 900, requires: ['void_forging'], tab: 'crafting', description: 'Shape abyss slivers into weapons of immense power. Only those who have ventured deep into the void can master this craft.', requiresMilestone: { stat: 'expeditionsCompleted', min: 5 } },
 };
 
 export const DEMO_LOCKED_RESEARCH = new Set([
     'advanced_arcana', 'void_sorcery', 'masterwork', 'golem_craft', 'mana_weaving',
     'mana_reservoir', 'brilliance', 'pyroclasm', 'void_architecture',
-    'void_forging', 'void_weaving', 'deep_delving'
+    'void_forging', 'void_weaving', 'auto_expedition_ii'
 ]);
 
 // Auto-derive unlocks from the 'research' field on buildings, recipes, and crops.

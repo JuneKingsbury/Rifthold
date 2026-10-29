@@ -62,8 +62,8 @@ export const RESOURCES = {
 
 export const WEATHER_TYPES = {
     clear:        { display: 'Clear', growthMult: 1.0 },
-    rain:         { display: 'Rain', growthMult: 1.3, extinguishesFire: true },
-    thunderstorm: { display: 'Storm', growthMult: 1.0, extinguishesFire: true, fireChance: true },
+    rain:         { display: 'Rain', growthMult: 1.3 },
+    thunderstorm: { display: 'Storm', growthMult: 1.0 },
     snow:         { display: 'Snow', growthMult: 0.5 },
     blizzard:     { display: 'Blizzard', growthMult: 0 },
     heatwave:     { display: 'Heat Wave', growthMult: 0.7 },

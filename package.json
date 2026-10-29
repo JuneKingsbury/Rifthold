@@ -12,7 +12,7 @@
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
     "dist:all": "electron-builder --mac --win --linux",
-    "copy:web": "rsync -a --delete --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='android' --exclude='www' --exclude='electron-main.js' --exclude='preload.js' --exclude='.claude' --exclude='BUILD_INSTRUCTIONS.txt' --exclude='Todo.md' --exclude='README.md' --exclude='package.json' --exclude='package-lock.json' --exclude='capacitor.config.ts' --exclude='.gitignore' --exclude='.DS_Store' . www/",
+    "copy:web": "rsync -a --delete --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='android' --exclude='www' --exclude='electron-main.js' --exclude='preload.js' --exclude='.claude' --exclude='BUILD_INSTRUCTIONS.txt' --exclude='Todo.md' --exclude='README.md' --exclude='package.json' --exclude='package-lock.json' --exclude='capacitor.config.ts' --exclude='.gitignore' --exclude='.DS_Store' --exclude='client_secret*.json' . www/",
     "cap:sync": "npm run copy:web && npx cap sync android",
     "cap:android": "npm run cap:sync && npx cap open android",
     "postinstall": "electron-builder install-app-deps"
@@ -35,7 +35,8 @@
       "!.DS_Store",
       "!Todo.md",
       "!README.md",
-      "!steam_appid.txt"
+      "!steam_appid.txt",
+      "!client_secret*.json"
     ],
     "asarUnpack": [
       "node_modules/steamworks.js/**"

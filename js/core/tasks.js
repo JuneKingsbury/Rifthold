@@ -7,14 +7,48 @@ export class TaskQueue {
     constructor() {
         this.tasks = [];
         this._byId = new Map();
-        this._byPosition = new Map();
-        this._busyStations = new Set();
+        // posKey -> array of tasks on that tile (several tasks can share a tile,
+        // e.g. a craft and a cook queued on one station, or hunt/tame targets).
+        this._byPos = new Map();
+        // posKey -> id of the task currently holding that station. Only the
+        // holder releasing or finishing frees the station.
+        this._busyStations = new Map();
         this._pending = [];
         this._pendingDirty = true;
     }
 
     _posKey(x, y) {
         return (y << 16) | x;
+    }
+
+    // Legacy read-only view: _byPosition.get(key) returns the first task on the tile.
+    get _byPosition() {
+        return { get: (key) => this._byPos.get(key)?.[0] };
+    }
+
+    _isStationTask(task) {
+        return task.type === 'craft' || task.type === 'cook' || task.type === 'enchant';
+    }
+
+    _indexAdd(task) {
+        const key = this._posKey(task.x, task.y);
+        const list = this._byPos.get(key);
+        if (list) list.push(task);
+        else this._byPos.set(key, [task]);
+    }
+
+    _indexRemove(task) {
+        const key = this._posKey(task.x, task.y);
+        const list = this._byPos.get(key);
+        if (!list) return;
+        const i = list.indexOf(task);
+        if (i >= 0) list.splice(i, 1);
+        if (list.length === 0) this._byPos.delete(key);
+    }
+
+    _releaseStation(task) {
+        const key = this._posKey(task.x, task.y);
+        if (this._busyStations.get(key) === task.id) this._busyStations.delete(key);
     }
 
     add(task) {
@@ -24,7 +58,7 @@ export class TaskQueue {
         task.status = 'pending';
         this.tasks.push(task);
         this._byId.set(task.id, task);
-        this._byPosition.set(this._posKey(task.x, task.y), task);
+        this._indexAdd(task);
         this._pendingDirty = true;
         return task;
     }
@@ -37,13 +71,13 @@ export class TaskQueue {
 
     _rebuildIndices() {
         this._byId.clear();
-        this._byPosition.clear();
+        this._byPos.clear();
         this._busyStations.clear();
         for (const t of this.tasks) {
             this._byId.set(t.id, t);
-            this._byPosition.set(this._posKey(t.x, t.y), t);
-            if ((t.type === 'craft' || t.type === 'cook' || t.type === 'enchant') && t.status === 'in_progress') {
-                this._busyStations.add(this._posKey(t.x, t.y));
+            this._indexAdd(t);
+            if (this._isStationTask(t) && t.status === 'in_progress') {
+                this._busyStations.set(this._posKey(t.x, t.y), t.id);
             }
         }
         this._pendingDirty = true;
@@ -55,8 +89,8 @@ export class TaskQueue {
         const idx = this.tasks.indexOf(task);
         if (idx >= 0) this.tasks.splice(idx, 1);
         this._byId.delete(taskId);
-        this._byPosition.delete(this._posKey(task.x, task.y));
-        this._busyStations.delete(this._posKey(task.x, task.y));
+        this._indexRemove(task);
+        this._releaseStation(task);
         this._pendingDirty = true;
     }
 
@@ -82,7 +116,7 @@ export class TaskQueue {
             if (!t.urgent && colonist.priorities[t.skillRequired] <= 0) continue;
             // Skip tasks this colonist recently failed to reach (30-tick cooldown)
             if (failedTasks && failedTasks[t.id] !== undefined && tick - failedTasks[t.id] < 30) continue;
-            if ((t.type === 'craft' || t.type === 'cook' || t.type === 'enchant') && this._busyStations.has(this._posKey(t.x, t.y))) continue;
+            if (this._isStationTask(t) && this._busyStations.has(this._posKey(t.x, t.y))) continue;
 
             // Lower priority number = higher preference, multiplied to dominate over distance.
             // Urgent tasks (e.g. lead_animal) use a fixed very-low prio so they beat all others.
@@ -111,8 +145,8 @@ export class TaskQueue {
         if (task) {
             task.assignedTo = colonistId;
             task.status = 'in_progress';
-            if (task.type === 'craft' || task.type === 'cook' || task.type === 'enchant') {
-                this._busyStations.add(this._posKey(task.x, task.y));
+            if (this._isStationTask(task)) {
+                this._busyStations.set(this._posKey(task.x, task.y), task.id);
             }
             this._pendingDirty = true;
         }
@@ -121,9 +155,7 @@ export class TaskQueue {
     release(taskId) {
         const task = this._byId.get(taskId);
         if (task) {
-            if (task.type === 'craft' || task.type === 'cook' || task.type === 'enchant') {
-                this._busyStations.delete(this._posKey(task.x, task.y));
-            }
+            this._releaseStation(task);
             task.assignedTo = null;
             task.status = 'pending';
             task.workDone = 0;
@@ -137,8 +169,8 @@ export class TaskQueue {
         const idx = this.tasks.indexOf(task);
         if (idx >= 0) this.tasks.splice(idx, 1);
         this._byId.delete(taskId);
-        this._byPosition.delete(this._posKey(task.x, task.y));
-        this._busyStations.delete(this._posKey(task.x, task.y));
+        this._indexRemove(task);
+        this._releaseStation(task);
         this._pendingDirty = true;
     }
 
@@ -146,8 +178,20 @@ export class TaskQueue {
         return this._byId.get(taskId) || null;
     }
 
+    // First task on the tile (oldest), or null.
     getByPosition(x, y) {
-        return this._byPosition.get(this._posKey(x, y)) || null;
+        return this._byPos.get(this._posKey(x, y))?.[0] || null;
+    }
+
+    // All tasks on the tile. Returns a copy, so callers may remove while iterating.
+    getAllByPosition(x, y) {
+        const list = this._byPos.get(this._posKey(x, y));
+        return list ? list.slice() : [];
+    }
+
+    hasTaskTypeAt(x, y, type) {
+        const list = this._byPos.get(this._posKey(x, y));
+        return !!list && list.some(t => t.type === type);
     }
 
     getAssignedTo(colonistId) {
@@ -166,13 +210,16 @@ export class TaskQueue {
         return this.tasks;
     }
 
-    updatePosition(taskId, x, y) {
-        const task = this._byId.get(taskId);
-        if (task) {
-            this._byPosition.delete(this._posKey(task.x, task.y));
-            task.x = x;
-            task.y = y;
-            this._byPosition.set(this._posKey(x, y), task);
-        }
+    // Accepts a task object or a task id. Moves only that task's index entry.
+    updatePosition(taskOrId, x, y) {
+        const task = typeof taskOrId === 'object' ? this._byId.get(taskOrId?.id) : this._byId.get(taskOrId);
+        if (!task || (task.x === x && task.y === y)) return;
+        this._indexRemove(task);
+        const holdsStation = this._busyStations.get(this._posKey(task.x, task.y)) === task.id;
+        if (holdsStation) this._busyStations.delete(this._posKey(task.x, task.y));
+        task.x = x;
+        task.y = y;
+        this._indexAdd(task);
+        if (holdsStation) this._busyStations.set(this._posKey(x, y), task.id);
     }
 }

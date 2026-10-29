@@ -19,12 +19,17 @@ const CLIENT_ID = '169773847895-lf82014dhkmiuqai9vdcv54r46q96nag.apps.googleuser
 const TOKEN_PROXY = 'https://rifthold-oauth.jurbanics.workers.dev/token';
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const TOKEN_KEY = 'gdrive_tokens';
+const AUTH_TIMEOUT_MS = 5 * 60 * 1000;
 
 // PKCE helpers
-async function _pkceChallenge() {
-    const array = new Uint8Array(32);
+function _randomBase64Url(bytes) {
+    const array = new Uint8Array(bytes);
     crypto.getRandomValues(array);
-    const verifier = btoa(String.fromCharCode(...array)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    return btoa(String.fromCharCode(...array)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function _pkceChallenge() {
+    const verifier = _randomBase64Url(32);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
     const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     return { verifier, challenge };
@@ -69,12 +74,28 @@ async function _driveRequest(method, url, opts = {}) {
     return fetch(url, { method, headers: { 'Authorization': `Bearer ${token}`, ...opts.headers }, body: opts.body });
 }
 
+// Resolves to the file ID, or null only when Drive reports no such file.
+// HTTP errors throw, so a failed lookup never reads as "not found" (which
+// would make cloudWrite create a duplicate file).
 async function _findFileId(filename) {
-    const q = encodeURIComponent(`name='${filename}' and trashed=false`);
+    const escaped = String(filename).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const q = encodeURIComponent(`name='${escaped}' and trashed=false`);
     const resp = await _driveRequest('GET', `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id)`);
-    if (!resp.ok) return null;
+    if (!resp.ok) throw new Error(`File lookup failed: ${resp.status}`);
     const data = await resp.json();
     return data.files?.[0]?.id || null;
+}
+
+// Per-filename queue so overlapping writes/deletes of one file run in order
+// instead of racing the lookup-then-create step.
+const _fileQueues = new Map();
+
+function _enqueue(filename, task) {
+    const prev = _fileQueues.get(filename) || Promise.resolve();
+    const next = prev.then(task, task);
+    _fileQueues.set(filename, next);
+    next.finally(() => { if (_fileQueues.get(filename) === next) _fileQueues.delete(filename); });
+    return next;
 }
 
 export async function cloudRead(filename) {
@@ -86,7 +107,11 @@ export async function cloudRead(filename) {
     } catch { return null; }
 }
 
-export async function cloudWrite(filename, data) {
+export function cloudWrite(filename, data) {
+    return _enqueue(filename, () => _cloudWrite(filename, data));
+}
+
+async function _cloudWrite(filename, data) {
     try {
         const token = await _getAccessToken();
         const fileId = await _findFileId(filename);
@@ -96,23 +121,26 @@ export async function cloudWrite(filename, data) {
         const url = fileId
             ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
             : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
-        await fetch(url, {
+        const resp = await fetch(url, {
             method: fileId ? 'PATCH' : 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': `multipart/related; boundary="${boundary}"` },
             body,
         });
+        if (!resp.ok) console.error('[GDrive web] cloudWrite error:', resp.status);
     } catch (e) {
         console.error('[GDrive web] cloudWrite error:', e.message);
     }
 }
 
-export async function cloudDelete(filename) {
-    try {
-        const fileId = await _findFileId(filename);
-        if (fileId) await _driveRequest('DELETE', `https://www.googleapis.com/drive/v3/files/${fileId}`);
-    } catch (e) {
-        console.error('[GDrive web] cloudDelete error:', e.message);
-    }
+export function cloudDelete(filename) {
+    return _enqueue(filename, async () => {
+        try {
+            const fileId = await _findFileId(filename);
+            if (fileId) await _driveRequest('DELETE', `https://www.googleapis.com/drive/v3/files/${fileId}`);
+        } catch (e) {
+            console.error('[GDrive web] cloudDelete error:', e.message);
+        }
+    });
 }
 
 export async function cloudList() {
@@ -129,77 +157,89 @@ export function enabled() {
     return Promise.resolve(!!(tokens && tokens.refresh_token));
 }
 
-export function beginAuth() {
-    return new Promise(async (resolve, reject) => {
-        const { verifier, challenge } = await _pkceChallenge();
-        const redirectUri = new URL('oauth-callback.html', location.href).href;
-        const authUrl = new URL('https://accounts.google.com/o/oauth2/auth');
-        authUrl.searchParams.set('client_id', CLIENT_ID);
-        authUrl.searchParams.set('redirect_uri', redirectUri);
-        authUrl.searchParams.set('response_type', 'code');
-        authUrl.searchParams.set('scope', SCOPE);
-        authUrl.searchParams.set('access_type', 'offline');
-        authUrl.searchParams.set('prompt', 'consent');
-        authUrl.searchParams.set('code_challenge', challenge);
-        authUrl.searchParams.set('code_challenge_method', 'S256');
+// Popup PKCE flow with a `state` check. Always settles: on success, on an
+// error/denial, when the popup is blocked or closed, or after AUTH_TIMEOUT_MS.
+export async function beginAuth() {
+    if (!globalThis.crypto?.subtle) {
+        throw new Error('Google sign-in needs a secure (https) page');
+    }
+    const { verifier, challenge } = await _pkceChallenge();
+    const state = _randomBase64Url(16);
+    const redirectUri = new URL('oauth-callback.html', location.href).href;
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/auth');
+    authUrl.searchParams.set('client_id', CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', SCOPE);
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('prompt', 'consent');
+    authUrl.searchParams.set('code_challenge', challenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
+    authUrl.searchParams.set('state', state);
 
-        const popup = window.open(authUrl.toString(), 'gdrive_auth', 'width=520,height=620,menubar=no,toolbar=no,location=yes');
+    const popup = window.open(authUrl.toString(), 'gdrive_auth', 'width=520,height=620,menubar=no,toolbar=no,location=yes');
+    if (!popup) throw new Error('Popup blocked. Allow popups for this site and try again.');
 
-        let resolved = false;
-        function done(qs) {
-            if (resolved) return;
-            resolved = true;
-            ch.close();
+    const qs = await new Promise((resolve, reject) => {
+        let ch = null;
+        let finished = false;
+        function finish(err, value) {
+            if (finished) return;
+            finished = true;
+            if (ch) ch.close();
             clearInterval(pollTimer);
-            const params = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs);
-            const code = params.get('code');
-            if (!code) { reject(new Error('No auth code')); return; }
-            fetch(TOKEN_PROXY, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    code,
-                    client_id: CLIENT_ID,
-                    redirect_uri: redirectUri,
-                    grant_type: 'authorization_code',
-                    code_verifier: verifier,
-                }),
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (!data.access_token) throw new Error(data.error || 'Token exchange failed');
-                _saveTokens({
-                    access_token: data.access_token,
-                    refresh_token: data.refresh_token || null,
-                    expiry_date: Date.now() + (data.expires_in - 60) * 1000,
-                });
-                resolve(true);
-            })
-            .catch(reject);
+            clearTimeout(timeoutTimer);
+            window.removeEventListener('message', onMessage);
+            if (err) reject(err); else resolve(value);
         }
-
-        const ch = new BroadcastChannel('rifthold_gdrive_auth');
-        ch.addEventListener('message', e => done(e.data));
-
-        // Also handle same-origin postMessage fallback from the callback page
+        // Messages whose state doesn't match are ignored (stale tab or forged
+        // callback), so the flow keeps waiting for the real one.
+        function onResult(raw) {
+            if (typeof raw !== 'string') return;
+            const params = new URLSearchParams(raw.startsWith('?') ? raw.slice(1) : raw);
+            if (params.get('state') !== state) return;
+            finish(null, params);
+        }
         function onMessage(e) {
             if (e.origin !== location.origin || !e.data?.riftholdGdriveAuth) return;
-            window.removeEventListener('message', onMessage);
-            done(e.data.riftholdGdriveAuth);
+            onResult(e.data.riftholdGdriveAuth);
         }
+
+        try {
+            ch = new BroadcastChannel('rifthold_gdrive_auth');
+            ch.addEventListener('message', e => onResult(e.data));
+        } catch { /* BroadcastChannel unavailable; postMessage fallback below */ }
+        // Also handle same-origin postMessage fallback from the callback page
         window.addEventListener('message', onMessage);
 
         // Detect popup closed without completing auth
         const pollTimer = setInterval(() => {
-            if (!resolved && popup && popup.closed) {
-                resolved = true;
-                ch.close();
-                clearInterval(pollTimer);
-                window.removeEventListener('message', onMessage);
-                reject(new Error('Popup closed'));
-            }
+            if (popup.closed) finish(new Error('Popup closed'));
         }, 500);
+        const timeoutTimer = setTimeout(() => finish(new Error('Google sign-in timed out')), AUTH_TIMEOUT_MS);
     });
+
+    const code = qs.get('code');
+    if (!code) throw new Error(qs.get('error') || 'No auth code');
+    const resp = await fetch(TOKEN_PROXY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            code,
+            client_id: CLIENT_ID,
+            redirect_uri: redirectUri,
+            grant_type: 'authorization_code',
+            code_verifier: verifier,
+        }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.access_token) throw new Error(data.error || 'Token exchange failed');
+    _saveTokens({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token || null,
+        expiry_date: Date.now() + (data.expires_in - 60) * 1000,
+    });
+    return true;
 }
 
 export async function revoke() {

@@ -3,7 +3,7 @@ import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFI
     EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
     EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
     FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG, ANIMAL_XP_CONFIG,
-    REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS,
+    REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS, CRYPT_CONFIG,
 } from '../core/config.js';
 import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit, addThought } from '../entities/colonist.js';
 import { checkHearthShrineMilestones } from '../entities/waves.js';
@@ -95,11 +95,30 @@ export class ExplorationSystem {
         return this._isRealmDemoLocked(game, REALMS[realmKey]);
     }
 
+    /**
+     * Whether a realm's chain is open on a map with no crypt anchor for it (saves from
+     * before anchors, which launch from the Rift Gate). Normally the chain's crypt ward
+     * orders the chains; without an anchor, a chain with no research gate instead needs
+     * the boss of the chain its ward is bound to cleared.
+     *
+     * @param {object} game Game instance.
+     * @param {object} dim Realm definition from REALMS.
+     * @return {boolean} True if the chain is open.
+     */
+    _chainOpen(game, dim) {
+        if (dim.research || game.ruins.getAnchor(dim.chain)) return true;
+        const prevChain = CRYPT_CONFIG.wardedBy[dim.chain];
+        if (!prevChain) return true;
+        const boss = Object.keys(REALMS).find(k => REALMS[k].chain === prevChain && REALMS[k].boss);
+        return !boss || this.completedRealms.has(boss);
+    }
+
     canSend(game, realmKey) {
         const dim = REALMS[realmKey];
         if (!dim) return false;
         if (this._isRealmDemoLocked(game, dim)) return false;
         if (dim.research && !game.research.isResearched(dim.research)) return false;
+        if (!this._chainOpen(game, dim)) return false;
         if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) return false;
         if (dim.scoutingMode) return true;
         if (!game.power || !game.power.powered) return false;
@@ -114,6 +133,7 @@ export class ExplorationSystem {
         for (const [key, dim] of Object.entries(REALMS)) {
             if (this._isRealmDemoLocked(game, dim)) continue;
             if (dim.research && !game.research.isResearched(dim.research)) continue;
+            if (!this._chainOpen(game, dim)) continue;
             if (dim.requiresRealm && !this.completedRealms.has(dim.requiresRealm)) continue;
             if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) continue;
             results.push({ key, ...dim });
@@ -193,7 +213,7 @@ export class ExplorationSystem {
         const packAnimals = [];
         for (const id of cappedPacks) {
             const a = game.entities.find(e => e.id === id && e.tamed);
-            if (!a || a.hp <= 0) continue;
+            if (!a || a.hp <= 0 || a.onExpedition) continue;
             const packRole = a.roles && a.roles.find(r => r.type === 'pack');
             if (packRole) {
                 const baseSpeed = packRole.expeditionSpeedBonus || 0.25;
@@ -258,6 +278,9 @@ export class ExplorationSystem {
             duration = Math.max(Math.floor(duration * (1 - totalSpeedBonus)), Math.floor(duration * 0.5));
         }
         let durationMult = 1.0;
+        // Consumable trinkets crumble at launch, but their expedition effects (e.g.
+        // a Map Fragment's lootMult) still apply for the whole run. Keyed by colonist id.
+        const consumedItems = {};
         for (const c of party) {
             // Trait-based duration (e.g. Trailblazer). The expedition object doesn't
             // exist yet, so scan the party directly like the equipment loop below.
@@ -268,7 +291,9 @@ export class ExplorationSystem {
             for (const item of getEquippedItems(c)) {
                 if (item.expedition?.durationMult) durationMult *= item.expedition.durationMult;
                 if (item.consumable) {
-                    game.resources.removeTrinket(item.key);
+                    // The equipped copy is the one consumed. It lives on the colonist,
+                    // not in the store, so no store copy is removed.
+                    (consumedItems[c.id] ||= []).push(item);
                     c.trinket = null;
                     invalidateEquipStatCache(c);
                     game.eventLog.add(game, `${c.name}'s ${item.name} crumbles to dust as the expedition begins`, 'event', null);
@@ -314,6 +339,9 @@ export class ExplorationSystem {
             warBeasts,
             partySnapshot: [],
             gatePos,
+            gatherStartTick: game.tick,
+            consumedItems,
+            enemyStatMults: computeEnemyStatMults(diffSettings, mutators, this.activeRealmEvents, realmKey),
             startTick: null,
             duration,
             encounters,
@@ -497,6 +525,11 @@ export class ExplorationSystem {
 
     retreatExpedition(game, expId) {
         const exp = this.expeditions.find(e => e.id === expId);
+        if (exp?.status === 'gathering') {
+            this._cancelGathering(exp, game, 'recalled before departure');
+            this.expeditions = this.expeditions.filter(e => e !== exp);
+            return true;
+        }
         if (!exp || exp.status !== 'exploring') return false;
         exp.status = 'returning';
         exp.manualRetreat = true;
@@ -559,7 +592,11 @@ export class ExplorationSystem {
         exp.pendingDecision = null;
         this._applyDecisionEffects(exp, game, choice.effects || {}, decision.encounterIndex);
         exp.summary.decisionsCount++;
-        this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerDecision);
+        if (!exp.xpAwardedDecisions) exp.xpAwardedDecisions = [];
+        if (!exp.xpAwardedDecisions.includes(decision.encounterIndex)) {
+            exp.xpAwardedDecisions.push(decision.encounterIndex);
+            this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerDecision);
+        }
 
         if (!exp.pendingDecision && !exp.combat) {
             if (exp.nodeMap) {
@@ -989,12 +1026,126 @@ export class ExplorationSystem {
         window.soundManager?.playExpSFX('colonist_death');
     }
 
+    // Snapshot of one departing colonist: the combat-relevant state the expedition
+    // simulation reads instead of the live colonist. Consumable trinkets crumble at
+    // launch, so they ride along in `consumedItems` for their expedition effects only.
+    _buildSnapshotMember(exp, c) {
+        const baseCd = (c.weapon && c.weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
+        const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
+        const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
+        return {
+            id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp, raceKey: c.race,
+            // Snapshot this colonist's opinions of the others so party
+            // synergies (friend/lover boost, rival penalty) can be computed
+            // during combat without live colonist access. Shallow copy so a
+            // mid-expedition opinion shift doesn't retroactively change it.
+            opinions: { ...(c.opinions || {}) },
+            bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor,
+            golem: c.golem, golemType: c.golemType,
+            weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
+            boots: c.boots,
+            trinket: c.trinketBroken ? null : c.trinket,
+            traits: c.traits || [],
+            // Only spells from attuned schools (and not manually disabled) are
+            // usable on expeditions, matching in-world autocast behavior.
+            knownSpells: (c.knownSpells || []).filter(s =>
+                (!c.disabledSpells || !c.disabledSpells.includes(s)) &&
+                isSpellAttuned(c, SPELLS[s])),
+            magicSkills: { ...(c.magicSkills || {}) },
+            mana: c.mana || 0,
+            maxMana: c.maxMana || 0,
+            spellCooldowns: {},
+            spellDamageBonus: getEquipmentStat(c, 'spellDamageBonus'),
+            schoolBonuses: buildSchoolBonuses(c),
+            spellHealBonus: getEquipmentStat(c, 'spellHealBonus'),
+            manaRegen: getEquipmentStat(c, 'manaRegen'),
+            spellCostReduction: getEquipmentStat(c, 'spellCostReduction'),
+            spellCooldownReduction: getEquipmentStat(c, 'spellCooldownReduction'),
+            healthRegen: getEquipmentStat(c, 'healthRegen'),
+            attackCooldown: baseCd,
+            effectiveCooldown: effCd,
+            // Attack-animation speed: ratio of this fighter's effective
+            // cooldown to the baseline. <1 for fast weapons (quick, snappy
+            // motion), >1 for slow/heavy ones. The visual clamps it.
+            _atkAnimMult: effCd / COLONIST_CONFIG.baseAttackCooldown,
+            // Basic-attack motion class ('Swing' | 'Stab' | 'DrawAndShoot').
+            attackAnim: (c.weapon && c.weapon.attackAnim) || (c.weapon && c.weapon.ranged ? 'DrawAndShoot' : 'Swing'),
+            shieldActive: false,
+            shieldReduction: 0,
+            dodgeCharges: 0,
+            chaosResistance: getEquipmentStat(c, 'chaosResistance'),
+            consumedItems: exp.consumedItems?.[c.id] || [],
+        };
+    }
+
+    // Living party members only: a colonist who died while walking to the gate
+    // must not ride along (and be revived at 1 HP on return).
+    _buildPartySnapshot(exp, game) {
+        return exp.partyIds
+            .map(id => game.getColonist(id))
+            .filter(c => c && c.hp > 0)
+            .map(c => this._buildSnapshotMember(exp, c));
+    }
+
+    // Drop a member who never left: clear the pending flags and the expedition
+    // walk so they return to normal colony work, in their Colony gear. A member
+    // who died on the way keeps the 'dead' state.
+    _dropGatheringMember(exp, game, c) {
+        exp.partyIds = exp.partyIds.filter(id => id !== c.id);
+        delete c.expeditionPending;
+        const wasWalking = !!c._expeditionMove;
+        delete c._expeditionMove;
+        if (c.hp <= 0 || c.state === 'dead') return;
+        if (wasWalking) {
+            c.path = [];
+            c.state = 'idle';
+        }
+        if (c.equipmentSets?.Colony && c.activeSet !== 'Colony') {
+            game.switchEquipmentSet(c.id, 'Colony');
+        }
+    }
+
+    // Abort an expedition that never left: release everyone (arrived members step
+    // back out of the gate), free the animals and return the potions. Consumable
+    // trinkets already crumbled at launch and are not refunded.
+    _cancelGathering(exp, game, reason) {
+        for (const id of exp.partyIds) {
+            const c = game.getColonist(id);
+            if (!c) continue;
+            if (c.onExpedition) {
+                c.onExpedition = false;
+                if (c.hp > 0 && c.state !== 'dead') {
+                    c.state = 'idle';
+                    c.path = [];
+                }
+            }
+            this._dropGatheringMember(exp, game, c);
+        }
+        for (const a of [...(exp.packAnimals || []), ...(exp.warBeasts || [])]) {
+            const animal = game.entities.find(e => e.id === a.id);
+            if (animal) animal.onExpedition = false;
+        }
+        this._returnPotions(exp, game);
+        exp.potionSupply = {};
+        exp.status = 'complete';
+        game.eventLog.add(game, `Expedition to ${exp.realmName} called off: ${reason}`, 'warning', null);
+    }
+
+    _returnPotions(exp, game) {
+        if (!exp.potionSupply) return;
+        for (const [potionKey, count] of Object.entries(exp.potionSupply)) {
+            const def = EXPEDITION_POTIONS[potionKey];
+            const resource = def?.resource || potionKey;
+            for (let i = 0; i < count; i++) game.resources.addPotion({ key: resource, type: resource, name: def?.name || potionKey });
+        }
+    }
+
     _updateGathering(exp, game) {
         // Scouting expeditions have no gate. Colonists depart immediately.
         if (!exp.gatePos) {
             for (const id of exp.partyIds) {
                 const c = game.getColonist(id);
-                if (c && !c.onExpedition) {
+                if (c && c.hp > 0 && !c.onExpedition) {
                     c.hp = c.maxHp;
                     if (c.maxMana) c.mana = c.maxMana;
                     c.onExpedition = true;
@@ -1007,74 +1158,41 @@ export class ExplorationSystem {
             exp.status = 'exploring';
             exp.startTick = game.tick;
             exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
-            exp.partySnapshot = exp.partyIds.map(id => {
-                const c = game.getColonist(id);
-                if (!c) return null;
-                const baseCd = (c.weapon && c.weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
-                const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
-                const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
-                return {
-                    id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp, raceKey: c.race,
-                    opinions: { ...(c.opinions || {}) },
-                    bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor,
-                    golem: c.golem, golemType: c.golemType,
-                    weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
-                    boots: c.boots,
-                    trinket: c.trinketBroken ? null : c.trinket,
-                    traits: c.traits || [],
-                    knownSpells: (c.knownSpells || []).filter(s =>
-                        (!c.disabledSpells || !c.disabledSpells.includes(s)) &&
-                        isSpellAttuned(c, SPELLS[s])),
-                    magicSkills: { ...(c.magicSkills || {}) },
-                    mana: c.mana || 0,
-                    maxMana: c.maxMana || 0,
-                    spellCooldowns: {},
-                    spellDamageBonus: getEquipmentStat(c, 'spellDamageBonus'),
-                    schoolBonuses: buildSchoolBonuses(c),
-                    spellHealBonus: getEquipmentStat(c, 'spellHealBonus'),
-                    manaRegen: getEquipmentStat(c, 'manaRegen'),
-                    spellCostReduction: getEquipmentStat(c, 'spellCostReduction'),
-                    spellCooldownReduction: getEquipmentStat(c, 'spellCooldownReduction'),
-                    healthRegen: getEquipmentStat(c, 'healthRegen'),
-                    attackCooldown: baseCd,
-                    effectiveCooldown: effCd,
-                    _atkAnimMult: effCd / COLONIST_CONFIG.baseAttackCooldown,
-                    attackAnim: (c.weapon && c.weapon.attackAnim) || (c.weapon && c.weapon.ranged ? 'DrawAndShoot' : 'Swing'),
-                    shieldActive: false,
-                    shieldReduction: 0,
-                    dodgeCharges: 0,
-                    chaosResistance: getEquipmentStat(c, 'chaosResistance'),
-                };
-            }).filter(Boolean);
+            exp.partySnapshot = this._buildPartySnapshot(exp, game);
             this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
             game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
             return;
         }
         const gx = exp.gatePos.x;
         const gy = exp.gatePos.y;
+        if (exp.gatherStartTick == null) exp.gatherStartTick = game.tick;
+        // Members who can't reach the gate (walled off, path blocked) would hold the
+        // party here forever. After the timeout the party leaves without them.
+        const timedOut = game.tick - exp.gatherStartTick >= EXPLORATION_CONFIG.gatherTimeoutTicks;
         let allArrived = true;
 
-        for (const id of exp.partyIds) {
+        for (const id of [...exp.partyIds]) {
             const c = game.getColonist(id);
             if (!c || c.hp <= 0) {
-                // Colonist died or was removed during gathering. Clear the pending flag
-                // so they aren't permanently locked out of future tasks.
-                if (c) { delete c.expeditionPending; delete c._expeditionMove; }
+                // Colonist died or was removed during gathering. Drop them from the
+                // party and clear the pending flag so they aren't permanently locked
+                // out of future tasks.
+                if (c) { c.onExpedition = false; this._dropGatheringMember(exp, game, c); }
+                else exp.partyIds = exp.partyIds.filter(pid => pid !== id);
                 continue;
             }
             if (c.onExpedition) continue;
 
             const dist = manhattanDist(c.x, c.y, gx, gy);
             if (dist <= 1) {
-                if (!c.onExpedition) {
-                    c.hp = c.maxHp;
-                    if (c.maxMana) c.mana = c.maxMana;
-                    c.onExpedition = true;
-                    c.state = 'idle';
-                    c.path = [];
-                    delete c._expeditionMove;
-                    delete c.expeditionPending;
-                }
+                c.onExpedition = true;
+                c.state = 'idle';
+                c.path = [];
+                delete c._expeditionMove;
+                delete c.expeditionPending;
+            } else if (timedOut) {
+                this._addLog(exp, game, `${c.name} couldn't reach the rift and stays behind.`, 'danger');
+                this._dropGatheringMember(exp, game, c);
             } else {
                 allArrived = false;
                 if (c.state === 'idle' || (c.state === 'moving' && (!c.path || c.path.length === 0))) {
@@ -1088,59 +1206,24 @@ export class ExplorationSystem {
             }
         }
 
+        if (exp.partyIds.length === 0) {
+            this._cancelGathering(exp, game, 'no one reached the rift');
+            return;
+        }
+
         if (allArrived) {
+            // Heal at departure rather than on arrival, so a cancelled gathering
+            // can't be used as a free full heal.
+            for (const id of exp.partyIds) {
+                const c = game.getColonist(id);
+                if (!c) continue;
+                c.hp = c.maxHp;
+                if (c.maxMana) c.mana = c.maxMana;
+            }
             exp.status = 'exploring';
             exp.startTick = game.tick;
             exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
-            exp.partySnapshot = exp.partyIds.map(id => {
-                const c = game.getColonist(id);
-                if (!c) return null;
-                const baseCd = (c.weapon && c.weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
-                const atkSpeed = 1 + getEquipmentStat(c, 'attackSpeed');
-                const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
-                return {
-                    id: c.id, name: c.name, hp: c.hp, maxHp: c.maxHp, raceKey: c.race,
-                    // Snapshot this colonist's opinions of the others so party
-                    // synergies (friend/lover boost, rival penalty) can be computed
-                    // during combat without live colonist access. Shallow copy so a
-                    // mid-expedition opinion shift doesn't retroactively change it.
-                    opinions: { ...(c.opinions || {}) },
-                    bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor,
-                    golem: c.golem, golemType: c.golemType,
-                    weapon: c.weapon, armor: c.armor, helmet: c.helmet, clothes: c.clothes, tool: c.tool,
-                    boots: c.boots,
-                    trinket: c.trinketBroken ? null : c.trinket,
-                    traits: c.traits || [],
-                    // Only spells from attuned schools (and not manually disabled) are
-                    // usable on expeditions, matching in-world autocast behavior.
-                    knownSpells: (c.knownSpells || []).filter(s =>
-                        (!c.disabledSpells || !c.disabledSpells.includes(s)) &&
-                        isSpellAttuned(c, SPELLS[s])),
-                    magicSkills: { ...(c.magicSkills || {}) },
-                    mana: c.mana || 0,
-                    maxMana: c.maxMana || 0,
-                    spellCooldowns: {},
-                    spellDamageBonus: getEquipmentStat(c, 'spellDamageBonus'),
-                    schoolBonuses: buildSchoolBonuses(c),
-                    spellHealBonus: getEquipmentStat(c, 'spellHealBonus'),
-                    manaRegen: getEquipmentStat(c, 'manaRegen'),
-                    spellCostReduction: getEquipmentStat(c, 'spellCostReduction'),
-                    spellCooldownReduction: getEquipmentStat(c, 'spellCooldownReduction'),
-                    healthRegen: getEquipmentStat(c, 'healthRegen'),
-                    attackCooldown: baseCd,
-                    effectiveCooldown: effCd,
-                    // Attack-animation speed: ratio of this fighter's effective
-                    // cooldown to the baseline. <1 for fast weapons (quick, snappy
-                    // motion), >1 for slow/heavy ones. The visual clamps it.
-                    _atkAnimMult: effCd / COLONIST_CONFIG.baseAttackCooldown,
-                    // Basic-attack motion class ('Swing' | 'Stab' | 'DrawAndShoot').
-                    attackAnim: (c.weapon && c.weapon.attackAnim) || (c.weapon && c.weapon.ranged ? 'DrawAndShoot' : 'Swing'),
-                    shieldActive: false,
-                    shieldReduction: 0,
-                    dodgeCharges: 0,
-                    chaosResistance: getEquipmentStat(c, 'chaosResistance'),
-                };
-            }).filter(Boolean);
+            exp.partySnapshot = this._buildPartySnapshot(exp, game);
             this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
             game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
             exp.lastMicroEventTick = game.tick;
@@ -1157,20 +1240,7 @@ export class ExplorationSystem {
         const encounters = [];
         const totalEncounters = dim.encounters + (diffSettings.extraEncounters || 0);
 
-        let mutEnemyHpMult = 1.0;
-        let mutEnemyDmgMult = 1.0;
-        for (const mutKey of mutators) {
-            const mut = EXPEDITION_MUTATORS[mutKey];
-            if (mut?.effects?.enemyHpMult) mutEnemyHpMult *= mut.effects.enemyHpMult;
-            if (mut?.effects?.enemyDmgMult) mutEnemyDmgMult *= mut.effects.enemyDmgMult;
-        }
-        for (const event of this.activeRealmEvents) {
-            if (!event.realms?.includes(realmKey)) continue;
-            if (event.effects?.enemyHpMult) mutEnemyHpMult *= event.effects.enemyHpMult;
-            if (event.effects?.enemyDmgMult) mutEnemyDmgMult *= event.effects.enemyDmgMult;
-        }
-        const hpMult = diffSettings.enemyHpMult * mutEnemyHpMult;
-        const dmgMult = diffSettings.enemyDmgMult * mutEnemyDmgMult;
+        const { hp: hpMult, dmg: dmgMult } = computeEnemyStatMults(diffSettings, mutators, this.activeRealmEvents, realmKey);
 
         const decisionKeys = Object.keys(EXPEDITION_DECISIONS);
         const puzzleKeys = Object.keys(PUZZLE_ENCOUNTERS).filter(k => {
@@ -1360,10 +1430,15 @@ export class ExplorationSystem {
 
     // Returns every available mask (all realm bosses except the Unraveler itself),
     // used both for the initial disguise phases and for mid-fight chaos swaps.
+    // Built once per game (REALMS is fixed after mod load) since mask swaps roll
+    // every round. Returns a fresh array; callers copy abilities before use.
     _buildAllMasks() {
-        return Object.entries(REALMS)
-            .filter(([, r]) => r.boss && !r.boss.dynamicMasks && Array.isArray(r.boss.phases) && r.boss.phases.length > 0)
-            .map(([, r]) => this._buildBossMask(r.boss.name, r.boss));
+        if (!this._allMasksCache) {
+            this._allMasksCache = Object.entries(REALMS)
+                .filter(([, r]) => r.boss && !r.boss.dynamicMasks && Array.isArray(r.boss.phases) && r.boss.phases.length > 0)
+                .map(([, r]) => this._buildBossMask(r.boss.name, r.boss));
+        }
+        return this._allMasksCache.slice();
     }
 
     // Generates the Unraveler's phase list at spawn: (maxPhases - 1) buffed masks of
@@ -1407,7 +1482,7 @@ export class ExplorationSystem {
                 damageReduction: slot.damageReduction || 0,
                 color: mask ? mask.color : slot.color,
                 sprite: mask ? mask.sprite : slot.sprite,
-                abilities: mask ? mask.abilities : (slot.abilities || []),
+                abilities: mask ? mask.abilities.map(a => ({ ...a })) : (slot.abilities || []),
                 autoChaosTick: slot.autoChaosTick || false,
                 transitionText: isLastMask
                     ? 'The borrowed faces slough away all at once. What is left underneath wears nothing but itself.'
@@ -1456,7 +1531,7 @@ export class ExplorationSystem {
             const xpRareMult = exp.partySnapshot.reduce((best, m) => Math.max(best, this._getXpLevelBonus(m.id, 'rareEncounterMult')), 1);
             const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult', exp.realm) * (exp.potionLootBoosts?.rareEncounterMult || 1) * xpRareMult;
             for (const rare of dimEvents.rare) {
-                if (Math.random() < rare.chance * rareEncounterMult * ds.rareLootMult) {
+                if (Math.random() < rare.chance * rareEncounterMult * ds.rareLootMult * this._getMutatorEffect(exp, 'rareLootMult')) {
                     const msg = rare.text.replace('{name}', member.name);
                     if (rare.loot.item) {
                         if (!exp.loot._items) exp.loot._items = [];
@@ -1464,7 +1539,7 @@ export class ExplorationSystem {
                         const itemName = ALL_ITEMS[rare.loot.item]?.name || rare.loot.item;
                         this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: rare.loot.item });
                     } else {
-                        const amount = Math.round(randInt(rare.loot.amount[0], rare.loot.amount[1]) * ds.lootAmountMult);
+                        const amount = Math.round(randInt(rare.loot.amount[0], rare.loot.amount[1]) * ds.lootAmountMult * this._realmResourceMult(exp, rare.loot.resource));
                         exp.loot[rare.loot.resource] = (exp.loot[rare.loot.resource] || 0) + amount;
                         this._addLog(exp, game, `${msg} (+${amount} ${rare.loot.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: rare.loot.resource });
                     }
@@ -1502,7 +1577,7 @@ export class ExplorationSystem {
                     const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
                     this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: lootEntry.item });
                 } else {
-                    const boostedAmount = Math.floor(lootEntry.amount * lootMult);
+                    const boostedAmount = Math.floor(lootEntry.amount * lootMult * this._realmResourceMult(exp, lootEntry.resource));
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + boostedAmount;
                     this._addLog(exp, game, `${msg} (+${boostedAmount} ${lootEntry.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: lootEntry.resource });
                 }
@@ -1533,8 +1608,14 @@ export class ExplorationSystem {
             if (node) node.current = true;
         }
 
-        this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerEncounter);
-        this._awardAnimalExpeditionXP(exp, ANIMAL_XP_CONFIG.xpPerCombatEncounter);
+        // XP once per encounter: a portal loop-back replays the same encounter.
+        const encKey = encounter.isBoss ? 'boss' : exp.currentEncounter;
+        if (!exp.xpAwardedEncounters) exp.xpAwardedEncounters = [];
+        if (!exp.xpAwardedEncounters.includes(encKey)) {
+            exp.xpAwardedEncounters.push(encKey);
+            this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerEncounter);
+            this._awardAnimalExpeditionXP(exp, ANIMAL_XP_CONFIG.xpPerCombatEncounter);
+        }
 
         // Scout (Adventurer Lv3): any member with this ability previews what lies ahead.
         const hasScout = exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 3);
@@ -1594,7 +1675,7 @@ export class ExplorationSystem {
                 this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: encounter.item });
             } else {
                 const streakMult = exp.streakMultiplier || 1.0;
-                const amount = Math.floor(encounter.amount * streakMult);
+                const amount = Math.floor(encounter.amount * streakMult * this._realmResourceMult(exp, encounter.resource));
                 exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + amount;
                 this._addLog(exp, game, `${msg} (+${amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: encounter.resource });
             }
@@ -1769,12 +1850,34 @@ export class ExplorationSystem {
             return;
         }
 
+        // Combat runs per tick (everyone acts on their own attack cooldown), but
+        // round-scoped effects advance once per combat round: one baseline attack
+        // cycle of EXPLORATION_CONFIG.combatRoundTicks. The first round starts on the
+        // first update; each later boundary bumps combat.round.
+        let roundStart = false;
+        if (combat.nextRoundTick == null) {
+            combat.nextRoundTick = game.tick + EXPLORATION_CONFIG.combatRoundTicks;
+        } else if (game.tick >= combat.nextRoundTick) {
+            roundStart = true;
+            combat.round++;
+            combat.nextRoundTick = game.tick + EXPLORATION_CONFIG.combatRoundTicks;
+        }
+
         // Apply DoTs and age out status effects at the top of the round, then
         // re-check for a wipe (poison can be lethal) before anyone acts.
-        this._tickCombatStatus(exp, game, combat);
-        if (exp.partySnapshot.every(p => p.hp <= 0) || combat.enemies.every(e => e.hp <= 0)) {
-            this._finishCombat(exp, game);
-            return;
+        if (roundStart) {
+            this._tickCombatStatus(exp, game, combat);
+            // Realm-event downside (e.g. Verdant Bloom): enemies regenerate each round.
+            const regenPerRound = this._getRealmEventEffect(exp, 'enemyRegenPerRound');
+            if (regenPerRound > 0) {
+                for (const e of combat.enemies) {
+                    if (e.hp > 0 && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + Math.max(1, Math.floor(e.maxHp * regenPerRound)));
+                }
+            }
+            if (exp.partySnapshot.every(p => p.hp <= 0) || combat.enemies.every(e => e.hp <= 0)) {
+                this._finishCombat(exp, game);
+                return;
+            }
         }
 
         this._tryUsePotions(exp, game);
@@ -1792,20 +1895,6 @@ export class ExplorationSystem {
         // -- Party attack phase --
         for (const member of alive) {
             if (member.hp <= 0) continue;
-            // Enemy-applied crowd control on the party (framework): a stunned member
-            // can't attack this round. A slowed one may lose its turn. Weaken scales
-            // its outgoing damage.
-            if (this._hasCombatStatus(member, 'stun')) {
-                this._addLog(exp, game, `${member.name} is stunned and cannot attack!`, 'danger');
-                continue;
-            }
-            if (this._hasCombatStatus(member, 'slow')) {
-                const slowMult = this._combatStatusValue(member, 'slow', 'mult', 0.5);
-                if (Math.random() > slowMult) {
-                    this._addLog(exp, game, `${member.name} is slowed and loses their turn!`, 'danger');
-                    continue;
-                }
-            }
             const memberWeaken = this._combatStatusValue(member, 'weaken', 'mult', 1);
             const disabled = member._disabledSlots || {};
             let weaponDmg = (member.weapon && !disabled.weapon) ? member.weapon.damage : EXPLORATION_CONFIG.baseFistDamage;
@@ -1819,6 +1908,13 @@ export class ExplorationSystem {
             const effCd = Math.max(1, Math.round(member.effectiveCooldown / atkSpeedBuff));
             if (game.tick < (member._nextAttackTick || 0)) continue;
             member._nextAttackTick = game.tick + effCd;
+            // Enemy-applied crowd control on the party (framework), checked on the
+            // member's own turn: a stunned member forfeits it, a slowed one may.
+            // Weaken scales its outgoing damage.
+            if (this._loseTurnToCrowdControl(member)) {
+                this._addLog(exp, game, `${member.name} ${member._lostTurnTo === 'stun' ? 'is stunned and cannot attack' : 'is slowed and loses their turn'}!`, 'danger');
+                continue;
+            }
             const isRanged = member.weapon && member.weapon.ranged;
             const formDmgMult = isRanged ? 1.0 : this._applyFormationModifier(exp, member.id, 'meleeDamageMult');
             const xpDmgMult = this._getXpLevelBonus(member.id, 'expeditionDamageMult');
@@ -1848,7 +1944,12 @@ export class ExplorationSystem {
             const voidBlessedBonus = this._combatStatusValue(member, 'void_blessed', 'dmgBonus', 0);
             const vulnerableMult = this._combatStatusValue(target, 'vulnerable', 'damageMult', 1);
             const inspiredMult = this._combatStatusValue(member, 'inspired', 'dmgMult', 1);
-            const postMoveMult = (combat.round === 0) ? 1 + memberItems.reduce((s, it) => s + (it.postMoveAttackBonus || 0), 0) : 1;
+            // First Strike (e.g. Striker's Band): the member's opening attack of the
+            // fight, i.e. the first blow after moving into the encounter.
+            if (!combat.struckIds) combat.struckIds = [];
+            const firstStrike = !combat.struckIds.includes(member.id);
+            if (firstStrike) combat.struckIds.push(member.id);
+            const postMoveMult = firstStrike ? 1 + memberItems.reduce((s, it) => s + (it.postMoveAttackBonus || 0), 0) : 1;
             let dmg = Math.max(1, Math.round((weaponDmg + voidBlessedBonus + randInt(0, 3)) * partyDmgMult * formDmgMult * xpDmgMult * synergyDmgMult * memberWeaken * armoredBonus * (1 - physResist) * chaosSurgeMult * vulnerableMult * inspiredMult * postMoveMult));
             let critHit = false;
             if (critChance > 0 && Math.random() < critChance) { dmg *= 2; critHit = true; }
@@ -1964,15 +2065,32 @@ export class ExplorationSystem {
             }
         }
 
-        // -- Elite abilities phase (regen etc) --
-        for (const enemy of combat.enemies) {
-            if (enemy.hp > 0) this._processEliteAbilities(enemy, exp, game);
+        // -- Elite and boss abilities phase (regen, AoE/summon rolls, chaos ticks,
+        // mask swaps): once per round, so their per-round chances hold. --
+        if (roundStart) {
+            for (const enemy of combat.enemies) {
+                if (enemy.hp > 0) this._processEliteAbilities(enemy, exp, game);
+            }
+            const bossEnemy = combat.enemies.find(e => e.isBoss && e.hp > 0);
+            if (bossEnemy) {
+                this._executeBossAbilities(bossEnemy, exp, game);
+            }
         }
-
-        // -- Boss abilities phase --
-        const bossEnemy = combat.enemies.find(e => e.isBoss && e.hp > 0);
-        if (bossEnemy) {
-            this._executeBossAbilities(bossEnemy, exp, game);
+        // Realm-event downside (Void Tide, Seismic Tremor): once per round, a
+        // chance that the realm lashes out through the enemies and splashes the
+        // whole party.
+        const realmAoEChance = roundStart ? this._getRealmEventEffect(exp, 'enemyAoEChance') : 0;
+        if (realmAoEChance > 0 && combat.enemies.some(e => e.hp > 0) && Math.random() < realmAoEChance) {
+            const range = this._getRealmEventAoEDamage(exp);
+            const aoeDmg = randInt(range[0], range[1]);
+            for (const p of alive) {
+                if (p.hp <= 0) continue;
+                const actual = Math.max(1, Math.floor(aoeDmg * this._applyFormationModifier(exp, p.id, 'damageTakenMult')));
+                p.hp -= actual;
+                if (exp.summary) exp.summary.damageTaken[p.id] = (exp.summary.damageTaken[p.id] || 0) + actual;
+                if (p.hp <= 0) this._checkExpeditionRevive(exp, p, game);
+            }
+            this._addLog(exp, game, `The realm lashes out through the enemy ranks, hitting all for ${aoeDmg}!`, 'danger');
         }
 
         // -- Enemy attack phase --
@@ -1987,20 +2105,6 @@ export class ExplorationSystem {
             if (enemy.hp <= 0) continue;
             if (inAmbush) { enemy._lastAttackKind = enemy.attackAnim || 'Swing'; continue; }
             const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
-            // Crowd control from party spells: a stunned enemy forfeits its turn. A
-            // slowed one has a (1 - mult) chance to lose it. Weaken (below) scales the
-            // damage of whatever attacks it does land.
-            if (this._hasCombatStatus(enemy, 'stun')) {
-                this._addLog(exp, game, `${attackerLabel} is stunned and cannot act!`, 'combat');
-                continue;
-            }
-            if (this._hasCombatStatus(enemy, 'slow')) {
-                const slowMult = this._combatStatusValue(enemy, 'slow', 'mult', 0.5);
-                if (Math.random() > slowMult) {
-                    this._addLog(exp, game, `${attackerLabel} is slowed and loses its turn!`, 'combat');
-                    continue;
-                }
-            }
             const enemyWeaken = this._combatStatusValue(enemy, 'weaken', 'mult', 1);
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             // Attack-animation speed (see party snapshot): <1 fast, >1 slow. The
@@ -2011,7 +2115,13 @@ export class ExplorationSystem {
             const effEnemyCd = Math.max(1, Math.floor(enemyCd * eliteSpeedMult));
             if (game.tick < (enemy._nextAttackTick || 0)) continue;
             enemy._nextAttackTick = game.tick + effEnemyCd;
-
+            // Crowd control from party spells, checked on the enemy's own turn: a
+            // stunned enemy forfeits it, a slowed one has a (1 - mult) chance to.
+            // Weaken (above) scales the damage of whatever attacks it does land.
+            if (this._loseTurnToCrowdControl(enemy)) {
+                this._addLog(exp, game, `${attackerLabel} ${enemy._lostTurnTo === 'stun' ? 'is stunned and cannot act' : 'is slowed and loses its turn'}!`, 'combat');
+                continue;
+            }
             {
                 if (enemy.spells) {
                     let castSpell = false;
@@ -2742,7 +2852,7 @@ export class ExplorationSystem {
                     }
                 }
                 for (const [res, amt] of Object.entries(boss.bonusResources)) {
-                    const boosted = Math.floor(amt * lootAmountMutMult) + lootBonusFlat;
+                    const boosted = Math.floor(amt * lootAmountMutMult * this._realmResourceMult(exp, res)) + lootBonusFlat;
                     exp.loot[res] = (exp.loot[res] || 0) + boosted;
                     this._addLog(exp, game, `+${boosted} ${res.replace(/_/g, ' ')} from the boss!`, 'loot', { itemKey: res });
                 }
@@ -2769,11 +2879,7 @@ export class ExplorationSystem {
                     const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
                     this._addLog(exp, game, `Victory! Found ${itemName}!`, 'success');
                 } else {
-                    let resMult = 1.0;
-                    for (const event of this.activeRealmEvents) {
-                        if (!event.realms?.includes(exp.realm)) continue;
-                        if (event.effects?.resourceMult?.[lootEntry.resource]) resMult *= event.effects.resourceMult[lootEntry.resource];
-                    }
+                    const resMult = this._realmResourceMult(exp, lootEntry.resource);
                     const amount = Math.floor(lootEntry.amount * lootMult * eliteLootMult * lootAmountMutMult * resMult) + lootBonusFlat;
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
                     this._addLog(exp, game, `Victory! Looted ${amount} ${lootEntry.resource.replace(/_/g, ' ')}.`, 'success');
@@ -2788,8 +2894,9 @@ export class ExplorationSystem {
             member.shieldActive = false;
             member.shieldReduction = 0;
             // Combat status effects are round-scoped: clear them so poison/slow/etc.
-            // never carry between encounters. (Enemies are discarded with exp.combat.)
-            member.statusEffects = [];
+            // never carry between encounters. Rest-of-expedition statuses (e.g. the
+            // altar's void_drained) stay. (Enemies are discarded with exp.combat.)
+            this._clearCombatStatuses(member, st => st.expiresWithExpedition);
             if (member._disabledSlots) {
                 for (const slot of Object.keys(member._disabledSlots)) {
                     member._disabledSlots[slot]--;
@@ -2835,6 +2942,8 @@ export class ExplorationSystem {
             const colonist = game.getColonist(snapshot.id);
             if (!colonist) continue;
             colonist.onExpedition = false;
+            // Died in the colony while away (e.g. at the gate): stays dead.
+            if (colonist.state === 'dead') continue;
             // Switch back to Colony gear set on return.
             if (colonist.equipmentSets?.Colony && colonist.activeSet !== 'Colony') {
                 game.switchEquipmentSet(colonist.id, 'Colony');
@@ -2972,13 +3081,7 @@ export class ExplorationSystem {
         }
 
         // Return any unused potions to the stockpile
-        if (exp.potionSupply) {
-            for (const [potionKey, count] of Object.entries(exp.potionSupply)) {
-                const def = EXPEDITION_POTIONS[potionKey];
-                const resource = def?.resource || potionKey;
-                for (let i = 0; i < count; i++) game.resources.addPotion({ key: resource, type: resource, name: def?.name || potionKey });
-            }
-        }
+        this._returnPotions(exp, game);
 
         const items = exp.loot._items || [];
         const lootResources = { ...exp.loot };
@@ -3016,11 +3119,18 @@ export class ExplorationSystem {
             game.eventLog.add(game, `Expedition to ${exp.realmName} failed. Salvaged: ${lootSummary || 'nothing'}`, 'warning', null);
         }
 
+        // Finished runs are kept (and saved) for their summaries, so bound both the
+        // per-run log and the uncollected-summary queue.
+        const logCap = EXPLORATION_CONFIG.completedLogCap;
+        if (exp.log.length > logCap) exp.log = exp.log.slice(-logCap);
         this.completedExpeditions.push(exp);
         if (this.completedExpeditions.length > 10) {
             this.completedExpeditions.shift();
         }
         this.pendingAutoSummaries.push(exp);
+        if (this.pendingAutoSummaries.length > EXPLORATION_CONFIG.maxPendingSummaries) {
+            this.pendingAutoSummaries.shift();
+        }
     }
 
     dismissSummary() {
@@ -3075,8 +3185,32 @@ export class ExplorationSystem {
             existing.rounds = Math.max(existing.rounds, rounds);
             Object.assign(existing, extra);
         } else {
-            target.statusEffects.push({ type, rounds, ...extra });
+            const status = { type, rounds, ...extra };
+            // Max-HP buffs (maxHpMult > 1, e.g. void_blessed) raise the cap and top
+            // up by the same amount while active. Caps below 1 (void_drained) are
+            // enforced in _tickCombatStatus instead.
+            if (extra.maxHpMult > 1 && target.maxHp > 0) {
+                status.hpBonus = Math.round(target.maxHp * (extra.maxHpMult - 1));
+                target.maxHp += status.hpBonus;
+                target.hp += status.hpBonus;
+            }
+            target.statusEffects.push(status);
         }
+    }
+
+    // Removes statuses, keeping those for which `keep(status)` is true (default:
+    // none), and undoes any max-HP bonus the removed ones granted.
+    _clearCombatStatuses(target, keep = () => false) {
+        if (!target.statusEffects) return;
+        const kept = [];
+        for (const s of target.statusEffects) {
+            if (keep(s)) { kept.push(s); continue; }
+            if (s.hpBonus) {
+                target.maxHp -= s.hpBonus;
+                target.hp = Math.min(target.hp, target.maxHp);
+            }
+        }
+        target.statusEffects = kept;
     }
 
     // ── Chaos effect system ───────────────────────────────────────────────
@@ -3160,6 +3294,29 @@ export class ExplorationSystem {
         return Math.random() < (dim.chaosEncounterChance || 0.30);
     }
 
+    // Turn-scoped crowd control. Stun and slow count down per turn of the afflicted
+    // combatant (not per round), so "stunned for 1 round" always costs exactly one
+    // attack regardless of that combatant's attack speed. Returns true when the turn
+    // is lost and records why in target._lostTurnTo for the log line.
+    _loseTurnToCrowdControl(target) {
+        if (!target.statusEffects) return false;
+        const stun = target.statusEffects.find(s => s.type === 'stun' && s.rounds > 0);
+        if (stun) {
+            stun.rounds--;
+            target._lostTurnTo = 'stun';
+            return true;
+        }
+        const slow = target.statusEffects.find(s => s.type === 'slow' && s.rounds > 0);
+        if (slow) {
+            slow.rounds--;
+            if (Math.random() > (slow.mult ?? 0.5)) {
+                target._lostTurnTo = 'slow';
+                return true;
+            }
+        }
+        return false;
+    }
+
     _hasCombatStatus(target, type) {
         return !!(target.statusEffects && target.statusEffects.some(s => s.type === type && s.rounds > 0));
     }
@@ -3176,11 +3333,13 @@ export class ExplorationSystem {
     }
 
     // Runs once per combat round: applies DoT damage, then decrements and prunes
-    // every combatant's status effects on both sides.
+    // every combatant's status effects on both sides. Stun and slow are skipped
+    // here (they count down per turn, see _loseTurnToCrowdControl), as are
+    // statuses that last the whole expedition.
     _tickCombatStatus(exp, game, combat) {
         const tick = (combatant, isParty) => {
             if (!combatant.statusEffects || combatant.statusEffects.length === 0) return;
-            if (combatant.hp <= 0) { combatant.statusEffects = []; return; }
+            if (combatant.hp <= 0) { this._clearCombatStatuses(combatant); return; }
             for (const s of combatant.statusEffects) {
                 if (s.type === 'poison' || s.type === 'burn') {
                     // Per-round damage: a fixed `damage`, or a rolled `damageRange`.
@@ -3202,9 +3361,10 @@ export class ExplorationSystem {
                         }
                     }
                 }
+                if (s.type === 'stun' || s.type === 'slow' || s.expiresWithExpedition) continue;
                 s.rounds--;
             }
-            combatant.statusEffects = combatant.statusEffects.filter(s => s.rounds > 0);
+            this._clearCombatStatuses(combatant, s => s.rounds > 0);
         };
         for (const enemy of combat.enemies) tick(enemy, false);
         for (const member of exp.partySnapshot) tick(member, true);
@@ -3357,9 +3517,9 @@ export class ExplorationSystem {
             this._addLog(exp, game, oldPhase.transitionText, 'danger');
         }
 
-        bossEnemy.hp = Math.round(nextPhase.hp * (exp.diffSettings?.enemyHpMult || 1));
+        bossEnemy.hp = Math.round(nextPhase.hp * this._enemyStatMults(exp).hp);
         bossEnemy.maxHp = bossEnemy.hp;
-        bossEnemy.damage = Math.round(nextPhase.damage * (exp.diffSettings?.enemyDmgMult || 1));
+        bossEnemy.damage = Math.round(nextPhase.damage * this._enemyStatMults(exp).dmg);
         bossEnemy.damageReduction = nextPhase.damageReduction || 0;
         // Void pact damage reduction expires when the protected phase ends.
         exp._voidPactBossDmgMult = null;
@@ -3426,9 +3586,9 @@ export class ExplorationSystem {
                 const count = ability.count || 2;
                 for (let i = 0; i < count; i++) {
                     exp.combat.enemies.push({
-                        hp: Math.round(ability.hp * (exp.diffSettings?.enemyHpMult || 1)),
-                        maxHp: Math.round(ability.hp * (exp.diffSettings?.enemyHpMult || 1)),
-                        damage: Math.round(ability.damage * (exp.diffSettings?.enemyDmgMult || 1)),
+                        hp: Math.round(ability.hp * this._enemyStatMults(exp).hp),
+                        maxHp: Math.round(ability.hp * this._enemyStatMults(exp).hp),
+                        damage: Math.round(ability.damage * this._enemyStatMults(exp).dmg),
                     });
                 }
                 this._addLog(exp, game, ability.text || `${bossEnemy.name} summons reinforcements!`, 'danger');
@@ -3537,7 +3697,7 @@ export class ExplorationSystem {
                 let shouldUse = false;
                 if (def.autoUse.hpThreshold && member.hp / member.maxHp <= def.autoUse.hpThreshold) shouldUse = true;
                 if (def.autoUse.manaThreshold && member.maxMana > 0 && member.mana / member.maxMana <= def.autoUse.manaThreshold) shouldUse = true;
-                if (def.autoUse.hasDot && exp.activeEffects?.some(e => e.targetId === member.id && e.type === 'dot')) shouldUse = true;
+                if (def.autoUse.hasDot && (exp.activeEffects?.some(e => e.targetId === member.id && e.type === 'dot') || this._hasCombatStatus(member, 'poison'))) shouldUse = true;
                 if (def.autoUse.anyMemberAtOrBelow) {
                     shouldUse = alive.some(p => p.hp / p.maxHp <= def.autoUse.anyMemberAtOrBelow);
                 }
@@ -3564,6 +3724,8 @@ export class ExplorationSystem {
                     }
                     if (def.effect.clearDot) {
                         exp.activeEffects = (exp.activeEffects || []).filter(e => e.targetId !== member.id || e.type !== 'dot');
+                        // Also cures in-combat poison (enemy venom spells and the like).
+                        if (member.statusEffects) member.statusEffects = member.statusEffects.filter(st => st.type !== 'poison');
                     }
                     if (def.effect.buffCombat) {
                         const b = def.effect.buffCombat;
@@ -3753,8 +3915,8 @@ export class ExplorationSystem {
                     const enemies = [];
                     for (let j = 0; j < baseCount; j++) {
                         const eDef = this._pickEnemyFromRealm(dim);
-                        const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
-                        const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
+                        const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * this._enemyStatMults(exp).hp);
+                        const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * this._enemyStatMults(exp).dmg);
                         enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name, sprite: eDef.sprite, color: eDef.color, typeKey: eDef.typeKey, spells: eDef.spells, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot', projectileChar: eDef.projectileChar, projectileColor: eDef.projectileColor, damageReduction: eDef.damageReduction || 0 });
                     }
                     exp.combat = { enemies, round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false, ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)) };
@@ -3807,7 +3969,7 @@ export class ExplorationSystem {
                     exp.loot._items.push(lootEntry.item);
                     this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot', { itemKey: lootEntry.item });
                 } else {
-                    const amount = Math.floor(lootEntry.amount * mult);
+                    const amount = Math.floor(lootEntry.amount * mult * this._realmResourceMult(exp, lootEntry.resource));
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
                     this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot', { itemKey: lootEntry.resource });
                 }
@@ -3822,8 +3984,8 @@ export class ExplorationSystem {
             const enemies = [];
             for (let j = 0; j < count; j++) {
                 const eDef = this._pickEnemyFromRealm(dim);
-                const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
-                const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
+                const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * this._enemyStatMults(exp).hp);
+                const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * this._enemyStatMults(exp).dmg);
                 enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot' || !!eDef.ranged, projectileChar: eDef.projectileChar || null, projectileColor: eDef.projectileColor || null });
             }
             this._addLog(exp, game, `Enemies emerge! (${count} foes)`, 'combat');
@@ -3934,8 +4096,8 @@ export class ExplorationSystem {
             const enemies = [];
             for (let j = 0; j < count; j++) {
                 const eDef = this._pickEnemyFromRealm(dim);
-                const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * (exp.diffSettings?.enemyHpMult || 1));
-                const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * (exp.diffSettings?.enemyDmgMult || 1));
+                const hp = Math.round(randInt(eDef.hp[0], eDef.hp[1]) * this._enemyStatMults(exp).hp);
+                const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * this._enemyStatMults(exp).dmg);
                 enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot' || !!eDef.ranged, projectileChar: eDef.projectileChar || null, projectileColor: eDef.projectileColor || null });
             }
             this._addLog(exp, game, `Enemies alerted! (${count} foes)`, 'combat');
@@ -3990,6 +4152,39 @@ export class ExplorationSystem {
         }
     }
 
+    // Stat multipliers fixed at launch. Saves from before they were stored fall back
+    // to the current difficulty, mutators and realm events.
+    _enemyStatMults(exp) {
+        if (!exp.enemyStatMults) {
+            exp.enemyStatMults = computeEnemyStatMults(exp.diffSettings, exp.mutators, this.activeRealmEvents, exp.realm);
+        }
+        return exp.enemyStatMults;
+    }
+
+    // Realm-event resourceMult for one loot resource (e.g. Crystal Surge doubles
+    // runite). Applied to every resource loot roll, not just combat victories.
+    _realmResourceMult(exp, resource) {
+        let mult = 1.0;
+        for (const event of this.activeRealmEvents) {
+            if (!event.realms?.includes(exp.realm)) continue;
+            const m = event.effects?.resourceMult?.[resource];
+            if (m) mult *= m;
+        }
+        return mult;
+    }
+
+    // [min, max] splash damage from the active realm events' enemyAoEDamage ranges
+    // (summed when several events overlap a realm).
+    _getRealmEventAoEDamage(exp) {
+        let lo = 0, hi = 0;
+        for (const event of this.activeRealmEvents) {
+            if (!event.realms?.includes(exp.realm)) continue;
+            const r = event.effects?.enemyAoEDamage;
+            if (r) { lo += r[0]; hi += r[1]; }
+        }
+        return [lo, Math.max(lo, hi)];
+    }
+
     _getRealmEventEffect(exp, effectKey) {
         let value = effectKey.includes('Mult') ? 1.0 : 0;
         for (const event of this.activeRealmEvents) {
@@ -4042,6 +4237,25 @@ const PEDESTAL_TO_EXPEDITION = {
     blightImmunity: null,
 };
 
+// Enemy HP/damage multipliers for a run: difficulty x mutators x the realm events
+// active in that realm. Shared by encounter generation and every later spawn
+// (boss phases, summoned adds, decision/puzzle ambushes) so they scale alike.
+function computeEnemyStatMults(diffSettings, mutators, activeRealmEvents, realmKey) {
+    let hp = diffSettings?.enemyHpMult || 1;
+    let dmg = diffSettings?.enemyDmgMult || 1;
+    for (const mutKey of mutators || []) {
+        const mut = EXPEDITION_MUTATORS[mutKey];
+        if (mut?.effects?.enemyHpMult) hp *= mut.effects.enemyHpMult;
+        if (mut?.effects?.enemyDmgMult) dmg *= mut.effects.enemyDmgMult;
+    }
+    for (const event of activeRealmEvents || []) {
+        if (!event.realms?.includes(realmKey)) continue;
+        if (event.effects?.enemyHpMult) hp *= event.effects.enemyHpMult;
+        if (event.effects?.enemyDmgMult) dmg *= event.effects.enemyDmgMult;
+    }
+    return { hp, dmg };
+}
+
 // Single source of truth for a party-wide expedition effect. Aggregates, per living
 // member: equipped-item bonuses, active pedestal bonuses (mapped keys), flat trait
 // bonuses (expedition.<key>), and realm-specific trait bonuses
@@ -4055,6 +4269,9 @@ function getPartyExpeditionEffect(partySnapshot, effectKey, realm) {
     for (const member of partySnapshot) {
         if (member.hp <= 0) continue;
         const items = [member.weapon, member.armor, member.helmet, member.clothes, member.boots, member.tool, member.trinket].filter(Boolean);
+        for (const item of member.consumedItems || []) {
+            if (item.expedition?.[effectKey]) apply(item.expedition[effectKey]);
+        }
         for (const item of items) {
             if (item.expedition?.[effectKey]) apply(item.expedition[effectKey]);
             if (item.pedestal && typeof item.pedestal.radius === 'number') {

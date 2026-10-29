@@ -1,4 +1,5 @@
 import { RESEARCH, RESEARCH_TABS, DEMO_LOCKED_RESEARCH, BUILDINGS } from '../core/config.js';
+import { escapeHtml, escapeAttr, jsArg } from './ui-utils.js';
 
 export function installResearchPanel(UI) {
     Object.assign(UI.prototype, researchMethods);
@@ -41,6 +42,15 @@ const researchMethods = {
                 : null;
         }
 
+        // Progress text and bar widths change every research tick. They go into
+        // the markup as placeholders and are tracked in `live`, so a tick that
+        // only moves progress patches those elements in place instead of
+        // rebuilding the tree (which would reset an in-progress pan).
+        const liveText = {};
+        const liveWidth = {};
+        const lt = (id, text) => { liveText[id] = text; return `<span data-rlive="${id}">\u0001${id}\u0001</span>`; };
+        const lw = (id, pct) => { liveWidth[id] = pct; return `\u0002${id}\u0002`; };
+
         let html = '<div class="research-drag-handle"></div><div class="panel-close" data-panel-close="research">&times;</div><h3>Research</h3>';
 
         if (research.activeResearch) {
@@ -48,10 +58,10 @@ const researchMethods = {
             const prog = research.getProgress(research.activeResearch);
             const pct = Math.min(100, Math.floor((prog / activeTech.cost) * 100));
             html += `<div class="info-row" style="color:#aa88ff; font-weight:bold; margin-bottom:6px;">`;
-            html += `Researching: ${activeTech.name} (${Math.floor(prog)}/${activeTech.cost})`;
+            html += lt('hdr', `Researching: ${activeTech.name} (${Math.floor(prog)}/${activeTech.cost})`);
             html += `<button style="margin-left:8px;font-size:10px;padding:1px 6px;cursor:pointer;" onclick="window.game.cancelResearch()">Cancel</button>`;
             html += `</div>`;
-            html += `<div style="background:#333;border-radius:3px;height:6px;margin-bottom:8px;"><div style="background:#aa88ff;height:100%;border-radius:3px;width:${pct}%;transition:width 0.3s;"></div></div>`;
+            html += `<div style="background:#333;border-radius:3px;height:6px;margin-bottom:8px;"><div data-rlive-w="hdr" style="background:#aa88ff;height:100%;border-radius:3px;width:${lw('hdr', pct)}%;transition:width 0.3s;"></div></div>`;
         } else {
             const hasAvail = research.hasAvailableResearch();
             html += `<div class="info-row" style="color:${hasAvail ? '#ffcc44' : '#888'}; font-weight:bold; margin-bottom:6px;">`;
@@ -67,8 +77,8 @@ const researchMethods = {
             const total = tabKeys.length;
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             const active = tab.key === activeTab ? ' active' : '';
-            html += `<button class="research-tab-btn${active}" data-research-tab="${tab.key}">`;
-            html += `${tab.name}`;
+            html += `<button class="research-tab-btn${active}" data-research-tab="${escapeAttr(tab.key)}">`;
+            html += `${escapeHtml(tab.name)}`;
             html += `<span class="research-tab-pill"><span class="research-tab-pill-fill" style="width:${pct}%"></span><span class="research-tab-pill-text">${done}/${total}</span></span>`;
             html += `</button>`;
         }
@@ -114,18 +124,18 @@ const researchMethods = {
                 }
                 const tooltip = tooltipLines.join(' | ');
 
-                const clickHandler = available && !isActive ? `onclick="window.game.selectResearch('${key}')"` : isActive ? `onclick="window.game.cancelResearch()"` : '';
-                html += `<div class="${cls}" data-key="${key}" data-requires="${sameTabReqs.join(',')}" data-tip="${tooltip.replace(/"/g, '&quot;')}" ${clickHandler}>`;
-                html += `<div class="research-node-name">${tech.name}</div>`;
-                html += `<div class="research-node-desc">${tech.description}</div>`;
+                const clickHandler = available && !isActive ? `onclick="window.game.selectResearch(${jsArg(key)})"` : isActive ? `onclick="window.game.cancelResearch()"` : '';
+                html += `<div class="${cls}" data-key="${escapeAttr(key)}" data-requires="${escapeAttr(sameTabReqs.join(','))}" data-tip="${escapeAttr(tooltip)}" ${clickHandler}>`;
+                html += `<div class="research-node-name">${escapeHtml(tech.name)}</div>`;
+                html += `<div class="research-node-desc">${escapeHtml(tech.description)}</div>`;
                 if (demoLocked) {
                     html += `<div class="research-node-cost" style="color:#ff6666;">Available in Full Version</div>`;
                 } else if (completed) {
                     html += `<div class="research-node-cost">Researched</div>`;
                 } else if (isActive) {
                     const pct = Math.min(100, Math.floor((prog / tech.cost) * 100));
-                    html += `<div class="research-node-cost">${Math.floor(prog)}/${tech.cost} pts (${pct}%)</div>`;
-                    html += `<div class="research-node-progress"><div class="research-node-progress-fill" style="width:${pct}%"></div></div>`;
+                    html += `<div class="research-node-cost">${lt('node', `${Math.floor(prog)}/${tech.cost} pts (${pct}%)`)}</div>`;
+                    html += `<div class="research-node-progress"><div class="research-node-progress-fill" data-rlive-w="node" style="width:${lw('node', pct)}%"></div></div>`;
                 } else if (prog > 0) {
                     const pct = Math.min(100, Math.floor((prog / tech.cost) * 100));
                     html += `<div class="research-node-cost">${Math.floor(prog)}/${tech.cost} pts (paused)</div>`;
@@ -143,7 +153,7 @@ const researchMethods = {
                             const pct = gate.required > 0 ? Math.round((gate.current / gate.required) * 100) : 100;
                             const countText = gate.required > 1 ? ` ${gate.current}/${gate.required}` : '';
                             html += `<div class="research-gate">` +
-                                `<div class="gate-bar-label" style="color:${color};">${gate.label}${countText}</div>` +
+                                `<div class="gate-bar-label" style="color:${color};">${escapeHtml(gate.label)}${countText}</div>` +
                                 `<div class="gate-bar"><div class="gate-bar-fill${gate.met ? ' gate-bar-met' : ''}" style="width:${pct}%"></div></div>` +
                                 `</div>`;
                         }
@@ -159,12 +169,12 @@ const researchMethods = {
                         const reqCompleted = research.completed.has(req);
                         const reqAvailable = !reqCompleted && reqTech.requires.every(r => research.completed.has(r));
                         const badgeColor = reqCompleted ? '#66cc66' : reqAvailable ? '#cc8833' : '#666';
-                        html += `<span class="research-cross-tab" data-jump-tab="${reqTech.tab}" style="border-color:${badgeColor}; color:${badgeColor}">${reqTech.name} (${reqTab.name} →)</span>`;
+                        html += `<span class="research-cross-tab" data-jump-tab="${escapeAttr(reqTech.tab)}" style="border-color:${badgeColor}; color:${badgeColor}">${escapeHtml(reqTech.name)} (${escapeHtml(reqTab?.name || reqTech.tab)} →)</span>`;
                     }
                     html += '</div>';
                 }
                 if (available && !isActive) {
-                    html += `<button class="research-node-btn" onclick="event.stopPropagation();window.game.selectResearch('${key}')">Select</button>`;
+                    html += `<button class="research-node-btn" onclick="event.stopPropagation();window.game.selectResearch(${jsArg(key)})">Select</button>`;
                 } else if (isActive) {
                     html += `<button class="research-node-btn" onclick="event.stopPropagation();window.game.cancelResearch()" style="background:#663333;">Cancel</button>`;
                 }
@@ -180,9 +190,25 @@ const researchMethods = {
         html += `</div>`;
         html += `</div>`; // .research-tree
 
-        if (html !== this._lastResearchHtml) {
+        // `html` is the template; only a template change needs a rebuild.
+        if (html === this._lastResearchHtml) {
+            for (const [id, text] of Object.entries(liveText)) {
+                const el = this.elements.researchPanel.querySelector(`[data-rlive="${id}"]`);
+                if (el && el.textContent !== text) el.textContent = text;
+            }
+            for (const [id, pct] of Object.entries(liveWidth)) {
+                const el = this.elements.researchPanel.querySelector(`[data-rlive-w="${id}"]`);
+                if (el) el.style.width = `${pct}%`;
+            }
+            return;
+        }
+        // Don't swap the tree out from under an active drag; retry next tick.
+        if (!this.elements.researchPanel.querySelector('.research-tree.panning')) {
             this._lastResearchHtml = html;
-            this.elements.researchPanel.innerHTML = html;
+            const full = html
+                .replace(/\u0001(\w+)\u0001/g, (_, id) => escapeHtml(liveText[id]))
+                .replace(/\u0002(\w+)\u0002/g, (_, id) => liveWidth[id]);
+            this.elements.researchPanel.innerHTML = full;
             const tabsContainer = this.elements.researchPanel.querySelector('.research-tabs');
             if (tabsContainer && this._researchTabsScroll) {
                 tabsContainer.scrollLeft = this._researchTabsScroll;
@@ -211,6 +237,7 @@ const researchMethods = {
             if (e.key === 'Escape') {
                 this.toggleResearchPanel();
             } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault();
                 const tabs = RESEARCH_TABS;
                 const idx = tabs.findIndex(t => t.key === (this._researchTab || 'foundations'));
                 const next = e.key === 'ArrowRight'

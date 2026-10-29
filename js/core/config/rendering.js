@@ -22,7 +22,6 @@ export const RENDER_CONFIG = {
         warmthPeak: 1.0,
     },
     lightSourceMargin: 8,
-    fireLightRadius: 2,
     seasonDaylight: {
         summer: { dawn: 0.15, dusk: 0.75 },
         winter: { dawn: 0.25, dusk: 0.65 },
@@ -525,9 +524,6 @@ export const COMBAT_VISUALS = {
     lootDropChar: '$',
     lootDropColor: '#ffdd44',
     lootDropTtl: 5,
-    fireIgniteChar: '^',
-    fireIgniteColor: '#ff6600',
-    fireIgniteTtl: 3,
     waveAlertTtl: 8,
     waveAlertColor: '#ff2222',
     golemActivateChar: '⚡',

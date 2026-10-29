@@ -14,8 +14,6 @@ export function createTile(terrain) {
         items: [],
         passable: TERRAIN[terrain] ? TERRAIN[terrain].passable.colonist : true,
         roomId: null,
-        onFire: false,
-        fireTimer: 0,
         snowCovered: false,
     };
 }
@@ -1474,11 +1472,7 @@ export function writeTileVisuals(tile, season, out) {
         out.bg = SEALED_BG;
         return out;
     }
-    if (tile.onFire) {
-        char = '^';
-        color = '#ff4400';
-    }
-    else if (tile.structure) {
+    if (tile.structure) {
         char = TILE_CHARS[tile.structure] || '?';
         color = TILE_COLORS[tile.structure] || '#fff';
         const bDef = BUILDINGS[tile.structure];
@@ -1598,6 +1592,12 @@ export function isWalkableFurniture(map, x, y) {
     return FURNITURE_STRUCTURES.has(map[y][x].structure);
 }
 
+function blocksSight(tile) {
+    if (!tile) return true;
+    if (tile.passable === false) return true;
+    return WALL_STRUCTURES.has(tile.structure) || DOOR_STRUCTURES.has(tile.structure);
+}
+
 export function hasLineOfSight(map, x0, y0, x1, y1) {
     if (x0 === x1 && y0 === y1) return true;
 
@@ -1612,22 +1612,23 @@ export function hasLineOfSight(map, x0, y0, x1, y1) {
         if (x === x1 && y === y1) break;
 
         const e2 = 2 * err;
-        if (e2 > -dy) {
+        const stepX = e2 > -dy;
+        const stepY = e2 < dx;
+        // A diagonal step squeezes between its two corner tiles. If both block,
+        // the line is passing through the seam of two diagonal walls.
+        if (stepX && stepY && blocksSight(map[y]?.[x + sx]) && blocksSight(map[y + sy]?.[x])) return false;
+        if (stepX) {
             err -= dy;
             x += sx;
         }
-        if (e2 < dx) {
+        if (stepY) {
             err += dx;
             y += sy;
         }
 
         if (x === x1 && y === y1) break;
 
-        const tile = map[y]?.[x];
-        if (!tile) return false;
-        if (tile.passable === false) return false;
-        if (WALL_STRUCTURES.has(tile.structure)) return false;
-        if (DOOR_STRUCTURES.has(tile.structure)) return false;
+        if (blocksSight(map[y]?.[x])) return false;
     }
 
     return true;

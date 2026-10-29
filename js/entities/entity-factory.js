@@ -49,6 +49,8 @@ export function createEntity(type, x, y, options = {}) {
         entity.projectileColor = def.projectileColor;
     }
     if (def.loot) entity.loot = def.loot;
+    // On-hit debuffs applied to colonists this entity damages (see colonistTakeDamage).
+    if (def.onHit) entity.onHit = { ...def.onHit };
 
     if (options.ownerId !== undefined) entity.ownerId = options.ownerId;
     if (options.expiresAt !== undefined) {

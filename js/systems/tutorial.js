@@ -421,7 +421,7 @@ const TUTORIAL_STEPS = [
         id: 'threats',
         levels: ['none'],
         title: 'Prepare for Trouble',
-        description: 'Raiders and wild creatures will come for the colony eventually. Fires can break out in summer, and blight can spread through your crops. The game pauses on its own when a raid starts, and you can change that in Settings. Colonists fight with whatever they have equipped, so next you\'ll arm everyone. A few scouts will test your defenses once you\'re ready.',
+        description: 'Raiders and wild creatures will come for the colony eventually. Blight can spread through your crops. The game pauses on its own when a raid starts, and you can change that in Settings. Colonists fight with whatever they have equipped, so next you\'ll arm everyone. A few scouts will test your defenses once you\'re ready.',
     }),
     {
         id: 'weapon',

@@ -13,12 +13,13 @@
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-// Only allow requests from the game's origin.
+// Only allow requests from the game's origin. Exact origin match, except the
+// local dev hosts, which may use any port. The Electron build also sends
+// Origin: http://localhost from its main process.
 const ALLOWED_ORIGINS = [
     'https://junekingsbury.github.io',
-    'http://localhost',        // local dev
-    'http://127.0.0.1',       // local dev
 ];
+const ALLOWED_DEV_HOSTS = ['localhost', '127.0.0.1'];
 
 function corsHeaders(origin) {
     return {
@@ -26,12 +27,18 @@ function corsHeaders(origin) {
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Max-Age': '86400',
+        'Vary': 'Origin',
     };
 }
 
 function isAllowedOrigin(origin) {
     if (!origin) return false;
-    return ALLOWED_ORIGINS.some(o => origin === o || origin.startsWith(o));
+    if (ALLOWED_ORIGINS.includes(origin)) return true;
+    let url;
+    try { url = new URL(origin); } catch { return false; }
+    // An Origin header is scheme://host[:port] only; anything else is malformed.
+    if (url.origin !== origin) return false;
+    return url.protocol === 'http:' && ALLOWED_DEV_HOSTS.includes(url.hostname);
 }
 
 export default {

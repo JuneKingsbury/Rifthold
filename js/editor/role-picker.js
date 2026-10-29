@@ -1,9 +1,11 @@
-import { ENTITIES } from '../core/config.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { toJsLiteral } from './config-source.js';
 
 export const ROLE_TYPES = [
     { value: 'guard', label: 'Guard', categories: ['animal', 'summon', 'enemy'] },
     { value: 'production', label: 'Production', categories: ['animal'] },
     { value: 'pack', label: 'Pack Animal', categories: ['animal'] },
+    { value: 'wander', label: 'Wander (near pen)', categories: ['animal'] },
     { value: 'ranged_attacker', label: 'Ranged Attacker', categories: ['enemy', 'summon'] },
     { value: 'melee_charger', label: 'Melee Charger', categories: ['enemy', 'summon'] },
     { value: 'nexus_target', label: 'Nexus Target', categories: ['enemy'] },
@@ -62,6 +64,10 @@ export class RolePicker {
         let html = `<div class="fe-effect-row fe-role-row" data-index="${index}">`;
         html += `<div class="fe-effect-header">`;
         html += `<select class="fe-role-type" data-index="${index}">`;
+        if (!available.some(t => t.value === role.type)) {
+            // Keep roles this category doesn't list (or unknown types) instead of relabelling them.
+            html += `<option value="${escapeAttr(role.type)}" selected>${escapeHtml(role.type)}</option>`;
+        }
         for (const t of available) {
             html += `<option value="${t.value}" ${t.value === role.type ? 'selected' : ''}>${t.label}</option>`;
         }
@@ -82,33 +88,40 @@ export class RolePicker {
         switch (role.type) {
             case 'guard':
                 html += `<div class="fe-row">`;
-                html += `<div class="fe-field"><label>Guard Radius</label><input type="number" class="fe-rp-guardRadius" value="${role.guardRadius || 8}"></div>`;
-                html += `<div class="fe-field"><label>Guard Damage</label><input type="number" class="fe-rp-guardDamage" value="${role.guardDamage || 8}"></div>`;
-                html += `<div class="fe-field"><label>Patrol Radius</label><input type="number" class="fe-rp-patrolRadius" value="${role.patrolRadius || 3}"></div>`;
+                html += `<div class="fe-field"><label>Guard Radius</label><input type="number" class="fe-rp-guardRadius" value="${escapeAttr(role.guardRadius || 8)}"></div>`;
+                html += `<div class="fe-field"><label>Guard Damage</label><input type="number" class="fe-rp-guardDamage" value="${escapeAttr(role.guardDamage || 8)}"></div>`;
+                html += `<div class="fe-field"><label>Patrol Radius</label><input type="number" class="fe-rp-patrolRadius" value="${escapeAttr(role.patrolRadius || 3)}"></div>`;
                 html += `</div>`;
                 break;
 
             case 'production':
                 html += `<div class="fe-row">`;
-                html += `<div class="fe-field"><label>Produces</label><input type="text" class="fe-rp-produces" value="${role.produces || 'eggs'}"></div>`;
-                html += `<div class="fe-field"><label>Produce Rate (ticks)</label><input type="number" class="fe-rp-produceRate" value="${role.produceRate || 80}"></div>`;
-                html += `<div class="fe-field"><label>Amount</label><input type="number" class="fe-rp-produceAmount" value="${role.produceAmount || 1}"></div>`;
+                html += `<div class="fe-field"><label>Produces</label><input type="text" class="fe-rp-produces" value="${escapeAttr(role.produces || 'eggs')}"></div>`;
+                html += `<div class="fe-field"><label>Produce Rate (ticks)</label><input type="number" class="fe-rp-produceRate" value="${escapeAttr(role.produceRate || 80)}"></div>`;
+                html += `<div class="fe-field"><label>Amount</label><input type="number" class="fe-rp-produceAmount" value="${escapeAttr(role.produceAmount || 1)}"></div>`;
+                html += `</div>`;
+                break;
+
+            case 'wander':
+                html += `<div class="fe-row">`;
+                html += `<div class="fe-field"><label>Wander Radius</label><input type="number" class="fe-rp-wanderRadius" value="${escapeAttr(role.wanderRadius || 3)}"></div>`;
+                html += `<div class="fe-field"><label>Move Chance (0-1)</label><input type="number" class="fe-rp-moveChance" step="0.05" value="${escapeAttr(role.moveChance || 0.1)}"></div>`;
                 html += `</div>`;
                 break;
 
             case 'pack':
-                html += `<div class="fe-field"><label>Expedition Speed Bonus</label><input type="number" class="fe-rp-expeditionSpeedBonus" step="0.05" value="${role.expeditionSpeedBonus || 0.25}"></div>`;
+                html += `<div class="fe-field"><label>Expedition Speed Bonus</label><input type="number" class="fe-rp-expeditionSpeedBonus" step="0.05" value="${escapeAttr(role.expeditionSpeedBonus || 0.25)}"></div>`;
                 break;
 
             case 'ranged_attacker':
                 html += `<div class="fe-row">`;
-                html += `<div class="fe-field"><label>Range</label><input type="number" class="fe-rp-range" value="${role.range || 6}"></div>`;
-                html += `<div class="fe-field"><label>Prefer Distance</label><input type="number" class="fe-rp-preferDistance" value="${role.preferDistance || 4}"></div>`;
+                html += `<div class="fe-field"><label>Range</label><input type="number" class="fe-rp-range" value="${escapeAttr(role.range || 6)}"></div>`;
+                html += `<div class="fe-field"><label>Prefer Distance</label><input type="number" class="fe-rp-preferDistance" value="${escapeAttr(role.preferDistance || 4)}"></div>`;
                 html += `</div>`;
                 break;
 
             case 'melee_charger':
-                html += `<div class="fe-field"><label>Charge Bonus Damage</label><input type="number" class="fe-rp-chargeBonus" value="${role.chargeBonus || 5}"></div>`;
+                html += `<div class="fe-field"><label>Charge Bonus Damage</label><input type="number" class="fe-rp-chargeBonus" value="${escapeAttr(role.chargeBonus || 5)}"></div>`;
                 break;
 
             case 'nexus_target':
@@ -116,13 +129,13 @@ export class RolePicker {
                 break;
 
             case 'structure_breaker':
-                html += `<div class="fe-field"><label>Break Speed</label><input type="number" class="fe-rp-breakSpeed" value="${role.breakSpeed || 1}"></div>`;
+                html += `<div class="fe-field"><label>Break Speed</label><input type="number" class="fe-rp-breakSpeed" value="${escapeAttr(role.breakSpeed || 1)}"></div>`;
                 break;
 
             case 'boss':
                 html += `<div class="fe-row">`;
-                html += `<div class="fe-field"><label>Enrage Threshold (0-1)</label><input type="number" class="fe-rp-enrageThreshold" step="0.05" value="${role.enrageThreshold || 0.3}"></div>`;
-                html += `<div class="fe-field"><label>Enrage Damage Mult</label><input type="number" class="fe-rp-enrageDamageMult" step="0.1" value="${role.enrageDamageMult || 1.5}"></div>`;
+                html += `<div class="fe-field"><label>Enrage Threshold (0-1)</label><input type="number" class="fe-rp-enrageThreshold" step="0.05" value="${escapeAttr(role.enrageThreshold || 0.3)}"></div>`;
+                html += `<div class="fe-field"><label>Enrage Damage Mult</label><input type="number" class="fe-rp-enrageDamageMult" step="0.1" value="${escapeAttr(role.enrageDamageMult || 1.5)}"></div>`;
                 html += `</div>`;
                 break;
 
@@ -135,12 +148,12 @@ export class RolePicker {
                     <option value="crafting" ${role.specialty === 'crafting' ? 'selected' : ''}>Crafting</option>
                     <option value="cooking" ${role.specialty === 'cooking' ? 'selected' : ''}>Cooking</option>
                 </select></div>`;
-                html += `<div class="fe-field"><label>Skill Level</label><input type="number" class="fe-rp-skillLevel" value="${role.skillLevel || 6}"></div>`;
+                html += `<div class="fe-field"><label>Skill Level</label><input type="number" class="fe-rp-skillLevel" value="${escapeAttr(role.skillLevel || 6)}"></div>`;
                 html += `</div>`;
                 break;
 
             case 'flee_on_damage':
-                html += `<div class="fe-field"><label>Flee Threshold (0-1)</label><input type="number" class="fe-rp-fleeThreshold" step="0.05" value="${role.fleeThreshold || 0.3}"></div>`;
+                html += `<div class="fe-field"><label>Flee Threshold (0-1)</label><input type="number" class="fe-rp-fleeThreshold" step="0.05" value="${escapeAttr(role.fleeThreshold || 0.3)}"></div>`;
                 break;
 
             case 'summoned':
@@ -156,6 +169,7 @@ export class RolePicker {
             if (!firstType) return;
             this._roles.push({ type: firstType.value });
             this._render();
+            this._applyDefaults(this._roles.length - 1);
             this._fireChange();
         });
 
@@ -194,6 +208,7 @@ export class RolePicker {
                 const i = parseInt(sel.dataset.index);
                 this._roles[i] = { type: sel.value };
                 this._render();
+                this._applyDefaults(i);
                 this._fireChange();
             });
         });
@@ -212,6 +227,12 @@ export class RolePicker {
                 });
             });
         });
+    }
+
+    // Read the rendered default values into a fresh role so it never exports undefined params.
+    _applyDefaults(index) {
+        const row = this._container.querySelector(`.fe-role-row[data-index="${index}"]`);
+        if (row) this._collectRowData(row, index);
     }
 
     _collectRowData(row, index) {
@@ -235,6 +256,13 @@ export class RolePicker {
                 if (p) role.produces = p.value.trim() || 'eggs';
                 if (r) role.produceRate = parseInt(r.value) || 80;
                 if (a) role.produceAmount = parseInt(a.value) || 1;
+                break;
+            }
+            case 'wander': {
+                const wr = row.querySelector('.fe-rp-wanderRadius');
+                const mc = row.querySelector('.fe-rp-moveChance');
+                if (wr) role.wanderRadius = parseInt(wr.value) || 3;
+                if (mc) role.moveChance = parseFloat(mc.value) || 0.1;
                 break;
             }
             case 'pack': {
@@ -288,45 +316,7 @@ export class RolePicker {
 
 export function formatRolesCode(roles, indent = '    ') {
     if (!roles || !roles.length) return '';
-    const lines = roles.map(r => {
-        const parts = [`type: '${r.type}'`];
-        switch (r.type) {
-            case 'guard':
-                parts.push(`guardRadius: ${r.guardRadius || 8}`);
-                parts.push(`guardDamage: ${r.guardDamage || 8}`);
-                if (r.patrolRadius) parts.push(`patrolRadius: ${r.patrolRadius}`);
-                break;
-            case 'production':
-                parts.push(`produces: '${r.produces || 'eggs'}'`);
-                parts.push(`produceRate: ${r.produceRate || 80}`);
-                parts.push(`produceAmount: ${r.produceAmount || 1}`);
-                break;
-            case 'pack':
-                parts.push(`expeditionSpeedBonus: ${r.expeditionSpeedBonus || 0.25}`);
-                break;
-            case 'ranged_attacker':
-                parts.push(`range: ${r.range || 6}`);
-                parts.push(`preferDistance: ${r.preferDistance || 4}`);
-                break;
-            case 'melee_charger':
-                if (r.chargeBonus) parts.push(`chargeBonus: ${r.chargeBonus}`);
-                break;
-            case 'structure_breaker':
-                parts.push(`breakSpeed: ${r.breakSpeed || 1}`);
-                break;
-            case 'boss':
-                parts.push(`enrageThreshold: ${r.enrageThreshold || 0.3}`);
-                parts.push(`enrageDamageMult: ${r.enrageDamageMult || 1.5}`);
-                break;
-            case 'worker':
-                parts.push(`specialty: '${r.specialty || 'farming'}'`);
-                parts.push(`skillLevel: ${r.skillLevel || 6}`);
-                break;
-            case 'flee_on_damage':
-                parts.push(`fleeThreshold: ${r.fleeThreshold || 0.3}`);
-                break;
-        }
-        return `${indent}    { ${parts.join(', ')} }`;
-    });
+    // Emit every field so params the picker doesn't model survive a round-trip.
+    const lines = roles.map(r => `${indent}    ${toJsLiteral(r, { inline: true })}`);
     return `[\n${lines.join(',\n')},\n${indent}]`;
 }

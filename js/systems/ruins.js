@@ -5,7 +5,7 @@
  * that (state, loot, traps, guardians) lives here and round-trips through the save.
  *
  * Crypts start sealed: their interior tiles carry tile.sealed and render dark. Any
- * gap in the wall ring (deconstructed, broken by an enemy, burned) breaches the
+ * gap in the wall ring (deconstructed or broken by an enemy) breaches the
  * crypt, which wakes its guardians and arms its traps.
  */
 import { CONFIG, CRYPT_CONFIG, REALMS, BUILDINGS, getCryptTiles } from '../core/config.js';
@@ -300,6 +300,7 @@ export class RuinSystem {
         game.eventLog.add(game, `The ${name} rift anchor is attuned. Expeditions to the ${name} realms can now gather here.`, 'success', { type: 'position', x, y });
         game.overlays.push({ type: 'floating_text', x, y, text: `${name} rift open`, color: '#aaf0ff', fontSize: 11, ttl: 24, maxTtl: 24 });
         window.soundManager?.playSFXAt('chop_hit', x, y);
+        game.story.checkMilestone(`anchor_${anchor.chain}`, game);
         return true;
     }
 

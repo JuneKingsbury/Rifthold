@@ -58,9 +58,10 @@ export function removeFarmZone(game, x, y) {
     tile.zone = null;
     if (game.mapIndex) game.mapIndex.removeZone(x, y);
     if (game.renderer) game.renderer.markTerrainDirty();
-    const task = game.taskQueue.getByPosition(x, y);
-    if (task && (task.type === 'plant' || task.type === 'harvest' || task.type === 'cleanse_blight')) {
-        game.taskQueue.remove(task.id);
+    for (const task of game.taskQueue.getAllByPosition(x, y)) {
+        if (task.type === 'plant' || task.type === 'harvest' || task.type === 'cleanse_blight') {
+            game.taskQueue.remove(task.id);
+        }
     }
 }
 
@@ -93,11 +94,13 @@ function updateFarmTile(game, x, y, season, growthMult) {
     if (!crop) return;
 
     if (tile.zone.state === 'empty') {
-        const canGrow = crop.seasons.includes(season) ||
-            (season === 'winter' && game.research.isResearched('irrigation'));
+        // Only plant what can actually grow now. Winter growth is zero unless
+        // irrigation is researched, and even then only for winter crops (the
+        // growth step below applies the same rule).
+        const canGrow = crop.seasons.includes(season) &&
+            (season !== 'winter' || game.research.isResearched('irrigation'));
         if (!canGrow) return;
-        const existingTask = game.taskQueue.getByPosition(x, y);
-        if (!existingTask) {
+        if (!game.taskQueue.hasTaskTypeAt(x, y, 'plant')) {
             game.taskQueue.add({
                 type: 'plant',
                 skillRequired: 'farming',
@@ -113,8 +116,8 @@ function updateFarmTile(game, x, y, season, growthMult) {
                 tile.zone.growth = 0;
                 tile.zone.blighted = false;
                 delete tile.zone.blightSpreadCount;
-                const task = game.taskQueue.getByPosition(x, y);
-                if (task && task.type === 'cleanse_blight') game.taskQueue.remove(task.id);
+                const task = game.taskQueue.getAllByPosition(x, y).find(t => t.type === 'cleanse_blight');
+                if (task) game.taskQueue.remove(task.id);
             } else {
                 spreadBlight(game, x, y, tile);
             }
@@ -139,8 +142,7 @@ function updateFarmTile(game, x, y, season, growthMult) {
             tile.zone.growth += effectiveMult;
             if (tile.zone.growth >= crop.growthTicks) {
                 tile.zone.state = 'ready';
-                const existingTask = game.taskQueue.getByPosition(x, y);
-                if (!existingTask) {
+                if (!game.taskQueue.hasTaskTypeAt(x, y, 'harvest')) {
                     game.taskQueue.add({
                         type: 'harvest',
                         skillRequired: 'farming',
@@ -151,8 +153,7 @@ function updateFarmTile(game, x, y, season, growthMult) {
             }
         }
     } else if (tile.zone.state === 'ready') {
-        const existingTask = game.taskQueue.getByPosition(x, y);
-        if (!existingTask) {
+        if (!game.taskQueue.hasTaskTypeAt(x, y, 'harvest')) {
             game.taskQueue.add({
                 type: 'harvest',
                 skillRequired: 'farming',
@@ -193,8 +194,7 @@ function spreadBlight(game, x, y, tile) {
     neighbor.zone.blightSpreadCount = 0;
     tile.zone.blightSpreadCount = (tile.zone.blightSpreadCount || 0) + 1;
 
-    const existingTask = game.taskQueue.getByPosition(nx, ny);
-    if (!existingTask) {
+    if (!game.taskQueue.hasTaskTypeAt(nx, ny, 'cleanse_blight')) {
         game.taskQueue.add({
             type: 'cleanse_blight',
             skillRequired: 'farming',

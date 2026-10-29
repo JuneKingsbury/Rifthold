@@ -27,8 +27,11 @@ export class CrtRenderer {
         container.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d');
         this._scanlinePattern = null;
-        this._patternW = 0;
-        this._patternH = 0;
+        this._patternOpacity = null;
+        this._hadContent = false;
+        this._w = 0;
+        this._h = 0;
+        this._dpr = 1;
     }
 
     initWarpMap() {
@@ -36,30 +39,52 @@ export class CrtRenderer {
         if (el) el.setAttribute('href', buildCrtWarpMap());
     }
 
-    resize(w, h) {
-        if (this.canvas.width !== w || this.canvas.height !== h) {
-            this.canvas.width = w;
-            this.canvas.height = h;
-            this.canvas.style.width = w + 'px';
-            this.canvas.style.height = h + 'px';
+    // Matches the main game canvas: CSS size w x h, backing store at device
+    // resolution (scaled context), so the scanlines are crisp on HiDPI screens
+    // and the canvas lines up exactly with the game canvas beneath it.
+    resize(w, h, dpr = 1) {
+        const bw = Math.round(w * dpr);
+        const bh = Math.round(h * dpr);
+        if (this.canvas.width !== bw || this.canvas.height !== bh || this._dpr !== dpr) {
+            this.canvas.width = bw;
+            this.canvas.height = bh;
+            this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            // Scale the 1x2 scanline tile with nearest-neighbour, not a blur.
+            this.ctx.imageSmoothingEnabled = false;
+            this._dpr = dpr;
             this._scanlinePattern = null;
+            this._hadContent = false;
         }
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
+        this._w = w;
+        this._h = h;
     }
 
+    // One scanline period built in physical pixels (dark rows then clear rows,
+    // about 1 + 1 CSS px at this DPR, rounded to whole device pixels) and mapped
+    // back through the context's DPR scale, so lines are evenly spaced even at
+    // fractional DPR instead of nearest-neighbour scaling a 1x2 tile.
     _buildPattern(opacity) {
+        const dpr = this._dpr;
+        const dark = Math.max(1, Math.round(dpr));
+        const period = Math.max(dark + 1, Math.round(2 * dpr));
         const pc = document.createElement('canvas');
         pc.width = 1;
-        pc.height = 2;
+        pc.height = period;
         const pctx = pc.getContext('2d');
-        pctx.clearRect(0, 0, 1, 2);
         pctx.fillStyle = `rgba(0,0,0,${opacity})`;
-        pctx.fillRect(0, 1, 1, 1);
+        pctx.fillRect(0, period - dark, 1, dark);
         this._scanlinePattern = this.ctx.createPattern(pc, 'repeat');
+        this._scanlinePattern.setTransform(new DOMMatrix([1 / dpr, 0, 0, 1 / dpr, 0, 0]));
+        this._patternOpacity = opacity;
     }
 
+    // The scanlines are static, so they are painted once and left alone until
+    // the canvas is resized (which clears it) or the opacity changes.
     render(settings, opacity) {
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        const w = this._w;
+        const h = this._h;
         if (!w || !h) return;
         if (!settings.showCrtScanlines) {
             if (this._hadContent) {
@@ -69,7 +94,8 @@ export class CrtRenderer {
             return;
         }
         const eff = opacity != null ? opacity : 0.18;
-        if (!this._scanlinePattern) this._buildPattern(eff);
+        if (this._hadContent && this._patternOpacity === eff && this._scanlinePattern) return;
+        if (!this._scanlinePattern || this._patternOpacity !== eff) this._buildPattern(eff);
         this.ctx.clearRect(0, 0, w, h);
         this.ctx.fillStyle = this._scanlinePattern;
         this.ctx.fillRect(0, 0, w, h);

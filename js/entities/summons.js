@@ -1,10 +1,36 @@
 import { ENTITIES, SUMMON_TYPES, COMBAT_VISUALS } from '../core/config.js';
 import { createEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
+import { isPassable } from '../world/map.js';
+
+// Picks where a summon actually appears: the requested tile when it is walkable
+// and free, otherwise the nearest walkable tile within a few steps (free tiles
+// preferred). Returns null when there is nowhere to stand, so callers never
+// place a summon inside a wall, in water, or off the map.
+function findSummonTile(game, x, y) {
+    const free = (tx, ty) => isPassable(game.map, tx, ty) && !game.isTileOccupied(tx, ty);
+    if (free(x, y)) return { x, y };
+    let fallback = isPassable(game.map, x, y) ? { x, y } : null;
+    for (let r = 1; r <= 3; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+                const tx = x + dx, ty = y + dy;
+                if (free(tx, ty)) return { x: tx, y: ty };
+                if (!fallback && isPassable(game.map, tx, ty)) fallback = { x: tx, y: ty };
+            }
+        }
+    }
+    return fallback;
+}
 
 export function spawnSummon(summonType, x, y, ownerId, game, hpMult = 1, damageMult = 1, durationMult = 1) {
     const def = SUMMON_TYPES[summonType];
     if (!def) return null;
+    const spot = findSummonTile(game, x, y);
+    if (!spot) return null;
+    x = spot.x;
+    y = spot.y;
     const summon = createEntity(summonType, x, y, {
         ownerId,
         expiresAt: game.tick + Math.round(def.duration * durationMult),

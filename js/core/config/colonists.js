@@ -99,7 +99,6 @@ export const TRAITS = {
     gluttonous:    { name: 'Gluttonous',    weight: 6,  value: -2, hungerDecayMult: 1.6,  description: 'Gets hungry 60% faster' },
     // ── Rare ────────────────────────────────────────────────────────────────
     lucky:         { name: 'Lucky',         weight: 3,  value:  4, qualityBonus: 2, description: '+2 quality tier chance on all crafted items', expedition: { rareEncounterMult: 1.3 } },
-    pyromaniac:    { name: 'Pyromaniac',    weight: 2,  value: -3, fireChance: 0.001, description: 'Rare chance to start fires' },
     // ── Very Rare ───────────────────────────────────────────────────────────
     pacifist:         { name: 'Pacifist',         weight: 1, value: -2, description: 'Refuses to attack enemies, only flees' },
     prodigy:          { name: 'Prodigy',          weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, description: 'Gains all XP 20% faster', expedition: { xpMult: 1.3 } },

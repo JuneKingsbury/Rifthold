@@ -22,15 +22,7 @@ export class ResearchSystem {
 
         if (tech.requiresBuildings) {
             for (const [building, count] of Object.entries(tech.requiresBuildings)) {
-                let found = 0;
-                for (let y = 0; y < game.map.length; y++) {
-                    for (let x = 0; x < game.map[y].length; x++) {
-                        if (game.map[y][x].structure === building) found++;
-                        if (found >= count) break;
-                    }
-                    if (found >= count) break;
-                }
-                if (found < count) return false;
+                if (game.mapIndex.getStructurePositions(building).size < count) return false;
             }
         }
 
@@ -112,16 +104,10 @@ export class ResearchSystem {
     }
 }
 
+// Desks in row-major map order (stable, so the same desks stay "full" rather
+// than diminished). Index lookup: this runs every 8 ticks and from the HUD.
 export function findResearchDesks(game) {
-    const desks = [];
-    for (let y = 0; y < game.map.length; y++) {
-        for (let x = 0; x < game.map[y].length; x++) {
-            if (game.map[y][x].structure === 'research_desk') {
-                desks.push({ x, y });
-            }
-        }
-    }
-    return desks;
+    return game.mapIndex.findAll('research_desk').sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
 const MAX_FULL_DESKS = 2;
@@ -132,8 +118,7 @@ export function updateResearch(game) {
 
     let activeCount = 0;
     for (const desk of desks) {
-        const task = game.taskQueue.getAll().find(t => t.type === 'research' && t.x === desk.x && t.y === desk.y);
-        if (!task) {
+        if (!game.taskQueue.hasTaskTypeAt(desk.x, desk.y, 'research')) {
             const diminished = activeCount >= MAX_FULL_DESKS;
             game.taskQueue.add({
                 type: 'research',

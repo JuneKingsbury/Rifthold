@@ -4,6 +4,7 @@
 // rather than through game.settings. The in-game panel passes an onApply
 // callback so it can additionally re-apply bindings to the live InputHandler.
 import { DEFAULT_KEYMAP, KEYBIND_ACTIONS } from '../core/config.js';
+import { escapeHtml } from './ui-utils.js';
 
 const SETTINGS_KEY = 'colony_settings';
 // Keys handled structurally by the input handler. Not rebindable.
@@ -27,10 +28,18 @@ export function getStoredBindings() {
     return readSettings().keyBindings || {};
 }
 
+// Rebinding replaces an action's primary key and keeps its secondary keys
+// (e.g. arrow-key alternates), so a rebind doesn't silently drop them.
+export function rebindKeyList(action, key, overrides = getStoredBindings()) {
+    const k = key.toLowerCase();
+    const current = effectiveKeys(action, overrides);
+    return [k, ...current.slice(1).filter(c => c !== k)];
+}
+
 export function setStoredBinding(action, key) {
     const s = readSettings();
     if (!s.keyBindings) s.keyBindings = {};
-    s.keyBindings[action] = [key.toLowerCase()];
+    s.keyBindings[action] = rebindKeyList(action, key, s.keyBindings);
     writeSettings(s);
 }
 
@@ -66,6 +75,17 @@ function conflictingKeys(overrides) {
     return new Set(Object.keys(counts).filter(k => counts[k] > 1));
 }
 
+// Labels of the other actions that `key` is already bound to.
+function actionsUsingKey(key, exceptAction, overrides) {
+    const labels = [];
+    for (const group of KEYBIND_ACTIONS) {
+        for (const { action, label } of group.items) {
+            if (action !== exceptAction && effectiveKeys(action, overrides).includes(key)) labels.push(label);
+        }
+    }
+    return labels;
+}
+
 // Human-readable label for a stored key string.
 export function formatKeyLabel(key) {
     const names = { ' ': 'Space', 'arrowup': '↑', 'arrowdown': '↓', 'arrowleft': '←', 'arrowright': '→', 'home': 'Home', 'escape': 'Esc', 'tab': 'Tab' };
@@ -91,7 +111,7 @@ export function keybindingRowsHtml(rebindExpr, resetExpr) {
         html += `<div style="color:#88aaff;font-size:11px;margin:4px 0 2px;">${group.group}</div>`;
         for (const { action, label } of group.items) {
             const keys = effectiveKeys(action, overrides);
-            const keyLabel = keys.map(k => formatKeyLabel(k)).join(' / ') || '—';
+            const keyLabel = escapeHtml(keys.map(k => formatKeyLabel(k)).join(' / ') || '—');
             const hasConflict = keys.some(k => conflicts.has(k));
             const color = hasConflict ? '#ff6666' : '#ffcc00';
             const border = hasConflict ? '#aa3333' : '#555';
@@ -105,35 +125,60 @@ export function keybindingRowsHtml(rebindExpr, resetExpr) {
     return html;
 }
 
-// Capture the next keypress for `action` and persist it. `onApply(action, key)`
-// runs after a successful bind (e.g. to re-apply live and re-render). `onError`
-// runs when a reserved key is pressed. A pending capture is stored on the module
-// so a second click cancels/replaces it.
+// Modifier keys alone can't be a binding; capture keeps waiting past them.
+const MODIFIER_KEYS = ['shift', 'control', 'alt', 'altgraph', 'meta', 'os', 'capslock', 'fn', 'numlock', 'scrolllock'];
+
+// Capture the next keypress for `action` and persist it. `onApply(action, key,
+// keys, conflicts)` runs after a successful bind (e.g. to re-apply live and
+// re-render). `keys` is the action's full new key list and `conflicts` the
+// labels of other actions already using `key`. `onError` runs when a reserved
+// key is pressed. Esc cancels. A pending capture is stored on the module so a
+// second click cancels/replaces it, and cancelRebindCapture() drops it when the
+// panel closes.
 let _pendingCapture = null;
+let _pendingRestore = null;
+
+export function cancelRebindCapture() {
+    if (_pendingCapture) document.removeEventListener('keydown', _pendingCapture, true);
+    if (_pendingRestore) _pendingRestore();
+    _pendingCapture = null;
+    _pendingRestore = null;
+}
 
 export function beginRebindCapture(action, btn, onApply, onError) {
-    if (_pendingCapture) {
-        document.removeEventListener('keydown', _pendingCapture, true);
-        _pendingCapture = null;
-    }
+    cancelRebindCapture();
     const prevLabel = btn.textContent;
+    const prevColor = btn.style.color;
     btn.textContent = 'Press…';
     btn.style.color = '#ff8888';
+    const restore = () => {
+        btn.textContent = prevLabel;
+        btn.style.color = prevColor;
+    };
     const capture = (e) => {
+        // The panel was closed or re-rendered without this row: the capture is
+        // stale, so drop it and let the key through.
+        if (!btn.isConnected && !document.querySelector(`[data-rebind-action="${action}"]`)?.offsetParent) {
+            cancelRebindCapture();
+            return;
+        }
         e.preventDefault();
         e.stopPropagation();
-        document.removeEventListener('keydown', capture, true);
-        _pendingCapture = null;
         const key = e.key.toLowerCase();
+        if (MODIFIER_KEYS.includes(key)) return;
+        cancelRebindCapture();
+        if (key === 'escape') return;
         if (isReservedKey(key)) {
-            btn.textContent = prevLabel;
-            btn.style.color = '#ffcc00';
             if (onError) onError(key);
             return;
         }
+        const overrides = getStoredBindings();
+        const conflicts = actionsUsingKey(key, action, overrides);
+        const keys = rebindKeyList(action, key, overrides);
         setStoredBinding(action, key);
-        if (onApply) onApply(action, key);
+        if (onApply) onApply(action, key, keys, conflicts);
     };
     _pendingCapture = capture;
+    _pendingRestore = restore;
     document.addEventListener('keydown', capture, true);
 }

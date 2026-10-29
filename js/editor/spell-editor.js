@@ -1,17 +1,42 @@
-import { SPELLS, SPELL_TOMES, RESEARCH, CONFIG, SUMMON_TYPES } from '../core/config.js';
-import { EffectPicker, formatEffectsCode } from './effect-picker.js';
+import { SPELLS, SPELL_TOMES, RESEARCH, CONFIG, SUMMON_TYPES, RECIPES } from '../core/config.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { toJsLiteral } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_spell_drafts';
 
 const SCHOOLS = ['evocation', 'abjuration', 'enchantment', 'conjuration', 'transmutation', 'divination'];
 const CAST_TYPES = ['auto', 'targeted'];
-const TRIGGERS = [
-    { value: 'inCombat', label: 'In Combat' },
-    { value: 'lowHealth', label: 'Low Health' },
-    { value: 'woundedNearby', label: 'Wounded Nearby (self/ally)' },
-    { value: 'hasTask', label: 'Has Task' },
-    { value: 'always', label: 'Always' },
-];
+const TRIGGER_LABELS = {
+    inCombat: 'In Combat',
+    lowHealth: 'Low Health',
+    woundedNearby: 'Wounded Nearby (self/ally)',
+    hasTask: 'Has Task',
+    always: 'Always',
+    debuffNearby: 'Ally Afflicted',
+    cropsNearby: 'Crops Nearby',
+    canTransmute: 'Materials Available',
+};
+
+// Fields the form edits directly. Everything else on a spell def is an
+// effect parameter, read by the handler for that spell's `effect` string.
+const CORE_FIELDS = ['name', 'school', 'minLevel', 'manaCost', 'cooldown', 'castType', 'trigger', 'effect'];
+
+// The game dispatches on `spell.effect` (colonist.js castSpell, main.js
+// castTargetedSpell, ui.js _spellTooltip). Offer every effect the config
+// already uses, with the first spell's params as the template.
+const EFFECT_TEMPLATES = {};
+for (const def of Object.values(SPELLS)) {
+    if (!def.effect || EFFECT_TEMPLATES[def.effect]) continue;
+    const params = {};
+    for (const [k, v] of Object.entries(def)) if (!CORE_FIELDS.includes(k)) params[k] = v;
+    EFFECT_TEMPLATES[def.effect] = params;
+}
+const TRIGGERS = [...new Set([...Object.keys(TRIGGER_LABELS), ...Object.values(SPELLS).map(s => s.trigger).filter(Boolean)])]
+    .map(value => ({ value, label: TRIGGER_LABELS[value] || value }));
+
+// Tome recipes live in BASE_RECIPES (equipment.js) as craft_<tomeKey>.
+const TOME_STATIONS = [...new Set(['scriptorium', 'workbench',
+    ...Object.values(RECIPES).filter(r => r.category === 'Tomes').map(r => r.station).filter(Boolean)])];
 
 const REFERENCE_DATA = [
     { title: 'Spell IDs', ids: Object.keys(SPELLS) },
@@ -20,6 +45,22 @@ const REFERENCE_DATA = [
     { title: 'Research IDs', ids: Object.keys(RESEARCH) },
     { title: 'Resource IDs', ids: Object.keys(CONFIG.START_RESOURCES) },
 ];
+
+const tomeKeyFor = (spellKey) => `tome_of_${spellKey}`;
+
+// Param values are typed as JSON (numbers, booleans, arrays, objects); any
+// other text is a plain string.
+function parseParamValue(raw) {
+    const s = raw.trim();
+    if (s === '') return undefined;
+    try { return JSON.parse(s); } catch { return raw; }
+}
+
+function formatParamValue(v) {
+    if (typeof v !== 'string') return JSON.stringify(v);
+    // Keep strings bare unless they would re-parse as a different JSON type.
+    try { JSON.parse(v); return JSON.stringify(v); } catch { return v; }
+}
 
 let editorInstance = null;
 
@@ -39,6 +80,7 @@ class SpellEditor {
         this.container = document.getElementById('spell-editor');
         this._buildDOM();
         this._bindEvents();
+        this._setEffect('ranged_damage', EFFECT_TEMPLATES.ranged_damage || {});
         this._autoRestore();
         this._updateCastTypeVisibility();
         this._schedulePreview();
@@ -154,15 +196,37 @@ class SpellEditor {
                 <div class="fe-field">
                     <label>Trigger (auto only)</label>
                     <select id="sp-trigger">
-                        ${TRIGGERS.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}
+                        ${TRIGGERS.map(t => `<option value="${escapeAttr(t.value)}">${escapeHtml(t.label)}</option>`).join('')}
                     </select>
                 </div>
             </div>
 
-            <div class="fe-section-title">Effects</div>
-            <div id="sp-effects-container"></div>
+            <div class="fe-section-title">Effect</div>
+            <div class="fe-field">
+                <label>Effect (handler the game runs)</label>
+                <select id="sp-effect">
+                    ${Object.keys(EFFECT_TEMPLATES).map(k => `<option value="${escapeAttr(k)}">${escapeHtml(k)}</option>`).join('')}
+                </select>
+            </div>
+            <div style="color:#666;font-size:10px;margin:4px 0;">Params are flat fields on the spell. Values are JSON (numbers, true/false, [..], {..}); anything else is text.</div>
+            <div id="sp-params"></div>
+            <button id="sp-add-param" class="fe-add-btn" style="margin-top:4px;">+ Param</button>
 
-            <div class="fe-section-title">Tome Recipe</div>
+            <div class="fe-section-title">Tome</div>
+            <div class="fe-row">
+                <div class="fe-field">
+                    <label>Tome Name</label>
+                    <input type="text" id="sp-tomeName" placeholder="Tome of Frost Bolt">
+                </div>
+                <div class="fe-field">
+                    <label>Trade Value</label>
+                    <input type="number" id="sp-tradeValue" value="20" min="0">
+                </div>
+            </div>
+            <div class="fe-field">
+                <label>Tome Description</label>
+                <input type="text" id="sp-tomeDesc" placeholder="Teaches ...">
+            </div>
             <div class="fe-row">
                 <div class="fe-field">
                     <label>Learning Work (ticks)</label>
@@ -173,6 +237,8 @@ class SpellEditor {
                     <input type="number" id="sp-tomeMinLevel" value="0" min="0">
                 </div>
             </div>
+
+            <div class="fe-section-title">Tome Recipe</div>
             <div class="fe-field">
                 <label>Craft Cost (e.g. planks:3, runite:1)</label>
                 <input type="text" id="sp-craftCost" placeholder="planks:3, runite:1">
@@ -183,8 +249,14 @@ class SpellEditor {
                     <input type="number" id="sp-craftTicks" value="30" min="1">
                 </div>
                 <div class="fe-field">
+                    <label>Station</label>
+                    <select id="sp-station">
+                        ${TOME_STATIONS.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="fe-field">
                     <label>Research Required</label>
-                    <input type="text" id="sp-research" placeholder="arcane_studies">
+                    <input type="text" id="sp-research" placeholder="arcane_studies" value="arcane_studies">
                 </div>
             </div>
 
@@ -212,6 +284,25 @@ class SpellEditor {
 
         document.getElementById('sp-castType').addEventListener('change', () => this._updateCastTypeVisibility());
 
+        // Switching effect swaps in that effect's template params, keeping any
+        // value the user already set for a param of the same name.
+        document.getElementById('sp-effect').addEventListener('change', (e) => {
+            const current = this._collectParams();
+            const template = EFFECT_TEMPLATES[e.target.value] || {};
+            const merged = {};
+            for (const k of Object.keys(template)) merged[k] = k in current ? current[k] : template[k];
+            this._setEffect(e.target.value, merged);
+        });
+
+        document.getElementById('sp-add-param').addEventListener('click', () => {
+            document.getElementById('sp-params').insertAdjacentHTML('beforeend', this._paramRowHtml('', ''));
+        });
+        document.getElementById('sp-params').addEventListener('click', (e) => {
+            if (!e.target.classList.contains('sp-param-del')) return;
+            e.target.closest('.fe-list-row').remove();
+            this._schedulePreview();
+        });
+
         this.container.querySelectorAll('.fe-tab-btn').forEach(btn => {
             btn.addEventListener('click', () => this._switchTab(btn.dataset.tab));
         });
@@ -219,13 +310,12 @@ class SpellEditor {
         this.container.addEventListener('input', () => this._schedulePreview());
         this.container.addEventListener('change', () => this._schedulePreview());
 
-        this._effectPicker = new EffectPicker(document.getElementById('sp-effects-container'), {
-            allowedContexts: ['on_cast', 'buff', 'aura'],
-            onChange: () => this._schedulePreview(),
-        });
-
         window.addEventListener('keydown', (e) => {
             if (this.container.style.display === 'none') return;
+            const t = e.target;
+            const typing = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable;
+            // Leave Ctrl+Z / Ctrl+Y to the browser's native text undo while typing.
+            if (typing) return;
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 this._undo();
@@ -236,8 +326,7 @@ class SpellEditor {
                 this._redo();
                 return;
             }
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-            if (e.key === 'Escape') this._goBack();
+            if (e.key === 'Escape' && !this.container.querySelector('.fe-export-modal')) this._goBack();
         });
     }
 
@@ -260,7 +349,7 @@ class SpellEditor {
             html += `<div class="fe-ref-category">`;
             html += `<div class="fe-ref-category-title">${cat.title}</div>`;
             for (const id of cat.ids) {
-                html += `<span class="fe-ref-id" data-ref-id="${id}">${id}</span>`;
+                html += `<span class="fe-ref-id" data-ref-id="${escapeAttr(id)}">${escapeHtml(id)}</span>`;
             }
             html += `</div>`;
         }
@@ -292,15 +381,46 @@ class SpellEditor {
         document.getElementById('sp-trigger').closest('.fe-field').style.display = castType === 'auto' ? '' : 'none';
     }
 
+    _paramRowHtml(key, value) {
+        return `<div class="fe-list-row" style="margin-bottom:4px;">
+            <input type="text" class="sp-param-key" value="${escapeAttr(key)}" placeholder="param" style="width:130px;">
+            <input type="text" class="sp-param-val" value="${escapeAttr(value)}" placeholder="value" style="flex:1;">
+            <button class="fe-remove-btn sp-param-del">✕</button>
+        </div>`;
+    }
+
+    _setEffect(effect, params) {
+        const sel = document.getElementById('sp-effect');
+        if (effect && ![...sel.options].some(o => o.value === effect)) {
+            // Effect not used by any base spell (e.g. from a mod draft): keep it selectable.
+            const opt = document.createElement('option');
+            opt.value = effect;
+            opt.textContent = effect;
+            sel.appendChild(opt);
+        }
+        sel.value = effect;
+        document.getElementById('sp-params').innerHTML = Object.entries(params || {})
+            .map(([k, v]) => this._paramRowHtml(k, formatParamValue(v))).join('');
+        this._schedulePreview();
+    }
+
+    _collectParams() {
+        const params = {};
+        document.querySelectorAll('#sp-params .fe-list-row').forEach(row => {
+            const k = row.querySelector('.sp-param-key').value.trim();
+            if (!k || CORE_FIELDS.includes(k)) return;
+            const v = parseParamValue(row.querySelector('.sp-param-val').value);
+            if (v !== undefined) params[k] = v;
+        });
+        return params;
+    }
+
     _updateCharPreview() {
-        const effects = this._effectPicker ? this._effectPicker.getEffects() : [];
-        const dmg = effects.find(e => e.type === 'damage');
-        const char = dmg?.projectileChar || '*';
-        const color = dmg?.projectileColor || '#ffaa33';
+        const params = this._collectParams();
         const preview = document.getElementById('sp-char-preview');
         if (preview) {
-            preview.textContent = char;
-            preview.style.color = color;
+            preview.textContent = typeof params.projectileChar === 'string' ? params.projectileChar : '*';
+            preview.style.color = typeof params.projectileColor === 'string' ? params.projectileColor : '#ffaa33';
         }
     }
 
@@ -347,14 +467,19 @@ class SpellEditor {
             data.trigger = document.getElementById('sp-trigger').value;
         }
 
-        data.effects = this._effectPicker ? this._effectPicker.getEffects() : [];
+        data.effect = document.getElementById('sp-effect').value;
+        data.params = this._collectParams();
 
         data.tome = {
+            name: document.getElementById('sp-tomeName').value.trim() || `Tome of ${data.name}`,
+            tradeValue: parseInt(document.getElementById('sp-tradeValue').value) || 0,
+            description: document.getElementById('sp-tomeDesc').value.trim(),
             learningWork: parseInt(document.getElementById('sp-learningWork').value) || 60,
             minSchoolLevel: parseInt(document.getElementById('sp-tomeMinLevel').value) || 0,
             craftCost: this._parseCost(document.getElementById('sp-craftCost').value),
             craftTicks: parseInt(document.getElementById('sp-craftTicks').value) || 30,
-            research: document.getElementById('sp-research').value.trim() || 'arcane_studies',
+            station: document.getElementById('sp-station').value || 'scriptorium',
+            research: document.getElementById('sp-research').value.trim(),
         };
 
         return data;
@@ -370,30 +495,43 @@ class SpellEditor {
         return cost;
     }
 
+    // Build the three config entries in the shape the game reads.
+    _buildEntries(data) {
+        const spell = {};
+        for (const f of ['name', 'school', 'minLevel', 'manaCost', 'cooldown', 'castType', 'trigger', 'effect']) {
+            if (data[f] !== undefined) spell[f] = data[f];
+        }
+        Object.assign(spell, data.params || {});
+
+        const t = data.tome || {};
+        const tomeKey = tomeKeyFor(data.key);
+        const tome = { name: t.name || `Tome of ${data.name}` };
+        if (t.tradeValue) tome.tradeValue = t.tradeValue;
+        tome.spell = data.key;
+        tome.learningWork = t.learningWork || 60;
+        tome.minSchoolLevel = t.minSchoolLevel || 0;
+        if (t.description) tome.description = t.description;
+
+        const recipe = { input: t.craftCost || {}, output: { [tomeKey]: 1 }, skill: 'crafting', ticks: t.craftTicks || 30, station: t.station || 'scriptorium' };
+        if (t.research) recipe.research = t.research;
+        recipe.category = 'Tomes';
+
+        return { spell, tomeKey, tome, recipeKey: `craft_${tomeKey}`, recipe };
+    }
+
+    _entryLine(key, value) {
+        return `${/^[A-Za-z_$][\w$]*$/.test(key) ? key : JSON.stringify(key)}: ${toJsLiteral(value, { inline: true })},\n`;
+    }
+
     _formatOutput(data) {
         if (!data) return '';
-        let out = '// === Add to SPELLS in config.js ===\n';
-        out += `${data.key}: {\n`;
-        out += `    name: '${data.name}',\n`;
-        out += `    school: '${data.school}',\n`;
-        out += `    minLevel: ${data.minLevel},\n`;
-        out += `    manaCost: ${data.manaCost},\n`;
-        out += `    cooldown: ${data.cooldown},\n`;
-        out += `    castType: '${data.castType}',\n`;
-        if (data.trigger) out += `    trigger: '${data.trigger}',\n`;
-        if (data.effects && data.effects.length) {
-            out += formatEffectsCode(data.effects) + ',\n';
-        }
-        out += `},\n\n`;
-
-        const tomeKey = `tome_${data.key}`;
-        out += `// === Add to SPELL_TOMES in config.js ===\n`;
-        out += `${tomeKey}: { name: 'Tome: ${data.name}', spell: '${data.key}', learningWork: ${data.tome.learningWork}, minSchoolLevel: ${data.tome.minSchoolLevel} },\n\n`;
-
-        const costStr = Object.entries(data.tome.craftCost).map(([k, v]) => `${k}: ${v}`).join(', ');
-        out += `// === Add to RECIPES in config.js ===\n`;
-        out += `craft_${tomeKey}: { input: { ${costStr} }, output: { ${tomeKey}: 1 }, skill: 'crafting', ticks: ${data.tome.craftTicks}, station: 'enchanting_table', research: '${data.tome.research}', category: 'Tomes' },\n`;
-
+        const e = this._buildEntries(data);
+        let out = '// === Add to SPELLS in js/core/config/magic.js ===\n';
+        out += this._entryLine(data.key, e.spell) + '\n';
+        out += '// === Add to SPELL_TOMES in js/core/config/magic.js ===\n';
+        out += this._entryLine(e.tomeKey, e.tome) + '\n';
+        out += '// === Add to BASE_RECIPES in js/core/config/equipment.js ===\n';
+        out += this._entryLine(e.recipeKey, e.recipe);
         return out;
     }
 
@@ -425,12 +563,16 @@ class SpellEditor {
         document.getElementById('sp-cooldown').value = '60';
         document.getElementById('sp-castType').value = 'auto';
         document.getElementById('sp-trigger').value = 'inCombat';
+        document.getElementById('sp-tomeName').value = '';
+        document.getElementById('sp-tradeValue').value = '20';
+        document.getElementById('sp-tomeDesc').value = '';
         document.getElementById('sp-learningWork').value = '60';
         document.getElementById('sp-tomeMinLevel').value = '0';
         document.getElementById('sp-craftCost').value = '';
         document.getElementById('sp-craftTicks').value = '30';
+        document.getElementById('sp-station').value = 'scriptorium';
         document.getElementById('sp-research').value = 'arcane_studies';
-        if (this._effectPicker) this._effectPicker.clear();
+        this._setEffect('ranged_damage', EFFECT_TEMPLATES.ranged_damage || {});
         this._updateCastTypeVisibility();
     }
 
@@ -441,15 +583,14 @@ class SpellEditor {
             return;
         }
         let html = `<table class="fe-batch-table"><thead><tr>
-            <th>School</th><th>Key</th><th>Name</th><th>Effects</th><th>Actions</th>
+            <th>School</th><th>Key</th><th>Name</th><th>Effect</th><th>Actions</th>
         </tr></thead><tbody>`;
         this.batchItems.forEach((item, i) => {
-            const effectSummary = (item.effects || []).map(e => e.type).join(', ') || '-';
             html += `<tr>
-                <td>${item.school}</td>
-                <td>${item.key}</td>
-                <td>${item.name}</td>
-                <td>${effectSummary}</td>
+                <td>${escapeHtml(item.school)}</td>
+                <td>${escapeHtml(item.key)}</td>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${escapeHtml(item.effect || '-')}</td>
                 <td>
                     <button data-edit="${i}">Edit</button>
                     <button data-remove="${i}">✕</button>
@@ -483,6 +624,7 @@ class SpellEditor {
     }
 
     _populateForm(data) {
+        data = this._upgradeLegacyDraft(data);
         document.getElementById('sp-key').value = data.key || '';
         document.getElementById('sp-name').value = data.name || '';
         document.getElementById('sp-school').value = data.school || 'evocation';
@@ -490,130 +632,88 @@ class SpellEditor {
         document.getElementById('sp-manaCost').value = data.manaCost || 8;
         document.getElementById('sp-cooldown').value = data.cooldown || 60;
         document.getElementById('sp-castType').value = data.castType || 'auto';
-        document.getElementById('sp-trigger').value = data.trigger || 'inCombat';
-
-        if (data.effects) {
-            this._effectPicker.setEffects(data.effects);
-        } else if (data.effect) {
-            this._effectPicker.setEffects(this._legacyToEffects(data));
+        const trig = document.getElementById('sp-trigger');
+        if (data.trigger && ![...trig.options].some(o => o.value === data.trigger)) {
+            const opt = document.createElement('option');
+            opt.value = data.trigger;
+            opt.textContent = data.trigger;
+            trig.appendChild(opt);
         }
+        trig.value = data.trigger || 'inCombat';
 
-        if (data.tome) {
-            document.getElementById('sp-learningWork').value = data.tome.learningWork || 60;
-            document.getElementById('sp-tomeMinLevel').value = data.tome.minSchoolLevel || 0;
-            if (data.tome.craftCost) {
-                document.getElementById('sp-craftCost').value = Object.entries(data.tome.craftCost).map(([k, v]) => `${k}:${v}`).join(', ');
-            }
-            document.getElementById('sp-craftTicks').value = data.tome.craftTicks || 30;
-            document.getElementById('sp-research').value = data.tome.research || 'arcane_studies';
+        this._setEffect(data.effect || 'ranged_damage', data.params || {});
+
+        const t = data.tome || {};
+        document.getElementById('sp-tomeName').value = t.name || '';
+        document.getElementById('sp-tradeValue').value = t.tradeValue ?? 20;
+        document.getElementById('sp-tomeDesc').value = t.description || '';
+        document.getElementById('sp-learningWork').value = t.learningWork || 60;
+        document.getElementById('sp-tomeMinLevel').value = t.minSchoolLevel || 0;
+        document.getElementById('sp-craftCost').value = Object.entries(t.craftCost || {}).map(([k, v]) => `${k}:${v}`).join(', ');
+        document.getElementById('sp-craftTicks').value = t.craftTicks || 30;
+        const station = document.getElementById('sp-station');
+        if (t.station && ![...station.options].some(o => o.value === t.station)) {
+            const opt = document.createElement('option');
+            opt.value = t.station;
+            opt.textContent = t.station;
+            station.appendChild(opt);
         }
+        station.value = t.station || 'scriptorium';
+        document.getElementById('sp-research').value = t.research ?? 'arcane_studies';
 
         this._updateCastTypeVisibility();
         this._schedulePreview();
     }
 
-    _legacyToEffects(data) {
-        const effect = { type: data.effect, context: 'on_cast' };
-        switch (data.effect) {
-            case 'ranged_damage':
-            case 'ranged_damage_aoe':
-                effect.type = 'damage';
-                effect.value = data.damage || 10;
-                effect.range = data.range || 5;
-                if (data.radius) effect.radius = data.radius;
-                if (data.projectileChar) effect.projectileChar = data.projectileChar;
-                if (data.projectileColor) effect.projectileColor = data.projectileColor;
-                break;
-            case 'heal':
-                effect.value = data.healAmount || 15;
-                if (data.hpThreshold) effect.hpThreshold = data.hpThreshold;
-                if (data.targetSelf) effect.targetSelf = true;
-                break;
-            case 'buff_speed':
-                effect.moveSpeedBonus = data.moveSpeedBonus || 0;
-                effect.workSpeedBonus = data.workSpeedBonus || 0;
-                effect.duration = data.duration || 60;
-                break;
-            case 'buff_defense':
-                effect.damageReduction = data.damageReduction || 0.3;
-                effect.duration = data.duration || 60;
-                break;
-            case 'teleport':
-                effect.range = data.range || 20;
-                break;
-            case 'summon':
-                effect.summonType = data.summonType || 'familiar';
-                break;
-            case 'boost_crops':
-                effect.range = data.range || 5;
-                effect.radius = data.radius || 2;
-                effect.growthMult = data.growthMult || 1.5;
-                effect.duration = data.duration || 100;
-                break;
-            case 'terraform':
-                effect.range = data.range || 8;
-                effect.radius = data.radius || 3;
-                effect.targetTerrain = data.targetTerrain || 'grass';
-                break;
-            case 'divination_modifier':
-                effect.type = 'divination';
-                effect.modifiers = data.modifiers || {};
-                effect.duration = data.duration || 300;
-                break;
-            case 'chain_damage':
-                // A bouncing bolt, modelled in the editor as a plain damage effect.
-                // the chain params live on the exported config, not the visual editor.
-                effect.type = 'damage';
-                effect.value = data.damage || 10;
-                effect.range = data.range || 6;
-                if (data.projectileChar) effect.projectileChar = data.projectileChar;
-                if (data.projectileColor) effect.projectileColor = data.projectileColor;
-                break;
-            case 'ranged_damage_slow':
-                effect.type = 'damage';
-                effect.value = data.damage || 10;
-                effect.range = data.range || 6;
-                break;
-            case 'chain_heal':
-                effect.type = 'heal';
-                effect.value = data.healAmount || 15;
-                if (data.hpThreshold) effect.hpThreshold = data.hpThreshold;
-                break;
-            case 'absorb_shield':
-                effect.type = 'shield';
-                effect.absorb = data.absorbAmount || 20;
-                effect.duration = data.duration || 120;
-                break;
-            case 'stun':
-                effect.type = 'stun';
-                effect.duration = data.stunDuration || 45;
-                effect.range = data.range || 6;
-                break;
-            case 'summon_swarm':
-                effect.type = 'summon';
-                effect.summonType = data.summonType || 'spectral_wisp';
-                break;
-            // cleanse, buff_quality, buff_rest, transmute, finish_construction and
-            // ripen_crops have no visual-editor primitive. They pass through as their raw
-            // type (the picker falls back to a generic row) and stay config-authored.
+    // Drafts saved by the old editor used an `effects: [...]` array and a
+    // tome without station. Map the first effect onto the flat schema.
+    _upgradeLegacyDraft(data) {
+        if (data.effect || !Array.isArray(data.effects)) return data;
+        const out = { ...data };
+        delete out.effects;
+        const e = data.effects[0];
+        if (e) {
+            const params = { ...e };
+            delete params.type; delete params.context; delete params.stacking;
+            if (e.type === 'damage') {
+                out.effect = e.radius ? 'ranged_damage_aoe' : 'ranged_damage';
+                params.damage = params.value; delete params.value;
+            } else if (e.type === 'heal') {
+                out.effect = 'heal';
+                params.healAmount = params.value; delete params.value;
+            } else if (e.type === 'divination') {
+                out.effect = 'divination_modifier';
+            } else {
+                out.effect = e.type;
+            }
+            out.params = params;
         }
-        return [effect];
+        return out;
     }
 
     _loadFromConfig(key) {
         const def = SPELLS[key];
         if (!def) return;
-        const data = { key, ...def };
-        const tome = SPELL_TOMES[`tome_${key}`];
-        if (tome) {
-            data.tome = {
-                learningWork: tome.learningWork || 60,
-                minSchoolLevel: tome.minSchoolLevel || 0,
-                craftCost: {},
-                craftTicks: 30,
-                research: 'arcane_studies',
-            };
+        const data = { key, params: {} };
+        for (const [k, v] of Object.entries(def)) {
+            if (CORE_FIELDS.includes(k)) data[k] = v;
+            else data.params[k] = v;
         }
+        const tomeKey = Object.keys(SPELL_TOMES).find(k => SPELL_TOMES[k].spell === key) || tomeKeyFor(key);
+        const tome = SPELL_TOMES[tomeKey];
+        const recipe = RECIPES[`craft_${tomeKey}`];
+        data.tome = {
+            // Leave the standard name blank so it keeps following the spell name.
+            name: tome?.name && tome.name !== `Tome of ${def.name}` ? tome.name : '',
+            tradeValue: tome?.tradeValue ?? 20,
+            description: tome?.description || '',
+            learningWork: tome?.learningWork || 60,
+            minSchoolLevel: tome?.minSchoolLevel || 0,
+            craftCost: recipe ? { ...recipe.input } : {},
+            craftTicks: recipe?.ticks || 30,
+            station: recipe?.station || 'scriptorium',
+            research: recipe ? (recipe.research || '') : 'arcane_studies',
+        };
         this._populateForm(data);
         this._pushUndoState();
     }
@@ -634,31 +734,21 @@ class SpellEditor {
 
     _showExportModal() {
         if (!this.batchItems.length) return;
+        const entries = this.batchItems.map(item => [item, this._buildEntries(item)]);
         let output = '';
-        output += '// === Add to SPELLS in config.js ===\n';
-        this.batchItems.forEach(item => {
-            const lines = this._formatOutput(item).split('\n');
-            const spellLines = lines.slice(1, lines.findIndex(l => l.startsWith('// === Add to SPELL_TOMES')));
-            output += spellLines.join('\n') + '\n';
-        });
-        output += '\n// === Add to SPELL_TOMES in config.js ===\n';
-        this.batchItems.forEach(item => {
-            const tomeKey = `tome_${item.key}`;
-            output += `${tomeKey}: { name: 'Tome: ${item.name}', spell: '${item.key}', learningWork: ${item.tome.learningWork}, minSchoolLevel: ${item.tome.minSchoolLevel} },\n`;
-        });
-        output += '\n// === Add to RECIPES in config.js ===\n';
-        this.batchItems.forEach(item => {
-            const tomeKey = `tome_${item.key}`;
-            const costStr = Object.entries(item.tome.craftCost).map(([k, v]) => `${k}: ${v}`).join(', ');
-            output += `craft_${tomeKey}: { input: { ${costStr} }, output: { ${tomeKey}: 1 }, skill: 'crafting', ticks: ${item.tome.craftTicks}, station: 'enchanting_table', research: '${item.tome.research}', category: 'Tomes' },\n`;
-        });
+        output += '// === Add to SPELLS in js/core/config/magic.js ===\n';
+        for (const [item, e] of entries) output += this._entryLine(item.key, e.spell);
+        output += '\n// === Add to SPELL_TOMES in js/core/config/magic.js ===\n';
+        for (const [, e] of entries) output += this._entryLine(e.tomeKey, e.tome);
+        output += '\n// === Add to BASE_RECIPES in js/core/config/equipment.js ===\n';
+        for (const [, e] of entries) output += this._entryLine(e.recipeKey, e.recipe);
 
         const modal = document.createElement('div');
         modal.className = 'fe-export-modal';
         modal.innerHTML = `
             <div class="fe-export-modal-content">
                 <div style="color:#ffcc00;font-weight:bold;margin-bottom:12px;">Export All Spells (${this.batchItems.length} items)</div>
-                <textarea readonly>${output}</textarea>
+                <textarea readonly>${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="sp-modal-copy">Copy to Clipboard</button>
                     <button id="sp-modal-close">Close</button>
@@ -690,7 +780,7 @@ class SpellEditor {
             const raw = localStorage.getItem(STORAGE_KEY + '_autosave');
             if (!raw) return;
             const state = JSON.parse(raw);
-            if (state.batch && state.batch.length) this.batchItems = state.batch;
+            if (state.batch && state.batch.length) this.batchItems = state.batch.map(b => this._upgradeLegacyDraft(b));
             this._renderBatchList();
             if (state.form && state.form.key) {
                 this._populateForm(state.form);
@@ -699,29 +789,28 @@ class SpellEditor {
     }
 
     _getFormSnapshot() {
-        const inputs = this.container.querySelectorAll('#sp-form input, #sp-form select');
+        const inputs = this.container.querySelectorAll('#sp-form input[id], #sp-form select[id]');
         const snap = {};
         inputs.forEach(el => {
-            const id = el.id;
-            if (!id) return;
-            if (el.type === 'checkbox') snap[id] = el.checked;
-            else snap[id] = el.value;
+            if (el.type === 'checkbox') snap[el.id] = el.checked;
+            else snap[el.id] = el.value;
         });
-        snap._effects = this._effectPicker ? this._effectPicker.getEffects() : [];
+        snap._params = [...document.querySelectorAll('#sp-params .fe-list-row')].map(row =>
+            [row.querySelector('.sp-param-key').value, row.querySelector('.sp-param-val').value]);
         return JSON.stringify(snap);
     }
 
     _restoreFormSnapshot(json) {
         const snap = JSON.parse(json);
-        const effects = snap._effects || [];
-        delete snap._effects;
+        const params = snap._params || [];
+        delete snap._params;
         for (const [id, val] of Object.entries(snap)) {
             const el = document.getElementById(id);
             if (!el) continue;
             if (el.type === 'checkbox') el.checked = val;
             else el.value = val;
         }
-        if (this._effectPicker) this._effectPicker.setEffects(effects);
+        document.getElementById('sp-params').innerHTML = params.map(([k, v]) => this._paramRowHtml(k, v)).join('');
         this._updateCastTypeVisibility();
         this._updatePreview();
     }

@@ -1,5 +1,7 @@
 import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS } from '../core/config.js';
 import { EffectPicker, formatEffectsCode, STAT_KEYS } from './effect-picker.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { toJsLiteral } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_equipment_drafts';
 
@@ -226,6 +228,10 @@ class EquipmentEditor {
 
         window.addEventListener('keydown', (e) => {
             if (this.container.style.display === 'none') return;
+            // Leave typing keys to the focused field: native text undo and Esc
+            // to blur, rather than form-level undo or leaving the editor.
+            const t = e.target;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 this._undo();
@@ -335,17 +341,18 @@ class EquipmentEditor {
 
     _formatItem(item) {
         if (!item || !item.key) return '';
-        let out = `${item.key}: {\n`;
-        out += `    name: '${item.name || item.key}',\n`;
+        const key = /^[A-Za-z_$][\w$]*$/.test(item.key) ? item.key : toJsLiteral(item.key);
+        let out = `${key}: {\n`;
+        out += `    name: ${toJsLiteral(item.name || item.key)},\n`;
         if (item.effects && item.effects.length) {
             out += formatEffectsCode(item.effects) + ',\n';
         }
         if (item.ranged) {
             out += `    ranged: true,\n`;
             out += `    range: ${item.range || 5},\n`;
-            out += `    projectileChar: '${item.projectileChar || '·'}',\n`;
-            out += `    projectileColor: '${item.projectileColor || '#ffaa33'}',\n`;
-            if (item.skinKey) out += `    skinKey: '${item.skinKey}',\n`;
+            out += `    projectileChar: ${toJsLiteral(item.projectileChar || '·')},\n`;
+            out += `    projectileColor: ${toJsLiteral(item.projectileColor || '#ffaa33')},\n`;
+            if (item.skinKey) out += `    skinKey: ${toJsLiteral(item.skinKey)},\n`;
         }
         out += `},`;
         return out;
@@ -425,9 +432,9 @@ class EquipmentEditor {
             const effectSummary = (item.effects || []).map(e => e.type).join(', ') || '-';
             html += `<tr>
                 <td>${CATEGORIES[item.category].label}</td>
-                <td>${item.key}</td>
-                <td>${item.name}</td>
-                <td>${effectSummary}</td>
+                <td>${escapeHtml(item.key)}</td>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${escapeHtml(effectSummary)}</td>
                 <td>
                     <button data-edit="${i}">Edit</button>
                     <button data-remove="${i}">✕</button>
@@ -479,7 +486,7 @@ class EquipmentEditor {
         modal.innerHTML = `
             <div class="fe-export-modal-content">
                 <div style="color:#ffcc00;font-weight:bold;margin-bottom:12px;">Export Equipment (${this.batchItems.length} items)</div>
-                <textarea readonly>${output}</textarea>
+                <textarea readonly>${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="eq-modal-copy">Copy to Clipboard</button>
                     <button id="eq-modal-close">Close</button>
@@ -520,7 +527,7 @@ class EquipmentEditor {
             html += `<div class="fe-ref-category" data-cat-title="${cat.title.toLowerCase()}">`;
             html += `<div class="fe-ref-category-title">${cat.title}</div>`;
             for (const id of cat.ids) {
-                html += `<span class="fe-ref-id" data-ref-id="${id}">${id}</span>`;
+                html += `<span class="fe-ref-id" data-ref-id="${escapeAttr(id)}">${escapeHtml(id)}</span>`;
             }
             html += `</div>`;
         }
@@ -562,44 +569,22 @@ class EquipmentEditor {
         const saved = this._getSaved();
         const item = saved.find(s => s.key === key);
         if (!item) return;
-        this._editBatchItem(-1);
-        this._switchCategory(item.category);
+        // Drafts hold exactly what _collectFormData produces: key, name,
+        // category, effects and the ranged fields.
+        this._clearForm();
+        this._switchCategory(CATEGORIES[item.category] ? item.category : 'weapon');
         document.getElementById('eq-key').value = item.key;
-        document.getElementById('eq-name').value = item.name;
-
-        if (item.category === 'trinket') {
-            TRINKET_EQUIPPED_STATS.forEach(f => {
-                document.getElementById(`eq-arteq-${f.key}`).value = item[f.key] || '';
-            });
-            document.getElementById('eq-art-consumable').checked = !!item.consumable;
-            if (item.pedestal) {
-                document.getElementById('eq-art-pedestal-toggle').checked = true;
-                TRINKET_PEDESTAL_FIELDS.forEach(f => {
-                    const el = document.getElementById(`eq-ped-${f.key}`);
-                    if (f.type === 'checkbox') el.checked = !!item.pedestal[f.key];
-                    else el.value = item.pedestal[f.key] || '';
-                });
-            }
-            if (item.expedition) {
-                document.getElementById('eq-art-expedition-toggle').checked = true;
-                TRINKET_EXPEDITION_FIELDS.forEach(f => {
-                    document.getElementById(`eq-exp-${f.key}`).value = item.expedition[f.key] || '';
-                });
-            }
-            if (item.durability) {
-                document.getElementById('eq-art-durability-toggle').checked = true;
-                document.getElementById('eq-dur-max').value = item.durability.max || '';
-                document.getElementById('eq-dur-breakOnUse').checked = !!item.durability.breakOnUse;
-            }
-            this._updateConditionals();
-        } else {
-            const fields = STAT_FIELDS[item.category];
-            if (fields) fields.forEach(f => {
-                const el = document.getElementById(`eq-stat-${f.key}`);
-                if (el) el.value = item[f.key] || '';
-            });
+        document.getElementById('eq-name').value = item.name || '';
+        if (this._effectPicker) this._effectPicker.setEffects(item.effects || []);
+        if (this.category === 'weapon' && item.ranged) {
+            document.getElementById('eq-ranged').checked = true;
+            document.getElementById('eq-range').value = item.range || 5;
+            document.getElementById('eq-projChar').value = item.projectileChar || '';
+            document.getElementById('eq-projColor').value = item.projectileColor || '#ffaa33';
+            document.getElementById('eq-skinKey').value = item.skinKey || '';
         }
         this._schedulePreview();
+        this._pushUndoState();
         document.getElementById('eq-load-select').value = '';
     }
 
@@ -620,7 +605,7 @@ class EquipmentEditor {
         const select = document.getElementById('eq-load-select');
         const saved = this._getSaved();
         select.innerHTML = '<option value="">Load draft...</option>' +
-            saved.map(s => `<option value="${s.key}">${s.name || s.key} (${s.category})</option>`).join('');
+            saved.map(s => `<option value="${escapeAttr(s.key)}">${escapeHtml(s.name || s.key)} (${escapeHtml(s.category)})</option>`).join('');
     }
 
     _refreshConfigDropdown() {
@@ -628,7 +613,7 @@ class EquipmentEditor {
         if (!select) return;
         const items = CONFIG_EQUIPMENT[this.category] || {};
         select.innerHTML = '<option value="">Load from Config...</option>' +
-            Object.entries(items).map(([k, v]) => `<option value="${k}">${v.name || k}</option>`).join('');
+            Object.entries(items).map(([k, v]) => `<option value="${escapeAttr(k)}">${escapeHtml(v.name || k)}</option>`).join('');
     }
 
     _loadFromConfig(key) {

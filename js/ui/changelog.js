@@ -48,17 +48,17 @@ export function renderCreditsHTML() {
     <div style="color:#ccc; margin-bottom:8px;"><b>Design & Development</b></div>
     <div style="color:#aaa; margin-bottom:20px;">Juniper Kingsbury</div>
     <div style="color:#ccc; margin-bottom:8px;"><b>Additional Sprites</b></div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-mini-world-sprites">Mini World</a> by Shade</div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-puny-world">Puny World</a> by Shade</div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-puny-dungeon">Puny Dungeon</a> by Shade</div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://glionox.itch.io/items16">16x16 Items</a> by Glionox</div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-effect-and-bullet-16x16">Free Effect and Bullet 16x16</a> by BDragon1727</div>
-    <div style="color:#aaa; margin-bottom:20px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-smoke-fx-pixel-2">Free Smoke Fx Pixel 2</a> by BDragon1727</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-mini-world-sprites" target="_blank" rel="noopener noreferrer">Mini World</a> by Shade</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-puny-world" target="_blank" rel="noopener noreferrer">Puny World</a> by Shade</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://merchant-shade.itch.io/16x16-puny-dungeon" target="_blank" rel="noopener noreferrer">Puny Dungeon</a> by Shade</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://glionox.itch.io/items16" target="_blank" rel="noopener noreferrer">16x16 Items</a> by Glionox</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-effect-and-bullet-16x16" target="_blank" rel="noopener noreferrer">Free Effect and Bullet 16x16</a> by BDragon1727</div>
+    <div style="color:#aaa; margin-bottom:20px;"><a style="color:#aaa;" href="https://bdragon1727.itch.io/free-smoke-fx-pixel-2" target="_blank" rel="noopener noreferrer">Free Smoke Fx Pixel 2</a> by BDragon1727</div>
     <div style="color:#ccc; margin-bottom:8px;"><b>Music & SFX</b></div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://flowerheadmusic.itch.io/somewhat-good-lofi">Somewhat Good Lofi</a> by Flowerhead</div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://not-jam.itch.io/not-jam-music-pack">NOT JAM MUSIC PACK</a> by NOT JAM</div>
-    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://www.bfxr.net/">bfxr (custom SFX maker)</a> by increpare</div>
-    <div style="color:#aaa; margin-bottom:24px;"><a style="color:#aaa;" href="https://dagurasusk.itch.io/retrosounds">Retro Sounds</a> by DASK</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://flowerheadmusic.itch.io/somewhat-good-lofi" target="_blank" rel="noopener noreferrer">Somewhat Good Lofi</a> by Flowerhead</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://not-jam.itch.io/not-jam-music-pack" target="_blank" rel="noopener noreferrer">NOT JAM MUSIC PACK</a> by NOT JAM</div>
+    <div style="color:#aaa; margin-bottom:4px;"><a style="color:#aaa;" href="https://www.bfxr.net/" target="_blank" rel="noopener noreferrer">bfxr (custom SFX maker)</a> by increpare</div>
+    <div style="color:#aaa; margin-bottom:24px;"><a style="color:#aaa;" href="https://dagurasusk.itch.io/retrosounds" target="_blank" rel="noopener noreferrer">Retro Sounds</a> by DASK</div>
     <div style="color:#aaa; font-size:10px;"><i>Thank you for playing my game!</i> -Juniper</div>
     <img style="float:none" class="pixel-art" src="portraits/juniper_heart.png" alt="A drawing of game dev Juniper">
     <div style="margin-top:16px; border-top:1px solid #333; padding-top:12px;">

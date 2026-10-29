@@ -1,3 +1,4 @@
+import { ROOM_QUALITY_TIERS } from './config.js';
 import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS, SEASONS, SEASON_ADVANCE_NOTICE, PRIORITY_PROFILES } from './config.js';
 import { WILDLIFE_CONFIG, LANDMARK_BLUEPRINTS, MAP_GENERATORS, CRYPT_CONFIG } from './config.js';
 import { PATHFINDING_CONFIG } from './config.js';
@@ -19,7 +20,7 @@ import { queueCraftingOrder, queueEnchantingOrder, updateAutoCook, updateAutoCra
 import { Weather } from '../world/weather.js';
 import { updateWildlife, designateHunt } from '../entities/wildlife.js';
 import { CombatSystem } from '../entities/combat.js';
-import { EventSystem, updateFires, getTradeRates, computeTradeValues } from '../systems/events.js';
+import { EventSystem, getTradeRates, computeTradeValues } from '../systems/events.js';
 import { SocialSystem } from '../systems/social.js';
 import { UI } from '../ui/ui.js';
 import { Minimap } from '../ui/minimap.js';
@@ -37,8 +38,9 @@ import { TradeRiftSystem } from '../systems/traderift.js';
 import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
-import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, getLastSyncTime, forceSyncNow } from './save.js';
+import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, getLastSyncTime, forceSyncNow, PER_SAVE_SETTING_DEFAULTS, applyPerSaveSettings } from './save.js';
 import { getGdriveAPI } from './gdrive-web.js';
+import { escapeHtml, escapeAttr, jsArg } from '../ui/ui-utils.js';
 import { initResizeHandles } from '../ui/resize.js';
 import { SpatialHash } from '../world/spatial.js';
 import { MapIndex } from '../world/mapindex.js';
@@ -98,6 +100,17 @@ if (_isMobileApp) {
         StatusBar.setOverlaysWebView({ overlay: true });
         StatusBar.hide();
     }).catch(() => {});
+}
+
+// Settings that are not global player preferences. Per-colony ones travel with
+// the save (see PER_SAVE_SETTING_DEFAULTS in save.js); primarySaveSlot is the
+// slot the running game is bound to. None of these are written to
+// colony_settings, except that the tutorial keys there keep holding the last
+// New Game choice (written by beginNewGame) so the start screen can preselect it.
+const _NON_GLOBAL_SETTING_KEYS = [...Object.keys(PER_SAVE_SETTING_DEFAULTS), 'primarySaveSlot'];
+
+function _roomTierRank(key) {
+    return ROOM_QUALITY_TIERS.findIndex(t => t.key === key);
 }
 
 class Game {
@@ -172,7 +185,14 @@ class Game {
         };
         try {
             const saved = JSON.parse(localStorage.getItem('colony_settings'));
-            if (saved) Object.assign(this.settings, saved);
+            if (saved) {
+                // Older builds stored per-colony settings here too. Ignore them so
+                // one colony's craft targets don't carry into another.
+                for (const key of _NON_GLOBAL_SETTING_KEYS) {
+                    if (key !== 'tutorialLevel' && key !== 'showTutorial') delete saved[key];
+                }
+                Object.assign(this.settings, saved);
+            }
             if (_isMobileApp && !saved) {
                 this.settings.particleDensity = 50;
                 this.settings.showCrtScanlines = false;
@@ -452,7 +472,14 @@ class Game {
     }
 
     async switchSkin(skinName) {
-        await this.skinManager.switchSkin(skinName);
+        // Only persist a skin that actually became active. A failed load or a
+        // switch superseded by a newer one must not overwrite the saved choice.
+        const ok = await this.skinManager.switchSkin(skinName);
+        if (!ok) {
+            // Re-render so the skin dropdown shows the skin that is really active.
+            if (this.ui?.settingsPanelVisible) this.ui.updateSettingsPanel();
+            return false;
+        }
         this.settings.activeSkin = skinName;
         localStorage.setItem('convocation_skin', skinName);
         this.renderer._ditherCache.clear();
@@ -461,6 +488,7 @@ class Game {
             this.ui._buildingSpriteCache = null;
             this.ui.forceStatusBarRefresh();
         }
+        return true;
     }
 
     setLayoutMode(mode) {
@@ -521,7 +549,10 @@ class Game {
                             }
                             steam.storeStats();
                         }
-                    }).catch(e => console.error('Auto-save failed:', e));
+                    }).catch(e => {
+                        console.error('Auto-save failed:', e);
+                        this.notifications.push({ text: `Auto-save failed: ${e?.message || e}`, tick: this.tick, type: 'danger' });
+                    });
                 }
             }
         }
@@ -550,11 +581,25 @@ class Game {
             }
         }
 
-        if (this.settings.fpsCap === 30) {
-            const elapsed = timestamp - (this._lastRenderTime || 0);
-            if (elapsed < 33) { this._rafId = requestAnimationFrame(this.gameLoop); return; }
-            this._lastRenderTime = timestamp;
+        // Render-rate cap. The next render is scheduled from the ideal time (not
+        // the actual frame time) so a 60 cap averages 60 on 120/144Hz displays.
+        // A frame up to 15% early still renders, so a display slightly faster
+        // than the cap (61Hz under a 60 cap) never drops frames. The schedule is
+        // clamped to [now, now + interval] so it neither builds up debt after a
+        // stall nor runs ahead of real frames. _lastRenderTime = 0 forces a render.
+        const capFps = this.settings.fpsCap;
+        if (capFps > 0 && this._lastRenderTime) {
+            const interval = 1000 / capFps;
+            const slack = interval * 0.15;
+            if (timestamp < (this._nextRenderTime || 0) - slack) { this._rafId = requestAnimationFrame(this.gameLoop); return; }
+            this._nextRenderTime = Math.min(Math.max((this._nextRenderTime || timestamp) + interval, timestamp), timestamp + interval);
+        } else {
+            this._nextRenderTime = timestamp + (capFps > 0 ? 1000 / capFps : 0);
         }
+        // Time since the last rendered frame. Skipped frames must not drop time,
+        // or camera glide and stat bars slow down under the cap.
+        const frameDt = this._lastRenderTime ? Math.min(timestamp - this._lastRenderTime, CONFIG.MAX_FRAME_DELTA) : dt;
+        this._lastRenderTime = timestamp;
 
         if (this.followingColonist) {
             const fc = this.getColonist(this.followingColonist);
@@ -566,7 +611,7 @@ class Game {
             }
         }
 
-        this.camera.lerpToward(dt / 1000);
+        this.camera.lerpToward(frameDt / 1000);
         _tickSmoothZoom(timestamp);
 
         const prof = this._profiler;
@@ -585,18 +630,21 @@ class Game {
         }
         if (this.settings.showMinimap) this.minimap.render();
         if (prof) prof.mark('frame:minimap');
-        if (this.ui.arcanePanelVisible) { this.ui.updateArcanePanel(); this._arcaneUpdatedThisFrame = true; }
+        // ui.update refreshes the arcane panel HTML too, on the same throttled
+        // cadence. The expedition visualizer canvas animates per frame, so it is
+        // drawn here on the frames where the panel refresh (which draws it) skipped.
         if (this._uiDirty || timestamp - (this._lastUiUpdate || 0) >= 66) {
             this._lastUiUpdate = timestamp;
             this._uiDirty = false;
-            this.ui.update(this._arcaneUpdatedThisFrame);
+            this.ui.update();
+        } else if (this.ui.arcanePanelVisible && (this.ui._arcaneTab || 'expeditions') === 'expeditions') {
+            this.ui._renderExpeditionVis?.();
         }
-        this._arcaneUpdatedThisFrame = false;
         if (prof) prof.mark('frame:ui.update');
         // Advance live stat bars every rendered frame, after all panel innerHTML
         // swaps and before paint, so the white-ghost recede keeps playing and
         // recreated bar elements are corrected from persisted state (no flash).
-        this.ui.animateStatBars(dt);
+        this.ui.animateStatBars(frameDt);
         this._rafId = requestAnimationFrame(this.gameLoop);
     }
 
@@ -606,7 +654,7 @@ class Game {
     //   Every tick:  rebuild hostile + colonist spatial hashes; weather update;
     //                room/quality recompute WHEN scheduled (see markRoomsDirty);
     //                per-colonist update; summons; wildlife; combat; waves;
-    //                exploration; events; social; fires; effect/projectile expiry.
+    //                exploration; events; social; effect/projectile expiry.
     //   Every 5:     farming. Every 8: research.
     //   Every 10:    power, tamed animals, auto-cook, auto-craft, auto-repair,
     //                pedestal auras (aura fields are cleared then reapplied here).
@@ -654,7 +702,12 @@ class Game {
         for (const r of this.raiders) { if (r.hp > 0) hostileEntities.push(r); }
         if (this.waves) { for (const e of this.waves.enemies) { if (e.hp > 0) hostileEntities.push(e); } }
         this.spatial.hostiles.rebuild(hostileEntities);
-        this.spatial.colonists.rebuild(this.colonists);
+        // Off-map (expedition) and dead colonists must not be found by hostile
+        // targeting queries.
+        const presentColonists = this._presentColonists || (this._presentColonists = []);
+        presentColonists.length = 0;
+        for (const c of this.colonists) { if (c.hp > 0 && !c.onExpedition) presentColonists.push(c); }
+        this.spatial.colonists.rebuild(presentColonists);
         if (prof) prof.mark('spatial.rebuild');
 
         this.ruins.update(this);
@@ -676,9 +729,7 @@ class Game {
         }
         if (this.weather.season !== prevSeason) {
             this.eventLog.add(this, `Season changed to ${this.weather.season} (Year ${this.weather.year})`, 'event', null);
-            this.weather.applySnow(this.map);
-            if (this.minimap) this.minimap.markTerrainDirty();
-            if (this.renderer) this.renderer.markTerrainDirty();
+            this._markTilesDirty(this.weather.applySnow(this.map));
             if (this.mapIndex.findFirst('trade_rift')) {
                 this.tradeRift.regenerate(this, 'season');
                 let msg = 'The Trade Rift shimmers! New seasonal requests have arrived.';
@@ -690,9 +741,7 @@ class Game {
             }
             if (this.weather.season === 'winter') this.tryWinterFeast();
         } else if (this.tick % 50 === 0) {
-            this.weather.applySnow(this.map);
-            if (this.minimap) this.minimap.markTerrainDirty();
-            if (this.renderer) this.renderer.markTerrainDirty();
+            this._markTilesDirty(this.weather.applySnow(this.map));
         }
 
         const ticksRemaining = CONFIG.TICKS_PER_SEASON - this.weather.seasonTick;
@@ -745,46 +794,68 @@ class Game {
 
             // Build room center index in a single pass over the map.
             // We only need the center point per room, so accumulate sums + count.
+            // Room ids are renumbered on every scan, so each room is matched to the
+            // previous scan's bedroom it shares the most tiles with. _prevRoomGrid
+            // holds the previous scan's room id per tile, so a room that grows,
+            // shrinks or merges still counts as the same room.
+            const mapH = this.map.length;
+            const mapW = mapH > 0 ? this.map[0].length : 0;
+            const prevGrid = this._prevRoomGrid && this._prevRoomGrid.length === mapW * mapH ? this._prevRoomGrid : null;
+            const prevQualities = this._prevRoomQualities || {};
+            const grid = new Int32Array(mapW * mapH).fill(-1);
             const roomSumX = new Float64Array(roomCount);
             const roomSumY = new Float64Array(roomCount);
             const roomTileCount = new Uint32Array(roomCount);
-            for (let y = 0; y < this.map.length; y++) {
+            const overlap = new Array(roomCount);
+            for (let y = 0; y < mapH; y++) {
                 const row = this.map[y];
                 for (let x = 0; x < row.length; x++) {
                     const rid = row[x].roomId;
-                    if (rid >= 0 && rid < roomCount) {
+                    if (rid !== null && rid >= 0 && rid < roomCount) {
+                        const i = y * mapW + x;
+                        grid[i] = rid;
                         roomSumX[rid] += x;
                         roomSumY[rid] += y;
                         roomTileCount[rid]++;
+                        const pid = prevGrid ? prevGrid[i] : -1;
+                        if (pid >= 0 && prevQualities[pid]) {
+                            const m = overlap[rid] || (overlap[rid] = new Map());
+                            m.set(pid, (m.get(pid) || 0) + 1);
+                        }
                     }
                 }
             }
 
             for (let roomId = 0; roomId < roomCount; roomId++) {
-                const prevQuality = this.roomQualities[roomId];
                 const newQuality = qualities.roomQualities[roomId];
-                if (newQuality && !prevQuality) {
-                    if (roomTileCount[roomId] > 0) {
-                        const centerX = Math.floor(roomSumX[roomId] / roomTileCount[roomId]);
-                        const centerY = Math.floor(roomSumY[roomId] / roomTileCount[roomId]);
-                        this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: 'Room complete', color: '#ffcc00', fontSize: 11, ttl: 25, maxTtl: 25 });
-                    }
-                } else if (newQuality && prevQuality && newQuality.tier > prevQuality.tier) {
-                    if (roomTileCount[roomId] > 0) {
-                        const centerX = Math.floor(roomSumX[roomId] / roomTileCount[roomId]);
-                        const centerY = Math.floor(roomSumY[roomId] / roomTileCount[roomId]);
-                        this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: `Room: ${newQuality.tier}`, color: '#44ff44', fontSize: 11, ttl: 25, maxTtl: 25 });
-                    }
+                // First scan after start or load: nothing to compare against.
+                if (!prevGrid || !newQuality || roomTileCount[roomId] === 0) continue;
+                const centerX = Math.floor(roomSumX[roomId] / roomTileCount[roomId]);
+                const centerY = Math.floor(roomSumY[roomId] / roomTileCount[roomId]);
+                const m = overlap[roomId];
+                if (!m) {
+                    this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: 'Room complete', color: '#ffcc00', fontSize: 11, ttl: 25, maxTtl: 25 });
+                    continue;
+                }
+                let bestPid = -1, bestCount = 0;
+                for (const [pid, n] of m) { if (n > bestCount) { bestCount = n; bestPid = pid; } }
+                const prevQuality = prevQualities[bestPid];
+                if (_roomTierRank(newQuality.tier) > _roomTierRank(prevQuality.tier)) {
+                    this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: `Room: ${newQuality.tierName || newQuality.tier}`, color: '#44ff44', fontSize: 11, ttl: 25, maxTtl: 25 });
                 }
             }
+            this._prevRoomGrid = grid;
+            this._prevRoomQualities = qualities.roomQualities;
 
             this.roomQualities = qualities.roomQualities;
             this.workshopQualities = qualities.workshopQualities;
             this.townHallQualities = qualities.townHallQualities;
             this.roomsDirtyTick = null;
             this.roomsDirtyDeadline = 0;
+            // Rooms run after build/deconstruct, so refresh the minimap. The ground
+            // bake does not depend on rooms, and build sites patch their own tiles
+            // (the bake also self-heals), so no full re-bake here.
             if (this.minimap) this.minimap.markTerrainDirty();
-            if (this.renderer) this.renderer.markTerrainDirty();
         }
 
         if (prof) prof.mark('weather+decay+rooms');
@@ -903,15 +974,6 @@ class Game {
         if (prof) prof.mark('events');
         this.social.update(this);
         if (prof) prof.mark('social');
-        const hadFiresBefore = this.mapIndex.fires.size > 0;
-        updateFires(this);
-        if (hadFiresBefore || this.mapIndex.fires.size > 0) {
-            if (this.minimap) this.minimap.markTerrainDirty();
-            if (this.renderer) this.renderer.markTerrainDirty();
-        }
-        if (prof) prof.mark('fires');
-
-        this._recipeCacheVersion++;
 
         if (this.tick % 20 === 0) {
             this.tutorial.update(this);
@@ -1025,6 +1087,7 @@ class Game {
         if (!this.settings.priorityProfiles) this.settings.priorityProfiles = {};
         const name = `Custom ${slotIndex + 1}`;
         this.settings.priorityProfiles[name] = { ...c.priorities };
+        this.saveSettingsToStorage();
     }
 
     get priorityProfiles() { return this.settings?.priorityProfiles || {}; }
@@ -2704,7 +2767,7 @@ class Game {
         html += `<div class="info-row" style="color:#888;">Choose colonists to send:</div>`;
         for (const c of available) {
             const weaponInfo = c.weapon ? ` (${c.weapon.name})` : ' (unarmed)';
-            html += `<div class="info-row"><label><input type="checkbox" class="exp-check" value="${c.id}"> ${c.name}${weaponInfo} HP:${c.hp}/${c.maxHp}</label></div>`;
+            html += `<div class="info-row"><label><input type="checkbox" class="exp-check" value="${escapeAttr(c.id)}"> ${escapeHtml(c.name)}${escapeHtml(weaponInfo)} HP:${c.hp}/${c.maxHp}</label></div>`;
         }
         const packAnimals = this.entities.filter(a => {
             return a.tamed && a.hp > 0 && !a.onExpedition &&
@@ -2715,10 +2778,10 @@ class Game {
             for (const a of packAnimals) {
                 const packRole = a.roles.find(r => r.type === 'pack');
                 const speedBonus = packRole ? packRole.expeditionSpeedBonus || 0.25 : 0.25;
-                html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${a.id}"> ${a.type} (+${Math.round(speedBonus * 100)}% speed)</label></div>`;
+                html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${escapeAttr(a.id)}"> ${escapeHtml(a.type)} (+${Math.round(speedBonus * 100)}% speed)</label></div>`;
             }
         }
-        html += `<div class="info-actions"><button onclick="window.game.launchExpedition('${realmKey}')" style="background:#1a4466;color:#88ddff;">Launch</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.launchExpedition(${jsArg(realmKey)})" style="background:#1a4466;color:#88ddff;">Launch</button></div>`;
         this.ui.elements.infoPanel.innerHTML = html;
     }
 
@@ -2883,9 +2946,12 @@ class Game {
     }
 
     retreatExpedition(expId) {
+        // A gathering party has not left yet, so retreating calls it off.
+        const wasGathering = this.exploration.expeditions.find(e => e.id === expId)?.status === 'gathering';
         const result = this.exploration.retreatExpedition(this, expId);
         if (result) {
-            this.notifications.push({ text: 'Retreat ordered!', tick: this.tick, type: 'info' });
+            const text = wasGathering ? 'Expedition called off. The party stands down.' : 'Retreat ordered!';
+            this.notifications.push({ text, tick: this.tick, type: 'info' });
             this.ui._lastArcaneHtml = '';
             this.ui.updateArcanePanel();
         }
@@ -3227,7 +3293,7 @@ class Game {
                             if (tile.zone.growth >= crop.growthTicks * (spell.ripenThreshold || 0.5)) {
                                 tile.zone.growth = crop.growthTicks;
                                 tile.zone.state = 'ready';
-                                if (!this.taskQueue.getByPosition(tx, ty)) {
+                                if (!this.taskQueue.hasTaskTypeAt(tx, ty, 'harvest')) {
                                     this.taskQueue.add({ type: 'harvest', skillRequired: 'farming', x: tx, y: ty, workAmount: WORK_CONFIG.harvestWork });
                                 }
                                 ripened++;
@@ -3438,7 +3504,8 @@ class Game {
         animal.penX = x;
         animal.penY = y;
         // Cancel any existing feed or relocate tasks for this animal.
-        for (const t of this.taskQueue.getAll()) {
+        // Iterate a copy: remove() splices the live task array.
+        for (const t of [...this.taskQueue.getAll()]) {
             if ((t.type === 'feed_animal' || t.type === 'relocate_animal') && t.targetAnimalId === animalId) {
                 this.taskQueue.remove(t.id);
             }
@@ -3469,7 +3536,8 @@ class Game {
     releaseAnimalToWild(animalId) {
         const animal = this.entities.find(e => e.id === animalId && e.tamed);
         if (!animal) return;
-        for (const t of this.taskQueue.getAll()) {
+        // Iterate a copy: remove() splices the live task array.
+        for (const t of [...this.taskQueue.getAll()]) {
             if ((t.type === 'feed_animal' || t.type === 'relocate_animal') && t.targetAnimalId === animalId) {
                 this.taskQueue.remove(t.id);
             }
@@ -3525,15 +3593,95 @@ class Game {
         }
     }
 
+    // Persists global player preferences only. Per-colony settings live in the save.
     saveSettingsToStorage() {
-        try { localStorage.setItem('colony_settings', JSON.stringify(this.settings)); } catch (e) {}
+        try {
+            const stored = JSON.parse(localStorage.getItem('colony_settings') || '{}') || {};
+            const out = {};
+            for (const [key, value] of Object.entries(this.settings)) {
+                if (!_NON_GLOBAL_SETTING_KEYS.includes(key)) out[key] = value;
+            }
+            if (stored.tutorialLevel !== undefined) out.tutorialLevel = stored.tutorialLevel;
+            if (stored.showTutorial !== undefined) out.showTutorial = stored.showTutorial;
+            localStorage.setItem('colony_settings', JSON.stringify(out));
+        } catch (e) {}
+    }
+
+    // Patch the ground bake for tiles whose look changed. Falls back to a full
+    // re-bake when the renderer has no per-tile path or the change is large
+    // (a season turning over), where one bake is cheaper than many patches.
+    _markTilesDirty(tiles) {
+        if (!tiles || tiles.length === 0) return;
+        if (this.minimap) this.minimap.markTerrainDirty();
+        const r = this.renderer;
+        if (!r) return;
+        if (typeof r.markTileDirty !== 'function' || tiles.length > 512) {
+            r.markTerrainDirty();
+            return;
+        }
+        for (const t of tiles) r.markTileDirty(t.x, t.y);
+    }
+
+    // Clears run-time state that must not survive a load into this Game:
+    // game-over latch, autosave clock, selection/follow, in-flight effects and
+    // UI view state. Called after every successful load and on new game.
+    _resetTransientState() {
+        this._gameOver = false;
+        this._lastAutoSaveTick = this.tick;
+        this.accumulator = 0;
+        this.selectedColonist = null;
+        this.selectedColonists = [];
+        this.followingColonist = null;
+        this.projectiles = [];
+        this.combatEffects = [];
+        this.overlays = [];
+        this.worldParticles = [];
+        this.alertRipple = null;
+        this.notifications = [];
+        this.activeComplexStructures = [];
+        this.roomQualities = {};
+        this.workshopQualities = {};
+        this.townHallQualities = {};
+        this._prevRoomGrid = null;
+        this._prevRoomQualities = null;
+        this._recipeCacheVersion++;
+        this._uiDirty = true;
+        this.ui?.onGameLoaded?.();
+    }
+
+    // Detach this Game from the page so a discarded instance (return to menu,
+    // failed load) stops running and stops reacting to input.
+    destroy() {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+        this.gameLoop = () => {};
+        if (this._onVisibilityChange) document.removeEventListener('visibilitychange', this._onVisibilityChange);
+        if (this._onWindowBlur) window.removeEventListener('blur', this._onWindowBlur);
+        if (this.input) {
+            if (typeof this.input.destroy === 'function') {
+                this.input.destroy();
+            } else {
+                // input.js binds document key listeners as arrows calling these
+                // methods, so stubbing them silences the stale instance.
+                this.input.onKeyDown = () => {};
+                this.input.onKeyUp = () => {};
+            }
+        }
+        this.ui?.destroy?.();
+        // The footer #minimap canvas persists across games, so its listeners must go.
+        this.minimap?.destroy?.();
+        if (window.game === this) window.game = null;
     }
 
     // Rebind a single action to a new key. Overrides are stored per-action in
     // settings.keyBindings (full key list), persisted, and re-applied live.
+    // `key` may be a single key or the action's full key list (primary first), so
+    // callers that edit one key can keep the secondary ones.
     setKeyBinding(action, key) {
         if (!this.settings.keyBindings) this.settings.keyBindings = {};
-        this.settings.keyBindings[action] = [key.toLowerCase()];
+        const keys = (Array.isArray(key) ? key : [key]).filter(k => typeof k === 'string' && k).map(k => k.toLowerCase());
+        if (keys.length === 0) return;
+        this.settings.keyBindings[action] = [...new Set(keys)];
         this.saveSettingsToStorage();
         this.input.applyKeyBindings();
         this.ui.updateSettingsPanel();
@@ -3593,30 +3741,44 @@ class Game {
         this.ui.updateSettingsPanel();
     }
 
+    _notifySaveFailed(e) {
+        console.error('Save failed:', e);
+        this.notifications.push({ text: `Save failed: ${e?.message || e}`, tick: this.tick, type: 'danger' });
+    }
+
     async save() {
         const slot = this.settings.primarySaveSlot;
         if (!slot) {
             this.notifications.push({ text: 'No save slot selected. Use Settings → Save to Slot…', tick: this.tick, type: 'warning' });
-            return;
+            return false;
         }
-        if (await saveToSlot(this, slot)) {
-            this.notifications.push({ text: 'Game saved!', tick: this.tick, type: 'success' });
-            this.saveSettingsToStorage();
+        try {
+            await saveToSlot(this, slot);
+        } catch (e) {
+            this._notifySaveFailed(e);
+            return false;
         }
+        this.notifications.push({ text: 'Game saved!', tick: this.tick, type: 'success' });
+        this.saveSettingsToStorage();
+        return true;
     }
 
     async saveToSlot(slotKey, opts = {}) {
-        if (await saveToSlot(this, slotKey, opts)) {
-            this.settings.primarySaveSlot = slotKey;
-            this.saveSettingsToStorage();
-            this.notifications.push({ text: 'Saved!', tick: this.tick, type: 'success' });
-            return true;
+        try {
+            await saveToSlot(this, slotKey, opts);
+        } catch (e) {
+            this._notifySaveFailed(e);
+            return false;
         }
-        return false;
+        this.settings.primarySaveSlot = slotKey;
+        this.saveSettingsToStorage();
+        this.notifications.push({ text: 'Saved!', tick: this.tick, type: 'success' });
+        return true;
     }
 
     async loadFromSlot(slotKey) {
         if (await loadFromSlot(this, slotKey)) {
+            this._resetTransientState();
             this.settings.primarySaveSlot = slotKey;
             this.saveSettingsToStorage();
             if (this.renderer) this.renderer.markTerrainDirty();
@@ -3629,6 +3791,7 @@ class Game {
             else if (this.settings.uiFontSize != null) window.setUIFontScale?.(this.settings.uiFontSize / 12);
             return true;
         }
+        this.notifications.push({ text: 'Could not load that save. Your current game is unchanged.', tick: this.tick, type: 'danger' });
         return false;
     }
 
@@ -3638,6 +3801,7 @@ class Game {
 
     async load() {
         if (await loadGame(this)) {
+            this._resetTransientState();
             // loadGame replaces this.map wholesale, so the baked ground cache is
             // now stale (built from the pre-load map). Force a rebuild on the next
             // frame. The minimap already gets the same treatment inside loadGame.
@@ -3653,8 +3817,8 @@ class Game {
     }
 
     async exportSave() {
-        await this.save();
-        if (await exportSave()) {
+        if (!(await this.save())) return;
+        if (await exportSlot(this.settings.primarySaveSlot)) {
             this.notifications.push({ text: 'Save exported!', tick: this.tick, type: 'success' });
         }
     }
@@ -4324,7 +4488,12 @@ function _onDOMReady(fn) {
 }
 _onDOMReady(() => {
     migrateColonySave();
-    syncAllFromCloud();
+    // Cloud pull runs in the background. syncAllFromCloud re-checks local
+    // timestamps before each write, so a slot saved meanwhile is never clobbered.
+    // Refresh the slot list if it is open when the pull lands.
+    syncAllFromCloud().then(() => {
+        if (saveSlotsPanel.style.display === 'block') openSaveSlotScreen({ silent: true });
+    }).catch(e => console.warn('Cloud sync failed:', e));
 
     const startScreen = document.getElementById('start-screen');
     const gameContainer = document.getElementById('game-container');
@@ -4483,21 +4652,25 @@ _onDOMReady(() => {
 
     function renderSlotCard(slotKey, meta, isAuto) {
         const isEmpty = !meta;
+        if (meta && !Array.isArray(meta.mods)) meta = { ...meta, mods: undefined };
         const slotIndex = parseInt(slotKey.slice(-1));
         const defaultLabel = isAuto ? `Auto ${slotIndex + 1}` : `Slot ${slotIndex + 1}`;
-        const displayName = meta?.label || defaultLabel;
-        const season = meta ? (meta.season.charAt(0).toUpperCase() + meta.season.slice(1)) : '';
-        const gameStr = meta ? `${season} Y${meta.year} · Day ${meta.dayOfSeason} · ${meta.colonistCount} colonist${meta.colonistCount !== 1 ? 's' : ''}` : '';
-        const dateStr = meta ? new Date(meta.timestamp).toLocaleString() : '';
-        const thumbHtml = meta?.thumbnail
-            ? `<img class="slot-thumbnail" src="${meta.thumbnail}" alt="">`
+        // Slot metadata can come from imported or cloud-synced saves, so every
+        // value is escaped and the thumbnail must be an inline image.
+        const displayName = escapeHtml(meta?.label || defaultLabel);
+        const seasonRaw = String(meta?.season || '');
+        const season = escapeHtml(seasonRaw.charAt(0).toUpperCase() + seasonRaw.slice(1));
+        const gameStr = meta ? `${season} Y${escapeHtml(meta.year)} · Day ${escapeHtml(meta.dayOfSeason)} · ${escapeHtml(meta.colonistCount)} colonist${meta.colonistCount !== 1 ? 's' : ''}` : '';
+        const dateStr = meta ? escapeHtml(new Date(meta.timestamp).toLocaleString()) : '';
+        const thumbHtml = typeof meta?.thumbnail === 'string' && meta.thumbnail.startsWith('data:image/')
+            ? `<img class="slot-thumbnail" src="${escapeAttr(meta.thumbnail)}" alt="">`
             : `<div class="slot-thumbnail-placeholder"></div>`;
         const mismatch = isEmpty ? null : _slotModMismatch(meta);
         const modsHtml = !isEmpty && meta.mods !== undefined
             ? (() => {
                 if (!meta.mods.length && !getLoadedManifests().length) return '';
                 if (mismatch) return `<span style="color:#ffaa33;font-size:10px;">&#9888; Mod mismatch</span>`;
-                if (meta.mods.length) return `<span style="color:#666;font-size:10px;">Mods: ${meta.mods.join(', ')}</span>`;
+                if (meta.mods.length) return `<span style="color:#666;font-size:10px;">Mods: ${escapeHtml(meta.mods.join(', '))}</span>`;
                 return `<span style="color:#666;font-size:10px;">No mods</span>`;
             })()
             : '';
@@ -4510,7 +4683,7 @@ _onDOMReady(() => {
         </div>`;
     }
 
-    function openSaveSlotScreen() {
+    function openSaveSlotScreen({ silent = false } = {}) {
         const meta = getAllSlotsMeta();
         let autoHtml = '';
         for (let i = 0; i < 3; i++) {
@@ -4524,7 +4697,7 @@ _onDOMReady(() => {
         document.getElementById('save-slots-manual').innerHTML = manualHtml;
         saveSlotsPanel.style.display = 'block';
         modalBackdropEl.style.display = 'block';
-        window.soundManager?.playSFXPitched('open_close_click', 3);
+        if (!silent) window.soundManager?.playSFXPitched('open_close_click', 3);
     }
 
     function _showModMismatchModal(slotKey, slotMeta, mismatch, onLoadAnyway) {
@@ -4605,9 +4778,12 @@ _onDOMReady(() => {
             modalBackdropEl.style.display = 'none';
             window.soundManager?.playSFXPitched('open_close_click', -3);
             launchGame(async game => {
-                await loadFromSlot(game, key);
+                // On failure, launchGame returns to the start screen. Never bind
+                // a fresh game to this slot, or the next save would overwrite it.
+                if (!(await loadFromSlot(game, key))) return false;
                 game.settings.primarySaveSlot = key;
                 game.saveSettingsToStorage();
+                return true;
             });
         };
         if (mismatch) {
@@ -4828,8 +5004,7 @@ _onDOMReady(() => {
         });
         startSkinSelect.addEventListener('change', async () => {
             const skinName = startSkinSelect.value;
-            localStorage.setItem('convocation_skin', skinName);
-            await sharedSkinManager.switchSkin(skinName);
+            if (await sharedSkinManager.switchSkin(skinName)) localStorage.setItem('convocation_skin', skinName);
             _startDitherCache.clear();
             renderStartBackground();
             refreshColonistPanelSprites();
@@ -5954,25 +6129,58 @@ _onDOMReady(() => {
         }
     });
 
-    // Shared transition from start screen into active game
+    // Return from a game (outro, failed load) to the start screen, discarding it.
+    // window.game falls back to the #game element (named access) when unset,
+    // hence the instanceof checks.
+    function returnToStartScreen() {
+        if (window.game instanceof Game) window.game.destroy();
+        window.game = null;
+        gameContainer.style.display = 'none';
+        startScreen.style.display = '';
+        window.soundManager?.playMusic('menu_theme');
+    }
+
+    // The game shell (footer tabs, panel overlay, resize handles) is static DOM
+    // shared by every Game, so its listeners are attached once per page.
+    let gameShellInitialized = false;
+
+    // Shared transition from start screen into active game. `setup` may return
+    // false to signal a failed load: the Game is discarded and the player is
+    // returned to the start screen.
     function launchGame(setup) {
+        if (window.game instanceof Game) window.game.destroy();
         startScreen.style.display = 'none';
         gameContainer.style.display = 'grid';
-        initFooterTabs();
-        initPanelOverlay();
-        initResizeHandles(fitGameFont);
+        if (!gameShellInitialized) {
+            gameShellInitialized = true;
+            initFooterTabs();
+            initPanelOverlay();
+            initResizeHandles(fitGameFont);
+        }
         if (window.innerWidth <= 768) setFooterMode(true);
         requestAnimationFrame(async () => {
             fitGameFont();
             const game = new Game();
             // setup may be async (loading a slot now decompresses off the main
             // thread), so await it before start() to avoid starting on unloaded state.
-            await setup(game);
+            let ok;
+            try {
+                ok = await setup(game);
+            } catch (e) {
+                console.error('Game setup failed:', e);
+                ok = false;
+            }
+            if (ok === false) {
+                game.destroy();
+                returnToStartScreen();
+                alert('That save could not be loaded. It was left untouched.');
+                return;
+            }
+            game._resetTransientState();
             window.soundManager.stopMusic();
-            // New games start at timeOfDay 75 (~0.16 of the day), which is night
-            // per DAY_NIGHT.dayStart. Start on the night track so it matches what
-            // updateMusicState will settle on (and the visual darkness at start).
-            window.soundManager.playMusic('ambient_night');
+            // Pick the track updateMusicState would settle on for this state
+            // (season / weather / combat) instead of a fixed one.
+            window.soundManager.updateMusicState(game);
             SoundManager.setMusicVolume(game.settings.musicVolume);
             SoundManager.setSFXVolume(game.settings.sfxVolume);
             const tm = game.settings.toolbarMode || (game.settings.alwaysShowToolbar ? 'always' : 'auto');
@@ -6239,6 +6447,7 @@ _onDOMReady(() => {
         const customDefs = readCustomColonistDefs();
         launchGame(game => {
             Object.assign(game.settings, startSettings);
+            applyPerSaveSettings(game.settings, { tutorialLevel: game.settings.tutorialLevel, showTutorial: game.settings.showTutorial });
             game.tutorial.setLevel(game.settings.tutorialLevel);
             game.settings.primarySaveSlot = null;
             if (startSettings.colorblindMode !== 'none') {
@@ -6262,60 +6471,32 @@ _onDOMReady(() => {
         openSaveSlotScreen();
     });
 
-    document.getElementById('start-blueprint').addEventListener('click', () => {
-        import('../editor/blueprint-editor.js').then(({ launchBlueprintEditor }) => {
-            launchBlueprintEditor();
+    // Editors load on demand. Surface a failed import or launch instead of
+    // leaving the button silently dead.
+    const openEditor = (path, launch) => {
+        import(path).then(launch).catch(err => {
+            console.error(err);
+            alert(`Could not open editor: ${err.message}`);
+            startScreen.style.display = '';
         });
-    });
-
-    document.getElementById('start-skin-editor').addEventListener('click', () => {
-        import('../editor/skin-editor.js').then(({ launchSkinEditor }) => {
-            launchSkinEditor();
-        });
-    });
-
-    document.getElementById('start-realm-editor').addEventListener('click', () => {
-        import('../editor/realm-editor.js').then(({ launchRealmEditor }) => {
-            launchRealmEditor();
-        });
-    });
-
-    document.getElementById('start-entity-editor').addEventListener('click', () => {
-        import('../editor/entity-editor.js').then(({ launchEntityEditor }) => {
-            launchEntityEditor();
-        });
-    });
-
-    document.getElementById('start-equipment-editor').addEventListener('click', () => {
-        import('../editor/equipment-editor.js').then(({ launchEquipmentEditor }) => {
-            launchEquipmentEditor();
-        });
-    });
-
-    document.getElementById('start-spell-editor').addEventListener('click', () => {
-        import('../editor/spell-editor.js').then(({ launchSpellEditor }) => {
-            launchSpellEditor();
-        });
-    });
-
-    document.getElementById('start-equipment-editor-pro').addEventListener('click', () => {
-        import('../editor/equipment-editor-pro.js').then(m => m.launchEquipmentEditorPro());
-    });
-    document.getElementById('start-realm-editor-pro').addEventListener('click', () => {
-        import('../editor/realm-editor-pro.js').then(m => m.launchRealmEditorPro());
-    });
+    };
+    const editorButtons = {
+        'start-blueprint':            ['../editor/blueprint-editor.js',     m => m.launchBlueprintEditor()],
+        'start-skin-editor':          ['../editor/skin-editor.js',          m => m.launchSkinEditor()],
+        'start-realm-editor':         ['../editor/realm-editor.js',         m => m.launchRealmEditor()],
+        'start-entity-editor':        ['../editor/entity-editor.js',        m => m.launchEntityEditor()],
+        'start-equipment-editor':     ['../editor/equipment-editor.js',     m => m.launchEquipmentEditor()],
+        'start-spell-editor':         ['../editor/spell-editor.js',         m => m.launchSpellEditor()],
+        'start-equipment-editor-pro': ['../editor/equipment-editor-pro.js', m => m.launchEquipmentEditorPro()],
+        'start-realm-editor-pro':     ['../editor/realm-editor-pro.js',     m => m.launchRealmEditorPro()],
+    };
+    for (const [id, [path, launch]] of Object.entries(editorButtons)) {
+        document.getElementById(id).addEventListener('click', () => openEditor(path, launch));
+    }
 
     document.getElementById('outro-return-btn').addEventListener('click', () => {
         document.getElementById('outro-overlay').style.display = 'none';
-        gameContainer.style.display = 'none';
-        startScreen.style.display = '';
-        if (window.game) {
-            cancelAnimationFrame(window.game._rafId);
-            document.removeEventListener('visibilitychange', window.game._onVisibilityChange);
-            window.removeEventListener('blur', window.game._onWindowBlur);
-            window.game = null;
-        }
-        window.soundManager?.playMusic('menu_theme');
+        returnToStartScreen();
     });
 
     const importFileInput = document.getElementById('import-file');
@@ -6329,11 +6510,13 @@ _onDOMReady(() => {
     importFileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const success = await importSave(file);
-        if (success) {
+        const result = await importSave(file);
+        if (typeof result === 'string') {
             exportBtn.disabled = false;
             openSaveSlotScreen();
-        } else {
+        } else if (result?.error) {
+            alert(`Could not import save: ${result.error}`);
+        } else if (result === false) {
             alert('Invalid save file.');
         }
         importFileInput.value = '';

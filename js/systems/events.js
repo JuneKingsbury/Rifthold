@@ -1,4 +1,4 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS, INDESTRUCTIBLE_STRUCTURES, PLANT_STRUCTURES, TERRAIN } from '../core/config.js';
+import { CONFIG, EVENTS, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, BLIGHT_CONFIG, TRAITS, ARRIVAL_BONDS, PLANT_STRUCTURES, TERRAIN } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
@@ -76,7 +76,7 @@ export function computeTradeValues(offer, request, goldOffer, rates, tradeData, 
             const parts = res.split('_');
             const type = parts[3];
             const idx = parseInt(parts[4], 10);
-            const arr = game?.resources[`${type}s`] || [];
+            const arr = game?.resources.getItemArray(type) || [];
             const item = arr[idx];
             equipOfferVal += getItemTradeValue(item) * rates.discount;
         } else if (res.startsWith('__potion_')) {
@@ -136,10 +136,6 @@ export class EventSystem {
 
             if (mods.some(m => m.suppressEvents && m.suppressEvents.includes(eventKey))) continue;
 
-            if (eventKey === 'fire') {
-                const wDef = WEATHER_TYPES[game.weather.currentWeather];
-                if (!(wDef && wDef.fireChance) && Math.random() > 0.01) continue;
-            }
             if (eventKey === 'void_whisper') {
                 const hasNexus = game.mapIndex
                     ? game.mapIndex.getStructurePositions('void_nexus').size > 0
@@ -193,7 +189,6 @@ export class EventSystem {
                 switch (eventKey) {
                     case 'wanderer': this.eventWanderer(game); break;
                     case 'caravan': this.eventCaravan(game); break;
-                    case 'fire': this.eventFire(game); break;
                     case 'void_whisper': this.eventVoidWhisper(game); break;
                 }
                 break;
@@ -216,6 +211,9 @@ export class EventSystem {
                 const tile = game.map[ny][nx];
                 if (!def.terrain.includes(tile.terrain)) continue;
                 if (tile.resource || (tile.structure && !PLANT_STRUCTURES.has(tile.structure))) continue;
+                // Leave player-owned and ruin ground alone: farms, floors, pending
+                // build/gather designations, and sealed crypt interiors.
+                if (tile.zone || tile.floor || tile.designation || tile.sealed) continue;
                 if (Math.random() >= def.fillChance) continue;
                 if (tile.structure) {
                     game.mapIndex?.removeStructure(nx, ny, tile.structure);
@@ -289,8 +287,7 @@ export class EventSystem {
                     tile.zone.growth = 0;
                     tile.zone.blighted = false;
                     delete tile.zone.blightSpreadCount;
-                    const staleTask = game.taskQueue._byPosition.get(game.taskQueue._posKey(x, y));
-                    if (staleTask) game.taskQueue.remove(staleTask.id);
+                    this._removeFarmTasksAt(game, x, y);
                     count++;
                 }
             }
@@ -304,6 +301,14 @@ export class EventSystem {
                     addThought(c, def.thought, def.moodChange, def.moodDuration, game.tick);
                 }
             }
+        }
+    }
+
+    // A crop reset to empty invalidates its pending harvest/cleanse tasks. Other
+    // tasks can share the tile, so only the farm ones are dropped.
+    _removeFarmTasksAt(game, x, y) {
+        for (const t of game.taskQueue.getAllByPosition(x, y)) {
+            if (t.type === 'harvest' || t.type === 'cleanse_blight') game.taskQueue.remove(t.id);
         }
     }
 
@@ -387,8 +392,7 @@ export class EventSystem {
             const tile = game.map[y][x];
             tile.zone.state = 'empty';
             tile.zone.growth = 0;
-            const staleTask = game.taskQueue._byPosition.get(game.taskQueue._posKey(x, y));
-            if (staleTask) game.taskQueue.remove(staleTask.id);
+            this._removeFarmTasksAt(game, x, y);
             game.entities.push({
                 type: 'blight_bloom', category: 'blight_bloom',
                 id: getNextId(),
@@ -630,7 +634,7 @@ export class EventSystem {
                 const parts = res.split('_');
                 const type = parts[3];
                 const idx = parseInt(parts[4], 10);
-                const arr = game.resources[`${type}s`] || [];
+                const arr = game.resources.getItemArray(type) || [];
                 if (!arr[idx]) return false;
             } else if (res.startsWith('__potion_')) {
                 const key = res.slice('__potion_'.length);
@@ -670,7 +674,7 @@ export class EventSystem {
             const parts = res.split('_');
             const type = parts[3];
             const idx = parseInt(parts[4], 10);
-            const arr = game.resources[`${type}s`];
+            const arr = game.resources.getItemArray(type);
             if (arr) arr.splice(idx, 1);
         }
         for (const [res, amt] of Object.entries(offering)) {
@@ -761,7 +765,7 @@ export class EventSystem {
                 reward: '+1 rare item drop from next expedition',
                 apply: (g) => {
                     for (const c of g.colonists.filter(c => c.hp > 0)) {
-                        c.rest = Math.max(0, (c.rest || 0) - 30);
+                        c.needs.rest = Math.max(0, c.needs.rest - 30);
                     }
                     g._voidWhisperNextExpRareMult = (g._voidWhisperNextExpRareMult || 1) * 2.0;
                     g.eventLog.add(g, `The colonists sleep fitfully. Next expedition has doubled rare loot chance.`, 'event', null);
@@ -835,17 +839,24 @@ export class EventSystem {
                 ask: 'A void wall is consumed (if present). Otherwise a stone wall.',
                 reward: 'Next wave spawns 20% fewer enemies',
                 apply: (g) => {
-                    let found = false;
-                    outer: for (let y = 0; y < g.map.length; y++) {
-                        for (let x = 0; x < g.map[y].length; x++) {
-                            const s = g.map[y][x].structure;
-                            if ((s === 'void_wall' || (s === 'wall' && !found)) && !g.ruins.getRuinAt(x, y)) {
-                                g.map[y][x].structure = null;
-                                if (g.mapIndex) g.mapIndex.removeStructure(x, y, s);
-                                found = true;
-                                if (s === 'void_wall') break outer;
-                            }
-                        }
+                    // Prefer a void wall, else a stone wall. Ruin walls are not the
+                    // colony's to offer.
+                    for (const type of ['void_wall', 'stone_wall']) {
+                        const pos = g.mapIndex.findAll(type).find(p => !g.ruins.getRuinAt(p.x, p.y));
+                        if (!pos) continue;
+                        const tile = g.map[pos.y][pos.x];
+                        // Drop the tile's tasks too, so a stale deconstruct/repair
+                        // can't later act on a wall rebuilt here.
+                        for (const t of g.taskQueue.getAllByPosition(pos.x, pos.y)) g.taskQueue.remove(t.id);
+                        g.mapIndex.removeStructure(pos.x, pos.y, type);
+                        tile.structure = null;
+                        tile.structureHp = undefined;
+                        tile.designation = null;
+                        tile.passable = TERRAIN[tile.terrain]?.passable.colonist ?? true;
+                        g.markRoomsDirty();
+                        g.renderer?.markTerrainDirty();
+                        g.minimap?.markTerrainDirty();
+                        break;
                     }
                     g._voidWhisperWaveEnemyMult = (g._voidWhisperWaveEnemyMult || 1) * 0.80;
                     g.eventLog.add(g, `A wall crumbles as tribute. Next wave: -20% enemies.`, 'event', null);
@@ -1015,31 +1026,6 @@ export class EventSystem {
             game._eventPaused = true;
         }
     }
-
-    eventFire(game) {
-        let fireX = -1, fireY = -1;
-        for (let attempts = 0; attempts < 20; attempts++) {
-            const x = Math.floor(Math.random() * CONFIG.MAP_WIDTH);
-            const y = Math.floor(Math.random() * CONFIG.MAP_HEIGHT);
-            const tile = game.map[y][x];
-            if (!tile.sealed && (tile.resource?.type === 'tree' || (tile.structure && tile.structure !== 'wall'))) {
-                fireX = x; fireY = y;
-                break;
-            }
-        }
-        if (fireX >= 0) {
-            game.map[fireY][fireX].onFire = true;
-            game.map[fireY][fireX].fireTimer = FIRE_CONFIG.initialLifespan;
-            if (game.mapIndex) game.mapIndex.addFire(fireX, fireY);
-            window.soundManager?.playSFXAt('fire_ignite', fireX, fireY);
-            game.notifications.push({ text: 'Fire has broken out!', tick: game.tick, type: 'danger' });
-            game.eventLog.add(game, 'Fire has broken out!', 'danger', { type: 'position', x: fireX, y: fireY });
-            const t = THOUGHTS.fire_panic;
-            for (const c of game.colonists) {
-                addThought(c, t.text, t.moodEffect, t.duration, game.tick);
-            }
-        }
-    }
 }
 
 // ============================================================================
@@ -1089,148 +1075,4 @@ function getRandomInterior() {
         x: Math.floor(Math.random() * CONFIG.MAP_WIDTH),
         y: Math.floor(Math.random() * CONFIG.MAP_HEIGHT),
     };
-}
-
-export function updateFires(game) {
-    const firePositions = game.mapIndex ? game.mapIndex.getFirePositions() : null;
-
-    if (!firePositions) {
-        _updateFiresFallback(game);
-        return;
-    }
-
-    for (const { x, y } of firePositions) {
-        const tile = game.map[y][x];
-        if (!tile.onFire) {
-            game.mapIndex.removeFire(x, y);
-            continue;
-        }
-
-        tile.fireTimer--;
-        // Captured before burnout clears the structure; see the spread check below.
-        const burningPlant = PLANT_STRUCTURES.has(tile.structure);
-
-        const wDef = WEATHER_TYPES[game.weather.currentWeather];
-        if (wDef && wDef.extinguishesFire) {
-            tile.onFire = false;
-            tile.fireTimer = 0;
-            game.mapIndex.removeFire(x, y);
-            continue;
-        }
-
-        if (tile.fireTimer <= 0) {
-            tile.onFire = false;
-            game.mapIndex.removeFire(x, y);
-            if (tile.resource?.type === 'tree') {
-                tile.resource = null;
-            } else if (tile.structure && tile.structure !== 'wall' && !INDESTRUCTIBLE_STRUCTURES.has(tile.structure)) {
-                const oldStructure = tile.structure;
-                if (oldStructure === 'bed') {
-                    for (const c of game.colonists) {
-                        if (c.assignedBed && c.assignedBed.x === x && c.assignedBed.y === y) {
-                            c.assignedBed = null;
-                        }
-                    }
-                }
-                tile.structure = null;
-                tile.passable = TERRAIN[tile.terrain]?.passable.colonist ?? true;
-                game.mapIndex.removeStructure(x, y, oldStructure);
-            }
-        }
-
-        // Plants catch fire but never pass it to other plants, so a meadow only
-        // burns where it borders a real fire instead of sweeping away.
-        if (tile.onFire && Math.random() < FIRE_CONFIG.spreadChance) {
-            const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-            const dir = dirs[Math.floor(Math.random() * 4)];
-            const nx = x + dir[0], ny = y + dir[1];
-            if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
-                const neighbor = game.map[ny][nx];
-                if (!neighbor.onFire && !neighbor.sealed && !(burningPlant && PLANT_STRUCTURES.has(neighbor.structure)) && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
-                    neighbor.onFire = true;
-                    neighbor.fireTimer = FIRE_CONFIG.spreadTimerMin + Math.floor(Math.random() * (FIRE_CONFIG.spreadTimerMax - FIRE_CONFIG.spreadTimerMin));
-                    game.mapIndex.addFire(nx, ny);
-                    game.combatEffects.push({ x: nx, y: ny, char: COMBAT_VISUALS.fireIgniteChar, color: COMBAT_VISUALS.fireIgniteColor, ttl: COMBAT_VISUALS.fireIgniteTtl });
-                    window.soundManager?.playSFXAt('fire_ignite', nx, ny);
-                }
-            }
-        }
-
-        if (tile.onFire) {
-            const existingTask = game.taskQueue.getByPosition(x, y);
-            if (!existingTask) {
-                game.taskQueue.add({
-                    type: 'extinguish',
-                    skillRequired: 'building',
-                    x, y,
-                    workAmount: 5,
-                });
-            }
-        }
-    }
-}
-
-function _updateFiresFallback(game) {
-    // Snapshot fire positions before iterating so newly ignited tiles in this
-    // tick are not immediately re-processed (which would cause multi-hop spread).
-    const fireTiles = [];
-    for (let y = 0; y < game.map.length; y++) {
-        for (let x = 0; x < game.map[y].length; x++) {
-            if (game.map[y][x].onFire) fireTiles.push({ x, y });
-        }
-    }
-    for (const { x, y } of fireTiles) {
-            const tile = game.map[y][x];
-            if (!tile.onFire) continue;
-
-            tile.fireTimer--;
-            // Captured before burnout clears the structure; see the spread check below.
-            const burningPlant = PLANT_STRUCTURES.has(tile.structure);
-
-            const wDef = WEATHER_TYPES[game.weather.currentWeather];
-            if (wDef && wDef.extinguishesFire) {
-                tile.onFire = false;
-                tile.fireTimer = 0;
-                continue;
-            }
-
-            if (tile.fireTimer <= 0) {
-                tile.onFire = false;
-                if (tile.resource?.type === 'tree') {
-                    tile.resource = null;
-                } else if (tile.structure && tile.structure !== 'wall' && !INDESTRUCTIBLE_STRUCTURES.has(tile.structure)) {
-                    // Keep mapIndex in sync, matching the primary fire path
-                    // (~line 1109). Without this the index retains a burned-out
-                    // structure key and drifts from a fresh rebuild.
-                    const oldStructure = tile.structure;
-                    tile.structure = null;
-                    tile.passable = TERRAIN[tile.terrain]?.passable.colonist ?? true;
-                    if (game.mapIndex) game.mapIndex.removeStructure(x, y, oldStructure);
-                }
-            }
-
-            if (Math.random() < FIRE_CONFIG.spreadChance) {
-                const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-                const dir = dirs[Math.floor(Math.random() * 4)];
-                const nx = x + dir[0], ny = y + dir[1];
-                if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
-                    const neighbor = game.map[ny][nx];
-                    if (!neighbor.onFire && !neighbor.sealed && !(burningPlant && PLANT_STRUCTURES.has(neighbor.structure)) && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
-                        neighbor.onFire = true;
-                        neighbor.fireTimer = FIRE_CONFIG.spreadTimerMin + Math.floor(Math.random() * (FIRE_CONFIG.spreadTimerMax - FIRE_CONFIG.spreadTimerMin));
-                        game.combatEffects.push({ x: nx, y: ny, char: COMBAT_VISUALS.fireIgniteChar, color: COMBAT_VISUALS.fireIgniteColor, ttl: COMBAT_VISUALS.fireIgniteTtl });
-                    }
-                }
-            }
-
-            const existingTask = game.taskQueue.getByPosition(x, y);
-            if (!existingTask && tile.onFire) {
-                game.taskQueue.add({
-                    type: 'extinguish',
-                    skillRequired: 'building',
-                    x, y,
-                    workAmount: 5,
-                });
-            }
-    }
 }

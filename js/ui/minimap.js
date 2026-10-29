@@ -2,6 +2,8 @@ import { CONFIG, TILE_COLORS, BUILDINGS, ENTITIES, CRYPT_CONFIG } from '../core/
 
 // Canvas pixels per tile for the footer minimap. The full-map panel picks its own.
 const DEFAULT_SCALE = 2;
+// How often (ms) the map is fully redrawn while the game is paused (see render).
+const PAUSED_REFRESH_MS = 500;
 
 // One distinct colour per terrain, chosen so each biome reads at a glance:
 // grassland bright yellow-green, forest deep emerald, swamp olive/brown/teal,
@@ -28,6 +30,13 @@ const UNKNOWN_TERRAIN_COLOR = [30, 30, 30];
 const ATTUNED_COLOR = [32, 190, 170];
 
 const TREE_LEAF_COLOR = [24, 92, 30];
+
+// Unit dot colours (shared by every render, so none are allocated per unit).
+const COLONIST_COLOR = [255, 255, 0];
+const TAMED_COLOR = [100, 200, 100];
+const WILDLIFE_COLOR = [150, 120, 80];
+const PREDATOR_COLOR = [180, 50, 50];
+const HOSTILE_COLOR = [255, 50, 50];
 const AUTUMN_LEAF_COLOR = [190, 115, 30];
 
 /**
@@ -44,7 +53,6 @@ export const MAP_LAYERS = [
     { key: 'ore',       label: 'Ore',              color: [196, 124, 78],  desc: 'Stone (grey), iron (copper) and runite (teal)' },
     { key: 'buildings', label: 'Buildings',        color: [180, 180, 180], desc: 'Walls (light grey), doors (brown), floors and furniture' },
     { key: 'farms',     label: 'Farm zones',       color: [60, 150, 30],   desc: 'Farm plots: brown when empty, green growing, gold ready' },
-    { key: 'fires',     label: 'Fires',            color: [255, 68, 0],    desc: 'Tiles currently burning' },
     { key: 'crypts',    label: 'Crypts',           color: [190, 160, 230], desc: 'Discovered crypts, tinted by state. Attuned means its rift anchor is active' },
     { key: 'landmarks', label: 'Landmarks',        color: [214, 178, 96],  desc: 'Ancient ruins scattered across the map' },
     { key: 'camera',    label: 'Screen center',    color: [235, 40, 40],   desc: 'Red arrow pointing at the center of the main view' },
@@ -104,6 +112,14 @@ const cryptColor = (ruin) => ruin.anchor?.attuned ? ATTUNED_COLOR : ruin.ward ? 
 export const isCryptComplete = (ruin) =>
     (ruin.loot ?? []).every(c => c.taken) && (!ruin.anchor || ruin.anchor.attuned) && (ruin.state === 'cleared' || !!ruin.anchor?.attuned);
 
+// 'rgb(r,g,b)' for a colour array, cached per array so per-dot draws don't build strings.
+const _cssColors = new WeakMap();
+const cssColor = (c) => {
+    let css = _cssColors.get(c);
+    if (!css) { css = `rgb(${c[0]},${c[1]},${c[2]})`; _cssColors.set(c, css); }
+    return css;
+};
+
 const mix = (a, b, t) => [
     Math.round(a[0] + (b[0] - a[0]) * t),
     Math.round(a[1] + (b[1] - a[1]) * t),
@@ -144,15 +160,32 @@ export class Minimap {
         this._lastCamX = -1;
         this._lastCamY = -1;
         this._lastSeason = null;
+        this._lastMap = null;
+        // What the canvas currently shows (see render): skip redrawing until the
+        // simulation ticks, the camera moves, or something marks it dirty.
+        this._drawnKey = '';
+        this._needsRedraw = true;
+        // Reused flat [x, y, color, ...] list of dots drawn above the markers.
+        this._topDots = [];
         this._icons = new Map();
         this._tinted = new Map();
 
-        canvas.addEventListener('mousedown', (e) => { e.stopPropagation(); this.onClick(e); });
+        // The footer canvas is a persistent index.html element while a Minimap is
+        // built per game, so its listeners are tied to an AbortController that
+        // destroy() fires (otherwise every relaunch would stack another set).
+        this._listenerAbort = new AbortController();
+        const signal = this._listenerAbort.signal;
+        canvas.addEventListener('mousedown', (e) => { e.stopPropagation(); this.onClick(e); }, { signal });
         canvas.addEventListener('mousemove', (e) => {
             if (e.buttons === 1) { e.stopPropagation(); this.onClick(e); }
-        });
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false });
-        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false });
+        }, { signal });
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false, signal });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); e.stopPropagation(); this.onTouch(e); }, { passive: false, signal });
+    }
+
+    /** Removes this minimap's canvas listeners (the canvas itself may be reused). */
+    destroy() {
+        this._listenerAbort.abort();
     }
 
     // Pixel multiplier that keeps markers a similar on-screen size across map sizes.
@@ -183,7 +216,10 @@ export class Minimap {
             img.src = src;
             this._icons.set(src, img);
         }
-        return img.complete && img.naturalWidth > 0 ? img : null;
+        if (img.complete && img.naturalWidth > 0) return img;
+        // Still loading: draw again next frame so the marker appears once it's in.
+        if (!img.complete) this._needsRedraw = true;
+        return null;
     }
 
     // Solid black copy of a sprite's shape, used to outline it. Cached per sprite.
@@ -322,6 +358,7 @@ export class Minimap {
 
     markTerrainDirty() {
         this._terrainDirty = true;
+        this._needsRedraw = true;
     }
 
     onTouch(e) {
@@ -355,10 +392,45 @@ export class Minimap {
         const w = CONFIG.MAP_WIDTH * scale;
         const h = CONFIG.MAP_HEIGHT * scale;
 
+        // The canvas was sized for the map at construction (or the last render).
+        // A load or new game can change the map size, so follow it here rather
+        // than relying on callers: otherwise a larger world shows only its
+        // top-left corner.
+        if (this.canvas.width !== w || this.canvas.height !== h) {
+            this.canvas.width = w;
+            this.canvas.height = h;
+            this._terrainImageData = null;
+            this._compositeImageData = null;
+            this._terrainDirty = true;
+            // The footer sizes its minimap panel from the canvas aspect ratio.
+            if (!this.detailed) window.resetMinimapSize?.();
+        }
+        if (map !== this._lastMap) {
+            this._lastMap = map;
+            this._terrainDirty = true;
+        }
+
+        // Everything drawn below only changes when the simulation ticks, the
+        // camera moves, or the terrain layer is marked dirty (layer toggles, room
+        // and snow changes). Skip the full-buffer copy + putImageData otherwise.
+        // While paused the tick never advances, but the player can still place
+        // zones, cancel designations and so on (room recompute, which normally
+        // marks the terrain dirty, only runs on ticks). Refresh everything at a
+        // low rate then so those edits show.
+        const nowMs = performance.now();
+        if (this.game.paused && nowMs - (this._lastPausedRefresh || 0) >= PAUSED_REFRESH_MS) {
+            this._lastPausedRefresh = nowMs;
+            this._terrainDirty = true;
+        }
+        const drawKey = `${this.game.tick}|${camX}|${camY}|${CONFIG.VIEWPORT_WIDTH}|${CONFIG.VIEWPORT_HEIGHT}|${season}`;
+        if (!this._needsRedraw && !this._terrainDirty && drawKey === this._drawnKey) return;
+        this._drawnKey = drawKey;
+        this._needsRedraw = false;
+
         // Rebuild static terrain layer only when something structural changed
-        // (roomsDirty, season flip, fire/snow state) or on first render.
+        // (roomsDirty, season flip, snow state, map replaced) or on first render.
         const seasonChanged = season !== this._lastSeason;
-        if (this._terrainDirty || seasonChanged) {
+        if (this._terrainDirty || seasonChanged || !this._terrainImageData) {
             if (!this._terrainImageData) this._terrainImageData = ctx.createImageData(w, h);
             const data = this._terrainImageData.data;
             const rowBytes = w * 4;
@@ -399,31 +471,32 @@ export class Minimap {
         const showWildlife = this.layerOn('wildlife');
         const showHostiles = this.layerOn('hostiles');
         // Hostiles and colonists are drawn last, over the ruin and crypt markers, so they never get lost under them.
-        const topDots = [];
+        const topDots = this._topDots;
+        topDots.length = 0;
         for (const e of entities) {
             if (e.hp <= 0) continue;
             if (e.tamed) {
-                if (showTamed) this.drawDot(data, e.x, e.y, [100, 200, 100], dotSize, outline);
+                if (showTamed) this.drawDot(data, e.x, e.y, TAMED_COLOR, dotSize, outline);
             } else if (e.category === 'animal') {
                 if (!(e.hostile ? showHostiles : showWildlife)) continue;
-                if (e.hostile) topDots.push([e.x, e.y, [180, 50, 50]]);
-                else this.drawDot(data, e.x, e.y, [150, 120, 80], dotSize, outline);
+                if (e.hostile) topDots.push(e.x, e.y, PREDATOR_COLOR);
+                else this.drawDot(data, e.x, e.y, WILDLIFE_COLOR, dotSize, outline);
             }
         }
         if (showHostiles) {
             for (const r of raiders) {
-                if (r.hp > 0) topDots.push([r.x, r.y, [255, 50, 50]]);
+                if (r.hp > 0) topDots.push(r.x, r.y, HOSTILE_COLOR);
             }
             // Wave enemies are only shown on the full map; the footer minimap never drew them.
             if (this.detailed && this.game.waves) {
                 for (const en of this.game.waves.enemies) {
-                    if (en.hp > 0) topDots.push([en.x, en.y, [255, 50, 50]]);
+                    if (en.hp > 0) topDots.push(en.x, en.y, HOSTILE_COLOR);
                 }
             }
         }
         if (this.layerOn('colonists')) {
             for (const c of colonists) {
-                if (c.hp > 0) topDots.push([c.x, c.y, [255, 255, 0]]);
+                if (c.hp > 0) topDots.push(c.x, c.y, COLONIST_COLOR);
             }
         }
 
@@ -460,7 +533,7 @@ export class Minimap {
             }
         }
 
-        for (const [x, y, color] of topDots) this.drawDotOnCanvas(x, y, color, dotSize, outline);
+        for (let i = 0; i < topDots.length; i += 3) this.drawDotOnCanvas(topDots[i], topDots[i + 1], topDots[i + 2], dotSize, outline);
 
         if (this.layerOn('camera')) {
             if (this.detailed) {
@@ -533,16 +606,15 @@ export class Minimap {
         const x0 = Math.round((x + 0.5) * this.scale - size / 2);
         const y0 = Math.round((y + 0.5) * this.scale - size / 2);
         if (outline) {
-            ctx.fillStyle = `rgb(${OUTLINE_COLOR[0]},${OUTLINE_COLOR[1]},${OUTLINE_COLOR[2]})`;
+            ctx.fillStyle = cssColor(OUTLINE_COLOR);
             ctx.fillRect(x0 - 1, y0 - 1, size + 2, size + 2);
         }
-        ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+        ctx.fillStyle = cssColor(color);
         ctx.fillRect(x0, y0, size, size);
     }
 
     getTileColor(tile, season) {
         if (tile.sealed) return [8, 8, 12];
-        if (tile.onFire && this.layerOn('fires')) return [255, 68, 0];
         // Decorative plants show the terrain beneath rather than a building pixel.
         if (tile.structure && this.layerOn('buildings') && BUILDINGS[tile.structure]?.structureType !== 'plant') {
             const bDef = BUILDINGS[tile.structure];

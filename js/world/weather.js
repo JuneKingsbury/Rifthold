@@ -9,6 +9,7 @@ export class Weather {
         this.currentWeather = 'clear';
         this.weatherTimer = 0;
         this.year = 1;
+        this._maybeSnow = true;
     }
 
     update(tick, divinationModifiers) {
@@ -66,23 +67,35 @@ export class Weather {
         return mult;
     }
 
+    // Updates tile.snowCovered and returns the tiles whose snow state changed
+    // ([{x, y}]) so the caller can patch only those. Outside winter the full-map
+    // pass runs once to melt everything, then is skipped until snow can return.
+    // _maybeSnow starts true (unknown, e.g. right after a load) to force that pass.
     applySnow(map) {
+        const changed = [];
         if (this.season === 'winter') {
+            this._maybeSnow = true;
             for (let y = 0; y < map.length; y++) {
                 for (let x = 0; x < map[y].length; x++) {
                     const tile = map[y][x];
-                    if (GRASS_TERRAIN.has(tile.terrain) && (!tile.structure || PLANT_STRUCTURES.has(tile.structure)) && !tile.zone) {
+                    if (!tile.snowCovered && GRASS_TERRAIN.has(tile.terrain) && (!tile.structure || PLANT_STRUCTURES.has(tile.structure)) && !tile.zone) {
                         tile.snowCovered = true;
+                        changed.push({ x, y });
                     }
                 }
             }
-        } else {
+        } else if (this._maybeSnow) {
             for (let y = 0; y < map.length; y++) {
                 for (let x = 0; x < map[y].length; x++) {
-                    map[y][x].snowCovered = false;
+                    if (map[y][x].snowCovered) {
+                        map[y][x].snowCovered = false;
+                        changed.push({ x, y });
+                    }
                 }
             }
+            this._maybeSnow = false;
         }
+        return changed;
     }
 
     getSeasonDisplay() {

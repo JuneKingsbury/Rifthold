@@ -1,6 +1,8 @@
 import { ENTITIES, ANIMALS, SPELLS, RESEARCH, CONFIG, SUMMON_TYPES, GOLEM_TYPES, RAID_TYPES, WAVE_TYPES } from '../core/config.js';
 import { EffectPicker, formatEffectsCode } from './effect-picker.js';
 import { RolePicker, formatRolesCode } from './role-picker.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { toJsLiteral } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_entity_drafts';
 
@@ -26,6 +28,23 @@ const REFERENCE_DATA = [
 
 const CONFIG_ENTITIES = Object.entries(ENTITIES).map(([key, def]) => ({ key, ...def }));
 
+// Entity effects are run by EFFECT_HANDLERS in entities/roles.js, which only
+// implements mood_aura. Offer just that so the editor can't author no-op effects.
+const ENTITY_EFFECT_TYPES = ['mood_aura'];
+
+// Fields the form owns. Collecting starts from the def being edited, drops
+// these, then re-adds them from the form, so every other field survives.
+const MANAGED_FIELDS = ['name', 'category', 'char', 'color', 'hp', 'speed', 'damage', 'hostile', 'aggroRange',
+    'spawnWeight', 'spawnCondition', 'meatYield', 'hideYield', 'fleeRange', 'roles', 'effects', 'tameable', 'tamed'];
+// Only owned while their section is shown for the chosen category.
+const SECTION_FIELDS = {
+    ranged: { cats: ['enemy', 'summon'], fields: ['ranged', 'projectileChar', 'projectileColor'] },
+    summon: { cats: ['summon'], fields: ['summonDuration'] },
+    golem: { cats: ['golem'], fields: ['craftTicks', 'cost'] },
+    loot: { cats: ['enemy'], fields: ['loot'] },
+};
+const MANAGED_TAMED_FIELDS = ['foodToTame', 'dangerousTame', 'baseTameChance', 'retaliationDamage', 'roles', 'effects'];
+
 let editorInstance = null;
 
 export function launchEntityEditor() {
@@ -39,6 +58,7 @@ export function launchEntityEditor() {
 class EntityEditor {
     constructor() {
         this.activeDraftKey = null;
+        this._base = {};
         this.undoStack = [];
         this.undoIndex = -1;
         this.container = document.getElementById('entity-editor');
@@ -314,6 +334,7 @@ class EntityEditor {
 
         this._effectPicker = new EffectPicker(document.getElementById('en-effects'), {
             allowedContexts: ['passive', 'aura', 'buff', 'on_hit', 'on_cast'],
+            allowedTypes: ENTITY_EFFECT_TYPES,
             onChange,
         });
 
@@ -324,6 +345,7 @@ class EntityEditor {
 
         this._tamedEffectPicker = new EffectPicker(document.getElementById('en-tame-effects'), {
             allowedContexts: ['passive', 'aura'],
+            allowedTypes: ENTITY_EFFECT_TYPES,
             onChange,
         });
 
@@ -336,10 +358,12 @@ class EntityEditor {
 
         window.addEventListener('keydown', (e) => {
             if (this.container.style.display === 'none') return;
+            const t = e.target;
+            // Leave Ctrl+Z / Ctrl+Y to native text undo while typing.
+            if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return;
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); this._undo(); return; }
             if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); this._redo(); return; }
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-            if (e.key === 'Escape') this._goBack();
+            if (e.key === 'Escape' && !this.container.querySelector('.fe-export-modal')) this._goBack();
         });
     }
 
@@ -361,7 +385,7 @@ class EntityEditor {
         for (const cat of REFERENCE_DATA) {
             html += `<div class="fe-ref-category"><div class="fe-ref-category-title">${cat.title}</div>`;
             for (const id of cat.ids) {
-                html += `<span class="fe-ref-id" data-ref-id="${id}">${id}</span>`;
+                html += `<span class="fe-ref-id" data-ref-id="${escapeAttr(id)}">${escapeHtml(id)}</span>`;
             }
             html += `</div>`;
         }
@@ -443,10 +467,18 @@ class EntityEditor {
         const data = this._collectFormData();
         if (!data || !data.key) return;
         const saved = this._getSaved();
-        const idx = saved.findIndex(s => s.key === data.key);
+        const prevKey = this.activeDraftKey;
+        const keyField = document.getElementById('en-key').closest('.fe-field');
+        // Renaming onto another draft's key would silently replace that draft.
+        const clash = prevKey != null && prevKey !== data.key && saved.some(s => s.key === data.key);
+        keyField.classList.toggle('fe-error', clash);
+        keyField.title = clash ? `A draft named "${data.key}" already exists` : '';
+        if (clash) return;
+        // A key edit renames the active draft instead of leaving the old one orphaned.
+        const idx = saved.findIndex(s => s.key === (prevKey ?? data.key));
         if (idx >= 0) saved[idx] = data;
         else saved.push(data);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(saved)); } catch { return; }
         this.activeDraftKey = data.key;
         this._renderDraftList();
         try { localStorage.setItem(STORAGE_KEY + '_active', data.key); } catch {}
@@ -504,6 +536,7 @@ class EntityEditor {
         document.getElementById('en-tame-dangerousTame').checked = false;
         document.getElementById('en-tame-baseTameChance').value = '0.4';
         document.getElementById('en-tame-retaliationDamage').value = '12';
+        this._base = {};
         this._rolePicker.clear();
         this._effectPicker.clear();
         this._tamedRolePicker.clear();
@@ -519,12 +552,12 @@ class EntityEditor {
             return;
         }
         container.innerHTML = saved.map(item => `
-            <div class="fe-draft-row${item.key === this.activeDraftKey ? ' active' : ''}" data-draft-key="${item.key}">
-                <span class="fe-draft-char" style="color:${item.color || '#ccc'}">${item.char || '?'}</span>
-                <span class="fe-draft-key">[${item.category || '?'}] ${item.key}</span>
+            <div class="fe-draft-row${item.key === this.activeDraftKey ? ' active' : ''}" data-draft-key="${escapeAttr(item.key)}">
+                <span class="fe-draft-char" style="color:${escapeAttr(item.color || '#ccc')}">${escapeHtml(item.char || '?')}</span>
+                <span class="fe-draft-key">[${escapeHtml(item.category || '?')}] ${escapeHtml(item.key)}</span>
                 <span class="fe-draft-actions">
-                    <button data-draft-load="${item.key}">Edit</button>
-                    <button data-draft-del="${item.key}" class="fe-draft-del">✕</button>
+                    <button data-draft-load="${escapeAttr(item.key)}">Edit</button>
+                    <button data-draft-del="${escapeAttr(item.key)}" class="fe-draft-del">✕</button>
                 </span>
             </div>
         `).join('');
@@ -562,37 +595,46 @@ class EntityEditor {
         if (!key) return null;
 
         const category = document.getElementById('en-category').value;
-        const data = {
-            key,
-            name: document.getElementById('en-name').value.trim() || undefined,
-            category,
-            char: document.getElementById('en-char').value.trim() || '?',
-            color: document.getElementById('en-color').value,
-            hp: parseInt(document.getElementById('en-hp').value) || 40,
-            speed: parseFloat(document.getElementById('en-speed').value) || 0.5,
-        };
+        const base = this._base || {};
+        const data = { ...base, key };
+        for (const f of MANAGED_FIELDS) delete data[f];
+        for (const { cats, fields } of Object.values(SECTION_FIELDS)) {
+            if (cats.includes(category)) for (const f of fields) delete data[f];
+        }
 
-        const damage = parseInt(document.getElementById('en-damage').value);
-        if (damage) data.damage = damage;
+        data.name = document.getElementById('en-name').value.trim() || undefined;
+        data.category = category;
+        data.char = document.getElementById('en-char').value.trim() || '?';
+        // A def loaded from config/drafts only gains a field the user actually set:
+        // an untouched form default is not written onto a def that never had it.
+        const loaded = Object.keys(base).length > 1;
+        const color = document.getElementById('en-color').value;
+        if ('color' in base || !loaded || color !== '#bb8855') data.color = color;
+        // Zero is omitted unless the def had the field, so explicit zeros survive.
+        const num = (field, id, def, required = false) => {
+            const v = parseFloat(document.getElementById(id).value);
+            if (!Number.isFinite(v)) { if (required && !loaded) data[field] = def; return; }
+            if (field in base) { data[field] = v; return; }
+            if (loaded && v === def) return;
+            if (v !== 0 || required) data[field] = v;
+        };
+        num('hp', 'en-hp', 40, true);
+        num('speed', 'en-speed', 0.5, true);
+        num('damage', 'en-damage', 0);
 
         const hostile = document.getElementById('en-hostile').checked;
         if (hostile) data.hostile = true;
+        else if ('hostile' in base) data.hostile = false;
 
-        const aggroRange = parseInt(document.getElementById('en-aggroRange').value);
-        if (aggroRange && hostile) data.aggroRange = aggroRange;
-
-        const spawnWeight = parseInt(document.getElementById('en-spawnWeight').value);
-        if (spawnWeight) data.spawnWeight = spawnWeight;
+        if (hostile || 'aggroRange' in base) num('aggroRange', 'en-aggroRange', 6);
+        num('spawnWeight', 'en-spawnWeight', 0);
 
         const spawnCondition = document.getElementById('en-spawnCondition').value;
         if (spawnCondition) data.spawnCondition = spawnCondition;
 
-        const meatYield = parseInt(document.getElementById('en-meatYield').value);
-        const hideYield = parseInt(document.getElementById('en-hideYield').value);
-        const fleeRange = parseInt(document.getElementById('en-fleeRange').value);
-        if (meatYield) data.meatYield = meatYield;
-        if (hideYield) data.hideYield = hideYield;
-        if (fleeRange) data.fleeRange = fleeRange;
+        num('meatYield', 'en-meatYield', 0);
+        num('hideYield', 'en-hideYield', 0);
+        num('fleeRange', 'en-fleeRange', 0);
 
         if (category === 'enemy' || category === 'summon') {
             const ranged = document.getElementById('en-ranged').checked;
@@ -609,24 +651,25 @@ class EntityEditor {
 
         if (category === 'golem') {
             data.craftTicks = parseInt(document.getElementById('en-craftTicks').value) || 80;
-            try { data.cost = JSON.parse(document.getElementById('en-cost').value); } catch { data.cost = {}; }
+            try { data.cost = JSON.parse(document.getElementById('en-cost').value); } catch { data.cost = base.cost ?? {}; }
         }
 
         if (category === 'enemy') {
-            try { data.loot = JSON.parse(document.getElementById('en-loot').value); } catch { data.loot = []; }
+            try { data.loot = JSON.parse(document.getElementById('en-loot').value); } catch { data.loot = base.loot ?? []; }
         }
 
         const roles = this._rolePicker.getRoles();
-        if (roles.length) data.roles = roles;
+        if (roles.length || 'roles' in base) data.roles = roles;
 
         const effects = this._effectPicker.getEffects();
-        if (effects.length) data.effects = effects;
+        if (effects.length || 'effects' in base) data.effects = effects;
 
         if (category === 'animal') {
             const tameable = document.getElementById('en-tameable').checked;
             if (tameable) {
                 data.tameable = true;
-                const tamed = {};
+                const tamed = { ...(base.tamed || {}) };
+                for (const f of MANAGED_TAMED_FIELDS) delete tamed[f];
                 tamed.foodToTame = parseInt(document.getElementById('en-tame-foodToTame').value) || 4;
                 if (document.getElementById('en-tame-dangerousTame').checked) {
                     tamed.dangerousTame = true;
@@ -634,11 +677,15 @@ class EntityEditor {
                     tamed.retaliationDamage = parseInt(document.getElementById('en-tame-retaliationDamage').value) || 12;
                 }
                 const tamedRoles = this._tamedRolePicker.getRoles();
-                if (tamedRoles.length) tamed.roles = tamedRoles;
+                if (tamedRoles.length || 'roles' in (base.tamed || {})) tamed.roles = tamedRoles;
                 const tamedEffects = this._tamedEffectPicker.getEffects();
-                if (tamedEffects.length) tamed.effects = tamedEffects;
+                if (tamedEffects.length || 'effects' in (base.tamed || {})) tamed.effects = tamedEffects;
                 data.tamed = tamed;
             }
+        } else {
+            // Taming isn't editable outside the animal category; keep what the def had.
+            if ('tameable' in base) data.tameable = base.tameable;
+            if ('tamed' in base) data.tamed = base.tamed;
         }
 
         return data;
@@ -646,59 +693,10 @@ class EntityEditor {
 
     _formatOutput(data) {
         if (!data) return '';
-        const parts = [];
-        if (data.name) parts.push(`name: '${data.name}'`);
-        parts.push(`char: '${data.char}'`);
-        parts.push(`color: '${data.color}'`);
-        parts.push(`hp: ${data.hp}`);
-        parts.push(`speed: ${data.speed}`);
-        parts.push(`category: '${data.category}'`);
-        if (data.hostile) parts.push(`hostile: true`);
-        if (data.damage) parts.push(`damage: ${data.damage}`);
-        if (data.aggroRange) parts.push(`aggroRange: ${data.aggroRange}`);
-        if (data.meatYield) parts.push(`meatYield: ${data.meatYield}`);
-        if (data.hideYield) parts.push(`hideYield: ${data.hideYield}`);
-        if (data.fleeRange) parts.push(`fleeRange: ${data.fleeRange}`);
-        if (data.spawnWeight) parts.push(`spawnWeight: ${data.spawnWeight}`);
-        if (data.spawnCondition) parts.push(`spawnCondition: '${data.spawnCondition}'`);
-        if (data.ranged) {
-            parts.push(`ranged: true`);
-            parts.push(`projectileChar: '${data.projectileChar}'`);
-            parts.push(`projectileColor: '${data.projectileColor}'`);
-        }
-        if (data.summonDuration) parts.push(`summonDuration: ${data.summonDuration}`);
-        if (data.craftTicks) parts.push(`craftTicks: ${data.craftTicks}`);
-        if (data.cost) parts.push(`cost: ${JSON.stringify(data.cost)}`);
-        if (data.loot && data.loot.length) parts.push(`loot: ${JSON.stringify(data.loot)}`);
-
-        if (data.roles && data.roles.length) {
-            parts.push(`roles: ${formatRolesCode(data.roles)}`);
-        }
-
-        if (data.effects && data.effects.length) {
-            parts.push(formatEffectsCode(data.effects));
-        }
-
-        if (data.tameable) {
-            parts.push(`tameable: true`);
-            const tamedParts = [];
-            const t = data.tamed;
-            tamedParts.push(`foodToTame: ${t.foodToTame}`);
-            if (t.dangerousTame) {
-                tamedParts.push(`dangerousTame: true`);
-                tamedParts.push(`baseTameChance: ${t.baseTameChance}`);
-                tamedParts.push(`retaliationDamage: ${t.retaliationDamage}`);
-            }
-            if (t.roles && t.roles.length) {
-                tamedParts.push(`roles: ${formatRolesCode(t.roles, '        ')}`);
-            }
-            if (t.effects && t.effects.length) {
-                tamedParts.push(formatEffectsCode(t.effects, '        '));
-            }
-            parts.push(`tamed: {\n        ${tamedParts.join(',\n        ')},\n    }`);
-        }
-
-        return `${data.key}: {\n    ${parts.join(',\n    ')},\n},`;
+        const def = { ...data };
+        delete def.key;
+        const key = /^[A-Za-z_$][\w$]*$/.test(data.key) ? data.key : JSON.stringify(data.key);
+        return `${key}: ${toJsLiteral(def)},`;
     }
 
     _copyPreview() {
@@ -718,7 +716,7 @@ class EntityEditor {
         modal.innerHTML = `
             <div class="fe-export-modal-content">
                 <div style="color:#ffcc00;font-weight:bold;margin-bottom:12px;">Export All Entities (${saved.length} items)</div>
-                <textarea readonly>${output}</textarea>
+                <textarea readonly>${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="en-modal-copy">Copy to Clipboard</button>
                     <button id="en-modal-close">Close</button>
@@ -736,21 +734,30 @@ class EntityEditor {
     }
 
     _populateForm(data) {
+        this._base = { ...data };
         document.getElementById('en-key').value = data.key || '';
         document.getElementById('en-name').value = data.name || '';
-        document.getElementById('en-category').value = data.category || 'animal';
+        const catSel = document.getElementById('en-category');
+        if (data.category && ![...catSel.options].some(o => o.value === data.category)) {
+            // e.g. 'boss' defs: keep their category rather than blanking it.
+            const opt = document.createElement('option');
+            opt.value = data.category;
+            opt.textContent = data.category;
+            catSel.appendChild(opt);
+        }
+        catSel.value = data.category || 'animal';
         document.getElementById('en-char').value = data.char || '';
         document.getElementById('en-color').value = data.color || '#bb8855';
-        document.getElementById('en-hp').value = data.hp || 40;
-        document.getElementById('en-speed').value = data.speed || 0.5;
-        document.getElementById('en-damage').value = data.damage || 0;
+        document.getElementById('en-hp').value = data.hp ?? 40;
+        document.getElementById('en-speed').value = data.speed ?? 0.5;
+        document.getElementById('en-damage').value = data.damage ?? 0;
         document.getElementById('en-hostile').checked = !!data.hostile;
-        document.getElementById('en-aggroRange').value = data.aggroRange || 6;
-        document.getElementById('en-spawnWeight').value = data.spawnWeight || 0;
+        document.getElementById('en-aggroRange').value = data.aggroRange ?? 6;
+        document.getElementById('en-spawnWeight').value = data.spawnWeight ?? 0;
         document.getElementById('en-spawnCondition').value = data.spawnCondition || '';
-        document.getElementById('en-meatYield').value = data.meatYield || 0;
-        document.getElementById('en-hideYield').value = data.hideYield || 0;
-        document.getElementById('en-fleeRange').value = data.fleeRange || 0;
+        document.getElementById('en-meatYield').value = data.meatYield ?? 0;
+        document.getElementById('en-hideYield').value = data.hideYield ?? 0;
+        document.getElementById('en-fleeRange').value = data.fleeRange ?? 0;
         document.getElementById('en-ranged').checked = !!data.ranged;
         document.getElementById('en-projectileChar').value = data.projectileChar || '-';
         document.getElementById('en-projectileColor').value = data.projectileColor || '#ffaa33';
@@ -834,6 +841,8 @@ class EntityEditor {
         snap._effects = this._effectPicker.getEffects();
         snap._tamedRoles = this._tamedRolePicker.getRoles();
         snap._tamedEffects = this._tamedEffectPicker.getEffects();
+        snap._base = this._base;
+        snap._activeDraftKey = this.activeDraftKey;
         return JSON.stringify(snap);
     }
 
@@ -847,6 +856,10 @@ class EntityEditor {
         delete snap._effects;
         delete snap._tamedRoles;
         delete snap._tamedEffects;
+        this._base = snap._base || {};
+        this.activeDraftKey = snap._activeDraftKey ?? this.activeDraftKey;
+        delete snap._base;
+        delete snap._activeDraftKey;
         for (const [id, val] of Object.entries(snap)) {
             const el = document.getElementById(id);
             if (!el) continue;

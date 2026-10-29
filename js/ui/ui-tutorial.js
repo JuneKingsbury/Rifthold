@@ -1,4 +1,5 @@
 import { installTutorialPointer } from './ui-tutorial-pointer.js';
+import { escapeHtml } from './ui-utils.js';
 
 export function installTutorialPanel(UI) {
     Object.assign(UI.prototype, tutorialMethods);
@@ -15,7 +16,7 @@ const tutorialMethods = {
         this._tutorialExpanded = true;
         this._tutorialEl = document.getElementById('tutorial-note');
         if (!this._tutorialEl) return;
-        this._tutorialEl.addEventListener('click', (e) => {
+        this._listen(this._tutorialEl, 'click', (e) => {
             const cls = e.target.classList;
             if (cls.contains('tutorial-collapse')) {
                 this._tutorialExpanded = false;
@@ -73,7 +74,7 @@ const tutorialMethods = {
             const pct = Math.round((tutorial.currentStep / total) * 100);
             html = `<div class="tutorial-header"><span class="tutorial-step">${step}/${total}</span>${toggle}</div>`
                 + `<div class="tutorial-progress"><div class="tutorial-progress-fill" style="width:${pct}%"></div></div>`
-                + `<div class="tutorial-title">${task.title}</div>`;
+                + `<div class="tutorial-title">${escapeHtml(task.title)}</div>`;
             if (this._tutorialExpanded) {
                 html += `<div class="tutorial-desc">${withKeycaps(tutorial.getDescription(task))}</div>`;
                 const help = tutorial.getHelpText(game);

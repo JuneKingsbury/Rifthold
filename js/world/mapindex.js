@@ -2,13 +2,11 @@ export class MapIndex {
     constructor() {
         this.structures = new Map();
         this.zones = new Set();
-        this.fires = new Set();
     }
 
     clear() {
         this.structures.clear();
         this.zones.clear();
-        this.fires.clear();
     }
 
     _key(x, y) {
@@ -18,7 +16,6 @@ export class MapIndex {
     rebuild(map) {
         this.structures.clear();
         this.zones.clear();
-        this.fires.clear();
 
         for (let y = 0; y < map.length; y++) {
             for (let x = 0; x < map[y].length; x++) {
@@ -34,9 +31,6 @@ export class MapIndex {
                 }
                 if (tile.zone) {
                     this.zones.add(k);
-                }
-                if (tile.onFire) {
-                    this.fires.add(k);
                 }
             }
         }
@@ -69,14 +63,6 @@ export class MapIndex {
         this.zones.delete(this._key(x, y));
     }
 
-    addFire(x, y) {
-        this.fires.add(this._key(x, y));
-    }
-
-    removeFire(x, y) {
-        this.fires.delete(this._key(x, y));
-    }
-
     getStructurePositions(type) {
         return this.structures.get(type) || new Set();
     }
@@ -94,14 +80,6 @@ export class MapIndex {
     getZonePositions() {
         const results = [];
         for (const k of this.zones) {
-            results.push({ x: k & 0xFFFF, y: k >> 16 });
-        }
-        return results;
-    }
-
-    getFirePositions() {
-        const results = [];
-        for (const k of this.fires) {
             results.push({ x: k & 0xFFFF, y: k >> 16 });
         }
         return results;

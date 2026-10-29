@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, net, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, protocol, net, ipcMain, dialog, shell } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -11,12 +11,39 @@ protocol.registerSchemesAsPrivileged([{
     standard: true,
     secure: true,
     supportFetchAPI: true,
-    stream: true,
-    bypassCSP: true
+    stream: true
   }
 }]);
 
 let mainWindow;
+
+const APP_ORIGIN = 'app://game';
+
+function isAppUrl(url) {
+  try { return new URL(url).origin === APP_ORIGIN; } catch { return false; }
+}
+
+// External links go to the system browser; nothing but the app's own origin
+// may load inside an app window (remote pages would get window.electronAPI).
+function openExternalIfWeb(url) {
+  try {
+    const { protocol: scheme } = new URL(url);
+    if (scheme === 'https:' || scheme === 'http:') shell.openExternal(url);
+  } catch { /* malformed URL, ignore */ }
+}
+
+app.on('web-contents-created', (_, contents) => {
+  contents.on('will-navigate', (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    openExternalIfWeb(url);
+  });
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isAppUrl(url)) return { action: 'allow' };
+    openExternalIfWeb(url);
+    return { action: 'deny' };
+  });
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -41,7 +68,7 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
 
-  mainWindow.loadURL('app://game/index.html');
+  mainWindow.loadURL(APP_ORIGIN + '/index.html');
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12') {
@@ -85,33 +112,89 @@ ipcMain.handle('steam:cloud-enabled', () => steamBridge.cloudEnabled());
 ipcMain.handle('steam:overlay-store', () => steamBridge.openOverlayStore());
 ipcMain.handle('steam:overlay-url', (_, url) => steamBridge.openOverlayUrl(url));
 
-ipcMain.handle('mods:default-path', () => {
-  return require('url').pathToFileURL(path.join(app.getPath('userData'), 'mods')).href;
-});
+// Mod file access is limited to known mod roots: the bundled mods folder, the
+// default userData mods folder, and folders the user picked in the dialog
+// (remembered across runs). Paths are realpath-checked so `..` segments and
+// symlinks cannot escape a root.
+function defaultModsDir() {
+  return path.join(app.getPath('userData'), 'mods');
+}
 
-ipcMain.handle('mods:scan-dir', (_, dirPath) => {
-  let dir;
+function pickedRootsPath() {
+  return path.join(app.getPath('userData'), 'mods-roots.json');
+}
+
+function loadPickedRoots() {
   try {
-    dir = dirPath.startsWith('file://') ? require('url').fileURLToPath(dirPath) : dirPath;
+    const list = JSON.parse(fs.readFileSync(pickedRootsPath(), 'utf8'));
+    return Array.isArray(list) ? list.filter(p => typeof p === 'string') : [];
   } catch {
     return [];
   }
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir, { withFileTypes: true })
-    .filter(e => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'manifest.json')))
-    .map(e => e.name)
-    .sort();
-});
+}
 
-ipcMain.handle('mods:read-file', (_, fileUrl) => {
-  let filePath;
+function rememberPickedRoot(dir) {
+  const roots = loadPickedRoots();
+  if (roots.includes(dir)) return;
+  roots.push(dir);
+  try { fs.writeFileSync(pickedRootsPath(), JSON.stringify(roots), 'utf8'); } catch {}
+}
+
+function realpathOrNull(p) {
+  try { return fs.realpathSync(p); } catch { return null; }
+}
+
+function isInside(child, root) {
+  const rel = path.relative(root, child);
+  return rel === '' || (!!rel && !rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+// Resolves a renderer-supplied file:// URL or path (relative paths are taken
+// relative to the app dir, where ./mods lives) to a real path inside a mod
+// root, or null if it does not exist or falls outside every root.
+function resolveModPath(input) {
+  if (typeof input !== 'string' || !input) return null;
+  let p;
   try {
-    filePath = fileUrl.startsWith('file://') ? require('url').fileURLToPath(fileUrl) : fileUrl;
+    p = input.startsWith('file://') ? require('url').fileURLToPath(input) : input;
   } catch {
     return null;
   }
-  if (!fs.existsSync(filePath)) return null;
-  return fs.readFileSync(filePath, 'utf8');
+  if (p.includes('\0')) return null;
+  const real = realpathOrNull(path.resolve(__dirname, p));
+  if (!real) return null;
+  const roots = [path.join(__dirname, 'mods'), defaultModsDir(), ...loadPickedRoots()]
+    .map(realpathOrNull)
+    .filter(Boolean);
+  return roots.some(root => isInside(real, root)) ? real : null;
+}
+
+ipcMain.handle('mods:default-path', () => {
+  return require('url').pathToFileURL(defaultModsDir()).href;
+});
+
+ipcMain.handle('mods:scan-dir', (_, dirPath) => {
+  const dir = resolveModPath(dirPath);
+  if (!dir) return [];
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter(e => e.isDirectory() && resolveModPath(path.join(dir, e.name, 'manifest.json')))
+      .map(e => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('mods:read-file', (_, fileUrl) => {
+  const filePath = resolveModPath(fileUrl);
+  if (!filePath) return null;
+  try {
+    if (!fs.statSync(filePath).isFile()) return null;
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return null;
+  }
 });
 
 ipcMain.handle('mods:pick-folder', async () => {
@@ -120,13 +203,30 @@ ipcMain.handle('mods:pick-folder', async () => {
     title: 'Select Mods Folder',
   });
   if (result.canceled || !result.filePaths.length) return null;
-  return require('url').pathToFileURL(result.filePaths[0]).href;
+  const real = realpathOrNull(result.filePaths[0]);
+  if (!real) return null;
+  rememberPickedRoot(real);
+  return require('url').pathToFileURL(real).href;
 });
 
-ipcMain.handle('write-portrait', (_, filename, base64Data) => {
-  const safe = path.basename(filename);
-  const dest = path.join(__dirname, 'portraits', safe);
-  fs.writeFileSync(dest, Buffer.from(base64Data, 'base64'));
+// Dev builds write straight into the source portraits/ folder (the skin editor
+// workflow). Packaged builds live in a read-only asar, so ask where to save.
+// Resolves to the written path, or null if the user cancelled.
+ipcMain.handle('write-portrait', async (_, filename, base64Data) => {
+  const safe = path.basename(String(filename));
+  if (!safe.toLowerCase().endsWith('.png')) throw new Error('Portrait must be a .png file');
+  let dest = path.join(__dirname, 'portraits', safe);
+  if (app.isPackaged) {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Portrait',
+      defaultPath: path.join(app.getPath('pictures'), safe),
+      filters: [{ name: 'PNG Image', extensions: ['png'] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    dest = result.filePath;
+  }
+  fs.writeFileSync(dest, Buffer.from(String(base64Data), 'base64'));
+  return dest;
 });
 
 ipcMain.handle('gdrive:enabled',    () => gdriveBridge.cloudEnabled());
@@ -140,12 +240,22 @@ ipcMain.handle('gdrive:list',   () => gdriveBridge.cloudList());
 app.whenReady().then(() => {
   protocol.handle('app', (request) => {
     const url = new URL(request.url);
-    let filePath = decodeURIComponent(url.pathname);
+    let filePath;
+    try {
+      filePath = decodeURIComponent(url.pathname);
+    } catch {
+      return new Response('', { status: 400 });
+    }
     if (filePath.startsWith('/')) filePath = filePath.slice(1);
-    if (filePath.endsWith('/')) {
+    if (filePath.endsWith('/') || filePath.includes('\0')) {
       return new Response('', { status: 404 });
     }
-    const fullPath = path.join(__dirname, filePath);
+    // Decoding can surface `..` or `/` from %2E/%2F, so check the resolved
+    // path still sits inside the app dir.
+    const fullPath = path.resolve(__dirname, filePath);
+    if (!isInside(fullPath, __dirname) || fullPath === __dirname) {
+      return new Response('', { status: 404 });
+    }
     return net.fetch(pathToFileURL(fullPath).href);
   });
 
@@ -157,9 +267,15 @@ app.whenReady().then(() => {
   steamBridge.initialize(480);
 });
 
+// The game quits when its window closes on every platform (including macOS).
+// window-all-closed is skipped when quitting via Cmd+Q or app.quit(), so Steam
+// shutdown happens in will-quit, which fires on every exit path.
 app.on('window-all-closed', () => {
-  steamBridge.shutdown();
   app.quit();
+});
+
+app.on('will-quit', () => {
+  steamBridge.shutdown();
 });
 
 app.on('activate', () => {

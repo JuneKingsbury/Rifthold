@@ -1,4 +1,6 @@
-import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, ALL_ITEMS, REALMS, RESEARCH, CONFIG } from '../core/config.js';
+import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, ALL_ITEMS, REALMS, RESEARCH, CONFIG, EXPEDITION_ENEMIES } from '../core/config.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { toJsLiteral } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_realm_drafts';
 
@@ -10,6 +12,7 @@ const REFERENCE_DATA = [
     { title: 'Helmet IDs', ids: Object.keys(HELMETS) },
     { title: 'Tool IDs', ids: Object.keys(TOOLS) },
     { title: 'Realm IDs', ids: Object.keys(REALMS) },
+    { title: 'Enemy IDs', ids: Object.keys(EXPEDITION_ENEMIES) },
     { title: 'Research IDs', ids: Object.keys(RESEARCH) },
 ];
 
@@ -30,6 +33,9 @@ class RealmEditor {
         this.lootRows = [];
         this.rareEvents = [];
         this.activeDraftKey = null;
+        // Realm fields this form doesn't model (boss, combatEncounters, ...),
+        // carried from "Load from Config" so the export keeps them.
+        this.baseDef = {};
         this.undoStack = [];
         this.undoIndex = -1;
         this.container = document.getElementById('realm-editor');
@@ -153,7 +159,7 @@ class RealmEditor {
             <div class="fe-row">
                 <div class="fe-field">
                     <label>Research Required</label>
-                    <input type="text" id="re-research" placeholder="e.g. deep_delving">
+                    <input type="text" id="re-research" placeholder="e.g. arcane_studies">
                 </div>
                 <div class="fe-field">
                     <label>Requires Realm</label>
@@ -176,26 +182,6 @@ class RealmEditor {
             <div class="fe-section-title">Enemies</div>
             <div class="fe-row">
                 <div class="fe-field">
-                    <label>HP Min</label>
-                    <input type="number" id="re-enemyHpMin" value="40" min="1">
-                </div>
-                <div class="fe-field">
-                    <label>HP Max</label>
-                    <input type="number" id="re-enemyHpMax" value="60" min="1">
-                </div>
-            </div>
-            <div class="fe-row">
-                <div class="fe-field">
-                    <label>Damage Min</label>
-                    <input type="number" id="re-enemyDmgMin" value="5" min="1">
-                </div>
-                <div class="fe-field">
-                    <label>Damage Max</label>
-                    <input type="number" id="re-enemyDmgMax" value="8" min="1">
-                </div>
-            </div>
-            <div class="fe-row">
-                <div class="fe-field">
                     <label>Count Min</label>
                     <input type="number" id="re-enemyCountMin" value="2" min="1">
                 </div>
@@ -203,6 +189,10 @@ class RealmEditor {
                     <label>Count Max</label>
                     <input type="number" id="re-enemyCountMax" value="4" min="1">
                 </div>
+            </div>
+            <div class="fe-field">
+                <label>Enemy Types (key:weight, comma separated; keys from EXPEDITION_ENEMIES)</label>
+                <input type="text" id="re-enemyTypes" placeholder="crystal_bat:30, shard_spider:30">
             </div>
 
             <div class="fe-section-title">Loot Table</div>
@@ -254,6 +244,9 @@ class RealmEditor {
 
         window.addEventListener('keydown', (e) => {
             if (this.container.style.display === 'none') return;
+            // Leave typing keys (native text undo, Esc) to the focused field.
+            const t = e.target;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 this._undo();
@@ -264,7 +257,6 @@ class RealmEditor {
                 this._redo();
                 return;
             }
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
             if (e.key === 'Escape') this._goBack();
         });
     }
@@ -288,7 +280,7 @@ class RealmEditor {
             html += `<div class="fe-ref-category">`;
             html += `<div class="fe-ref-category-title">${cat.title}</div>`;
             for (const id of cat.ids) {
-                html += `<span class="fe-ref-id" data-ref-id="${id}">${id}</span>`;
+                html += `<span class="fe-ref-id" data-ref-id="${escapeAttr(id)}">${escapeHtml(id)}</span>`;
             }
             html += `</div>`;
         }
@@ -334,7 +326,7 @@ class RealmEditor {
                     <option value="resource" ${row.type === 'resource' ? 'selected' : ''}>Resource</option>
                     <option value="item" ${row.type === 'item' ? 'selected' : ''}>Item</option>
                 </select>
-                <input type="text" data-loot-key="${i}" value="${row.key}" placeholder="key" style="flex:1;">
+                <input type="text" data-loot-key="${i}" value="${escapeAttr(row.key)}" placeholder="key" style="flex:1;">
                 <input type="number" data-loot-weight="${i}" value="${row.weight}" placeholder="wt" style="width:50px;" min="1">
                 <input type="number" data-loot-min="${i}" value="${row.amountMin || ''}" placeholder="min" style="width:50px;">
                 <input type="number" data-loot-max="${i}" value="${row.amountMax || ''}" placeholder="max" style="width:50px;">
@@ -379,14 +371,14 @@ class RealmEditor {
         container.innerHTML = this.rareEvents.map((row, i) => `
             <div class="fe-list-row" style="flex-wrap:wrap;">
                 <input type="number" data-rare-chance="${i}" value="${row.chance}" placeholder="chance" style="width:60px;" min="0" max="1" step="0.01">
-                <input type="text" data-rare-text="${i}" value="${row.text}" placeholder="Event text..." style="flex:1;min-width:200px;">
+                <input type="text" data-rare-text="${i}" value="${escapeAttr(row.text)}" placeholder="Event text..." style="flex:1;min-width:200px;">
                 <button class="fe-remove-btn" data-remove-rare="${i}">✕</button>
                 <div style="width:100%;display:flex;gap:6px;margin-top:4px;">
                     <select data-rare-loottype="${i}" style="width:80px;">
                         <option value="resource" ${row.lootType === 'resource' ? 'selected' : ''}>resource</option>
                         <option value="item" ${row.lootType === 'item' ? 'selected' : ''}>item</option>
                     </select>
-                    <input type="text" data-rare-lootkey="${i}" value="${row.lootKey}" placeholder="loot key" style="flex:1;">
+                    <input type="text" data-rare-lootkey="${i}" value="${escapeAttr(row.lootKey)}" placeholder="loot key" style="flex:1;">
                     <input type="number" data-rare-lootmin="${i}" value="${row.lootMin || ''}" placeholder="min" style="width:50px;">
                     <input type="number" data-rare-lootmax="${i}" value="${row.lootMax || ''}" placeholder="max" style="width:50px;">
                 </div>
@@ -445,6 +437,7 @@ class RealmEditor {
         data._ambient = document.getElementById('re-events-ambient').value;
         data._discoveries = document.getElementById('re-events-discoveries').value;
         data._traps = document.getElementById('re-events-traps').value;
+        data._base = this.baseDef;
 
         const saved = this._getSaved();
         const idx = saved.findIndex(s => s.key === data.key);
@@ -492,10 +485,6 @@ class RealmEditor {
         document.getElementById('re-requiresRealm').value = s.requiresRealm || '';
         document.getElementById('re-visWall').value = s.visWall || '';
         document.getElementById('re-visFloor').value = s.visFloor || '';
-        document.getElementById('re-enemyHpMin').value = s.enemyHpMin || 40;
-        document.getElementById('re-enemyHpMax').value = s.enemyHpMax || 60;
-        document.getElementById('re-enemyDmgMin').value = s.enemyDmgMin || 5;
-        document.getElementById('re-enemyDmgMax').value = s.enemyDmgMax || 8;
         document.getElementById('re-enemyCountMin').value = s.enemyCountMin || 2;
         document.getElementById('re-enemyCountMax').value = s.enemyCountMax || 4;
         document.getElementById('re-events-ambient').value = s.ambient || '';
@@ -529,10 +518,7 @@ class RealmEditor {
         document.getElementById('re-requiresRealm').value = '';
         document.getElementById('re-visWall').value = '';
         document.getElementById('re-visFloor').value = '';
-        document.getElementById('re-enemyHpMin').value = '40';
-        document.getElementById('re-enemyHpMax').value = '60';
-        document.getElementById('re-enemyDmgMin').value = '5';
-        document.getElementById('re-enemyDmgMax').value = '8';
+        document.getElementById('re-enemyTypes').value = '';
         document.getElementById('re-enemyCountMin').value = '2';
         document.getElementById('re-enemyCountMax').value = '4';
         document.getElementById('re-events-ambient').value = '';
@@ -540,6 +526,7 @@ class RealmEditor {
         document.getElementById('re-events-traps').value = '';
         this.lootRows = [{ type: 'resource', key: '', weight: 30, amountMin: 1, amountMax: 5 }];
         this.rareEvents = [];
+        this.baseDef = {};
         this._renderLootList();
         this._renderRareList();
     }
@@ -552,12 +539,12 @@ class RealmEditor {
             return;
         }
         container.innerHTML = saved.map(item => `
-            <div class="fe-draft-row${item.key === this.activeDraftKey ? ' active' : ''}" data-draft-key="${item.key}">
+            <div class="fe-draft-row${item.key === this.activeDraftKey ? ' active' : ''}" data-draft-key="${escapeAttr(item.key)}">
                 <span class="fe-draft-char" style="color:#cc88ff">⬡</span>
-                <span class="fe-draft-key">${item.key}${item.name && item.name !== item.key ? ` — ${item.name}` : ''}</span>
+                <span class="fe-draft-key">${escapeHtml(item.key)}${item.name && item.name !== item.key ? ` — ${escapeHtml(item.name)}` : ''}</span>
                 <span class="fe-draft-actions">
-                    <button data-draft-load="${item.key}">Edit</button>
-                    <button data-draft-del="${item.key}" class="fe-draft-del">✕</button>
+                    <button data-draft-load="${escapeAttr(item.key)}">Edit</button>
+                    <button data-draft-del="${escapeAttr(item.key)}" class="fe-draft-del">✕</button>
                 </span>
             </div>
         `).join('');
@@ -609,12 +596,10 @@ class RealmEditor {
         document.getElementById('re-requiresRealm').value = data.requiresRealm || '';
         document.getElementById('re-visWall').value = data.vis ? data.vis.wall : '';
         document.getElementById('re-visFloor').value = data.vis ? data.vis.floor : '';
-        document.getElementById('re-enemyHpMin').value = data.enemies ? data.enemies.hp[0] : 40;
-        document.getElementById('re-enemyHpMax').value = data.enemies ? data.enemies.hp[1] : 60;
-        document.getElementById('re-enemyDmgMin').value = data.enemies ? data.enemies.damage[0] : 5;
-        document.getElementById('re-enemyDmgMax').value = data.enemies ? data.enemies.damage[1] : 8;
-        document.getElementById('re-enemyCountMin').value = data.enemies ? data.enemies.count[0] : 2;
-        document.getElementById('re-enemyCountMax').value = data.enemies ? data.enemies.count[1] : 4;
+        document.getElementById('re-enemyCountMin').value = data.enemies?.count?.[0] ?? 2;
+        document.getElementById('re-enemyCountMax').value = data.enemies?.count?.[1] ?? 4;
+        document.getElementById('re-enemyTypes').value = this._formatEnemyTypes(data.enemies?.types);
+        this.baseDef = data._base || {};
 
         document.getElementById('re-events-ambient').value = data._ambient || '';
         document.getElementById('re-events-discoveries').value = data._discoveries || '';
@@ -648,18 +633,12 @@ class RealmEditor {
                 floor: document.getElementById('re-visFloor').value.trim() || 'stone_floor',
             },
             enemies: {
-                hp: [
-                    parseInt(document.getElementById('re-enemyHpMin').value) || 40,
-                    parseInt(document.getElementById('re-enemyHpMax').value) || 60,
-                ],
-                damage: [
-                    parseInt(document.getElementById('re-enemyDmgMin').value) || 5,
-                    parseInt(document.getElementById('re-enemyDmgMax').value) || 8,
-                ],
+                ...(this.baseDef.enemies || {}),
                 count: [
                     parseInt(document.getElementById('re-enemyCountMin').value) || 2,
                     parseInt(document.getElementById('re-enemyCountMax').value) || 4,
                 ],
+                types: this._parseEnemyTypes(document.getElementById('re-enemyTypes').value),
             },
         };
 
@@ -668,29 +647,50 @@ class RealmEditor {
         const requiresRealm = document.getElementById('re-requiresRealm').value.trim();
         if (requiresRealm) data.requiresRealm = requiresRealm;
 
-        data.loot = this.lootRows.filter(r => r.key).map(r => {
-            const entry = {};
+        data.loot = this._lootFromRows(this.lootRows);
+
+        const ambient = this._parseTextarea('re-events-ambient');
+        const discoveries = this._parseTextarea('re-events-discoveries');
+        const traps = this._parseTextarea('re-events-traps');
+        const rare = this._rareFromRows(this.rareEvents);
+
+        data.events = { ...(this.baseDef.events || {}), ambient, discoveries, traps, rare };
+
+        return data;
+    }
+
+    _formatEnemyTypes(types) {
+        return (types || []).map(t => `${t.key}:${t.weight}`).join(', ');
+    }
+
+    _parseEnemyTypes(text) {
+        return text.split(',').map(s => s.trim()).filter(Boolean).map(part => {
+            const [key, w] = part.split(':').map(s => s.trim());
+            return { key, weight: parseInt(w) || 10 };
+        }).filter(t => t.key);
+    }
+
+    // Rows keep any extra fields of the original entry in `extra` so a
+    // round-trip through the form doesn't drop them.
+    _lootFromRows(rows) {
+        return rows.filter(r => r.key).map(r => {
+            const entry = { ...(r.extra || {}) };
             entry[r.type] = r.key;
             entry.weight = r.weight;
             if (r.amountMin && r.amountMax) entry.amount = [r.amountMin, r.amountMax];
             return entry;
         });
+    }
 
-        const ambient = this._parseTextarea('re-events-ambient');
-        const discoveries = this._parseTextarea('re-events-discoveries');
-        const traps = this._parseTextarea('re-events-traps');
-        const rare = this.rareEvents.filter(r => r.text).map(r => {
-            const entry = { chance: r.chance, text: r.text };
+    _rareFromRows(rows) {
+        return rows.filter(r => r.text).map(r => {
+            const entry = { ...(r.extra || {}), chance: r.chance, text: r.text };
             if (r.lootKey) {
-                entry.loot = { [r.lootType]: r.lootKey };
+                entry.loot = { ...(r.lootExtra || {}), [r.lootType]: r.lootKey };
                 if (r.lootMin && r.lootMax) entry.loot.amount = [r.lootMin, r.lootMax];
             }
             return entry;
         });
-
-        data.events = { ambient, discoveries, traps, rare };
-
-        return data;
     }
 
     _parseTextarea(id) {
@@ -699,61 +699,14 @@ class RealmEditor {
 
     _formatOutput(data) {
         if (!data) return '';
-        let out = `${data.key}: {\n`;
-        out += `    name: '${data.name}',\n`;
-        out += `    difficulty: ${data.difficulty},\n`;
-        out += `    chain: '${data.chain}',\n`;
-        out += `    chainOrder: ${data.chainOrder},\n`;
-        out += `    duration: [${data.duration[0]}, ${data.duration[1]}],\n`;
-        out += `    encounters: ${data.encounters},\n`;
-        if (data.research) out += `    research: '${data.research}',\n`;
-        if (data.requiresRealm) out += `    requiresRealm: '${data.requiresRealm}',\n`;
-        out += `    vis: { wall: '${data.vis.wall}', floor: '${data.vis.floor}' },\n`;
-
-        out += `    loot: [\n`;
-        data.loot.forEach(l => {
-            const parts = [];
-            if (l.resource) parts.push(`resource: '${l.resource}'`);
-            if (l.item) parts.push(`item: '${l.item}'`);
-            parts.push(`weight: ${l.weight}`);
-            if (l.amount) parts.push(`amount: [${l.amount[0]}, ${l.amount[1]}]`);
-            out += `        { ${parts.join(', ')} },\n`;
-        });
-        out += `    ],\n`;
-
-        out += `    enemies: { hp: [${data.enemies.hp.join(', ')}], damage: [${data.enemies.damage.join(', ')}], count: [${data.enemies.count.join(', ')}] },\n`;
-
-        out += `    events: {\n`;
-        out += `        ambient: [\n`;
-        data.events.ambient.forEach(t => { out += `            '${this._escapeStr(t)}',\n`; });
-        out += `        ],\n`;
-        out += `        discoveries: [\n`;
-        data.events.discoveries.forEach(t => { out += `            '${this._escapeStr(t)}',\n`; });
-        out += `        ],\n`;
-        out += `        traps: [\n`;
-        data.events.traps.forEach(t => { out += `            '${this._escapeStr(t)}',\n`; });
-        out += `        ],\n`;
-        out += `        rare: [\n`;
-        data.events.rare.forEach(r => {
-            let lootStr = '';
-            if (r.loot) {
-                const lootParts = [];
-                if (r.loot.resource) lootParts.push(`resource: '${r.loot.resource}'`);
-                if (r.loot.item) lootParts.push(`item: '${r.loot.item}'`);
-                if (r.loot.amount) lootParts.push(`amount: [${r.loot.amount[0]}, ${r.loot.amount[1]}]`);
-                lootStr = `, loot: { ${lootParts.join(', ')} }`;
-            }
-            out += `            { chance: ${r.chance}, text: '${this._escapeStr(r.text)}'${lootStr} },\n`;
-        });
-        out += `        ],\n`;
-        out += `    },\n`;
-        out += `},`;
-
-        return out;
-    }
-
-    _escapeStr(s) {
-        return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const { key, _base, ...fields } = data;
+        // Unmodeled fields from the original def come first, so a loaded realm
+        // keeps its key order and fields like boss or combatEncounters.
+        const def = { ...(_base || this.baseDef), ...fields };
+        for (const k of ['research', 'requiresRealm']) if (!fields[k]) delete def[k];
+        for (const k of Object.keys(def)) if (k.startsWith('_')) delete def[k];
+        const jsKey = /^[A-Za-z_$][\w$]*$/.test(key) ? key : toJsLiteral(key);
+        return `${jsKey}: ${toJsLiteral(def)},`;
     }
 
     _copyPreview() {
@@ -776,7 +729,7 @@ class RealmEditor {
         modal.innerHTML = `
             <div class="fe-export-modal-content">
                 <div style="color:#ffcc00;font-weight:bold;margin-bottom:12px;">Export All Realms (${saved.length} items)</div>
-                <textarea readonly>${output}</textarea>
+                <textarea readonly>${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="re-modal-copy">Copy to Clipboard</button>
                     <button id="re-modal-close">Close</button>
@@ -801,27 +754,15 @@ class RealmEditor {
         const discoveries = (saved._discoveries || '').split('\n').map(l => l.trim()).filter(Boolean);
         const traps = (saved._traps || '').split('\n').map(l => l.trim()).filter(Boolean);
 
-        const loot = lootRows.filter(r => r.key).map(r => {
-            const entry = {};
-            entry[r.type] = r.key;
-            entry.weight = r.weight;
-            if (r.amountMin && r.amountMax) entry.amount = [r.amountMin, r.amountMax];
-            return entry;
-        });
-
-        const rare = rareEvents.filter(r => r.text).map(r => {
-            const entry = { chance: r.chance, text: r.text };
-            if (r.lootKey) {
-                entry.loot = { [r.lootType]: r.lootKey };
-                if (r.lootMin && r.lootMax) entry.loot.amount = [r.lootMin, r.lootMax];
-            }
-            return entry;
-        });
+        const loot = this._lootFromRows(lootRows);
+        const rare = this._rareFromRows(rareEvents);
+        const base = saved._base || {};
 
         return {
             ...saved,
+            _base: base,
             loot,
-            events: { ambient, discoveries, traps, rare },
+            events: { ...(base.events || {}), ambient, discoveries, traps, rare },
         };
     }
 
@@ -851,35 +792,46 @@ class RealmEditor {
             document.getElementById('re-visFloor').value = def.vis.floor || '';
         }
         if (def.enemies) {
-            document.getElementById('re-enemyHpMin').value = def.enemies.hp[0];
-            document.getElementById('re-enemyHpMax').value = def.enemies.hp[1];
-            document.getElementById('re-enemyDmgMin').value = def.enemies.damage[0];
-            document.getElementById('re-enemyDmgMax').value = def.enemies.damage[1];
-            document.getElementById('re-enemyCountMin').value = def.enemies.count[0];
-            document.getElementById('re-enemyCountMax').value = def.enemies.count[1];
+            if (def.enemies.count) {
+                document.getElementById('re-enemyCountMin').value = def.enemies.count[0];
+                document.getElementById('re-enemyCountMax').value = def.enemies.count[1];
+            }
+            document.getElementById('re-enemyTypes').value = this._formatEnemyTypes(def.enemies.types);
         }
+        this.baseDef = structuredClone(def);
         if (def.loot) {
-            this.lootRows = def.loot.map(l => ({
-                type: l.item ? 'item' : 'resource',
-                key: l.resource || l.item || '',
-                weight: l.weight || 10,
-                amountMin: l.amount ? l.amount[0] : 1,
-                amountMax: l.amount ? l.amount[1] : 1,
-            }));
+            this.lootRows = def.loot.map(l => {
+                const { resource, item, weight, amount, ...extra } = l;
+                return {
+                    type: item ? 'item' : 'resource',
+                    key: resource || item || '',
+                    weight: weight || 10,
+                    // Entries without an amount stay that way on export.
+                    amountMin: amount ? amount[0] : 0,
+                    amountMax: amount ? amount[1] : 0,
+                    extra,
+                };
+            });
         }
         if (def.events) {
             if (def.events.ambient) document.getElementById('re-events-ambient').value = def.events.ambient.join('\n');
             if (def.events.discoveries) document.getElementById('re-events-discoveries').value = def.events.discoveries.join('\n');
             if (def.events.traps) document.getElementById('re-events-traps').value = def.events.traps.join('\n');
             if (def.events.rare) {
-                this.rareEvents = def.events.rare.map(r => ({
-                    chance: r.chance || 0.05,
-                    text: r.text || '',
-                    lootType: r.loot ? (r.loot.item ? 'item' : 'resource') : 'resource',
-                    lootKey: r.loot ? (r.loot.resource || r.loot.item || '') : '',
-                    lootMin: r.loot && r.loot.amount ? r.loot.amount[0] : 1,
-                    lootMax: r.loot && r.loot.amount ? r.loot.amount[1] : 3,
-                }));
+                this.rareEvents = def.events.rare.map(r => {
+                    const { chance, text, loot, ...extra } = r;
+                    const { resource, item, amount, ...lootExtra } = loot || {};
+                    return {
+                        chance: chance || 0.05,
+                        text: text || '',
+                        lootType: item ? 'item' : 'resource',
+                        lootKey: resource || item || '',
+                        lootMin: amount ? amount[0] : 0,
+                        lootMax: amount ? amount[1] : 0,
+                        extra,
+                        lootExtra,
+                    };
+                });
             }
         }
         this._renderLootList();
@@ -921,6 +873,7 @@ class RealmEditor {
         });
         snap._lootRows = JSON.stringify(this.lootRows);
         snap._rareEvents = JSON.stringify(this.rareEvents);
+        snap._baseDef = JSON.stringify(this.baseDef);
         return JSON.stringify(snap);
     }
 
@@ -929,6 +882,7 @@ class RealmEditor {
         for (const [id, val] of Object.entries(snap)) {
             if (id === '_lootRows') { this.lootRows = JSON.parse(val); continue; }
             if (id === '_rareEvents') { this.rareEvents = JSON.parse(val); continue; }
+            if (id === '_baseDef') { this.baseDef = JSON.parse(val); continue; }
             const el = document.getElementById(id);
             if (!el) continue;
             el.value = val;

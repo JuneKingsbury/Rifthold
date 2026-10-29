@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- 'unsafe-inline' is required by the UI's inline onclick handlers and
+         style attributes. localhost hosts are for mods served from a local dev
+         server (Mods panel URL). Google/Worker hosts are Drive sync. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://localhost:* http://127.0.0.1:*; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://www.googleapis.com https://oauth2.googleapis.com https://rifthold-oauth.jurbanics.workers.dev http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
     <title>Rifthold</title>
     <link rel="stylesheet" href="fonts/fonts.css">
     <link rel="stylesheet" href="css/style.css">

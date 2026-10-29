@@ -1,27 +1,62 @@
-import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, ITEM_CHARS, RECIPES, MATERIALS, RECIPE_CATEGORIES } from '../core/config.js';
+import { ITEM_CHARS, RECIPES } from '../core/config.js';
 import { RESEARCH } from '../core/config/magic.js';
 import { STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines } from '../core/config/effects.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { getLoadedManifests } from '../core/mod-registry.js';
+import { importPristineConfig, fetchConfigSource, spliceExportObject, toJsLiteral } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_equip_pro';
 
+// Base (unmodded) item tables, so exports never bake mod content into equipment.js.
+const PRISTINE = await importPristineConfig('equipment.js');
+const EQUIP = PRISTINE || await import('../core/config/equipment.js');
+// Without the unmodded copy the editor shows live config, which includes any loaded mods' content.
+const MODDED_FALLBACK = !PRISTINE && getLoadedManifests().length > 0;
+
 const CATEGORIES = {
-    weapon: { label: 'Weapons', config: WEAPONS, headerColor: '#cc8888' },
-    armor: { label: 'Armor', config: ARMORS, headerColor: '#9966cc' },
-    helmet: { label: 'Helmets', config: HELMETS, headerColor: '#7799cc' },
-    clothes: { label: 'Clothes', config: CLOTHES, headerColor: '#77aa77' },
-    boots: { label: 'Boots', config: BOOTS, headerColor: '#aa8855' },
-    tool: { label: 'Tools', config: TOOLS, headerColor: '#88aacc' },
-    trinket: { label: 'Trinkets', config: TRINKETS, headerColor: '#ccaa44' },
+    weapon: { label: 'Weapons', exportName: 'WEAPONS', config: EQUIP.WEAPONS, headerColor: '#cc8888' },
+    armor: { label: 'Armor', exportName: 'ARMORS', config: EQUIP.ARMORS, headerColor: '#9966cc' },
+    helmet: { label: 'Helmets', exportName: 'HELMETS', config: EQUIP.HELMETS, headerColor: '#7799cc' },
+    clothes: { label: 'Clothes', exportName: 'CLOTHES', config: EQUIP.CLOTHES, headerColor: '#77aa77' },
+    boots: { label: 'Boots', exportName: 'BOOTS', config: EQUIP.BOOTS, headerColor: '#aa8855' },
+    tool: { label: 'Tools', exportName: 'TOOLS', config: EQUIP.TOOLS, headerColor: '#88aacc' },
+    trinket: { label: 'Trinkets', exportName: 'TRINKETS', config: EQUIP.TRINKETS, headerColor: '#ccaa44' },
 };
 
-const STATIONS = ['workbench', 'anvil', 'cooking_pot', 'enchanting_table'];
-const RESOURCES = ['wood', 'stone', 'planks', 'bricks', 'iron_ore', 'iron', 'leather', 'hides', 'runite', 'void_essence', 'wool', 'berries', 'wheat', 'corn', 'potatoes', 'moonbloom'];
-const TIER_COLORS = ['#666', '#88cc88', '#4488ff', '#cc88ff', '#ffaa33'];
+// Matches the per-category recipe defaults in equipment.js (EQUIPMENT_RECIPE_SOURCES).
+const DEFAULT_STATION = { clothes: 'loom' };
+const defaultStation = (cat) => DEFAULT_STATION[cat] || 'workbench';
+
+// Station and resource choices come from the real recipes, so no existing value is missing from a dropdown.
+const STATIONS = [...new Set([
+    ...Object.values(RECIPES).map(r => r.station),
+    ...Object.values(CATEGORIES).flatMap(c => Object.values(c.config).map(d => d.recipe?.station)),
+].filter(Boolean))].sort();
+const RESOURCES = [...new Set([
+    ...Object.keys(EQUIP.MATERIALS),
+    ...Object.values(RECIPES).flatMap(r => Object.keys(r.input || {})),
+])].sort();
+const SKIN_KEYS = ['projectile_spell', 'projectile_arrow', 'projectile_bolt', 'projectile_void'];
+const TIER_COLORS = ['#666', '#88cc88', '#4488ff', '#cc88ff', '#ffaa33', '#ff4444'];
+const MAX_TIER = TIER_COLORS.length - 1;
+// Select value standing for a multi-research requirement (an array), which the single select can't edit.
+const KEEP_RESEARCH = '__keep__';
 const QUALITY_MAP = { 0: null, 1: null, 2: 'fine', 3: 'superior', 4: 'superior' };
 
 const TRINKET_EQUIP_STATS = ['moveSpeedBonus', 'workSpeedBonus', 'damageReduction', 'healthRegen', 'spellDamageBonus'];
 const PEDESTAL_STATS = ['workSpeedBonus', 'skillGrowthBonus', 'wandererChanceMult', 'blightImmunity', 'cookingBonusFood', 'tradeMarkupMult', 'damageBonusMult', 'lightRadius'];
 const EXPEDITION_STATS = ['lootMult', 'trapDamageMult', 'durationMult', 'rareEncounterMult', 'partyDamageMult'];
+
+// Fields each category's form section edits. On a category change the old section's
+// fields are dropped so they don't leak into the new category's export.
+const DEFENSE_FIELDS = ['damageReduction', 'coldResistance', 'hungerReduction', 'spellDamageBonus', 'moodBonus'];
+const CATEGORY_FIELDS = {
+    weapon: ['damage', 'choppingSpeed', 'miningSpeed', 'spellDamageBonus', 'ranged', 'range', 'projectileChar', 'projectileColor', 'skinKey'],
+    armor: DEFENSE_FIELDS,
+    helmet: DEFENSE_FIELDS,
+    tool: ['miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed', 'cookingSpeed', 'buildSpeed'],
+    trinket: [...TRINKET_EQUIP_STATS, 'consumable', 'pedestal', 'expedition', 'durability'],
+};
 
 let editorInstance = null;
 
@@ -67,7 +102,10 @@ class EquipmentEditorPro {
             const saved = JSON.parse(raw);
             if (saved.items) {
                 for (const [key, item] of Object.entries(saved.items)) {
-                    this.items.set(key, item);
+                    // Drafts from before v2 were saved by a lossy form; restore the
+                    // fields it dropped from the base definition.
+                    const base = saved.v >= 2 ? null : this.originalItems.get(key);
+                    this.items.set(key, base ? { ...JSON.parse(base), ...item } : item);
                 }
             }
             if (saved.deleted) {
@@ -88,7 +126,11 @@ class EquipmentEditorPro {
         for (const [key, item] of this.items) {
             if (!this.originalItems.has(key)) modified[key] = item;
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ items: modified, deleted }));
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 2, items: modified, deleted }));
+        } catch (err) {
+            console.warn('Equipment editor: draft autosave failed', err);
+        }
     }
 
     _buildDOM() {
@@ -104,6 +146,7 @@ class EquipmentEditorPro {
             <button id="eqp-redo" title="Redo (Ctrl+Y)">↪</button>
             <span class="fe-sep"></span>
             <button id="eqp-export">Export equipment.js</button>
+            ${MODDED_FALLBACK ? '<span style="color:#ff8844;font-size:10px;margin-left:8px;">Could not load base data separately from mods: showing modded data, full-file export disabled.</span>' : ''}
             <span style="margin-left:auto;color:#666;font-size:10px;">${this.items.size} items loaded</span>
         `;
         this.container.appendChild(toolbar);
@@ -134,7 +177,7 @@ class EquipmentEditorPro {
             for (const [key, item] of items) {
                 const dirty = this._isDirty(key) ? ' •' : '';
                 const sel = key === this.selectedKey ? ' selected' : '';
-                options += `<option value="${key}"${sel}>${item.name || key}${dirty}</option>`;
+                options += `<option value="${escapeAttr(key)}"${sel}>${escapeHtml(item.name || key)}${dirty}</option>`;
             }
             options += `</optgroup>`;
         }
@@ -158,8 +201,16 @@ class EquipmentEditorPro {
         document.getElementById('eqp-export').addEventListener('click', () => this._showExportModal());
         this._bindSelectorEvents();
 
+        // Form listeners are bound once: #eqp-fields survives re-renders (only its innerHTML is replaced).
+        const fields = document.getElementById('eqp-fields');
+        fields.addEventListener('input', () => this._scheduleUpdate());
+        fields.addEventListener('change', () => this._scheduleUpdate());
+
         window.addEventListener('keydown', (e) => {
             if (this.container.style.display === 'none') return;
+            // Leave typing keys to the focused field: native text undo and Esc to blur.
+            const t = e.target;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); this._undo(); }
             if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); this._redo(); }
             if (e.key === 'Escape' && !this.container.querySelector('.fe-export-modal')) this._goBack();
@@ -225,68 +276,65 @@ class EquipmentEditorPro {
         let html = `
             <div class="fe-section-title">Item Info</div>
             <div class="fe-row">
-                <div class="fe-field"><label>Key (snake_case)</label><input type="text" id="eqp-key" value="${item.key}"></div>
-                <div class="fe-field"><label>Name</label><input type="text" id="eqp-name" value="${item.name || ''}"></div>
+                <div class="fe-field"><label>Key (snake_case)</label><input type="text" id="eqp-key" value="${escapeAttr(item.key)}"></div>
+                <div class="fe-field"><label>Name</label><input type="text" id="eqp-name" value="${escapeAttr(item.name ?? '')}"></div>
             </div>
             <div class="fe-row">
                 <div class="fe-field"><label>Category</label>
                     <select id="eqp-category">${Object.entries(CATEGORIES).map(([k, v]) => `<option value="${k}"${k === cat ? ' selected' : ''}>${v.label}</option>`).join('')}</select>
                 </div>
-                <div class="fe-field"><label>Tier</label><input type="number" id="eqp-tier" min="0" max="4" value="${item.tier || 0}"></div>
+                <div class="fe-field"><label>Tier</label><input type="number" id="eqp-tier" min="0" max="${MAX_TIER}" value="${escapeAttr(item.tier || 0)}"></div>
             </div>
-            <div class="fe-field"><label>Description</label><input type="text" id="eqp-desc" value="${(item.description || '').replace(/"/g, '&quot;')}"></div>
+            <div class="fe-field"><label>Description</label><input type="text" id="eqp-desc" value="${escapeAttr(item.description || '')}"></div>
         `;
 
         if (cat === 'weapon') {
             html += `<div class="fe-section-title">Weapon Stats</div>`;
             html += `<div class="fe-row">`;
             html += `<div class="fe-field"><label>Damage</label><input type="number" id="eqp-damage" value="${item.damage || 0}"></div>`;
-            html += `<div class="fe-field"><label>Chopping Speed</label><input type="number" id="eqp-choppingSpeed" step="0.05" value="${item.choppingSpeed || ''}"></div>`;
-            html += `<div class="fe-field"><label>Mining Speed</label><input type="number" id="eqp-miningSpeed" step="0.05" value="${item.miningSpeed || ''}"></div>`;
+            html += `<div class="fe-field"><label>Chopping Speed</label><input type="number" id="eqp-choppingSpeed" step="0.05" value="${item.choppingSpeed ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Mining Speed</label><input type="number" id="eqp-miningSpeed" step="0.05" value="${item.miningSpeed ?? ''}"></div>`;
             html += `</div>`;
             html += `<div class="fe-row">`;
-            html += `<div class="fe-field"><label>Spell Dmg Bonus</label><input type="number" id="eqp-spellDamageBonus" step="0.05" value="${item.spellDamageBonus || ''}"></div>`;
+            html += `<div class="fe-field"><label>Spell Dmg Bonus</label><input type="number" id="eqp-spellDamageBonus" step="0.05" value="${item.spellDamageBonus ?? ''}"></div>`;
             html += `</div>`;
             html += `<div class="fe-section-title">Ranged</div>`;
             html += `<div class="fe-row">`;
             html += `<div class="fe-field" style="flex:0 0 auto;"><label>Ranged</label><input type="checkbox" id="eqp-ranged" style="width:auto;margin-top:6px;" ${item.ranged ? 'checked' : ''}></div>`;
             html += `<div class="fe-field"><label>Range</label><input type="number" id="eqp-range" value="${item.range || 5}"></div>`;
-            html += `<div class="fe-field" style="flex:0 0 60px;"><label>Proj Char</label><input type="text" id="eqp-projChar" maxlength="2" value="${item.projectileChar || ''}"></div>`;
-            html += `<div class="fe-field" style="flex:0 0 60px;"><label>Proj Color</label><input type="color" id="eqp-projColor" value="${item.projectileColor || '#ffaa33'}"></div>`;
+            html += `<div class="fe-field" style="flex:0 0 60px;"><label>Proj Char</label><input type="text" id="eqp-projChar" maxlength="2" value="${escapeAttr(item.projectileChar ?? '')}"></div>`;
+            html += `<div class="fe-field" style="flex:0 0 60px;"><label>Proj Color</label><input type="color" id="eqp-projColor" value="${escapeAttr(item.projectileColor || '#ffaa33')}"></div>`;
             html += `</div>`;
             html += `<div class="fe-row"><div class="fe-field"><label>Skin Key</label><select id="eqp-skinKey"><option value="">(none)</option>
-                <option value="projectile_spell"${item.skinKey === 'projectile_spell' ? ' selected' : ''}>projectile_spell</option>
-                <option value="projectile_arrow"${item.skinKey === 'projectile_arrow' ? ' selected' : ''}>projectile_arrow</option>
-                <option value="projectile_bolt"${item.skinKey === 'projectile_bolt' ? ' selected' : ''}>projectile_bolt</option>
-                <option value="projectile_void"${item.skinKey === 'projectile_void' ? ' selected' : ''}>projectile_void</option>
+                ${[...new Set([...SKIN_KEYS, item.skinKey].filter(Boolean))].map(k => `<option value="${escapeAttr(k)}"${item.skinKey === k ? ' selected' : ''}>${escapeHtml(k)}</option>`).join('')}
             </select></div></div>`;
         } else if (cat === 'armor' || cat === 'helmet') {
             html += `<div class="fe-section-title">Defense Stats</div>`;
             html += `<div class="fe-row">`;
-            html += `<div class="fe-field"><label>Damage Reduction</label><input type="number" id="eqp-damageReduction" step="0.01" value="${item.damageReduction || ''}"></div>`;
-            html += `<div class="fe-field"><label>Cold Resistance</label><input type="number" id="eqp-coldResistance" step="0.1" value="${item.coldResistance || ''}"></div>`;
+            html += `<div class="fe-field"><label>Damage Reduction</label><input type="number" id="eqp-damageReduction" step="0.01" value="${item.damageReduction ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Cold Resistance</label><input type="number" id="eqp-coldResistance" step="0.1" value="${item.coldResistance ?? ''}"></div>`;
             html += `</div><div class="fe-row">`;
-            html += `<div class="fe-field"><label>Hunger Reduction</label><input type="number" id="eqp-hungerReduction" step="0.05" value="${item.hungerReduction || ''}"></div>`;
-            html += `<div class="fe-field"><label>Spell Dmg Bonus</label><input type="number" id="eqp-spellDamageBonus" step="0.05" value="${item.spellDamageBonus || ''}"></div>`;
-            html += `<div class="fe-field"><label>Mood Bonus</label><input type="number" id="eqp-moodBonus" value="${item.moodBonus || ''}"></div>`;
+            html += `<div class="fe-field"><label>Hunger Reduction</label><input type="number" id="eqp-hungerReduction" step="0.05" value="${item.hungerReduction ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Spell Dmg Bonus</label><input type="number" id="eqp-spellDamageBonus" step="0.05" value="${item.spellDamageBonus ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Mood Bonus</label><input type="number" id="eqp-moodBonus" value="${item.moodBonus ?? ''}"></div>`;
             html += `</div>`;
         } else if (cat === 'tool') {
             html += `<div class="fe-section-title">Tool Speeds</div>`;
             html += `<div class="fe-row">`;
-            html += `<div class="fe-field"><label>Mining</label><input type="number" id="eqp-miningSpeed" step="0.05" value="${item.miningSpeed || ''}"></div>`;
-            html += `<div class="fe-field"><label>Chopping</label><input type="number" id="eqp-choppingSpeed" step="0.05" value="${item.choppingSpeed || ''}"></div>`;
-            html += `<div class="fe-field"><label>Farming</label><input type="number" id="eqp-farmingSpeed" step="0.05" value="${item.farmingSpeed || ''}"></div>`;
+            html += `<div class="fe-field"><label>Mining</label><input type="number" id="eqp-miningSpeed" step="0.05" value="${item.miningSpeed ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Chopping</label><input type="number" id="eqp-choppingSpeed" step="0.05" value="${item.choppingSpeed ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Farming</label><input type="number" id="eqp-farmingSpeed" step="0.05" value="${item.farmingSpeed ?? ''}"></div>`;
             html += `</div><div class="fe-row">`;
-            html += `<div class="fe-field"><label>Crafting</label><input type="number" id="eqp-craftingSpeed" step="0.05" value="${item.craftingSpeed || ''}"></div>`;
-            html += `<div class="fe-field"><label>Cooking</label><input type="number" id="eqp-cookingSpeed" step="0.05" value="${item.cookingSpeed || ''}"></div>`;
-            html += `<div class="fe-field"><label>Building</label><input type="number" id="eqp-buildSpeed" step="0.05" value="${item.buildSpeed || ''}"></div>`;
+            html += `<div class="fe-field"><label>Crafting</label><input type="number" id="eqp-craftingSpeed" step="0.05" value="${item.craftingSpeed ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Cooking</label><input type="number" id="eqp-cookingSpeed" step="0.05" value="${item.cookingSpeed ?? ''}"></div>`;
+            html += `<div class="fe-field"><label>Building</label><input type="number" id="eqp-buildSpeed" step="0.05" value="${item.buildSpeed ?? ''}"></div>`;
             html += `</div>`;
         } else if (cat === 'trinket') {
             html += `<div class="fe-section-title">Equipped Stats</div>`;
             html += `<div class="fe-row">`;
             for (const stat of TRINKET_EQUIP_STATS) {
                 const meta = STAT_META[stat];
-                html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="number" id="eqp-${stat}" step="0.05" value="${item[stat] || ''}"></div>`;
+                html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="number" id="eqp-${stat}" step="0.05" value="${item[stat] ?? ''}"></div>`;
             }
             html += `</div>`;
             html += `<div class="fe-row"><div class="fe-field" style="flex:0 0 auto;"><label>Consumable</label><input type="checkbox" id="eqp-consumable" style="width:auto;margin-top:6px;" ${item.consumable ? 'checked' : ''}></div></div>`;
@@ -294,12 +342,12 @@ class EquipmentEditorPro {
             html += `<div class="fe-section-title">Pedestal <input type="checkbox" id="eqp-pedestal-toggle" style="width:auto;vertical-align:middle;" ${item.pedestal ? 'checked' : ''}></div>`;
             html += `<div id="eqp-pedestal-fields" style="display:${item.pedestal ? 'block' : 'none'};">`;
             html += `<div class="fe-row">`;
-            html += `<div class="fe-field"><label>Radius</label><input type="text" id="eqp-ped-radius" value="${item.pedestal?.radius || 5}"></div>`;
+            html += `<div class="fe-field"><label>Radius</label><input type="text" id="eqp-ped-radius" value="${escapeAttr(item.pedestal?.radius ?? 5)}"></div>`;
             html += `<div class="fe-field"><label>Mana Cost</label><input type="number" id="eqp-ped-manaCost" value="${item.pedestal?.manaCost || 1}"></div>`;
             html += `</div><div class="fe-row">`;
             for (const stat of PEDESTAL_STATS) {
                 const meta = STAT_META[stat];
-                html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="${meta?.format === 'boolean' ? 'checkbox' : 'number'}" id="eqp-ped-${stat}" ${meta?.format === 'boolean' ? (item.pedestal?.[stat] ? 'checked' : '') + ' style="width:auto;margin-top:6px;"' : `step="0.05" value="${item.pedestal?.[stat] || ''}"`}></div>`;
+                html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="${meta?.format === 'boolean' ? 'checkbox' : 'number'}" id="eqp-ped-${stat}" ${meta?.format === 'boolean' ? (item.pedestal?.[stat] ? 'checked' : '') + ' style="width:auto;margin-top:6px;"' : `step="0.05" value="${item.pedestal?.[stat] ?? ''}"`}></div>`;
             }
             html += `</div></div>`;
 
@@ -307,7 +355,7 @@ class EquipmentEditorPro {
             html += `<div id="eqp-expedition-fields" style="display:${item.expedition ? 'block' : 'none'};"><div class="fe-row">`;
             for (const stat of EXPEDITION_STATS) {
                 const meta = STAT_META[stat];
-                html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="number" id="eqp-exp-${stat}" step="0.05" value="${item.expedition?.[stat] || ''}"></div>`;
+                html += `<div class="fe-field"><label>${meta?.label || stat}</label><input type="number" id="eqp-exp-${stat}" step="0.05" value="${item.expedition?.[stat] ?? ''}"></div>`;
             }
             html += `</div></div>`;
 
@@ -322,8 +370,14 @@ class EquipmentEditorPro {
         html += `<div id="eqp-recipe-fields" style="display:${item.recipe ? 'block' : 'none'};">`;
         html += `<div class="fe-row">`;
         html += `<div class="fe-field"><label>Ticks</label><input type="number" id="eqp-recipe-ticks" value="${item.recipe?.ticks || 20}"></div>`;
-        html += `<div class="fe-field"><label>Station</label><select id="eqp-recipe-station">${STATIONS.map(s => `<option value="${s}"${(item.recipe?.station || 'workbench') === s ? ' selected' : ''}>${s}</option>`).join('')}</select></div>`;
-        html += `<div class="fe-field"><label>Research</label><select id="eqp-recipe-research"><option value="">(none)</option>${Object.entries(RESEARCH).map(([k, r]) => `<option value="${k}"${item.recipe?.research === k ? ' selected' : ''}>${r.name}</option>`).join('')}</select></div>`;
+        const station = item.recipe?.station || defaultStation(cat);
+        html += `<div class="fe-field"><label>Station</label><select id="eqp-recipe-station">${[...new Set([...STATIONS, station])].map(s => `<option value="${escapeAttr(s)}"${station === s ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('')}</select></div>`;
+        const research = item.recipe?.research;
+        let researchKeys = Object.entries(RESEARCH);
+        if (Array.isArray(research)) researchKeys = [[KEEP_RESEARCH, { name: research.map(r => RESEARCH[r]?.name || r).join(' + ') }], ...researchKeys];
+        else if (research && !Object.hasOwn(RESEARCH, research)) researchKeys = [[research, { name: research }], ...researchKeys];
+        const researchSel = Array.isArray(research) ? KEEP_RESEARCH : research;
+        html += `<div class="fe-field"><label>Research</label><select id="eqp-recipe-research"><option value="">(none)</option>${researchKeys.map(([k, r]) => `<option value="${escapeAttr(k)}"${researchSel === k ? ' selected' : ''}>${escapeHtml(r.name || k)}</option>`).join('')}</select></div>`;
         html += `</div>`;
         html += `<div class="fe-section-title" style="font-size:10px;margin-top:8px;">Input Resources</div>`;
         html += `<div id="eqp-recipe-inputs">`;
@@ -341,17 +395,13 @@ class EquipmentEditorPro {
 
     _recipeInputRowHtml(res, amt) {
         return `<div class="fe-list-row" style="margin-bottom:4px;">
-            <select class="eqp-res-key" style="flex:1;">${RESOURCES.map(r => `<option value="${r}"${r === res ? ' selected' : ''}>${r}</option>`).join('')}</select>
-            <input type="number" class="eqp-res-amt" value="${amt}" min="1" style="width:50px;">
+            <select class="eqp-res-key" style="flex:1;">${[...new Set([...RESOURCES, res])].map(r => `<option value="${escapeAttr(r)}"${r === res ? ' selected' : ''}>${escapeHtml(r)}</option>`).join('')}</select>
+            <input type="number" class="eqp-res-amt" value="${escapeAttr(amt)}" min="1" style="width:50px;">
             <button class="fe-remove-btn eqp-res-del">✕</button>
         </div>`;
     }
 
     _bindFormEvents() {
-        const fields = document.getElementById('eqp-fields');
-        fields.addEventListener('input', () => this._scheduleUpdate());
-        fields.addEventListener('change', () => this._scheduleUpdate());
-
         const recipeToggle = document.getElementById('eqp-recipe-toggle');
         if (recipeToggle) recipeToggle.addEventListener('change', () => {
             document.getElementById('eqp-recipe-fields').style.display = recipeToggle.checked ? 'block' : 'none';
@@ -407,90 +457,113 @@ class EquipmentEditorPro {
 
     _collectAndSave() {
         if (!this.selectedKey) return;
+        const base = this.items.get(this.selectedKey) || {};
         const item = this._collectFormData();
         if (!item) return;
 
         const oldKey = this.selectedKey;
+        const keyInput = document.getElementById('eqp-key');
+        if (item.key !== oldKey && this.items.has(item.key)) {
+            // Refuse a rename onto another item's key; keep editing under the old key.
+            keyInput.style.borderColor = '#ff4444';
+            keyInput.title = `"${item.key}" is already used by another item`;
+            item.key = oldKey;
+        } else if (keyInput) {
+            keyInput.style.borderColor = '';
+            keyInput.title = '';
+        }
         if (item.key !== oldKey) {
             this.items.delete(oldKey);
             this.selectedKey = item.key;
         }
         this.items.set(item.key, item);
         this._saveToStorage();
+        // Show the new category's stat fields.
+        if (item.category !== base.category) this._renderForm();
     }
 
+    // Form values are merged over the item being edited, so fields the form
+    // doesn't show (attackAnim, onHit, tradeValue, ...) survive the round-trip.
     _collectFormData() {
         const key = document.getElementById('eqp-key')?.value.trim();
         if (!key) return null;
-        const cat = document.getElementById('eqp-category')?.value || 'weapon';
+        const base = this.items.get(this.selectedKey) || {};
+        const cat = document.getElementById('eqp-category')?.value || base.category || 'weapon';
 
-        const item = { key, category: cat };
+        const item = { ...base, key, category: cat };
+        if (base.category && cat !== base.category) {
+            const keep = new Set(CATEGORY_FIELDS[cat] || []);
+            for (const f of CATEGORY_FIELDS[base.category] || []) if (!keep.has(f)) delete item[f];
+        }
         item.name = document.getElementById('eqp-name')?.value.trim() || key;
         const desc = document.getElementById('eqp-desc')?.value.trim();
-        if (desc) item.description = desc;
-        const tier = parseInt(document.getElementById('eqp-tier')?.value);
-        if (tier > 0) item.tier = tier;
+        if (desc) item.description = desc; else delete item.description;
+        this._collectNumericStat(item, base, 'tier', document.getElementById('eqp-tier'));
 
         if (cat === 'weapon') {
-            const dmg = parseInt(document.getElementById('eqp-damage')?.value);
-            if (dmg) item.damage = dmg;
-            this._collectNumericStat(item, 'choppingSpeed');
-            this._collectNumericStat(item, 'miningSpeed');
-            this._collectNumericStat(item, 'spellDamageBonus');
+            this._collectNumericStat(item, base, 'damage');
+            this._collectNumericStat(item, base, 'choppingSpeed');
+            this._collectNumericStat(item, base, 'miningSpeed');
+            this._collectNumericStat(item, base, 'spellDamageBonus');
             if (document.getElementById('eqp-ranged')?.checked) {
                 item.ranged = true;
                 item.range = parseInt(document.getElementById('eqp-range')?.value) || 5;
                 item.projectileChar = document.getElementById('eqp-projChar')?.value || '·';
                 item.projectileColor = document.getElementById('eqp-projColor')?.value || '#ffaa33';
                 const sk = document.getElementById('eqp-skinKey')?.value;
-                if (sk) item.skinKey = sk;
+                if (sk) item.skinKey = sk; else delete item.skinKey;
+            } else {
+                for (const k of ['ranged', 'range', 'projectileChar', 'projectileColor', 'skinKey']) delete item[k];
             }
         } else if (cat === 'armor' || cat === 'helmet') {
-            this._collectNumericStat(item, 'damageReduction');
-            this._collectNumericStat(item, 'coldResistance');
-            this._collectNumericStat(item, 'hungerReduction');
-            this._collectNumericStat(item, 'spellDamageBonus');
-            this._collectNumericStat(item, 'moodBonus');
+            for (const stat of ['damageReduction', 'coldResistance', 'hungerReduction', 'spellDamageBonus', 'moodBonus']) {
+                this._collectNumericStat(item, base, stat);
+            }
         } else if (cat === 'tool') {
             for (const stat of ['miningSpeed', 'choppingSpeed', 'farmingSpeed', 'craftingSpeed', 'cookingSpeed', 'buildSpeed']) {
-                this._collectNumericStat(item, stat);
+                this._collectNumericStat(item, base, stat);
             }
         } else if (cat === 'trinket') {
-            for (const stat of TRINKET_EQUIP_STATS) this._collectNumericStat(item, stat);
-            if (document.getElementById('eqp-consumable')?.checked) item.consumable = true;
+            for (const stat of TRINKET_EQUIP_STATS) this._collectNumericStat(item, base, stat);
+            if (document.getElementById('eqp-consumable')?.checked) item.consumable = true; else delete item.consumable;
 
             if (document.getElementById('eqp-pedestal-toggle')?.checked) {
-                const ped = {};
+                const ped = { ...base.pedestal };
                 const radiusVal = document.getElementById('eqp-ped-radius')?.value.trim();
                 ped.radius = radiusVal === 'global' ? 'global' : (parseInt(radiusVal) || 5);
                 ped.manaCost = parseInt(document.getElementById('eqp-ped-manaCost')?.value) || 1;
                 for (const stat of PEDESTAL_STATS) {
-                    const meta = STAT_META[stat];
-                    if (meta?.format === 'boolean') {
-                        if (document.getElementById(`eqp-ped-${stat}`)?.checked) ped[stat] = true;
+                    const el = document.getElementById(`eqp-ped-${stat}`);
+                    if (STAT_META[stat]?.format === 'boolean') {
+                        if (el?.checked) ped[stat] = true; else delete ped[stat];
                     } else {
-                        const v = parseFloat(document.getElementById(`eqp-ped-${stat}`)?.value);
-                        if (v) ped[stat] = v;
+                        this._collectNumericStat(ped, base.pedestal || {}, stat, el);
                     }
                 }
                 item.pedestal = ped;
+            } else {
+                delete item.pedestal;
             }
             if (document.getElementById('eqp-expedition-toggle')?.checked) {
-                const exp = {};
+                const exp = { ...base.expedition };
                 for (const stat of EXPEDITION_STATS) {
-                    const v = parseFloat(document.getElementById(`eqp-exp-${stat}`)?.value);
-                    if (v) exp[stat] = v;
+                    this._collectNumericStat(exp, base.expedition || {}, stat, document.getElementById(`eqp-exp-${stat}`));
                 }
-                if (Object.keys(exp).length) item.expedition = exp;
+                if (Object.keys(exp).length) item.expedition = exp; else delete item.expedition;
+            } else {
+                delete item.expedition;
             }
             if (document.getElementById('eqp-durability-toggle')?.checked) {
-                item.durability = { max: parseInt(document.getElementById('eqp-dur-max')?.value) || 1 };
+                item.durability = { ...base.durability, max: parseInt(document.getElementById('eqp-dur-max')?.value) || 1 };
                 if (document.getElementById('eqp-dur-breakOnUse')?.checked) item.durability.breakOnUse = true;
+                else delete item.durability.breakOnUse;
+            } else {
+                delete item.durability;
             }
         }
 
         if (document.getElementById('eqp-recipe-toggle')?.checked) {
-            const recipe = {};
+            const recipe = { ...base.recipe };
             recipe.input = {};
             document.getElementById('eqp-recipe-inputs')?.querySelectorAll('.fe-list-row').forEach(row => {
                 const res = row.querySelector('.eqp-res-key')?.value;
@@ -498,19 +571,28 @@ class EquipmentEditorPro {
                 if (res) recipe.input[res] = amt;
             });
             recipe.ticks = parseInt(document.getElementById('eqp-recipe-ticks')?.value) || 20;
+            // Omit the station when it equals the category default, unless the original spelled it out.
             const station = document.getElementById('eqp-recipe-station')?.value;
-            if (station && station !== 'workbench') recipe.station = station;
+            if (station && (station !== defaultStation(cat) || base.recipe?.station)) recipe.station = station;
+            else delete recipe.station;
             const research = document.getElementById('eqp-recipe-research')?.value;
-            if (research) recipe.research = research;
+            if (research === KEEP_RESEARCH) recipe.research = base.recipe?.research;
+            else if (research) recipe.research = research;
+            else delete recipe.research;
             item.recipe = recipe;
+        } else {
+            delete item.recipe;
         }
 
         return item;
     }
 
-    _collectNumericStat(item, stat) {
-        const v = parseFloat(document.getElementById(`eqp-${stat}`)?.value);
-        if (v) item[stat] = v;
+    // A blank field removes the stat; an explicit 0 is kept only if the original had the field.
+    _collectNumericStat(item, base, stat, el = document.getElementById(`eqp-${stat}`)) {
+        if (!el) return;
+        const v = parseFloat(el.value);
+        if (Number.isFinite(v) && (v !== 0 || Object.hasOwn(base, stat))) item[stat] = v;
+        else delete item[stat];
     }
 
     _renderPreview() {
@@ -527,17 +609,17 @@ class EquipmentEditorPro {
 
         html += `<div class="fe-preview-section-title">Info</div>`;
         html += `<div class="fe-preview-badges">`;
-        const tier = item.tier || 0;
-        const tierBar = '█'.repeat(tier) + '░'.repeat(4 - tier);
-        html += `<span class="fe-preview-badge tier" style="color:${TIER_COLORS[tier]}">Tier ${tier}/4 ${tierBar}</span>`;
+        const tier = Math.min(MAX_TIER, Math.max(0, parseInt(item.tier) || 0));
+        const tierBar = '█'.repeat(tier) + '░'.repeat(MAX_TIER - tier);
+        html += `<span class="fe-preview-badge tier" style="color:${TIER_COLORS[tier]}">Tier ${tier}/${MAX_TIER} ${tierBar}</span>`;
         if (item.recipe?.research) {
-            const rName = RESEARCH[item.recipe.research]?.name || item.recipe.research;
-            html += `<span class="fe-preview-badge research">📖 ${rName}</span>`;
+            const rName = [].concat(item.recipe.research).map(r => RESEARCH[r]?.name || r).join(' + ');
+            html += `<span class="fe-preview-badge research">📖 ${escapeHtml(rName)}</span>`;
         }
-        if (item.ranged) html += `<span class="fe-preview-badge ranged">${item.projectileChar || '·'} Range: ${item.range || 5}</span>`;
+        if (item.ranged) html += `<span class="fe-preview-badge ranged">${escapeHtml(item.projectileChar || '·')} Range: ${escapeHtml(item.range || 5)}</span>`;
         if (item.recipe) {
             const costs = Object.entries(item.recipe.input || {}).map(([r, a]) => `${r}×${a}`).join(', ');
-            if (costs) html += `<span class="fe-preview-badge recipe">⚒ ${costs}</span>`;
+            if (costs) html += `<span class="fe-preview-badge recipe">⚒ ${escapeHtml(costs)}</span>`;
         }
         html += `</div>`;
 
@@ -545,25 +627,25 @@ class EquipmentEditorPro {
             html += `<div class="fe-preview-section-title">Trinket Details</div>`;
             html += `<div class="fe-preview-ingame" style="font-size:11px;">`;
             const equipped = getItemStatLines(item);
-            if (equipped.length) html += `<div style="color:#ccc;margin-bottom:4px;">${equipped.join(', ')}</div>`;
+            if (equipped.length) html += `<div style="color:#ccc;margin-bottom:4px;">${escapeHtml(equipped.join(', '))}</div>`;
             if (item.pedestal) {
                 const pedLines = getNestedEffectLines(item.pedestal);
                 const radius = item.pedestal.radius === 'global' ? 'global' : `${item.pedestal.radius} tiles`;
-                html += `<div style="color:#88ccff;margin-top:4px;">Pedestal (${radius}, ${item.pedestal.manaCost} mana/tick):</div>`;
-                html += `<div style="color:#aaa;padding-left:8px;">${pedLines.join(', ') || 'none'}</div>`;
+                html += `<div style="color:#88ccff;margin-top:4px;">Pedestal (${escapeHtml(radius)}, ${escapeHtml(item.pedestal.manaCost)} mana/tick):</div>`;
+                html += `<div style="color:#aaa;padding-left:8px;">${escapeHtml(pedLines.join(', ') || 'none')}</div>`;
             }
             if (item.expedition) {
                 const expLines = getNestedEffectLines(item.expedition);
                 html += `<div style="color:#ffaa33;margin-top:4px;">Expedition:</div>`;
-                html += `<div style="color:#aaa;padding-left:8px;">${expLines.join(', ')}</div>`;
+                html += `<div style="color:#aaa;padding-left:8px;">${escapeHtml(expLines.join(', '))}</div>`;
             }
-            if (item.durability) html += `<div style="color:#cc6666;margin-top:4px;">Durability: ${item.durability.max}${item.durability.breakOnUse ? ' (breaks on use)' : ''}</div>`;
+            if (item.durability) html += `<div style="color:#cc6666;margin-top:4px;">Durability: ${escapeHtml(item.durability.max)}${item.durability.breakOnUse ? ' (breaks on use)' : ''}</div>`;
             if (item.consumable) html += `<div style="color:#aa44ff;margin-top:4px;">Consumable (single use)</div>`;
             html += `</div>`;
         }
 
         html += `<div class="fe-preview-section-title">Code</div>`;
-        html += `<div class="fe-preview-code" style="margin:0 12px 12px;padding:10px;font-size:10px;max-height:200px;overflow-y:auto;">${this._serializeItem(item.key, item)}</div>`;
+        html += `<div class="fe-preview-code" style="margin:0 12px 12px;padding:10px;font-size:10px;max-height:200px;overflow-y:auto;white-space:pre;">${escapeHtml(this._serializeItem(item.key, item))}</div>`;
 
         panel.innerHTML = html;
     }
@@ -584,82 +666,40 @@ class EquipmentEditorPro {
         } else {
             stats = getItemStatLines(item).join(', ');
         }
+        stats = escapeHtml(stats);
 
         return `<div style="color:${CATEGORIES[cat].headerColor};margin-bottom:4px;font-size:11px;"><b>${CATEGORIES[cat].label}:</b></div>` +
-            `<div class="inv-row"><span class="inv-name" style="color:${qColor}"><span style="color:${icon.color};font-weight:bold;margin-right:2px;">${icon.char}</span>${item.name || item.key}</span><span class="inv-amount">${stats}</span></div>`;
+            `<div class="inv-row"><span class="inv-name" style="color:${qColor}"><span style="color:${icon.color};font-weight:bold;margin-right:2px;">${escapeHtml(icon.char)}</span>${escapeHtml(item.name || item.key)}</span><span class="inv-amount">${stats}</span></div>`;
+    }
+
+    // Config definition without the editor's own bookkeeping fields.
+    _toDef(item) {
+        const { key, category, ...def } = item;
+        return def;
     }
 
     _serializeItem(key, item) {
-        const lines = [];
-        lines.push(`${key}: {`);
-        lines.push(`    name: '${(item.name || key).replace(/'/g, "\\'")}',`);
-        if (item.damage !== undefined) lines.push(`    damage: ${item.damage},`);
-        if (item.damageReduction) lines.push(`    damageReduction: ${item.damageReduction},`);
-        if (item.tier) lines.push(`    tier: ${item.tier},`);
-        if (item.order !== undefined) lines.push(`    order: ${item.order},`);
-
-        const statKeys = [...Object.keys(STAT_META)];
-        for (const sk of statKeys) {
-            if (sk === 'damage' || sk === 'damageReduction') continue;
-            if (item[sk] !== undefined && item[sk] !== null && item[sk] !== 0 && item[sk] !== false) {
-                if (typeof item[sk] === 'boolean') lines.push(`    ${sk}: true,`);
-                else lines.push(`    ${sk}: ${item[sk]},`);
-            }
-        }
-
-        if (item.consumable) lines.push(`    consumable: true,`);
-        if (item.ranged) {
-            lines.push(`    ranged: true,`);
-            lines.push(`    range: ${item.range || 5},`);
-            lines.push(`    projectileChar: '${item.projectileChar || '·'}',`);
-            lines.push(`    projectileColor: '${item.projectileColor || '#ffaa33'}',`);
-            if (item.skinKey) lines.push(`    skinKey: '${item.skinKey}',`);
-        }
-        if (item.description) lines.push(`    description: '${item.description.replace(/'/g, "\\'")}',`);
-
-        if (item.pedestal) {
-            const pp = [];
-            pp.push(`radius: ${item.pedestal.radius === 'global' ? "'global'" : item.pedestal.radius}`);
-            pp.push(`manaCost: ${item.pedestal.manaCost}`);
-            for (const [k, v] of Object.entries(item.pedestal)) {
-                if (k === 'radius' || k === 'manaCost') continue;
-                if (v === true) pp.push(`${k}: true`);
-                else if (v) pp.push(`${k}: ${v}`);
-            }
-            lines.push(`    pedestal: { ${pp.join(', ')} },`);
-        }
-        if (item.expedition) {
-            const pp = Object.entries(item.expedition).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`);
-            lines.push(`    expedition: { ${pp.join(', ')} },`);
-        }
-        if (item.durability) {
-            const pp = [`max: ${item.durability.max}`];
-            if (item.durability.breakOnUse) pp.push('breakOnUse: true');
-            lines.push(`    durability: { ${pp.join(', ')} },`);
-        }
-
-        if (item.recipe) {
-            const r = item.recipe;
-            const inputParts = Object.entries(r.input || {}).map(([k, v]) => `${k}: ${v}`);
-            let recipeLine = `    recipe: { input: { ${inputParts.join(', ')} }, ticks: ${r.ticks || 20}`;
-            if (r.station && r.station !== 'workbench') recipeLine += `, station: '${r.station}'`;
-            if (r.research) recipeLine += `, research: '${r.research}'`;
-            recipeLine += ` },`;
-            lines.push(recipeLine);
-        }
-
-        lines.push(`},`);
-        return lines.join('\n');
+        return `${key}: ${toJsLiteral(this._toDef(item))},`;
     }
 
-    _showExportModal() {
-        const output = this._generateFullFile();
+    async _showExportModal() {
+        if (MODDED_FALLBACK) {
+            alert('Export disabled: base equipment.js data could not be loaded separately from the enabled mods, so the file would include mod content. Disable mods and reload to export.');
+            return;
+        }
+        let output;
+        try {
+            output = await this._generateFullFile();
+        } catch (err) {
+            alert(`Export failed: ${err.message}`);
+            return;
+        }
         const modal = document.createElement('div');
         modal.className = 'fe-export-modal';
         modal.innerHTML = `
             <div class="fe-export-modal-content" style="width:800px;">
                 <div style="color:#ffcc00;font-weight:bold;margin-bottom:12px;">Export equipment.js (${this.items.size} items)</div>
-                <textarea readonly style="min-height:400px;">${output}</textarea>
+                <textarea readonly style="min-height:400px;">${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="eqp-modal-download">Download File</button>
                     <button id="eqp-modal-copy">Copy to Clipboard</button>
@@ -684,110 +724,23 @@ class EquipmentEditorPro {
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     }
 
-    _generateFullFile() {
-        let out = '';
-        out += `export const RECIPE_CATEGORIES = ${JSON.stringify(RECIPE_CATEGORIES)};\n\n`;
-        out += `export const MATERIALS = {\n`;
-        for (const [key, mat] of Object.entries(MATERIALS)) {
-            const r = mat.recipe;
-            out += `    ${key}: { name: '${mat.name}', recipe: { input: { ${Object.entries(r.input).map(([k,v])=>`${k}: ${v}`).join(', ')} }, output: ${r.output}, ticks: ${r.ticks}, prefix: '${r.prefix}' } },\n`;
-        }
-        out += `};\n\n`;
-
-        out += `const BASE_RECIPES = {\n`;
-        for (const [key, r] of Object.entries(RECIPES)) {
-            if (key.startsWith('craft_') || key.startsWith('brew_') || key.startsWith('smelt_') || key.startsWith('tan_')) continue;
-            const parts = [`input: { ${Object.entries(r.input).map(([k,v])=>`${k}: ${v}`).join(', ')} }`];
-            parts.push(`output: { ${Object.entries(r.output).map(([k,v])=>`${k}: ${v}`).join(', ')} }`);
-            parts.push(`skill: '${r.skill}'`);
-            parts.push(`ticks: ${r.ticks}`);
-            parts.push(`station: '${r.station}'`);
-            parts.push(`category: '${r.category}'`);
-            if (r.research) parts.push(`research: '${r.research}'`);
-            if (r.special) parts.push(`special: '${r.special}'`);
-            out += `    ${key}: { ${parts.join(', ')} },\n`;
-        }
-        out += `};\n\n`;
-
-        const cats = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
-        const exports = { weapon: 'WEAPONS', armor: 'ARMORS', helmet: 'HELMETS', clothes: 'CLOTHES', boots: 'BOOTS', tool: 'TOOLS', trinket: 'TRINKETS' };
-
-        for (const cat of cats) {
-            const exportName = exports[cat];
-            const items = [...this.items.entries()].filter(([, v]) => v.category === cat);
-            out += `export const ${exportName} = {\n`;
-            for (const [key, item] of items) {
-                out += '    ' + this._serializeItem(key, item).replace(/\n/g, '\n    ').replace(/\n    $/, '\n');
+    // Start from the real equipment.js source and splice in only the entries the
+    // user changed, so every other export, comment and the derived ALL_ITEMS /
+    // RECIPES code stay exactly as shipped.
+    async _generateFullFile() {
+        let out = await fetchConfigSource('equipment.js');
+        for (const [cat, { exportName, config }] of Object.entries(CATEGORIES)) {
+            const changed = new Map(), removed = new Set(), added = new Map();
+            for (const key of Object.keys(config)) {
+                const item = this.items.get(key);
+                if (!item || item.category !== cat) removed.add(key);
+                else if (this._isDirty(key)) changed.set(key, this._toDef(item));
             }
-            out += `};\n\n`;
-            if (cat === 'helmet') {
-                out += `export const EQUIPMENT_OVERLAY_OFFSETS = {\n    helmet: { offsetY: -0.25 },\n    armor: { offsetY: 0 },\n};\n\n`;
+            for (const [key, item] of this.items) {
+                if (item.category === cat && !Object.hasOwn(config, key)) added.set(key, this._toDef(item));
             }
+            out = spliceExportObject(out, exportName, { changed, removed, added });
         }
-
-        out += `export const POTIONS = {\n`;
-        for (const [key, p] of Object.entries(POTIONS)) {
-            const parts = [`name: '${p.name}'`];
-            parts.push(`trigger: '${p.trigger}'`);
-            if (p.hpThreshold) parts.push(`hpThreshold: ${p.hpThreshold}`);
-            if (p.manaThreshold) parts.push(`manaThreshold: ${p.manaThreshold}`);
-            parts.push(`effect: '${p.effect}'`);
-            if (p.healAmount) parts.push(`healAmount: ${p.healAmount}`);
-            if (p.manaAmount) parts.push(`manaAmount: ${p.manaAmount}`);
-            if (p.moveSpeedBonus) parts.push(`moveSpeedBonus: ${p.moveSpeedBonus}`);
-            if (p.workSpeedBonus) parts.push(`workSpeedBonus: ${p.workSpeedBonus}`);
-            if (p.damageReduction) parts.push(`damageReduction: ${p.damageReduction}`);
-            if (p.duration) parts.push(`duration: ${p.duration}`);
-            if (p.cooldown) parts.push(`cooldown: ${p.cooldown}`);
-            if (p.recipe) {
-                const r = p.recipe;
-                let rParts = `input: { ${Object.entries(r.input).map(([k,v])=>`${k}: ${v}`).join(', ')} }, skill: '${r.skill}', ticks: ${r.ticks}, station: '${r.station}'`;
-                if (r.research) rParts += `, research: '${r.research}'`;
-                parts.push(`recipe: { ${rParts} }`);
-            }
-            out += `    ${key}: { ${parts.join(', ')} },\n`;
-        }
-        out += `};\n\n`;
-
-        out += `export const ITEM_CHARS = {\n`;
-        for (const [k, v] of Object.entries(ITEM_CHARS)) {
-            out += `    ${k}: { char: '${v.char === '\\' ? '\\\\' : v.char}', color: '${v.color}' },\n`;
-        }
-        out += `};\n\n`;
-
-        out += `const EQUIPMENT_RECIPE_SOURCES = [\n`;
-        out += `    { items: WEAPONS, category: 'Weapons', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: HELMETS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: ARMORS, category: 'Armor', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: TOOLS, category: 'Tools', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: TRINKETS, category: 'Trinkets', prefix: 'craft_', defaults: { skill: 'crafting', station: 'workbench' } },\n`;
-        out += `    { items: POTIONS, category: 'Food & Potions', prefix: 'brew_', defaults: { skill: 'cooking', station: 'cooking_pot' } },\n`;
-        out += `];\n\n`;
-
-        out += `export const RECIPES = {};\n\n`;
-        out += `for (const [key, mat] of Object.entries(MATERIALS)) {\n`;
-        out += `    if (!mat.recipe) continue;\n`;
-        out += `    const r = mat.recipe;\n`;
-        out += `    RECIPES[\`\${r.prefix || 'craft_'}\${key}\`] = {\n`;
-        out += `        input: r.input, output: { [key]: r.output },\n`;
-        out += `        skill: 'crafting', ticks: r.ticks, station: 'workbench', category: 'Materials',\n`;
-        out += `        ...(r.research ? { research: r.research } : {}),\n`;
-        out += `    };\n`;
-        out += `}\n\n`;
-        out += `Object.assign(RECIPES, BASE_RECIPES);\n\n`;
-        out += `for (const { items, category, prefix, defaults } of EQUIPMENT_RECIPE_SOURCES) {\n`;
-        out += `    for (const [key, item] of Object.entries(items)) {\n`;
-        out += `        if (!item.recipe) continue;\n`;
-        out += `        const r = item.recipe;\n`;
-        out += `        RECIPES[\`\${prefix}\${key}\`] = {\n`;
-        out += `            input: r.input, output: { [key]: 1 },\n`;
-        out += `            skill: r.skill || defaults.skill, ticks: r.ticks,\n`;
-        out += `            station: r.station || defaults.station, category,\n`;
-        out += `            ...(r.research ? { research: r.research } : {}),\n`;
-        out += `        };\n`;
-        out += `    }\n`;
-        out += `}\n`;
-
         return out;
     }
 

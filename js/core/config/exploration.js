@@ -482,7 +482,6 @@ export const REALMS = {
             { key: 'tome_guardian', weight: 35 },
             { key: 'spell_wraith', weight: 15 },
         ] },
-        research: 'arcane_studies',
         events: {
             ambient: [
                 '{name} reads a passage from a floating book.',
@@ -516,7 +515,6 @@ export const REALMS = {
         duration: [320, 500], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'university_wall', floor: 'university_floor' },
         requiresRealm: 'arcane_library',
-        research: 'arcane_studies',
         loot: [
             { resource: 'tome_of_magic_missile', weight: 15, amount: [1, 1] },
             { resource: 'tome_of_renewal', weight: 15, amount: [1, 1] },
@@ -565,7 +563,6 @@ export const REALMS = {
         duration: [450, 680], encounters: 8, combatEncounters: [2, 4],
         vis: { wall: 'university_wall', floor: 'university_floor' },
         requiresRealm: 'ancient_university',
-        research: 'arcane_studies',
         loot: [
             { resource: 'tome_of_magic_missile', weight: 12, amount: [1, 1] },
             { resource: 'tome_of_renewal', weight: 12, amount: [1, 1] },
@@ -665,7 +662,6 @@ export const REALMS = {
             { key: 'void_stalker', weight: 35 },
             { key: 'shade', weight: 35 },
         ] },
-        research: 'deep_delving',
         events: {
             ambient: [
                 'Reality flickers. {name} sees double for a moment.',
@@ -701,7 +697,6 @@ export const REALMS = {
         duration: [550, 800], encounters: 7, combatEncounters: [3, 5],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
         requiresRealm: 'shadow_realm',
-        research: 'deep_delving',
         loot: [
             { resource: 'void_essence', weight: 45, amount: [5, 10] },
             { resource: 'runite', weight: 20, amount: [4, 8] },
@@ -750,7 +745,6 @@ export const REALMS = {
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
         requiresRealm: 'void_abyss',
-        research: 'deep_delving',
         loot: [
             { resource: 'void_essence', weight: 50, amount: [7, 14] },
             { resource: 'runite', weight: 20, amount: [5, 10] },
@@ -837,7 +831,6 @@ export const REALMS = {
         chain: 'void_pact', chainOrder: 1,
         duration: [400, 620], encounters: 6, combatEncounters: [2, 3],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
-        research: 'void_pact',
         loot: [
             { resource: 'void_essence', weight: 45, amount: [4, 9] },
             { resource: 'runite', weight: 30, amount: [2, 5] },
@@ -879,7 +872,6 @@ export const REALMS = {
         chain: 'void_pact', chainOrder: 2,
         duration: [500, 750], encounters: 7, combatEncounters: [2, 4],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
-        research: 'void_pact',
         requiresRealm: 'void_hollow',
         loot: [
             { resource: 'void_essence', weight: 40, amount: [5, 12] },
@@ -924,7 +916,6 @@ export const REALMS = {
         chain: 'void_pact', chainOrder: 3,
         duration: [600, 900], encounters: 8, combatEncounters: [3, 5],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
-        research: 'void_pact',
         requiresRealm: 'void_sanctum',
         loot: [
             { resource: 'void_essence', weight: 40, amount: [6, 14] },
@@ -1019,7 +1010,6 @@ export const REALMS = {
         chain: 'chaos', chainOrder: 1,
         duration: [420, 650], encounters: 6, combatEncounters: [2, 3],
         vis: { wall: 'crystal_wall', floor: 'shadow_floor' },
-        research: 'unraveling',
         chaosEncounterChance: 0.30,
         loot: [
             { resource: 'void_essence', weight: 30, amount: [3, 7] },
@@ -1064,7 +1054,6 @@ export const REALMS = {
         chain: 'chaos', chainOrder: 2,
         duration: [550, 820], encounters: 8, combatEncounters: [3, 5],
         vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
-        research: 'unraveling',
         requiresRealm: 'fracture_gate',
         chaosEncounterChance: 0.50,
         loot: [
@@ -1109,7 +1098,6 @@ export const REALMS = {
         chain: 'chaos', chainOrder: 3,
         duration: [650, 950], encounters: 9, combatEncounters: [4, 6],
         vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
-        research: 'unraveling',
         requiresRealm: 'shifting_labyrinth',
         chaosEncounterChance: 0.70,
         loot: [
@@ -1219,7 +1207,6 @@ export const REALMS = {
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
 
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
-        research: 'deep_delving',
         requiresEvent: 'crusader_raid_defeated',
         loot: [
             { resource: 'gold', weight: 35, amount: [5, 12] },
@@ -1265,7 +1252,6 @@ export const REALMS = {
         chain: 'kingdom', chainOrder: 2,
         duration: [700, 1000], encounters: 9, combatEncounters: [4, 6],
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
-        research: 'deep_delving',
         requiresRealm: 'kingdom_outskirts',
         loot: [
             { resource: 'runite', weight: 30, amount: [5, 10] },
@@ -1313,7 +1299,6 @@ export const REALMS = {
         chain: 'kingdom', chainOrder: 3,
         duration: [700, 1000], encounters: 9, combatEncounters: [5, 7],
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
-        research: 'deep_delving',
         requiresRealm: 'crusader_barracks',
         loot: [
             { resource: 'gold', weight: 40, amount: [12, 24] },
@@ -1400,7 +1385,17 @@ export const EXPLORATION_CONFIG = {
     retreatTicks: 200,
     encounterSpacing: 0.2,
     baseFistDamage: 5,
-    combatRoundTicks: 8,
+    // One expedition combat round = one baseline attack cycle (matches
+    // COLONIST_CONFIG.baseAttackCooldown). Status durations, DoTs, boss/elite
+    // ability rolls, chaos ticks and "per round" regen advance once per round.
+    combatRoundTicks: 3,
+    // A gathering party leaves without members who haven't reached the rift
+    // after this long (one in-game day), and is called off if no one has.
+    gatherTimeoutTicks: 480,
+    // Finished expeditions keep at most this many log lines, and at most this
+    // many uncollected "Expeditions Returned" summaries are kept.
+    completedLogCap: 300,
+    maxPendingSummaries: 20,
     bossTriggerPercent: 0.7,
     microEventChance: 0.04,
     trapDamageRange: [5, 15],
@@ -2211,7 +2206,7 @@ export const PUZZLE_ENCOUNTERS = {
                 label: 'Copy down the terms',
                 description: 'Crafting skill lets you document the agreements for advantage',
                 skill: 'crafting', minLevel: 4,
-                traitBonus: ['studious'],
+                traitBonus: ['creative'],
                 successText: '{name} carefully copies the terms and extracts useful information!',
                 failText: '{name} misreads the ledger and triggers a void burst!',
             },
@@ -3069,7 +3064,7 @@ export const STORY_MILESTONES = {
     research_deep_delving: {
         tab: 'research',
         title: 'Deep Delving',
-        trigger: 'research_deep_delving',
+        trigger: 'anchor_shadow',
         text: `
         In spite of the dangers you find yourself sending colonists deeper into
         these hostile realms. The deeper they go the greater the rewards become, but

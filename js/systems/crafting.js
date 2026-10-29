@@ -7,13 +7,34 @@
 import { RECIPES, WORK_CONFIG, ENCHANT_COST_BY_TIER } from '../core/config.js';
 import { getEquippedItems } from '../entities/colonist.js';
 
-// Cached recipe availability. Invalidated when resources, research, structures,
-// or the task queue change. Uses a version counter on game to detect staleness.
+// Cached recipe availability. Availability depends only on research, the stock of
+// recipe inputs, which station types exist and grid power, so the cache is keyed
+// by a cheap signature of exactly those (plus game._recipeCacheVersion for
+// explicit invalidation) and rebuilt only when one of them really changes.
 let _recipeCache = null;
-let _recipeCacheVersion = -1;
+let _recipeCacheKey = null;
+let _recipeInputs = null;   // { resources: string[], stations: string[] }, from RECIPES
 
 export function invalidateRecipeCache() {
-    _recipeCacheVersion = -1;
+    _recipeCacheKey = null;
+    _recipeInputs = null;
+}
+
+function recipeCacheKey(game) {
+    if (!_recipeInputs) {
+        const resources = new Set();
+        const stations = new Set(['enchanting_table']);
+        for (const recipe of Object.values(RECIPES)) {
+            for (const res of Object.keys(recipe.input || {})) resources.add(res);
+            if (recipe.station) stations.add(recipe.station);
+        }
+        _recipeInputs = { resources: [...resources], stations: [...stations] };
+    }
+    const stock = game.resources.stockpile;
+    const parts = [game._recipeCacheVersion || 0, game.research.completed.size, game.power.hasPower() ? 1 : 0];
+    for (const st of _recipeInputs.stations) parts.push(game.mapIndex.getStructurePositions(st).size > 0 ? 1 : 0);
+    for (const res of _recipeInputs.resources) parts.push(res === 'foodstuffs' ? game.resources.getFoodstuffTotal() : (stock[res] || 0));
+    return parts.join(',');
 }
 
 function isRecipeResearched(game, research) {
@@ -47,7 +68,6 @@ export function queueCraftingOrder(game, recipeKey) {
         recipe,
     });
 
-    _recipeCacheVersion = -1;
     return true;
 }
 
@@ -84,9 +104,12 @@ function findAvailableStation(game, stationType) {
     if (stationType === 'enchanting_table' || usePowered) {
         const stations = game.mapIndex.findAll('enchanting_table');
         let best = null, bestCount = Infinity;
+        // Enchanting tables draw grid mana, so they only count as powered while
+        // the grid is net-positive.
+        const powered = game.power.hasPower();
         for (const { x, y } of stations) {
             const count = taskCountAt(x, y);
-            if (count < bestCount) { best = { x, y, powered: true }; bestCount = count; }
+            if (count < bestCount) { best = { x, y, powered }; bestCount = count; }
         }
         if (best) return best;
     }
@@ -101,8 +124,8 @@ function findAvailableStation(game, stationType) {
 }
 
 export function getAvailableRecipes(game) {
-    const version = game._recipeCacheVersion || 0;
-    if (_recipeCache && _recipeCacheVersion === version) return _recipeCache;
+    const key = recipeCacheKey(game);
+    if (_recipeCache && _recipeCacheKey === key) return _recipeCache;
 
     const available = [];
     for (const [key, recipe] of Object.entries(RECIPES)) {
@@ -112,7 +135,7 @@ export function getAvailableRecipes(game) {
         available.push({ key, recipe, hasResources, hasStation, canCraft: hasResources && hasStation });
     }
     _recipeCache = available;
-    _recipeCacheVersion = version;
+    _recipeCacheKey = key;
     return available;
 }
 

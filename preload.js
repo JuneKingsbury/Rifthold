@@ -5,8 +5,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quit: () => ipcRenderer.invoke('quit'),
   setFullscreen: (enabled) => ipcRenderer.invoke('set-fullscreen', enabled),
   isFullscreen: () => ipcRenderer.invoke('is-fullscreen'),
+  // Returns an unsubscribe function.
   onFullscreenChanged: (callback) => {
-    ipcRenderer.on('fullscreen-changed', (event, isFullscreen) => callback(isFullscreen));
+    const listener = (event, isFullscreen) => callback(isFullscreen);
+    ipcRenderer.on('fullscreen-changed', listener);
+    return () => ipcRenderer.removeListener('fullscreen-changed', listener);
   },
   gdrive: {
     enabled:     () => ipcRenderer.invoke('gdrive:enabled'),

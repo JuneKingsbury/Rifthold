@@ -1,5 +1,5 @@
 import { SOUND_MANIFEST } from './sound-manifest.js';
-import { CONFIG, DAY_NIGHT } from './config.js';
+import { CONFIG } from './config.js';
 
 const CROSSFADE_MS = 2000;
 const SFX_COOLDOWN_MS = 200;
@@ -15,6 +15,9 @@ class SoundManagerClass {
         this.sfxVolume = 80;
         this.expeditionMode = false;
         this.bufferCache = new Map();
+        // In-flight fetch+decode promises by cache key, so concurrent requests
+        // for one file share a single fetch.
+        this.pendingBuffers = new Map();
         this.unavailable = new Set();
         this.lastPlayTime = new Map();
         this.activeSfxCount = 0;
@@ -24,6 +27,10 @@ class SoundManagerClass {
         this.currentMusicStartTime = null;
         this.currentMusicStartOffset = 0;
         this.seasonTrackPositions = {};
+        // Each playMusic/stopMusic call bumps this; a playMusic whose buffer
+        // arrives after a newer call bails, so the latest request always wins.
+        this.musicRequestId = 0;
+        this.pendingMusicName = null;
     }
 
     init() {
@@ -70,7 +77,7 @@ class SoundManagerClass {
 
     async playSFXAt(name, worldX, worldY) {
         try {
-            if (!this.ctx || this.unavailable.has(name)) return;
+            if (!this.ctx || this.unavailable.has('sfx_' + name)) return;
             if (this.activeSfxCount >= MAX_CONCURRENT_SFX) return;
 
             const camera = window.game?.camera;
@@ -111,7 +118,7 @@ class SoundManagerClass {
 
     async playSFX(name) {
         try {
-            if (!this.ctx || this.unavailable.has(name)) return;
+            if (!this.ctx || this.unavailable.has('sfx_' + name)) return;
             if (this.activeSfxCount >= MAX_CONCURRENT_SFX) return;
 
             const now = performance.now();
@@ -143,7 +150,7 @@ class SoundManagerClass {
     // Pass gainNode = this.expeditionSfxGain to bypass the expedition volume dampening.
     async playSFXPitched(name, semitones = 0, gainNode = null) {
         try {
-            if (!this.ctx || this.unavailable.has(name)) return;
+            if (!this.ctx || this.unavailable.has('sfx_' + name)) return;
             if (this.activeSfxCount >= MAX_CONCURRENT_SFX) return;
 
             const now = performance.now();
@@ -171,7 +178,7 @@ class SoundManagerClass {
 
     async playExpSFX(name) {
         try {
-            if (!this.ctx || this.unavailable.has(name)) return;
+            if (!this.ctx || this.unavailable.has('sfx_' + name)) return;
             if (this.activeSfxCount >= MAX_CONCURRENT_SFX) return;
 
             const now = performance.now();
@@ -199,12 +206,21 @@ class SoundManagerClass {
     async playMusic(name) {
         try {
             if (!this.ctx) return;
-            if (this.currentMusicName === name) return;
+            if (this.pendingMusicName === name) return;
+            if (this.currentMusicName === name) {
+                // Asking for the current track again cancels any pending switch.
+                if (this.pendingMusicName) { this.musicRequestId++; this.pendingMusicName = null; }
+                return;
+            }
             if (this.unavailable.has('music_' + name)) return;
 
+            const requestId = ++this.musicRequestId;
+            this.pendingMusicName = name;
             if (this.ctx.state === 'suspended') await this.ctx.resume();
 
             const buffer = await this._getBuffer(name, 'music');
+            if (requestId !== this.musicRequestId) return;
+            this.pendingMusicName = null;
             if (!buffer) return;
 
             const fadeTime = CROSSFADE_MS / 1000;
@@ -240,11 +256,14 @@ class SoundManagerClass {
             this.currentMusicName = name;
             this.currentMusicStartTime = this.ctx.currentTime;
             this.currentMusicStartOffset = offset;
-        } catch (e) { /* silent */ }
+        } catch (e) { this.pendingMusicName = null; }
     }
 
     stopMusic(fadeMs = 1000) {
         try {
+            // Cancel any track still loading so it doesn't start after the stop.
+            this.musicRequestId++;
+            this.pendingMusicName = null;
             if (!this.ctx || !this.currentMusic || !this.currentMusicGain) return;
             this._saveSeasonPosition();
             const now = this.ctx.currentTime;
@@ -278,9 +297,9 @@ class SoundManagerClass {
     // Returns the first candidate music name whose file is actually available,
     // skipping names already known-missing. Missing candidates are checked
     // against the in-memory `unavailable` set, so this is cheap on the steady
-    // path (the winning track is cached after first play). ambient_day/night
-    // act as the guaranteed final fallback, so a valid name is essentially
-    // always returned when they are passed last.
+    // path (the winning track is cached after first play). The season tracks
+    // act as the final fallback, so a valid name is essentially always
+    // returned when one is passed last.
     async _firstAvailableMusic(candidates) {
         for (const name of candidates) {
             if (this.unavailable.has('music_' + name)) continue;
@@ -290,8 +309,14 @@ class SoundManagerClass {
         return null;
     }
 
+    // The track lookup awaits fetches. If the game was discarded meanwhile
+    // (return to menu, failed load), its music must not replace the menu theme.
+    _isCurrentGame(game) {
+        return typeof window === 'undefined' || window.game === game;
+    }
+
     // Layered music selection, highest priority first:
-    //   expedition > combat > weather_<type> > season_<name> > ambient_day/night
+    //   expedition > combat > weather_<type> > season_<name>
     // Each specialized layer falls through to the next if its track file is
     // missing (404) or absent from the manifest.
     async updateMusicState(game) {
@@ -312,6 +337,7 @@ class SoundManagerClass {
                     ? ['expedition_' + realmKey, 'expedition']
                     : ['expedition'];
                 const name = await this._firstAvailableMusic(candidates);
+                if (!this._isCurrentGame(game)) return;
                 if (name) {
                     if (name !== this.currentMusicName) this.playMusic(name);
                 } else if (this.currentMusicName !== null) {
@@ -333,12 +359,10 @@ class SoundManagerClass {
                     candidates.push('weather_' + w.currentWeather);
                 }
                 if (w && w.season) candidates.push('season_' + w.season);
-                const t = game.timeOfDay / CONFIG.TICKS_PER_DAY;
-                const isNight = t >= DAY_NIGHT.nightStart || t < DAY_NIGHT.dayStart;
-                candidates.push(isNight ? 'ambient_night' : 'ambient_day');
             }
 
             const desired = await this._firstAvailableMusic(candidates);
+            if (!this._isCurrentGame(game)) return;
             if (desired && desired !== this.currentMusicName) {
                 this.playMusic(desired);
             }
@@ -348,7 +372,19 @@ class SoundManagerClass {
     async _getBuffer(name, type) {
         const cacheKey = type + '_' + name;
         if (this.bufferCache.has(cacheKey)) return this.bufferCache.get(cacheKey);
+        if (this.unavailable.has(cacheKey)) return null;
+        if (this.pendingBuffers.has(cacheKey)) return this.pendingBuffers.get(cacheKey);
 
+        const pending = this._loadBuffer(name, type, cacheKey);
+        this.pendingBuffers.set(cacheKey, pending);
+        try {
+            return await pending;
+        } finally {
+            this.pendingBuffers.delete(cacheKey);
+        }
+    }
+
+    async _loadBuffer(name, type, cacheKey) {
         const manifest = type === 'music' ? SOUND_MANIFEST.music : SOUND_MANIFEST.sfx;
         const path = manifest[name];
         if (!path) {

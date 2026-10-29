@@ -5,7 +5,7 @@ import { CRYPT_CONFIG, BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMOR
 } from '../core/config.js';
 import { estimatePartyStrength, getExpeditionSlotItem } from '../systems/exploration.js';
 import { getOmens } from '../systems/omens.js';
-import { getTargetPriority, getThreatDisplayHtml } from './ui-utils.js';
+import { getTargetPriority, getThreatDisplayHtml, escapeHtml, escapeAttr, jsArg } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
 import { drawBarFill, advanceGhost, drawGhostBar } from './bar-fx.js';
 import { getRelaxActivityLabel } from '../entities/colonist.js';
@@ -26,8 +26,8 @@ const _COMBAT_STATUS_ICONS = {
 
 function _combatStatusIcon(type) {
     const def = _COMBAT_STATUS_ICONS[type];
-    if (!def) return `<span style="color:#aaa;font-size:0.85em;">${type}</span>`;
-    return `<span title="${type}" style="color:${def.color};font-size:0.9em;">${def.char}</span>`;
+    if (!def) return `<span style="color:#aaa;font-size:0.85em;">${escapeHtml(type)}</span>`;
+    return `<span title="${escapeAttr(type)}" style="color:${def.color};font-size:0.9em;">${def.char}</span>`;
 }
 
 // Render a run of status icons for a combatant's statusEffects array, each
@@ -39,8 +39,8 @@ function _combatStatusIcons(statusEffects) {
     return ' ' + active.map(s => {
         const def = _COMBAT_STATUS_ICONS[s.type];
         const color = def ? def.color : '#aaa';
-        const char = def ? def.char : s.type;
-        return `<span title="${s.type} (${s.rounds} rnd)" style="color:${color};font-size:0.85em;">${char}${s.rounds}</span>`;
+        const char = def ? def.char : escapeHtml(s.type);
+        return `<span title="${escapeAttr(s.type)} (${s.rounds} rnd)" style="color:${color};font-size:0.85em;">${char}${s.rounds}</span>`;
     }).join(' ');
 }
 
@@ -52,6 +52,9 @@ const arcaneMethods = {
     toggleArcanePanel(tab) {
         const opening = !this.arcanePanelVisible;
         this._closeAllPanels();
+        // Arcane doesn't pause (expeditions animate live); end any pause a
+        // previously open panel started so switching here resumes the game.
+        this._panelPause(false);
         this.arcanePanelVisible = opening;
         this.elements.arcanePanel.style.display = opening ? 'block' : 'none';
         window.soundManager?.setExpeditionMode(opening);
@@ -67,6 +70,7 @@ const arcaneMethods = {
     },
 
     updateArcanePanel() {
+        if (!this.arcanePanelVisible) return;
         const tab = this._arcaneTab || 'expeditions';
         let html = '<div class="panel-close" data-panel-close="arcane">&times;</div>';
         html += '<h3 style="color:#aa44ff">Rifts</h3>';
@@ -111,7 +115,18 @@ const arcaneMethods = {
             let savedChecks = null;
             let savedPacks = null;
             let savedWar = null;
+            let savedPreset = null;
             if (tab === 'expeditions' && this._arcaneExpSetup) {
+                // Keep a half-typed preset name (and its caret) across the swap.
+                const presetInput = this.elements.arcanePanel.querySelector('#exp-preset-name');
+                if (presetInput) {
+                    savedPreset = {
+                        value: presetInput.value,
+                        focused: document.activeElement === presetInput,
+                        start: presetInput.selectionStart,
+                        end: presetInput.selectionEnd,
+                    };
+                }
                 savedChecks = [...this.elements.arcanePanel.querySelectorAll('.exp-check:checked')].map(cb => cb.value);
                 savedPacks = [...this.elements.arcanePanel.querySelectorAll('.exp-pack-check:checked')].map(cb => cb.value);
                 savedWar = [...this.elements.arcanePanel.querySelectorAll('.exp-war-check:checked')].map(cb => cb.value);
@@ -125,32 +140,38 @@ const arcaneMethods = {
             this._lastArcaneHtml = html;
             this.elements.arcanePanel.innerHTML = html;
             if (tab === 'expeditions') {
-                if (savedChecks && savedChecks.length > 0) {
-                    for (const val of savedChecks) {
-                        const cb = this.elements.arcanePanel.querySelector(`.exp-check[value="${val}"]`);
+                // Restore each checkbox group independently: pack animals and
+                // war beasts can be picked before any colonist is checked.
+                const restoreChecks = (cls, vals) => {
+                    if (!vals) return;
+                    for (const val of vals) {
+                        const cb = this.elements.arcanePanel.querySelector(`.${cls}[value="${CSS.escape(val)}"]`);
                         if (cb) cb.checked = true;
                     }
-                    for (const val of savedPacks) {
-                        const cb = this.elements.arcanePanel.querySelector(`.exp-pack-check[value="${val}"]`);
-                        if (cb) cb.checked = true;
-                    }
-                    if (savedWar) {
-                        for (const val of savedWar) {
-                            const cb = this.elements.arcanePanel.querySelector(`.exp-war-check[value="${val}"]`);
-                            if (cb) cb.checked = true;
+                };
+                restoreChecks('exp-check', savedChecks);
+                restoreChecks('exp-pack-check', savedPacks);
+                restoreChecks('exp-war-check', savedWar);
+                if (savedPreset) {
+                    const presetInput = this.elements.arcanePanel.querySelector('#exp-preset-name');
+                    if (presetInput) {
+                        presetInput.value = savedPreset.value;
+                        if (savedPreset.focused) {
+                            presetInput.focus();
+                            presetInput.setSelectionRange(savedPreset.start, savedPreset.end);
                         }
                     }
                 }
                 if (this._savedMutators) {
                     for (const mk of this._savedMutators) {
-                        const cb = this.elements.arcanePanel.querySelector(`.exp-mutator[value="${mk}"]`);
+                        const cb = this.elements.arcanePanel.querySelector(`.exp-mutator[value="${CSS.escape(mk)}"]`);
                         if (cb) cb.checked = true;
                     }
                     this._savedMutators = null;
                 }
                 if (this._savedPotions) {
                     for (const [pk, count] of Object.entries(this._savedPotions)) {
-                        const input = this.elements.arcanePanel.querySelector(`.exp-potion[data-potion="${pk}"]`);
+                        const input = this.elements.arcanePanel.querySelector(`.exp-potion[data-potion="${CSS.escape(pk)}"]`);
                         if (input) input.value = Math.min(count, parseInt(input.max) || count);
                     }
                     this._savedPotions = null;
@@ -167,13 +188,7 @@ const arcaneMethods = {
 
     _buildNexusTabHtml() {
         let html = '';
-        let hasNexus = false;
-        for (const row of this.game.map) {
-            for (const t of row) {
-                if (t.structure === 'void_nexus') { hasNexus = true; break; }
-            }
-            if (hasNexus) break;
-        }
+        const hasNexus = this.game.mapIndex.getStructurePositions('void_nexus').size > 0;
 
         if (!hasNexus) {
             html += `<div class="arcane-section" style="color:#888;padding:20px 0;text-align:center;">`;
@@ -261,12 +276,12 @@ const arcaneMethods = {
             html += `<div class="info-row" style="color:#aaddcc;font-weight:bold;margin-top:4px;">${group.label}</div>`;
             for (const req of reqs) {
                 const costStr = Object.entries(req.cost)
-                    .map(([k, qty]) => `${this._itemIcon(k, 'material')}${qty} ${k.replace(/_/g, ' ')}`)
+                    .map(([k, qty]) => `${this._itemIcon(k, 'material')}${qty} ${escapeHtml(k.replace(/_/g, ' '))}`)
                     .join(' + ');
                 if (req.fulfilled) {
                     html += `<div class="trade-rift-card fulfilled">`;
                     html += `<div class="trade-rift-give">Gave ${costStr}</div>`;
-                    html += `<span class="trade-rift-reward" style="color:#888;">${req.vagueText}</span>`;
+                    html += `<span class="trade-rift-reward" style="color:#888;">${escapeHtml(req.vagueText)}</span>`;
                     html += `<div style="color:#66ccaa;">✓ Fulfilled</div>`;
                     html += `</div>`;
                     continue;
@@ -277,7 +292,7 @@ const arcaneMethods = {
                 const reason = !powered ? ' (unpowered)' : (!affordable ? ' (short on materials)' : '');
                 html += `<div class="trade-rift-card">`;
                 html += `<div class="trade-rift-give">Give ${costStr}</div>`;
-                html += `<span class="trade-rift-reward">for <span style="color:${rewardColor};">${req.vagueText}</span></span>`;
+                html += `<span class="trade-rift-reward">for <span style="color:${rewardColor};">${escapeHtml(req.vagueText)}</span></span>`;
                 html += `<div class="info-actions"><button onclick="window.game.fulfillTradeRiftRequest(${x},${y},${req.id})"${disabled}>Fulfill${reason}</button></div>`;
                 html += `</div>`;
             }
@@ -310,8 +325,8 @@ const arcaneMethods = {
         for (const o of omens) {
             const col = toneColor[o.tone] || '#aaaacc';
             html += `<div class="info-row" style="border-left:3px solid ${col};padding:6px 8px;margin-top:6px;background:#161622;border-radius:3px;">`;
-            html += `<div style="color:${col};font-weight:bold;"><span style="font-size:1.1em;">${o.icon}</span> ${o.title}</div>`;
-            html += `<div style="color:#ccc;font-size:0.9em;margin-top:2px;">${o.text}</div>`;
+            html += `<div style="color:${col};font-weight:bold;"><span style="font-size:1.1em;">${o.icon}</span> ${escapeHtml(o.title)}</div>`;
+            html += `<div style="color:#ccc;font-size:0.9em;margin-top:2px;">${escapeHtml(o.text)}</div>`;
             html += `</div>`;
         }
         html += `</div>`;
@@ -329,13 +344,7 @@ const arcaneMethods = {
 
     _buildExpeditionsTabHtml() {
         let html = '';
-        let hasGate = false;
-        for (const row of this.game.map) {
-            for (const t of row) {
-                if (t.structure === 'rift_gate') { hasGate = true; break; }
-            }
-            if (hasGate) break;
-        }
+        const hasGate = this.game.mapIndex.getStructurePositions('rift_gate').size > 0;
 
         // A portal is a legacy Rift Gate or any attuned rift anchor.
         const hasPortal = hasGate || this.game.ruins.list.some(r => r.anchor?.attuned);
@@ -382,9 +391,9 @@ const arcaneMethods = {
             if (exp.status === 'gathering') {
                 const names = exp.partyIds.map(id => {
                     const c = this.game.getColonist(id);
-                    return c ? c.name : '?';
+                    return c ? escapeHtml(c.name) : '?';
                 }).join(', ');
-                html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — Assembling</div>`;
+                html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${escapeHtml(exp.realmName)} — Assembling</div>`;
                 html += `<div class="info-row" style="color:#888;">Party: ${names}</div>`;
             } else {
                 const elapsed = this.game.tick - exp.startTick;
@@ -392,14 +401,14 @@ const arcaneMethods = {
                 let pct = Math.min(100, Math.floor((elapsed / totalDur) * 100));
                 if (exp.status === 'returning' && !exp.retreatTick) pct = 100;
                 const statusLabel = exp.pendingVoidPactChoice ? 'VOID PACT' : exp.pendingDecision ? 'AWAITING CHOICE' : exp.combat ? 'COMBAT' : exp.status;
-                html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${exp.realmName} — ${statusLabel}</div>`;
+                html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${escapeHtml(exp.realmName)} — ${statusLabel}</div>`;
 
                 // Mutator badges
                 if (exp.mutators && exp.mutators.length > 0) {
                     html += `<div class="info-row" style="font-size:0.8em;color:#cc88ff;">`;
                     for (const mk of exp.mutators) {
                         const mut = EXPEDITION_MUTATORS[mk];
-                        html += `<span style="background:#2a1a3e;padding:1px 4px;border-radius:2px;margin-right:3px;">${mut?.name || mk}</span>`;
+                        html += `<span style="background:#2a1a3e;padding:1px 4px;border-radius:2px;margin-right:3px;">${escapeHtml(mut?.name || mk)}</span>`;
                     }
                     html += `</div>`;
                 }
@@ -437,14 +446,14 @@ const arcaneMethods = {
                     if (p.shieldActive) buffs += ' <span style="color:#4488ff;font-size:0.85em;">Shield</span>';
                     if (p.dodgeCharges > 0) buffs += ` <span style="color:#aa44ff;font-size:0.85em;">Phase: ${p.dodgeCharges}</span>`;
                     buffs += _combatStatusIcons(p.statusEffects);
-                    html += `<div class="info-row" style="color:${color}; padding-left:8px;">${p.name}${rowLabel} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${hpBar}${manaStr}${buffs}${status}${threatStr}</div>`;
+                    html += `<div class="info-row" style="color:${color}; padding-left:8px;">${escapeHtml(p.name)}${rowLabel} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${hpBar}${manaStr}${buffs}${status}${threatStr}</div>`;
                 }
 
                 if (exp.combat) {
                     const enemiesAlive = exp.combat.enemies.filter(e => e.hp > 0);
                     html += `<div class="info-row" style="color:#ff8844;margin-top:4px;">Enemies: ${enemiesAlive.length}/${exp.combat.enemies.length}`;
                     const elites = enemiesAlive.filter(e => e.elite);
-                    if (elites.length > 0) html += ` (<span style="color:${elites[0].eliteColor}">${elites.length} elite</span>)`;
+                    if (elites.length > 0) html += ` (<span style="color:${escapeAttr(elites[0].eliteColor)}">${elites.length} elite</span>)`;
                     const statusCounts = {};
                     for (const e of enemiesAlive) {
                         if (!e.statusEffects) continue;
@@ -461,7 +470,7 @@ const arcaneMethods = {
                 // Potion supply
                 if (exp.potionSupply && Object.keys(exp.potionSupply).length > 0) {
                     html += `<div class="info-row" style="color:#44cc88;font-size:0.85em;">Potions: `;
-                    html += Object.entries(exp.potionSupply).map(([k, n]) => `${EXPEDITION_POTIONS[k]?.name || k} x${n}`).join(', ');
+                    html += Object.entries(exp.potionSupply).map(([k, n]) => `${escapeHtml(EXPEDITION_POTIONS[k]?.name || k)} x${n}`).join(', ');
                     html += `</div>`;
                 }
 
@@ -471,6 +480,12 @@ const arcaneMethods = {
                     html += `<button onclick="window.game.retreatExpedition(${exp.id})" style="background:#663322;color:#ffaa88;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Retreat (keep loot)</button>`;
                     html += `</div>`;
                 }
+                // Still assembling: calling it off releases the party and returns potions.
+                if (exp.status === 'gathering') {
+                    html += `<div class="info-actions" style="margin-top:4px;">`;
+                    html += `<button onclick="window.game.retreatExpedition(${exp.id})" style="background:#663322;color:#ffaa88;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;">Call off</button>`;
+                    html += `</div>`;
+                }
 
                 html += `<div class="exp-log-container" style="max-height:200px;overflow-y:auto;" id="exp-log-active">`;
                 for (let li = exp.log.length - 1; li >= 0; li--) {
@@ -478,7 +493,7 @@ const arcaneMethods = {
                     const color = this._expLogColor(entry.type);
                     const st = this._expLogStyle(entry.type);
                     const styleAttr = [`color:${color}`, st.bold ? 'font-weight:bold' : '', st.italic ? 'font-style:italic' : ''].filter(Boolean).join(';');
-                    html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
+                    html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(entry.text)}</div>`;
                 }
                 html += `</div>`;
             }
@@ -495,7 +510,7 @@ const arcaneMethods = {
             const needsAttention = !!(watchedExp.pendingDecision || watchedExp.pendingVoidPactChoice);
             const btnColor = needsAttention ? '#ff8844' : '#33aaff';
             html += `<div style="margin-bottom:8px;">`;
-            html += `<button onclick="window.game.ui._arcaneShowOverview=false;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#112233;color:${btnColor};padding:5px 14px;border:1px solid ${btnColor};border-radius:3px;cursor:pointer;font-size:0.9em;">&#9654; Watch Expedition — ${watchedExp.realmName} (${statusLabel})</button>`;
+            html += `<button onclick="window.game.ui._arcaneShowOverview=false;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#112233;color:${btnColor};padding:5px 14px;border:1px solid ${btnColor};border-radius:3px;cursor:pointer;font-size:0.9em;">&#9654; Watch Expedition — ${escapeHtml(watchedExp.realmName)} (${statusLabel})</button>`;
             html += `</div>`;
         }
 
@@ -506,16 +521,16 @@ const arcaneMethods = {
             for (const aExp of expl.pendingAutoSummaries) {
                 const lootParts = [];
                 for (const itemKey of (aExp.loot?._items || [])) {
-                    lootParts.push(ALL_ITEMS[itemKey]?.name || itemKey);
+                    lootParts.push(escapeHtml(ALL_ITEMS[itemKey]?.name || itemKey));
                 }
                 for (const [res, amt] of Object.entries(aExp.loot || {})) {
                     if (res === '_items') continue;
-                    lootParts.push(`${amt}× ${ALL_ITEMS[res]?.name || res}`);
+                    lootParts.push(`${amt}× ${escapeHtml(ALL_ITEMS[res]?.name || res)}`);
                 }
                 const lootStr = lootParts.length > 0 ? lootParts.slice(0, 4).join(', ') + (lootParts.length > 4 ? '…' : '') : 'nothing';
                 const modeTag = aExp.autoMode ? `<span style="color:#66ccaa;font-size:0.75em;margin-right:4px;">[auto]</span>` : '';
                 html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;border-top:1px solid #1a3322;">`;
-                html += `<span style="color:#aaa;font-size:0.85em;">${modeTag}${aExp.realmName}: ${lootStr}</span>`;
+                html += `<span style="color:#aaa;font-size:0.85em;">${modeTag}${escapeHtml(aExp.realmName)}: ${lootStr}</span>`;
                 html += `<button onclick="window.game.collectAutoExpedition(${aExp.id})" style="background:#225533;color:#88ff88;padding:2px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;white-space:nowrap;margin-left:8px;">Collect</button>`;
                 html += `</div>`;
             }
@@ -533,7 +548,7 @@ const arcaneMethods = {
                 if (aExp.status === 'returning' && !aExp.retreatTick) pct = 100;
                 const aStatusLabel = aExp.status === 'gathering' ? 'Assembling' : aExp.combat ? 'Combat' : aExp.status;
                 html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;font-size:0.85em;">`;
-                html += `<span style="color:#88ddcc;">${aExp.realmName}</span>`;
+                html += `<span style="color:#88ddcc;">${escapeHtml(aExp.realmName)}</span>`;
                 html += `<span style="color:#666;">${aStatusLabel} ${pct}%</span>`;
                 html += `</div>`;
             }
@@ -565,7 +580,7 @@ const arcaneMethods = {
                 if (!anyVisible && !anyDemoLocked && !chainRealms.some(r => !r.research || this.game.research.isResearched(r.research))) continue;
                 const chainIconKey = chain.toLowerCase().replace(/\s+/g, '_');
                 const chainIconSrc = resolvePortraitSrc(`chain_${chainIconKey}`);
-                html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;display:flex;align-items:center;gap:4px;"><img src="${chainIconSrc}" class="pixel-art-icon" style="width:16px;height:16px;flex-shrink:0;" onerror="this.style.display='none'">${chain} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
+                html += `<div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:6px;margin-bottom:2px;display:flex;align-items:center;gap:4px;"><img src="${escapeAttr(chainIconSrc)}" class="pixel-art-icon" style="width:16px;height:16px;flex-shrink:0;" onerror="this.style.display='none'">${escapeHtml(chain)} <span style="color:#44cc44">${completedCount}/${chainRealms.length}</span></div>`;
                 for (const realm of chainRealms) {
                     const available = dims.find(d => d.key === realm.key);
                     const sendable = available && expl.canSend(this.game, realm.key);
@@ -576,12 +591,12 @@ const arcaneMethods = {
                     if (sendable) {
                         html += `<div class="info-actions" style="${indent}display:flex;align-items:center;gap:4px;">`;
                         if (canSendWatched) {
-                            html += `<button onclick="window.game.showExpeditionSetupInPanel('${realm.key}')" style="background:#1a4466;color:#88ddff;padding:6px 12px;border:none;border-radius:3px;cursor:pointer;margin:2px 0;">${realm.name} (Difficulty ${realm.difficulty})${badge}</button>`;
+                            html += `<button onclick="window.game.showExpeditionSetupInPanel(${jsArg(realm.key)})" style="background:#1a4466;color:#88ddff;padding:6px 12px;border:none;border-radius:3px;cursor:pointer;margin:2px 0;">${escapeHtml(realm.name)} (Difficulty ${realm.difficulty})${badge}</button>`;
                         } else {
-                            html += `<span style="color:#556677;padding:6px 12px;display:inline-block;">${realm.name} (Difficulty ${realm.difficulty})${badge}</span>`;
+                            html += `<span style="color:#556677;padding:6px 12px;display:inline-block;">${escapeHtml(realm.name)} (Difficulty ${realm.difficulty})${badge}</span>`;
                         }
                         if (canSendAuto && completed) {
-                            html += `<button onclick="window.game.showExpeditionSetupInPanel('${realm.key}', true)" style="background:#1a3322;color:#66dd99;padding:6px 10px;border:1px solid #336644;border-radius:3px;cursor:pointer;margin:2px 0;font-size:0.85em;">Auto</button>`;
+                            html += `<button onclick="window.game.showExpeditionSetupInPanel(${jsArg(realm.key)}, true)" style="background:#1a3322;color:#66dd99;padding:6px 10px;border:1px solid #336644;border-radius:3px;cursor:pointer;margin:2px 0;font-size:0.85em;">Auto</button>`;
                         }
                         html += `</div>`;
                     } else if (available && !realm.scoutingMode && (!expl.findLaunchPosition(this.game, realm) || (this.game.ruins.getAnchor(realm.chain) && !this.game.research.isResearched('planar_rift')))) {
@@ -589,19 +604,19 @@ const arcaneMethods = {
                         let need;
                         if (!expl.findLaunchPosition(this.game, realm)) {
                             need = anchor
-                                ? `attune the rift anchor of a crypt in the ${CRYPT_CONFIG.themes[realm.chain]?.biome ? CRYPT_CONFIG.themes[realm.chain].biome + 's' : 'wilds'}`
+                                ? `attune the rift anchor of a crypt in the ${CRYPT_CONFIG.themes[realm.chain]?.biome ? escapeHtml(CRYPT_CONFIG.themes[realm.chain].biome) + 's' : 'wilds'}`
                                 : 'requires Rift Gate';
                         } else {
                             need = 'requires Planar Rifts research';
                         }
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - <span style="color:#888;">${need}</span></span></div>`;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${escapeHtml(realm.name)} - <span style="color:#888;">${need}</span></span></div>`;
                     } else if (expl.isRealmDemoLocked(this.game, realm.key)) {
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${escapeHtml(realm.name)} - <span style="color:#ff6666;">Available in Full Version</span></span></div>`;
                     } else if (realm.requiresEvent && !expl._checkEvent(this.game, realm.requiresEvent)) {
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - locked</span></div>`;
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${escapeHtml(realm.name)} - locked</span></div>`;
                     } else if (realm.requiresRealm && !expl.completedRealms.has(realm.requiresRealm) && (!realm.research || this.game.research.isResearched(realm.research))) {
-                        const reqName = REALMS[realm.requiresRealm]?.name || realm.requiresRealm;
-                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${realm.name} - complete ${reqName} to unlock</span></div>`;
+                        const reqName = escapeHtml(REALMS[realm.requiresRealm]?.name || realm.requiresRealm);
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${escapeHtml(realm.name)} - complete ${reqName} to unlock</span></div>`;
                     }
                 }
             }
@@ -624,14 +639,14 @@ const arcaneMethods = {
             html += `<div style="margin-top:8px;padding:4px 6px;background:#1a1a2e;border-radius:3px;border-left:2px solid #cc88ff;">`;
             html += `<div style="color:#cc88ff;font-size:0.85em;font-weight:bold;">Active Realm Events</div>`;
             for (const evt of realmEvents) {
-                html += `<div style="color:#aaa;font-size:0.8em;margin:2px 0;"><span style="color:#ffcc44;">${evt.name}</span> — ${evt.description} <span style="color:#666;">(${evt.realms.join(', ')})</span></div>`;
+                html += `<div style="color:#aaa;font-size:0.8em;margin:2px 0;"><span style="color:#ffcc44;">${escapeHtml(evt.name)}</span> — ${escapeHtml(evt.description)} <span style="color:#666;">(${escapeHtml(evt.realms.join(', '))})</span></div>`;
             }
             html += `</div>`;
         }
 
         if (expl.expeditions.length === 0 && expl.completedExpeditions.length > 0) {
             const last = expl.completedExpeditions[expl.completedExpeditions.length - 1];
-            html += `<div class="info-row" style="margin-top:10px;color:#88ccff;font-weight:bold;">Last: ${last.realmName}</div>`;
+            html += `<div class="info-row" style="margin-top:10px;color:#88ccff;font-weight:bold;">Last: ${escapeHtml(last.realmName)}</div>`;
 
             // Summary stats for the last expedition
             if (last.summary) {
@@ -644,7 +659,7 @@ const arcaneMethods = {
                 const color = this._expLogColor(entry.type);
                 const st = this._expLogStyle(entry.type);
                 const styleAttr = [`color:${color}`, st.bold ? 'font-weight:bold' : '', st.italic ? 'font-style:italic' : ''].filter(Boolean).join(';');
-                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
+                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(entry.text)}</div>`;
             }
             html += `</div>`;
         }
@@ -663,9 +678,9 @@ const arcaneMethods = {
             const portraitKey = realmDef.portrait || `realm_${realmKey}`;
             const portraitSrc = resolvePortraitSrc(portraitKey);
             html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a44;">`;
-            html += `<img src="${portraitSrc}" class="pixel-art" style="width:48px;height:48px;object-fit:cover;border-radius:3px;flex-shrink:0;" onerror="this.style.display='none'">`;
-            html += `<div><div style="color:#33ccff;font-weight:bold;">${realmDef.name}</div>`;
-            if (realmDef.description) html += `<div style="color:#888;font-size:0.85em;margin-top:2px;">${realmDef.description}</div>`;
+            html += `<img src="${escapeAttr(portraitSrc)}" class="pixel-art" style="width:48px;height:48px;object-fit:cover;border-radius:3px;flex-shrink:0;" onerror="this.style.display='none'">`;
+            html += `<div><div style="color:#33ccff;font-weight:bold;">${escapeHtml(realmDef.name)}</div>`;
+            if (realmDef.description) html += `<div style="color:#888;font-size:0.85em;margin-top:2px;">${escapeHtml(realmDef.description)}</div>`;
             html += `</div></div>`;
         }
 
@@ -674,10 +689,9 @@ const arcaneMethods = {
             html += `<div style="margin-bottom:6px;">`;
             html += `<span style="color:#888;font-size:0.8em;">Presets: </span>`;
             for (const preset of expl.partyPresets) {
-                const safeName = preset.name.replace(/'/g, "\\'");
                 html += `<span style="display:inline-flex;align-items:center;margin-right:4px;background:#1a2e1a;border-radius:2px;">`;
-                html += `<button onclick="window.game.loadExpeditionPreset('${safeName}')" style="background:none;color:#88cc88;padding:2px 6px;border:none;cursor:pointer;font-size:0.8em;">${preset.name}</button>`;
-                html += `<button onclick="window.game.deleteExpeditionPreset('${safeName}')" style="background:none;color:#ff6644;padding:0 4px;border:none;border-left:1px solid #333;cursor:pointer;font-size:0.8em;" title="Delete preset">&times;</button>`;
+                html += `<button onclick="window.game.loadExpeditionPreset(${jsArg(preset.name)})" style="background:none;color:#88cc88;padding:2px 6px;border:none;cursor:pointer;font-size:0.8em;">${escapeHtml(preset.name)}</button>`;
+                html += `<button onclick="window.game.deleteExpeditionPreset(${jsArg(preset.name)})" style="background:none;color:#ff6644;padding:0 4px;border:none;border-left:1px solid #333;cursor:pointer;font-size:0.8em;" title="Delete preset">&times;</button>`;
                 html += `</span>`;
             }
             html += `</div>`;
@@ -705,7 +719,7 @@ const arcaneMethods = {
             if (cGroup !== lastExpGroup) {
                 lastExpGroup = cGroup;
                 if (cGroup !== null) {
-                    html += `<div style="color:#ffcc44;font-size:0.8em;margin-top:4px;margin-bottom:1px;padding-left:2px;border-bottom:1px solid #332200;">${cGroup}</div>`;
+                    html += `<div style="color:#ffcc44;font-size:0.8em;margin-top:4px;margin-bottom:1px;padding-left:2px;border-bottom:1px solid #332200;">${escapeHtml(cGroup)}</div>`;
                 } else if (expSorted.some(x => (x.group && expGroups.includes(x.group)))) {
                     html += `<div style="color:#888;font-size:0.8em;margin-top:4px;margin-bottom:1px;padding-left:2px;border-bottom:1px solid #333;">Ungrouped</div>`;
                 }
@@ -723,7 +737,7 @@ const arcaneMethods = {
             const fatigued = expl.isFatigued(c.id, this.game.tick);
             const fatigueStr = fatigued ? ` <span style="color:#ff6644;font-size:0.8em;">[Fatigued]</span>` : '';
             const disabledAttr = fatigued ? ' disabled' : '';
-            html += `<div class="info-row"><label><input type="checkbox" class="exp-check" value="${c.id}" data-max="5"${disabledAttr}> ${c.name}${lvlStr}${fatigueStr} <span style="color:#888;font-size:0.85em;">Dmg:${dmg}${defStr}${priorityStr}</span></label></div>`;
+            html += `<div class="info-row"><label><input type="checkbox" class="exp-check" value="${c.id}" data-max="5"${disabledAttr}> ${escapeHtml(c.name)}${lvlStr}${fatigueStr} <span style="color:#888;font-size:0.85em;">Dmg:${dmg}${defStr}${priorityStr}</span></label></div>`;
         }
         const packAnimals = this.game.entities.filter(a => {
             if (!a.tamed || a.hp <= 0 || a.onExpedition) return false;
@@ -736,9 +750,9 @@ const arcaneMethods = {
                 const def = TAMED_ANIMALS[a.type];
                 const packLvlBonus = this.game.exploration._animalPackLevelBonus(a.level || 0);
                 const totalSpeed = Math.round((def.expeditionSpeedBonus + packLvlBonus) * 100);
-                const packName = a.name || a.type;
+                const packName = escapeHtml(a.name || a.type);
                 const packLvlBadge = animalLevelBadge(a.level || 0);
-                const packLvlTip = animalLevelTooltip(a.level || 0, a.type).replace(/\n/g, '&#10;');
+                const packLvlTip = escapeAttr(animalLevelTooltip(a.level || 0, a.type)).replace(/\n/g, '&#10;');
                 html += `<div class="info-row"><label title="${packLvlTip}"><input type="checkbox" class="exp-pack-check" value="${a.id}" data-max="2"> ${packName}${packLvlBadge} (+${totalSpeed}% speed)</label></div>`;
             }
         }
@@ -754,9 +768,9 @@ const arcaneMethods = {
                 const warLvlBonus = this.game.exploration._animalWarBeastLevelBonus(a.level || 0);
                 const displayHp  = def.beastHp  + warLvlBonus.hpBonus;
                 const displayDmg = def.beastDamage + warLvlBonus.damageBonus;
-                const warName = a.name || a.type;
+                const warName = escapeHtml(a.name || a.type);
                 const warLvlBadge = animalLevelBadge(a.level || 0);
-                const warLvlTip = animalLevelTooltip(a.level || 0, a.type).replace(/\n/g, '&#10;');
+                const warLvlTip = escapeAttr(animalLevelTooltip(a.level || 0, a.type)).replace(/\n/g, '&#10;');
                 html += `<div class="info-row"><label title="${warLvlTip}"><input type="checkbox" class="exp-war-check" value="${a.id}" data-max="2" data-hp="${displayHp}" data-damage="${displayDmg}"> ${warName}${warLvlBadge} <span style="color:#888;font-size:0.85em;">HP:${displayHp} Dmg:${displayDmg}</span></label></div>`;
             }
         }
@@ -769,7 +783,7 @@ const arcaneMethods = {
         html += `<div id="exp-front-row">`;
         for (const c of available) {
             if (this._expBackRowIds.has(c.id)) continue;
-            html += `<div class="exp-formation-member" data-id="${c.id}" style="display:none;padding:1px 0;"><span style="color:#ccc;">${c.name}</span> <button onclick="window.game.ui._toggleFormationRow(${c.id})" style="background:#1a1a3e;color:#6688ff;border:1px solid #446;border-radius:2px;padding:0 4px;cursor:pointer;font-size:0.9em;" title="Move to back row">Back &#9658;</button></div>`;
+            html += `<div class="exp-formation-member" data-id="${c.id}" style="display:none;padding:1px 0;"><span style="color:#ccc;">${escapeHtml(c.name)}</span> <button onclick="window.game.ui._toggleFormationRow(${c.id})" style="background:#1a1a3e;color:#6688ff;border:1px solid #446;border-radius:2px;padding:0 4px;cursor:pointer;font-size:0.9em;" title="Move to back row">Back &#9658;</button></div>`;
         }
         html += `</div></div>`;
         html += `<div style="flex:1;border:1px solid #333;border-radius:3px;padding:4px;background:#111;">`;
@@ -777,14 +791,14 @@ const arcaneMethods = {
         html += `<div id="exp-back-row">`;
         for (const c of available) {
             if (!this._expBackRowIds.has(c.id)) continue;
-            html += `<div class="exp-formation-member" data-id="${c.id}" style="display:none;padding:1px 0;"><span style="color:#ccc;">${c.name}</span> <button onclick="window.game.ui._toggleFormationRow(${c.id})" style="background:#2e1a1a;color:#ff8844;border:1px solid #644;border-radius:2px;padding:0 4px;cursor:pointer;font-size:0.9em;" title="Move to front row">&#9668; Front</button></div>`;
+            html += `<div class="exp-formation-member" data-id="${c.id}" style="display:none;padding:1px 0;"><span style="color:#ccc;">${escapeHtml(c.name)}</span> <button onclick="window.game.ui._toggleFormationRow(${c.id})" style="background:#2e1a1a;color:#ff8844;border:1px solid #644;border-radius:2px;padding:0 4px;cursor:pointer;font-size:0.9em;" title="Move to front row">&#9668; Front</button></div>`;
         }
         html += `</div></div></div>`;
 
         // Mutator picker
         html += `<div class="info-row" style="margin-top:10px;color:#cc88ff;font-weight:bold;">Mutators <span style="color:#888;font-weight:normal;font-size:0.8em;">(optional modifiers)</span></div>`;
         for (const [mk, mut] of Object.entries(EXPEDITION_MUTATORS)) {
-            html += `<div class="info-row"><label><input type="checkbox" class="exp-mutator" value="${mk}"> <span style="color:#cc88ff;">${mut.name}</span> <span style="color:#888;font-size:0.8em;">— ${mut.description}</span></label></div>`;
+            html += `<div class="info-row"><label><input type="checkbox" class="exp-mutator" value="${escapeAttr(mk)}"> <span style="color:#cc88ff;">${escapeHtml(mut.name)}</span> <span style="color:#888;font-size:0.8em;">— ${escapeHtml(mut.description)}</span></label></div>`;
         }
 
         // Potion selector
@@ -794,9 +808,9 @@ const arcaneMethods = {
             if (stockCount <= 0) continue;
             const maxTake = Math.min(pDef.maxCarry, stockCount);
             html += `<div class="info-row" style="display:flex;align-items:center;gap:6px;font-size:0.85em;">`;
-            html += `<span style="color:#44cc88;">${pDef.name}</span>`;
+            html += `<span style="color:#44cc88;">${escapeHtml(pDef.name)}</span>`;
             html += `<span style="color:#888;">(${stockCount} in stock, max ${pDef.maxCarry})</span>`;
-            html += `<input type="number" class="exp-potion" data-potion="${pk}" min="0" max="${maxTake}" value="0" style="width:40px;background:#1a1a2e;color:#ccc;border:1px solid #333;border-radius:2px;text-align:center;">`;
+            html += `<input type="number" class="exp-potion" data-potion="${escapeAttr(pk)}" min="0" max="${maxTake}" value="0" style="width:40px;background:#1a1a2e;color:#ccc;border:1px solid #333;border-radius:2px;text-align:center;">`;
             html += `</div>`;
         }
 
@@ -813,7 +827,7 @@ const arcaneMethods = {
         const launchLabel = this._arcaneExpIsAuto ? 'Launch Auto Expedition' : 'Launch Expedition';
         const launchBg = this._arcaneExpIsAuto ? '#1a3322' : '#1a4466';
         const launchColor = this._arcaneExpIsAuto ? '#66dd99' : '#88ddff';
-        html += `<button onclick="window.game.launchExpeditionFromPanel('${realmKey}')" style="background:${launchBg};color:${launchColor};padding:8px 16px;border:none;border-radius:4px;cursor:pointer;font-size:1em;">${launchLabel}</button>`;
+        html += `<button onclick="window.game.launchExpeditionFromPanel(${jsArg(realmKey)})" style="background:${launchBg};color:${launchColor};padding:8px 16px;border:none;border-radius:4px;cursor:pointer;font-size:1em;">${launchLabel}</button>`;
         html += `<input id="exp-preset-name" type="text" placeholder="Preset name" maxlength="20" style="margin-left:8px;width:100px;background:#1a1a2e;color:#ccc;border:1px solid #333;border-radius:3px;padding:4px 6px;font-size:0.85em;">`;
         html += `<button onclick="window.game.saveExpeditionPreset()" style="background:#1a2e1a;color:#88cc88;padding:8px 8px;border:none;border-radius:4px;cursor:pointer;margin-left:4px;font-size:0.9em;">Save Preset</button>`;
         html += `<button onclick="window.game.ui._arcaneExpSetup=null;window.game.ui._arcaneExpIsAuto=false;window.game.ui._lastArcaneHtml='';window.game.ui.updateArcanePanel();" style="background:#333;color:#aaa;padding:8px 12px;border:none;border-radius:4px;cursor:pointer;margin-left:8px;">Cancel</button>`;
@@ -833,11 +847,11 @@ const arcaneMethods = {
         html += `<div style="margin-top:4px;padding:6px 8px;background:#1a1630;border-radius:4px;font-size:0.85em;">`;
         if (existing) {
             const tone = existing.tone === 'good' ? '#66cc88' : existing.tone === 'bad' ? '#ff7755' : '#aaaacc';
-            html += `<div style="color:${tone};"><span style="margin-right:4px;">${existing.icon}</span><b>${existing.title}</b></div>`;
-            html += `<div style="color:#bbb;margin-top:2px;">${existing.text}</div>`;
+            html += `<div style="color:${tone};"><span style="margin-right:4px;">${existing.icon}</span><b>${escapeHtml(existing.title)}</b></div>`;
+            html += `<div style="color:#bbb;margin-top:2px;">${escapeHtml(existing.text)}</div>`;
         } else if (canScry) {
             html += `<div style="color:#888;margin-bottom:4px;">A diviner can peer into this rift and reveal one of its secrets.</div>`;
-            html += `<button onclick="window.game.scryRealmFromPanel('${realmKey}')" style="background:#2a1f45;color:#bb99ff;padding:5px 12px;border:1px solid #55408a;border-radius:4px;cursor:pointer;font-size:0.85em;">Scry the Rift</button>`;
+            html += `<button onclick="window.game.scryRealmFromPanel(${jsArg(realmKey)})" style="background:#2a1f45;color:#bb99ff;padding:5px 12px;border:1px solid #55408a;border-radius:4px;cursor:pointer;font-size:0.85em;">Scry the Rift</button>`;
         } else {
             html += `<div style="color:#777;">No colonist has the Divination skill to scry this rift.</div>`;
         }
@@ -857,7 +871,7 @@ const arcaneMethods = {
             const pct = Math.round(entry.weight / totalWeight * 100);
             const key = entry.item || entry.resource;
             const isFound = discovered.has(`${realmKey}:${key}`);
-            const name = isFound ? (entry.item ? (ALL_ITEMS[entry.item]?.name || entry.item) : entry.resource.replace(/_/g, ' ')) : '??????';
+            const name = isFound ? escapeHtml(entry.item ? (ALL_ITEMS[entry.item]?.name || entry.item) : entry.resource.replace(/_/g, ' ')) : '??????';
             const icon = isFound ? this._itemIcon(key, entry.item ? (ALL_ITEMS[entry.item]?.type || 'trinket') : null) : '';
             const nameColor = isFound ? '#ccc' : '#555';
             html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px;font-size:0.8em;">`;
@@ -874,11 +888,11 @@ const arcaneMethods = {
                 if (rare.loot.item) {
                     key = rare.loot.item;
                     isFound = discovered.has(`${realmKey}:${key}`);
-                    name = isFound ? (ALL_ITEMS[key]?.name || key) : '??????';
+                    name = isFound ? escapeHtml(ALL_ITEMS[key]?.name || key) : '??????';
                 } else {
                     key = rare.loot.resource;
                     isFound = discovered.has(`${realmKey}:${key}`);
-                    name = isFound ? key.replace(/_/g, ' ') : '??????';
+                    name = isFound ? escapeHtml(key.replace(/_/g, ' ')) : '??????';
                 }
                 const icon = isFound ? this._itemIcon(key, rare.loot.item ? (ALL_ITEMS[key]?.type || 'trinket') : null) : '';
                 const nameColor = isFound ? '#ccc' : '#555';
@@ -965,14 +979,14 @@ const arcaneMethods = {
 
         if (this._expPresetPotions) {
             for (const [pk, count] of Object.entries(this._expPresetPotions)) {
-                const input = panel.querySelector(`.exp-potion[data-potion="${pk}"]`);
+                const input = panel.querySelector(`.exp-potion[data-potion="${CSS.escape(pk)}"]`);
                 if (input) input.value = Math.min(count, parseInt(input.max) || count);
             }
             this._expPresetPotions = null;
         }
         if (this._expPresetMutators) {
             for (const mk of this._expPresetMutators) {
-                const cb = panel.querySelector(`.exp-mutator[value="${mk}"]`);
+                const cb = panel.querySelector(`.exp-mutator[value="${CSS.escape(mk)}"]`);
                 if (cb) cb.checked = true;
             }
             this._expPresetMutators = null;
@@ -1024,13 +1038,13 @@ const arcaneMethods = {
         html += '<div style="margin-top:6px;border-top:1px solid #333;padding-top:4px;">';
         const expl = this.game.exploration;
         for (const m of result.members) {
-            const traitStr = m.traits.length > 0 ? ` <span style="color:#88cc88;">[${m.traits.map(t => t.name).join(', ')}]</span>` : '';
+            const traitStr = m.traits.length > 0 ? ` <span style="color:#88cc88;">[${escapeHtml(m.traits.map(t => t.name).join(', '))}]</span>` : '';
             const manaStr = m.maxMana > 0 ? ` | <span style="color:#6688ff;">${m.maxMana} MP</span>` : '';
             const expLvl = expl ? expl.getExpeditionLevel(m.id) : 0;
             const lvlTip = expLvl > 0 ? adventurerLevelTooltip(expLvl).replace(/"/g, '&quot;') : '';
             const lvlStr = expLvl > 0 ? ` <span class="skill-tip" data-tip="${lvlTip}" style="color:#ffcc44;cursor:help;">Lv${expLvl}</span>` : '';
             html += `<div style="font-size:0.8em;color:#ccc;margin:1px 0;">`
-                + `<span style="color:#eee;">${m.name}</span>${lvlStr}: ${m.dmgPerRound} dmg x${m.hitsPerRound}/rnd | ${m.hp} HP | ${m.dr}% DR${manaStr}${traitStr}</div>`;
+                + `<span style="color:#eee;">${escapeHtml(m.name)}</span>${lvlStr}: ${m.dmgPerRound} dmg x${m.hitsPerRound}/rnd | ${m.hp} HP | ${m.dr}% DR${manaStr}${traitStr}</div>`;
         }
         html += '</div>';
 
@@ -1059,8 +1073,8 @@ const arcaneMethods = {
             html += '<div style="margin-top:4px;border-top:1px solid #333;padding-top:3px;font-size:0.8em;">';
             html += '<div style="color:#ffaa44;margin-bottom:2px;">Skill Checks:</div>';
             for (const [, info] of Object.entries(sc)) {
-                html += `<div style="color:#bbb;margin:1px 0;"><span style="color:#eee;">${info.name}</span> `
-                    + `Lv${info.level} <span style="color:#888;">(${info.colonist})</span></div>`;
+                html += `<div style="color:#bbb;margin:1px 0;"><span style="color:#eee;">${escapeHtml(info.name)}</span> `
+                    + `Lv${info.level} <span style="color:#888;">(${escapeHtml(info.colonist)})</span></div>`;
             }
             html += '</div>';
         }
@@ -1070,8 +1084,8 @@ const arcaneMethods = {
             html += '<div style="color:#aa88ff;margin-bottom:2px;">Party Spells:</div>';
             for (const s of result.spellRoster) {
                 const schoolColor = { evocation: '#ff8844', abjuration: '#44ff88', conjuration: '#aa66ff', enchantment: '#44aaff' }[s.school] || '#aaa';
-                html += `<div style="color:#bbb;margin:1px 0;"><span style="color:${schoolColor};">${s.name}</span> `
-                    + `<span style="color:#888;">(${s.casters.join(', ')})</span> — ${s.effectDesc}, ${s.manaCost} MP, ${s.triggerDesc}</div>`;
+                html += `<div style="color:#bbb;margin:1px 0;"><span style="color:${schoolColor};">${escapeHtml(s.name)}</span> `
+                    + `<span style="color:#888;">(${escapeHtml(s.casters.join(', '))})</span> — ${escapeHtml(s.effectDesc)}, ${s.manaCost} MP, ${escapeHtml(s.triggerDesc)}</div>`;
             }
             html += '</div>';
         }
@@ -1111,14 +1125,14 @@ const arcaneMethods = {
         const pending = exp.pendingDecision;
         if (!pending) return '';
         let html = `<div style="margin:8px 0;padding:8px;background:#1a1a2e;border-radius:4px;border-left:3px solid #44ccff;">`;
-        html += `<div style="color:#44ccff;font-weight:bold;margin-bottom:4px;">${pending.text}</div>`;
+        html += `<div style="color:#44ccff;font-weight:bold;margin-bottom:4px;">${escapeHtml(pending.text)}</div>`;
 
         if (pending.type === 'decision') {
             for (let i = 0; i < pending.choices.length; i++) {
                 const c = pending.choices[i];
                 html += `<div style="margin:4px 0;">`;
-                html += `<button onclick="window.game.resolveExpeditionDecision(${exp.id}, ${i})" style="background:#1a3344;color:#88ddff;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${c.label}</button>`;
-                html += ` <span style="color:#888;font-size:0.8em;">${c.description || ''}</span>`;
+                html += `<button onclick="window.game.resolveExpeditionDecision(${exp.id}, ${i})" style="background:#1a3344;color:#88ddff;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${escapeHtml(c.label)}</button>`;
+                html += ` <span style="color:#888;font-size:0.8em;">${escapeHtml(c.description || '')}</span>`;
                 html += `</div>`;
             }
         } else if (pending.type === 'puzzle') {
@@ -1148,11 +1162,11 @@ const arcaneMethods = {
                 }
                 html += `<div style="margin:4px 0;">`;
                 if (canAttempt) {
-                    html += `<button onclick="window.game.resolveExpeditionPuzzle(${exp.id}, ${i})" style="background:#2a1a44;color:#aa88ff;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${c.label}</button>`;
-                    html += ` <span style="color:#888;font-size:0.8em;">${reqText}</span>`;
+                    html += `<button onclick="window.game.resolveExpeditionPuzzle(${exp.id}, ${i})" style="background:#2a1a44;color:#aa88ff;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${escapeHtml(c.label)}</button>`;
+                    html += ` <span style="color:#888;font-size:0.8em;">${escapeHtml(reqText)}</span>`;
                 } else {
-                    html += `<button disabled style="background:#1a1a1a;color:#555;padding:4px 10px;border:1px solid #333;border-radius:3px;font-size:0.9em;cursor:not-allowed;">${c.label}</button>`;
-                    html += ` <span style="color:#664444;font-size:0.8em;">${reqText}</span>`;
+                    html += `<button disabled style="background:#1a1a1a;color:#555;padding:4px 10px;border:1px solid #333;border-radius:3px;font-size:0.9em;cursor:not-allowed;">${escapeHtml(c.label)}</button>`;
+                    html += ` <span style="color:#664444;font-size:0.8em;">${escapeHtml(reqText)}</span>`;
                 }
                 html += `</div>`;
             }
@@ -1192,11 +1206,11 @@ const arcaneMethods = {
                 const costText = costParts.length > 0 ? ` (${costParts.join(', ')})` : '';
                 html += `<div style="margin:4px 0;">`;
                 if (canAfford) {
-                    html += `<button onclick="window.game.resolveExpeditionNpc(${exp.id}, ${i})" style="background:#1a2e1a;color:#88cc88;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${c.label}</button>`;
-                    html += ` <span style="color:#888;font-size:0.8em;">${costText}</span>`;
+                    html += `<button onclick="window.game.resolveExpeditionNpc(${exp.id}, ${i})" style="background:#1a2e1a;color:#88cc88;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${escapeHtml(c.label)}</button>`;
+                    html += ` <span style="color:#888;font-size:0.8em;">${escapeHtml(costText)}</span>`;
                 } else {
-                    html += `<button disabled style="background:#1a1a1a;color:#555;padding:4px 10px;border:1px solid #333;border-radius:3px;font-size:0.9em;cursor:not-allowed;">${c.label}</button>`;
-                    html += ` <span style="color:#664444;font-size:0.8em;">${reasonText}${costText}</span>`;
+                    html += `<button disabled style="background:#1a1a1a;color:#555;padding:4px 10px;border:1px solid #333;border-radius:3px;font-size:0.9em;cursor:not-allowed;">${escapeHtml(c.label)}</button>`;
+                    html += ` <span style="color:#664444;font-size:0.8em;">${escapeHtml(reasonText + costText)}</span>`;
                 }
                 html += `</div>`;
             }
@@ -1235,11 +1249,11 @@ const arcaneMethods = {
                 }
                 html += `<div style="margin:4px 0;">`;
                 if (canAttempt) {
-                    html += `<button onclick="window.game.resolveExpeditionTrap(${exp.id}, ${i})" style="background:#2e2a1a;color:#ffcc44;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${c.label}</button>`;
-                    html += ` <span style="color:#888;font-size:0.8em;">${c.description} — ${reqText}</span>`;
+                    html += `<button onclick="window.game.resolveExpeditionTrap(${exp.id}, ${i})" style="background:#2e2a1a;color:#ffcc44;padding:4px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.9em;">${escapeHtml(c.label)}</button>`;
+                    html += ` <span style="color:#888;font-size:0.8em;">${escapeHtml(c.description)} — ${escapeHtml(reqText)}</span>`;
                 } else {
-                    html += `<button disabled style="background:#1a1a1a;color:#555;padding:4px 10px;border:1px solid #333;border-radius:3px;font-size:0.9em;cursor:not-allowed;">${c.label}</button>`;
-                    html += ` <span style="color:#664444;font-size:0.8em;">${c.description} — ${reqText}</span>`;
+                    html += `<button disabled style="background:#1a1a1a;color:#555;padding:4px 10px;border:1px solid #333;border-radius:3px;font-size:0.9em;cursor:not-allowed;">${escapeHtml(c.label)}</button>`;
+                    html += ` <span style="color:#664444;font-size:0.8em;">${escapeHtml(c.description)} — ${escapeHtml(reqText)}</span>`;
                 }
                 html += `</div>`;
             }
@@ -1257,14 +1271,14 @@ const arcaneMethods = {
         if (!pact) return '';
         let html = `<div style="margin:8px 0;padding:8px;background:#0d0d1a;border-radius:4px;border-left:3px solid #aa44ff;">`;
         html += `<div style="color:#cc88ff;font-weight:bold;margin-bottom:6px;">The Void Arbiter extends its terms.</div>`;
-        html += `<div style="color:#aaaacc;margin-bottom:8px;font-size:0.9em;">${pact.text}</div>`;
+        html += `<div style="color:#aaaacc;margin-bottom:8px;font-size:0.9em;">${escapeHtml(pact.text)}</div>`;
         html += `<div style="margin:4px 0;">`;
         html += `<button onclick="window.game.resolveVoidPactChoice(${exp.id}, true)" style="background:#2a1a44;color:#cc88ff;padding:4px 12px;border:1px solid #6633aa;border-radius:3px;cursor:pointer;font-size:0.9em;">Accept</button>`;
-        html += ` <span style="color:#8866aa;font-size:0.8em;">${pact.acceptLabel || 'Accept the terms'}</span>`;
+        html += ` <span style="color:#8866aa;font-size:0.8em;">${escapeHtml(pact.acceptLabel || 'Accept the terms')}</span>`;
         html += `</div>`;
         html += `<div style="margin:4px 0;">`;
         html += `<button onclick="window.game.resolveVoidPactChoice(${exp.id}, false)" style="background:#1a1a1a;color:#888;padding:4px 12px;border:1px solid #444;border-radius:3px;cursor:pointer;font-size:0.9em;">Refuse</button>`;
-        html += ` <span style="color:#666;font-size:0.8em;">${pact.refuseLabel || 'Refuse. Fight on.'}</span>`;
+        html += ` <span style="color:#666;font-size:0.8em;">${escapeHtml(pact.refuseLabel || 'Refuse. Fight on.')}</span>`;
         html += `</div>`;
         html += `</div>`;
         return html;
@@ -1281,7 +1295,7 @@ const arcaneMethods = {
         html += `<div style="color:#ffcc44;font-weight:bold;margin-bottom:3px;">Expedition Summary</div>`;
 
         const partyNames = {};
-        for (const p of (exp.partySnapshot || [])) partyNames[p.id] = p.name;
+        for (const p of (exp.partySnapshot || [])) partyNames[p.id] = escapeHtml(p.name);
 
         // Per-member stats
         for (const p of (exp.partySnapshot || [])) {
@@ -1295,7 +1309,7 @@ const arcaneMethods = {
             if (kills > 0) parts.push(`${kills} kills`);
             if (healed > 0) parts.push(`${healed} healed`);
             if (taken > 0) parts.push(`<span style="color:#ff8844;">${taken} dmg taken</span>`);
-            html += `<div${_row()}><span style="color:#ccc;margin:1px 0;">${p.name}: ${parts.join(' | ')}</span></div>`;
+            html += `<div${_row()}><span style="color:#ccc;margin:1px 0;">${escapeHtml(p.name)}: ${parts.join(' | ')}</span></div>`;
         }
 
         // Aggregate stats
@@ -1307,7 +1321,7 @@ const arcaneMethods = {
         if (parts.length > 0) html += `<div${_row()}><span style="color:#888;margin-top:3px;">${parts.join(' | ')}</span></div>`;
 
         if (s.beastsDefeated && s.beastsDefeated.length > 0) {
-            html += `<div${_row()}><span style="color:#ff8844;margin-top:3px;">Fell in battle: ${s.beastsDefeated.join(', ')} (recovered at colony)</span></div>`;
+            html += `<div${_row()}><span style="color:#ff8844;margin-top:3px;">Fell in battle: ${escapeHtml(s.beastsDefeated.join(', '))} (recovered at colony)</span></div>`;
         }
 
         // MVP
@@ -1343,7 +1357,7 @@ const arcaneMethods = {
         };
         let html = `<div class="arcane-section" style="text-align:center;">`;
         html += `<div style="font-size:1.4em;color:${titleColor};font-weight:bold;margin:12px 0 4px;">${titleText}</div>`;
-        html += `<div style="color:#88ccff;font-size:1.1em;margin-bottom:10px;">${exp.realmName}</div>`;
+        html += `<div style="color:#88ccff;font-size:1.1em;margin-bottom:10px;">${escapeHtml(exp.realmName)}</div>`;
 
         // Loot summary
         const lootEntries = Object.entries(exp.loot || {}).filter(([k]) => k !== '_items');
@@ -1353,11 +1367,11 @@ const arcaneMethods = {
             html += `<div style="color:#44cc44;font-weight:bold;margin-bottom:4px;">Loot</div>`;
             for (const [res, amt] of lootEntries) {
                 const resIcon = this._resourceIcon(res);
-                html += `<div${_reveal()}><span style="color:#ccc;">${resIcon}${res.replace(/_/g, ' ')}: <span style="color:#ffcc44;">${amt}</span></span></div>`;
+                html += `<div${_reveal()}><span style="color:#ccc;">${resIcon}${escapeHtml(res.replace(/_/g, ' '))}: <span style="color:#ffcc44;">${amt}</span></span></div>`;
             }
             for (const itemKey of items) {
                 const itemDef = ALL_ITEMS[itemKey];
-                const itemName = itemDef?.name || itemKey;
+                const itemName = escapeHtml(itemDef?.name || itemKey);
                 const icon = this._itemIcon(itemKey);
                 let tooltip = '';
                 if (itemDef) {
@@ -1365,7 +1379,7 @@ const arcaneMethods = {
                     const parts = [];
                     if (itemDef.description) parts.push(itemDef.description);
                     if (statLines.length > 0) parts.push(statLines.join(', '));
-                    if (parts.length > 0) tooltip = ` title="${parts.join(' — ').replace(/"/g, '&quot;')}"`;
+                    if (parts.length > 0) tooltip = ` title="${escapeAttr(parts.join(' — '))}"`;
                 }
                 html += `<div${_reveal()}><span style="color:#aa88ff;cursor:default;"${tooltip}>${icon}${itemName}</span></div>`;
             }
@@ -1383,7 +1397,7 @@ const arcaneMethods = {
             const color = this._expLogColor(entry.type);
             const st = this._expLogStyle(entry.type);
             const styleAttr = [`color:${color}`, 'font-size:0.85em', st.bold ? 'font-weight:bold' : '', st.italic ? 'font-style:italic' : ''].filter(Boolean).join(';');
-            html += `<div style="${styleAttr};">${st.prefix}${entry.text}</div>`;
+            html += `<div style="${styleAttr};">${st.prefix}${escapeHtml(entry.text)}</div>`;
         }
         html += `</div></details>`;
 
@@ -3488,7 +3502,7 @@ const arcaneMethods = {
         const mgr = this.game.skinManager;
         if (mgr && mgr.isActive) {
             const url = mgr.getItemSpriteDataURL(resKey);
-            if (url) return `<img src="${url}" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;image-rendering:pixelated;">`;
+            if (url) return `<img src="${escapeAttr(url)}" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;image-rendering:pixelated;">`;
         }
         return '';
     },
@@ -3497,7 +3511,7 @@ const arcaneMethods = {
         const mgr = this.game.skinManager;
         if (mgr && mgr.isActive) {
             const url = mgr.getItemSpriteDataURL(itemKey);
-            if (url) return `<img src="${url}" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;image-rendering:pixelated;">`;
+            if (url) return `<img src="${escapeAttr(url)}" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;image-rendering:pixelated;">`;
         }
         const cat = categoryHint || this._getItemCategory(itemKey);
         if (!cat) return '';
@@ -3505,7 +3519,7 @@ const arcaneMethods = {
         const ch = itemDef?.char || ITEM_CHARS[cat]?.char;
         if (!ch) return '';
         const color = itemDef?.charColor || ITEM_CHARS[cat]?.color || '#aaa';
-        return `<span style="color:${color};font-weight:bold;margin-right:2px;">${ch}</span>`;
+        return `<span style="color:${escapeAttr(color)};font-weight:bold;margin-right:2px;">${escapeHtml(ch)}</span>`;
     },
 
     _getItemCategory(itemKey) {
@@ -3858,10 +3872,10 @@ const arcaneMethods = {
                 const disabled = !canAfford || alreadyFull ? 'disabled' : '';
                 html += `<div style="border:1px solid #443366;border-radius:5px;padding:8px;background:#11111e;">`;
                 html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
-                html += `<span style="color:#cc99ff;font-size:11px;font-weight:bold;">${mod.label}</span>`;
-                html += `<button onclick="window.game.voidShardsShopBuy('${mod.key}')" ${disabled} style="padding:3px 10px;font-size:10px;background:${canAfford && !alreadyFull ? '#2a1a4a' : '#1a1a2e'};border:1px solid ${canAfford && !alreadyFull ? '#6644aa' : '#333'};border-radius:3px;color:${canAfford && !alreadyFull ? '#cc99ff' : '#555'};font-family:inherit;cursor:${canAfford && !alreadyFull ? 'pointer' : 'default'};">${mod.cost} Fd</button>`;
+                html += `<span style="color:#cc99ff;font-size:11px;font-weight:bold;">${escapeHtml(mod.label)}</span>`;
+                html += `<button onclick="window.game.voidShardsShopBuy(${jsArg(mod.key)})" ${disabled} style="padding:3px 10px;font-size:10px;background:${canAfford && !alreadyFull ? '#2a1a4a' : '#1a1a2e'};border:1px solid ${canAfford && !alreadyFull ? '#6644aa' : '#333'};border-radius:3px;color:${canAfford && !alreadyFull ? '#cc99ff' : '#555'};font-family:inherit;cursor:${canAfford && !alreadyFull ? 'pointer' : 'default'};">${mod.cost} Fd</button>`;
                 html += '</div>';
-                html += `<div style="color:#886699;font-size:10px;margin-top:3px;">${mod.desc}</div>`;
+                html += `<div style="color:#886699;font-size:10px;margin-top:3px;">${escapeHtml(mod.desc)}</div>`;
                 html += '</div>';
             }
             if (!vs.shopOffers.length) {
@@ -3881,9 +3895,9 @@ const arcaneMethods = {
                 const disabled = !canAfford || dieSlotsFull ? 'disabled' : '';
                 html += `<div style="border:1px solid #335566;border-radius:5px;padding:8px;background:#0e1a1e;">`;
                 html += `<div style="display:flex;justify-content:space-between;align-items:center;">`;
-                html += `<span style="color:#88ddee;font-size:11px;font-weight:bold;">${preset.label}</span>`;
+                html += `<span style="color:#88ddee;font-size:11px;font-weight:bold;">${escapeHtml(preset.label)}</span>`;
                 if (key !== 'singular') {
-                    html += `<button onclick="window.game.voidShardsBuyReforge('${key}')" ${disabled} style="padding:3px 10px;font-size:10px;background:${canAfford && !dieSlotsFull ? '#163844' : '#1a1a2e'};border:1px solid ${canAfford && !dieSlotsFull ? '#2a8899' : '#333'};border-radius:3px;color:${canAfford && !dieSlotsFull ? '#88ddee' : '#555'};font-family:inherit;cursor:${canAfford && !dieSlotsFull ? 'pointer' : 'default'};">${preset.cost} Fd</button>`;
+                    html += `<button onclick="window.game.voidShardsBuyReforge(${jsArg(key)})" ${disabled} style="padding:3px 10px;font-size:10px;background:${canAfford && !dieSlotsFull ? '#163844' : '#1a1a2e'};border:1px solid ${canAfford && !dieSlotsFull ? '#2a8899' : '#333'};border-radius:3px;color:${canAfford && !dieSlotsFull ? '#88ddee' : '#555'};font-family:inherit;cursor:${canAfford && !dieSlotsFull ? 'pointer' : 'default'};">${preset.cost} Fd</button>`;
                 } else {
                     html += `<span style="color:#88ddee;font-size:10px;">${preset.cost} Fd</span>`;
                 }
@@ -3917,10 +3931,10 @@ const arcaneMethods = {
                     const relicOk = canAffordRelic && !relicSlotsFull && !atDiceBound;
                     html += `<div style="border:1px solid #665522;border-radius:5px;padding:8px;background:#1a1608;">`;
                     html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">`;
-                    html += `<span style="display:flex;align-items:center;gap:6px;">${this._buildRelicIconHtml(vs.relicOffer, 20)}<span style="color:#ffcc66;font-size:11px;font-weight:bold;">${relic.label}</span></span>`;
-                    html += `<button onclick="window.game.voidShardsBuyRelic('${vs.relicOffer}')" ${relicDisabled} style="padding:3px 10px;font-size:10px;background:${relicOk ? '#3a2e10' : '#1a1a2e'};border:1px solid ${relicOk ? '#aa8822' : '#333'};border-radius:3px;color:${relicOk ? '#ffcc66' : '#555'};font-family:inherit;cursor:${relicOk ? 'pointer' : 'default'};">${relic.cost} Fd</button>`;
+                    html += `<span style="display:flex;align-items:center;gap:6px;">${this._buildRelicIconHtml(vs.relicOffer, 20)}<span style="color:#ffcc66;font-size:11px;font-weight:bold;">${escapeHtml(relic.label)}</span></span>`;
+                    html += `<button onclick="window.game.voidShardsBuyRelic(${jsArg(vs.relicOffer)})" ${relicDisabled} style="padding:3px 10px;font-size:10px;background:${relicOk ? '#3a2e10' : '#1a1a2e'};border:1px solid ${relicOk ? '#aa8822' : '#333'};border-radius:3px;color:${relicOk ? '#ffcc66' : '#555'};font-family:inherit;cursor:${relicOk ? 'pointer' : 'default'};">${relic.cost} Fd</button>`;
                     html += '</div>';
-                    html += `<div style="color:#998855;font-size:10px;margin-top:3px;">${relic.desc}</div>`;
+                    html += `<div style="color:#998855;font-size:10px;margin-top:3px;">${escapeHtml(relic.desc)}</div>`;
                     html += '</div>';
                 }
             } else {
@@ -3952,8 +3966,8 @@ const arcaneMethods = {
                 const def = SHARD_BOSS_EFFECTS[eff.key];
                 if (!def) continue;
                 html += `<div style="background:#241414;border:1px solid #663322;border-radius:4px;padding:5px 8px;">`;
-                html += `<div style="color:#ffaa66;font-size:10px;font-weight:bold;">${def.label}</div>`;
-                html += `<div style="color:#cc9977;font-size:10px;margin-top:2px;">${def.desc(eff.face)}</div>`;
+                html += `<div style="color:#ffaa66;font-size:10px;font-weight:bold;">${escapeHtml(def.label)}</div>`;
+                html += `<div style="color:#cc9977;font-size:10px;margin-top:2px;">${escapeHtml(def.desc(eff.face))}</div>`;
                 html += '</div>';
             }
             html += '</div>';
@@ -4889,7 +4903,7 @@ const arcaneMethods = {
     // HTML attribute (data-vd-tooltip="..."). Only `"` needs escaping here
     // since these strings are always wrapped in double quotes.
     _escapeAttr(str) {
-        return String(str == null ? '' : str).replace(/"/g, '&quot;');
+        return escapeAttr(str);
     },
 
     _voidShardsEnemyLabel(key) {
@@ -4970,8 +4984,8 @@ const arcaneMethods = {
             const canAfford = cost !== null && fd >= cost;
             html += `<div style="display:flex;align-items:center;justify-content:space-between;background:#11111e;border:1px solid #331a44;border-radius:4px;padding:5px 8px;">`;
             html += `<div>`;
-            html += `<span style="color:#aa88cc;font-size:11px;">${upg.label}</span>`;
-            html += `<span style="color:#554466;font-size:10px;margin-left:6px;">${upg.desc}</span>`;
+            html += `<span style="color:#aa88cc;font-size:11px;">${escapeHtml(upg.label)}</span>`;
+            html += `<span style="color:#554466;font-size:10px;margin-left:6px;">${escapeHtml(upg.desc)}</span>`;
             html += `</div>`;
             html += `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">`;
             html += `<span style="color:#776699;font-size:10px;">${level}/${upg.maxLevel}</span>`;
@@ -4998,7 +5012,7 @@ const arcaneMethods = {
             for (const key of Object.keys(DICE_FACE_SETS)) {
                 const preset = DICE_FACE_SETS[key];
                 const sel = meta.startingReforgePreset === key ? 'selected' : '';
-                html += `<option value="${key}" ${sel}>${preset.label}</option>`;
+                html += `<option value="${escapeAttr(key)}" ${sel}>${escapeHtml(preset.label)}</option>`;
             }
             html += '</select>';
             html += `<input id="vs-start-reforge-value" type="number" min="1" max="6" value="${meta.startingReforgeValue || 1}" style="width:32px;font-size:10px;background:#111;border:1px solid #333;border-radius:3px;color:#88ddee;font-family:inherit;" />`;
@@ -5076,6 +5090,6 @@ const arcaneMethods = {
             case 'cook': label = `Cooking ${task.recipe?.name || 'food'}`; break;
             default: label = task.type; break;
         }
-        return `<span style="cursor:pointer;text-decoration:underline" onclick="window.game.camera.centerOn(${task.x},${task.y})">${label} at (${task.x},${task.y})</span>`;
+        return `<span style="cursor:pointer;text-decoration:underline" onclick="window.game.camera.centerOn(${task.x},${task.y})">${escapeHtml(label)} at (${task.x},${task.y})</span>`;
     },
 };

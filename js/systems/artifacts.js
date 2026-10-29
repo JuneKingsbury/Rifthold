@@ -8,10 +8,10 @@ import { ALL_ITEMS } from '../core/config.js';
 
 export function getPedestalEffect(game, effectKey) {
     let value = effectKey.includes('Mult') ? 1.0 : 0;
-    const allStructures = game.mapIndex.getAllStructurePositions();
-    for (const { x, y, type } of allStructures) {
-        if (type !== 'artifact_pedestal') continue;
-        const tile = game.map[y][x];
+    // Pedestal-only lookup: this runs per tick from the event roll, so avoid
+    // materializing every structure position on the map.
+    for (const k of game.mapIndex.getStructurePositions('artifact_pedestal')) {
+        const tile = game.map[k >> 16][k & 0xFFFF];
         if (!tile.pedestalArtifact || tile.pedestalInactive) continue;
         const def = ALL_ITEMS[tile.pedestalArtifact];
         if (!def?.pedestal) continue;

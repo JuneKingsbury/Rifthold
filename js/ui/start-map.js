@@ -14,8 +14,6 @@ function createTile(terrain) {
         items: [],
         passable: true,
         roomId: null,
-        onFire: false,
-        fireTimer: 0,
         snowCovered: false,
     };
 }

@@ -1,9 +1,10 @@
 import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG, TAMED_ANIMALS } from '../core/config.js';
-import { manhattanDist, findPathForEnemies } from '../world/pathfinding.js';
+import { manhattanDist, findPathForEnemies, findPathUniform, wasLastSearchExhausted } from '../world/pathfinding.js';
 import { isPassable, isPassableForEnemies, isBreakableByEnemies, hasLineOfSight, findLineOfSightTile } from '../world/map.js';
 import { moveEntity, computeMoveDuration, computeMoveCooldown } from '../systems/movement-lerp.js';
-import { colonistTakeDamage, getMoveSpeedBonus } from './colonist.js';
+import { colonistTakeDamage, getMoveSpeedBonus, addThought } from './colonist.js';
 import { spawnDamageText, spawnImpactSpray, spawnStructureCrumble } from '../ui/overlay-renderer.js';
+import { escapeHtml as esc } from '../ui/ui-utils.js';
 
 function canAttack(entity, game) {
     const cooldown = entity.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
@@ -19,9 +20,9 @@ export const ROLE_HANDLERS = {
         },
         info(entity, role) {
             const rs = entity.roleState.guard || {};
-            const state = rs.state || 'patrolling';
+            const state = String(rs.state || 'patrolling');
             const stateColor = state === 'engaging' ? '#ff4444' : state === 'retreating' ? '#ffaa00' : '#44cc44';
-            return `<div class="info-row" style="color:${stateColor}">Guard: ${state.charAt(0).toUpperCase() + state.slice(1)} (radius ${role.guardRadius || 8}, ${role.guardDamage || 8} dmg)</div>`;
+            return `<div class="info-row" style="color:${stateColor}">Guard: ${esc(state.charAt(0).toUpperCase() + state.slice(1))} (radius ${esc(role.guardRadius || 8)}, ${esc(role.guardDamage || 8)} dmg)</div>`;
         },
         update(entity, role, game) {
             const rs = entity.roleState.guard;
@@ -109,7 +110,7 @@ export const ROLE_HANDLERS = {
             const tamedDef = TAMED_ANIMALS[entity.type];
             const threshold = tamedDef?.hungerThreshold || 3;
             const hungerStr = (entity.hunger || 0) >= threshold ? ' <span style="color:#ff6644">Hungry!</span>' : '';
-            return `<div class="info-row" style="color:#88cc88">Produces: ${role.produces} (every ${role.produceRate || 80} ticks, next in ${next})${hungerStr}</div>`;
+            return `<div class="info-row" style="color:#88cc88">Produces: ${esc(role.produces)} (every ${esc(role.produceRate || 80)} ticks, next in ${esc(next)})${hungerStr}</div>`;
         },
         update(entity, role, game) {
             if (entity.onExpedition) return;
@@ -149,7 +150,7 @@ export const ROLE_HANDLERS = {
             entity.roleState.ranged_attacker = { state: 'approaching', cooldown: 0 };
         },
         info(entity, role) {
-            return `<div class="info-row" style="color:#ffaa33">Ranged Attacker (range ${role.range || 6}, prefers distance ${role.preferDistance || 4})</div>`;
+            return `<div class="info-row" style="color:#ffaa33">Ranged Attacker (range ${esc(role.range || 6)}, prefers distance ${esc(role.preferDistance || 4)})</div>`;
         },
         update(entity, role, game, combatSystem) {
             const rs = entity.roleState.ranged_attacker;
@@ -231,7 +232,7 @@ export const ROLE_HANDLERS = {
         info(entity, role) {
             const rs = entity.roleState.melee_charger || {};
             const status = rs.charged ? 'Engaged' : 'Charging';
-            return `<div class="info-row" style="color:#ff6644">Melee Charger: ${status} (+${role.chargeBonus || 5} first hit bonus)</div>`;
+            return `<div class="info-row" style="color:#ff6644">Melee Charger: ${status} (+${esc(role.chargeBonus || 5)} first hit bonus)</div>`;
         },
         update(entity, role, game, combatSystem) {
             const rs = entity.roleState.melee_charger;
@@ -303,7 +304,7 @@ export const ROLE_HANDLERS = {
                 : game.colonists.filter(c => c.hp > 0 && manhattanDist(entity.x, entity.y, c.x, c.y) <= 1);
 
             for (const c of nearbyColonists) {
-                if (c.hp <= 0) continue;
+                if (c.hp <= 0 || c.onExpedition) continue;
                 if (manhattanDist(entity.x, entity.y, c.x, c.y) <= 1) {
                     if (canAttack(entity, game)) {
                         colonistTakeDamage(c, entity.damage, game, entity);
@@ -331,7 +332,7 @@ export const ROLE_HANDLERS = {
             entity.roleState.structure_breaker = {};
         },
         info(entity, role) {
-            return `<div class="info-row" style="color:#ffaa00">Structure Breaker (${role.breakSpeed || 1}x break speed)</div>`;
+            return `<div class="info-row" style="color:#ffaa00">Structure Breaker (${esc(role.breakSpeed || 1)}x break speed)</div>`;
         },
         update(entity, role, game) {
             if (!entity.path || entity.path.length === 0) return;
@@ -352,7 +353,7 @@ export const ROLE_HANDLERS = {
         info(entity, role) {
             const rs = entity.roleState.boss || {};
             const status = rs.enraged ? '<span style="color:#ff0000">ENRAGED</span>' : 'Normal';
-            return `<div class="info-row" style="color:#ff8800">Boss: ${status} (enrage at ${Math.round((role.enrageThreshold || 0.3) * 100)}% HP, ${role.enrageDamageMult || 1.5}x damage)</div>`;
+            return `<div class="info-row" style="color:#ff8800">Boss: ${status} (enrage at ${Math.round((role.enrageThreshold || 0.3) * 100)}% HP, ${esc(role.enrageDamageMult || 1.5)}x damage)</div>`;
         },
         update(entity, role, game) {
             const rs = entity.roleState.boss;
@@ -399,7 +400,7 @@ export const ROLE_HANDLERS = {
             const rs = entity.roleState.pet || {};
             const stateColor = rs.state === 'sheltering' ? '#ffaa00' : rs.state === 'fighting' ? '#ff4444' : '#aaddff';
             const stateLabel = rs.state === 'sheltering' ? 'Sheltering' : rs.state === 'fighting' ? 'Fighting!' : 'Following';
-            return `<div class="info-row" style="color:${stateColor}">Pet: ${stateLabel}</div>`;
+            return `<div class="info-row" style="color:${stateColor}">Pet: ${esc(stateLabel)}</div>`;
         },
         update(entity, role, game) {
             if (entity.onExpedition) return;
@@ -493,9 +494,11 @@ export const ROLE_HANDLERS = {
             }
 
             // Per-species passive bonuses applied to bonded owner while following and in range.
+            // Mood goes through a short, refreshed thought: computeMood rebuilds mood from
+            // thoughts every tick, so a direct write to owner.mood would be discarded.
             switch (entity.type) {
-                case 'rabbit': owner.mood = Math.min(100, (owner.mood || 50) + 0.04); break;
-                case 'tapir':  owner.mood = Math.min(100, (owner.mood || 50) + 0.06); break;
+                case 'rabbit': addThought(owner, 'Pet rabbit at my side', 4, 20, game.tick); break;
+                case 'tapir':  addThought(owner, 'Pet tapir at my side', 6, 20, game.tick); break;
                 case 'deer':   owner.activePetSpeedBonus = (owner.activePetSpeedBonus || 0) + 0.10; break;
                 case 'okapi':  owner.activePetSpeedBonus = (owner.activePetSpeedBonus || 0) + 0.15; break;
                 case 'boar':   owner.activePetDmgBonus   = (owner.activePetDmgBonus   || 0) + 1;    break;
@@ -506,7 +509,7 @@ export const ROLE_HANDLERS = {
     worker: {
         init() {},
         info(entity, role) {
-            return `<div class="info-row" style="color:#88aaff">Worker: ${(role.specialty || 'general').charAt(0).toUpperCase() + (role.specialty || 'general').slice(1)} (skill ${role.skillLevel || 6})</div>`;
+            return `<div class="info-row" style="color:#88aaff">Worker: ${esc(String(role.specialty || 'general').charAt(0).toUpperCase() + String(role.specialty || 'general').slice(1))} (skill ${esc(role.skillLevel || 6)})</div>`;
         },
         update() {},
     },
@@ -538,7 +541,7 @@ export const ROLE_HANDLERS = {
         init() {},
         info(entity, role) {
             const remaining = entity.expiresAt ? Math.max(0, entity.expiresAt - (window.game?.tick || 0)) : '?';
-            return `<div class="info-row" style="color:#9966ff">Summoned (${remaining} ticks remaining)</div>`;
+            return `<div class="info-row" style="color:#9966ff">Summoned (${esc(remaining)} ticks remaining)</div>`;
         },
         update(entity, role, game) {
             if (entity.expiresAt && game.tick >= entity.expiresAt) {
@@ -645,30 +648,29 @@ const EFFECT_HANDLERS = {
         info(entity, effect) {
             const bonus = effect.moodBonus || 5;
             const scope = effect.scope || 'aura';
-            if (scope === 'self') return `<div class="info-row" style="color:#ffaacc">Mood: +${bonus} (self)</div>`;
-            if (scope === 'global') return `<div class="info-row" style="color:#ffaacc">Mood: +${bonus} (all colonists)</div>`;
-            return `<div class="info-row" style="color:#ffaacc">Mood Aura: +${bonus} (${effect.radius || 4} tile radius)</div>`;
+            if (scope === 'self') return `<div class="info-row" style="color:#ffaacc">Mood: +${esc(bonus)} (self)</div>`;
+            if (scope === 'global') return `<div class="info-row" style="color:#ffaacc">Mood: +${esc(bonus)} (all colonists)</div>`;
+            return `<div class="info-row" style="color:#ffaacc">Mood Aura: +${esc(bonus)} (${esc(effect.radius || 4)} tile radius)</div>`;
         },
         update(entity, effect, game) {
             if (entity.onExpedition) return;
-            const bonus = (effect.moodBonus || 5) * 0.01;
+            const bonus = effect.moodBonus || 5;
             const scope = effect.scope || 'aura';
 
             if (scope === 'self') {
-                if (entity.mood !== undefined) entity.mood = Math.min(100, entity.mood + bonus);
+                if (entity.mood !== undefined) entity.mood = Math.min(100, entity.mood + bonus * 0.01);
                 return;
             }
-            if (scope === 'global') {
-                for (const c of game.colonists) {
-                    if (c.hp > 0) c.mood = Math.min(100, c.mood + bonus);
-                }
-                return;
-            }
-            const radius = effect.radius || 4;
+            // Colonist mood is rebuilt from thoughts every tick (computeMood), so the
+            // aura grants a short thought that is refreshed while the colonist stays in
+            // range. One thought per animal type: several rabbits don't stack.
+            const text = `Soothed by a ${entity.type}`;
+            const radius = scope === 'global' ? Infinity : (effect.radius || 4);
             for (const c of game.colonists) {
-                if (c.hp <= 0) continue;
-                const dist = manhattanDist(c.x, c.y, entity.x, entity.y);
-                if (dist <= radius) c.mood = Math.min(100, c.mood + bonus);
+                if (c.hp <= 0 || c.onExpedition || c.golem) continue;
+                if (manhattanDist(c.x, c.y, entity.x, entity.y) <= radius) {
+                    addThought(c, text, bonus, 20, game.tick);
+                }
             }
         },
     },
@@ -701,7 +703,8 @@ function getHostiles(game, entity) {
 
 function getTargets(entity, game) {
     if (entity.hostile) {
-        return game.colonists.filter(c => c.hp > 0);
+        // Colonists away on an expedition keep their gate-tile position but are off-map.
+        return game.colonists.filter(c => c.hp > 0 && !c.onExpedition);
     }
     return getHostiles(game, entity);
 }
@@ -753,54 +756,61 @@ function moveTowardGreedy(entity, target, map, dur, game) {
     moveEntity(entity, pick[0], pick[1], dur);
 }
 
-/*function moveToward(entity, target, map, dur, game) {
-    const passCheck = entity.hostile ? isPassableForEnemies : isPassable;
-    const path = findPath(map, entity.x, entity.y, target.x, target.y, passCheck);
+// Node budget for role-driven searches. A target sealed behind walls (e.g. a
+// walled map center) would otherwise flood the whole map on every move turn.
+const ROLE_PATH_MAX_NODES = 6000;
+// Ticks to wait before re-searching after a failed search.
+const ROLE_PATH_RETRY_TICKS = 20;
 
-    // No path at all, entity stays put.
-    if (!path || path.length === 0) return;
-
-    // The next step is the first node in the path.
-    const [nx, ny] = path[0];
-
-    // Respect occupancy if game context is provided.
-    if (game && game.isTileOccupied(nx, ny)) {
-        // Try the second step if available (shuffle around an occupied tile).
-        if (path.length > 1 && !game.isTileOccupied(path[1][0], path[1][1])) {
-            // Only step forward two if the intermediate is also passable.
-            if (passCheck(map, path[1][0], path[1][1])) {
-                moveEntity(entity, path[1][0], path[1][1], dur);
-                return;
-            }
-        }
-        // Otherwise wait as the tile is blocked by another entity.
-        return;
-    }
-    moveEntity(entity, nx, ny, dur);
-}*/
+// True when the cached next step can still be taken: it must be adjacent and
+// either walkable or the goal itself. A wall built across the route, or the
+// entity being displaced, invalidates the rest of the path.
+function isStepValid(entity, step, target, passCheck, map) {
+    if (Math.abs(step.x - entity.x) + Math.abs(step.y - entity.y) !== 1) return false;
+    return (step.x === target.x && step.y === target.y) || passCheck(map, step.x, step.y);
+}
 
 function moveToward(entity, target, map, dur, game) {
     const passCheck = entity.hostile ? isPassableForEnemies : isPassable;
+    const tick = game ? game.tick : 0;
 
-    // Recompute path only when the target has moved or we have no path left.
+    // Recompute path only when the target has moved, the next step is no longer
+    // valid, or we have no path left.
     const targetMoved =
         !entity._pathTarget ||
         entity._pathTarget.x !== target.x ||
         entity._pathTarget.y !== target.y;
+    const hasPath = entity._path && entity._path.length > 0;
 
-    if (targetMoved || !entity._path || entity._path.length === 0) {
-        entity._path = findPath(map, entity.x, entity.y, target.x, target.y, passCheck) ?? [];
+    if (targetMoved || !hasPath || !isStepValid(entity, entity._path[0], target, passCheck, map)) {
+        if (entity._pathRetryAt && tick < entity._pathRetryAt) {
+            // Backing off after a failed search. If it only ran out of budget the
+            // target may still be reachable, so keep closing in greedily.
+            if (entity._pathExhausted) moveTowardGreedy(entity, target, map, dur, game);
+            return;
+        }
+        const path = findPathUniform(map, entity.x, entity.y, target.x, target.y, passCheck, ROLE_PATH_MAX_NODES);
         entity._pathTarget = { x: target.x, y: target.y };
+        if (path) {
+            entity._path = path;
+            entity._pathRetryAt = 0;
+        } else {
+            entity._path = [];
+            entity._pathRetryAt = tick + ROLE_PATH_RETRY_TICKS;
+            entity._pathExhausted = wasLastSearchExhausted();
+            if (entity._pathExhausted) moveTowardGreedy(entity, target, map, dur, game);
+            return;
+        }
     }
 
     if (entity._path.length === 0) return;
 
-    const [nx, ny] = entity._path[0];
+    const next = entity._path[0];
 
-    if (game && game.isTileOccupied(nx, ny)) return;
+    if (game && game.isTileOccupied(next.x, next.y)) return;
 
     entity._path.shift(); // consume the step.
-    moveEntity(entity, nx, ny, dur);
+    moveEntity(entity, next.x, next.y, dur);
 }
 
 // Applies breach damage to the breakable structure at (x,y). Lazily seeds
@@ -849,17 +859,29 @@ function damageStructureTile(map, x, y, breakDmg, game) {
 // costly or impossible), so the attacker breaches that wall instead of freezing.
 // Breaking is paced by the attacker's normal attack cooldown so it chips a wall
 // at the same rate it strikes a colonist. Uses a dedicated `_siegePath` cache
-// (distinct from moveToward's `_path`) so the {x,y} node format never collides
-// with moveToward's [x,y] arrays on entities that use both movers.
+// (distinct from moveToward's `_path`) so the two movers never consume each
+// other's routes on entities that use both.
 function siegeMoveToward(entity, target, role, map, dur, game) {
     const targetMoved =
         !entity._siegeTarget ||
         entity._siegeTarget.x !== target.x ||
         entity._siegeTarget.y !== target.y;
+    const siegePass = (m, x, y) => isPassableForEnemies(m, x, y) || isBreakableByEnemies(m, x, y);
+    const hasPath = entity._siegePath && entity._siegePath.length > 0;
 
-    if (targetMoved || !entity._siegePath || entity._siegePath.length === 0) {
-        entity._siegePath = findPathForEnemies(map, entity.x, entity.y, target.x, target.y) ?? [];
+    const backingOff = entity._siegeRetryAt && game.tick < entity._siegeRetryAt;
+    if (!backingOff && (targetMoved || !hasPath || !isStepValid(entity, entity._siegePath[0], target, siegePass, map))) {
+        const path = findPathForEnemies(map, entity.x, entity.y, target.x, target.y, ROLE_PATH_MAX_NODES);
+        entity._siegePath = path ?? [];
         entity._siegeTarget = { x: target.x, y: target.y };
+        entity._siegeRetryAt = path ? 0 : game.tick + ROLE_PATH_RETRY_TICKS;
+        entity._siegeExhausted = !path && wasLastSearchExhausted();
+    }
+
+    // Out of search budget: the target may still be reachable, so close in greedily.
+    if (entity._siegePath.length === 0 && entity._siegeRetryAt && game.tick < entity._siegeRetryAt) {
+        if (entity._siegeExhausted) moveTowardGreedy(entity, target, map, dur, game);
+        return;
     }
 
     if (entity._siegePath.length === 0) return;
@@ -880,69 +902,6 @@ function siegeMoveToward(entity, target, role, map, dur, game) {
 
     entity._siegePath.shift();
     moveEntity(entity, next.x, next.y, dur);
-}
-
-// A* path finding for the non-greedy movement option.
-function findPath(map, startX, startY, goalX, goalY, passCheck) {
-    const key = (x, y) => `${x},${y}`;
-    const heuristic = (x, y) => Math.abs(x - goalX) + Math.abs(y - goalY);
-
-    const open = new Map();
-    const closed = new Set();
-
-    const startNode = {
-        x: startX, y: startY,
-        g: 0,
-        f: heuristic(startX, startY),
-        parent: null,
-    };
-    open.set(key(startX, startY), startNode);
-
-    while (open.size > 0) {
-        // Pick the open node with the lowest score.
-        let current = null;
-        for (const node of open.values()) {
-            if (!current || node.f < current.f) current = node;
-        }
-
-        if (current.x === goalX && current.y === goalY) {
-            // Reconstruct path.
-            const path = [];
-            let node = current;
-            while (node.parent) {
-                path.unshift([node.x, node.y]);
-                node = node.parent;
-            }
-            return path;
-        }
-
-        open.delete(key(current.x, current.y));
-        closed.add(key(current.x, current.y));
-
-        // Cardinal neighbors only.
-        const neighbors = [
-            [current.x + 1, current.y],
-            [current.x - 1, current.y],
-            [current.x, current.y + 1],
-            [current.x, current.y - 1],
-        ];
-
-        for (const [nx, ny] of neighbors) {
-            if (closed.has(key(nx, ny))) continue;
-            // Allow the goal tile even if it would normally be impassable.
-            // (e.g. the player standing on it counts as the destination).
-            if (!passCheck(map, nx, ny) && !(nx === goalX && ny === goalY)) continue;
-
-            const g = current.g + 1;
-            const existing = open.get(key(nx, ny));
-            if (!existing || g < existing.g) {
-                const node = { x: nx, y: ny, g, f: g + heuristic(nx, ny), parent: current };
-                open.set(key(nx, ny), node);
-            }
-        }
-    }
-
-    return null; // No path found.
 }
 
 function moveTowardPassable(entity, target, map, dur, game) {

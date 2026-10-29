@@ -22,6 +22,9 @@ import { RENDER_CONFIG } from '../core/config.js';
 // on the PERSISTENT sim entity. The static renderer's per-tile entity objects
 // are rebuilt every tick, so scratch there would not survive across ticks.
 
+// Fidget gesture lengths (ms), indexed by fidget type.
+const FIDGET_DURATIONS = [800, 600, 500];
+
 // Reusable transform descriptor. `identity` reflects the AFFINE transform only
 // (rotation/offset/scale); growPx and the overlay are applied by the renderer
 // regardless, so the fast path (plain drawImage + inline grow) matches today.
@@ -209,13 +212,12 @@ export function getWaterWave(now, seed) {
 }
 
 // Progress (0..1) of a tick-stamped one-shot, latching its wall-clock start on
-// the entity's scratch object. Returns null when inactive/expired. `key`
-// namespaces the latch so different one-shots don't clobber each other.
+// the entity's scratch object. Returns null when inactive/expired. `seenKey`/
+// `startKey` namespace the latch so different one-shots don't clobber each
+// other (passed as literals so no key string is built per call).
 // Mirrors `_animShotT` in ui-arcane.js.
-function animShotT(scratch, tick, key, durationMs, now) {
+function animShotT(scratch, tick, seenKey, startKey, durationMs, now) {
     if (tick == null) return null;
-    const seenKey = key + 'Seen';
-    const startKey = key + 'Start';
     if (scratch[seenKey] !== tick) { scratch[seenKey] = tick; scratch[startKey] = now; }
     const start = scratch[startKey];
     if (start == null) return null;
@@ -307,11 +309,10 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
 
         // Resolve the single winning one-shot: highest priority with a live t;
         // `>=` lets a fresh same-priority action replace the holder (crisp restart).
-        let best = null;
-        const consider = (name, t, pr) => {
-            if (t == null) return;
-            if (!best || pr >= best.pr) best = { name, t, pr };
-        };
+        // Considered in order cast, attack, hit (plain locals, no per-frame objects).
+        let bestName = null;
+        let bestT = 0;
+        let bestPr = 0;
         // Weapon-driven motion class, matching the expedition view's attack anim
         // (js/ui/ui-arcane.js `_composeEntityAnim`). New stamps carry the weapon's
         // `attackAnim` ('Swing' | 'Stab' | 'DrawAndShoot'); older stamps
@@ -320,20 +321,23 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         if (atkClass === 'melee') atkClass = 'Swing';
         else if (atkClass === 'ranged' || atkClass === 'bow' || atkClass === 'wand') atkClass = 'DrawAndShoot';
         const atkDur = atkClass === 'DrawAndShoot' ? A.rangedRecoilDurationMs : RENDER_CONFIG.attackSwingDurationMs;
-        consider('cast', animShotT(scratch, entity._lastCastTick, 'cast', A.castDurationMs, now), P.cast);
-        consider('attack', animShotT(scratch, entity._lastAttackTick, 'attack', atkDur, now), P.attack);
+        const castT = animShotT(scratch, entity._lastCastTick, 'castSeen', 'castStart', A.castDurationMs, now);
+        if (castT != null) { bestName = 'cast'; bestT = castT; bestPr = P.cast; }
+        const attackT = animShotT(scratch, entity._lastAttackTick, 'attackSeen', 'attackStart', atkDur, now);
+        if (attackT != null && (bestName === null || P.attack >= bestPr)) { bestName = 'attack'; bestT = attackT; bestPr = P.attack; }
         // Hit uses `_dmgFlashUntil` as its tick signal. It changes value on each
         // new hit that advances the tick, so no extra sim stamp is needed.
-        consider('hit', animShotT(scratch, entity._dmgFlashUntil, 'hit', A.hitDurationMs, now), P.hit);
+        const hitT = animShotT(scratch, entity._dmgFlashUntil, 'hitSeen', 'hitStart', A.hitDurationMs, now);
+        if (hitT != null && (bestName === null || P.hit >= bestPr)) { bestName = 'hit'; bestT = hitT; bestPr = P.hit; }
 
-        if (best) {
+        if (bestName !== null) {
             oneShotActive = true;
-            const t = best.t;
+            const t = bestT;
             const arc = Math.sin(t * Math.PI);   // 0→1→0, upright/centered at ends
             const dir = entity._lastAttackDir;
             const facing = dir ? (dir.dx >= 0 ? 1 : -1) : ((seed & 1) ? -1 : 1);
 
-            switch (best.name) {
+            switch (bestName) {
                 case 'attack':
                     // Motion class per equipped weapon, mirroring the expedition view.
                     // Directional lunge/recoil follow the stamped attack vector when
@@ -444,7 +448,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
 
     // ── Startle reaction (danger nearby) ──
     if (actionsOn && entity && entity._startleUntil) {
-        const t = animShotT(entity._wanim || (entity._wanim = {}), entity._startleUntil, 'startle', 180, now);
+        const t = animShotT(entity._wanim || (entity._wanim = {}), entity._startleUntil, 'startleSeen', 'startleStart', 180, now);
         if (t != null && !oneShotActive) {
             const arc = Math.sin(t * Math.PI);
             const facing = (seed & 1) ? 1 : -1;
@@ -468,8 +472,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         }
         if (scratch.fidgetStart != null) {
             const elapsed = now - scratch.fidgetStart;
-            const fidgetDurations = [800, 600, 500];
-            const dur = fidgetDurations[scratch.fidgetType] || 700;
+            const dur = FIDGET_DURATIONS[scratch.fidgetType] || 700;
             if (elapsed < dur) {
                 const ft = elapsed / dur;
                 const arc = Math.sin(ft * Math.PI);
@@ -503,7 +506,10 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     if (flags.weatherIntensity > 0 && entity && entity.state !== 'sleeping') {
         let cold;
         if (entity.thoughts) {
-            cold = entity.thoughts.some(t => t.text === 'Freezing outside');
+            cold = false;
+            for (const th of entity.thoughts) {
+                if (th.text === 'Freezing outside') { cold = true; break; }
+            }
         } else {
             const tile = game.map[entity.y] && game.map[entity.y][entity.x];
             cold = !(tile && tile.roomId !== null && tile.roomId !== undefined);

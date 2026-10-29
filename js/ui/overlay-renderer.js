@@ -27,8 +27,21 @@ const YIELD_LABELS = {
     eggs: 'Eggs', milk: 'Milk',
 };
 
+// Upper bound on live world particles. Spawns past it are dropped so a long
+// session (or a burst of combat impacts) can't grow the array without limit.
+const MAX_WORLD_PARTICLES = 800;
+
+// Current UI font scale (the --ui-font-scale custom property). setUIFontScale
+// writes it as an inline style on <html>, so read that directly: unlike
+// getComputedStyle it never forces a style recalc. Falls back to 1, the
+// stylesheet default.
+export function uiFontScale() {
+    return parseFloat(document.documentElement.style.getPropertyValue('--ui-font-scale')) || 1;
+}
+
 export function spawnParticle(game, props) {
     if (!game.worldParticles) game.worldParticles = [];
+    if (game.worldParticles.length >= MAX_WORLD_PARTICLES) return;
     game.worldParticles.push({
         x: props.x, y: props.y,
         vx: props.vx || 0, vy: props.vy || 0,
@@ -158,6 +171,11 @@ export class OverlayRenderer {
         this.canvas.style.pointerEvents = 'none';
         container.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d', { alpha: true });
+        // Logical (CSS pixel) size. The backing store is this times the DPR and
+        // the context is scaled to match, so all drawing uses CSS pixels.
+        this._w = 0;
+        this._h = 0;
+        this._dpr = 1;
         this._weatherParticles = [];
         this._lastWeatherTime = 0;
         this._lastParticleTime = 0;
@@ -168,11 +186,22 @@ export class OverlayRenderer {
         this._weatherFading = false;   // true = fading out before switching type
     }
 
-    resize(width, height) {
-        if (this.canvas.width !== width || this.canvas.height !== height) {
-            this.canvas.width = width;
-            this.canvas.height = height;
+    // Matches the main game canvas: CSS size width x height, backing store at
+    // device resolution so overlays stay crisp on HiDPI screens and line up
+    // with the tiles underneath.
+    resize(width, height, dpr = 1) {
+        const bw = Math.round(width * dpr);
+        const bh = Math.round(height * dpr);
+        if (this.canvas.width !== bw || this.canvas.height !== bh || this._dpr !== dpr) {
+            this.canvas.width = bw;
+            this.canvas.height = bh;
+            this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
+        this.canvas.style.width = width + 'px';
+        this.canvas.style.height = height + 'px';
+        this._w = width;
+        this._h = height;
+        this._dpr = dpr;
     }
 
     render(game, charWidth, charHeight, camera) {
@@ -180,11 +209,11 @@ export class OverlayRenderer {
         const cw = charWidth;
         const ch = charHeight;
         const now = performance.now();
-        this._uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this._uiFontScale = uiFontScale();
+        ctx.clearRect(0, 0, this._w, this._h);
 
         if (game.input && (game.input.mode === 'build' || game.input.mode === 'zone')) {
-            this._renderBuildGrid(ctx, cw, ch, this.canvas.width, this.canvas.height, camera);
+            this._renderBuildGrid(ctx, cw, ch, this._w, this._h, camera);
         }
 
         if (game.input?._complexPreviewTiles?.length) {
@@ -196,7 +225,7 @@ export class OverlayRenderer {
             this._lastWeatherTime = now;
             const targetWeather = game.settings.showWeatherParticles ? game.weather.currentWeather : 'clear';
             const density = (game.settings.particleDensity || 100) / 100;
-            this._updateWeatherParticles(targetWeather, this.canvas.width, this.canvas.height, dt, now, density);
+            this._updateWeatherParticles(targetWeather, this._w, this._h, dt, now, density);
             if (this._weatherAlpha > 0 && this._weatherParticles.length > 0) {
                 ctx.save();
                 ctx.globalAlpha = this._weatherAlpha;
@@ -207,7 +236,7 @@ export class OverlayRenderer {
                 ctx.save();
                 ctx.globalAlpha = this._lightningFlash;
                 ctx.fillStyle = '#ffffee';
-                ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                ctx.fillRect(0, 0, this._w, this._h);
                 ctx.restore();
             }
         } else if (this._weatherParticles.length > 0) {
@@ -296,27 +325,32 @@ export class OverlayRenderer {
     }
 
     _renderBuildGrid(ctx, cw, ch, canvasWidth, canvasHeight, camera) {
-        // Mirror the tile loop's pixel math: px = Math.round(wx * cw - camOriginX).
-        // The first visible world tile column is Math.floor(camera.x), so the first
-        // grid line falls at Math.round(Math.floor(camera.x) * cw - camOriginX).
-        // Expressed as an offset from pixel 0: startX = -(camOriginX % cw) mod cw.
-        const camOriginX = camera ? camera.x * cw : 0;
-        const camOriginY = camera ? camera.y * ch : 0;
-        // How many pixels into a tile cell the camera is sitting (0..cw, 0..ch).
-        const startX = ((camOriginX % cw) + cw) % cw;
-        const startY = ((camOriginY % ch) + ch) % ch;
+        // Mirror the tile loop's pixel math: tiles are snapped in physical pixels,
+        // world tile wx's left edge at (wx * P + round(-camera.x * P)) / dpr CSS px
+        // where P is the integer physical tile size. Each grid line is centred on
+        // a tile boundary.
+        const dpr = this._dpr;
+        const P = Math.round(cw * dpr);
+        const PH = Math.round(ch * dpr);
+        if (P <= 0 || PH <= 0) return;
+        const camX = camera ? camera.x : 0;
+        const camY = camera ? camera.y : 0;
+        const offX = Math.round(-camX * P);
+        const offY = Math.round(-camY * PH);
         ctx.save();
         ctx.strokeStyle = RENDER_CONFIG.buildGridColor;
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
-        for (let x = -startX; x <= canvasWidth; x += cw) {
-            const rx = Math.round(x) + 1;
+        for (let wx = Math.floor(camX); ; wx++) {
+            const rx = (wx * P + offX) / dpr;
+            if (rx > canvasWidth) break;
             ctx.moveTo(rx, 0);
             ctx.lineTo(rx, canvasHeight);
         }
-        for (let y = -startY; y <= canvasHeight; y += ch) {
-            const ry = Math.round(y) + 1;
+        for (let wy = Math.floor(camY); ; wy++) {
+            const ry = (wy * PH + offY) / dpr;
+            if (ry > canvasHeight) break;
             ctx.moveTo(0, ry);
             ctx.lineTo(canvasWidth, ry);
         }
@@ -477,7 +511,7 @@ export class OverlayRenderer {
     _renderProgressBar(ctx, overlay, cw, ch, camera) {
         const sx = (overlay.x - camera.x) * cw;
         const sy = (overlay.y - camera.y) * ch;
-        if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) return;
+        if (sx < -cw || sx > this._w || sy < -ch || sy > this._h) return;
 
         const barHeight = 3;
         const barWidth = cw * 0.8;
@@ -510,7 +544,7 @@ export class OverlayRenderer {
     _renderHealthBar(ctx, overlay, cw, ch, camera) {
         const sx = (overlay.x - camera.x) * cw;
         const sy = (overlay.y - camera.y) * ch;
-        if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) return;
+        if (sx < -cw || sx > this._w || sy < -ch || sy > this._h) return;
 
         const barHeight = 2;
         const barWidth = cw * 0.8;
@@ -548,7 +582,7 @@ export class OverlayRenderer {
         ctx.save();
         ctx.globalAlpha = overlay.alpha || 0.2;
         ctx.fillStyle = overlay.color || '#ff0000';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.fillRect(0, 0, this._w, this._h);
         ctx.restore();
     }
 
@@ -559,7 +593,7 @@ export class OverlayRenderer {
 
         const sx = (overlay.x - camera.x) * cw + cw / 2;
         const sy = (overlay.y - camera.y) * ch - floatOffset;
-        if (sx < -100 || sx > this.canvas.width + 100 || sy < -50 || sy > this.canvas.height + 50) return;
+        if (sx < -100 || sx > this._w + 100 || sy < -50 || sy > this._h + 50) return;
 
         ctx.save();
         ctx.globalAlpha = alpha;
@@ -587,7 +621,7 @@ export class OverlayRenderer {
 
         const sx = (overlay.x - camera.x) * cw + cw / 2;
         const sy = (overlay.y - camera.y) * ch - floatOffset;
-        if (sx < -100 || sx > this.canvas.width + 100 || sy < -50 || sy > this.canvas.height + 50) return;
+        if (sx < -100 || sx > this._w + 100 || sy < -50 || sy > this._h + 50) return;
 
         const fontSize = Math.round(12 * (this._uiFontScale || 1) * 1.4);
         const text = `+${overlay.amount}`;
@@ -640,7 +674,7 @@ export class OverlayRenderer {
 
         const sx = (overlay.x - camera.x) * cw + cw / 2;
         const sy = (overlay.y - camera.y) * ch - ch * 0.8 - floatOffset;
-        if (sx < -100 || sx > this.canvas.width + 100 || sy < -50 || sy > this.canvas.height + 50) return;
+        if (sx < -100 || sx > this._w + 100 || sy < -50 || sy > this._h + 50) return;
 
         const text = overlay.text || '...';
         const fontSize = Math.round(11 * (this._uiFontScale || 1) * 1.2);
@@ -682,13 +716,25 @@ export class OverlayRenderer {
         ctx.restore();
     }
 
+    // getAllStructurePositions() builds a fresh array over every structure on the
+    // map. Structures only change as the simulation ticks, so the overlays share
+    // one copy per tick instead of rebuilding it every frame.
+    _structurePositions(game) {
+        if (this._structTick !== game.tick || this._structIndex !== game.mapIndex) {
+            this._structTick = game.tick;
+            this._structIndex = game.mapIndex;
+            this._structList = game.mapIndex.getAllStructurePositions();
+        }
+        return this._structList;
+    }
+
     _renderWarmthOverlay(ctx, game, cw, ch, camera) {
         // Collect all active warmth sources: passive (campfire) and powered (ember_heater etc.)
         const sources = [];
         const isWinter = game.weather.season === 'winter';
         const isPowered = game.power.hasPower();
 
-        const allStructures = game.mapIndex.getAllStructurePositions();
+        const allStructures = this._structurePositions(game);
         for (const { x, y, type } of allStructures) {
             const bDef = BUILDINGS[type];
             if (!bDef) continue;
@@ -724,7 +770,7 @@ export class OverlayRenderer {
                     if (dist > r) continue;
                     const sx = (src.x + dx - camera.x) * cw;
                     const sy = (src.y + dy - camera.y) * ch;
-                    if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) continue;
+                    if (sx < -cw || sx > this._w || sy < -ch || sy > this._h) continue;
                     buckets[dist].push(sx, sy);
                 }
             }
@@ -770,7 +816,7 @@ export class OverlayRenderer {
                 if (Math.abs(dx) + Math.abs(dy) > radius) continue;
                 const sx = (x + dx - camera.x) * cw;
                 const sy = (y + dy - camera.y) * ch;
-                if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) continue;
+                if (sx < -cw || sx > this._w || sy < -ch || sy > this._h) continue;
                 ctx.globalAlpha = fillAlpha;
                 ctx.fillRect(sx, sy, cw, ch);
             }
@@ -821,12 +867,16 @@ export class OverlayRenderer {
         ctx.save();
         const map = game.map;
         const camX = camera.x, camY = camera.y;
-        const cWidth = this.canvas.width, cHeight = this.canvas.height;
+        const cWidth = this._w, cHeight = this._h;
+        // Iterate whole tiles: the camera is fractional while gliding, dragging or
+        // following, and map[] only has integer indices.
+        const wx0 = Math.floor(camX), wy0 = Math.floor(camY);
+        const wx1 = wx0 + Math.ceil(cWidth / cw) + 1, wy1 = wy0 + Math.ceil(cHeight / ch) + 1;
 
-        for (let wy = camY; wy < camY + Math.ceil(cHeight / ch) + 1; wy++) {
+        for (let wy = wy0; wy <= wy1; wy++) {
             const row = map[wy];
             if (!row) continue;
-            for (let wx = camX; wx < camX + Math.ceil(cWidth / cw) + 1; wx++) {
+            for (let wx = wx0; wx <= wx1; wx++) {
                 const tile = row[wx];
                 if (!tile || tile.roomId == null) continue;
                 const px = (wx - camX) * cw;
@@ -862,10 +912,14 @@ export class OverlayRenderer {
         // Room borders: draw edges where roomId changes or tile exits the room
         ctx.globalAlpha = 0.7;
         ctx.lineWidth = 1.5;
-        for (let wy = camY; wy < camY + Math.ceil(cHeight / ch) + 1; wy++) {
+        const roomIdAt = (x, y) => {
+            const nr = map[y]; if (!nr) return null;
+            const nt = nr[x]; return nt ? nt.roomId : null;
+        };
+        for (let wy = wy0; wy <= wy1; wy++) {
             const row = map[wy];
             if (!row) continue;
-            for (let wx = camX; wx < camX + Math.ceil(cWidth / cw) + 1; wx++) {
+            for (let wx = wx0; wx <= wx1; wx++) {
                 const tile = row[wx];
                 if (!tile || tile.roomId == null) continue;
                 const px = (wx - camX) * cw;
@@ -882,15 +936,11 @@ export class OverlayRenderer {
                 else if (thq) { tierIdx = TOWN_HALL_TIER_INDEX.get(thq.tier) ?? 0; colors = townhallColors; }
                 ctx.strokeStyle = colors[Math.max(0, tierIdx)] || '#888899';
 
-                const neighborId = (dx, dy) => {
-                    const nr = map[wy + dy]; if (!nr) return null;
-                    const nt = nr[wx + dx]; return nt ? nt.roomId : null;
-                };
                 ctx.beginPath();
-                if (neighborId(0, -1) !== id) { ctx.moveTo(px, py); ctx.lineTo(px + cw, py); }
-                if (neighborId(0,  1) !== id) { ctx.moveTo(px, py + ch); ctx.lineTo(px + cw, py + ch); }
-                if (neighborId(-1, 0) !== id) { ctx.moveTo(px, py); ctx.lineTo(px, py + ch); }
-                if (neighborId( 1, 0) !== id) { ctx.moveTo(px + cw, py); ctx.lineTo(px + cw, py + ch); }
+                if (roomIdAt(wx, wy - 1) !== id) { ctx.moveTo(px, py); ctx.lineTo(px + cw, py); }
+                if (roomIdAt(wx, wy + 1) !== id) { ctx.moveTo(px, py + ch); ctx.lineTo(px + cw, py + ch); }
+                if (roomIdAt(wx - 1, wy) !== id) { ctx.moveTo(px, py); ctx.lineTo(px, py + ch); }
+                if (roomIdAt(wx + 1, wy) !== id) { ctx.moveTo(px + cw, py); ctx.lineTo(px + cw, py + ch); }
                 ctx.stroke();
             }
         }
@@ -917,7 +967,7 @@ export class OverlayRenderer {
         }
 
         // Artifact pedestals with finite radius (gold)
-        const allStructures = game.mapIndex.getAllStructurePositions();
+        const allStructures = this._structurePositions(game);
         for (const { x, y, type } of allStructures) {
             if (type !== 'artifact_pedestal') continue;
             const tile = game.map[y]?.[x];
@@ -961,7 +1011,7 @@ export class OverlayRenderer {
         for (const p of particles) {
             const sx = (p.x - camera.x) * cw;
             const sy = (p.y - camera.y) * ch;
-            if (sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20) continue;
+            if (sx < -20 || sx > this._w + 20 || sy < -20 || sy > this._h + 20) continue;
             const wobbleX = p.wobblePhase ? Math.sin(p.wobblePhase) * cw * 0.15 : 0;
             ctx.globalAlpha = Math.max(0, Math.min(1, p.life * (p.alpha || 1)));
             ctx.fillStyle = p.color;
@@ -1036,7 +1086,7 @@ export class OverlayRenderer {
         const pulse = 0.5 + 0.5 * Math.sin(now / cfg.pulsePeriodMs * Math.PI * 2);
         const alpha = intensity * (cfg.pulseMin + (1 - cfg.pulseMin) * pulse);
 
-        const w = this.canvas.width, h = this.canvas.height;
+        const w = this._w, h = this._h;
         const cx = w / 2, cy = h / 2;
         const inner = Math.min(w, h) * cfg.innerRadiusFrac;
         const outer = Math.max(w, h) * 0.75;
@@ -1053,8 +1103,8 @@ export class OverlayRenderer {
     // Tutorial pointer for map targets: a dashed box over the suggested tiles with a
     // bobbing arrow. If the tiles are off screen, an arrow on the screen edge points toward them.
     _renderTutorialMapHint(ctx, hint, cw, ch, camera, now) {
-        const W = this.canvas.width;
-        const H = this.canvas.height;
+        const W = this._w;
+        const H = this._h;
         const still = hint.reduceMotion;
         const pulse = still ? 0.5 : (Math.sin(now / 250) + 1) / 2;
         const bob = still ? 0 : Math.sin(now / 200) * 6;
@@ -1150,7 +1200,7 @@ export class OverlayRenderer {
                 if (Math.abs(dx) + Math.abs(dy) > radius) continue;
                 const sx = (x + dx - camera.x) * cw;
                 const sy = (y + dy - camera.y) * ch;
-                if (sx < -cw || sx > this.canvas.width || sy < -ch || sy > this.canvas.height) continue;
+                if (sx < -cw || sx > this._w || sy < -ch || sy > this._h) continue;
                 ctx.fillRect(sx, sy, cw, ch);
             }
         }

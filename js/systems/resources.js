@@ -60,6 +60,24 @@ export class ResourceManager {
         }
     }
 
+    // The inventory array for a non-stackable item type ('boots' -> this.boots,
+    // 'clothes' -> this.clothes, 'weapon' -> this.weapons). Naive pluralizing
+    // breaks on boots/clothes, so callers resolve arrays through here.
+    getItemArray(type) {
+        switch (type) {
+            case 'weapon':     return this.weapons;
+            case 'armor':      return this.armors;
+            case 'helmet':     return this.helmets;
+            case 'clothes':    return this.clothes;
+            case 'tool':       return this.tools;
+            case 'trinket':    return this.trinkets;
+            case 'boots':      return this.boots;
+            case 'tome':       return this.tomes;
+            case 'consumable': return this.consumables;
+            default:           return null;
+        }
+    }
+
     has(costs) {
         for (const [resource, amount] of Object.entries(costs)) {
             if (resource === 'foodstuffs') {

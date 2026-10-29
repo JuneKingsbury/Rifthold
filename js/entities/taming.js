@@ -97,18 +97,7 @@ export function releaseAnimal(animal, game) {
             if (t) addThought(bonded, t.text, t.moodEffect, t.duration, game.tick);
         }
     }
-    animal.tamed = false;
-    animal.fleeing = true;
-    animal.penX = undefined;
-    animal.penY = undefined;
-    animal.bondedColonistId = null;
-    animal.isPet = false;
-    animal.bondLevel = 0;
-    animal._feedTaskQueued = false;
-    animal.hunger = 0;
-    animal.roles = [];
-    animal.roleState = {};
-    animal.effects = [];
+    _returnToWild(animal, game);
 }
 
 function _escapeAnimal(animal, game) {
@@ -122,8 +111,16 @@ function _escapeAnimal(animal, game) {
             if (t) addThought(bonded, t.text, t.moodEffect, t.duration, game.tick);
         }
     }
+    _returnToWild(animal, game);
+}
+
+// Turns a tamed animal back into a wild one. It must rejoin game.wildAnimals,
+// the only list the wildlife AI updates, or it would freeze in place and block
+// its tile until the next load.
+function _returnToWild(animal, game) {
     animal.tamed = false;
     animal.fleeing = true;
+    animal.hostile = !!ANIMALS[animal.type]?.hostile;
     animal.penX = undefined;
     animal.penY = undefined;
     animal.bondedColonistId = null;
@@ -134,8 +131,8 @@ function _escapeAnimal(animal, game) {
     animal.roles = [];
     animal.roleState = {};
     animal.effects = [];
+    if (game.wildAnimals && !game.wildAnimals.includes(animal)) game.wildAnimals.push(animal);
 }
-
 
 export function designateTame(game, wildAnimalId) {
     if (!game.research.isResearched('beast_binding')) return false;

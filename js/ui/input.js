@@ -10,6 +10,25 @@ import { getSpellCooldownMult } from '../systems/complexBuildings.js';
 // sub-tile jitter would otherwise cross into the next tile and read as a drag.
 const DRAG_SELECT_PX = 4;
 
+// Wheel/trackpad zoom: the first wheel event after a pause (or a direction
+// reversal) zooms one step at once, so a single mouse-wheel notch always counts.
+// Within a continuing gesture, deltas accumulate and each WHEEL_STEP_PX of
+// travel is one more step, so a trackpad's stream of small events doesn't jump
+// straight to min/max zoom.
+const WHEEL_STEP_PX = 100;
+// Keys a focused <select> uses itself (single characters are its type-ahead).
+const SELECT_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'enter',
+    'home', 'end', 'pageup', 'pagedown', 'tab']);
+// Shared empty set for previews with no "unaffordable" tiles (never mutated).
+const EMPTY_SET = new Set();
+const WHEEL_GESTURE_GAP_MS = 200;
+
+// <input> types that take typed text. Other inputs (checkboxes, sliders,
+// buttons, colour pickers) keep focus after a click but don't consume keys, so
+// they must not swallow hotkeys or Esc.
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'password', 'number', 'tel', 'url',
+    'date', 'datetime-local', 'month', 'time', 'week']);
+
 export class InputHandler {
     constructor(game, preElement) {
         this.game = game;
@@ -46,11 +65,22 @@ export class InputHandler {
         this.charHeight = 0;
         this.measureCharSize();
 
-        document.addEventListener('keydown', (e) => this.onKeyDown(e));
-        document.addEventListener('keyup', (e) => this.onKeyUp(e));
+        // Listeners on document/window outlive this handler (a new one is built
+        // per game), so they are kept here for destroy() to remove. Canvas
+        // listeners go away with the canvas, which the renderer recreates.
+        this._onDocKeyDown = (e) => this.onKeyDown(e);
+        this._onDocKeyUp = (e) => this.onKeyUp(e);
+        this._onWindowMouseUp = (e) => { if (e.target !== preElement) this.cancelPointerDrag(e.button); };
+        this._onWindowBlur = () => this.cancelPointerDrag();
+        document.addEventListener('keydown', this._onDocKeyDown);
+        document.addEventListener('keyup', this._onDocKeyUp);
         preElement.addEventListener('mousedown', (e) => this.onMouseDown(e));
         preElement.addEventListener('mousemove', (e) => this.onMouseMove(e));
         preElement.addEventListener('mouseup', (e) => this.onMouseUp(e));
+        // A button released over the UI (or outside the window) never reaches the
+        // canvas, which would leave a middle-drag pan or a build/right drag stuck.
+        window.addEventListener('mouseup', this._onWindowMouseUp);
+        window.addEventListener('blur', this._onWindowBlur);
         preElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
         preElement.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
@@ -61,11 +91,67 @@ export class InputHandler {
         preElement.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
         preElement.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
 
+        this._wheelAccum = 0;
+        this._wheelDir = 0;
+        this._wheelLastTime = -Infinity;
         preElement.addEventListener('wheel', (e) => {
             e.preventDefault();
-            if (e.deltaY < 0) window.zoomIn?.();
-            else if (e.deltaY > 0) window.zoomOut?.();
+            this.onWheel(e);
         }, { passive: false });
+    }
+
+    onWheel(e) {
+        // Normalise to pixels: deltaMode 1 is lines, 2 is pages.
+        let dy = e.deltaY;
+        if (e.deltaMode === 1) dy *= 16;
+        else if (e.deltaMode === 2) dy *= window.innerHeight;
+        if (dy === 0) return;
+        const now = performance.now();
+        const dir = dy < 0 ? -1 : 1;
+        const newGesture = now - this._wheelLastTime > WHEEL_GESTURE_GAP_MS || dir !== this._wheelDir;
+        this._wheelLastTime = now;
+        let steps = 0;
+        if (newGesture) {
+            this._wheelDir = dir;
+            this._wheelAccum = 0;
+            steps = 1;
+        } else {
+            this._wheelAccum += Math.abs(dy);
+            while (this._wheelAccum >= WHEEL_STEP_PX) {
+                this._wheelAccum -= WHEEL_STEP_PX;
+                steps++;
+            }
+        }
+        for (let i = 0; i < steps; i++) {
+            if (dir < 0) window.zoomIn?.();
+            else window.zoomOut?.();
+        }
+    }
+
+    // Ends any in-progress pointer drag without applying it. Used when the button
+    // is released off the canvas or the window loses focus. `button` limits it
+    // to that button's drag (middle = pan); omit to cancel everything.
+    cancelPointerDrag(button) {
+        if (button === undefined || button === 1) this._middleDrag = false;
+        if (button === 1) return;
+        if (this.dragging || this._rightDrag) {
+            this.dragStart = null;
+            this.dragEnd = null;
+            this.dragging = false;
+            this._clickPos = null;
+            this._rightDrag = false;
+            this._downClient = null;
+        }
+    }
+
+    // Detaches the document/window listeners so a discarded game (return to
+    // menu, relaunch) stops reacting to input. Called from Game.destroy().
+    destroy() {
+        document.removeEventListener('keydown', this._onDocKeyDown);
+        document.removeEventListener('keyup', this._onDocKeyUp);
+        window.removeEventListener('mouseup', this._onWindowMouseUp);
+        window.removeEventListener('blur', this._onWindowBlur);
+        this.cancelPointerDrag();
     }
 
     measureCharSize() {
@@ -120,19 +206,31 @@ export class InputHandler {
         };
     }
 
+    // Affordable/blocked tile sets for the drag rectangle, drawn by the renderer
+    // every frame. The result only depends on the rectangle, the build/zone
+    // choice and the map/stockpile (which change as the simulation ticks), so it
+    // is cached on those and rebuilt only when one changes. Every new drag
+    // starts uncached (onMouseDown/onTouchStart), which covers blueprints placed
+    // while paused, when the tick doesn't advance.
     getBuildDragPreview() {
         if (!this.dragging) return null;
         const rect = this.getSelectionRect();
         if (!rect) return null;
+        if (this.mode !== 'zone' && (this.mode !== 'build' || !this.buildType || !BUILDINGS[this.buildType])) return null;
 
-        if (this.mode === 'zone') return this._getZoneDragPreview(rect);
+        const key = `${this.mode}|${this.buildType}|${!!this._rightDrag}|${rect.x1},${rect.y1},${rect.x2},${rect.y2}|${this.game.tick}`;
+        if (key === this._dragPreviewKey) return this._dragPreview;
+        this._dragPreviewKey = key;
+        this._dragPreview = this.mode === 'zone' ? this._getZoneDragPreview(rect) : this._computeBuildDragPreview(rect);
+        return this._dragPreview;
+    }
 
-        if (this.mode !== 'build' || !this.buildType) return null;
+    _computeBuildDragPreview(rect) {
         const def = BUILDINGS[this.buildType];
-        if (!def) return null;
         const affordable = new Set();
         const unaffordable = new Set();
         const blocked = new Set();
+        const costEntries = Object.entries(def.cost);
         const remaining = {};
         for (const [k, v] of Object.entries(this.game.resources.stockpile)) {
             remaining[k] = v;
@@ -154,11 +252,11 @@ export class InputHandler {
                     if (tile.structure && !PLANT_STRUCTURES.has(tile.structure)) { blocked.add(key); continue; }
                 }
                 let canAfford = true;
-                for (const [res, amt] of Object.entries(def.cost)) {
+                for (const [res, amt] of costEntries) {
                     if ((remaining[res] || 0) < amt) { canAfford = false; break; }
                 }
                 if (canAfford) {
-                    for (const [res, amt] of Object.entries(def.cost)) remaining[res] -= amt;
+                    for (const [res, amt] of costEntries) remaining[res] -= amt;
                     affordable.add(key);
                 } else {
                     unaffordable.add(key);
@@ -186,7 +284,7 @@ export class InputHandler {
                 }
             }
         }
-        return { affordable, unaffordable: new Set(), blocked };
+        return { affordable, unaffordable: EMPTY_SET, blocked };
     }
 
     // Named action handlers, keyed by the action names in DEFAULT_KEYMAP.
@@ -418,15 +516,27 @@ export class InputHandler {
 
     // True when the user is typing into a text field, so gameplay hotkeys
     // should not fire (e.g. naming a colony, editor text inputs).
+    // A focused <select> is handled separately (see onKeyDown): it only owns
+    // its navigation keys, so it isn't a typing target.
     _isTypingTarget() {
         const el = document.activeElement;
-        return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+        if (!el) return false;
+        if (el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+        return el.tagName === 'INPUT' && TEXT_INPUT_TYPES.has((el.type || 'text').toLowerCase());
     }
 
     onKeyDown(e) {
         if (this._isTypingTarget()) return;
 
         const key = e.key.toLowerCase();
+        // A focused <select> (settings dropdowns, colonist group) keeps focus after
+        // a change. Leave it the keys it uses (navigation, open/confirm, letter
+        // type-ahead); Esc blurs it and then works as usual, and other hotkeys pass.
+        const active = document.activeElement;
+        if (active && active.tagName === 'SELECT') {
+            if (key === 'escape') active.blur();
+            else if (SELECT_KEYS.has(key) || key.length === 1) return;
+        }
         this.keysDown.add(key);
 
         // Structural keys handled outside the rebindable keymap.
@@ -455,6 +565,10 @@ export class InputHandler {
                 return;
             }
         }
+
+        // The research panel uses Left/Right to switch tabs (its own document
+        // keydown listener), so those keys must not also pan the camera.
+        if ((key === 'arrowleft' || key === 'arrowright') && this.game.ui?.researchPanelVisible) return;
 
         const action = this.keyToAction[key];
         if (action) this.actions[action](e);
@@ -595,6 +709,9 @@ export class InputHandler {
     }
 
     onMouseDown(e) {
+        // A new gesture may follow placements made while paused (same tick), so
+        // never reuse the previous drag's preview.
+        this._dragPreviewKey = null;
         if (e.button === 1) {
             e.preventDefault();
             this._middleDrag = true;
@@ -670,6 +787,8 @@ export class InputHandler {
     }
 
     onMouseMove(e) {
+        // Middle button no longer held (released somewhere we didn't see): stop panning.
+        if (this._middleDrag && !(e.buttons & 4)) this._middleDrag = false;
         if (this._middleDrag) {
             const dx = e.clientX - this._middleLast.x;
             const dy = e.clientY - this._middleLast.y;
@@ -774,6 +893,7 @@ export class InputHandler {
     }
 
     onTouchStart(e) {
+        this._dragPreviewKey = null;
         e.preventDefault();
         if (e.touches.length === 2) {
             const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1335,7 +1455,7 @@ export class InputHandler {
         const nothingHere = colonistsHere.length === 0 && animalsHere.length === 0 && tamedHere.length === 0
             && summonsHere.length === 0 && raidersHere.length === 0 && waveEnemiesHere.length === 0;
         const bareTile = !tile.structure && !tile.floor && !tile.resource && !tile.zone
-            && tile.roomId === null && !tile.onFire;
+            && tile.roomId === null;
         if (nothingHere && bareTile) {
             this.game.radiusHighlight = null;
             this.game.ui.showColonyOverview();

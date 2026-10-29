@@ -282,15 +282,6 @@ export function updateColonist(colonist, game) {
     updateMana(colonist);
     tryAutocastSpells(colonist, game);
 
-    if (!CONFIG.PEACEFUL_MODE && colonist.traits.includes('pyromaniac') && Math.random() < TRAITS.pyromaniac.fireChance) {
-        const tile = game.map[colonist.y][colonist.x];
-        if (!tile.onFire && tile.terrain !== 'water' && tile.terrain !== 'rock' && tile.terrain !== 'tall_rock') {
-            tile.onFire = true;
-            tile.fireTimer = 0;
-            if (game.mapIndex) game.mapIndex.addFire(colonist.x, colonist.y);
-        }
-    }
-
     switch (colonist.state) {
         case 'idle': updateIdle(colonist, game); break;
         case 'moving': updateMoving(colonist, game); break;
@@ -540,14 +531,19 @@ function updateThoughts(colonist, game) {
     }
 
     if (game.waves) {
-        const aliveColonists = game.colonists.filter(c => c.hp > 0 && !c.golem);
-        const cap = game.waves.getColonistCap(game);
-        if (aliveColonists.length > cap) {
-            const sorted = aliveColonists.slice().sort((a, b) => a.id - b.id);
-            const myRank = sorted.indexOf(colonist);
-            if (myRank >= cap) {
-                addThought(colonist, THOUGHTS.unwanted.text, THOUGHTS.unwanted.moodEffect, 20, game.tick);
+        // The over-cap ranking is the same for every colonist, so build it once per tick.
+        if (game._unwantedTick !== game.tick) {
+            game._unwantedTick = game.tick;
+            game._unwantedIds = null;
+            const aliveColonists = game.colonists.filter(c => c.hp > 0 && !c.golem);
+            const cap = game.waves.getColonistCap(game);
+            if (aliveColonists.length > cap) {
+                const sorted = aliveColonists.slice().sort((a, b) => a.id - b.id);
+                game._unwantedIds = new Set(sorted.slice(cap).map(c => c.id));
             }
+        }
+        if (game._unwantedIds && game._unwantedIds.has(colonist.id)) {
+            addThought(colonist, THOUGHTS.unwanted.text, THOUGHTS.unwanted.moodEffect, 20, game.tick);
         }
     }
 }
@@ -959,7 +955,7 @@ function tickDotEffects(colonist, game) {
     if (!colonist.activeEffects) return;
     for (const e of colonist.activeEffects) {
         if (e.type === 'dot' && e.nextTick <= game.tick) {
-            colonistTakeDamage(colonist, e.damagePerTick, null, game);
+            colonistTakeDamage(colonist, e.damagePerTick, game, null, true);
             e.nextTick += e.tickInterval;
         }
         if (e.type === 'regen' && game.tick % (e.tickInterval || 5) === 0) {
@@ -1005,6 +1001,9 @@ export function grantCastXp(colonist, spell, game) {
     }
 }
 
+// Ticks before a colonist retries a spell that fizzled for lack of room.
+const SPELL_FIZZLE_RETRY_TICKS = 30;
+
 function tryAutocastSpells(colonist, game) {
     if (!colonist.knownSpells || colonist.knownSpells.length === 0) return;
     if (!colonist._spellCooldowns) colonist._spellCooldowns = {};
@@ -1017,6 +1016,7 @@ function tryAutocastSpells(colonist, game) {
         if (!isSpellAttuned(colonist, spell)) continue;
         const effectiveCooldown = spell.cooldown * getSpellCooldownMult(game) * getSpellCooldownFactor(colonist, spell);
         if (colonist._spellCooldowns[spellKey] && game.tick - colonist._spellCooldowns[spellKey] < effectiveCooldown) continue;
+        if (colonist._spellRetryAt?.[spellKey] > game.tick) continue;
         const effectiveCost = getEffectiveManaCost(colonist, spell);
         if (colonist.mana < effectiveCost) {
             game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'No mana', color: '#6688cc', fontSize: 10, ttl: 10, maxTtl: 10 });
@@ -1025,12 +1025,22 @@ function tryAutocastSpells(colonist, game) {
 
         if (!shouldCastSpell(colonist, spell, game)) continue;
 
+        const prevCastTick = colonist._spellCooldowns[spellKey];
         colonist.mana -= effectiveCost;
         colonist._spellCooldowns[spellKey] = game.tick;
+        if (applySpellEffect(colonist, spell, game) === false) {
+            // The spell fizzled (e.g. no room for a summon): refund it and retry a bit later.
+            colonist.mana += effectiveCost;
+            if (prevCastTick === undefined) delete colonist._spellCooldowns[spellKey];
+            else colonist._spellCooldowns[spellKey] = prevCastTick;
+            if (!colonist._spellRetryAt) colonist._spellRetryAt = {};
+            colonist._spellRetryAt[spellKey] = game.tick + SPELL_FIZZLE_RETRY_TICKS;
+            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'No room to summon', color: '#9966ff', fontSize: 10, ttl: 14, maxTtl: 14 });
+            continue;
+        }
         // Render latch for the per-school cast animation (js/ui/entity-animation.js).
         colonist._lastCastTick = game.tick;
         colonist._lastCastSchool = spell.school;
-        applySpellEffect(colonist, spell, game);
         grantCastXp(colonist, spell, game);
         applyThought(colonist, 'cast_spell', game.tick);
         game.story.checkMilestone('first_spell_cast', game);
@@ -1391,7 +1401,7 @@ function applySpellEffect(colonist, spell, game) {
             const sumHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
             const sumDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
             const sumDurMult = 1 + getEquipmentStat(colonist, 'summonDurationBonus');
-            spawnSummon(spell.summonType, sx, sy, colonist.id, game, sumHpMult, sumDmgMult, sumDurMult);
+            if (!spawnSummon(spell.summonType, sx, sy, colonist.id, game, sumHpMult, sumDmgMult, sumDurMult)) return false;
             break;
         }
         case 'divination_modifier': {
@@ -1585,10 +1595,12 @@ function applySpellEffect(colonist, spell, game) {
             const swarmHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
             const swarmDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
             const swarmDurMult = 1 + getEquipmentStat(colonist, 'summonDurationBonus');
+            let spawned = 0;
             for (let i = 0; i < count; i++) {
                 const [ox, oy] = ring[i % ring.length];
-                spawnSummon(spell.summonType, colonist.x + ox, colonist.y + oy, colonist.id, game, swarmHpMult, swarmDmgMult, swarmDurMult);
+                if (spawnSummon(spell.summonType, colonist.x + ox, colonist.y + oy, colonist.id, game, swarmHpMult, swarmDmgMult, swarmDurMult)) spawned++;
             }
+            if (spawned === 0) return false;
             window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
             break;
         }
@@ -1768,7 +1780,7 @@ function applySpellEffect(colonist, spell, game) {
             if (!summonDef) break;
             const sx = colonist.x + (Math.random() > 0.5 ? 1 : -1);
             const sy = colonist.y + (Math.random() > 0.5 ? 1 : -1);
-            spawnSummon(spell.summonType, sx, sy, colonist.id, game, 1, 1);
+            if (!spawnSummon(spell.summonType, sx, sy, colonist.id, game, 1, 1)) return false;
             window.soundManager?.playSFXAt('spell_cast', colonist.x, colonist.y);
             break;
         }
@@ -1819,7 +1831,31 @@ function countHarmful(c) {
     return c.activeEffects.reduce((n, e) => n + ((e.type === 'dot' || e.type === 'slow' || e.harmful) ? 1 : 0), 0);
 }
 
+// Records one "can't reach" vote by `colonist` on `record` (a task, or any object
+// carrying the same bookkeeping) and returns true once the task should be dropped.
+// Normally several distinct colonists must fail. A small colony may not have that
+// many able workers, so the distinct-failer bar is capped at the number of
+// colonists who could take the task, and repeat failures (spaced by the per-task
+// cooldown) make up the rest of the threshold.
+function recordUnreachableFailure(record, colonist, game) {
+    if (!record._unreachableFailers) record._unreachableFailers = {};
+    record._unreachableFailers[colonist.id] = true;
+    record._unreachableAttempts = (record._unreachableAttempts || 0) + 1;
+    const threshold = TASK_CONFIG.unreachableFailThreshold;
+    const able = game.colonists.reduce((n, c) =>
+        (c.hp > 0 && !c.onExpedition && (record.urgent || c.priorities?.[record.skillRequired] > 0)) ? n + 1 : n, 0);
+    return Object.keys(record._unreachableFailers).length >= Math.max(1, Math.min(threshold, able)) &&
+        record._unreachableAttempts >= threshold;
+}
+
 function updateIdle(colonist, game) {
+    // Being idle means any earlier walk was finished or interrupted. Drop its
+    // arrival intents so they don't fire at the end of an unrelated later path
+    // (e.g. falling asleep on arrival at a work task after a fight).
+    delete colonist._sleepAfterMove;
+    delete colonist._relaxAfterMove;
+    delete colonist._injuryRest;
+
     if (colonist.expeditionPending) return;
 
     if (colonist.drafted) {
@@ -1960,9 +1996,7 @@ function updateIdle(colonist, game) {
                     task._budgetFails = (task._budgetFails || 0) + 1;
                     cancel = task._budgetFails >= TASK_CONFIG.budgetFailThreshold;
                 } else {
-                    if (!task._unreachableFailers) task._unreachableFailers = {};
-                    task._unreachableFailers[colonist.id] = true;
-                    cancel = Object.keys(task._unreachableFailers).length >= TASK_CONFIG.unreachableFailThreshold;
+                    cancel = recordUnreachableFailure(task, colonist, game);
                 }
                 if (cancel) {
                     game.taskQueue.remove(task.id);
@@ -2006,7 +2040,8 @@ function updateIdle(colonist, game) {
             c.id !== colonist.id && c.hp > 0 && !c.onExpedition &&
             manhattanDist(colonist.x, colonist.y, c.x, c.y) <= socialRange
         );
-        if (!alreadyNear) {
+        // A failed search is not retried every idle tick (target walled off, etc.).
+        if (!alreadyNear && !(colonist._socialPathRetryAt && game.tick < colonist._socialPathRetryAt)) {
             const target = game.colonists.reduce((best, c) => {
                 if (c.id === colonist.id || c.hp <= 0 || c.onExpedition) return best;
                 const d = manhattanDist(colonist.x, colonist.y, c.x, c.y);
@@ -2019,6 +2054,7 @@ function updateIdle(colonist, game) {
                     colonist.state = 'moving';
                     return;
                 }
+                if (!path) colonist._socialPathRetryAt = game.tick + SOCIAL_PATH_RETRY_TICKS;
             }
         }
     }
@@ -2029,6 +2065,13 @@ function updateIdle(colonist, game) {
         colonist.wanderCooldown = COLONIST_CONFIG.wanderCooldown[0] + Math.floor(Math.random() * (COLONIST_CONFIG.wanderCooldown[1] - COLONIST_CONFIG.wanderCooldown[0]));
     }
 }
+
+// Ticks a colonist waits before re-searching after a failed social/draft/fight search.
+const SOCIAL_PATH_RETRY_TICKS = 60;
+const DRAFT_PATH_RETRY_TICKS = 30;
+const FIGHT_PATH_RETRY_TICKS = 10;
+// Move attempts a hunter may spend without getting closer before giving up.
+const HUNT_STUCK_LIMIT = 60;
 
 function wander(colonist, game) {
     const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -2428,7 +2471,7 @@ function updateWorking(colonist, game) {
     const skill = colonist.skills[task.skillRequired] || 1;
     speed *= (1 + skill * COLONIST_CONFIG.skillWorkBonus);
 
-    if (task.type === 'mine' && game.research.isResearched('stonework')) {
+    if (task.type === 'mine' && game.research.isResearched('runecraft')) {
         speed *= WORK_CONFIG.stoneworkMiningMult;
     }
     if (task.skillRequired === 'farming' && colonist.traits.includes('green_thumb')) {
@@ -2623,13 +2666,17 @@ function fightStepToward(colonist, dest, adjacent, game) {
     const path = colonist._fightPath;
     const offPath = !path || path.length === 0
         || (Math.abs(path[0].x - colonist.x) + Math.abs(path[0].y - colonist.y)) !== 1;
-    if (targetMoved || offPath) {
+    // After a failed search, wait a few ticks before retrying unless the target moved.
+    const backingOff = !targetMoved && colonist._fightPathRetryAt && game.tick < colonist._fightPathRetryAt;
+    if ((targetMoved || offPath) && !backingOff) {
         const fresh = adjacent
             ? findPathAdjacent(game.map, colonist.x, colonist.y, dest.x, dest.y, game._occupiedTiles)
             : findPath(game.map, colonist.x, colonist.y, dest.x, dest.y, game._occupiedTiles);
         colonist._fightPath = fresh || [];
         colonist._fightDest = { x: dest.x, y: dest.y };
+        colonist._fightPathRetryAt = fresh ? 0 : game.tick + FIGHT_PATH_RETRY_TICKS;
     }
+    if (!colonist._fightPath) colonist._fightPath = [];
     if (colonist._fightPath.length === 0) return;
     const next = colonist._fightPath[0];
     if (!isPassable(game.map, next.x, next.y)) { colonist._fightPath = []; return; }
@@ -2799,6 +2846,7 @@ function updateFighting(colonist, game) {
         target._killerColonist = colonist; // for the loot-drop effect on kill
         applyWeaponOnHit(weapon, target, game);
         spawnDamageText(game, target.x, target.y, dmg, '#ff4444', isCrit);
+        if (getEquipmentStat(colonist, 'lifeSteal')) colonist.hp = Math.min(colonist.maxHp, colonist.hp + Math.round(dmg * getEquipmentStat(colonist, 'lifeSteal')));
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
         if (game.settings?.showCombatParticles && !game.settings?.reduceMotion) {
@@ -2851,22 +2899,45 @@ function updateHunting(colonist, game) {
     const isRanged = weapon && weapon.ranged;
     const attackRange = isRanged ? getRangedWeaponRange(colonist, game) : 1;
 
+    if (colonist._huntStuckFor !== animal.id) {
+        colonist._huntStuckFor = animal.id;
+        colonist._huntStuck = 0;
+    }
+
     if (dist > attackRange) {
         if (colonist.moveCooldown > 0) {
             colonist.moveCooldown--;
             return;
         }
-        const dx = Math.sign(animal.x - colonist.x);
-        const dy = Math.sign(animal.y - colonist.y);
-        const moveBonus = getMoveSpeedBonus(colonist);
-        if (dx !== 0 && isPassable(game.map, colonist.x + dx, colonist.y)) {
-            const cost = getMoveCost(game.map, colonist.x + dx, colonist.y);
-            moveEntity(colonist, colonist.x + dx, colonist.y, computeMoveDuration(cost, moveBonus, game.speed));
-            colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
-        } else if (dy !== 0 && isPassable(game.map, colonist.x, colonist.y + dy)) {
-            const cost = getMoveCost(game.map, colonist.x, colonist.y + dy);
-            moveEntity(colonist, colonist.x, colonist.y + dy, computeMoveDuration(cost, moveBonus, game.speed));
-            colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
+        // Route around obstacles (same mover as combat) instead of a greedy step
+        // that stalls behind the first wall or river bend.
+        const fromX = colonist.x, fromY = colonist.y;
+        fightStepToward(colonist, animal, true, game);
+        if (colonist.x !== fromX || colonist.y !== fromY) {
+            colonist._huntStuck = 0;
+        } else if (++colonist._huntStuck >= HUNT_STUCK_LIMIT) {
+            // Can't get at the animal. Stop chasing so this colonist isn't stuck
+            // forever. The hunt task was consumed when the chase began, so its
+            // unreachable votes live on the animal and carry over to the re-queued
+            // task: repeated give-ups eventually drop the hunt instead of cycling.
+            colonist._huntStuck = 0;
+            colonist._huntStuckFor = null;
+            colonist.state = 'idle';
+            colonist._fightPath = [];
+            delete colonist.huntTargetId;
+            const votes = animal._huntUnreachable || (animal._huntUnreachable = { skillRequired: 'animals' });
+            if (recordUnreachableFailure(votes, colonist, game)) {
+                game.notifications.push({ text: `Cancelled unreachable hunt task`, tick: game.tick, type: 'warning' });
+            } else {
+                const retry = game.taskQueue.add({
+                    type: 'hunt', skillRequired: 'animals', x: animal.x, y: animal.y,
+                    workAmount: 1, skillXpGain: 1, targetAnimalId: animal.id,
+                });
+                retry._unreachableFailers = { ...votes._unreachableFailers };
+                retry._unreachableAttempts = votes._unreachableAttempts;
+                if (!colonist._failedTasks) colonist._failedTasks = {};
+                colonist._failedTasks[retry.id] = game.tick;
+            }
         }
         return;
     }
@@ -2944,11 +3015,30 @@ function updateFleeing(colonist, game) {
         return;
     }
 
-    const dx = Math.sign(colonist.x - threat.x);
-    const dy = Math.sign(colonist.y - threat.y);
-    const nx = colonist.x + dx;
-    const ny = colonist.y + dy;
-    if (isPassable(game.map, nx, ny)) {
+    // Cardinal steps only (a diagonal step could cut a wall corner). Prefer
+    // stepping away along the axis of greater separation, then the other axis,
+    // then a sidestep that at least keeps the current distance, so a colonist
+    // backed against an obstacle slides along it instead of freezing.
+    const curDist = manhattanDist(colonist.x, colonist.y, threat.x, threat.y);
+    const awayX = Math.sign(colonist.x - threat.x);
+    const awayY = Math.sign(colonist.y - threat.y);
+    const steps = [];
+    if (awayX !== 0) steps.push([awayX, 0]);
+    if (awayY !== 0) steps.push([0, awayY]);
+    if (Math.abs(colonist.y - threat.y) > Math.abs(colonist.x - threat.x)) steps.reverse();
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+        if (steps.some(([sx, sy]) => sx === dx && sy === dy)) continue;
+        if (manhattanDist(colonist.x + dx, colonist.y + dy, threat.x, threat.y) >= curDist) steps.push([dx, dy]);
+    }
+    let pick = null;
+    for (const [dx, dy] of steps) {
+        const nx = colonist.x + dx, ny = colonist.y + dy;
+        if (!isPassable(game.map, nx, ny)) continue;
+        if (!game.isTileOccupied(nx, ny)) { pick = [nx, ny]; break; }
+        if (!pick) pick = [nx, ny];
+    }
+    if (pick) {
+        const [nx, ny] = pick;
         const cost = getMoveCost(game.map, nx, ny);
         const moveBonus = getMoveSpeedBonus(colonist);
         moveEntity(colonist, nx, ny, computeMoveDuration(cost, moveBonus, game.speed));
@@ -2976,9 +3066,29 @@ function updateDrafted(colonist, game) {
         return;
     }
     if (colonist.draftTarget) {
+        const dt = colonist.draftTarget;
+        // A path left over from before a fight (or one a new wall now crosses) no
+        // longer starts next to the colonist. Following it would teleport them. A
+        // path that ends somewhere else belongs to an earlier rally point.
+        const last = colonist.path[colonist.path.length - 1];
+        const stale = colonist.path.length > 0 &&
+            (manhattanDist(colonist.x, colonist.y, colonist.path[0].x, colonist.path[0].y) !== 1 ||
+             !isPassable(game.map, colonist.path[0].x, colonist.path[0].y) ||
+             last.x !== dt.x || last.y !== dt.y);
+        if (stale) colonist.path = [];
         if (colonist.path.length === 0) {
-            const path = findPath(game.map, colonist.x, colonist.y, colonist.draftTarget.x, colonist.draftTarget.y, game._occupiedTiles);
-            if (path) colonist.path = path;
+            // Don't re-run a failed search every tick. A new draft target retries at once.
+            const fail = colonist._draftPathFail;
+            const backingOff = fail && fail.x === dt.x && fail.y === dt.y && game.tick < fail.until;
+            if (!backingOff) {
+                const path = findPath(game.map, colonist.x, colonist.y, dt.x, dt.y, game._occupiedTiles);
+                if (path) {
+                    colonist.path = path;
+                    colonist._draftPathFail = null;
+                } else {
+                    colonist._draftPathFail = { x: dt.x, y: dt.y, until: game.tick + DRAFT_PATH_RETRY_TICKS };
+                }
+            }
         }
         if (colonist.path.length > 0) {
             const next = colonist.path[0];
@@ -2998,7 +3108,7 @@ function updateDrafted(colonist, game) {
                 moveEntity(colonist, next.x, next.y, dur);
                 colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
             } else {
-                colonist.path.shift();
+                colonist.path = []; // blocked: re-route next tick rather than skip the step
             }
         }
         if (colonist.x === colonist.draftTarget.x && colonist.y === colonist.draftTarget.y) {
@@ -3041,10 +3151,29 @@ function isIndoors(colonist, map) {
     return tile && tile.roomId !== null;
 }
 
-export function colonistTakeDamage(colonist, damage, game, attacker) {
-    let dodgeChance = getEquipmentStat(colonist, 'dodgeChance');
-    if (colonist.traits.includes('duelist')) dodgeChance += TRAITS.duelist.dodgeChance;
-    const evasionEff = colonist.activeEffects?.find(e => e.type === 'evasion' && game.tick < e.expiresAt);
+// Releases every task the colonist holds (and the station reservations that go
+// with them) and drops its movement/hunt state. Call on every death path: a dead
+// colonist's in-progress task would otherwise keep its workbench busy forever,
+// including across save/load.
+export function releaseColonistTasks(colonist, game) {
+    const queue = game.taskQueue;
+    if (queue) {
+        if (colonist.currentTaskId) queue.release(colonist.currentTaskId);
+        for (const t of queue.getAll()) {
+            if (t.assignedTo === colonist.id) queue.release(t.id);
+        }
+    }
+    colonist.currentTaskId = null;
+    colonist.path = [];
+    delete colonist.huntTargetId;
+}
+
+// `isDot` marks damage-over-time ticks: they can't be dodged, don't trigger
+// retaliation or on-hit effects, and don't pull the colonist into combat.
+export function colonistTakeDamage(colonist, damage, game, attacker, isDot = false) {
+    let dodgeChance = isDot ? 0 : getEquipmentStat(colonist, 'dodgeChance');
+    if (!isDot && colonist.traits.includes('duelist')) dodgeChance += TRAITS.duelist.dodgeChance;
+    const evasionEff = !isDot && colonist.activeEffects?.find(e => e.type === 'evasion' && game.tick < e.expiresAt);
     if (evasionEff) dodgeChance += evasionEff.dodgeChance || 0;
     dodgeChance = Math.min(0.75, dodgeChance);
     if (dodgeChance > 0 && Math.random() < dodgeChance) {
@@ -3155,7 +3284,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
         }
     }
 
-    if (colonist.state !== 'fighting' && colonist.state !== 'fleeing' && colonist.hp > 0) {
+    if (!isDot && colonist.state !== 'fighting' && colonist.state !== 'fleeing' && colonist.hp > 0) {
         game.eventLog.add(game, `${colonist.name} is under attack!`, 'danger', { type: 'colonist', id: colonist.id });
     }
 
@@ -3181,6 +3310,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
         if (!revived) {
             colonist.hp = 0;
             colonist.state = 'dead';
+            releaseColonistTasks(colonist, game);
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.deathChar, color: COMBAT_VISUALS.deathColor, ttl: COMBAT_VISUALS.deathTtl });
             window.soundManager?.playSFXAt('colonist_death', colonist.x, colonist.y);
             game.eventLog.add(game, `${colonist.name} has died!`, 'danger', { type: 'colonist', id: colonist.id });
@@ -3215,7 +3345,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker) {
                 }
             }
         }
-    } else if (colonist.state !== 'fighting' && colonist.state !== 'fleeing') {
+    } else if (!isDot && colonist.state !== 'fighting' && colonist.state !== 'fleeing') {
         colonist.state = 'fighting';
     }
 }

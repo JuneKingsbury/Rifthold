@@ -822,7 +822,6 @@ img.pixel-art-icon {
 }
 
 .info-row { margin: 3px 0; color: #ccc; }
-.info-row.fire { color: #ff4400; font-weight: bold; }
 
 /* Persistent Colony Summary footer inside the info panel. When a tile/structure
    is selected it sits below that info (separated); when nothing is selected the

@@ -1,5 +1,6 @@
 import { CONFIG } from '../core/config.js';
 import { Minimap, MAP_LAYERS, MAP_TERRAIN_KEY, CRYPT_STATE_KEY, defaultMapLayers } from './minimap.js';
+import { escapeHtml } from './ui-utils.js';
 
 const LAYER_STORAGE_KEY = 'rifthold_fullmap_layers';
 
@@ -64,16 +65,18 @@ const mapPanelMethods = {
             canvas.style.width = '';
             canvas.style.height = '';
             this._wireMapTooltip(canvas);
-            panel.addEventListener('change', (e) => {
+            // The panel element persists across games while a UI is built per
+            // game, so register through _listen for UI.destroy() to remove.
+            this._listen(panel, 'change', (e) => {
                 const box = e.target.closest('[data-map-layer]');
                 if (!box) return;
                 this._mapLayers[box.dataset.mapLayer] = box.checked;
                 saveLayers(this._mapLayers);
-                // Terrain colours depend on the tree/ore/building/farm/fire layers.
+                // Terrain colours depend on the tree/ore/building/farm layers.
                 this.fullMap.markTerrainDirty();
                 this.updateMapPanel();
             });
-            panel.addEventListener('click', (e) => {
+            this._listen(panel, 'click', (e) => {
                 const action = e.target.closest('[data-map-action]')?.dataset.mapAction;
                 if (!action) return;
                 for (const l of MAP_LAYERS) this._mapLayers[l.key] = action === 'all';
@@ -90,6 +93,8 @@ const mapPanelMethods = {
 
     // Hover tooltip naming the unit, crypt, anchor or landmark under the cursor.
     _wireMapTooltip(canvas) {
+        // A previous game's UI may have left its tooltip behind; reuse the id once.
+        document.getElementById('fullmap-tooltip')?.remove();
         const tip = document.createElement('div');
         tip.id = 'fullmap-tooltip';
         document.body.appendChild(tip);
@@ -115,12 +120,12 @@ const mapPanelMethods = {
 
     _mapPanelHtml() {
         const layerRows = MAP_LAYERS.map(l =>
-            `<label class="map-layer-row" title="${l.desc}">` +
-            `<input type="checkbox" data-map-layer="${l.key}"${this._mapLayers[l.key] ? ' checked' : ''}>` +
-            `${swatch(l.color)}<span class="map-layer-text"><b>${l.label}</b><small>${l.desc}</small></span></label>`
+            `<label class="map-layer-row" title="${escapeHtml(l.desc)}">` +
+            `<input type="checkbox" data-map-layer="${escapeHtml(l.key)}"${this._mapLayers[l.key] ? ' checked' : ''}>` +
+            `${swatch(l.color)}<span class="map-layer-text"><b>${escapeHtml(l.label)}</b><small>${escapeHtml(l.desc)}</small></span></label>`
         ).join('');
-        const terrainRows = MAP_TERRAIN_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${t.label}</span>`).join('');
-        const cryptRows = CRYPT_STATE_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${t.label}</span>`).join('');
+        const terrainRows = MAP_TERRAIN_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${escapeHtml(t.label)}</span>`).join('');
+        const cryptRows = CRYPT_STATE_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${escapeHtml(t.label)}</span>`).join('');
         const doneRow = '<span class="map-key-item" title="All chests opened and, if it has one, its rift anchor attuned"><span class="map-check">&#10003;</span>Complete</span>';
         return '<div class="panel-close" data-panel-close="map">&times;</div>' +
             '<h3>World Map</h3>' +

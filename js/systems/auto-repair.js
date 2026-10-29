@@ -19,8 +19,7 @@ export function updateAutoRepair(game, structurePositions = game.mapIndex.getAll
         if (tile.structureHp === undefined) continue;
         const maxHp = BUILDINGS[tile.structure]?.hp;
         if (!maxHp || tile.structureHp >= maxHp) continue;
-        const existing = game.taskQueue.getByPosition(x, y);
-        if (existing) continue;
+        if (game.taskQueue.hasTaskTypeAt(x, y, 'repair') || game.taskQueue.hasTaskTypeAt(x, y, 'deconstruct')) continue;
         game.taskQueue.add({
             type: 'repair',
             skillRequired: 'building',
@@ -30,12 +29,16 @@ export function updateAutoRepair(game, structurePositions = game.mapIndex.getAll
     }
     const anvils = structurePositions.filter(s => s.type === 'anvil');
     if (anvils.length === 0) return;
+    // Trinket repair costs 1 runite (paid when the task completes), so only
+    // queue new repairs while the colony can afford one.
+    const canAffordRepair = (game.resources.stockpile.runite || 0) >= 1;
     for (const c of game.colonists) {
         if (c.hp <= 0 || !c.trinketBroken || !c.trinket) continue;
         const anvil = anvils[0];
         const existing = game.taskQueue.getAll().find(t => t.type === 'repair_trinket' && t.colonistId === c.id);
         if (existing) { c._repairQueued = true; continue; }
         c._repairQueued = false;
+        if (!canAffordRepair) continue;
         game.taskQueue.add({
             type: 'repair_trinket',
             skillRequired: 'crafting',

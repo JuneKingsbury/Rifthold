@@ -120,7 +120,7 @@ export const ENEMY_BLOCKED_STRUCTURES = new Set(
     Object.entries(BUILDINGS).filter(([, b]) => b.passable && !b.passable.enemy).map(([k]) => k)
 );
 // Structures the player can neither place nor remove (e.g. the Arcane Core, which only
-// exists in pre-generated ruins). Guards deconstruction, replacement and fire.
+// exists in pre-generated ruins). Guards deconstruction and replacement.
 export const INDESTRUCTIBLE_STRUCTURES = new Set(
     Object.entries(BUILDINGS).filter(([, b]) => b.indestructible).map(([k]) => k)
 );

@@ -7,12 +7,12 @@ import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
-import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip } from './ui-utils.js';
+import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
 import { getRoleInfoHtml, getEffectInfoHtml } from '../entities/roles.js';
-import { keybindingRowsHtml, beginRebindCapture, formatKeyLabel } from './keybindings-ui.js';
+import { keybindingRowsHtml, beginRebindCapture, cancelRebindCapture, formatKeyLabel } from './keybindings-ui.js';
 import { statBarHtml, runStatBarPass, statBarFactors } from './stat-bar.js';
 import { installArcanePanel } from './ui-arcane.js';
 import { getGdriveAPI } from '../core/gdrive-web.js';
@@ -63,6 +63,11 @@ function salvagePreview(item, game) {
         .join(', ');
 }
 
+// Expedition canvas animation state, reset on a new game or load.
+function freshExpVisState() {
+    return { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, _prevExpStatus: null, _arriveFrame: 0, _seenDiscoveryTick: 0, _seenResolutionTick: 0, _seenFatigueTick: 0, _seenRallyTick: 0, summonLastPos: {} };
+}
+
 export class UI {
     constructor(game) {
         this.game = game;
@@ -79,7 +84,7 @@ export class UI {
         this._arcaneTab = 'expeditions';
         this._arcaneExpSetup = null;
         this._lastArcaneHtml = '';
-        this._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, _prevExpStatus: null, _arriveFrame: 0, _seenDiscoveryTick: 0, _seenResolutionTick: 0, _seenFatigueTick: 0, _seenRallyTick: 0, summonLastPos: {} };
+        this._expVisState = freshExpVisState();
         this.storyPanelVisible = false;
         this.mapPanelVisible = false;
         this._storyTab = 'colony';
@@ -101,17 +106,28 @@ export class UI {
         this.initElements();
     }
 
+    // addEventListener that records the listener so destroy() can remove it.
+    // Use for anything outliving this UI instance: document, window, and the
+    // persistent index.html panels (a new UI is built for every game).
+    _listen(target, type, fn, opts) {
+        if (!target) return;
+        target.addEventListener(type, fn, opts);
+        (this._listeners || (this._listeners = [])).push([target, type, fn, opts]);
+    }
+
     initElements() {
         this.elements.statusBar = document.getElementById('status-bar');
-        document.getElementById('btn-pause').addEventListener('click', () => { if (!this.game.paused) this.game.togglePause(); });
-        document.getElementById('btn-speed-1').addEventListener('click', () => this.game.setSpeed(1));
-        document.getElementById('btn-speed-2').addEventListener('click', () => this.game.setSpeed(2));
-        document.getElementById('btn-speed-3').addEventListener('click', () => this.game.setSpeed(3));
-        document.getElementById('btn-settings').addEventListener('click', () => this.game.toggleSettingsPanel());
+        this._listen(document.getElementById('btn-pause'), 'click', () => { if (!this.game.paused) this.game.togglePause(); });
+        this._listen(document.getElementById('btn-speed-1'), 'click', () => this.game.setSpeed(1));
+        this._listen(document.getElementById('btn-speed-2'), 'click', () => this.game.setSpeed(2));
+        this._listen(document.getElementById('btn-speed-3'), 'click', () => this.game.setSpeed(3));
+        this._listen(document.getElementById('btn-settings'), 'click', () => this.game.toggleSettingsPanel());
         this.elements.infoPanel = document.getElementById('info-content');
         this.elements.colonySummary = document.getElementById('colony-summary');
-        this.elements.infoPanel.addEventListener('mouseleave', () => {
-            if (this._pendingColonistInfoHtml) {
+        this._listen(this.elements.infoPanel, 'mouseleave', () => {
+            // Only flush if the deferred HTML still belongs to the viewed colonist:
+            // a selection change since it was queued makes it stale.
+            if (this._pendingColonistInfoHtml && this._pendingColonistInfoId === this._viewingColonistId) {
                 this.elements.infoPanel.innerHTML = this._pendingColonistInfoHtml;
                 this._pendingColonistInfoHtml = null;
                 // Set bar widths on the freshly-swapped elements right away so
@@ -119,7 +135,7 @@ export class UI {
                 this.animateStatBars(0);
             }
         });
-        this.elements.infoPanel.addEventListener('click', (e) => {
+        this._listen(this.elements.infoPanel, 'click', (e) => {
             if (e.target.closest('[data-open-attune]')) {
                 this._prioTab = 'attune';
                 if (!this.priorityPanelVisible) this.togglePriorityPanel();
@@ -128,7 +144,7 @@ export class UI {
         });
         // The persistent Colony Summary defers its rebuild while hovered (so a
         // click on an alert row isn't lost to a mid-hover swap), then flushes.
-        this.elements.colonySummary.addEventListener('mouseleave', () => {
+        this._listen(this.elements.colonySummary, 'mouseleave', () => {
             if (this._pendingSummaryHtml) {
                 this.elements.colonySummary.innerHTML = this._pendingSummaryHtml;
                 this._pendingSummaryHtml = null;
@@ -136,7 +152,7 @@ export class UI {
             }
         });
         // Colony Summary alert rows jump to the flagged colonist.
-        this.elements.colonySummary.addEventListener('click', (e) => {
+        this._listen(this.elements.colonySummary, 'click', (e) => {
             const alertRow = e.target.closest('.overview-alert[data-colonist-id]');
             if (alertRow) {
                 this.game.selectColonistById(parseInt(alertRow.dataset.colonistId));
@@ -150,8 +166,8 @@ export class UI {
         this.elements.eventPanel = document.getElementById('event-panel');
         this.elements.colonistHud = document.getElementById('colonist-hud');
         this._colonistHudHovered = false;
-        this.elements.colonistHud.addEventListener('mouseenter', () => { this._colonistHudHovered = true; });
-        this.elements.colonistHud.addEventListener('mouseleave', () => {
+        this._listen(this.elements.colonistHud, 'mouseenter', () => { this._colonistHudHovered = true; });
+        this._listen(this.elements.colonistHud, 'mouseleave', () => {
             this._colonistHudHovered = false;
             if (this._pendingHudHtml) {
                 this.elements.colonistHud.innerHTML = this._pendingHudHtml;
@@ -170,7 +186,7 @@ export class UI {
 
         this.initTutorialNote();
 
-        this.elements.storyPanel.addEventListener('click', (e) => {
+        this._listen(this.elements.storyPanel, 'click', (e) => {
             const tab = e.target.closest('[data-story-tab]');
             if (tab) {
                 this._storyTab = tab.dataset.storyTab;
@@ -222,7 +238,7 @@ export class UI {
             }
         });
 
-        this.elements.arcanePanel.addEventListener('click', (e) => {
+        this._listen(this.elements.arcanePanel, 'click', (e) => {
             const tab = e.target.closest('[data-arcane-tab]');
             if (tab) {
                 this._arcaneTab = tab.dataset.arcaneTab;
@@ -237,7 +253,7 @@ export class UI {
             }
         });
 
-        this.elements.craftPanel.addEventListener('click', (e) => {
+        this._listen(this.elements.craftPanel, 'click', (e) => {
             const tab = e.target.closest('[data-craft-tab]');
             if (tab) {
                 this._craftTab = tab.dataset.craftTab;
@@ -298,7 +314,7 @@ export class UI {
             }
         });
 
-        this.elements.researchPanel.addEventListener('click', (e) => {
+        this._listen(this.elements.researchPanel, 'click', (e) => {
             const toggle = e.target.closest('[data-research-hide-toggle]');
             if (toggle) {
                 this._researchHideCompleted = !this._researchHideCompleted;
@@ -324,7 +340,7 @@ export class UI {
             }
         });
 
-        this.elements.colonistHud.addEventListener('click', (e) => {
+        this._listen(this.elements.colonistHud, 'click', (e) => {
             const row = e.target.closest('[data-colonist-id]');
             if (row) {
                 this.game.selectColonistById(parseInt(row.dataset.colonistId));
@@ -333,7 +349,7 @@ export class UI {
 
         // Drag-to-reorder colonist rows
         let _dragColonistId = null;
-        this.elements.colonistHud.addEventListener('dragstart', (e) => {
+        this._listen(this.elements.colonistHud, 'dragstart', (e) => {
             const row = e.target.closest('[data-drag-colonist-id]');
             if (!row) return;
             if (this._colonistHudLocked) { e.preventDefault(); return; }
@@ -346,13 +362,13 @@ export class UI {
                 el.classList.remove('hud-drop-before', 'hud-drop-after', 'hud-drop-target');
             });
         };
-        this.elements.colonistHud.addEventListener('dragend', (e) => {
+        this._listen(this.elements.colonistHud, 'dragend', (e) => {
             const row = e.target.closest('[data-drag-colonist-id]');
             if (row) row.style.opacity = '';
             _dragColonistId = null;
             _clearDropIndicators();
         });
-        this.elements.colonistHud.addEventListener('dragover', (e) => {
+        this._listen(this.elements.colonistHud, 'dragover', (e) => {
             if (_dragColonistId == null) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
@@ -369,12 +385,12 @@ export class UI {
                 target.classList.add(before ? 'hud-drop-before' : 'hud-drop-after');
             }
         });
-        this.elements.colonistHud.addEventListener('dragleave', (e) => {
+        this._listen(this.elements.colonistHud, 'dragleave', (e) => {
             if (!this.elements.colonistHud.contains(e.relatedTarget)) {
                 _clearDropIndicators();
             }
         });
-        this.elements.colonistHud.addEventListener('drop', (e) => {
+        this._listen(this.elements.colonistHud, 'drop', (e) => {
             e.preventDefault();
             _clearDropIndicators();
             if (_dragColonistId == null) return;
@@ -425,7 +441,7 @@ export class UI {
             }
         });
 
-        this.elements.eventLog.addEventListener('click', (e) => {
+        this._listen(this.elements.eventLog, 'click', (e) => {
             const row = e.target.closest('[data-entity]');
             if (row) {
                 const data = JSON.parse(row.dataset.entity);
@@ -433,7 +449,7 @@ export class UI {
             }
         });
 
-        this.elements.modeBar.addEventListener('click', (e) => {
+        this._listen(this.elements.modeBar, 'click', (e) => {
             const catOpt = e.target.closest('[data-build-cat]');
             if (catOpt) {
                 this.game.input.setBuildCategory(catOpt.dataset.buildCat);
@@ -535,16 +551,16 @@ export class UI {
             this._positionBuildTooltip(e);
         };
 
-        this.elements.buildPanel.addEventListener('click', buildOptClick);
-        this.elements.buildPanel.addEventListener('mouseover', buildOptHover);
-        this.elements.buildPanel.addEventListener('mouseout', buildOptOut);
-        this.elements.buildPanel.addEventListener('mousemove', buildOptMove);
+        this._listen(this.elements.buildPanel, 'click', buildOptClick);
+        this._listen(this.elements.buildPanel, 'mouseover', buildOptHover);
+        this._listen(this.elements.buildPanel, 'mouseout', buildOptOut);
+        this._listen(this.elements.buildPanel, 'mousemove', buildOptMove);
 
-        this.elements.modeBar.addEventListener('mouseover', buildOptHover);
-        this.elements.modeBar.addEventListener('mouseout', buildOptOut);
-        this.elements.modeBar.addEventListener('mousemove', buildOptMove);
+        this._listen(this.elements.modeBar, 'mouseover', buildOptHover);
+        this._listen(this.elements.modeBar, 'mouseout', buildOptOut);
+        this._listen(this.elements.modeBar, 'mousemove', buildOptMove);
 
-        this.elements.priorityPanel.addEventListener('click', (e) => {
+        this._listen(this.elements.priorityPanel, 'click', (e) => {
             const tabBtn = e.target.closest('[data-prio-tab]');
             if (tabBtn) {
                 this._prioTab = tabBtn.dataset.prioTab;
@@ -602,7 +618,7 @@ export class UI {
             }
         });
 
-        this.elements.priorityPanel.addEventListener('contextmenu', (e) => {
+        this._listen(this.elements.priorityPanel, 'contextmenu', (e) => {
             e.preventDefault();
             const cell = e.target.closest('[data-colonist-id][data-skill]');
             if (cell) {
@@ -625,7 +641,7 @@ export class UI {
             }
         });
 
-        this.elements.priorityPanel.addEventListener('keydown', (e) => {
+        this._listen(this.elements.priorityPanel, 'keydown', (e) => {
             if (e.key === 'Enter') {
                 const input = e.target.closest('[data-add-group-input]');
                 if (input) {
@@ -638,7 +654,7 @@ export class UI {
             }
         });
 
-        this.elements.inventoryPanel.addEventListener('click', (e) => {
+        this._listen(this.elements.inventoryPanel, 'click', (e) => {
             const tabBtn = e.target.closest('[data-inv-tab]');
             if (tabBtn) {
                 this._invTab = tabBtn.dataset.invTab;
@@ -714,7 +730,7 @@ export class UI {
             }
         });
 
-        this.elements.inventoryPanel.addEventListener('change', (e) => {
+        this._listen(this.elements.inventoryPanel, 'change', (e) => {
             const rebondSel = e.target.closest('[data-animal-rebond]');
             if (rebondSel) {
                 this.game.rebondAnimal(parseInt(rebondSel.dataset.animalRebond), parseInt(rebondSel.value));
@@ -738,7 +754,7 @@ export class UI {
             }
         });
 
-        this.elements.inventoryPanel.addEventListener('keydown', (e) => {
+        this._listen(this.elements.inventoryPanel, 'keydown', (e) => {
             const input = e.target.closest('[data-animal-rename-input]');
             if (!input) return;
             if (e.key === 'Enter') {
@@ -756,7 +772,7 @@ export class UI {
             }
         });
 
-        document.addEventListener('mousedown', (e) => {
+        this._listen(document, 'mousedown', (e) => {
             const closeBtn = e.target.closest('[data-panel-close]');
             if (!closeBtn) return;
             e.preventDefault();
@@ -785,7 +801,7 @@ export class UI {
             uiTooltip.style.left = left + 'px';
             uiTooltip.style.top = top + 'px';
         };
-        document.addEventListener('mouseover', (e) => {
+        this._listen(document, 'mouseover', (e) => {
             const compareTip = e.target.closest('.skill-tip[data-compare]');
             if (compareTip) {
                 uiTooltip.innerHTML = compareTip.dataset.compare;
@@ -799,7 +815,7 @@ export class UI {
             uiTooltip.style.opacity = '1';
             _positionTooltip(tip.getBoundingClientRect());
         });
-        document.addEventListener('mouseout', (e) => {
+        this._listen(document, 'mouseout', (e) => {
             const compareTip = e.target.closest('.skill-tip[data-compare]');
             if (compareTip) {
                 const related = e.relatedTarget;
@@ -813,6 +829,104 @@ export class UI {
             if (related && related.closest && related.closest('.skill-tip[data-tip]')) return;
             uiTooltip.style.opacity = '0';
         });
+    }
+
+    // Tear down the listeners (document and persistent panels) and body-level
+    // elements this instance added, so a UI from a finished game doesn't keep
+    // reacting after Game.destroy().
+    destroy() {
+        cancelRebindCapture();
+        this._removeResearchKeyboard?.();
+        for (const [target, type, fn, opts] of this._listeners || []) target.removeEventListener(type, fn, opts);
+        this._listeners = [];
+        clearTimeout(this._tipTimer);
+        clearTimeout(this._buildTooltipTimer);
+        // Detach but keep the reference: listeners on persistent panel elements
+        // may still touch it.
+        this._buildTooltip?.remove();
+        const uiTooltip = document.getElementById('ui-tooltip');
+        if (uiTooltip) uiTooltip.style.opacity = '0';
+    }
+
+    // Reset all per-game UI view state after a load or new game, so nothing from
+    // the previous game (selection, deferred panel HTML, cached panel strings,
+    // open selection-dependent panels, half-done trades) leaks into this one.
+    // Called by Game after the new state is in place.
+    onGameLoaded() {
+        cancelRebindCapture();
+        this._closeAllPanels();
+        // End any panel pause session without touching the loaded pause state.
+        this._panelSessionActive = false;
+        this._wasPausedBeforePanel = false;
+        this._updateOverlay();
+        this.hideTileTooltip();
+        this._hideBuildTooltip();
+
+        // Selection and deferred info-panel HTML.
+        this._viewingColonistId = null;
+        this._pendingColonistInfoHtml = null;
+        this._pendingColonistInfoId = null;
+        this._lastColonistInfoHtml = null;
+        this._viewingRiftGate = false;
+        this._viewingRitualAltar = false;
+        this._riftPortalChain = null;
+        this._lastTileInfo = null;
+        this._colonistViewingSet = {};
+        this._renamingAnimalId = null;
+        this._releasingAnimalId = null;
+        this._pendingSummaryHtml = null;
+        this._lastSummaryHtml = null;
+        this._pendingHudHtml = null;
+        this._lastHudHtml = null;
+
+        // Cached panel HTML / change-detection signatures.
+        this._lastPrioHtml = null;
+        this._prioProfileDraft = null;
+        this._prioProfileDraftSource = null;
+        this._lastCraftHtml = null;
+        this._lastInvHtml = null;
+        this._lastEventLogHtml = null;
+        this._lastResearchHtml = null;
+        this._lastStoryHtml = '';
+        this._storyNewAtOpen = new Set();
+        this._lastStoryHasNew = false;
+        this._lastResearchNeedsAttention = false;
+        this._lastManaCrystalBonus = undefined;
+        this._lastExpPending = undefined;
+        this._lastResHtml = null;
+        this._lastColonyHtml = null;
+        this._lastDatetimeHtml = null;
+        this._lastStatusTick = -1;
+        this._resPunchValues = {};
+        this._notifSig = null;
+        this._notifKeys = new Set();
+        this._bossPhaseView.clear();
+        this._statBarState.clear();
+
+        // Event / trade panel.
+        this._lastEventId = null;
+        this._tradeOpen = false;
+        this._tradeDirty = false;
+        this._tradeOffer = null;
+        this._tradeRequest = null;
+        this._tradeGoldOffer = 0;
+        if (this.elements.eventPanel) {
+            this.elements.eventPanel.style.display = 'none';
+            this.elements.eventPanel.className = '';
+        }
+
+        // Arcane / expedition panel.
+        this._lastArcaneHtml = '';
+        this._arcaneExpSetup = null;
+        this._savedMutators = null;
+        this._savedPotions = null;
+        this._expVisState = freshExpVisState();
+
+        // Rebuild what's always visible from the new state.
+        this.showColonyOverview();
+        this.forceStatusBarRefresh();
+        this.forceUpdateColonistHud();
+        if (this.game.input) this.updateModeDisplay(this.game.input);
     }
 
     update(skipArcane) {
@@ -882,9 +996,10 @@ export class UI {
         this._lastStatusPaused = this.game.paused;
         this._lastStatusSpeed = this.game.speed;
         const r = this.game.resources.stockpile;
-        const season = this.game.weather.getSeasonDisplay();
-        const dayStr = this.game.weather.getDayDisplay();
-        const weather = this.game.weather.getWeatherDisplay();
+        // Weather fields come from the save, so escape them before innerHTML.
+        const season = escapeHtml(this.game.weather.getSeasonDisplay());
+        const dayStr = escapeHtml(this.game.weather.getDayDisplay());
+        const weather = escapeHtml(this.game.weather.getWeatherDisplay());
         const tempC = Math.round(this.game.weather.temperature);
         const useF = this.game.settings.temperatureUnit === 'F';
         const temp = useF ? Math.round(tempC * 9 / 5 + 32) : tempC;
@@ -1044,14 +1159,14 @@ export class UI {
         this._hideBuildTooltip();
         if (input.spellTargeting) {
             const { spell } = input.spellTargeting;
-            let html = `<span class="mode-label" style="color:#bb88ff">SPELL TARGET: ${spell.name}</span>`;
+            let html = `<span class="mode-label" style="color:#bb88ff">SPELL TARGET: ${escapeHtml(spell.name)}</span>`;
             html += `<span class="mode-hint" style="color:#aa88ff">Click target tile (range: ${spell.range || '∞'}) | [Esc] Cancel</span>`;
             this.elements.modeBar.innerHTML = html;
             return;
         }
         if (input.guardPointTargeting) {
             const colonist = this.game.getColonist(input.guardPointTargeting.colonistId);
-            let html = `<span class="mode-label" style="color:#88ff88">SET GUARD POINT: ${colonist.name}</span>`;
+            let html = `<span class="mode-label" style="color:#88ff88">SET GUARD POINT: ${escapeHtml(colonist.name)}</span>`;
             html += `<span class="mode-hint" style="color:#66ff66">Click passable tile to set guard point | [Esc] Cancel</span>`;
             this.elements.modeBar.innerHTML = html;
             return;
@@ -1133,13 +1248,13 @@ export class UI {
             );
             const bldIcon = bldSprite
                 ? `<img src="${this._getBuildingSpriteURL(opt, isFloorType)}" class="build-card-icon--sprite">`
-                : `<span style="color:${def.color}">${def.char}</span>`;
+                : `<span style="color:${escapeAttr(def.color)}">${escapeHtml(def.char)}</span>`;
             const costHtml = Object.entries(def.cost).map(([k, v]) => this._buildCostChip(k, v)).join('');
             const overlayHtml = locked ? '<span class="build-card-overlay">LOCKED</span>' : atMax ? '<span class="build-card-overlay">MAX</span>' : '';
-            html += `<div class="build-card${active}${stateClass}" data-build-opt="${opt}">`;
+            html += `<div class="build-card${active}${stateClass}" data-build-opt="${escapeAttr(opt)}">`;
             html += `<div class="build-card-key">${keyLabel}</div>`;
             html += `<div class="build-card-icon-wrap">${bldIcon}</div>`;
-            html += `<div class="build-card-name">${BUILDINGS[opt]?.name || opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>`;
+            html += `<div class="build-card-name">${escapeHtml(BUILDINGS[opt]?.name || opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</div>`;
             html += `<div class="build-card-cost">${costHtml}</div>`;
             html += overlayHtml;
             html += `</div>`;
@@ -1152,7 +1267,7 @@ export class UI {
             if (availableStructures.length > 0) {
                 const current = input._complexStructurePreview || '';
                 const opts = availableStructures.map(([k, def]) =>
-                    `<option value="${k}"${current === k ? ' selected' : ''}>${def.name}</option>`
+                    `<option value="${escapeAttr(k)}"${current === k ? ' selected' : ''}>${escapeHtml(def.name)}</option>`
                 ).join('');
                 html += `<div style="padding:6px 8px;background:#1a1a2e;border-top:1px solid #333;">` +
                     `<div style="color:#888;font-size:10px;margin-bottom:3px;">Preview chalk pattern:</div>` +
@@ -1275,12 +1390,24 @@ export class UI {
         if (!hasActive && !hasCompleted) return;
         const riftSection = this.elements.infoPanel.querySelector('[data-rift-info]');
         if (!riftSection) return;
+        // Compare against the last built string (innerHTML re-serializes, so it
+        // never matches), and hold the swap while a button is hovered so a
+        // progress tick can't replace it mid-click.
         const html = this._buildRiftGateInnerHtml();
-        if (html !== riftSection.innerHTML) {
-            riftSection.innerHTML = html;
-            const logContainer = riftSection.querySelector('.exp-log-container');
-            if (logContainer) logContainer.scrollTop = logContainer.scrollHeight;
-        }
+        if (html === riftSection._lastHtml || riftSection.querySelector('button:hover')) return;
+        const firstRefresh = riftSection._lastHtml === undefined;
+        riftSection._lastHtml = html;
+        // Keep each log's scroll position; only follow new entries when the
+        // reader was already at the bottom.
+        const logs = [...riftSection.querySelectorAll('.exp-log-container')].map(el => ({
+            top: el.scrollTop,
+            atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 4,
+        }));
+        riftSection.innerHTML = html;
+        riftSection.querySelectorAll('.exp-log-container').forEach((el, i) => {
+            const prev = logs[i];
+            el.scrollTop = firstRefresh || !prev || prev.atBottom ? el.scrollHeight : prev.top;
+        });
     }
 
     _refreshColonistInfo() {
@@ -1296,6 +1423,7 @@ export class UI {
             this._lastColonistInfoHtml = html;
             if (this.elements.infoPanel.matches(':hover')) {
                 this._pendingColonistInfoHtml = html;
+                this._pendingColonistInfoId = colonist.id;
                 this._updateSkillTooltips(colonist);
             } else {
                 this.elements.infoPanel.innerHTML = html;
@@ -1383,15 +1511,15 @@ export class UI {
                 if (exp.status === 'gathering') {
                     const names = exp.partyIds.map(id => {
                         const c = this.game.getColonist(id);
-                        return c ? c.name : '?';
+                        return c ? escapeHtml(c.name) : '?';
                     }).join(', ');
-                    html += `<div class="info-row" style="color:#aaddff;">${exp.realmName} — assembling</div>`;
+                    html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(exp.realmName)} — assembling</div>`;
                     html += `<div class="info-row" style="color:#888;">Party: ${names}</div>`;
                 } else {
                     const elapsed = this.game.tick - exp.startTick;
                     const totalDur = Math.floor(exp.duration * 1.2);
                     const pct = Math.min(100, Math.floor((elapsed / totalDur) * 100));
-                    html += `<div class="info-row" style="color:#aaddff;">${exp.realmName} — ${exp.status}${exp.combat ? ' [COMBAT]' : ''} (${pct}%)</div>`;
+                    html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(exp.realmName)} — ${escapeHtml(exp.status)}${exp.combat ? ' [COMBAT]' : ''} (${pct}%)</div>`;
 
                     const aliveParty = exp.partySnapshot.filter(p => p.hp > 0);
                     html += `<div class="info-row" style="color:#888;">Party (${aliveParty.length}/${exp.partySnapshot.length} alive):</div>`;
@@ -1402,7 +1530,7 @@ export class UI {
                         const manaStr = p.maxMana > 0 ? ` | ${Math.round(p.mana)}/${p.maxMana} MP` : '';
                         const shieldStr = p.shieldActive ? ' 🛡' : '';
                         const threatStr = getThreatDisplayHtml(getTargetPriority(p));
-                        html += `<div class="info-row" style="color:${color}; padding-left:8px;">${p.name} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${manaStr}${shieldStr}${status}${threatStr}</div>`;
+                        html += `<div class="info-row" style="color:${color}; padding-left:8px;">${escapeHtml(p.name)} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${manaStr}${shieldStr}${status}${threatStr}</div>`;
                     }
 
                     if (exp.combat) {
@@ -1420,7 +1548,7 @@ export class UI {
                             st.bold   ? 'font-weight:bold'  : '',
                             st.italic ? 'font-style:italic' : '',
                         ].filter(Boolean).join(';');
-                        html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
+                        html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(entry.text)}</div>`;
                     }
                     html += `</div>`;
                 }
@@ -1437,7 +1565,7 @@ export class UI {
             html += `<div class="info-row" style="margin-top:6px;"><b>Send Expedition:</b></div>`;
             const sortedDims = dims.slice().sort((a, b) => a.difficulty - b.difficulty);
             for (const dim of sortedDims) {
-                html += `<div class="info-actions"><button onclick="window.game.showExpeditionSetup('${dim.key}')" style="background:#1a4466;color:#88ddff;">${dim.name} (Diff ${dim.difficulty})</button></div>`;
+                html += `<div class="info-actions"><button onclick="window.game.showExpeditionSetup(${jsArg(dim.key)})" style="background:#1a4466;color:#88ddff;">${escapeHtml(dim.name)} (Diff ${dim.difficulty})</button></div>`;
             }
         } else if (!this.game.power.powered) {
             html += `<div class="info-row" style="color:#ff4444;">No mana — cannot send expeditions</div>`;
@@ -1445,7 +1573,7 @@ export class UI {
 
         if (expl.completedExpeditions.length > 0 && expl.expeditions.length === 0) {
             const last = expl.completedExpeditions[expl.completedExpeditions.length - 1];
-            html += `<div class="info-row" style="margin-top:6px;color:#88ccff;font-size:0.9em;">Last expedition: ${last.realmName}</div>`;
+            html += `<div class="info-row" style="margin-top:6px;color:#88ccff;font-size:0.9em;">Last expedition: ${escapeHtml(last.realmName)}</div>`;
             html += `<div class="exp-log-container">`;
             const logSlice = last.log.slice(-10);
             for (const entry of logSlice) {
@@ -1456,7 +1584,7 @@ export class UI {
                     st.bold   ? 'font-weight:bold'  : '',
                     st.italic ? 'font-style:italic' : '',
                 ].filter(Boolean).join(';');
-                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${entry.text}</div>`;
+                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(entry.text)}</div>`;
             }
             html += `</div>`;
         }
@@ -1516,7 +1644,7 @@ export class UI {
         const powered = this.game.power.hasPower();
         let html = '';
         if (def.description) {
-            html += `<div class="info-row" style="color:#999;font-size:11px;">${def.description}</div>`;
+            html += `<div class="info-row" style="color:#999;font-size:11px;">${escapeHtml(def.description)}</div>`;
         }
         if (def.maxCount !== undefined) {
             const limit = def.maxCount + getMaxCountBonus(def, structure, this.game);
@@ -1567,7 +1695,7 @@ export class UI {
             'manaRegen', 'maxMana', 'warmth', 'critChance', 'critMultiplier', 'blockChance', 'gatherBonus',
             'craftSpeedBonus', 'qualityBonus', 'lightRadius', 'maxHpBonus',
         ]);
-        if (!equippedItem && !candidateItem) return slotLabel + ': empty';
+        if (!equippedItem && !candidateItem) return escapeHtml(slotLabel) + ': empty';
         if (!candidateItem) {
             const ws = weaponSummary(equippedItem);
             const weaponRows = ws
@@ -1583,8 +1711,8 @@ export class UI {
                 `<tr><td colspan="2" style="color:#ffaa55;">${line}</td></tr>`
             ).join('');
             const fallback = !weaponRows && !rows ? '<tr><td style="color:#666;">No stats</td></tr>' : '';
-            return `<div style="min-width:160px;"><div style="color:#ffdd88;margin-bottom:4px;font-weight:bold;">${equippedItem.name}</div>` +
-                (equippedItem.description ? `<div style="color:#888;font-size:10px;margin-bottom:4px;">${equippedItem.description}</div>` : '') +
+            return `<div style="min-width:160px;"><div style="color:#ffdd88;margin-bottom:4px;font-weight:bold;">${escapeHtml(equippedItem.name)}</div>` +
+                (equippedItem.description ? `<div style="color:#888;font-size:10px;margin-bottom:4px;">${escapeHtml(equippedItem.description)}</div>` : '') +
                 `<table style="border-collapse:collapse;font-size:11px;">${weaponRows}${rows}${onHitRows}${fallback}</table></div>`;
         }
         const eqWs = weaponSummary(equippedItem);
@@ -1627,7 +1755,7 @@ export class UI {
         const fallbackRow = !weaponCompareRows && !rowsHtml ? `<tr><td colspan="3" style="color:#666;">No stat differences</td></tr>` : '';
         const eqName = equippedItem ? equippedItem.name : 'Empty';
         return `<div style="min-width:200px;"><table style="border-collapse:collapse;font-size:11px;width:100%;">` +
-            `<tr><th style="color:#666;text-align:left;padding-bottom:3px;">${slotLabel}</th><th style="color:#aaa;text-align:left;padding-right:6px;">${eqName}</th><th style="color:#ffdd88;text-align:left;">${candidateItem.name}</th></tr>` +
+            `<tr><th style="color:#666;text-align:left;padding-bottom:3px;">${escapeHtml(slotLabel)}</th><th style="color:#aaa;text-align:left;padding-right:6px;">${escapeHtml(eqName)}</th><th style="color:#ffdd88;text-align:left;">${escapeHtml(candidateItem.name)}</th></tr>` +
             weaponCompareRows + rowsHtml + onHitCompareRows + fallbackRow +
             `</table></div>`;
     }
@@ -1678,7 +1806,7 @@ export class UI {
             }
         }
         if (parts.length) {
-            const prefix = isViewingInactive ? `<span style="color:#5566aa">${viewingSet} set:</span> ` : '';
+            const prefix = isViewingInactive ? `<span style="color:#5566aa">${escapeHtml(viewingSet)} set:</span> ` : '';
             sections.push(prefix + parts.join(sep));
         }
         const expParts = [];
@@ -1735,11 +1863,11 @@ export class UI {
         const moodLevel = getMoodLabel(colonist.mood);
         const traitSpanArr = colonist.traits.map(t => {
             const trait = TRAITS[t];
-            if (!trait) return t;
-            return `<span class="skill-tip" data-tip="${trait.description}">${trait.name}</span>`;
+            if (!trait) return escapeHtml(t);
+            return `<span class="skill-tip" data-tip="${escapeAttr(trait.description)}">${escapeHtml(trait.name)}</span>`;
         });
         const thoughts = colonist.thoughts.slice(-5).map(t =>
-            `<span class="${t.moodEffect >= 0 ? 'positive' : 'negative'}">${t.text} (${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)})</span>`
+            `<span class="${t.moodEffect >= 0 ? 'positive' : 'negative'}">${escapeHtml(t.text)} (${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)})</span>`
         ).join('<br>');
 
         const weaponTip = colonist.weapon ? getWeaponTooltip(colonist) : 'No weapon equipped';
@@ -1750,9 +1878,9 @@ export class UI {
         const bootsTip = colonist.boots ? `${colonist.boots.description || ''} ${getItemStatLines(colonist.boots).join(', ')}`.trim() : 'No boots equipped';
         const trinketTip = colonist.trinket ? this._getTrinketTooltip(colonist.trinket) : 'No trinket equipped';
 
-        const nc = colonist.nameColor || '#ffff00';
+        const nc = escapeAttr(colonist.nameColor || '#ffff00');
         const sectionHdr = 'color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333;margin-top:8px;padding-bottom:2px;margin-bottom:3px';
-        let html = `<div class="info-header" style="cursor:pointer;color:${nc}" onclick="window.game.selectColonistById(${colonist.id})">${colonist.name} ${colonist.drafted ? '[DRAFTED]' : ''}${colonist.guardMode ? '[GUARDING]' : ''}</div>`;
+        let html = `<div class="info-header" style="cursor:pointer;color:${nc}" onclick="window.game.selectColonistById(${colonist.id})">${escapeHtml(colonist.name)} ${colonist.drafted ? '[DRAFTED]' : ''}${colonist.guardMode ? '[GUARDING]' : ''}</div>`;
 
         // --- Status ---
         html += `<div style="${sectionHdr}">Status</div>`;
@@ -1762,14 +1890,14 @@ export class UI {
         const hungerBar = statBarHtml({ key: `info:hunger:${colonist.id}`, pct: colonist.needs.hunger, color: statColor(colonist.needs.hunger), max: 100, width: 90 });
         const restBar = statBarHtml({ key: `info:rest:${colonist.id}`, pct: colonist.needs.rest, color: statColor(colonist.needs.rest), max: 100, width: 90 });
         html += `<div class="info-row">Hunger: ${colonist.needs.hunger.toFixed(0)} ${hungerBar} Rest: ${colonist.needs.rest.toFixed(0)} ${restBar}</div>`;
-        html += `<div class="info-row">State: ${colonist.state} | Task: ${this.getColonistTaskDescription(colonist)}</div>`;
+        html += `<div class="info-row">State: ${escapeHtml(colonist.state)} | Task: ${this.getColonistTaskDescription(colonist)}</div>`;
         const allTraits = traitSpanArr.filter(Boolean).join(', ');
         if (allTraits) html += `<div class="info-row">Traits: ${allTraits}</div>`;
         if (colonist.voidBound) {
             html += `<div class="info-row"><span style="color:#bb66ff">◈ Void-Bound</span> <span style="color:#888;font-size:0.85em">(+15% combat damage, -10% work speed)</span></div>`;
         }
         const groups = this.game.colonistGroups || [];
-        const groupOptions = `<option value="">— None —</option>` + groups.map(g => `<option value="${g.replace(/"/g, '&quot;')}"${colonist.group === g ? ' selected' : ''}>${g}</option>`).join('');
+        const groupOptions = `<option value="">— None —</option>` + groups.map(g => `<option value="${escapeAttr(g)}"${colonist.group === g ? ' selected' : ''}>${escapeHtml(g)}</option>`).join('');
         html += `<div class="info-row">Group: <select onchange="window.game.setColonistGroup(${colonist.id},this.value)">${groupOptions}</select></div>`;
         html += `<div class="info-row">Bed: ${colonist.assignedBed ? `(${colonist.assignedBed.x},${colonist.assignedBed.y})` : 'None'}</div>`;
         if (this.game.exploration) {
@@ -1797,7 +1925,7 @@ export class UI {
         html += `<div class="info-row">${Object.entries(SKILLS).map(([k, def]) => {
             const level = colonist.skills[k] || 1;
             const xpTip = skillXpTip(def, k, level, colonist.skillXp?.[k] || 0);
-            return `<span class="skill-tip" data-tip="${xpTip}">${def.name}:${level}</span>`;
+            return `<span class="skill-tip" data-tip="${escapeAttr(xpTip)}">${escapeHtml(def.name)}:${level}</span>`;
         }).join(' ')}</div>`;
         const hasMagic = colonist.magicSkills && Object.values(colonist.magicSkills).some(v => v > 0);
         if (hasMagic) {
@@ -1810,7 +1938,7 @@ export class UI {
                 const isAttuned = attunedSchools.includes(k);
                 const tip = magicXpTip(def, level, colonist.magicXpAccumulator?.[k] || 0) + (isAttuned ? ' — attuned' : '');
                 const style = isAttuned ? `color:${def.color};font-weight:bold` : 'color:#bb88ff';
-                return `<span class="skill-tip" data-tip="${tip}" style="${style}">${isAttuned ? '★' : ''}${def.name}:${level}</span>`;
+                return `<span class="skill-tip" data-tip="${escapeAttr(tip)}" style="${style}">${isAttuned ? '★' : ''}${escapeHtml(def.name)}:${level}</span>`;
             }).join(' ')}</div>`;
             if (attunedSchools.length > 0) {
                 const names = attunedSchools.map(k => `<span style="color:${MAGIC_SKILLS[k].color}">${MAGIC_SKILLS[k].name}</span>`).join(', ');
@@ -1838,12 +1966,12 @@ export class UI {
             const isViewing = sn === viewingSet;
             const bg = isViewing ? '#2a2a4e' : '#111';
             const border = isViewing ? (isActive ? '#88aaff' : '#5566aa') : '#333';
-            const label = isActive ? `${sn} ◆` : sn;
-            html += `<button onclick="window.game.ui._setColonistViewingSet(${colonist.id},'${sn}')" style="flex:1;padding:2px 4px;background:${bg};border:1px solid ${border};border-radius:3px;color:${isViewing ? '#ddd' : '#888'};font-size:11px;cursor:pointer;">${label}</button>`;
+            const label = escapeHtml(isActive ? `${sn} ◆` : sn);
+            html += `<button onclick="window.game.ui._setColonistViewingSet(${colonist.id},${jsArg(sn)})" style="flex:1;padding:2px 4px;background:${bg};border:1px solid ${border};border-radius:3px;color:${isViewing ? '#ddd' : '#888'};font-size:11px;cursor:pointer;">${label}</button>`;
         }
         html += `</div>`;
         if (!isViewingActive) {
-            html += `<div style="font-size:10px;color:#5566aa;margin-bottom:3px;">Previewing ${viewingSet} set. Chain icon = shared from ${colonist.activeSet || 'Colony'}. Expedition set activates automatically on departure.</div>`;
+            html += `<div style="font-size:10px;color:#5566aa;margin-bottom:3px;">Previewing ${escapeHtml(viewingSet)} set. Chain icon = shared from ${escapeHtml(colonist.activeSet || 'Colony')}. Expedition set activates automatically on departure.</div>`;
         }
 
         const tomeName = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : null;
@@ -1855,10 +1983,12 @@ export class UI {
                 // Active set: render normally using existing slot select mechanism.
                 const item = colonist[slot];
                 let inner = item ? this._itemIcon(item.key, slot) : `<span style="color:#333;font-size:14px">${fallbackChar}</span>`;
-                const compareHtml = this._buildEquipCompareHtml(label, item, null).replace(/"/g, '&quot;');
+                // data-compare is decoded then set as innerHTML, so attribute-escape
+                // the whole (already HTML-safe) fragment, ampersands included.
+                const compareHtml = escapeAttr(this._buildEquipCompareHtml(label, item, null));
                 const tipAttr = item
                     ? `data-compare="${compareHtml}"`
-                    : `data-tip="${tipText}"`;
+                    : `data-tip="${escapeAttr(tipText)}"`;
                 return `<div class="skill-tip" data-tut-slot="${slot}" ${tipAttr} style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
             }
             // Inactive set: show set-specific override or shared fallback.
@@ -1868,25 +1998,25 @@ export class UI {
             const listName = SLOT_LIST[slot];
             if (setItem) {
                 // This set owns a dedicated item for this slot.
-                const compareHtml = this._buildEquipCompareHtml(`${label} (${viewingSet} override)`, setItem, null).replace(/"/g, '&quot;');
-                const removeBtn = `<span onclick="window.game.removeItemFromSet(${colonist.id},'${viewingSet}','${slot}')" style="position:absolute;top:1px;right:2px;color:#cc4444;font-size:10px;cursor:pointer;z-index:10;" title="Return to inventory">x</span>`;
+                const compareHtml = escapeAttr(this._buildEquipCompareHtml(`${label} (${viewingSet} override)`, setItem, null));
+                const removeBtn = `<span onclick="window.game.removeItemFromSet(${colonist.id},${jsArg(viewingSet)},'${slot}')" style="position:absolute;top:1px;right:2px;color:#cc4444;font-size:10px;cursor:pointer;z-index:10;" title="Return to inventory">x</span>`;
                 const assignSelect = this._buildSetAssignSelect(colonist, viewingSet, slot, listName);
                 return `<div class="skill-tip" data-compare="${compareHtml}" style="${slotStyle}">${removeBtn}<div style="color:#666;font-size:10px">${label}</div>${this._itemIcon(setItem.key, slot)}${assignSelect}</div>`;
             } else {
                 // Shared: dim the currently-equipped item and show chain icon.
                 const inner = sharedItem
-                    ? `<span style="opacity:0.4;">${this._itemIcon(sharedItem.key, slot)}</span><span style="position:absolute;bottom:2px;right:3px;font-size:9px;color:#5566aa;" title="Shared from ${colonist.activeSet || 'Colony'} set">⛓</span>`
+                    ? `<span style="opacity:0.4;">${this._itemIcon(sharedItem.key, slot)}</span><span style="position:absolute;bottom:2px;right:3px;font-size:9px;color:#5566aa;" title="Shared from ${escapeAttr(colonist.activeSet || 'Colony')} set">⛓</span>`
                     : `<span style="color:#222;font-size:14px">${fallbackChar}</span>`;
                 const tip = sharedItem ? `Shared: ${sharedItem.name} (from ${colonist.activeSet || 'Colony'} set). Click to assign a dedicated item.` : `No item. Click to assign.`;
                 const assignSelect = this._buildSetAssignSelect(colonist, viewingSet, slot, listName);
-                return `<div class="skill-tip" data-tip="${tip}" style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${assignSelect}</div>`;
+                return `<div class="skill-tip" data-tip="${escapeAttr(tip)}" style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${assignSelect}</div>`;
             }
         };
 
         html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:4px 0 0 0;text-align:center;">`;
         // Row 1: Tome | Helmet | Armor | Trinket
         // Tome always uses the normal select (not part of equipment sets).
-        html += `<div class="skill-tip" data-tut-slot="tome" data-tip="${tomeTip}" style="${slotStyle}">`;
+        html += `<div class="skill-tip" data-tut-slot="tome" data-tip="${escapeAttr(tomeTip)}" style="${slotStyle}">`;
         html += `<div style="color:#666;font-size:10px">Tome</div>`;
         html += colonist.equippedTome ? `${this._itemIcon(colonist.equippedTome, 'tome')}` : `<span style="color:#333;font-size:14px">~</span>`;
         html += this._buildSlotSelect(colonist, 'tome');
@@ -1935,7 +2065,7 @@ export class UI {
                 const tomeDef = SPELL_TOMES[colonist.equippedTome];
                 const currentProgress = (colonist.tomeProgress && colonist.tomeProgress[colonist.equippedTome]) || 0;
                 const progress = Math.floor((currentProgress / tomeDef.learningWork) * 100);
-                html += `<div class="info-row"><span style="color:#bb88ff">Studying: ${tomeDef.name} (${progress}%)</span></div>`;
+                html += `<div class="info-row"><span style="color:#bb88ff">Studying: ${escapeHtml(tomeDef.name)} (${progress}%)</span></div>`;
             }
             if (colonist.knownSpells && colonist.knownSpells.length > 0) {
                 const attuned = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
@@ -1963,16 +2093,16 @@ export class UI {
                     let spellHtml = '';
                     if (spell.castType === 'auto') {
                         const checked = !isDisabled ? 'checked' : '';
-                        spellHtml += `<input type="checkbox" ${checked} onchange="window.game.toggleSpell(${colonist.id},'${spellKey}')" style="margin-right:4px;vertical-align:middle">`;
+                        spellHtml += `<input type="checkbox" ${checked} onchange="window.game.toggleSpell(${colonist.id},${jsArg(spellKey)})" style="margin-right:4px;vertical-align:middle">`;
                     }
                     const tipDesc = this._spellTooltip(spell);
-                    spellHtml += `<span class="skill-tip" data-tip="${tipDesc}" style="color:${greyed ? '#666' : '#bb88ff'}">${spell.name}</span> <span style="color:#666;font-size:0.85em">(${spell.manaCost} mana, ${spell.cooldown}t cd)</span>`;
+                    spellHtml += `<span class="skill-tip" data-tip="${escapeAttr(tipDesc)}" style="color:${greyed ? '#666' : '#bb88ff'}">${escapeHtml(spell.name)}</span> <span style="color:#666;font-size:0.85em">(${spell.manaCost} mana, ${spell.cooldown}t cd)</span>`;
                     if (spell.castType === 'targeted') {
                         const disabled = onCooldown || !hasManaForSpell;
                         const reason = onCooldown ? `${cdRemaining}t` : !hasManaForSpell ? 'low mana' : '';
                         spellHtml += disabled
                             ? ` <span style="color:#666">[${reason}]</span>`
-                            : ` <button onclick="window.game.startSpellTargeting(${colonist.id},'${spellKey}')" style="font-size:0.8em">Cast</button>`;
+                            : ` <button onclick="window.game.startSpellTargeting(${colonist.id},${jsArg(spellKey)})" style="font-size:0.8em">Cast</button>`;
                     } else if (notAttuned) {
                         spellHtml += ` <span style="color:#a66;font-size:0.8em">[not attuned]</span>`;
                     } else {
@@ -2001,7 +2131,7 @@ export class UI {
                         case 'rest': return `<span style="color:#aaffcc">Tireless (${t}t)</span>`;
                         case 'shield': return `<span style="color:#88ccff">Shield (${t}t)</span>`;
                         case 'speed': return `<span style="color:#ffff88">Haste (${t}t)</span>`;
-                        default: return `<span style="color:#88ffaa">${e.type} (${t}t)</span>`;
+                        default: return `<span style="color:#88ffaa">${escapeHtml(e.type)} (${t}t)</span>`;
                     }
                 }).join(', ');
                 html += `<div class="info-row">Effects: ${effects}</div>`;
@@ -2013,7 +2143,7 @@ export class UI {
                     const clickAction = a.sourceType === 'pedestal'
                         ? `window.game.camera.centerOn(${a.x},${a.y})`
                         : `window.game.selectColonistById(${a.colonistId})`;
-                    return `<span class="skill-tip" data-tip="${tip}" style="color:#ccaa44;cursor:pointer;text-decoration:underline" onclick="${clickAction}">${a.name}</span>`;
+                    return `<span class="skill-tip" data-tip="${escapeAttr(tip)}" style="color:#ccaa44;cursor:pointer;text-decoration:underline" onclick="${clickAction}">${escapeHtml(a.name)}</span>`;
                 }).join(', ');
                 html += `<div class="info-row">Auras: ${auraSpans}</div>`;
             }
@@ -2038,7 +2168,7 @@ export class UI {
         } else {
             const relHtml = notableRelationships.map(r => {
                 const tierDef = RELATIONSHIP_TIERS.find(t => t.key === r.tier.key) || r.tier;
-                return `<span style="color:${tierDef.color}">[${tierDef.name}]</span> <span style="cursor:pointer;text-decoration:underline" onclick="window.game.selectColonistById(${r.colonist.id})">${r.colonist.name}</span> <span style="color:#555;font-size:0.85em">(${r.opinion > 0 ? '+' : ''}${r.opinion})</span>`;
+                return `<span style="color:${tierDef.color}">[${tierDef.name}]</span> <span style="cursor:pointer;text-decoration:underline" onclick="window.game.selectColonistById(${r.colonist.id})">${escapeHtml(r.colonist.name)}</span> <span style="color:#555;font-size:0.85em">(${r.opinion > 0 ? '+' : ''}${r.opinion})</span>`;
             }).join('<br>');
             html += `<div class="info-row">${relHtml}</div>`;
         }
@@ -2057,11 +2187,11 @@ export class UI {
         if (colonist.guardMode) html += `<button onclick="window.game.input.startGuardPointTargeting(${colonist.id})">Set Guard Point</button>`;
         html += `<button onclick="window.game.draftAll()">Draft All</button>`;
         html += `<button onclick="window.game.undraftAll()">Undraft All</button>`;
-        html += `<button onclick="window.game.autoEquipBest(${colonist.id})" title="Auto-equip best available items into the active set (${colonist.activeSet || 'Colony'})">Auto-equip Best</button>`;
+        html += `<button onclick="window.game.autoEquipBest(${colonist.id})" title="Auto-equip best available items into the active set (${escapeAttr(colonist.activeSet || 'Colony')})">Auto-equip Best</button>`;
         const others = this.game.colonists.filter(c => c.hp > 0 && c.id !== colonist.id);
         if (others.length > 0) {
             html += `<select onchange="if(this.value)window.game.copyPriorities(${colonist.id},parseInt(this.value))"><option value="">Copy Priorities From...</option>`;
-            for (const o of others) html += `<option value="${o.id}">${o.name}</option>`;
+            for (const o of others) html += `<option value="${o.id}">${escapeHtml(o.name)}</option>`;
             html += `</select>`;
         }
         html += `<button onclick="window.game.centerOnColonist(${colonist.id})">Center Camera</button>`;
@@ -2077,7 +2207,10 @@ export class UI {
         this._viewingRiftGate = false;
         this.setSummaryVisible(false);
         this._viewingColonistId = colonist.id;
-        this.elements.infoPanel.innerHTML = this.buildColonistInfoHtml(colonist);
+        this._pendingColonistInfoHtml = null;
+        const html = this.buildColonistInfoHtml(colonist);
+        this._lastColonistInfoHtml = html;
+        this.elements.infoPanel.innerHTML = html;
     }
 
     // Live colony summary shown in the Info panel whenever nothing is selected.
@@ -2148,6 +2281,7 @@ export class UI {
     showColonyOverview() {
         this._switchToInfoTab();
         this._viewingColonistId = null;
+        this._pendingColonistInfoHtml = null;
         this._viewingRiftGate = false;
         this._viewingRitualAltar = false;
         this._lastTileInfo = null;
@@ -2212,9 +2346,9 @@ export class UI {
         };
         if (slot === 'tome') {
             const tomes = this.game.resources.tomes || [];
-            let html = `<select style="${overlayStyle}" id="eq-tome-${colonist.id}" onchange="if(this.value==='unequip'){window.game.unequipTome(${colonist.id})}else if(this.value!==''){window.game.equipTome(${colonist.id},parseInt(this.value))}">`;
+            let html = `<select style="${overlayStyle}" id="eq-tome-${colonist.id}" onchange="if(this.value==='unequip'){window.game.unequipTome(${colonist.id})}else if(this.value!==''){const i=window.game.ui._resolveSelectItemIndex(this,'tomes');if(i>=0)window.game.equipTome(${colonist.id},i)}">`;
             const currentTome = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : 'None';
-            html += `<option value="">Tome: ${currentTome}</option>`;
+            html += `<option value="">Tome: ${escapeHtml(currentTome)}</option>`;
             if (colonist.equippedTome) html += `<option value="unequip">Unequip</option>`;
 
             const attuned = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
@@ -2228,8 +2362,8 @@ export class UI {
                 if (!spell) return;
                 if (colonist.knownSpells.includes(def.spell)) return;
                 const canStudy = (colonist.magicSkills[spell.school] || 0) >= def.minSchoolLevel;
-                const label = `${def.name} (Lv ${def.minSchoolLevel})${canStudy ? '' : ` - need ${MAGIC_SKILLS[spell.school].name} ${def.minSchoolLevel}`}`;
-                const entry = { i, def, spell, canStudy, label };
+                const label = escapeHtml(`${def.name} (Lv ${def.minSchoolLevel})${canStudy ? '' : ` - need ${MAGIC_SKILLS[spell.school]?.name} ${def.minSchoolLevel}`}`);
+                const entry = { i, def, spell, canStudy, label, sig: this._itemSig(t) };
                 if (attuned.includes(spell.school)) attunedEntries.push(entry);
                 else otherEntries.push(entry);
             });
@@ -2239,15 +2373,15 @@ export class UI {
 
             if (attunedEntries.length > 0) {
                 html += `<optgroup label="Attuned Schools">`;
-                attunedEntries.forEach(({ i, canStudy, label }) => {
-                    html += `<option value="${i}"${canStudy ? '' : ' disabled'}>${label}</option>`;
+                attunedEntries.forEach(({ i, canStudy, label, sig }) => {
+                    html += `<option value="${i}" data-sig="${sig}"${canStudy ? '' : ' disabled'}>${label}</option>`;
                 });
                 html += `</optgroup>`;
             }
             if (otherEntries.length > 0) {
                 html += `<optgroup label="Other Schools">`;
-                otherEntries.forEach(({ i, canStudy, label }) => {
-                    html += `<option value="${i}"${canStudy ? '' : ' disabled'}>${label}</option>`;
+                otherEntries.forEach(({ i, canStudy, label, sig }) => {
+                    html += `<option value="${i}" data-sig="${sig}"${canStudy ? '' : ' disabled'}>${label}</option>`;
                 });
                 html += `</optgroup>`;
             }
@@ -2258,16 +2392,50 @@ export class UI {
         const cfg = SLOT_CONFIG[slot];
         const items = this.game.resources[cfg.listName];
         const current = colonist[slot];
-        let html = `<select style="${overlayStyle}" id="eq-${slot}-${colonist.id}" onchange="if(this.value==='unequip'){window.game.${cfg.unequipFn}(${colonist.id})}else if(this.value!==''){window.game.${cfg.equipFn}(${colonist.id},parseInt(this.value))}">`;
-        html += `<option value="">${cfg.label}: ${current?.name || cfg.fallback}</option>`;
-        if (current) html += `<option value="unequip">Unequip ${current.name}</option>`;
+        let html = `<select style="${overlayStyle}" id="eq-${slot}-${colonist.id}" onchange="if(this.value==='unequip'){window.game.${cfg.unequipFn}(${colonist.id})}else if(this.value!==''){const i=window.game.ui._resolveSelectItemIndex(this,'${cfg.listName}');if(i>=0)window.game.${cfg.equipFn}(${colonist.id},i)}">`;
+        html += `<option value="">${cfg.label}: ${escapeHtml(current?.name || cfg.fallback)}</option>`;
+        if (current) html += `<option value="unequip">Unequip ${escapeHtml(current.name)}</option>`;
         items.forEach((item, i) => {
             const stats = cfg.statRenderer(item);
-            html += `<option value="${i}">${item.name}${stats ? ` (${stats})` : ''}</option>`;
+            html += `<option value="${i}" data-sig="${this._itemSig(item)}">${escapeHtml(item.name)}${stats ? ` (${escapeHtml(stats)})` : ''}</option>`;
         });
         if (items.length === 0 && !current) html += `<option disabled>No ${cfg.label.toLowerCase()}s available</option>`;
         html += `</select>`;
         return html;
+    }
+
+    // Short fingerprint of an inventory item (its primitive fields), stamped on
+    // equip <option>s. The colonist panel defers its rebuild while hovered, so
+    // an option's index can be stale by the time it's picked.
+    _itemSig(item) {
+        let src = '';
+        for (const [k, v] of Object.entries(item || {})) {
+            if (v === null || typeof v !== 'object') src += `${k}=${v};`;
+        }
+        let h = 5381;
+        for (let i = 0; i < src.length; i++) h = ((h * 33) ^ src.charCodeAt(i)) >>> 0;
+        return h.toString(36);
+    }
+
+    // Map a picked equip <option> back to the item's current index in the live
+    // inventory list: keep its index if the item there still matches, else find
+    // the matching item elsewhere. Returns -1 (and refreshes) if it's gone.
+    _resolveSelectItemIndex(select, listName) {
+        const opt = select.selectedOptions[0];
+        const list = this.game.resources[listName] || [];
+        const idx = parseInt(select.value);
+        const sig = opt?.dataset.sig;
+        if (!sig) return idx;
+        if (list[idx] && this._itemSig(list[idx]) === sig) return idx;
+        const found = list.findIndex(it => this._itemSig(it) === sig);
+        if (found < 0) {
+            select.value = '';
+            if (this._viewingColonistId != null) {
+                const c = this.game.getColonist(this._viewingColonistId);
+                if (c) this.showColonistInfo(c);
+            }
+        }
+        return found;
     }
 
     // Track which equipment set tab each colonist is viewing in the UI.
@@ -2293,11 +2461,11 @@ export class UI {
             boots:   { label: 'Boots',   statRenderer: b => getItemStatLines(b).join(', ') },
         };
         const cfg = SLOT_CONFIG_LABELS[slot];
-        let html = `<select style="${overlayStyle}" onchange="if(this.value!==''){window.game.assignItemToSet(${colonist.id},'${setName}','${slot}','${listName}',parseInt(this.value));this.value=''}">`;
+        let html = `<select style="${overlayStyle}" onchange="if(this.value!==''){const i=window.game.ui._resolveSelectItemIndex(this,'${listName}');if(i>=0)window.game.assignItemToSet(${colonist.id},${jsArg(setName)},'${slot}','${listName}',i);this.value=''}">`;
         html += `<option value="">Assign ${cfg.label}...</option>`;
         items.forEach((item, i) => {
             const stats = cfg.statRenderer(item);
-            html += `<option value="${i}">${item.name}${stats ? ` (${stats})` : ''}</option>`;
+            html += `<option value="${i}" data-sig="${this._itemSig(item)}">${escapeHtml(item.name)}${stats ? ` (${escapeHtml(stats)})` : ''}</option>`;
         });
         if (items.length === 0) html += `<option disabled>No items available</option>`;
         html += `</select>`;
@@ -2321,7 +2489,7 @@ export class UI {
             if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${thCaps.size}</div>`;
             if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${thCaps.floor}</div>`;
             if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${thCaps.light}</div>`;
-            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${thCaps.decor} (${th.decorList.map(d => d.replace(/_/g, ' ')).join(', ')})</div>`;
+            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${thCaps.decor} (${escapeHtml(th.decorList.map(d => d.replace(/_/g, ' ')).join(', '))})</div>`;
             if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence} / ${thCaps.coherence}</div>`;
         }
         if (rq) {
@@ -2332,19 +2500,19 @@ export class UI {
             if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${rqCaps.size}</div>`;
             if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${rqCaps.floor}</div>`;
             if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${rqCaps.light}</div>`;
-            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${rqCaps.decor} (${rq.decorList.map(d => d.replace(/_/g, ' ')).join(', ')})</div>`;
+            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${rqCaps.decor} (${escapeHtml(rq.decorList.map(d => d.replace(/_/g, ' ')).join(', '))})</div>`;
             if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence} / ${rqCaps.coherence}</div>`;
         }
         if (wq) {
-            const label = wq.focusGroup ? `${wq.tierName} ${wq.focusGroup}` : wq.tierName;
+            const label = escapeHtml(wq.focusGroup ? `${wq.tierName} ${wq.focusGroup}` : wq.tierName);
             html += `<div class="info-row" style="color:#ffcc44;font-weight:bold;">Workshop — ${label} (${wq.total}/100)</div>`;
             const b = wq.breakdown;
             const wqCaps = ROOM_SCORE_CAPS.workshop;
             if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${wqCaps.size}</div>`;
             if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${wqCaps.floor}</div>`;
             if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${wqCaps.light}</div>`;
-            if (b.focus > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Focus: +${b.focus} / ${wqCaps.focus}${wq.focusGroup ? ` (${wq.focusGroup})` : ''}</div>`;
-            if (b.support > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Support: +${b.support} / ${wqCaps.support} (${wq.supportList.map(s => s.replace(/_/g, ' ')).join(', ')})</div>`;
+            if (b.focus > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Focus: +${b.focus} / ${wqCaps.focus}${wq.focusGroup ? ` (${escapeHtml(wq.focusGroup)})` : ''}</div>`;
+            if (b.support > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Support: +${b.support} / ${wqCaps.support} (${escapeHtml(wq.supportList.map(s => s.replace(/_/g, ' ')).join(', '))})</div>`;
             if (wq.speedMult > 1 || wq.qualityBonus > 0) {
                 let bonusText = '';
                 if (wq.speedMult > 1) bonusText += `Speed: +${Math.round((wq.speedMult - 1) * 100)}%`;
@@ -2361,7 +2529,7 @@ export class UI {
             c.assignedBed && c.assignedBed.x === x && c.assignedBed.y === y && c.hp > 0
         );
         if (assigned) {
-            html += `<div class="info-row">Assigned to: ${assigned.name}</div>`;
+            html += `<div class="info-row">Assigned to: ${escapeHtml(assigned.name)}</div>`;
             html += `<div class="info-actions"><button onclick="window.game.unassignBed(${x},${y})">Unassign</button></div>`;
         } else {
             html += `<div class="info-row">Unassigned bed</div>`;
@@ -2372,7 +2540,7 @@ export class UI {
             for (const c of this.game.colonists) {
                 if (c.hp <= 0) continue;
                 const hasBed = c.assignedBed ? ` (has bed)` : '';
-                html += `<option value="${c.id}">${c.name}${hasBed}</option>`;
+                html += `<option value="${c.id}">${escapeHtml(c.name)}${hasBed}</option>`;
             }
             html += `</select></div>`;
         }
@@ -2396,7 +2564,7 @@ export class UI {
         if (tile.pedestalArtifact) {
             const artDef = ALL_ITEMS[tile.pedestalArtifact];
             const broken = tile.pedestalInactive ? ' <span style="color:#ff4444;">(No Power)</span>' : '';
-            html += `<div class="info-row" style="color:#ccaa44;">Placed: ${this._itemIcon(tile.pedestalArtifact, artDef?.type || 'trinket')}${artDef?.name || tile.pedestalArtifact}${broken}</div>`;
+            html += `<div class="info-row" style="color:#ccaa44;">Placed: ${this._itemIcon(tile.pedestalArtifact, artDef?.type || 'trinket')}${escapeHtml(artDef?.name || tile.pedestalArtifact)}${broken}</div>`;
             html += this.getPedestalEffectDescription(artDef);
             if (artDef?.pedestal?.radius && artDef.pedestal.radius !== 'global') {
                 html += `<div class="info-row">Radius: ${artDef.pedestal.radius} | Mana: -${artDef.pedestal.manaCost || 0}</div>`;
@@ -2416,7 +2584,7 @@ export class UI {
             if (available.length > 0) {
                 html += `<div class="info-actions"><select id="pedestal-select">`;
                 for (const art of available) {
-                    html += `<option value="${art.key}">${art.name}</option>`;
+                    html += `<option value="${escapeAttr(art.key)}">${escapeHtml(art.name)}</option>`;
                 }
                 html += `</select>`;
                 html += `<button onclick="window.game.placePedestalItem(${x},${y},document.getElementById('pedestal-select').value)">Place</button></div>`;
@@ -2437,7 +2605,7 @@ export class UI {
             const elapsed = this.game.tick - (watchedExp.startTick || this.game.tick);
             const totalDur = Math.floor((watchedExp.duration || 1) * 1.2);
             const pct = watchedExp.status === 'gathering' ? 0 : Math.min(100, Math.floor((elapsed / totalDur) * 100));
-            html += `<div class="info-row" style="color:#aaddff;">${watchedExp.realmName} — ${watchedExp.status} (${pct}%)</div>`;
+            html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(watchedExp.realmName)} — ${escapeHtml(watchedExp.status)} (${pct}%)</div>`;
         }
         if (autoCount > 0) {
             html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${autoCount} auto running</div>`;
@@ -2532,14 +2700,16 @@ export class UI {
 
     // Display name for a wild animal type: its configured name (crypt guardians have
     // one, e.g. "Crypt Warden"), else the type with underscores read as spaces.
+    // Returned HTML-escaped (mods define animal names).
     _animalDisplayName(type) {
         const name = ANIMALS[type]?.name || type.replace(/_/g, ' ');
-        return name.charAt(0).toUpperCase() + name.slice(1);
+        return escapeHtml(name.charAt(0).toUpperCase() + name.slice(1));
     }
 
     showAnimalInfo(animal) {
         this._switchToInfoTab();
         this._viewingColonistId = null;
+        this._pendingColonistInfoHtml = null;
         this.setSummaryVisible(false);
         const def = ANIMALS[animal.type];
         let html = `<div class="info-header">${this._animalDisplayName(animal.type)}</div>`;
@@ -2563,7 +2733,13 @@ export class UI {
     _refreshRitualAltarInfo() {
         const el = this.elements.infoPanel.querySelector('#ritual-altar-section');
         if (!el) { this._viewingRitualAltar = false; return; }
-        el.innerHTML = this._buildRitualHtml(true);
+        // Only swap when the content changed (e.g. the cooldown second ticks
+        // over), so the Perform button isn't replaced mid-click every frame.
+        const html = this._buildRitualHtml(true);
+        if (html !== el._lastHtml) {
+            el._lastHtml = html;
+            el.innerHTML = html;
+        }
     }
 
     _buildRitualHtml(inner = false) {
@@ -2582,13 +2758,13 @@ export class UI {
                 const remaining = Math.ceil((readyAt - this.game.tick) / ticksPerSec);
                 note = `<span style="color:#cc7744;font-size:0.85em"> recovering ${remaining}s</span>`;
             } else if (!canAfford) {
-                note = `<span style="color:#cc7744;font-size:0.85em"> need ${costStr}</span>`;
+                note = `<span style="color:#cc7744;font-size:0.85em"> need ${escapeHtml(costStr)}</span>`;
             }
             html += `<div class="info-row" style="border-top:1px solid #333;padding-top:4px;">`;
-            html += `<div style="color:${ritual.color};font-weight:bold;">${ritual.icon} ${ritual.name}</div>`;
-            html += `<div style="color:#aaa;font-size:0.85em">${ritual.description}</div>`;
-            html += `<div style="color:#999;font-size:0.8em">Cost: ${costStr}</div>`;
-            html += `<div class="info-actions"><button ${disabled} onclick="window.game.triggerRitual('${key}')" style="background:#3a2a55;color:#cc99ff;">Perform</button>${note}</div>`;
+            html += `<div style="color:${escapeAttr(ritual.color)};font-weight:bold;">${escapeHtml(ritual.icon)} ${escapeHtml(ritual.name)}</div>`;
+            html += `<div style="color:#aaa;font-size:0.85em">${escapeHtml(ritual.description)}</div>`;
+            html += `<div style="color:#999;font-size:0.8em">Cost: ${escapeHtml(costStr)}</div>`;
+            html += `<div class="info-actions"><button ${disabled} onclick="window.game.triggerRitual(${jsArg(key)})" style="background:#3a2a55;color:#cc99ff;">Perform</button>${note}</div>`;
             html += `</div>`;
         }
         if (!inner) html += `</div>`;
@@ -2599,12 +2775,13 @@ export class UI {
         this._switchToInfoTab();
         this._lastTileInfo = { tile, x, y };
         this._viewingColonistId = null;
+        this._pendingColonistInfoHtml = null;
         this.setSummaryVisible(true);
         this._viewingRiftGate = this._setRiftPortal(tile, x, y);
         let html = `<div class="info-header">Tile (${x},${y})</div>`;
-        html += `<div class="info-row">Terrain: ${tile.terrain}</div>`;
+        html += `<div class="info-row">Terrain: ${escapeHtml(tile.terrain)}</div>`;
         if (tile.structure) {
-            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' ')}</div>`;
+            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${escapeHtml(BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' '))}</div>`;
             const maxHp = BUILDINGS[tile.structure]?.hp;
             if (maxHp) {
                 const currentHp = tile.structureHp !== undefined ? tile.structureHp : maxHp;
@@ -2614,11 +2791,11 @@ export class UI {
             html += this.getStructureDescription(tile.structure);
         }
         if (tile.floor) {
-            html += `<div class="info-row" style="color:#999">Floor: ${tile.floor.replace(/_/g,' ')}</div>`;
+            html += `<div class="info-row" style="color:#999">Floor: ${escapeHtml(tile.floor.replace(/_/g,' '))}</div>`;
         }
-        if (tile.resource) html += `<div class="info-row">Resource: ${tile.resource.type} (${tile.resource.amount})</div>`;
+        if (tile.resource) html += `<div class="info-row">Resource: ${escapeHtml(tile.resource.type)} (${tile.resource.amount})</div>`;
         if (tile.zone) {
-            html += `<div class="info-row">Zone: ${tile.zone.crop} (${tile.zone.state})</div>`;
+            html += `<div class="info-row">Zone: ${escapeHtml(tile.zone.crop)} (${escapeHtml(tile.zone.state)})</div>`;
             if (tile.zone.state === 'growing') {
                 const cropDef = CROPS[tile.zone.crop];
                 if (cropDef) {
@@ -2628,7 +2805,6 @@ export class UI {
             }
         }
         if (tile.roomId !== null) html += this._buildRoomQualityHtml(tile.roomId);
-        if (tile.onFire) html += `<div class="info-row fire">ON FIRE!</div>`;
 
         if (tile.structure === 'bed') {
             html += this._buildBedInfoHtml(tile, x, y);
@@ -2660,7 +2836,7 @@ export class UI {
             if (cs) {
                 html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
                 const def = COMPLEX_STRUCTURES[cs.key];
-                if (def) html += `<div class="info-row" style="color:#88ff88;">${def.description}</div>`;
+                if (def) html += `<div class="info-row" style="color:#88ff88;">${escapeHtml(def.description)}</div>`;
                 if (cs.effect.ritualAltar) { html += this._buildRitualHtml(); this._viewingRitualAltar = true; }
             } else {
                 this._viewingRitualAltar = false;
@@ -2681,7 +2857,7 @@ export class UI {
         const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
         const currentName = animal.name || cap(animal.type);
         const color = header.style.color;
-        header.innerHTML = `<input id="animal-rename-input-${animalId}" type="text" value="" placeholder="${currentName}" maxlength="24" style="background:#222;color:#eee;border:1px solid #666;padding:1px 4px;font-size:0.9em;width:110px;">` +
+        header.innerHTML = `<input id="animal-rename-input-${animalId}" type="text" value="" placeholder="${escapeAttr(currentName)}" maxlength="24" style="background:#222;color:#eee;border:1px solid #666;padding:1px 4px;font-size:0.9em;width:110px;">` +
             `<button onclick="window.game.ui._confirmAnimalRename(${animalId})" style="background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:4px;">OK</button>` +
             `<button onclick="window.game.ui._cancelAnimalRename(${animalId})" style="background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:2px;">✕</button>`;
         const input = document.getElementById(`animal-rename-input-${animalId}`);
@@ -2712,8 +2888,8 @@ export class UI {
         const def = TAMED_ANIMALS[animal.type];
         const color = def?.color || '#ccaa88';
         header.style.color = color;
-        const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-        const headerName = animal.name ? `${animal.name} <span style="color:#888;font-size:0.85em;">(${cap(animal.type)})</span>` : cap(animal.type);
+        const cap = s => escapeHtml(s.charAt(0).toUpperCase() + s.slice(1));
+        const headerName = animal.name ? `${escapeHtml(animal.name)} <span style="color:#888;font-size:0.85em;">(${cap(animal.type)})</span>` : cap(animal.type);
         const petLabel = animal.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
         const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
         header.innerHTML = `${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${animalId})">Rename</button>`;
@@ -2728,6 +2904,7 @@ export class UI {
         this._viewingRiftGate = this._setRiftPortal(tile, x, y);
         this._viewingColonistId = (colonists.length === 1 && animals.length === 0 && raiders.length === 0 && tamedAnimals.length === 0 && summons.length === 0)
             ? colonists[0].id : null;
+        this._pendingColonistInfoHtml = null;
         let html = '';
 
         for (const r of raiders) {
@@ -2735,9 +2912,9 @@ export class UI {
             const label = def?.name || (r.char === 'E' ? 'Void Enemy' : 'Raider');
             const color = def?.color || (r.char === 'E' ? '#cc00ff' : '#ff3333');
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            html += `<div class="info-header" style="color:${color};">${label}</div>`;
+            html += `<div class="info-header" style="color:${escapeAttr(color)};">${escapeHtml(label)}</div>`;
             html += `<div class="info-row">HP: ${r.hp}/${r.maxHp}</div>`;
-            html += `<div class="info-row">Damage: ${r.weapon?.name ? r.weapon.name + ' ' : ''}${r.damage}d (${(r.damage / (r.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1)} dps)</div>`;
+            html += `<div class="info-row">Damage: ${r.weapon?.name ? escapeHtml(r.weapon.name) + ' ' : ''}${r.damage}d (${(r.damage / (r.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1)} dps)</div>`;
             if (r.damageReduction) html += `<div class="info-row" style="color:#aaddff;">DR: ${Math.round(r.damageReduction * 100)}%</div>`;
             html += `<div class="info-row">State: ${r.fleeing ? 'Fleeing' : 'Attacking'}</div>`;
             if (r.roles && r.roles.length > 0) html += getRoleInfoHtml(r);
@@ -2754,14 +2931,14 @@ export class UI {
             const def = ANIMALS[a.type];
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            html += `<div class="info-header" style="color:${color};">${this._animalDisplayName(a.type)}${a.hostile ? ' (hostile)' : ''}</div>`;
+            html += `<div class="info-header" style="color:${escapeAttr(color)};">${this._animalDisplayName(a.type)}${a.hostile ? ' (hostile)' : ''}</div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
             if (def?.meatYield) html += `<div class="info-row">Meat yield: ${def.meatYield}</div>`;
             if (def?.hideYield) html += `<div class="info-row">Hide yield: ${def.hideYield}</div>`;
             if (a.hostile && def?.damage) html += `<div class="info-row">Damage: ${def.damage}</div>`;
             if (def?.tameable) {
                 const tamedDef = TAMED_ANIMALS[a.type];
-                if (tamedDef?.produces) html += `<div class="info-row" style="color:#88cc88">Produces: ${tamedDef.produces} (every ${tamedDef.produceRate} ticks)</div>`;
+                if (tamedDef?.produces) html += `<div class="info-row" style="color:#88cc88">Produces: ${escapeHtml(tamedDef.produces)} (every ${tamedDef.produceRate} ticks)</div>`;
                 if (tamedDef?.packAnimal) html += `<div class="info-row" style="color:#bbaa44">Pack animal (+${Math.round(tamedDef.expeditionSpeedBonus * 100)}% expedition speed)</div>`;
                 if (tamedDef?.happinessAura) html += `<div class="info-row" style="color:#ff88cc">Happiness aura (radius ${tamedDef.auraRadius})</div>`;
             }
@@ -2788,18 +2965,18 @@ export class UI {
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
             const petLabel = a.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
-            const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-            const headerName = a.name ? `${a.name} <span style="color:#888;font-size:0.85em;">(${cap(a.type)})</span>` : cap(a.type);
+            const cap = s => escapeHtml(s.charAt(0).toUpperCase() + s.slice(1));
+            const headerName = a.name ? `${escapeHtml(a.name)} <span style="color:#888;font-size:0.85em;">(${cap(a.type)})</span>` : cap(a.type);
             const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
-            html += `<div class="info-header" style="color:${color};" data-animal-header="${a.id}">${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">Rename</button></div>`;
+            html += `<div class="info-header" style="color:${escapeAttr(color)};" data-animal-header="${a.id}">${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">Rename</button></div>`;
             html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
             if (a.level > 0) {
-                const lvlTip = animalLevelTooltip(a.level, a.type).replace(/\n/g, '&#10;');
+                const lvlTip = escapeAttr(animalLevelTooltip(a.level, a.type)).replace(/\n/g, '&#10;');
                 html += `<div class="info-row" style="color:#ffcc44;" title="${lvlTip}">Animal Level ${a.level}${a.level >= 5 ? ' (Max)' : ''}</div>`;
             }
             if (a.bondedColonistId) {
                 const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
-                const bondName = bonded ? bonded.name : 'Unknown';
+                const bondName = bonded ? escapeHtml(bonded.name) : 'Unknown';
                 const PET_BOND_THRESHOLD = 5;
                 const bondDisplay = a.isPet ? `${bondName} (Pet)` : `${bondName} (Bond: ${a.bondLevel || 0}/${PET_BOND_THRESHOLD})`;
                 html += `<div class="info-row" style="color:#aaddff">Bonded: ${bondDisplay}</div>`;
@@ -2817,7 +2994,7 @@ export class UI {
                 html += getRoleInfoHtml(a);
             } else {
                 if (def?.produces) {
-                    html += `<div class="info-row">Produces: ${def.produces} (every ${def.produceRate} ticks)</div>`;
+                    html += `<div class="info-row">Produces: ${escapeHtml(def.produces)} (every ${def.produceRate} ticks)</div>`;
                     html += `<div class="info-row">Next in: ${a.produceCooldown} ticks</div>`;
                 }
                 if (def?.guardAnimal) {
@@ -2834,7 +3011,7 @@ export class UI {
                 const aliveColonists = this.game.colonists.filter(c => c.hp > 0);
                 if (aliveColonists.length > 0) {
                     const opts = aliveColonists.map(c =>
-                        `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                        `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                     ).join('');
                     html += `<div class="info-row" style="margin-top:4px;">`;
                     html += `<label style="color:#aaaaaa;font-size:0.85em;">Defends: </label>`;
@@ -2849,7 +3026,7 @@ export class UI {
                         ? this.game.entities.filter(e => e.tamed && e.isPet && e.bondedColonistId === a.bondedColonistId).length
                         : 0;
                     const opts = aliveColonists.map(c =>
-                        `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                        `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                     ).join('');
                     html += `<div class="info-row" style="margin-top:4px;">`;
                     html += `<label style="color:#aaaaaa;font-size:0.85em;">Pet (${ownerPetCount}/${maxPets}): </label>`;
@@ -2881,7 +3058,7 @@ export class UI {
             const color = def?.color || s.color || '#9966ff';
             const name = def?.name || s.type || 'Summon';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            html += `<div class="info-header" style="color:${color};">${name}</div>`;
+            html += `<div class="info-header" style="color:${escapeAttr(color)};">${escapeHtml(name)}</div>`;
             html += `<div class="info-row">HP: ${s.hp}/${s.maxHp}</div>`;
             html += `<div class="info-row">Damage: ${s.damage}d (${(s.damage / (s.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1)} dps)</div>`;
             if (s.roles && s.roles.length > 0) {
@@ -2889,15 +3066,14 @@ export class UI {
             } else {
                 const remaining = s.expiresAt ? Math.max(0, s.expiresAt - (this.game.tick || 0)) : '?';
                 html += `<div class="info-row" style="color:#9966ff">Expires in ${remaining} ticks</div>`;
-                html += `<div class="info-row">State: ${s.guardState || 'idle'}</div>`;
+                html += `<div class="info-row">State: ${escapeHtml(s.guardState || 'idle')}</div>`;
             }
             html += `</div>`;
         }
 
         html += `<div class="info-header" style="font-size:11px;color:#aaa;">Tile (${x},${y})</div>`;
-        if (tile.onFire) html += `<div class="info-row fire">ON FIRE!</div>`;
         if (tile.structure) {
-            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' ')}</div>`;
+            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${escapeHtml(BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' '))}</div>`;
             const maxHp = BUILDINGS[tile.structure]?.hp;
             if (maxHp) {
                 const currentHp = tile.structureHp !== undefined ? tile.structureHp : maxHp;
@@ -2910,7 +3086,7 @@ export class UI {
                 if (cs) {
                     html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
                     const def = COMPLEX_STRUCTURES[cs.key];
-                    if (def) html += `<div class="info-row" style="color:#88ff88;">${def.description}</div>`;
+                    if (def) html += `<div class="info-row" style="color:#88ff88;">${escapeHtml(def.description)}</div>`;
                     if (cs.effect.ritualAltar) { html += this._buildRitualHtml(); this._viewingRitualAltar = true; }
                 } else {
                     this._viewingRitualAltar = false;
@@ -2918,9 +3094,9 @@ export class UI {
                 }
             }
         }
-        if (tile.floor) html += `<div class="info-row" style="color:#999">Floor: ${tile.floor.replace(/_/g,' ')}</div>`;
+        if (tile.floor) html += `<div class="info-row" style="color:#999">Floor: ${escapeHtml(tile.floor.replace(/_/g,' '))}</div>`;
         if (tile.zone) {
-            html += `<div class="info-row">Zone: ${tile.zone.crop} (${tile.zone.state})</div>`;
+            html += `<div class="info-row">Zone: ${escapeHtml(tile.zone.crop)} (${escapeHtml(tile.zone.state)})</div>`;
             if (tile.zone.state === 'growing') {
                 const cropDef = CROPS[tile.zone.crop];
                 if (cropDef) {
@@ -2929,8 +3105,8 @@ export class UI {
                 }
             }
         }
-        if (tile.resource) html += `<div class="info-row">Resource: ${tile.resource.type} (${tile.resource.amount})</div>`;
-        html += `<div class="info-row">Terrain: ${tile.terrain}</div>`;
+        if (tile.resource) html += `<div class="info-row">Resource: ${escapeHtml(tile.resource.type)} (${tile.resource.amount})</div>`;
+        html += `<div class="info-row">Terrain: ${escapeHtml(tile.terrain)}</div>`;
         if (tile.roomId !== null) html += this._buildRoomQualityHtml(tile.roomId);
 
         if (tile.structure === 'bed') {
@@ -2964,6 +3140,7 @@ export class UI {
     showMultiColonistInfo(colonists) {
         this._switchToInfoTab();
         this._viewingColonistId = null;
+        this._pendingColonistInfoHtml = null;
         this.setSummaryVisible(false);
         const draftedCount = colonists.filter(c => c.drafted).length;
         let html = `<div class="info-header">${colonists.length} Colonists Selected</div>`;
@@ -2976,9 +3153,9 @@ export class UI {
         for (const c of colonists) {
             const moodLevel = getMoodLabel(c.mood);
             html += `<div style="border-top:1px solid #333;margin-top:4px;padding-top:4px;">`;
-            html += `<span class="info-header" style="cursor:pointer;color:${c.nameColor || '#ffff00'}" onclick="window.game.selectColonistById(${c.id})">${c.name}</span>`;
+            html += `<span class="info-header" style="cursor:pointer;color:${escapeAttr(c.nameColor || '#ffff00')}" onclick="window.game.selectColonistById(${c.id})">${escapeHtml(c.name)}</span>`;
             html += ` <span class="mood-${moodLevel}">${c.mood.toFixed(0)}</span>`;
-            html += ` <span style="color:#888">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${c.golem ? ' [Golem]' : ''}</span>`;
+            html += ` <span style="color:#888">${escapeHtml(c.state)}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${c.golem ? ' [Golem]' : ''}</span>`;
             html += `<div class="info-row">HP:${Math.round(c.hp)} H:${c.needs.hunger.toFixed(0)} R:${c.needs.rest.toFixed(0)}</div>`;
             html += `<div class="info-actions">`;
             html += `<button onclick="window.game.selectColonistById(${c.id})">Focus</button>`;
@@ -3020,6 +3197,8 @@ export class UI {
         if (this.settingsPanelVisible) {
             this.settingsPanelVisible = false;
             this.elements.settingsPanel.style.display = 'none';
+            // A pending key-rebind must not outlive the panel.
+            cancelRebindCapture();
         }
         if (this.arcanePanelVisible) {
             this.arcanePanelVisible = false;
@@ -3047,6 +3226,9 @@ export class UI {
                 if (!this.game.paused) this.game.togglePause(true);
             }
         } else {
+            // Only restore when a pausing panel actually started a session, so a
+            // non-pausing panel (Arcane) can call this safely to end one.
+            if (!this._panelSessionActive) return;
             this._panelSessionActive = false;
             if (!this._wasPausedBeforePanel && this.game.paused) this.game.togglePause(true);
         }
@@ -3088,13 +3270,14 @@ export class UI {
         let profileToolbar = '';
         if (this._prioTab === 'work') {
             const customProfiles = this.game.priorityProfiles || {};
+            // Every custom profile, whatever it was renamed to (not just "Custom N").
             const allProfileNames = [
                 ...Object.keys(PRIORITY_PROFILES),
-                ...Object.keys(customProfiles).filter(k => k.startsWith('Custom')),
+                ...Object.keys(customProfiles).filter(k => !PRIORITY_PROFILES[k]),
             ];
             const selectedName = this._prioSelectedProfile || '';
             const profileOptions = allProfileNames
-                .map(name => `<option value="${name}"${name === selectedName ? ' selected' : ''}>${name}</option>`)
+                .map(name => `<option value="${escapeAttr(name)}"${name === selectedName ? ' selected' : ''}>${escapeHtml(name)}</option>`)
                 .join('');
 
             // Load draft from selected profile if selection changed or draft missing.
@@ -3128,7 +3311,7 @@ export class UI {
                     return `<td ${attr} style="${style}">${display}</td>`;
                 }).join('');
                 const nameInput = isBuiltIn ? '' :
-                    `<input id="prio-profile-name" value="${selectedName}" maxlength="20" style="background:#222;color:#ccc;border:1px solid #444;border-radius:3px;padding:2px 6px;font-size:12px;width:110px;" />`;
+                    `<input id="prio-profile-name" value="${escapeAttr(selectedName)}" maxlength="20" style="background:#222;color:#ccc;border:1px solid #444;border-radius:3px;padding:2px 6px;font-size:12px;width:110px;" />`;
                 const saveBtn = isBuiltIn ? '' :
                     `<button onclick="window.game.ui._saveProfileDraft()" style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">Save</button>`;
                 profileValueRow =
@@ -3188,10 +3371,15 @@ export class UI {
     }
 
     _newCustomProfile() {
-        const existing = Object.keys(this.game.priorityProfiles || {}).filter(k => k.startsWith('Custom'));
-        const name = `Custom ${existing.length + 1}`;
+        // First free "Custom N", so a new profile never overwrites an existing one.
+        const existing = this.game.priorityProfiles || {};
+        let n = 1;
+        while (existing[`Custom ${n}`] || PRIORITY_PROFILES[`Custom ${n}`]) n++;
+        const name = `Custom ${n}`;
         if (!this.game.settings.priorityProfiles) this.game.settings.priorityProfiles = {};
         this.game.settings.priorityProfiles[name] = { building: 3, farming: 3, crafting: 3, cooking: 3, animals: 3, research: 3 };
+        // Profiles are a global preference; persist now so a reload keeps them.
+        this.game.saveSettingsToStorage();
         this._prioSelectedProfile = name;
         this._prioProfileDraft = null;
         this._prioProfileDraftSource = null;
@@ -3205,10 +3393,18 @@ export class UI {
         const newName = nameInput ? nameInput.value.trim() : this._prioProfileDraftSource;
         if (!newName) return;
         if (!this.game.settings.priorityProfiles) this.game.settings.priorityProfiles = {};
+        // Renaming onto a built-in or another custom profile would shadow or
+        // overwrite it; refuse instead.
+        if (newName !== this._prioProfileDraftSource
+            && (PRIORITY_PROFILES[newName] || this.game.settings.priorityProfiles[newName])) {
+            this.game.notifications.push({ text: `A profile named "${newName}" already exists`, tick: this.game.tick, type: 'danger' });
+            return;
+        }
         if (newName !== this._prioProfileDraftSource) {
             delete this.game.settings.priorityProfiles[this._prioProfileDraftSource];
         }
         this.game.settings.priorityProfiles[newName] = { ...this._prioProfileDraft };
+        this.game.saveSettingsToStorage();
         this._prioSelectedProfile = newName;
         this._prioProfileDraftSource = newName;
         this._lastPrioHtml = null;
@@ -3228,12 +3424,12 @@ export class UI {
             html += '<tr><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">Group</th><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">Members</th><th></th></tr>';
             for (const g of groups) {
                 const members = colonists.filter(c => c.group === g);
-                const memberNames = members.length > 0 ? members.map(c => `<span style="color:${c.nameColor || '#ffcc00'}">${c.name}</span>`).join(', ') : '<span style="color:#555">—</span>';
+                const memberNames = members.length > 0 ? members.map(c => `<span style="color:${escapeAttr(c.nameColor || '#ffcc00')}">${escapeHtml(c.name)}</span>`).join(', ') : '<span style="color:#555">—</span>';
                 html += `<tr>`;
-                html += `<td style="padding:4px 8px 4px 0;font-weight:bold;color:#ffcc44;white-space:nowrap;">${g}</td>`;
+                html += `<td style="padding:4px 8px 4px 0;font-weight:bold;color:#ffcc44;white-space:nowrap;">${escapeHtml(g)}</td>`;
                 html += `<td style="padding:4px 8px;font-size:0.88em;line-height:1.5;">${memberNames}</td>`;
                 html += `<td style="padding:4px 0;white-space:nowrap;">`;
-                html += `<button data-delete-group="${g.replace(/"/g, '&quot;')}" style="background:none;border:1px solid #552222;color:#cc4444;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:0.85em;" title="Delete group and unassign all members">Delete</button>`;
+                html += `<button data-delete-group="${escapeAttr(g)}" style="background:none;border:1px solid #552222;color:#cc4444;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:0.85em;" title="Delete group and unassign all members">Delete</button>`;
                 html += `</td>`;
                 html += `</tr>`;
             }
@@ -3255,7 +3451,7 @@ export class UI {
 
         for (const c of this.game.colonists) {
             if (c.hp <= 0) continue;
-            html += `<tr><td style="color:${c.nameColor || '#ffff00'}">${c.name}</td>`;
+            html += `<tr><td style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</td>`;
             for (const s of skills) {
                 const val = c.priorities[s];
                 const display = val === 0 ? '-' : val;
@@ -3289,9 +3485,9 @@ export class UI {
             const hasMagic = c.magicSkills && Object.values(c.magicSkills).some(v => v > 0);
             const isUnderAttuned = hasMagic && attuned.length < MAGIC_STUDY_CONFIG.attunementSlots;
             const nameCellStyle = isUnderAttuned
-                ? `color:${c.nameColor || '#ffff00'};background:#2a1a00;`
-                : `color:${c.nameColor || '#ffff00'}`;
-            const nameLabel = isUnderAttuned ? `${c.name} <span style="color:#ff8844;font-size:0.85em" title="Missing attunement slot(s)">⚠</span>` : c.name;
+                ? `color:${escapeAttr(c.nameColor || '#ffff00')};background:#2a1a00;`
+                : `color:${escapeAttr(c.nameColor || '#ffff00')}`;
+            const nameLabel = isUnderAttuned ? `${escapeHtml(c.name)} <span style="color:#ff8844;font-size:0.85em" title="Missing attunement slot(s)">⚠</span>` : escapeHtml(c.name);
             html += `<tr><td style="${nameCellStyle}">${nameLabel}</td>`;
             for (const s of schools) {
                 const level = (c.magicSkills && c.magicSkills[s]) || 0;
@@ -3329,7 +3525,7 @@ export class UI {
         html += '<div class="craft-tabs">';
         for (const cat of RECIPE_CATEGORIES) {
             const active = cat === this._craftTab ? ' active' : '';
-            html += `<button class="craft-tab${active}" data-craft-tab="${cat}">${cat}</button>`;
+            html += `<button class="craft-tab${active}" data-craft-tab="${escapeAttr(cat)}">${escapeHtml(cat)}</button>`;
         }
         html += '</div>';
         const hasEquipTiers = ['Weapons', 'Armor', 'Clothing', 'Tools', 'Trinkets'].includes(this._craftTab);
@@ -3531,25 +3727,25 @@ export class UI {
             }
             const inputStr = Object.entries(recipe.input).map(([k, v]) => {
                 if (k === 'foodstuffs') return `${v} foodstuffs (have ${this.game.resources.getFoodstuffTotal()})`;
-                return `${k}:${v}`;
+                return `${escapeHtml(k)}:${v}`;
             }).join(' + ');
             const outputStr = Object.entries(recipe.output).map(([k, v]) => {
                 const tip = this.getCraftOutputTip(k);
-                if (tip) return `${this._itemIcon(k)}<span class="skill-tip" data-tip="${tip}">${k.replace(/_/g, ' ')}${v > 1 ? ':' + v : ''}</span>`;
-                return `${k}:${v}`;
+                if (tip) return `${this._itemIcon(k)}<span class="skill-tip" data-tip="${escapeAttr(tip)}">${escapeHtml(k.replace(/_/g, ' '))}${v > 1 ? ':' + v : ''}</span>`;
+                return `${escapeHtml(k)}:${v}`;
             }).join('+');
             const cls = canCraft ? 'craft-available' : 'craft-unavailable';
             const ct = this.game.settings.craftTargets[key] || {};
             const repeatCls = ct.repeat ? 'craft-repeat active' : 'craft-repeat';
             html += `<div class="craft-row ${cls}">`;
-            html += `<button ${canCraft ? '' : 'disabled'} data-craft-recipe="${key}" onclick="window.game.craft('${key}')">${key.replace(/_/g, ' ')}</button>`;
-            html += `<button ${canCraft ? '' : 'disabled'} onclick="window.game.craftMultiple('${key}',5)" class="craft-multi">x5</button>`;
-            html += `<button onclick="window.game.toggleCraftRepeat('${key}')" class="craft-multi ${repeatCls}" title="Auto-repeat">&#x27F3;</button>`;
-            html += `<input type="number" min="0" max="999" value="${ct.target || 0}" onchange="window.game.setCraftTarget('${key}',this.value)" title="Maintain stock target (0=off)" style="width:35px;background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:3px;padding:1px 2px;text-align:center;font-size:0.85em;">`;
+            html += `<button ${canCraft ? '' : 'disabled'} data-craft-recipe="${escapeAttr(key)}" onclick="window.game.craft(${jsArg(key)})">${escapeHtml(key.replace(/_/g, ' '))}</button>`;
+            html += `<button ${canCraft ? '' : 'disabled'} onclick="window.game.craftMultiple(${jsArg(key)},5)" class="craft-multi">x5</button>`;
+            html += `<button onclick="window.game.toggleCraftRepeat(${jsArg(key)})" class="craft-multi ${repeatCls}" title="Auto-repeat">&#x27F3;</button>`;
+            html += `<input type="number" min="0" max="999" value="${parseInt(ct.target) || 0}" onchange="window.game.setCraftTarget(${jsArg(key)},this.value)" title="Maintain stock target (0=off)" style="width:35px;background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:3px;padding:1px 2px;text-align:center;font-size:0.85em;">`;
             html += `<span>${inputStr} → ${outputStr}</span>`;
             if (!hasStation) {
                 const stationName = (recipe.station || 'workbench').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                html += `<span style="color:#ff4444;font-size:0.85em;margin-left:auto;">Needs ${stationName}</span>`;
+                html += `<span style="color:#ff4444;font-size:0.85em;margin-left:auto;">Needs ${escapeHtml(stationName)}</span>`;
             }
             html += `</div>`;
         }
@@ -3603,10 +3799,10 @@ export class UI {
         const draggable = this._colonistHudLocked ? '' : ' draggable="true"';
         const dragId = this._colonistHudLocked ? '' : ` data-drag-colonist-id="${c.id}"`;
         if (c.hp <= 0) {
-            return `<div class="hud-colonist dead"><span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span style="color:#cc4444">DEAD</span></div>`;
+            return `<div class="hud-colonist dead"><span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span style="color:#cc4444">DEAD</span></div>`;
         }
         if (c.onExpedition) {
-            return `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}><span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
+            return `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}><span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
         }
         const moodLevel = getMoodLabel(c.mood);
         const moodColor = moodLevel === 'inspired' ? '#66ffcc' : moodLevel === 'content' ? '#88cc88' : moodLevel === 'stressed' ? '#cccc44' : '#ff4444';
@@ -3614,15 +3810,15 @@ export class UI {
         const restColor = statColor(c.needs.rest);
         const hpColor = statColor(c.maxHp > 0 ? (c.hp / c.maxHp) * 100 : 100);
         const weaponIcon = c.weapon ? this._itemIcon(c.weapon.key, 'weapon') : '';
-        const weapon = c.weapon?.name || 'Fists';
+        const weapon = escapeHtml(c.weapon?.name || 'Fists');
         const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ' <span style="color:#ff6644">[Fatigued]</span>' : '';
         const dot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
         const cManaPct = c.maxMana > 0 ? (c.mana / c.maxMana) * 100 : 0;
         const sparkline = this._moodSparklineSvg(c);
-        const moodThoughtLines = (c.thoughts || []).slice(-5).map(t => `${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)}: ${t.text}`).join('&#10;');
+        const moodThoughtLines = (c.thoughts || []).slice(-5).map(t => `${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)}: ${escapeAttr(t.text)}`).join('&#10;');
         const moodTip = `Mood: ${c.mood.toFixed(0)} (${moodLevel})${moodThoughtLines ? '&#10;' + moodThoughtLines : ''}`;
         let row = `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}>`;
-        row += `<span class="hud-name" style="color:${c.nameColor || '#ffff00'}">${c.name}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${c.state}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
+        row += `<span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${escapeHtml(c.state)}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
         row += `<div class="hud-dots">`;
         row += `<span class="hud-stat skill-tip" data-tip="${moodTip}"><span class="hud-stat-dot" style="color:${moodColor}">●</span>Mood${sparkline}</span>`;
         row += dot('Food', hungerColor);
@@ -3670,13 +3866,12 @@ export class UI {
         for (const [groupName, members] of buckets) {
             if (members.length === 0) continue;
             if (groupName !== null) {
-                const safeGroup = groupName.replace(/'/g, "\\'");
-                html += `<div class="hud-group-header" data-group-name="${groupName.replace(/"/g, '&quot;')}">`;
-                html += `<span class="hud-group-name">${groupName}</span>`;
+                html += `<div class="hud-group-header" data-group-name="${escapeAttr(groupName)}">`;
+                html += `<span class="hud-group-name">${escapeHtml(groupName)}</span>`;
                 if (!locked) {
                     html += `<span class="hud-group-actions">`;
-                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupUp('${safeGroup}')" title="Move group up">▲</button>`;
-                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupDown('${safeGroup}')" title="Move group down">▼</button>`;
+                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupUp(${jsArg(groupName)})" title="Move group up">▲</button>`;
+                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupDown(${jsArg(groupName)})" title="Move group down">▼</button>`;
                     html += `</span>`;
                 }
                 html += `</div>`;
@@ -3693,18 +3888,18 @@ export class UI {
             const sortedGolems = [...golems].sort((a, b) => (b.hp > 0 ? 1 : 0) - (a.hp > 0 ? 1 : 0));
             for (const g of sortedGolems) {
                 if (g.hp <= 0) {
-                    html += `<div class="hud-colonist dead"><span class="hud-name" style="color:${g.nameColor || '#ffff00'}">${g.name}</span> <span style="color:#cc4444">DESTROYED</span></div>`;
+                    html += `<div class="hud-colonist dead"><span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span style="color:#cc4444">DESTROYED</span></div>`;
                     continue;
                 }
                 if (g.onExpedition) {
-                    html += `<div class="hud-colonist" data-colonist-id="${g.id}"><span class="hud-name" style="color:${g.nameColor || '#ffff00'}">${g.name}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
+                    html += `<div class="hud-colonist" data-colonist-id="${g.id}"><span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
                     continue;
                 }
                 const hpColor = statColor(g.maxHp > 0 ? (g.hp / g.maxHp) * 100 : 100);
                 const weaponIcon = g.weapon ? this._itemIcon(g.weapon.key, 'weapon') : '';
-                const weapon = g.weapon?.name || 'None';
+                const weapon = escapeHtml(g.weapon?.name || 'None');
                 html += `<div class="hud-colonist" data-colonist-id="${g.id}">`;
-                html += `<span class="hud-name" style="color:${g.nameColor || '#ffff00'}">${g.name}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${g.state}${g.drafted ? ' [D]' : ''}</span>`;
+                html += `<span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${escapeHtml(g.state)}${g.drafted ? ' [D]' : ''}</span>`;
                 const gDot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
                 html += `<div class="hud-dots">${gDot('HP', hpColor)}</div>`;
                 html += `</div>`;
@@ -3739,12 +3934,12 @@ export class UI {
             const e = entries[i];
             const colorStyle = e.type === 'danger' ? 'color:#ff6666' : e.type === 'success' ? 'color:#66ff66' : 'color:#ffcc44';
             if (e.linkedEntity) {
-                const entityJson = JSON.stringify(e.linkedEntity).replace(/"/g, '&quot;');
+                const entityJson = escapeAttr(JSON.stringify(e.linkedEntity));
                 html += `<div class="event-log-row" style="cursor:pointer;${colorStyle}" data-entity="${entityJson}">`;
             } else {
                 html += `<div class="event-log-row" style="${colorStyle}">`;
             }
-            html += `<span class="event-log-time">[${e.time}]</span> ${e.text}`;
+            html += `<span class="event-log-time">[${escapeHtml(e.time)}]</span> ${escapeHtmlKeepEntities(e.text)}`;
             html += `</div>`;
         }
         if (html !== this._lastEventLogHtml) {
@@ -3835,7 +4030,7 @@ export class UI {
         if (buildingEntries.length > 0) {
             html += '<div class="info-row" style="color:#aa8844;margin-bottom:4px;"><b>Building Materials</b></div>';
             for (const [key, amount] of buildingEntries) {
-                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${key.replace(/_/g, ' ')}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
+                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(key.replace(/_/g, ' '))}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
             }
         }
 
@@ -3853,14 +4048,14 @@ export class UI {
                     const cls = isReserved ? 'inv-reserve active' : 'inv-reserve';
                     extra = `<button class="${cls}" data-reserve-food="${key}" title="${isReserved ? 'Unreserve — allow cooking' : 'Reserve — protect from cooking'}">${isReserved ? '🔒' : '🔓'}</button>`;
                 }
-                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${key.replace(/_/g, ' ')}</span>${extra}<span class="inv-amount">${Math.round(amount)}</span></div>`;
+                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(key.replace(/_/g, ' '))}</span>${extra}<span class="inv-amount">${Math.round(amount)}</span></div>`;
             }
         }
 
         if (otherEntries.length > 0) {
             html += '<div class="info-row" style="color:#8888cc;margin-top:8px;margin-bottom:4px;"><b>Other</b></div>';
             for (const [key, amount] of otherEntries) {
-                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${key.replace(/_/g, ' ')}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
+                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(key.replace(/_/g, ' '))}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
             }
         }
 
@@ -3927,7 +4122,7 @@ export class UI {
             void_essence: 'Ve', hides: 'Hi', gold: 'Au',
         };
         const color = colors[key] || '#aaa';
-        const label = abbr[key] || key.charAt(0).toUpperCase();
+        const label = escapeHtml(abbr[key] || key.charAt(0).toUpperCase());
         return `<span class="cost-chip" style="color:${color}">${label}${amount}</span>`;
     }
 
@@ -3935,11 +4130,11 @@ export class UI {
         const buildType = card.dataset.buildOpt;
         const def = BUILDINGS[buildType];
         if (!def) return;
-        let html = `<div class="build-tip-name">${buildType.replace(/_/g, ' ')}</div>`;
-        html += `<div class="build-tip-desc">${def.description || ''}</div>`;
+        let html = `<div class="build-tip-name">${escapeHtml(buildType.replace(/_/g, ' '))}</div>`;
+        html += `<div class="build-tip-desc">${escapeHtml(def.description || '')}</div>`;
         if (def.research) {
             const unlocked = this.game.research.isResearched(def.research);
-            html += `<div class="build-tip-meta" style="color:${unlocked ? '#66cc66' : '#cc6666'}">Research: ${def.research.replace(/_/g, ' ')}${unlocked ? ' (done)' : ''}</div>`;
+            html += `<div class="build-tip-meta" style="color:${unlocked ? '#66cc66' : '#cc6666'}">Research: ${escapeHtml(def.research.replace(/_/g, ' '))}${unlocked ? ' (done)' : ''}</div>`;
         }
         if (def.power) {
             if (def.power.generates) html += `<div class="build-tip-meta" style="color:#aa44ff">Generates ${def.power.generates} mana</div>`;
@@ -4001,10 +4196,10 @@ export class UI {
                 const wec = ENCHANT_COST_BY_TIER[w.tier] ?? { resource: 'runite', amount: 5 };
                 const wecLabel = `${wec.amount} ${wec.resource.replace(/_/g, ' ')}`;
                 const wi = weapons.indexOf(w);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${tip}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${w.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${escapeHtml(w.name)}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${w.name.replace(/'/g, "\\'")} for ${wecLabel}?')){window.game.enchantWeapon(${wi});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${w.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(w, this.game)}')){window.game.discardWeapon(${wi})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${w.name} for ${wecLabel}?`)})){window.game.enchantWeapon(${wi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${w.name}?\n\nReturns: ${salvagePreview(w, this.game)}`)})){window.game.discardWeapon(${wi})}">♻</button></span></div>`;
             });
         }
         if (armors.length > 0) {
@@ -4020,10 +4215,10 @@ export class UI {
                 const aec = ENCHANT_COST_BY_TIER[a.tier] ?? { resource: 'runite', amount: 5 };
                 const aecLabel = `${aec.amount} ${aec.resource.replace(/_/g, ' ')}`;
                 const ai = armors.indexOf(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${tip}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${a.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${escapeHtml(a.name)}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${a.name.replace(/'/g, "\\'")} for ${aecLabel}?')){window.game.enchantArmor(${ai});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardArmor(${ai})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${a.name} for ${aecLabel}?`)})){window.game.enchantArmor(${ai});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${a.name}?\n\nReturns: ${salvagePreview(a, this.game)}`)})){window.game.discardArmor(${ai})}">♻</button></span></div>`;
             });
         }
         if (helmets.length > 0) {
@@ -4039,10 +4234,10 @@ export class UI {
                 const hec = ENCHANT_COST_BY_TIER[h.tier] ?? { resource: 'runite', amount: 5 };
                 const hecLabel = `${hec.amount} ${hec.resource.replace(/_/g, ' ')}`;
                 const hi = helmets.indexOf(h);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${tip}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${h.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${escapeHtml(h.name)}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${h.name.replace(/'/g, "\\'")} for ${hecLabel}?')){window.game.enchantHelmet(${hi});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${h.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(h, this.game)}')){window.game.discardHelmet(${hi})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${h.name} for ${hecLabel}?`)})){window.game.enchantHelmet(${hi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${h.name}?\n\nReturns: ${salvagePreview(h, this.game)}`)})){window.game.discardHelmet(${hi})}">♻</button></span></div>`;
             });
         }
         if (boots.length > 0) {
@@ -4058,10 +4253,10 @@ export class UI {
                 const bec = ENCHANT_COST_BY_TIER[b.tier] ?? { resource: 'runite', amount: 5 };
                 const becLabel = `${bec.amount} ${bec.resource.replace(/_/g, ' ')}`;
                 const bi = boots.indexOf(b);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${tip}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${b.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${escapeHtml(b.name)}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${b.name.replace(/'/g, "\\'")} for ${becLabel}?')){window.game.enchantBoots(${bi});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${b.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(b, this.game)}')){window.game.discardBoots(${bi})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${b.name} for ${becLabel}?`)})){window.game.enchantBoots(${bi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${b.name}?\n\nReturns: ${salvagePreview(b, this.game)}`)})){window.game.discardBoots(${bi})}">♻</button></span></div>`;
             });
         }
         if (clothes.length > 0) {
@@ -4077,10 +4272,10 @@ export class UI {
                 const cec = ENCHANT_COST_BY_TIER[c.tier] ?? { resource: 'runite', amount: 5 };
                 const cecLabel = `${cec.amount} ${cec.resource.replace(/_/g, ' ')}`;
                 const ci = clothes.indexOf(c);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${tip}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${c.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${escapeHtml(c.name)}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${c.name.replace(/'/g, "\\'")} for ${cecLabel}?')){window.game.enchantClothes(${ci});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${c.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(c, this.game)}')){window.game.discardClothes(${ci})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${c.name} for ${cecLabel}?`)})){window.game.enchantClothes(${ci});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${c.name}?\n\nReturns: ${salvagePreview(c, this.game)}`)})){window.game.discardClothes(${ci})}">♻</button></span></div>`;
             });
         }
         if (tools.length > 0) {
@@ -4096,10 +4291,10 @@ export class UI {
                 const tec = ENCHANT_COST_BY_TIER[t.tier] ?? { resource: 'runite', amount: 5 };
                 const tecLabel = `${tec.amount} ${tec.resource.replace(/_/g, ' ')}`;
                 const ti = tools.indexOf(t);
-                html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(t)}" data-tip="${tip}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${t.name}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(t)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${escapeHtml(t.name)}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm('Enchant ${t.name.replace(/'/g, "\\'")} for ${tecLabel}?')){window.game.enchantTool(${ti});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm('Salvage ${t.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(t, this.game)}')){window.game.discardTool(${ti})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${t.name} for ${tecLabel}?`)})){window.game.enchantTool(${ti});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${t.name}?\n\nReturns: ${salvagePreview(t, this.game)}`)})){window.game.discardTool(${ti})}">♻</button></span></div>`;
             });
         }
         if (trinkets.length > 0) {
@@ -4112,7 +4307,7 @@ export class UI {
                 }
                 const tip = this._getTrinketTooltip(a);
                 const ai = trinkets.indexOf(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tip}" style="color:${a.textColor || "#d3d597"}">${this._itemIcon(a.key, 'trinket')}${a.name}</span><span class="inv-amount"></span><span class="inv-actions"><button class="inv-delete" onclick="if(confirm('Salvage ${a.name.replace(/'/g, "\\'")}?\\n\\nReturns: ${salvagePreview(a, this.game)}')){window.game.discardTrinket(${ai})}">♻</button></span></div>`;
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(tip)}" style="color:${escapeAttr(a.textColor || "#d3d597")}">${this._itemIcon(a.key, 'trinket')}${escapeHtml(a.name)}</span><span class="inv-amount"></span><span class="inv-actions"><button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${a.name}?\n\nReturns: ${salvagePreview(a, this.game)}`)})){window.game.discardTrinket(${ai})}">♻</button></span></div>`;
             });
         }
         if (!html) html = '<div class="info-row" style="color:#666;">No equipment in storage.</div>';
@@ -4128,7 +4323,7 @@ export class UI {
                 const def = ALL_ITEMS[c.key];
                 const desc = def?.description || '';
                 const icon = this._itemIcon(c.key);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${desc}">${icon}${c.name}</span><button class="inv-use" onclick="window.game.useConsumable(${i})">Use</button></div>`;
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(desc)}">${icon}${escapeHtml(c.name)}</span><button class="inv-use" onclick="window.game.useConsumable(${i})">Use</button></div>`;
             }
         }
         if (potions.length > 0) {
@@ -4140,10 +4335,10 @@ export class UI {
                 const autoUse = this.game.settings.potionAutoUse || {};
                 const isEnabled = autoUse[type] !== false;
                 html += `<div class="inv-row" style="display:flex;align-items:center;gap:6px;">`;
-                html += `<span class="inv-name skill-tip" data-tip="${potionTip}" style="flex:1;">${this._itemIcon(type, 'potion')}${def ? def.name : type}</span>`;
+                html += `<span class="inv-name skill-tip" data-tip="${escapeAttr(potionTip)}" style="flex:1;">${this._itemIcon(type, 'potion')}${escapeHtml(def ? def.name : type)}</span>`;
                 html += `<span class="inv-amount">x${count}</span>`;
                 html += `<label style="display:flex;align-items:center;gap:3px;font-size:0.8em;color:#aaa;white-space:nowrap;cursor:pointer;" title="Allow colonists to auto-use this potion">`;
-                html += `<input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="window.game.setPotionAutoUse('${type}', this.checked)" style="cursor:pointer;accent-color:#44cc88;">`;
+                html += `<input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="window.game.setPotionAutoUse(${jsArg(type)}, this.checked)" style="cursor:pointer;accent-color:#44cc88;">`;
                 html += `</label>`;
                 html += `</div>`;
             }
@@ -4156,7 +4351,7 @@ export class UI {
                 const spell = def ? SPELLS[def.spell] : null;
                 const schoolName = spell ? MAGIC_SKILLS[spell.school]?.name : '';
                 const tomeTip = this.getCraftOutputTip(key) || '';
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${tomeTip}">${this._itemIcon(key, 'tome')}${def ? def.name : key}</span><span class="inv-amount">x${count}${schoolName ? ` (${schoolName})` : ''}</span></div>`;
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(tomeTip)}">${this._itemIcon(key, 'tome')}${escapeHtml(def ? def.name : key)}</span><span class="inv-amount">x${count}${schoolName ? ` (${escapeHtml(schoolName)})` : ''}</span></div>`;
             }
         }
         if (!html) html = '<div class="info-row" style="color:#666;">No consumables.</div>';
@@ -4184,14 +4379,14 @@ export class UI {
         for (const type of order) {
             const animals = groups[type];
             const def = TAMED_ANIMALS[type] || {};
-            const color = def.color || '#ccaa88';
+            const color = escapeAttr(def.color || '#ccaa88');
             html += `<div style="margin-bottom:8px;">`;
             const irregularPlurals = { sheep: 'Sheep', goose: 'Geese' };
-            const typeLabel = irregularPlurals[type] || (cap(type) + 's');
+            const typeLabel = escapeHtml(irregularPlurals[type] || (cap(type) + 's'));
             html += `<div style="color:${color};font-weight:bold;border-bottom:1px solid #333;margin-bottom:4px;padding-bottom:2px;">${typeLabel} (${animals.length})</div>`;
 
             for (const a of animals) {
-                const displayName = a.name || cap(a.type);
+                const displayName = escapeHtml(a.name || cap(a.type));
                 html += `<div style="padding:4px 0 4px 8px;border-bottom:1px solid #2a2a2a;">`;
 
                 // name row: clickable name + rename button / inline input when editing
@@ -4216,14 +4411,14 @@ export class UI {
 
                 // level
                 if (a.level > 0) {
-                    const lvlTip = animalLevelTooltip(a.level, a.type).replace(/\n/g, '&#10;');
+                    const lvlTip = escapeAttr(animalLevelTooltip(a.level, a.type)).replace(/\n/g, '&#10;');
                     html += `<div class="info-row" style="color:#ffcc44;font-size:0.9em;" title="${lvlTip}">Animal Level ${a.level}${a.level >= 5 ? ' (Max)' : ''}</div>`;
                 }
 
                 // bond
                 if (a.bondedColonistId) {
                     const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
-                    const bondName = bonded ? bonded.name : 'Unknown';
+                    const bondName = bonded ? escapeHtml(bonded.name) : 'Unknown';
                     const bondDisplay = a.isPet ? `${bondName} (Pet)` : `${bondName} (Bond: ${a.bondLevel || 0}/${PET_BOND_THRESHOLD})`;
                     html += `<div class="info-row" style="color:#aaddff;font-size:0.9em;">Bonded: ${bondDisplay}</div>`;
                 }
@@ -4247,7 +4442,7 @@ export class UI {
                         const aliveColonists = this.game.colonists.filter(c => c.hp > 0);
                         if (aliveColonists.length > 0) {
                             const opts = aliveColonists.map(c =>
-                                `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                                `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                             ).join('');
                             html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
                             html += `<label style="color:#aaaaaa;">Defends: </label>`;
@@ -4262,7 +4457,7 @@ export class UI {
                                 ? this.game.entities.filter(e => e.tamed && e.isPet && e.bondedColonistId === a.bondedColonistId).length
                                 : 0;
                             const opts = aliveColonists.map(c =>
-                                `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${c.name}</option>`
+                                `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                             ).join('');
                             html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
                             html += `<label style="color:#aaaaaa;">Pet (${ownerPetCount}/${maxPets}): </label>`;
@@ -4326,13 +4521,15 @@ export class UI {
             const key = `colony_slot_manual_${i}`;
             const m = meta[key] || null;
             const isPrimary = key === primary;
-            const season = m ? (m.season.charAt(0).toUpperCase() + m.season.slice(1)) : '';
-            const gameStr = m ? `${season} Y${m.year} · Day ${m.dayOfSeason} · ${m.colonistCount} colonist${m.colonistCount !== 1 ? 's' : ''}` : '';
-            const dateStr = m ? new Date(m.timestamp).toLocaleString() : '';
-            const thumbHtml = m?.thumbnail
-                ? `<img class="slot-thumbnail" src="${m.thumbnail}" alt="">`
+            // Slot metadata can come from an imported or cloud save: escape it all.
+            const seasonRaw = m ? String(m.season ?? '') : '';
+            const season = seasonRaw.charAt(0).toUpperCase() + seasonRaw.slice(1);
+            const gameStr = m ? escapeHtml(`${season} Y${m.year} · Day ${m.dayOfSeason} · ${m.colonistCount} colonist${m.colonistCount !== 1 ? 's' : ''}`) : '';
+            const dateStr = m ? escapeHtml(new Date(m.timestamp).toLocaleString()) : '';
+            const thumbHtml = typeof m?.thumbnail === 'string' && m.thumbnail.startsWith('data:image/')
+                ? `<img class="slot-thumbnail" src="${escapeAttr(m.thumbnail)}" alt="">`
                 : `<div class="slot-thumbnail-placeholder"></div>`;
-            const nameVal = (m?.label || '').replace(/"/g, '&quot;');
+            const nameVal = escapeAttr(m?.label || '');
             const primaryBadge = isPrimary ? `<span style="color:#ffcc00;font-size:10px;margin-right:4px;" title="Active save slot">&#9733; Active</span>` : '';
             html += `<div class="slot-card${m ? '' : ' slot-empty'}${isPrimary ? ' slot-primary' : ''}">
                 ${thumbHtml}
@@ -4349,7 +4546,7 @@ export class UI {
 
         if (!this._saveSlotPanelListenerAdded) {
             this._saveSlotPanelListenerAdded = true;
-            this.elements.saveSlotPanel.addEventListener('click', (e) => {
+            this._listen(this.elements.saveSlotPanel, 'click', (e) => {
                 const saveBtn = e.target.closest('.slot-save-btn[data-slot-save-key]');
                 if (saveBtn) {
                     const key = saveBtn.dataset.slotSaveKey;
@@ -4435,7 +4632,7 @@ export class UI {
         const skinNames = this.game.skinManager.getSkinNames();
         for (const name of skinNames) {
             const display = name === 'ascii' ? 'ASCII' : name.charAt(0).toUpperCase() + name.slice(1);
-            graphics += `<option value="${name}" ${s.activeSkin === name ? 'selected' : ''}>${display}</option>`;
+            graphics += `<option value="${escapeAttr(name)}" ${s.activeSkin === name ? 'selected' : ''}>${escapeHtml(display)}</option>`;
         }
         graphics += `</select></div>`;
         graphics += `<div class="settings-row">`;
@@ -4576,7 +4773,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-trinket-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(TRINKETS)) {
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('trinket',document.getElementById('debug-trinket-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Trinket</button>`;
@@ -4584,7 +4781,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-boots-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(BOOTS)) {
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('boots',document.getElementById('debug-boots-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Boots</button>`;
@@ -4593,7 +4790,7 @@ export class UI {
         general += `<select id="debug-weapon-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(WEAPONS)) {
             if (key === 'fists') continue;
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('weapon',document.getElementById('debug-weapon-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Weapon</button>`;
@@ -4601,7 +4798,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-armor-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(ARMORS)) {
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('armor',document.getElementById('debug-armor-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Armor</button>`;
@@ -4609,7 +4806,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-tool-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(TOOLS)) {
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('tool',document.getElementById('debug-tool-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Tool</button>`;
@@ -4617,7 +4814,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-helmet-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(HELMETS)) {
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('helmet',document.getElementById('debug-helmet-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Helmet</button>`;
@@ -4625,7 +4822,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-clothes-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(CLOTHES)) {
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatSpawnItem('clothes',document.getElementById('debug-clothes-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Clothes</button>`;
@@ -4633,7 +4830,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-resource-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:80px;">`;
         for (const key of Object.keys(this.game.resources.stockpile)) {
-            general += `<option value="${key}">${key.replace(/_/g, ' ')}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(key.replace(/_/g, ' '))}</option>`;
         }
         general += `</select>`;
         general += `<input id="debug-resource-amount" type="number" value="50" min="1" max="999" style="width:50px;background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
@@ -4642,7 +4839,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-event-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const key of Object.keys(EVENTS)) {
-            general += `<option value="${key}">${key.replace(/_/g, ' ')}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(key.replace(/_/g, ' '))}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatTriggerEvent(document.getElementById('debug-event-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Trigger Event</button>`;
@@ -4650,7 +4847,7 @@ export class UI {
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-raid-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(RAID_TYPES)) {
-            general += `<option value="${key}">${def.name}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
         general += `<button onclick="window.game.cheatTriggerRaid(document.getElementById('debug-raid-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Trigger Raid</button>`;
@@ -4763,7 +4960,19 @@ export class UI {
     _startRebind(action, btn) {
         beginRebindCapture(
             action, btn,
-            (_action, key) => { this.game.setKeyBinding(action, key); },
+            (_action, key, keys, conflicts) => {
+                // Store the full list (setKeyBinding keeps only the new key, which
+                // would drop the action's secondary keys), then re-apply live.
+                const s = this.game.settings;
+                if (!s.keyBindings) s.keyBindings = {};
+                s.keyBindings[action] = keys;
+                this.game.saveSettingsToStorage();
+                this.game.input.applyKeyBindings();
+                this.updateSettingsPanel();
+                if (conflicts.length) {
+                    this.game.notifications.push({ text: `"${formatKeyLabel(key)}" is also bound to ${conflicts.join(', ')}`, tick: this.game.tick, type: 'danger' });
+                }
+            },
             (key) => { this.game.notifications.push({ text: `"${formatKeyLabel(key)}" is reserved and cannot be rebound`, tick: this.game.tick, type: 'danger' }); }
         );
     }
@@ -4893,7 +5102,7 @@ export class UI {
             const key = `${n.tick}${n.text}`;
             // Only notifs that weren't shown last render get the enter animation.
             const enter = (!reduceMotion && !prevKeys.has(key)) ? ' notif-enter' : '';
-            return `<div class="notif notif-${n.type}${enter}">${n.text}</div>`;
+            return `<div class="notif notif-${escapeAttr(n.type)}${enter}">${escapeHtmlKeepEntities(n.text)}</div>`;
         }).join('');
         this._notifKeys = new Set(shown.map(n => `${n.tick}${n.text}`));
         this._notifSig = sig;
@@ -4928,19 +5137,19 @@ export class UI {
         this.elements.eventPanel.className = evt.type === 'raid' ? 'event-panel-raid' : evt.type === 'void_whisper' ? 'event-panel-void' : '';
         let html = '';
         if (evt.type === 'void_whisper') {
-            html += `<div class="event-text">◈ ${evt.title} ◈</div>`;
+            html += `<div class="event-text">◈ ${escapeHtmlKeepEntities(evt.title)} ◈</div>`;
             const waves = this.game.waves;
             const waveCtx = waves.active
                 ? `The Nexus trembles — Wave ${waves.currentWave} rages`
                 : `The Nexus pulses before Wave ${waves.highestWaveCompleted + 1}`;
             html += `<div class="void-whisper-context">◈ ${waveCtx} ◈</div>`;
-            html += `<div style="color:#aa88cc;font-size:0.9em;margin-bottom:6px;">${evt.text}</div>`;
+            html += `<div style="color:#aa88cc;font-size:0.9em;margin-bottom:6px;">${escapeHtmlKeepEntities(evt.text)}</div>`;
             html += `<div class="void-whisper-body">`;
-            html += `<div style="color:#cc66ff;font-size:0.85em;margin-bottom:3px;"><b>It asks:</b> ${evt.askText}</div>`;
-            html += `<div style="color:#88ddaa;font-size:0.85em;"><b>It offers:</b> ${evt.rewardText}</div>`;
+            html += `<div style="color:#cc66ff;font-size:0.85em;margin-bottom:3px;"><b>It asks:</b> ${escapeHtmlKeepEntities(evt.askText)}</div>`;
+            html += `<div style="color:#88ddaa;font-size:0.85em;"><b>It offers:</b> ${escapeHtmlKeepEntities(evt.rewardText)}</div>`;
             html += `</div>`;
         } else {
-            html += `<div class="event-text">${evt.text}</div>`;
+            html += `<div class="event-text">${escapeHtmlKeepEntities(evt.text)}</div>`;
         }
         html += `<div class="event-choices">`;
         if (evt.type === 'trade') {
@@ -4948,7 +5157,7 @@ export class UI {
             html += `<button onclick="window.game.dismissTrader()">Dismiss</button>`;
         } else {
             evt.choices.forEach((choice, i) => {
-                html += `<button onclick="window.game.resolveEvent(${i})">${choice}</button>`;
+                html += `<button onclick="window.game.resolveEvent(${i})">${escapeHtmlKeepEntities(choice)}</button>`;
             });
         }
         html += '</div>';
@@ -4963,7 +5172,7 @@ export class UI {
         const mgr = this.game.skinManager;
         if (mgr && mgr.isActive) {
             const url = mgr.getItemSpriteDataURL(key);
-            if (url) return `<img src="${url}" style="width:14px;height:14px;vertical-align:middle;image-rendering:pixelated;margin-right:3px;">`;
+            if (url) return `<img src="${escapeAttr(url)}" style="width:14px;height:14px;vertical-align:middle;image-rendering:pixelated;margin-right:3px;">`;
         }
         const colors = {
             wood: '#8b6b3a', stone: '#999', food: '#88cc44', planks: '#c89648',
@@ -4975,7 +5184,7 @@ export class UI {
         };
         const abbr = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', hides: 'Hi', meat: 'Mt', wheat: 'Wh', berries: 'Be', corn: 'Cn', potatoes: 'Po', moonbloom: 'Mb', eggs: 'Eg', milk: 'Mk', gold: 'Au' };
         const color = colors[key] || '#aaa';
-        const ch = abbr[key] || this._formatResourceName(key).slice(0, 2);
+        const ch = escapeHtml(abbr[key] || this._formatResourceName(key).slice(0, 2));
         return `<span style="color:${color};font-weight:bold;margin-right:3px;font-size:0.9em;">${ch}</span>`;
     }
 
@@ -5024,7 +5233,7 @@ export class UI {
 
         const ratio = (effectiveMarkup / effectiveDiscount).toFixed(2);
         let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">`;
-        html += `<div class="event-text" style="font-size:0.95em;margin:0;">${data.merchantName || 'Trade Caravan'}</div>`;
+        html += `<div class="event-text" style="font-size:0.95em;margin:0;">${escapeHtml(data.merchantName || 'Trade Caravan')}</div>`;
         html += `<div class="trade-step-selector">`;
         for (const s of [1, 10, 100]) {
             html += `<button class="trade-step-btn${step === s ? ' active' : ''}" onclick="window.game.ui._tradeStep=${s};window.game.ui._tradeDirty=true;">±${s}</button>`;
@@ -5061,13 +5270,13 @@ export class UI {
             const reqAmt = request[res] || 0;
             const selected = reqAmt > 0 ? ' selected' : '';
             html += `<div class="trade-item-row${selected}">`;
-            html += `<div class="trade-item-name">${this._tradeResIcon(res)}${this._formatResourceName(res)} <span style="color:#888;">×${amt}</span>`;
+            html += `<div class="trade-item-name">${this._tradeResIcon(res)}${escapeHtml(this._formatResourceName(res))} <span style="color:#888;">×${amt}</span>`;
             if (reqAmt > 0) html += `<span class="trade-item-badge">${reqAmt}</span>`;
             html += `</div>`;
             html += `<div class="trade-item-value">${val}g</div>`;
             html += `<div class="trade-item-buttons">`;
-            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest('${res}',${step})">−</button>`;
-            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest('${res}',${step})">+</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest(${jsArg(res)},${step})">−</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest(${jsArg(res)},${step})">+</button>`;
             html += `</div></div>`;
         }
         if (data.exclusiveItems?.length > 0) {
@@ -5083,8 +5292,8 @@ export class UI {
                 const exTierMarkup = TIER_BUY_MARKUP[exDef?.tier || 0] || 1.0;
                 const price = Math.round(getItemTradeValue(item) * effectiveMarkup * exTierMarkup);
                 const exPitch = request[slotKey] ? -3 : 3;
-                html += `<div class="trade-exclusive-row skill-tip" data-tip="${tip.replace(/"/g, '&quot;')}">`;
-                html += `<div class="trade-item-name">${exIcon}${item.name || item.key}</div>`;
+                html += `<div class="trade-exclusive-row skill-tip" data-tip="${escapeAttr(tip)}">`;
+                html += `<div class="trade-item-name">${exIcon}${escapeHtml(item.name || item.key)}</div>`;
                 html += `<div class="trade-item-value">${price}g</div>`;
                 html += `<button class="trade-exclusive-toggle${isSelected}" onclick="window.soundManager?.playSFXPitched('button_click',${exPitch});window.game.${request[slotKey] ? 'tradeRemoveRequest' : 'tradeRequest'}('${slotKey}',1)">${request[slotKey] ? 'Remove' : 'Buy'}</button>`;
                 html += `</div>`;
@@ -5100,13 +5309,13 @@ export class UI {
                 const val = (getItemTradeValue(def) * effectiveMarkup).toFixed(1);
                 const selected = reqAmt > 0 ? ' selected' : '';
                 html += `<div class="trade-item-row${selected}">`;
-                html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${def?.name || key} <span style="color:#888;">×${amt}</span>`;
+                html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${escapeHtml(def?.name || key)} <span style="color:#888;">×${amt}</span>`;
                 if (reqAmt > 0) html += `<span class="trade-item-badge">${reqAmt}</span>`;
                 html += `</div>`;
                 html += `<div class="trade-item-value">${val}g</div>`;
                 html += `<div class="trade-item-buttons">`;
-                html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest('${reqKey}',${step})">−</button>`;
-                html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest('${reqKey}',${step})">+</button>`;
+                html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest(${jsArg(reqKey)},${step})">−</button>`;
+                html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest(${jsArg(reqKey)},${step})">+</button>`;
                 html += `</div></div>`;
             }
         }
@@ -5121,11 +5330,12 @@ export class UI {
 
         // Equipment items the merchant will buy, filtered by buyCategories
         const buyCategories = data.buyCategories ? new Set(data.buyCategories) : null;
-        const EQUIP_ARRAYS = ['weapon', 'armor', 'helmet', 'tool', 'trinket', 'boots', 'tome', 'consumable'];
+        const EQUIP_ARRAYS = ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'trinket', 'boots', 'tome', 'consumable'];
         const offerableEquip = [];
         for (const type of EQUIP_ARRAYS) {
             if (buyCategories && !buyCategories.has(type)) continue;
-            const arr = this.game.resources[`${type}s`] || [];
+            // getItemArray, not `${type}s`: that makes 'bootss' / 'clothess'.
+            const arr = this.game.resources.getItemArray(type) || [];
             for (let i = 0; i < arr.length; i++) {
                 const item = arr[i];
                 if (getItemTradeValue(item) > 0) offerableEquip.push({ key: `__equip_${type}_${i}`, item, type });
@@ -5159,13 +5369,13 @@ export class UI {
             const val = (baseVal * nextMult).toFixed(1);
             const selected = offAmt > 0 ? ' selected' : '';
             html += `<div class="trade-item-row${selected}">`;
-            html += `<div class="trade-item-name">${this._tradeResIcon(res)}${this._formatResourceName(res)} <span style="color:#888;">×${amt}</span>`;
+            html += `<div class="trade-item-name">${this._tradeResIcon(res)}${escapeHtml(this._formatResourceName(res))} <span style="color:#888;">×${amt}</span>`;
             if (offAmt > 0) html += `<span class="trade-item-badge">${offAmt}</span>`;
             html += `</div>`;
             html += `<div class="trade-item-value">${val}g</div>`;
             html += `<div class="trade-item-buttons">`;
-            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer('${res}',${step})">−</button>`;
-            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer('${res}',${step})">+</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer(${jsArg(res)},${step})">−</button>`;
+            html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer(${jsArg(res)},${step})">+</button>`;
             html += `</div></div>`;
         }
 
@@ -5177,9 +5387,9 @@ export class UI {
                 const isOffered = !!offer[key];
                 const selected = isOffered ? ' selected' : '';
                 const icon = this._itemIcon(item.key || key, type);
-                const tip = this._getEquipmentTooltip(item).replace(/"/g, '&quot;');
+                const tip = escapeAttr(this._getEquipmentTooltip(item));
                 html += `<div class="trade-item-row${selected}">`;
-                html += `<div class="trade-item-name skill-tip" data-tip="${tip}">${icon}${item.name}`;
+                html += `<div class="trade-item-name skill-tip" data-tip="${tip}">${icon}${escapeHtml(item.name)}`;
                 if (isOffered) html += `<span class="trade-item-badge">1</span>`;
                 html += `</div>`;
                 html += `<div class="trade-item-value">${val}g</div>`;
@@ -5210,13 +5420,13 @@ export class UI {
                     const val = (getItemTradeValue(def) * effectiveDiscount).toFixed(1);
                     const selected = offAmt > 0 ? ' selected' : '';
                     html += `<div class="trade-item-row${selected}">`;
-                    html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${def?.name || key} <span style="color:#888;">×${count}</span>`;
+                    html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${escapeHtml(def?.name || key)} <span style="color:#888;">×${count}</span>`;
                     if (offAmt > 0) html += `<span class="trade-item-badge">${offAmt}</span>`;
                     html += `</div>`;
                     html += `<div class="trade-item-value">${val}g</div>`;
                     html += `<div class="trade-item-buttons">`;
-                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer('${offKey}',${step})">−</button>`;
-                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer('${offKey}',${step})">+</button>`;
+                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer(${jsArg(offKey)},${step})">−</button>`;
+                    html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer(${jsArg(offKey)},${step})">+</button>`;
                     html += `</div></div>`;
                 }
             }
@@ -5348,10 +5558,10 @@ export class UI {
                     src.thoughts
                         .filter(t => t.text && (t.text.includes(other.name) || t.targetId === other.id))
                         .slice(-2)
-                        .forEach(t => tipLines.push(`${src.name}: ${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)} ${t.text}`));
+                        .forEach(t => tipLines.push(escapeAttr(`${src.name}: ${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)} ${t.text}`)));
                 }
             }
-            const tip = tipLines.length ? tipLines.join('&#10;').replace(/"/g, '&quot;') : '';
+            const tip = tipLines.length ? tipLines.join('&#10;') : '';
             const tipAttr = tip ? `class="skill-tip" data-tip="${tip}"` : '';
 
             let synergyTag = '';
@@ -5366,9 +5576,9 @@ export class UI {
             }
 
             html += `<div ${tipAttr} style="display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:3px;background:#1a1a1a;cursor:${tip ? 'help' : 'default'};">` +
-                `<span style="color:${a.nameColor || '#ffff00'};font-size:11px;min-width:70px;">${a.name}</span>` +
+                `<span style="color:${escapeAttr(a.nameColor || '#ffff00')};font-size:11px;min-width:70px;">${escapeHtml(a.name)}</span>` +
                 `<span style="color:${color};font-size:10px;min-width:80px;text-align:center;">${tier.key.replace('_', ' ')}</span>` +
-                `<span style="color:${b.nameColor || '#ffff00'};font-size:11px;min-width:70px;">${b.name}</span>` +
+                `<span style="color:${escapeAttr(b.nameColor || '#ffff00')};font-size:11px;min-width:70px;">${escapeHtml(b.name)}</span>` +
                 `<span style="color:${color};font-size:10px;">${sign}${score}</span>` +
                 (synergyTag ? `<span style="margin-left:auto;">${synergyTag}</span>` : '') +
                 `</div>`;
@@ -5400,7 +5610,7 @@ export class UI {
         const tabLabel = (name, label) => {
             const c = tabCounts[name] || { unlocked: 0, total: 0 };
             const badge = tabHasNew(name) ? newBadge : '';
-            return `${label} (${c.unlocked}/${c.total})${badge}`;
+            return `${escapeHtml(label)} (${c.unlocked}/${c.total})${badge}`;
         };
 
         const FIXED_TABS = [
@@ -5426,12 +5636,12 @@ export class UI {
         html += '<div class="story-tabs">';
         for (const { key, label } of FIXED_TABS) {
             if (!tabCounts[key]) continue;
-            html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${key}">${tabLabel(key, label)}</button>`;
+            html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${escapeAttr(key)}">${tabLabel(key, label)}</button>`;
         }
         html += `<button class="story-tab-btn${tab === 'bestiary' ? ' active' : ''}" data-story-tab="bestiary">Bestiary (${bestiarySize})</button>`;
         html += `<button class="story-tab-btn${tab === 'social' ? ' active' : ''}" data-story-tab="social">Social</button>`;
         for (const { key, label } of modTabs) {
-            html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${key}">${tabLabel(key, label)}</button>`;
+            html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${escapeAttr(key)}">${tabLabel(key, label)}</button>`;
         }
         html += '</div>';
 
@@ -5444,19 +5654,19 @@ export class UI {
             const bestiary = this.game.exploration?.bestiary;
             const _bestiaryEntryHtml = (entry, spriteHtml) => {
                 const realmName = entry.realms
-                    ? entry.realms.map(r => REALMS[r]?.name || r).join(', ')
-                    : (REALMS[entry.realm]?.name || entry.realm);
+                    ? escapeHtml(entry.realms.map(r => REALMS[r]?.name || r).join(', '))
+                    : escapeHtml(REALMS[entry.realm]?.name || entry.realm);
                 const entryTypeKey = entry.key?.split(':')[1];
-                const lore = entry.lore || EXPEDITION_ENEMIES[entryTypeKey]?.lore || NPC_ENCOUNTERS[entryTypeKey]?.lore || '';
+                const lore = escapeHtml(entry.lore || EXPEDITION_ENEMIES[entryTypeKey]?.lore || NPC_ENCOUNTERS[entryTypeKey]?.lore || '');
                 const catColors = { regular: '#ff4444', boss: '#ffcc44', npc: '#44ccff' };
                 const catKey = entry.category === 'elite' ? 'regular' : (entry.category || 'regular');
                 if (!spriteHtml) {
                     const color = entry.color || catColors[catKey] || '#ff4444';
                     const symbol = catKey === 'boss' ? '&#9650;' : catKey === 'npc' ? '&#9786;' : '&#9668;';
-                    spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${color};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
+                    spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${escapeAttr(color)};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
                 }
                 let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div style="flex:1;">`;
-                h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
+                h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(entry.name)}</div>`;
                 h += `<div class="story-entry-text" style="font-size:0.8em;">Found in: ${realmName} | Encountered: ${entry.count}x</div>`;
                 if (entry.category === 'boss' && entry.phases?.length > 1) {
                     const phaseIdx = this._bossPhaseView.get(entry.key) || 0;
@@ -5467,16 +5677,16 @@ export class UI {
                     const disabledStyle = 'background:none;border:1px solid #333;color:#555;padding:1px 6px;border-radius:3px;font-size:0.85em;';
                     h += `<div style="font-size:0.8em;color:#aaa;margin-top:2px;display:flex;align-items:center;gap:6px;">`;
                     h += canPrev
-                        ? `<button style="${btnStyle}" data-boss-phase-nav="${entry.key}" data-boss-phase-dir="-1">&#9664;</button>`
+                        ? `<button style="${btnStyle}" data-boss-phase-nav="${escapeAttr(entry.key)}" data-boss-phase-dir="-1">&#9664;</button>`
                         : `<span style="${disabledStyle}">&#9664;</span>`;
-                    h += `<span style="color:#ffcc44;">Phase ${phaseIdx + 1}/${entry.phases.length}: ${phase.name || ''}</span>`;
+                    h += `<span style="color:#ffcc44;">Phase ${phaseIdx + 1}/${entry.phases.length}: ${escapeHtml(phase.name || '')}</span>`;
                     h += canNext
-                        ? `<button style="${btnStyle}" data-boss-phase-nav="${entry.key}" data-boss-phase-dir="1">&#9654;</button>`
+                        ? `<button style="${btnStyle}" data-boss-phase-nav="${escapeAttr(entry.key)}" data-boss-phase-dir="1">&#9654;</button>`
                         : `<span style="${disabledStyle}">&#9654;</span>`;
                     h += `</div>`;
                 }
                 if (entry.eliteCounts && Object.keys(entry.eliteCounts).length > 0) {
-                    const eliteParts = Object.values(entry.eliteCounts).map(e => `${e.name} ×${e.count}`);
+                    const eliteParts = Object.values(entry.eliteCounts).map(e => `${escapeHtml(e.name)} ×${e.count}`);
                     h += `<div class="story-entry-text" style="font-size:0.75em;color:#ff8844;">Elites: ${eliteParts.join(', ')}</div>`;
                 }
                 if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
@@ -5484,14 +5694,14 @@ export class UI {
             };
             const _killEntryHtml = (entry, spriteHtml, lore, showTamed, hideDrops) => {
                 if (!spriteHtml) {
-                    spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${entry.color};vertical-align:middle;margin-right:6px;">${entry.char}</span>`;
+                    spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${escapeAttr(entry.color)};vertical-align:middle;margin-right:6px;">${escapeHtml(entry.char)}</span>`;
                 }
                 let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
-                h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
-                let statLine = hideDrops ? `Defeated: ${entry.count}x` : `Killed: ${entry.count}x | Drops: ${entry.drops || 'Nothing'}`;
+                h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(entry.name)}</div>`;
+                let statLine = hideDrops ? `Defeated: ${entry.count}x` : `Killed: ${entry.count}x | Drops: ${escapeHtml(entry.drops || 'Nothing')}`;
                 if (showTamed && entry.tameCount) statLine += ` | Tamed: ${entry.tameCount}x`;
                 h += `<div class="story-entry-text" style="font-size:0.8em;">${statLine}</div>`;
-                if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
+                if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${escapeHtml(lore)}</div>`;
                 return h + `</div></div>`;
             };
             const _getSpriteHtml = (sprite) => {
@@ -5600,11 +5810,11 @@ export class UI {
                     html += _emptyHint('Summon creatures during combat to add them here.');
                 } else {
                     for (const entry of summonsSeen) {
-                        const lore = ENTITIES[entry.sprite]?.lore || entry.lore || '';
+                        const lore = escapeHtml(ENTITIES[entry.sprite]?.lore || entry.lore || '');
                         const spriteHtml = _getSpriteHtml(entry.sprite) ||
-                            `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${entry.color};vertical-align:middle;margin-right:6px;">${entry.char}</span>`;
+                            `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${escapeAttr(entry.color)};vertical-align:middle;margin-right:6px;">${escapeHtml(entry.char)}</span>`;
                         let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
-                        h += `<div class="story-entry-title" style="font-size:0.9em;">${entry.name}</div>`;
+                        h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(entry.name)}</div>`;
                         if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
                         html += h + `</div></div>`;
                     }
@@ -5626,18 +5836,18 @@ export class UI {
                 const groupUnlocked = group.entries.filter(([k]) => unlocked.has(k)).length;
                 const collapsed = this._collapsedRealmGroups.has(group.name);
                 const arrow = collapsed ? '&#9654;' : '&#9660;';
-                html += `<div class="realm-group-header" data-realm-group="${group.name}">${arrow} ${group.name} (${groupUnlocked}/${group.entries.length})</div>`;
+                html += `<div class="realm-group-header" data-realm-group="${escapeAttr(group.name)}">${arrow} ${escapeHtml(group.name)} (${groupUnlocked}/${group.entries.length})</div>`;
                 if (!collapsed) {
                     for (const [key, milestone] of group.entries) {
                         if (unlocked.has(key)) {
                             const info = unlocked.get(key);
-                            const dateStr = info ? `Year ${info.year}, ${info.season.charAt(0).toUpperCase() + info.season.slice(1)}` : '';
+                            const dateStr = info ? escapeHtml(`Year ${info.year}, ${String(info.season ?? '').charAt(0).toUpperCase() + String(info.season ?? '').slice(1)}`) : '';
                             const isNew = newAtOpen.has(key);
                             html += `<div class="story-entry unlocked${isNew ? ' story-entry-new' : ''}">`;
                             if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
                             const realmNewBadge = isNew ? `<span class="story-new-badge">NEW</span> ` : '';
-                            html += `<div class="story-entry-title">${realmNewBadge}${milestone.title}</div>`;
-                            html += `<div class="story-entry-text">${milestone.text}</div>`;
+                            html += `<div class="story-entry-title">${realmNewBadge}${escapeHtml(milestone.title)}</div>`;
+                            html += `<div class="story-entry-text">${sanitizeHtml(milestone.text)}</div>`;
                             html += `</div>`;
                         } else {
                             html += `<div class="story-entry locked">`;
@@ -5665,13 +5875,13 @@ export class UI {
             const lockedEntries = entries.filter(([k]) => !unlocked.has(k));
             for (const [key, milestone] of unlockedEntries) {
                 const info = unlocked.get(key);
-                const dateStr = info ? `Year ${info.year}, ${info.season.charAt(0).toUpperCase() + info.season.slice(1)}` : '';
+                const dateStr = info ? escapeHtml(`Year ${info.year}, ${String(info.season ?? '').charAt(0).toUpperCase() + String(info.season ?? '').slice(1)}`) : '';
                 const isNew = newAtOpen.has(key);
                 html += `<div class="story-entry unlocked${isNew ? ' story-entry-new' : ''}">`;
                 if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
                 const newBadge = isNew ? `<span class="story-new-badge">NEW</span> ` : '';
-                html += `<div class="story-entry-title">${newBadge}${milestone.title}</div>`;
-                html += `<div class="story-entry-text">${milestone.text}</div>`;
+                html += `<div class="story-entry-title">${newBadge}${escapeHtml(milestone.title)}</div>`;
+                html += `<div class="story-entry-text">${sanitizeHtml(milestone.text)}</div>`;
                 html += `</div>`;
             }
             for (const [,] of lockedEntries) {

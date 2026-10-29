@@ -463,6 +463,16 @@ function _registerPortraits(modId, dataFiles, modDirHandle) {
     }
 }
 
+// Comparator: user drag order first, then manifest loadOrder.
+function _byLoadOrder(userOrder) {
+    const userOrderIndex = id => { const i = userOrder.indexOf(id); return i === -1 ? Infinity : i; };
+    return (a, b) => {
+        const ui = userOrderIndex(a.id) - userOrderIndex(b.id);
+        if (ui !== 0 && !Number.isNaN(ui)) return ui;
+        return (a.loadOrder || 50) - (b.loadOrder || 50);
+    };
+}
+
 function _resolveLoadOrder(manifests) {
     const inDegree = new Map(manifests.map(m => [m.id, 0]));
     const graph = new Map(manifests.map(m => [m.id, []]));
@@ -480,13 +490,7 @@ function _resolveLoadOrder(manifests) {
         }
     }
 
-    const userOrder = getModLoadOrder();
-    const userOrderIndex = id => { const i = userOrder.indexOf(id); return i === -1 ? Infinity : i; };
-    const byLoadOrder = (a, b) => {
-        const ui = userOrderIndex(a.id) - userOrderIndex(b.id);
-        if (ui !== 0) return ui;
-        return (a.loadOrder || 50) - (b.loadOrder || 50);
-    };
+    const byLoadOrder = _byLoadOrder(getModLoadOrder());
     const queue = manifests.filter(m => inDegree.get(m.id) === 0).sort(byLoadOrder);
     const sorted = [];
 
@@ -548,26 +552,33 @@ async function _discoverModIds(baseUrl, dirHandle) {
 export async function runModLoader() {
     // Try to restore a previously chosen local directory handle (browser FSAPI mode).
     await loadLocalDirHandle();
-    const dirHandle = getLocalDirHandle();
+    let activeHandle = getLocalDirHandle();
 
-    // Request permission if we have a stored handle but haven't confirmed access yet.
-    if (dirHandle) {
-        try {
-            const perm = await dirHandle.requestPermission({ mode: 'read' });
-            if (perm !== 'granted') {
-                recordWarning('Permission denied for local mods folder. Falling back to URL-based path.');
-            }
-        } catch { /* API unavailable or denied, will fall back */ }
+    // A restored handle can only be read once permission is granted again, and
+    // requestPermission() needs a user gesture, which boot doesn't have. Check
+    // without prompting; if not granted, the Mods panel offers a grant button.
+    if (activeHandle) {
+        let perm = 'denied';
+        try { perm = await activeHandle.queryPermission({ mode: 'read' }); }
+        catch { /* API unavailable */ }
+        if (perm !== 'granted') {
+            recordWarning('Local mods folder needs permission again. Open Mods and click "Grant access", then restart. Falling back to URL-based path.');
+            activeHandle = null;
+        }
     }
 
     const baseUrl = getModsBaseUrl();
-    const activeHandle = getLocalDirHandle();
 
     const index = await _discoverModIds(baseUrl, activeHandle);
     if (!index || index.length === 0) return;
 
     const manifestResults = await Promise.all(
-        index.map(id => _fetchJson(`${baseUrl}/${id}/manifest.json`).then(m => m ? { ...m, id } : null))
+        index.map(id => {
+            const loader = activeHandle
+                ? _readJsonFromHandle(activeHandle, `${id}/manifest.json`)
+                : _fetchJson(`${baseUrl}/${id}/manifest.json`);
+            return loader.then(m => m ? { ...m, id } : null);
+        })
     );
     const allManifests = manifestResults.filter(Boolean);
     recordDiscoveredManifests(allManifests);
@@ -575,14 +586,19 @@ export async function runModLoader() {
     const enabled = allManifests.filter(m => isModEnabled(m.id, m.defaultEnabled !== false));
     if (enabled.length === 0) return;
 
-    // Enforce conflict rules (disable the later mod in load order).
+    // Enforce conflict rules (disable the later mod in load order). Walk in load
+    // order and skip mods already disabled, so a mutual conflict drops only one.
     const enabledIds = new Set(enabled.map(m => m.id));
-    for (const m of enabled) {
+    const byOrder = [...enabled].sort(_byLoadOrder(getModLoadOrder()));
+    const rank = new Map(byOrder.map((m, i) => [m.id, i]));
+    for (const m of byOrder) {
+        if (!enabledIds.has(m.id)) continue;
         for (const conflictId of m.conflicts || []) {
-            if (enabledIds.has(conflictId)) {
-                recordWarning(`Mod "${m.id}" conflicts with "${conflictId}". Disabling "${conflictId}".`);
-                enabledIds.delete(conflictId);
-            }
+            if (!enabledIds.has(conflictId)) continue;
+            const loser = rank.get(conflictId) > rank.get(m.id) ? conflictId : m.id;
+            recordWarning(`Mod "${m.id}" conflicts with "${conflictId}". Disabling "${loser}".`);
+            enabledIds.delete(loser);
+            if (loser === m.id) break;
         }
     }
     const active = enabled.filter(m => enabledIds.has(m.id));

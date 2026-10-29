@@ -4,10 +4,14 @@ import { manhattanDist } from '../world/pathfinding.js';
 import { colonistTakeDamage } from './colonist.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { createWildAnimal } from './entity-factory.js';
+import { tickHostileStatusEffects } from './combat.js';
 
 export function updateWildlife(game) {
     maybeSpawnAnimal(game);
     syncAnimalTasks(game);
+    // Built once per tick so each animal's checks are set lookups rather than
+    // scans of every task.
+    const ctx = buildAnimalTaskIndex(game);
 
     // Iterate the dedicated wild-animal subset to avoid scanning all entities.
     for (let i = game.wildAnimals.length - 1; i >= 0; i--) {
@@ -21,9 +25,12 @@ export function updateWildlife(game) {
 
         // Animal being led to pen: follow the colonist each tick.
         if (animal.pendingTame) {
-            updatePendingLeadAnimal(animal, game);
+            updatePendingLeadAnimal(animal, game, ctx);
             continue;
         }
+
+        // Weapon DoTs and spell effects from colonists tick the same way as on raiders.
+        if (animal.hp > 0) tickHostileStatusEffects(animal, game);
 
         if (animal.hp <= 0) {
             // Animals that wandered off the map die silently, no meat/hides. Only
@@ -62,7 +69,7 @@ export function updateWildlife(game) {
             game.wildAnimals.splice(i, 1);
             continue;
         }
-        updateAnimal(animal, game);
+        updateAnimal(animal, game, ctx);
     }
 }
 
@@ -130,20 +137,28 @@ function isEdgeExit(fromX, fromY, toX, toY) {
     return fromX === 0 || fromX === CONFIG.MAP_WIDTH - 1 || fromY === 0 || fromY === CONFIG.MAP_HEIGHT - 1;
 }
 
-function updateAnimal(animal, game) {
-    animal.moveCooldown -= animal.speed;
+function updateAnimal(animal, game, ctx) {
+    // Colonist CC: a stunned animal skips its turn, a slowed one acts at reduced
+    // speed (same deadlines the raider and void-wave AI read).
+    if (animal._stunnedUntil && game.tick < animal._stunnedUntil) {
+        if (game.tick % 6 === 0) game.combatEffects.push({ x: animal.x, y: animal.y, char: '✦', color: '#ffccff', ttl: 4 });
+        return;
+    }
+    const slowMult = (animal._slowUntil && game.tick < animal._slowUntil) ? (animal._slowMult || 0.5) : 1;
+    const effSpeed = animal.speed * slowMult;
+    animal.moveCooldown -= effSpeed;
     if (animal.moveCooldown > 0) return;
     animal.moveCooldown = 1;
 
     const def = ANIMALS[animal.type];
 
-    if (def.tameable && isBeingTamed(animal, game)) return;
+    if (def.tameable && ctx.tamed.has(animal.id)) return;
 
-    const dur = CONFIG.TICK_RATE / (animal.speed * game.speed);
+    const dur = CONFIG.TICK_RATE / (effSpeed * game.speed);
     if (def.hostile) {
         updateHostileAnimal(animal, def, game, dur);
     } else {
-        updatePassiveAnimal(animal, def, game, dur);
+        updatePassiveAnimal(animal, def, game, dur, ctx);
     }
 
     if (animal.x < 0 || animal.x >= CONFIG.MAP_WIDTH || animal.y < 0 || animal.y >= CONFIG.MAP_HEIGHT) {
@@ -152,10 +167,18 @@ function updateAnimal(animal, game) {
     }
 }
 
+const ANIMAL_TASK_TYPES = new Set(['hunt', 'tame', 'lead_animal', 'feed_animal', 'relocate_animal']);
+
 function syncAnimalTasks(game) {
-    for (const task of game.taskQueue.getAll()) {
-        if (task.type !== 'hunt' && task.type !== 'tame' && task.type !== 'lead_animal' && task.type !== 'feed_animal' && task.type !== 'relocate_animal') continue;
-        const animal = game.entities.find(a => a.id === task.targetAnimalId && a.category === 'animal');
+    let animalsById = null;
+    // Iterate a copy: tasks for vanished animals are removed mid-loop.
+    for (const task of game.taskQueue.getAll().slice()) {
+        if (!ANIMAL_TASK_TYPES.has(task.type)) continue;
+        if (!animalsById) {
+            animalsById = new Map();
+            for (const e of game.entities) if (e.category === 'animal') animalsById.set(e.id, e);
+        }
+        const animal = animalsById.get(task.targetAnimalId);
         if (!animal || animal.hp <= 0) {
             if (task.type === 'lead_animal' && animal) { animal.pendingTame = false; animal.leaderId = null; }
             if (task.type === 'feed_animal' && animal) animal._feedTaskQueued = false;
@@ -164,23 +187,38 @@ function syncAnimalTasks(game) {
         } else if (task.type === 'relocate_animal') {
             // Keep task x/y tracking the animal so the colonist can find it if it moves.
             if (task.x !== animal.x || task.y !== animal.y) {
-                game.taskQueue.updatePosition(task.id, animal.x, animal.y);
+                game.taskQueue.updatePosition(task, animal.x, animal.y);
             }
         } else if (task.type === 'hunt' || task.type === 'tame') {
             if (task.x !== animal.x || task.y !== animal.y) {
-                game.taskQueue.updatePosition(task.id, animal.x, animal.y);
+                game.taskQueue.updatePosition(task, animal.x, animal.y);
             }
         }
     }
 }
 
-function updatePendingLeadAnimal(animal, game) {
+// Per-tick lookup of which animals are targeted by tame/hunt/lead tasks, so the
+// per-animal checks below don't each rescan the task list.
+function buildAnimalTaskIndex(game) {
+    const tamed = new Set();
+    const hunted = new Set();
+    const leadTasks = new Map();
+    for (const t of game.taskQueue.getAll()) {
+        if (t.type === 'tame') tamed.add(t.targetAnimalId);
+        else if (t.type === 'hunt') hunted.add(t.targetAnimalId);
+        else if (t.type === 'lead_animal' && t.assignedTo !== null && !leadTasks.has(t.targetAnimalId)) leadTasks.set(t.targetAnimalId, t);
+    }
+    for (const c of game.colonists) {
+        if (c.state === 'hunting' && c.huntTargetId !== undefined) hunted.add(c.huntTargetId);
+    }
+    return { tamed, hunted, leadTasks };
+}
+
+function updatePendingLeadAnimal(animal, game, ctx) {
     // Sync leaderId to whoever currently holds the lead_animal task for this animal.
     // This handles the case where the original tamer dropped the task and another
     // colonist picked it up (or it was re-claimed after an interrupt).
-    const leadTask = game.taskQueue.getAll().find(
-        t => t.type === 'lead_animal' && t.targetAnimalId === animal.id && t.assignedTo !== null
-    );
+    const leadTask = ctx.leadTasks.get(animal.id);
     if (leadTask) {
         animal.leaderId = leadTask.assignedTo;
     } else {
@@ -200,18 +238,9 @@ function updatePendingLeadAnimal(animal, game) {
     moveEntity(animal, leader.x, leader.y, dur);
 }
 
-function isBeingTamed(animal, game) {
-    return game.taskQueue.getAll().some(t => t.type === 'tame' && t.targetAnimalId === animal.id);
-}
-
-function isBeingHunted(animal, game) {
-    return game.taskQueue.getAll().some(t => t.type === 'hunt' && t.targetAnimalId === animal.id)
-        || game.colonists.some(c => c.state === 'hunting' && c.huntTargetId === animal.id);
-}
-
-function updatePassiveAnimal(animal, def, game, dur) {
-    if (isBeingTamed(animal, game)) return;
-    if (isBeingHunted(animal, game)) return;
+function updatePassiveAnimal(animal, def, game, dur, ctx) {
+    if (ctx.tamed.has(animal.id)) return;
+    if (ctx.hunted.has(animal.id)) return;
 
     const nearestColonist = findNearestColonist(animal, game);
     if (nearestColonist && manhattanDist(animal.x, animal.y, nearestColonist.x, nearestColonist.y) <= def.fleeRange) {

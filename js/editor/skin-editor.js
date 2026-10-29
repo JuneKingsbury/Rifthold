@@ -1,4 +1,5 @@
 import { BUILDINGS, TERRAIN, RESOURCES, ANIMALS, GOLEM_TYPES, CROPS, COMBAT_VISUALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, SPELL_TOMES, ITEM_CHARS, WEATHER_TYPES, EQUIPMENT_OVERLAY_OFFSETS, ENTITIES, EXPEDITION_ENEMIES } from '../core/config.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
 
 const MATERIAL_ITEMS = [
     { key: 'wood', char: '≡', color: '#8b6b3a', desc: 'Wood resource' },
@@ -144,6 +145,24 @@ const ENTITY_SPECIALS = (() => {
     return combined.filter(e => (seen.has(e.key) ? false : (seen.add(e.key), true)));
 })();
 
+// Colonist variant groups: palette group -> count property and sprite key prefix.
+const VARIANT_GROUPS = {
+    body:        { prop: 'bodyVariants',        prefix: 'colonist_body' },
+    humanBody:   { prop: 'humanBodyVariants',   prefix: 'colonist_human_body' },
+    nymphBody:   { prop: 'nymphBodyVariants',   prefix: 'colonist_nymph_body' },
+    ferinBody:   { prop: 'ferinBodyVariants',   prefix: 'colonist_ferin_body' },
+    kobalosBody: { prop: 'kobalosBodyVariants', prefix: 'colonist_kobalos_body' },
+    bufosBody:   { prop: 'bufosBodyVariants',   prefix: 'colonist_bufos_body' },
+    hair:        { prop: 'hairVariants',        prefix: 'colonist_hair' },
+    shirt:       { prop: 'shirtVariants',       prefix: 'colonist_shirt' },
+};
+// Upper bound for variant counts read from storage or an imported zip, so a
+// hostile or corrupt manifest can't make the palette build millions of items.
+const MAX_VARIANTS = 64;
+// Base body sprites used as the onion skin when drawing worn equipment, in preference order.
+const BASE_BODY_SPRITES = ['humanBody', 'nymphBody', 'ferinBody', 'kobalosBody', 'bufosBody', 'body']
+    .map(g => `entities:${VARIANT_GROUPS[g].prefix}_1`);
+
 const VARIANT_COLORS = ['#ffff00', '#00ffff', '#00ff00', '#ff88ff', '#ffaa00', '#88ffaa', '#ff8888', '#aaaaff'];
 
 const ICON_ITEMS = [
@@ -164,7 +183,6 @@ const OVERLAY_ITEMS = [
 ];
 
 const EFFECT_ITEMS = [
-    { key: 'fire', char: '^', color: '#ff4400', desc: 'Tile on fire' },
     { key: 'portal', char: 'Ø', color: '#ff55ff', desc: 'Void nexus portal' },
     { key: 'snow', char: '*', color: '#ffffff', desc: 'Snow overlay (winter grass)' },
     { key: 'rally', char: '⚑', color: '#ff4444', desc: 'Draft rally point' },
@@ -207,7 +225,6 @@ const EFFECT_ITEMS = [
     { key: 'summon_arrive', char: '◊', color: '#cc44ff', desc: 'Summon arrival swirl' },
     { key: 'loot_drop', char: '$', color: '#ffdd44', desc: 'Loot drop sparkle' },
     { key: 'speed_trail', char: '·', color: '#88ffff', desc: 'Speed buff afterimage trail' },
-    { key: 'fire_ignite', char: '^', color: '#ff6600', desc: 'Fire spread ignition' },
     { key: 'wave_alert', char: '!', color: '#ff2222', desc: 'Wave incoming screen flash' },
     { key: 'golem_activate', char: '⚡', color: '#44ffff', desc: 'Golem activation burst' },
     { key: 'xp_gain', char: '·', color: '#88ff88', desc: 'XP gain particle' },
@@ -305,7 +322,7 @@ class SkinEditor {
         this.transparencyLock = false;
 
         // Custom palette (6 saveable color slots)
-        this.customPalette = JSON.parse(localStorage.getItem('convocation_skin_custom_palette') || 'null') || [
+        this.customPalette = this._loadCustomPalette() || [
             { r: 0, g: 0, b: 0, a: 255 },
             { r: 255, g: 255, b: 255, a: 255 },
             { r: 200, g: 50, b: 50, a: 255 },
@@ -348,7 +365,15 @@ class SkinEditor {
         this._loadSkinData();
     }
 
+    // Every pixel-buffer swap marks the canvas dirty; in-place edits happen inside
+    // input handlers, which mark it dirty too (see _bindEvents).
+    get pixels() { return this._pixels; }
+    set pixels(value) { this._pixels = value; this._dirty = true; }
+
+    _markDirty() { this._dirty = true; }
+
     show() {
+        this._dirty = true;
         this.container.style.display = 'flex';
         requestAnimationFrame(() => {
             this._recalcZoom();
@@ -357,6 +382,7 @@ class SkinEditor {
     }
 
     hide() {
+        this._flushPersist();
         this.container.style.display = 'none';
         if (this._animFrame) {
             cancelAnimationFrame(this._animFrame);
@@ -771,23 +797,24 @@ class SkinEditor {
                 break;
         }
 
+        // Keys, names, chars and colors can come from mods, so escape everything.
         let html = '';
         for (const item of items) {
             if (item.isAction) {
-                html += `<div class="bp-palette-item se-add-variant" data-action="add-variant" data-variant-group="${item.variantGroup || ''}" title="${item.desc}">
-                    <span style="color:${item.color}">${item.char}</span> ${item.desc}
+                html += `<div class="bp-palette-item se-add-variant" data-action="add-variant" data-variant-group="${escapeAttr(item.variantGroup || '')}" title="${escapeAttr(item.desc)}">
+                    <span style="color:${escapeAttr(item.color)}">${escapeHtml(item.char)}</span> ${escapeHtml(item.desc)}
                 </div>`;
                 continue;
             }
             const active = this.activeObject && this.activeObject.key === item.key && this.activeObject.category === item.category ? ' active' : '';
             const spriteKey = `${item.category}:${item.key}`;
             const saved = this.savedSprites[spriteKey];
-            const removeBtn = item.isVariant ? ` <span class="se-remove-variant" data-variant-key="${item.key}" title="Remove variant">✕</span>` : '';
+            const removeBtn = item.isVariant ? ` <span class="se-remove-variant" data-variant-key="${escapeAttr(item.key)}" title="Remove variant">✕</span>` : '';
             const icon = saved
-                ? `<img src="${saved.data}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;">`
-                : `<span style="color:${item.color}">${item.char}</span>`;
-            html += `<div class="bp-palette-item${active}" data-key="${item.key}" data-category="${item.category}" title="${item.desc}">
-                ${icon} ${item.key.replace(/_/g, ' ')}${removeBtn}
+                ? `<img src="${escapeAttr(saved.data)}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;">`
+                : `<span style="color:${escapeAttr(item.color)}">${escapeHtml(item.char)}</span>`;
+            html += `<div class="bp-palette-item${active}" data-key="${escapeAttr(item.key)}" data-category="${escapeAttr(item.category)}" title="${escapeAttr(item.desc)}">
+                ${icon} ${escapeHtml(item.key.replace(/_/g, ' '))}${removeBtn}
             </div>`;
         }
         palette.innerHTML = html;
@@ -810,6 +837,7 @@ class SkinEditor {
         document.getElementById('se-zoom-reset').addEventListener('click', () => this._resetZoom());
 
         document.getElementById('se-skin-name').addEventListener('change', (e) => {
+            this._flushPersist();
             this.skinName = e.target.value.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
             e.target.value = this.skinName;
             this.savedSprites = {};
@@ -1029,15 +1057,22 @@ class SkinEditor {
         this.canvas.addEventListener('mousedown', (e) => this._onMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this._onMouseUp(e));
-        this.canvas.addEventListener('mouseleave', () => { this.hoveredPixel = null; this._mouseDown = false; this._middleDown = false; });
+        this.canvas.addEventListener('mouseleave', () => this._onMouseLeave());
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         this.canvas.addEventListener('wheel', (e) => this._onWheel(e), { passive: false });
 
         // Keyboard
         window.addEventListener('keydown', (e) => this._onKeyDown(e));
+        window.addEventListener('beforeunload', () => this._flushPersist());
+
+        // Redraw only after something could have changed. Capture phase so
+        // handlers that stop propagation still count.
+        for (const type of ['mousedown', 'mousemove', 'mouseup', 'wheel', 'keydown', 'keyup', 'click', 'input', 'change']) {
+            window.addEventListener(type, () => { if (this.container.style.display !== 'none') this._dirty = true; }, { capture: true, passive: true });
+        }
 
         // Resize
-        window.addEventListener('resize', () => this._onResize());
+        window.addEventListener('resize', () => { this._dirty = true; this._onResize(); });
     }
 
     _onMouseDown(e) {
@@ -1047,6 +1082,8 @@ class SkinEditor {
             this._lastDragPos = { x: e.clientX, y: e.clientY };
             return;
         }
+        // The canvas is about to be replaced by the sprite being loaded, so a stroke started now would be lost.
+        if (this._loadPending) return;
         this._mouseDown = true;
         const pos = this._eventToPixel(e);
         if (!pos) return;
@@ -1166,6 +1203,28 @@ class SkinEditor {
             this._pushUndo();
             this._autoSave();
         }
+    }
+
+    // Leaving the canvas ends the gesture: commit a freehand stroke (undoable and
+    // autosaved, same as mouseup) and drop any unfinished shape preview.
+    _onMouseLeave() {
+        this.hoveredPixel = null;
+        this._middleDown = false;
+        if (!this._mouseDown) return;
+        this._mouseDown = false;
+        if (this.tool === 'select') {
+            this._selMoving = false;
+            this._selStart = null;
+            return;
+        }
+        if (this._shapeStart) {
+            this._shapeStart = null;
+            this._shapePreview = null;
+            this._strokeSnapshot = null;
+            return;
+        }
+        this._pushUndo();
+        this._autoSave();
     }
 
     _onWheel(e) {
@@ -1494,6 +1553,13 @@ class SkinEditor {
 
     _setCanvasSize(size) {
         if (size === this.canvasSize) return;
+        this._commitSelection();
+        this.selection = null;
+        this._shapeStart = null;
+        this._shapePreview = null;
+        // Undo snapshots are sized for the old canvas; restoring one would hand
+        // ImageData a wrong-length buffer and kill the render loop.
+        this._clearUndoHistory();
         const oldPixels = this.pixels;
         const oldSize = this.canvasSize;
         this.canvasSize = size;
@@ -1511,12 +1577,29 @@ class SkinEditor {
                 this.pixels[newI + 3] = oldPixels[oldI + 3];
             }
         }
+        this._syncSizeSelect(size);
         this._recalcZoom();
+    }
+
+    _syncSizeSelect(size) {
+        const sizeSelect = document.getElementById('se-canvas-size');
+        const customInput = document.getElementById('se-custom-size');
+        if (!sizeSelect || !customInput) return;
+        const opt = [...sizeSelect.options].find(o => parseInt(o.value) === size);
+        if (opt) {
+            sizeSelect.value = String(size);
+            customInput.style.display = 'none';
+        } else {
+            sizeSelect.value = 'custom';
+            customInput.style.display = 'inline-block';
+            customInput.value = size;
+        }
     }
 
     _recalcZoom() {
         const area = document.getElementById('se-canvas-wrap');
         if (!area) return;
+        this._dirty = true;
         const rect = area.getBoundingClientRect();
         this.canvas.width = rect.width;
         this.canvas.height = rect.height;
@@ -1531,55 +1614,31 @@ class SkinEditor {
     _selectObject(key, category) {
         const prevSpriteKey = this.activeObject ? `${this.activeObject.category}:${this.activeObject.key}` : null;
 
+        this._commitSelection();
+        this.selection = null;
         this._autoSave();
         this._clearUndoHistory();
         this.activeObject = { key, category };
-
-        if (category === 'portraits') {
-            const portraitDef = PORTRAIT_ITEMS.find(p => p.key === key);
-            if (portraitDef && this.canvasSize !== portraitDef.size) {
-                this._setCanvasSize(portraitDef.size);
-                const sizeSelect = document.getElementById('se-canvas-size');
-                if (sizeSelect) {
-                    const opt = [...sizeSelect.options].find(o => parseInt(o.value) === portraitDef.size);
-                    if (opt) {
-                        sizeSelect.value = portraitDef.size;
-                        document.getElementById('se-custom-size').style.display = 'none';
-                    } else {
-                        sizeSelect.value = 'custom';
-                        document.getElementById('se-custom-size').style.display = 'inline-block';
-                        document.getElementById('se-custom-size').value = portraitDef.size;
-                    }
-                }
-            }
-        }
-
         const spriteKey = `${category}:${key}`;
-        const saved = this.savedSprites[spriteKey];
-        if (saved) {
-            this._loadPixelsFromDataURL(saved.data, saved.size);
-        } else if (category === 'portraits') {
-            this._loadPortraitFromDisk(key);
-        } else {
-            this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
-        }
+        this._loadActiveSprite();
 
         if (this._onionSkinKey === '__pending__' && prevSpriteKey && prevSpriteKey !== spriteKey) {
             this._setOnionSkinFromSprite(prevSpriteKey);
         }
 
         if (category === 'equipment_worn') {
-            const colonistSprite = this.savedSprites['entities:colonist_body_1'];
-            if (colonistSprite) {
+            // The palette only offers per-race bodies, so the legacy colonist_body_1 key alone is never set.
+            const bodyKey = BASE_BODY_SPRITES.find(k => this.savedSprites[k]);
+            if (bodyKey) {
                 this._onionSkinOpacity = 1.0;
                 const slotType = HELMETS[key] ? 'helmet' : WEAPONS[key] ? 'weapon' : TOOLS[key] ? 'tool' : 'armor';
                 const offsets = EQUIPMENT_OVERLAY_OFFSETS[slotType] || {};
                 this._onionSkinOffsetX = -(offsets.offsetX || 0);
                 this._onionSkinOffsetY = -(offsets.offsetY || 0);
                 if (slotType === 'weapon' || slotType === 'tool') {
-                    this._setOnionSkinComposite('entities:colonist_body_1');
+                    this._setOnionSkinComposite(bodyKey);
                 } else {
-                    this._setOnionSkinFromSprite('entities:colonist_body_1');
+                    this._setOnionSkinFromSprite(bodyKey);
                 }
             }
         } else if (this._onionSkinOpacity === 1.0) {
@@ -1604,12 +1663,48 @@ class SkinEditor {
             return;
         }
         const { key, category } = this.activeObject;
-        el.innerHTML = `<strong>${category}/${key}</strong>`;
+        el.innerHTML = `<strong>${escapeHtml(category)}/${escapeHtml(key)}</strong>`;
     }
 
-    _loadPixelsFromDataURL(dataURL, savedSize) {
+    // Show the active object's sprite. The canvas switches to the sprite's saved
+    // size first, so selecting it and clicking away doesn't autosave a resampled
+    // copy over the original. Pixels start blank until the async load lands.
+    _loadActiveSprite() {
+        this._cancelLoad();
+        if (!this.activeObject) return;
+        const { key, category } = this.activeObject;
+        const saved = this.savedSprites[`${category}:${key}`];
+        const portraitDef = category === 'portraits' ? PORTRAIT_ITEMS.find(p => p.key === key) : null;
+        const savedSize = Number.isInteger(saved?.size) && saved.size >= 1 && saved.size <= 256 ? saved.size : null;
+        const targetSize = savedSize || portraitDef?.size;
+        if (targetSize && targetSize !== this.canvasSize) this._setCanvasSize(targetSize);
+        this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
+        if (saved) this._loadPixelsFromDataURL(saved.data);
+        else if (category === 'portraits') this._loadPortraitFromDisk(key);
+    }
+
+    // Async loads carry a token; a newer selection bumps it so a slow load can't
+    // land on (and autosave under) the wrong sprite. Autosave is held while pending.
+    _beginLoad() {
+        this._loadToken = (this._loadToken || 0) + 1;
+        this._loadPending = true;
+        return this._loadToken;
+    }
+
+    _cancelLoad() {
+        this._loadToken = (this._loadToken || 0) + 1;
+        this._loadPending = false;
+    }
+
+    _endLoad(token) {
+        if (token === this._loadToken) this._loadPending = false;
+    }
+
+    _loadPixelsFromDataURL(dataURL, token = this._beginLoad()) {
         const img = new Image();
+        img.onerror = () => this._endLoad(token);
         img.onload = () => {
+            if (token !== this._loadToken) return;
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = this.canvasSize;
             tempCanvas.height = this.canvasSize;
@@ -1618,20 +1713,24 @@ class SkinEditor {
             tempCtx.drawImage(img, 0, 0, this.canvasSize, this.canvasSize);
             const imageData = tempCtx.getImageData(0, 0, this.canvasSize, this.canvasSize);
             this.pixels = new Uint8ClampedArray(imageData.data);
+            this._clearUndoHistory();
+            this._endLoad(token);
         };
         img.src = dataURL;
     }
 
     _loadPortraitFromDisk(key) {
-        fetch(`portraits/${key}.png`)
+        const token = this._beginLoad();
+        fetch(`portraits/${encodeURIComponent(key)}.png`)
             .then(r => r.ok ? r.blob() : null)
             .then(blob => {
-                if (!blob) return;
+                if (!blob || token !== this._loadToken) { this._endLoad(token); return; }
                 const reader = new FileReader();
-                reader.onload = () => this._loadPixelsFromDataURL(reader.result, this.canvasSize);
+                reader.onload = () => this._loadPixelsFromDataURL(reader.result, token);
+                reader.onerror = () => this._endLoad(token);
                 reader.readAsDataURL(blob);
             })
-            .catch(() => {});
+            .catch(() => this._endLoad(token));
     }
 
     // --- Color Management ---
@@ -1750,8 +1849,20 @@ class SkinEditor {
     _startLoop() {
         const loop = () => {
             if (this.container.style.display === 'none') { this._animFrame = null; return; }
-            this._render();
-            this._renderPreview();
+            // Idle frames are skipped; the periodic redraw is a backstop for async
+            // state changes that don't mark the canvas dirty.
+            this._idleFrames = (this._idleFrames || 0) + 1;
+            if (this._dirty || this._idleFrames >= 30) {
+                this._dirty = false;
+                this._idleFrames = 0;
+                try {
+                    this._render();
+                    this._renderPreview();
+                } catch (err) {
+                    // Keep the loop alive; a throw here used to stop rendering for good.
+                    if (!this._renderErrorLogged) { console.error('Skin editor render failed', err); this._renderErrorLogged = true; }
+                }
+            }
             this._animFrame = requestAnimationFrame(loop);
         };
         this._animFrame = requestAnimationFrame(loop);
@@ -1772,19 +1883,11 @@ class SkinEditor {
         // Checkerboard background within the pixel grid area
         const gridW = size * z;
         const gridH = size * z;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(ox, oy, gridW, gridH);
-        ctx.clip();
         const checkSize = Math.max(1, Math.floor(z / 2));
-        for (let y = 0; y < gridH; y += checkSize) {
-            for (let x = 0; x < gridW; x += checkSize) {
-                const cx = Math.floor(x / checkSize);
-                const cy = Math.floor(y / checkSize);
-                ctx.fillStyle = (cx + cy) % 2 === 0 ? CHECKERBOARD_LIGHT : CHECKERBOARD_DARK;
-                ctx.fillRect(ox + x, oy + y, checkSize, checkSize);
-            }
-        }
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.fillStyle = this._getCheckerPattern(ctx, checkSize);
+        ctx.fillRect(0, 0, gridW, gridH);
         ctx.restore();
 
         // Reference image overlay (behind pixels)
@@ -1805,19 +1908,9 @@ class SkinEditor {
             ctx.globalAlpha = 1.0;
         }
 
-        // Draw pixels
-        for (let py = 0; py < size; py++) {
-            for (let px = 0; px < size; px++) {
-                const i = (py * size + px) * 4;
-                const a = this.pixels[i + 3];
-                if (a === 0) continue;
-                const r = this.pixels[i];
-                const g = this.pixels[i + 1];
-                const b = this.pixels[i + 2];
-                ctx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
-                ctx.fillRect(ox + px * z, oy + py * z, z, z);
-            }
-        }
+        // Draw pixels: one scaled blit of the sprite instead of a fillRect per pixel
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(this._getSpriteCanvas(), ox, oy, gridW, gridH);
 
         // Grid lines
         if (this.showGrid && z >= 4) {
@@ -1892,21 +1985,50 @@ class SkinEditor {
         }
     }
 
+    // Two-cell checker tile, cached per cell size and used as a repeating pattern.
+    _getCheckerPattern(ctx, checkSize) {
+        if (this._checkerPattern && this._checkerPatternSize === checkSize) return this._checkerPattern;
+        const tile = document.createElement('canvas');
+        tile.width = tile.height = checkSize * 2;
+        const tctx = tile.getContext('2d');
+        tctx.fillStyle = CHECKERBOARD_DARK;
+        tctx.fillRect(0, 0, checkSize * 2, checkSize * 2);
+        tctx.fillStyle = CHECKERBOARD_LIGHT;
+        tctx.fillRect(0, 0, checkSize, checkSize);
+        tctx.fillRect(checkSize, checkSize, checkSize, checkSize);
+        this._checkerPattern = ctx.createPattern(tile, 'repeat');
+        this._checkerPatternSize = checkSize;
+        return this._checkerPattern;
+    }
+
+    // Offscreen canvas holding the current pixels at 1:1, reused across frames.
+    _getSpriteCanvas() {
+        const size = this.canvasSize;
+        if (!this._spriteCanvas || this._spriteCanvas.width !== size) {
+            this._spriteCanvas = document.createElement('canvas');
+            this._spriteCanvas.width = this._spriteCanvas.height = size;
+            this._spriteCtx = this._spriteCanvas.getContext('2d');
+            this._spriteImageData = this._spriteCtx.createImageData(size, size);
+        }
+        this._spriteImageData.data.set(this.pixels);
+        this._spriteCtx.putImageData(this._spriteImageData, 0, 0);
+        return this._spriteCanvas;
+    }
+
     _renderPreview() {
         const ctx = this.previewCtx;
         const size = this.canvasSize;
         const pw = this.previewCanvas.width;
         const ph = this.previewCanvas.height;
 
+        // _render() just refreshed the sprite canvas for this frame.
+        const tempCanvas = this._spriteCanvas && this._spriteCanvas.width === size ? this._spriteCanvas : this._getSpriteCanvas();
         if (this._showTilePreview) {
-            this.previewCanvas.width = size * 3;
-            this.previewCanvas.height = size * 3;
+            if (this.previewCanvas.width !== size * 3 || this.previewCanvas.height !== size * 3) {
+                this.previewCanvas.width = size * 3;
+                this.previewCanvas.height = size * 3;
+            }
             ctx.clearRect(0, 0, size * 3, size * 3);
-            const imageData = new ImageData(this.pixels.slice(), size, size);
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = size;
-            tempCanvas.height = size;
-            tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
             for (let ty = 0; ty < 3; ty++) {
                 for (let tx = 0; tx < 3; tx++) {
                     ctx.drawImage(tempCanvas, tx * size, ty * size);
@@ -1922,11 +2044,6 @@ class SkinEditor {
                 ctx.imageSmoothingEnabled = false;
                 ctx.drawImage(this._onionSkinData, 0, 0, size, size);
             }
-            const imageData = new ImageData(this.pixels.slice(), size, size);
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = size;
-            tempCanvas.height = size;
-            tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
             const previewOffX = (this.activeObject?.category === 'equipment_worn' && this._onionSkinOffsetX)
                 ? -Math.floor(size * this._onionSkinOffsetX) : 0;
             const previewOffY = (this.activeObject?.category === 'equipment_worn' && this._onionSkinOffsetY)
@@ -1967,15 +2084,19 @@ class SkinEditor {
 
     _undo() {
         if (this._undoStack.length === 0) return;
+        const snap = this._undoStack.pop();
+        if (snap.length !== this.pixels.length) { this._clearUndoHistory(); return; }
         this._redoStack.push(new Uint8ClampedArray(this.pixels));
-        this.pixels = this._undoStack.pop();
+        this.pixels = snap;
         this._autoSave();
     }
 
     _redo() {
         if (this._redoStack.length === 0) return;
+        const snap = this._redoStack.pop();
+        if (snap.length !== this.pixels.length) { this._clearUndoHistory(); return; }
         this._undoStack.push(new Uint8ClampedArray(this.pixels));
-        this.pixels = this._redoStack.pop();
+        this.pixels = snap;
         this._autoSave();
     }
 
@@ -2323,6 +2444,18 @@ class SkinEditor {
     }
 
     // --- Custom Palette ---
+    // Stored palette is untrusted (hand-edited or corrupt storage): only accept 6 numeric RGBA slots.
+    _loadCustomPalette() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('convocation_skin_custom_palette') || 'null');
+            const isColor = c => c && ['r', 'g', 'b', 'a'].every(k => Number.isFinite(c[k]));
+            if (Array.isArray(saved) && saved.length === 6 && saved.every(isColor)) {
+                return saved.map(({ r, g, b, a }) => ({ r, g, b, a }));
+            }
+        } catch { /* fall back to the default palette */ }
+        return null;
+    }
+
     _buildCustomPaletteHTML() {
         return `<div style="display:flex;gap:4px;align-items:center;padding:4px 8px;">
             <span style="font-size:10px;color:#888;margin-right:4px;">Palette:</span>
@@ -2469,7 +2602,7 @@ class SkinEditor {
         }
         this._onionSkinKey = spriteKey;
         const img = new Image();
-        img.onload = () => { this._onionSkinData = img; };
+        img.onload = () => { this._onionSkinData = img; this._dirty = true; };
         img.src = saved.data;
     }
 
@@ -2516,6 +2649,7 @@ class SkinEditor {
             return Promise.all(layers);
         }).then(() => {
             this._onionSkinData = canvas;
+            this._dirty = true;
         });
     }
 
@@ -2551,6 +2685,7 @@ class SkinEditor {
             img.onload = () => {
                 this._refImage = img;
                 this._showRefImage = true;
+                this._dirty = true;
                 document.getElementById('se-toggle-ref').classList.add('active');
                 document.getElementById('se-status').textContent = `Reference image loaded (${img.width}x${img.height})`;
             };
@@ -2585,8 +2720,8 @@ class SkinEditor {
     }
 
     _showSheetPicker() {
-        const existing = document.getElementById('se-sheet-picker');
-        if (existing) existing.remove();
+        // Tear down any previous picker fully, or its window listeners and rAF loop leak.
+        this._closeSheetPicker();
 
         this._sheetPickerOpen = true;
 
@@ -2822,39 +2957,37 @@ class SkinEditor {
 
     // --- Colonist Variants ---
     _addVariant(group) {
-        if (group === 'body') this.bodyVariants++;
-        else if (group === 'humanBody') this.humanBodyVariants++;
-        else if (group === 'nymphBody') this.nymphBodyVariants++;
-        else if (group === 'ferinBody') this.ferinBodyVariants++;
-        else if (group === 'kobalosBody') this.kobalosBodyVariants++;
-        else if (group === 'bufosBody') this.bufosBodyVariants++;
-        else if (group === 'hair') this.hairVariants++;
-        else if (group === 'shirt') this.shirtVariants++;
+        const g = VARIANT_GROUPS[group];
+        if (!g || this[g.prop] >= MAX_VARIANTS) return;
+        this[g.prop]++;
         this._persistSkinData();
         this._buildPalette();
     }
 
     _removeVariant(variantKey) {
-        // variantKey is like 'colonist_body_2', 'colonist_hair_1', 'colonist_shirt_3'
-        const parts = variantKey.split('_');
-        const group = parts[1]; // 'body' | 'hair' | 'shirt'
-        const num = parseInt(parts[2]);
-        const countProp = group === 'body' ? 'bodyVariants' : group === 'hair' ? 'hairVariants' : 'shirtVariants';
+        // variantKey is like 'colonist_human_body_2', 'colonist_hair_1', 'colonist_shirt_3'
+        const m = /^(.+)_(\d+)$/.exec(variantKey || '');
+        const g = m && Object.values(VARIANT_GROUPS).find(v => v.prefix === m[1]);
+        if (!g) return;
+        const prefix = g.prefix;
+        const countProp = g.prop;
+        const num = parseInt(m[2]);
         if (!num || num > this[countProp] || this[countProp] <= 1) return;
         delete this.savedSprites[`entities:${variantKey}`];
         for (let i = num; i < this[countProp]; i++) {
-            const nextKey = `entities:colonist_${group}_${i + 1}`;
-            const curKey = `entities:colonist_${group}_${i}`;
+            const nextKey = `entities:${prefix}_${i + 1}`;
+            const curKey = `entities:${prefix}_${i}`;
             if (this.savedSprites[nextKey]) {
                 this.savedSprites[curKey] = this.savedSprites[nextKey];
             } else {
                 delete this.savedSprites[curKey];
             }
         }
-        delete this.savedSprites[`entities:colonist_${group}_${this[countProp]}`];
+        delete this.savedSprites[`entities:${prefix}_${this[countProp]}`];
         this[countProp]--;
         if (this.activeObject && this.activeObject.key === variantKey) {
             this.activeObject = null;
+            this._cancelLoad();
             this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
             this._updateActiveObjectDisplay();
         }
@@ -2890,7 +3023,8 @@ class SkinEditor {
         if (category === 'portraits' && window.electronAPI?.writePortrait) {
             const base64 = dataURL.split(',')[1];
             window.electronAPI.writePortrait(`${key}.png`, base64)
-                .then(() => alert(`Saved portraits/${key}.png`))
+                // Resolves to the saved path, or null if the user cancelled the Save dialog.
+                .then(dest => { if (dest) alert(`Saved ${dest}`); })
                 .catch(err => alert(`Failed to save: ${err.message}`));
             return;
         }
@@ -2927,7 +3061,7 @@ class SkinEditor {
             manifest[category].push(key);
         }
 
-        zip.file('manifest.json', JSON.stringify({ sprites: manifest, bodyVariants: this.bodyVariants, humanBodyVariants: this.humanBodyVariants, nymphBodyVariants: this.nymphBodyVariants, ferinBodyVariants: this.ferinBodyVariants, kobalosBodyVariants: this.kobalosBodyVariants, bufosBodyVariants: this.bufosBodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants }, null, 2));
+        zip.file('manifest.json', JSON.stringify({ sprites: manifest, ...this._variantCounts() }, null, 2));
 
         const blob = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(blob);
@@ -2960,16 +3094,29 @@ class SkinEditor {
                 return;
             }
             const manifest = JSON.parse(await manifestFile.async('string'));
+            if (!manifest || typeof manifest !== 'object') {
+                alert('manifest.json is not a valid skin manifest.');
+                return;
+            }
 
             let name = file.name.replace(/\.skin\.zip$/i, '').replace(/\.zip$/i, '');
             name = name.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+            if (localStorage.getItem(STORAGE_PREFIX + name) !== null
+                && !confirm(`A skin named "${name}" already exists. Replace it with the imported one?`)) {
+                return;
+            }
+            this._flushPersist();
             this.skinName = name;
             document.getElementById('se-skin-name').value = name;
             this.savedSprites = {};
 
             let count = 0;
-            for (const [category, keys] of Object.entries(manifest.sprites || {})) {
+            const rejected = [];
+            const sprites = manifest.sprites && typeof manifest.sprites === 'object' ? manifest.sprites : {};
+            for (const [category, keys] of Object.entries(sprites)) {
+                if (!Array.isArray(keys)) continue;
                 for (const key of keys) {
+                    if (typeof key !== 'string') continue;
                     const zipFile = zip.file(`${category}/${key}.png`);
                     if (!zipFile) continue;
                     const blob = await zipFile.async('blob');
@@ -2984,67 +3131,25 @@ class SkinEditor {
                         i.onerror = () => resolve(null);
                         i.src = dataURL;
                     });
-                    const size = img ? img.width : this.canvasSize;
-                    this.savedSprites[`${category}:${key}`] = { size, data: dataURL };
+                    // Only square images at an editor canvas size can be edited without resampling
+                    // (which would then autosave a lossy copy), so anything else is skipped.
+                    if (!img || img.width !== img.height || !CANVAS_SIZES.includes(img.width)) {
+                        rejected.push(`${category}/${key}.png${img ? ` (${img.width}x${img.height})` : ''}`);
+                        continue;
+                    }
+                    this.savedSprites[`${category}:${key}`] = { size: img.width, data: dataURL };
                     count++;
                 }
             }
 
-            if (manifest.bodyVariants != null) {
-                this.bodyVariants = manifest.bodyVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_body_${v + 1}`]) v++;
-                this.bodyVariants = Math.max(v, this.bodyVariants);
-            }
-            if (manifest.humanBodyVariants != null) {
-                this.humanBodyVariants = manifest.humanBodyVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_human_body_${v + 1}`]) v++;
-                this.humanBodyVariants = Math.max(v, this.humanBodyVariants);
-            }
-            if (manifest.nymphBodyVariants != null) {
-                this.nymphBodyVariants = manifest.nymphBodyVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_nymph_body_${v + 1}`]) v++;
-                this.nymphBodyVariants = Math.max(v, this.nymphBodyVariants);
-            }
-            if (manifest.ferinBodyVariants != null) {
-                this.ferinBodyVariants = manifest.ferinBodyVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_ferin_body_${v + 1}`]) v++;
-                this.ferinBodyVariants = Math.max(v, this.ferinBodyVariants);
-            }
-            if (manifest.kobalosBodyVariants != null) {
-                this.kobalosBodyVariants = manifest.kobalosBodyVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_kobalos_body_${v + 1}`]) v++;
-                this.kobalosBodyVariants = Math.max(v, this.kobalosBodyVariants);
-            }
-            if (manifest.bufosBodyVariants != null) {
-                this.bufosBodyVariants = manifest.bufosBodyVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_bufos_body_${v + 1}`]) v++;
-                this.bufosBodyVariants = Math.max(v, this.bufosBodyVariants);
-            }
-            if (manifest.hairVariants != null) {
-                this.hairVariants = manifest.hairVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_hair_${v + 1}`]) v++;
-                this.hairVariants = Math.max(v, this.hairVariants);
-            }
-            if (manifest.shirtVariants != null) {
-                this.shirtVariants = manifest.shirtVariants;
-            } else {
-                let v = 0;
-                while (this.savedSprites[`entities:colonist_shirt_${v + 1}`]) v++;
-                this.shirtVariants = Math.max(v, this.shirtVariants);
+            for (const { prop, prefix } of Object.values(VARIANT_GROUPS)) {
+                if (manifest[prop] != null) {
+                    this[prop] = this._clampVariantCount(manifest[prop], this[prop]);
+                } else {
+                    let v = 0;
+                    while (v < MAX_VARIANTS && this.savedSprites[`entities:${prefix}_${v + 1}`]) v++;
+                    this[prop] = Math.max(v, this[prop]);
+                }
             }
 
             this._persistSkinData();
@@ -3053,18 +3158,15 @@ class SkinEditor {
             this._buildPalette();
             this._clearUndoHistory();
 
-            if (this.activeObject) {
-                const spriteKey = `${this.activeObject.category}:${this.activeObject.key}`;
-                const saved = this.savedSprites[spriteKey];
-                if (saved) {
-                    this._loadPixelsFromDataURL(saved.data, saved.size);
-                } else {
-                    this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
-                }
-            }
+            this._loadActiveSprite();
 
             const el = document.getElementById('se-status');
-            el.textContent = `Imported ${count} sprite(s) from ${file.name}`;
+            el.textContent = `Imported ${count} sprite(s) from ${file.name}`
+                + (rejected.length ? `, skipped ${rejected.length} with an unsupported size` : '');
+            if (rejected.length) {
+                alert(`Skipped ${rejected.length} sprite(s) that are not square or not ${CANVAS_SIZES.join('/')} px:\n`
+                    + rejected.slice(0, 20).join('\n') + (rejected.length > 20 ? '\n...' : ''));
+            }
         } catch (err) {
             alert('Failed to import zip: ' + err.message);
         }
@@ -3078,7 +3180,7 @@ class SkinEditor {
     }
 
     _autoSave() {
-        if (!this.activeObject) return;
+        if (!this.activeObject || this._loadPending) return;
         const hasContent = this.pixels.some((v, i) => i % 4 === 3 && v > 0);
         const spriteKey = `${this.activeObject.category}:${this.activeObject.key}`;
         if (!hasContent) {
@@ -3093,43 +3195,76 @@ class SkinEditor {
             tempCtx.putImageData(imageData, 0, 0);
             this.savedSprites[spriteKey] = { size, data: tempCanvas.toDataURL('image/png') };
         }
+        this._schedulePersist();
+    }
+
+    _variantCounts() {
+        const counts = {};
+        for (const { prop } of Object.values(VARIANT_GROUPS)) counts[prop] = this[prop];
+        return counts;
+    }
+
+    _clampVariantCount(value, fallback) {
+        const n = Math.floor(Number(value));
+        return Number.isFinite(n) ? Math.max(1, Math.min(MAX_VARIANTS, n)) : fallback;
+    }
+
+    // Serializing every sprite is expensive, so stroke autosaves coalesce into
+    // one write shortly after the user stops drawing.
+    _schedulePersist() {
+        clearTimeout(this._persistTimer);
+        this._persistTimer = setTimeout(() => this._persistSkinData(), 750);
+    }
+
+    _flushPersist() {
+        if (!this._persistTimer) return;
         this._persistSkinData();
     }
 
     _persistSkinData() {
-        const data = { sprites: this.savedSprites, bodyVariants: this.bodyVariants, hairVariants: this.hairVariants, shirtVariants: this.shirtVariants };
-        localStorage.setItem(STORAGE_PREFIX + this.skinName, JSON.stringify(data));
+        clearTimeout(this._persistTimer);
+        this._persistTimer = null;
+        const data = { sprites: this.savedSprites, ...this._variantCounts() };
+        try {
+            localStorage.setItem(STORAGE_PREFIX + this.skinName, JSON.stringify(data));
+            this._quotaWarned = false;
+        } catch (err) {
+            // Usually QuotaExceededError: the in-memory skin is intact, so tell the
+            // user to export a zip rather than silently losing work.
+            console.warn('Skin editor: could not save skin to localStorage', err);
+            const el = document.getElementById('se-status');
+            if (el) el.textContent = 'Could not save skin locally (storage full?). Export the skin to a zip to keep your work.';
+            if (!this._quotaWarned) {
+                this._quotaWarned = true;
+                alert('Browser storage is full, so this skin can no longer be autosaved. Use Export to save it as a zip.');
+            }
+        }
     }
 
     _loadSkinData() {
+        for (const { prop } of Object.values(VARIANT_GROUPS)) this[prop] = 3;
         const data = localStorage.getItem(STORAGE_PREFIX + this.skinName);
         if (data) {
             try {
                 const parsed = JSON.parse(data);
                 this.savedSprites = parsed.sprites || {};
-                if (typeof parsed.bodyVariants === 'number') this.bodyVariants = parsed.bodyVariants;
-                if (typeof parsed.hairVariants === 'number') this.hairVariants = parsed.hairVariants;
-                if (typeof parsed.shirtVariants === 'number') this.shirtVariants = parsed.shirtVariants;
+                for (const { prop } of Object.values(VARIANT_GROUPS)) {
+                    if (typeof parsed[prop] === 'number') this[prop] = this._clampVariantCount(parsed[prop], this[prop]);
+                }
             } catch { /* ignore */ }
         }
     }
 
     _loadSkinByName(name) {
+        this._flushPersist();
         this.skinName = name;
         document.getElementById('se-skin-name').value = name;
         this.savedSprites = {};
         this._loadSkinData();
         this._refreshSavedList();
         this._buildPalette();
-        if (this.activeObject) {
-            const spriteKey = `${this.activeObject.category}:${this.activeObject.key}`;
-            const saved = this.savedSprites[spriteKey];
-            if (saved) {
-                this._loadPixelsFromDataURL(saved.data, saved.size);
-            } else {
-                this.pixels = new Uint8ClampedArray(this.canvasSize * this.canvasSize * 4);
-            }
-        }
+        this._clearUndoHistory();
+        this._loadActiveSprite();
     }
 
     _refreshLoadDropdown() {
@@ -3143,7 +3278,7 @@ class SkinEditor {
             }
         }
         sel.innerHTML = '<option value="">Load Skin...</option>' +
-            skins.map(s => `<option value="${s}">${s}</option>`).join('');
+            skins.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
     }
 
     _refreshSavedList() {
@@ -3157,9 +3292,9 @@ class SkinEditor {
         el.innerHTML = keys.map(k => {
             const { data } = this.savedSprites[k];
             const [cat, name] = k.split(':');
-            return `<div class="se-saved-item" data-sprite-key="${k}" title="${cat}/${name}">
-                <img src="${data}" class="se-saved-thumb">
-                <span>${name}</span>
+            return `<div class="se-saved-item" data-sprite-key="${escapeAttr(k)}" title="${escapeAttr(`${cat}/${name}`)}">
+                <img src="${escapeAttr(data)}" class="se-saved-thumb">
+                <span>${escapeHtml(name)}</span>
             </div>`;
         }).join('');
 

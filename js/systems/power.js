@@ -69,8 +69,8 @@ export class PowerSystem {
 
                 if (pwr.warmRadius && (!pwr.seasonalHeat || isWinter)) this.heaters.push({ x, y, radius: pwr.warmRadius });
                 if (pwr.damage && pwr.warmRadius) this.aoeWards.push({ x, y, radius: pwr.warmRadius, damage: pwr.damage });
-                else if (pwr.damage && type === 'arcane_sentinel') this.turrets.push({ x, y, radius: pwr.range || 4 });
-                else if (pwr.damage && type === 'void_turret') this.voidTurrets.push({ x, y, radius: pwr.range || 5 });
+                else if (pwr.damage && type === 'arcane_sentinel') this.turrets.push({ x, y, radius: pwr.range || 4, type });
+                else if (pwr.damage && type === 'void_turret') this.voidTurrets.push({ x, y, radius: pwr.range || 5, type });
             }
 
             if (bDef.lightRadius) {
@@ -168,12 +168,9 @@ export class PowerSystem {
             }
         }
 
-        const allTurrets = [
-            ...this.turrets.map(t => ({ ...t, type: 'arcane_sentinel' })),
-            ...this.voidTurrets.map(t => ({ ...t, type: 'void_turret' })),
-        ];
-
-        for (const t of allTurrets) {
+        // Runs every tick: iterate both lists in place rather than building a
+        // merged copy. Entries carry their structure type from update().
+        for (const turretList of [this.turrets, this.voidTurrets]) for (const t of turretList) {
             const pwr = BUILDINGS[t.type].power;
             const cooldown = pwr.attackCooldown || 3;
             const tile = game.map[t.y][t.x];

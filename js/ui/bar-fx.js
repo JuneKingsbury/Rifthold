@@ -80,13 +80,29 @@ function getDitherTiles() {
     return _tiles;
 }
 
+// CanvasPatterns are bound to the context that made them, so cache them per
+// context and per tile. Building a pattern per bar per frame was a steady
+// allocation in the overlay hot path.
+const _patterns = new WeakMap();
+
+function getPattern(ctx, tile) {
+    let byTile = _patterns.get(ctx);
+    if (!byTile) { byTile = new Map(); _patterns.set(ctx, byTile); }
+    let pat = byTile.get(tile);
+    if (pat === undefined) {
+        pat = ctx.createPattern(tile, 'repeat');
+        byTile.set(tile, pat);
+    }
+    return pat;
+}
+
 /**
  * Paint a dither tile across a rect, tiling horizontally and anchored to the
  * rect's top-left so dots stay on the integer pixel grid. No-op if empty.
  */
 function paintStrip(ctx, tile, x, y, w, h) {
     if (w <= 0 || h <= 0) return;
-    const pat = ctx.createPattern(tile, 'repeat');
+    const pat = getPattern(ctx, tile);
     if (!pat) return;
     ctx.save();
     ctx.translate(x, y);

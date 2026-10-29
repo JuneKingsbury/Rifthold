@@ -30,60 +30,102 @@ function getMinMoveCost() {
 let lastSearchExhausted = false;
 export function wasLastSearchExhausted() { return lastSearchExhausted; }
 
-// Binary min-heap keyed on f-score for A* open set.
+// Binary min-heap keyed on f-score for A* open set, storing tile indices in
+// parallel typed arrays so a search allocates nothing per push.
 // Duplicate entries are allowed: when a node's g-score improves, we push a new
 // entry with the lower f. The stale duplicate is harmless. It will be popped
 // later and skipped because the node is already in the closed set.
-class MinHeap {
-    constructor() {
-        this.data = [];
+class IndexMinHeap {
+    constructor(capacity = 1024) {
+        this.idx = new Int32Array(capacity);
+        this.f = new Float64Array(capacity);
+        this.length = 0;
     }
 
-    push(node) {
-        this.data.push(node);
-        this._bubbleUp(this.data.length - 1);
+    clear() {
+        this.length = 0;
     }
 
+    _grow() {
+        const idx = new Int32Array(this.idx.length * 2);
+        const f = new Float64Array(this.f.length * 2);
+        idx.set(this.idx);
+        f.set(this.f);
+        this.idx = idx;
+        this.f = f;
+    }
+
+    push(node, f) {
+        if (this.length === this.idx.length) this._grow();
+        let i = this.length++;
+        const idx = this.idx, fs = this.f;
+        while (i > 0) {
+            const p = (i - 1) >> 1;
+            if (fs[p] <= f) break;
+            idx[i] = idx[p];
+            fs[i] = fs[p];
+            i = p;
+        }
+        idx[i] = node;
+        fs[i] = f;
+    }
+
+    // Removes and returns the tile index with the lowest f.
     pop() {
-        const top = this.data[0];
-        const last = this.data.pop();
-        if (this.data.length > 0) {
-            this.data[0] = last;
-            this._sinkDown(0);
+        const idx = this.idx, fs = this.f;
+        const top = idx[0];
+        const n = --this.length;
+        if (n > 0) {
+            const node = idx[n], f = fs[n];
+            let i = 0;
+            while (true) {
+                const l = 2 * i + 1;
+                const r = l + 1;
+                let s = i;
+                let sf = f;
+                if (l < n && fs[l] < sf) { s = l; sf = fs[l]; }
+                if (r < n && fs[r] < sf) { s = r; }
+                if (s === i) break;
+                idx[i] = idx[s];
+                fs[i] = fs[s];
+                i = s;
+            }
+            idx[i] = node;
+            fs[i] = f;
         }
         return top;
     }
+}
 
-    get length() {
-        return this.data.length;
-    }
+// Per-tile search state shared by every search (searches never nest), indexed
+// y * W + x. `stamp` marks which search last touched a tile, so stale g-scores
+// and closed flags from earlier searches are ignored without clearing the arrays.
+let gridW = 0, gridH = 0;
+let searchGen = 0;
+let stamp = null;      // Uint32Array: search generation that wrote gScore/cameFrom
+let closedGen = null;  // Uint32Array: search generation that closed the tile
+let gScoreArr = null;  // Float64Array
+let cameFromArr = null; // Int32Array
+const openHeap = new IndexMinHeap();
 
-    _bubbleUp(i) {
-        const node = this.data[i];
-        while (i > 0) {
-            const parentIdx = (i - 1) >> 1;
-            if (this.data[parentIdx].f <= node.f) break;
-            this.data[i] = this.data[parentIdx];
-            i = parentIdx;
-        }
-        this.data[i] = node;
+function beginSearch(w, h) {
+    if (w !== gridW || h !== gridH || !stamp) {
+        gridW = w;
+        gridH = h;
+        const n = w * h;
+        stamp = new Uint32Array(n);
+        closedGen = new Uint32Array(n);
+        gScoreArr = new Float64Array(n);
+        cameFromArr = new Int32Array(n);
+        searchGen = 0;
     }
-
-    _sinkDown(i) {
-        const length = this.data.length;
-        const node = this.data[i];
-        while (true) {
-            let smallest = i;
-            const left = 2 * i + 1;
-            const right = 2 * i + 2;
-            if (left < length && this.data[left].f < this.data[smallest].f) smallest = left;
-            if (right < length && this.data[right].f < this.data[smallest].f) smallest = right;
-            if (smallest === i) break;
-            this.data[i] = this.data[smallest];
-            this.data[smallest] = node;
-            i = smallest;
-        }
+    searchGen++;
+    if (searchGen === 0xFFFFFFFF) {
+        stamp.fill(0);
+        closedGen.fill(0);
+        searchGen = 1;
     }
+    openHeap.clear();
 }
 
 // Packs (x, y) into a single integer for use as a Map/Set key.
@@ -109,59 +151,76 @@ export function manhattanDist(x1, y1, x2, y2) {
 // `goalKeys` (optional): Set of packed tile keys. When supplied the search ends at
 // the first of them reached, and (endX, endY) is only the heuristic anchor: it
 // must lie within 1 tile of every goal so `distance - 1` stays admissible.
-function findPathGeneric(map, startX, startY, endX, endY, passabilityFn, goalKeys) {
+//
+// `opts` (optional): { hScale, goalStepCost, maxNodes }. hScale overrides the
+// per-tile heuristic weight (default getMinMoveCost()). goalStepCost is a lower
+// bound on the cost of stepping onto the goal when that is cheaper than hScale
+// (enemy searches enter their goal at cost 1), keeping the heuristic admissible
+// on the final step. maxNodes overrides the node budget.
+function findPathGeneric(map, startX, startY, endX, endY, passabilityFn, goalKeys, opts) {
     lastSearchExhausted = false;
-    const start = tileKey(startX, startY);
-    if (goalKeys ? goalKeys.has(start) : (startX === endX && startY === endY)) return [];
+    if (goalKeys ? goalKeys.has(tileKey(startX, startY)) : (startX === endX && startY === endY)) return [];
 
-    const open = new MinHeap();
-    const closed = new Set();
-    const cameFrom = new Map();
-    const gScore = new Map();
+    const H = map.length;
+    const W = H > 0 ? map[0].length : 0;
+    if (startX < 0 || startX >= W || startY < 0 || startY >= H) return null;
+    beginSearch(W, H);
+    const gen = searchGen;
 
-    const end = tileKey(endX, endY);
-    const hScale = getMinMoveCost();
+    const hScale = opts && opts.hScale !== undefined ? opts.hScale : getMinMoveCost();
     const slack = goalKeys ? 1 : 0;
-    const heuristic = (x, y) => Math.max(0, manhattanDist(x, y, endX, endY) - slack) * hScale;
+    const lastStep = opts && opts.goalStepCost !== undefined ? Math.min(opts.goalStepCost, hScale) : hScale;
+    const heuristic = (x, y) => {
+        const d = Math.max(0, Math.abs(x - endX) + Math.abs(y - endY) - slack);
+        return d > 0 ? (d - 1) * hScale + lastStep : 0;
+    };
 
-    gScore.set(start, 0);
-    open.push({ x: startX, y: startY, f: heuristic(startX, startY) });
+    const start = startY * W + startX;
+    const end = (endX >= 0 && endX < W && endY >= 0 && endY < H) ? endY * W + endX : -1;
+    stamp[start] = gen;
+    gScoreArr[start] = 0;
+    cameFromArr[start] = -1;
+    openHeap.push(start, heuristic(startX, startY));
 
-    const maxNodes = getMaxNodes();
+    const maxNodes = opts && opts.maxNodes !== undefined ? Math.min(opts.maxNodes, getMaxNodes()) : getMaxNodes();
     let iterations = 0;
-    while (open.length > 0) {
+    while (openHeap.length > 0) {
         if (iterations >= maxNodes) {
             lastSearchExhausted = true;
             return null;
         }
         iterations++;
-        const current = open.pop();
-        const currentKey = tileKey(current.x, current.y);
+        const current = openHeap.pop();
 
         // Skip stale duplicates that remained in the heap after a g-score update
-        if (closed.has(currentKey)) continue;
+        if (closedGen[current] === gen) continue;
 
-        if (goalKeys ? goalKeys.has(currentKey) : currentKey === end) {
-            return reconstructPath(cameFrom, current.x, current.y, startX, startY);
+        const cx = current % W;
+        const cy = (current - cx) / W;
+        if (goalKeys ? goalKeys.has(tileKey(cx, cy)) : current === end) {
+            return reconstructPath(current, start, W);
         }
 
-        closed.add(currentKey);
+        closedGen[current] = gen;
+        const currentG = gScoreArr[current];
 
-        for (const [dx, dy] of DIRS) {
-            const nx = current.x + dx;
-            const ny = current.y + dy;
-            const nKey = tileKey(nx, ny);
+        for (let d = 0; d < DIRS.length; d++) {
+            const nx = cx + DIRS[d][0];
+            const ny = cy + DIRS[d][1];
+            if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+            const n = ny * W + nx;
 
-            if (closed.has(nKey)) continue;
+            if (closedGen[n] === gen) continue;
 
             const cost = passabilityFn(map, nx, ny, endX, endY);
             if (cost === false) continue;
 
-            const tentativeG = gScore.get(currentKey) + cost;
-            if (tentativeG < (gScore.get(nKey) ?? Infinity)) {
-                cameFrom.set(nKey, currentKey);
-                gScore.set(nKey, tentativeG);
-                open.push({ x: nx, y: ny, f: tentativeG + heuristic(nx, ny) });
+            const tentativeG = currentG + cost;
+            if (stamp[n] !== gen || tentativeG < gScoreArr[n]) {
+                stamp[n] = gen;
+                cameFromArr[n] = current;
+                gScoreArr[n] = tentativeG;
+                openHeap.push(n, tentativeG + heuristic(nx, ny));
             }
         }
     }
@@ -248,20 +307,36 @@ export function findPathAdjacent(map, startX, startY, targetX, targetY, occupied
         (m, x, y) => passability(m, x, y, -1, -1), goalKeys);
 }
 
-export function findPathForEnemies(map, startX, startY, endX, endY) {
-    return findPathGeneric(map, startX, startY, endX, endY, enemyPassability);
+// The goal tile is entered at cost 1 (see enemyPassability), below the usual
+// per-tile heuristic weight, so the last step's heuristic is capped to match.
+// `maxNodes` (optional) lowers the node budget for callers that search often.
+export function findPathForEnemies(map, startX, startY, endX, endY, maxNodes) {
+    return findPathGeneric(map, startX, startY, endX, endY, enemyPassability, null, { goalStepCost: 1, maxNodes });
 }
 
-function reconstructPath(cameFrom, endX, endY, startX, startY) {
-    const path = [];
-    const startKey = tileKey(startX, startY);
-    let currentKey = tileKey(endX, endY);
+// Unit-cost search for simple movers (role-driven raiders, guards, pets). Every
+// step costs 1, `passCheck(map, x, y)` decides passability, and the goal tile is
+// always enterable (it is usually occupied by the entity being approached).
+// `maxNodes` bounds the search. Check wasLastSearchExhausted() on null. The
+// heuristic is weighted by a hair over 1 so ties on open ground resolve toward
+// the goal instead of flooding the bounding box; paths stay shortest for any
+// route under 1000 steps.
+export function findPathUniform(map, startX, startY, endX, endY, passCheck, maxNodes) {
+    const passability = (m, x, y) => {
+        if (x === endX && y === endY) return 1;
+        return passCheck(m, x, y) ? 1 : false;
+    };
+    return findPathGeneric(map, startX, startY, endX, endY, passability, null, { hScale: 1.001, maxNodes });
+}
 
-    while (currentKey !== startKey) {
-        path.push({ x: currentKey & 0xFFFF, y: currentKey >> 16 });
-        const prev = cameFrom.get(currentKey);
-        if (prev === undefined) break;
-        currentKey = prev;
+function reconstructPath(endIdx, startIdx, W) {
+    const path = [];
+    let current = endIdx;
+
+    while (current !== startIdx && current !== -1) {
+        const x = current % W;
+        path.push({ x, y: (current - x) / W });
+        current = cameFromArr[current];
     }
 
     path.reverse();

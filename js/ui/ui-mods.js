@@ -132,6 +132,7 @@ export function openModsPanel() {
         ? `<div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; flex-wrap:wrap;">
                <span id="mods-local-label" style="color:#ccc; font-size:11px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${localLabel}</span>
                <button id="mods-local-browse" style="flex-shrink:0; padding:2px 8px; background:#2a2a4e; color:#aaa; border:1px solid #444; border-radius:3px; cursor:pointer; font-family:inherit; font-size:11px;">Browse local folder</button>
+               ${currentHandle ? `<button id="mods-local-grant" style="display:none; flex-shrink:0; padding:2px 8px; background:#3a2800; color:#ffcc00; border:1px solid #aa6600; border-radius:3px; cursor:pointer; font-family:inherit; font-size:11px;">Grant access</button>` : ''}
                ${currentHandle ? `<button id="mods-local-clear" style="flex-shrink:0; padding:2px 8px; background:#16162a; color:#888; border:1px solid #333; border-radius:3px; cursor:pointer; font-family:inherit; font-size:11px;">Clear</button>` : ''}
                <div style="width:100%; color:#666; font-size:10px; margin-top:2px;">Or use a URL:</div>
                <input id="mods-path-input" type="text" value="${_esc(currentPath)}"
@@ -209,14 +210,33 @@ export function openModsPanel() {
             }
             const label = document.getElementById('mods-local-label');
             if (label) label.textContent = `Local folder: ${handle.name}`;
+            document.getElementById('mods-local-grant')?.remove();
             _markRestart();
             saveLocalDirHandle(handle).catch(e => console.warn('[Mods] Failed to persist handle:', e));
         });
+        // A restored folder handle loses read permission between sessions, and
+        // only a click (user gesture) may ask for it again.
+        const grantBtn = document.getElementById('mods-local-grant');
+        if (grantBtn && currentHandle) {
+            Promise.resolve(currentHandle.queryPermission?.({ mode: 'read' })).then(perm => {
+                if (perm !== 'granted') grantBtn.style.display = '';
+            }).catch(() => {});
+            grantBtn.addEventListener('click', async () => {
+                let perm;
+                try { perm = await currentHandle.requestPermission({ mode: 'read' }); }
+                catch (e) { console.warn('[Mods] Permission request failed:', e); return; }
+                if (perm === 'granted') {
+                    grantBtn.remove();
+                    _markRestart();
+                }
+            });
+        }
         const clearBtn = document.getElementById('mods-local-clear');
         if (clearBtn) {
             clearBtn.addEventListener('click', async () => {
                 await clearLocalDirHandle();
                 document.getElementById('mods-local-label').textContent = 'No local folder selected';
+                document.getElementById('mods-local-grant')?.remove();
                 clearBtn.remove();
                 _markRestart();
             });

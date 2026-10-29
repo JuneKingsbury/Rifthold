@@ -146,10 +146,13 @@ function applyInteraction(a, b, interaction, game) {
 
 export class SocialSystem {
     update(game) {
+        const decayDue = game.tick % SOCIAL_CONFIG.opinionDecayInterval === 0;
+        const checkDue = game.tick % SOCIAL_CONFIG.checkInterval === 0;
+        if (!decayDue && !checkDue) return;
         const colonists = game.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.golem);
 
         // Passive opinion decay
-        if (game.tick % SOCIAL_CONFIG.opinionDecayInterval === 0) {
+        if (decayDue) {
             for (const c of colonists) {
                 if (!c.opinions) continue;
                 for (const id of Object.keys(c.opinions)) {
@@ -160,7 +163,7 @@ export class SocialSystem {
             }
         }
 
-        if (game.tick % SOCIAL_CONFIG.checkInterval !== 0) return;
+        if (!checkDue) return;
 
         for (let i = 0; i < colonists.length; i++) {
             for (let j = i + 1; j < colonists.length; j++) {

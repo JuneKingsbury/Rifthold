@@ -1,11 +1,11 @@
 import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS, HEARTH_SHRINE_MILESTONES, WORLD_SIZE_COLONY, REALMS, countCompletedChains } from '../core/config.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
-import { colonistTakeDamage, getEquipmentStat } from './colonist.js';
+import { colonistTakeDamage, getEquipmentStat, releaseColonistTasks } from './colonist.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { createWaveEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
-import { attackStructure, getColonistTargetPriority } from './combat.js';
+import { attackStructure, getColonistTargetPriority, tickHostileStatusEffects } from './combat.js';
 
 // Evaluates all unearned Hearth Shrine milestones against the current game state.
 // Grants one extra shrine build slot per newly satisfied milestone.
@@ -201,6 +201,10 @@ export class WaveSystem {
                 this.enemies.splice(i, 1);
                 continue;
             }
+            // Weapon DoTs and spell effects tick before the enemy acts. A kill here is
+            // processed (loot, essence) on the next tick like any other death.
+            tickHostileStatusEffects(enemy, game);
+            if (enemy.hp <= 0) continue;
             this.updateEnemy(enemy, game);
             // Cull a fleeing enemy that has reached (or left) the map border. A flee_on_damage
             // enemy runs to the nearest edge and then idles there forever. Since the wave only
@@ -270,7 +274,8 @@ export class WaveSystem {
         let bestTarget = null;
         let bestScore = -Infinity;
         for (const c of nearbyColonists) {
-            if (c.hp <= 0) continue;
+            // Colonists on an expedition keep their gate-tile position but are off-map.
+            if (c.hp <= 0 || c.onExpedition) continue;
             if (manhattanDist(enemy.x, enemy.y, c.x, c.y) > 1) continue;
             const score = getColonistTargetPriority(c);
             if (score > bestScore) { bestScore = score; bestTarget = c; }
@@ -316,6 +321,12 @@ export class WaveSystem {
 
         if (enemy.path && enemy.path.length > 0) {
             const next = enemy.path[0];
+            // A cached route that no longer starts beside the enemy (it was displaced)
+            // is stale: following it would teleport. Drop it and re-route next turn.
+            if (Math.abs(next.x - enemy.x) + Math.abs(next.y - enemy.y) !== 1) {
+                enemy.path = null;
+                return;
+            }
             if (isBreakableByEnemies(game.map, next.x, next.y)) {
                 attackStructure(game, next.x, next.y, enemy.damage);
                 enemy.pathAge = (enemy.pathAge || 0) + 1;
@@ -403,6 +414,8 @@ export class WaveSystem {
                 const pactColonist = game.colonists.find(c => c.id === pactId);
                 if (pactColonist && pactColonist.hp > 0) {
                     pactColonist.hp = 0;
+                    pactColonist.state = 'dead';
+                    releaseColonistTasks(pactColonist, game);
                     game.notifications.push({ text: `${pactColonist.name}'s void pact is forfeit. The Nexus claims them.`, tick: game.tick, type: 'danger' });
                     game.eventLog.add(game, `${pactColonist.name}'s void pact is forfeit. The Nexus claims them.`, 'danger', { type: 'colonist', id: pactColonist.id });
                 }

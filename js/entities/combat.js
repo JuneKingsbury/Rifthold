@@ -1,4 +1,4 @@
-import { CONFIG, ENTITIES, RAID_CONFIG, RAID_TYPES, BUILDINGS, COMBAT_VISUALS, PATHFINDING_CONFIG, COLONIST_CONFIG } from '../core/config.js';
+import { CONFIG, ENTITIES, RAID_CONFIG, RAID_TYPES, BUILDINGS, COMBAT_VISUALS, PATHFINDING_CONFIG, COLONIST_CONFIG, REALMS, CRYPT_CONFIG } from '../core/config.js';
 import { spawnParticle, spawnStructureCrumble, spawnImpactSpray } from '../ui/overlay-renderer.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { findPathForEnemies, manhattanDist } from '../world/pathfinding.js';
@@ -6,6 +6,15 @@ import { colonistTakeDamage } from './colonist.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { createRaidEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
+
+let _crusaderTriggerRealm;
+function crusaderTriggerRealm() {
+    if (_crusaderTriggerRealm === undefined) {
+        const chain = CRYPT_CONFIG.wardedBy.kingdom;
+        _crusaderTriggerRealm = Object.keys(REALMS).find(k => REALMS[k].chain === chain && REALMS[k].boss) || null;
+    }
+    return _crusaderTriggerRealm;
+}
 
 export class CombatSystem {
     constructor() {
@@ -25,6 +34,13 @@ export class CombatSystem {
 
     update(game) {
         if (CONFIG.PEACEFUL_MODE) return;
+
+        // The Crusader raid gates the Kingdom chain. It musters once the boss of the
+        // chain the Kingdom crypt's ward is bound to falls, the same moment that ward lifts.
+        if (!this.crusaderRaidArmed && !this.crusaderRaidTriggered && !this.crusaderRaidDefeated &&
+            game.tick % 50 === 0 && game.exploration?.completedRealms.has(crusaderTriggerRealm())) {
+            this.armCrusaderRaid(game);
+        }
 
         if (this.crusaderRaidArmed && !this.raidActive &&
             !this.crusaderRaidTriggered && !this.crusaderRaidDefeated &&
@@ -281,38 +297,19 @@ export class CombatSystem {
                 game.raiders.splice(i, 1);
                 continue;
             }
-            // Tick weapon DoT effects applied by colonist weapons (poison/bleed/burn).
-            if (raider._dotEffects && raider._dotEffects.length > 0) {
-                raider._dotEffects = raider._dotEffects.filter(d => game.tick < d.expiresAt);
-                for (const d of raider._dotEffects) {
-                    if (game.tick >= d.nextTick) {
-                        d.nextTick = game.tick + d.interval;
-                        raider.hp -= d.damage;
-                        game.combatEffects.push({ x: raider.x, y: raider.y, char: '·', color: d.type === 'burn' ? '#ff6622' : '#66cc44', ttl: 3 });
-                    }
-                }
-            }
-            // Prune and tick spell-applied activeEffects (weaken, hex, charmed, dot_burn).
-            if (raider.activeEffects && raider.activeEffects.length > 0) {
-                raider.activeEffects = raider.activeEffects.filter(e => game.tick < e.expiresAt);
-                for (const e of raider.activeEffects) {
-                    if (e.type === 'dot' && e.tickInterval && game.tick % e.tickInterval === 0) {
-                        raider.hp -= (e.tickDamage || 0);
-                        game.combatEffects.push({ x: raider.x, y: raider.y, char: '~', color: '#ff6600', ttl: 3 });
-                    }
-                }
-            }
+            tickHostileStatusEffects(raider, game);
             if (raider.hp <= 0) continue;
             updateRaider(raider, game, this);
             // Cull raiders that have left the map, and fleeing raiders that have reached a
             // border tile. moveToEdge parks a fleer on the edge (dx/dy become 0 there), so it
             // never crosses the < 0 bound. Without this an escaped fleer lingers forever and
-            // keeps raidActive true, permanently blocking all future raids.
+            // keeps raidActive true, permanently blocking all future raids. A fleer that has
+            // been boxed in for too long is treated as having slipped away for the same reason.
             const atBorder = raider.x <= 0 || raider.x >= CONFIG.MAP_WIDTH - 1 ||
                 raider.y <= 0 || raider.y >= CONFIG.MAP_HEIGHT - 1;
             if (raider.x < 0 || raider.x >= CONFIG.MAP_WIDTH ||
                 raider.y < 0 || raider.y >= CONFIG.MAP_HEIGHT ||
-                (raider.fleeing && atBorder)) {
+                (raider.fleeing && (atBorder || (raider._fleeStuck || 0) >= FLEE_STUCK_LIMIT))) {
                 game.raiders.splice(i, 1);
             }
         }
@@ -330,6 +327,38 @@ export class CombatSystem {
                 game.story.checkMilestone('first_crusader_raid_survived', game);
             }
             if (game.stats) game.stats.raidsDefeated++;
+        }
+    }
+}
+
+// Move turns a fleeing raider may spend unable to step before it is culled as escaped.
+const FLEE_STUCK_LIMIT = 40;
+// Ticks a raider waits before re-searching after a failed path search.
+const RAIDER_PATH_RETRY_TICKS = 20;
+
+// Ticks weapon DoTs (`_dotEffects`: poison/bleed/burn from colonist weapons) and
+// spell-applied activeEffects (weaken, hex, charmed, dot) on a hostile entity,
+// pruning expired entries. Shared by raiders, void-wave enemies and hostile
+// wildlife so every hostile honours the same status effects. Callers check
+// hp <= 0 afterwards.
+export function tickHostileStatusEffects(entity, game) {
+    if (entity._dotEffects && entity._dotEffects.length > 0) {
+        entity._dotEffects = entity._dotEffects.filter(d => game.tick < d.expiresAt);
+        for (const d of entity._dotEffects) {
+            if (game.tick >= d.nextTick) {
+                d.nextTick = game.tick + d.interval;
+                entity.hp -= d.damage;
+                game.combatEffects.push({ x: entity.x, y: entity.y, char: '·', color: d.type === 'burn' ? '#ff6622' : '#66cc44', ttl: 3 });
+            }
+        }
+    }
+    if (entity.activeEffects && entity.activeEffects.length > 0) {
+        entity.activeEffects = entity.activeEffects.filter(e => game.tick < e.expiresAt);
+        for (const e of entity.activeEffects) {
+            if (e.type === 'dot' && e.tickInterval && game.tick % e.tickInterval === 0) {
+                entity.hp -= (e.tickDamage || 0);
+                game.combatEffects.push({ x: entity.x, y: entity.y, char: '~', color: '#ff6600', ttl: 3 });
+            }
         }
     }
 }
@@ -400,15 +429,26 @@ function updateRaider(raider, game, combatSystem) {
     raider.pathAge = (raider.pathAge || 0) + 1;
     const targetMoved = raider._lastTargetX !== undefined &&
         manhattanDist(nearest.x, nearest.y, raider._lastTargetX, raider._lastTargetY) > 3;
-    if (!raider.path || raider.path.length === 0 || raider.pathAge > PATHFINDING_CONFIG.raiderRepathInterval || targetMoved) {
-        raider.path = findPathForEnemies(game.map, raider.x, raider.y, nearest.x, nearest.y) || [];
+    const backingOff = raider._pathRetryAt && game.tick < raider._pathRetryAt;
+    if (!backingOff && (!raider.path || raider.path.length === 0 || raider.pathAge > PATHFINDING_CONFIG.raiderRepathInterval || targetMoved)) {
+        const path = findPathForEnemies(game.map, raider.x, raider.y, nearest.x, nearest.y);
+        raider.path = path || [];
         raider.pathAge = 0;
+        // A failed search (target sealed off or out of budget) is not retried every move turn.
+        raider._pathRetryAt = path ? 0 : game.tick + RAIDER_PATH_RETRY_TICKS;
     }
+    if (!raider.path) raider.path = [];
     raider._lastTargetX = nearest.x;
     raider._lastTargetY = nearest.y;
 
     if (raider.path.length > 0) {
         const next = raider.path[0];
+        // A cached route that no longer starts beside the entity (it was displaced)
+        // is stale: following it would teleport. Drop it and re-route next turn.
+        if (Math.abs(next.x - raider.x) + Math.abs(next.y - raider.y) !== 1) {
+            raider.path = [];
+            return;
+        }
         if (isBreakableByEnemies(game.map, next.x, next.y)) {
             attackStructure(game, next.x, next.y, raider.damage);
             return;
@@ -441,7 +481,8 @@ function findNearestColonist(raider, game) {
     let minScore = Infinity;
     const radius = PATHFINDING_CONFIG.raiderSearchRadius;
     for (const c of game.colonists) {
-        if (c.hp <= 0) continue;
+        // Colonists on an expedition keep their gate-tile position but are off-map.
+        if (c.hp <= 0 || c.onExpedition) continue;
         const dist = manhattanDist(raider.x, raider.y, c.x, c.y);
         if (dist > radius) continue;
         const score = dist - getColonistTargetPriority(c);
@@ -485,7 +526,20 @@ function moveToEdge(raider, game, dur) {
     const candidates = [];
     if (dx !== 0 && isPassableForEnemies(game.map, raider.x + dx, raider.y)) candidates.push([raider.x + dx, raider.y]);
     if (dy !== 0 && isPassableForEnemies(game.map, raider.x, raider.y + dy)) candidates.push([raider.x, raider.y + dy]);
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+        // The straight line to the edge is blocked: sidestep along the edge-parallel
+        // axis to work around the obstacle, and count the turn as stuck so a fleer
+        // boxed in for good is eventually culled (see updateRaid).
+        raider._fleeStuck = (raider._fleeStuck || 0) + 1;
+        const side = dx !== 0 ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
+        const open = side
+            .map(([sx, sy]) => [raider.x + sx, raider.y + sy])
+            .filter(([sx, sy]) => isPassableForEnemies(game.map, sx, sy) && !game.isTileOccupied(sx, sy));
+        if (open.length === 0) return;
+        const pick = open[Math.floor(Math.random() * open.length)];
+        moveEntity(raider, pick[0], pick[1], dur);
+        return;
+    }
     const unoccupied = candidates.filter(([cx, cy]) => !game.isTileOccupied(cx, cy));
     const pool = unoccupied.length > 0 ? unoccupied : candidates;
     const pick = pool[Math.floor(Math.random() * pool.length)];

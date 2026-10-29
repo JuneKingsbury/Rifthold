@@ -91,3 +91,70 @@ export function getThreatDisplayHtml(priority) {
     const arrow = priority > 0 ? '▲' : '▼';
     return ` <span style="color:${color};font-size:0.85em;">[${arrow}Threat]</span>`;
 }
+
+// Escape a string for safe interpolation into HTML text content. Use on any
+// value that can come from a mod, an imported/cloud save, a skin zip or player
+// input (names, descriptions, preset labels) before it goes into innerHTML.
+export function escapeHtml(str) {
+    return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Escape a string for a quoted HTML attribute value. Same rules as escapeHtml;
+// kept separate so call sites document which context they target.
+export function escapeAttr(str) {
+    return escapeHtml(str);
+}
+
+// Encode a string as a JS string literal for an inline handler attribute, e.g.
+// onclick="fn(${jsArg(name)})". JSON-encodes (handles quotes, backslashes,
+// newlines) then HTML-escapes so the result is safe inside a quoted attribute.
+export function jsArg(str) {
+    return escapeAttr(JSON.stringify(String(str ?? '')));
+}
+
+// Escape like escapeHtml, but keep character references (`&#10022;`, `&mdash;`)
+// working. For game text that embeds external names (notifications, event
+// text) but also uses entities for glyphs. A character reference only ever
+// decodes to text, so letting it through can't inject markup.
+export function escapeHtmlKeepEntities(str) {
+    return escapeHtml(str).replace(/&amp;(#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, '&$1;');
+}
+
+// Sanitize game text that is meant to carry simple markup (story milestone
+// text with portraits and line breaks) but that mods can also supply. Parses
+// into an inert <template> (no scripts run, no images load), keeps a small
+// allowlist of tags and attributes, and drops event handlers and non-relative
+// or non-image URLs. Disallowed elements are unwrapped (their text kept).
+const SANITIZE_TAGS = new Set(['B', 'I', 'EM', 'STRONG', 'U', 'SMALL', 'BR', 'P', 'SPAN', 'DIV', 'IMG', 'UL', 'OL', 'LI']);
+const SANITIZE_ATTRS = new Set(['class', 'style', 'src', 'alt', 'title']);
+const SANITIZE_DROP = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'TEMPLATE', 'SVG', 'MATH', 'LINK', 'META']);
+const _sanitizeCache = new Map();
+export function sanitizeHtml(html) {
+    const src = String(html ?? '');
+    const cached = _sanitizeCache.get(src);
+    if (cached !== undefined) return cached;
+    const tpl = document.createElement('template');
+    tpl.innerHTML = src;
+    const walk = (parent) => {
+        for (const node of [...parent.childNodes]) {
+            if (node.nodeType === Node.COMMENT_NODE) { node.remove(); continue; }
+            if (node.nodeType !== Node.ELEMENT_NODE) continue;
+            if (SANITIZE_DROP.has(node.tagName)) { node.remove(); continue; }
+            walk(node);
+            if (!SANITIZE_TAGS.has(node.tagName)) { node.replaceWith(...node.childNodes); continue; }
+            for (const attr of [...node.attributes]) {
+                const name = attr.name.toLowerCase();
+                const val = attr.value.trim();
+                const badUrl = name === 'src' && (/^[a-z][a-z0-9+.-]*:/i.test(val) && !/^data:image\//i.test(val) || val.startsWith('//'));
+                // Reject any backslash too: CSS escapes (`u\72l(`) would slip past a url() check.
+                const badStyle = name === 'style' && /url|expression|\\/i.test(val);
+                if (!SANITIZE_ATTRS.has(name) || badUrl || badStyle) node.removeAttribute(attr.name);
+            }
+        }
+    };
+    walk(tpl.content);
+    const out = tpl.innerHTML;
+    if (_sanitizeCache.size > 500) _sanitizeCache.clear();
+    _sanitizeCache.set(src, out);
+    return out;
+}

@@ -1,6 +1,6 @@
 import { CONFIG, GRASS_TERRAIN, TILE_COLORS, BUILDINGS, PLANT_STRUCTURES, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
 import { writeTileVisuals, SEALED_BG } from '../world/map.js';
-import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
+import { OverlayRenderer, spawnParticle, uiFontScale } from './overlay-renderer.js';
 import { CrtRenderer } from './crt-renderer.js';
 import { SkinManager } from './skin-manager.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
@@ -16,6 +16,54 @@ const DITHER_DIRECTIONS = [
 ];
 const DITHER_DISTANCE_MAP = { none: 0, minimal: 0.12, light: 0.2, normal: 0.3, heavy: 0.45, extreme: 0.6 };
 const DITHER_QUALITY_MAP = { chunky: 4, low: 3, medium: 2, high: 1 };
+const NEIGHBOR_OFFSETS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+// Static ground cache chunking (see _terrainChunks). A chunk is a square of
+// tiles about TERRAIN_CHUNK_TARGET_PX physical pixels across, baked lazily the
+// first time it is visible. Chunks off screen are evicted least-recently-used
+// once all chunk canvases together exceed TERRAIN_CHUNK_BUDGET_PX pixels.
+// Above TERRAIN_CACHE_MAX_TILE_PX per tile (far zoomed in, few tiles on
+// screen) the cache is off and ground draws live, which is already cheap there.
+const TERRAIN_CHUNK_TARGET_PX = 1024;
+const TERRAIN_CHUNK_BUDGET_PX = 16 * 1024 * 1024;
+const TERRAIN_CACHE_MAX_TILE_PX = 256;
+// Per-frame time budget (ms) for baking newly visible chunks. At least one chunk
+// bakes per frame; the rest of the visible tiles draw live until baked.
+const TERRAIN_CHUNK_BAKE_BUDGET_MS = 6;
+
+// Per-tile bake state flags for the static ground cache (see _bakedKind).
+const BAKE_GROUND = 1;   // tile was baked as plain ground
+const BAKE_SPRITE = 2;   // ...and its ground sprite existed, so the blit fully covers it
+const BAKE_SNOW = 4;     // ...while snow covered
+
+// Upper bound on live water ripples (rain impacts + footsteps).
+const MAX_WATER_RIPPLES = 160;
+// Ripples are bucketed by alpha so each bucket strokes as one path.
+const RIPPLE_ALPHA_BUCKETS = 12;
+
+// Memoized `<terrain>_autumn` sprite keys, so the live ground path doesn't
+// concatenate a string per tile per frame.
+const _autumnKeys = new Map();
+function autumnKey(terrain) {
+    let k = _autumnKeys.get(terrain);
+    if (k === undefined) { k = terrain + '_autumn'; _autumnKeys.set(terrain, k); }
+    return k;
+}
+
+// Memoized ground-variant keys for transparent floors (see _resolveFloorSprite),
+// for the same reason: terrain -> (':snow' | season) -> key.
+const _floorGroundKeys = new Map();
+function floorGroundKey(terrain, snow, season) {
+    let byVariant = _floorGroundKeys.get(terrain);
+    if (!byVariant) { byVariant = new Map(); _floorGroundKeys.set(terrain, byVariant); }
+    const variant = snow ? ':snow' : (season || '');
+    let k = byVariant.get(variant);
+    if (k === undefined) {
+        k = terrain + (snow ? ':snow' : (season ? ':' + season : ''));
+        byVariant.set(variant, k);
+    }
+    return k;
+}
 
 export class Renderer {
     constructor(container, skinManager) {
@@ -56,23 +104,39 @@ export class Renderer {
         this._tileVisuals = { char: '', color: '', bg: '' };
 
         // --- Static ground cache ---
-        // Offscreen full-map canvas that bakes the static ground layer (terrain /
-        // floor / snow sprite + terrain dither) for every "pure ground" tile: tiles
-        // with no structure, resource, zone, or fire. The visible sub-region is
-        // blitted in ONE drawImage per frame, replacing thousands of per-tile ground
-        // draws + up-to-4 dither composites each (measured at ~99% of frame time when
+        // Offscreen canvases that bake the static ground layer (terrain / floor /
+        // snow sprite + terrain dither) for every "pure ground" tile: tiles with no
+        // structure, resource, or zone. The visible chunks are blitted with one
+        // drawImage each per frame, replacing thousands of per-tile ground draws +
+        // up-to-4 dither composites each (measured at ~99% of frame time when
         // zoomed out). Everything dynamic (structures, resources, trees, crops,
-        // entities, fire, effects, tints) still draws live on top, so visuals are
-        // identical. Invalidated via markTerrainDirty() on build/deconstruct, season
-        // change, snow melt, and fire changes. The buffer resolution tracks the
-        // current cell size, so it is small exactly when zoomed out (many tiles) and
-        // larger when zoomed in (few tiles). Above _terrainCacheMaxPx it disables and
-        // the loop draws ground live (that regime is already fast).
-        this._terrainCanvas = null;
-        this._terrainCtx = null;
+        // entities, effects, tints) still draws live on top, so visuals are
+        // identical. The map is split into chunks (see TERRAIN_CHUNK_*) baked
+        // lazily when first visible, so the cache works on any map size and a full
+        // invalidation only costs re-baking what is on screen.
+        // markTerrainDirty() invalidates every chunk (season, skin, load);
+        // markTileDirty() patches one tile. The bake is also self-healing: each
+        // tile records what it was baked as (_bakedKind/_bakedFloor/_bakedTerrain),
+        // and a visible tile whose current state disagrees draws live and is
+        // re-patched before the next frame, so a missed invalidation never shows as
+        // a hole. Chunks are in physical (device) pixels at the current cell size.
+        this._terrainChunks = new Map();   // chunk index -> { canvas, ctx, lastUsed }
+        this._chunkBaked = null;           // Uint8Array, 1 = chunk baked and current
+        this._chunkTiles = 0;              // chunk side length in tiles
+        this._chunksX = 0;
+        this._chunkPx = 0;                 // total pixels across all chunk canvases
+        this._frameNo = 0;
         this._terrainDirty = true;
         this._terrainKey = '';
-        this._terrainCacheMaxPx = 4096;
+        this._bakedKind = null;      // Uint8Array of BAKE_* flags per tile
+        this._bakedFloor = null;     // floor key each tile was baked with
+        this._bakedTerrain = null;   // terrain each tile was baked with
+        this._bakedMap = null;       // map array the bake was built from
+        this._bakeTileP = 0;         // physical px per tile in the bake
+        this._bakeSeason = null;
+        this._bakeDither = null;     // dither args the bake was built with
+        this._pendingTilePatches = new Set();
+        this._dpr = 1;
         // While the user is actively zooming, the cell size (and thus the bake key)
         // changes every step, and a full-map rebuild per step would be a burst of
         // heavy frames worse than just drawing the viewport live. So we defer baking:
@@ -112,6 +176,8 @@ export class Renderer {
         const logicalHeight = Math.ceil(fontSize * RENDER_CONFIG.fontHeightMult);
         const physHeight = Math.round(logicalHeight * dpr);  // integer physical pixels
         const prevCharWidth = this.charWidth;
+        this._dpr = dpr;
+        this._tileP = physHeight;                             // physical px per tile (integer)
         this.charHeight = physHeight / dpr;                   // CSS pixels (possibly fractional)
         this.charWidth = this.charHeight;
         this._textOffsetX = Math.floor((this.charWidth - this._textWidth) / 2);
@@ -125,23 +191,32 @@ export class Renderer {
     }
 
     _resizeCanvas() {
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = this._dpr;
         const w = (CONFIG.VIEWPORT_WIDTH + 1) * this.charWidth;
         const h = (CONFIG.VIEWPORT_HEIGHT + 1) * this.charHeight;
         const bw = Math.round(w * dpr);
         const bh = Math.round(h * dpr);
-        if (this.canvas.width !== bw || this.canvas.height !== bh) {
+        if (this.canvas.width !== bw || this.canvas.height !== bh || this._ctxDpr !== dpr) {
             this.canvas.width = bw;
             this.canvas.height = bh;
             this.canvas.style.width = w + 'px';
             this.canvas.style.height = h + 'px';
             this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            this._ctxDpr = dpr;
             this.ctx.imageSmoothingEnabled = false;
             this.ctx.font = `${this.fontSize}px 'Courier New', monospace`;
             this.ctx.textBaseline = 'top';
         }
-        this.overlayRenderer.resize(w, h);
-        this.crtRenderer.resize(w, h);
+        this.overlayRenderer.resize(w, h, dpr);
+        this.crtRenderer.resize(w, h, dpr);
+        // The overlay canvases are absolutely positioned, i.e. from the
+        // container's padding edge, while the game canvas sits inside its padding.
+        // Offset them by the padding so overlay pixels line up with the tiles.
+        const cs = getComputedStyle(this.container);
+        for (const c of [this.overlayRenderer.canvas, this.crtRenderer.canvas]) {
+            c.style.left = cs.paddingLeft;
+            c.style.top = cs.paddingTop;
+        }
         this._lastViewportW = CONFIG.VIEWPORT_WIDTH;
         this._lastViewportH = CONFIG.VIEWPORT_HEIGHT;
     }
@@ -189,7 +264,6 @@ export class Renderer {
                 return sm.getSprite('entities', entity.type);
             }
         }
-        if (tile.onFire) return sm.getSprite('effects', 'fire');
         if (tile.structure) {
             if (tileKey !== undefined && this._doorFlash.get(tileKey) > 0
                 && BUILDINGS[tile.structure]?.structureType === 'door') {
@@ -214,7 +288,7 @@ export class Renderer {
         const grassy = GRASS_TERRAIN.has(tile.terrain);
         if (tile.snowCovered && grassy) return sm.getSprite('effects', 'snow');
         if (season === 'autumn' && grassy) {
-            return sm.getSprite('terrain', tile.terrain + '_autumn') || sm.getSprite('terrain', tile.terrain);
+            return sm.getSprite('terrain', autumnKey(tile.terrain)) || sm.getSprite('terrain', tile.terrain);
         }
         return sm.getSprite('terrain', tile.terrain);
     }
@@ -243,7 +317,7 @@ export class Renderer {
             return sm.getSprite('effects', 'snow') || sm.getSprite('terrain', tile.terrain);
         }
         if (season === 'autumn' && grassy) {
-            return sm.getSprite('terrain', tile.terrain + '_autumn') || sm.getSprite('terrain', tile.terrain);
+            return sm.getSprite('terrain', autumnKey(tile.terrain)) || sm.getSprite('terrain', tile.terrain);
         }
         return sm.getSprite('terrain', tile.terrain);
     }
@@ -259,7 +333,7 @@ export class Renderer {
             return this.skinManager.getSprite('floors', tile.floor);
         }
         const groundSprite = this._resolveTerrainBaseSprite(tile, season);
-        const groundKey = tile.terrain + (tile.snowCovered ? ':snow' : (season ? ':' + season : ''));
+        const groundKey = floorGroundKey(tile.terrain, tile.snowCovered, season);
         return this.skinManager.getFloorOverGroundSprite(tile.floor, groundKey, groundSprite);
     }
 
@@ -289,119 +363,253 @@ export class Renderer {
     }
 
     // A tile bakes into the static ground cache only when its ground layer is
-    // fully static this frame: no structure, resource, zone, or fire. Such a tile
+    // fully static this frame: no structure, resource, or zone. Such a tile
     // draws exactly _resolveGroundSprite(tile) plus terrain dither, both of which
     // depend only on terrain/floor/snow and neighbor terrain, never on time or
-    // entities. Tiles that fail this test (structures, trees/ore, farm plots,
-    // burning tiles) keep drawing live so their dynamic parts stay correct.
+    // entities. Tiles that fail this test (structures, trees/ore, farm plots)
+    // keep drawing live so their dynamic parts stay correct.
     _isBakeableGround(tile) {
-        return !tile.structure && !tile.resource && !tile.zone && !tile.onFire;
+        return !tile.structure && !tile.resource && !tile.zone;
     }
 
-    // Invalidate the static ground cache so it re-bakes on the next frame. Cheap:
-    // just flips a flag. Call on any event that changes a baked tile's ground
-    // appearance: build/deconstruct a floor, season change (snow/terrain color),
-    // snow accumulate/melt. Structures/resources aren't baked, so building a wall
-    // still needs this only because deconstructing can re-expose bare ground.
+    // Invalidate the whole static ground cache so it re-bakes on the next frame.
+    // Cheap to call (just flips a flag), but the re-bake walks the entire map, so
+    // prefer markTileDirty() when only known tiles changed. Use this for changes
+    // that touch every tile: season, skin, or a replaced map.
     markTerrainDirty() {
         this._terrainDirty = true;
     }
 
-    // Rebuilds the offscreen full-map ground buffer at the current cell size. Bakes
-    // every bakeable-ground tile's ground sprite + dither into world-space tile
-    // coordinates, so the tile loop can blit any visible sub-region in one draw.
-    // Returns false (and leaves the cache disabled) when the buffer would exceed
-    // _terrainCacheMaxPx on either axis, i.e. when zoomed in far enough that live
-    // ground drawing is already cheap. Skin mode only: ASCII ground is a single
-    // fillText/fillRect per tile, already the cheap path, so it isn't baked.
-    _rebuildTerrainCache(game, season, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize) {
-        const cw = this.charWidth;
-        const ch = this.charHeight;
+    // Queue one tile of the static ground cache for a re-patch before the next
+    // draw. Call when a tile's ground may look different: floor built/removed,
+    // snow fell/melted, a structure/resource/zone added or cleared, terrain
+    // changed (its neighbors' dither is re-patched too). A no-op while the cache
+    // is off, a full invalidation is pending, or the tile's chunk isn't baked
+    // (it will bake fresh). Missing a call is not fatal: the tile loop re-patches
+    // any visible tile whose bake state is stale.
+    markTileDirty(x, y) {
+        if (!this._chunkBaked || this._terrainDirty) return;
+        if (x < 0 || y < 0 || x >= CONFIG.MAP_WIDTH || y >= CONFIG.MAP_HEIGHT) return;
+        this._pendingTilePatches.add(y * CONFIG.MAP_WIDTH + x);
+    }
+
+    // Chunk index of a tile (tile coords must be on the map).
+    _chunkOf(wx, wy) {
+        const C = this._chunkTiles;
+        return ((wy / C) | 0) * this._chunksX + ((wx / C) | 0);
+    }
+
+    // Starts a fresh bake generation at the current cell size, season and dither
+    // settings: every chunk is marked unbaked (canvases are kept for reuse when
+    // their size still fits). Chunks then bake lazily as they become visible.
+    // Returns false (cache off) when zoomed in past TERRAIN_CACHE_MAX_TILE_PX,
+    // where live ground drawing is already cheap. Skin mode only: ASCII ground is
+    // a single fillText/fillRect per tile, already the cheap path.
+    _resetTerrainCache(game, season, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize) {
+        const P = this._tileP;
         const mapW = CONFIG.MAP_WIDTH;
         const mapH = CONFIG.MAP_HEIGHT;
-        const bufW = Math.round(mapW * cw);
-        const bufH = Math.round(mapH * ch);
-        if (bufW > this._terrainCacheMaxPx || bufH > this._terrainCacheMaxPx) {
-            // Too large to be worth caching at this zoom. Disable and draw live.
-            this._terrainCanvas = null;
-            this._terrainCtx = null;
-            this._terrainDirty = false;
+        this._pendingTilePatches.clear();
+        this._terrainDirty = false;
+        this._bakedMap = game.map;
+        const mapResized = mapW !== this._bakeMapW || mapH !== this._bakeMapH;
+        this._bakeMapW = mapW;
+        this._bakeMapH = mapH;
+        if (P > TERRAIN_CACHE_MAX_TILE_PX) {
+            this._dropTerrainChunks();
+            this._chunkBaked = null;
             return false;
         }
-
-        if (!this._terrainCanvas) {
-            this._terrainCanvas = document.createElement('canvas');
+        const C = Math.max(4, Math.floor(TERRAIN_CHUNK_TARGET_PX / P));
+        const chunksX = Math.ceil(mapW / C);
+        const chunksY = Math.ceil(mapH / C);
+        // Chunk canvases are sized from P, C and the map edge, so any change to
+        // those drops them; otherwise they are simply re-baked in place.
+        if (P !== this._bakeTileP || C !== this._chunkTiles || chunksX !== this._chunksX
+            || !this._chunkBaked || this._chunkBaked.length !== chunksX * chunksY || mapResized) {
+            this._dropTerrainChunks();
+            this._chunkBaked = new Uint8Array(chunksX * chunksY);
+        } else {
+            this._chunkBaked.fill(0);
         }
-        if (this._terrainCanvas.width !== bufW || this._terrainCanvas.height !== bufH) {
-            this._terrainCanvas.width = bufW;
-            this._terrainCanvas.height = bufH;
-            this._terrainCtx = null;
+        this._chunkTiles = C;
+        this._chunksX = chunksX;
+        const n = mapW * mapH;
+        if (!this._bakedKind || this._bakedKind.length !== n) {
+            this._bakedKind = new Uint8Array(n);
+            this._bakedFloor = new Array(n);
+            this._bakedTerrain = new Array(n);
         }
-        const tctx = this._terrainCtx || (this._terrainCtx = this._terrainCanvas.getContext('2d'));
-        tctx.imageSmoothingEnabled = false;
-        tctx.clearRect(0, 0, bufW, bufH);
+        this._bakeTileP = P;
+        this._bakeSeason = season;
+        this._bakeDither = [ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize];
+        return true;
+    }
 
-        const map = game.map;
-        for (let wy = 0; wy < mapH; wy++) {
-            const row = map[wy];
-            for (let wx = 0; wx < mapW; wx++) {
-                const tile = row[wx];
-                if (!this._isBakeableGround(tile)) continue;
-                // Round to integer pixels using the shared-edge pattern so adjacent
-                // tiles always meet exactly with no sub-pixel gap. On mobile, cw/ch are
-                // often fractional (physHeight/dpr with non-integer DPR), and accumulated
-                // fractional positions produce visible seams after the cache blit.
-                const px = Math.round(wx * cw);
-                const py = Math.round(wy * ch);
-                const tw = Math.round((wx + 1) * cw) - px;
-                const th = Math.round((wy + 1) * ch) - py;
-                // Bake the terrain background color under the ground sprite, exactly
-                // as the live path fills it before drawing the sprite. This keeps
-                // output pixel-identical even if a terrain sprite is semi-transparent
-                // (its gaps show the terrain bg, not the main canvas color).
-                const tv = writeTileVisuals(tile, season, this._tileVisuals);
-                let bakeBg = tv.bg;
-                if (tile.terrain === 'grass' && !tile.snowCovered && season && SEASON_EFFECTS[season] && bakeBg === '#1a2a12') {
-                    bakeBg = SEASON_EFFECTS[season].grassBg;
-                }
-                if (bakeBg) {
-                    tctx.fillStyle = bakeBg;
-                    tctx.fillRect(px, py, tw, th);
-                }
-                // The live path draws the shadow sprite under the ground sprite for
-                // every bare tile (noShadow is false without a structure). Bake it
-                // too so output matches even where the ground sprite has transparency.
-                const shadow = this.skinManager.getSprite('effects', 'shadow');
-                if (shadow) tctx.drawImage(shadow, px, py, tw, th);
-                const ground = this._resolveGroundSprite(tile, season);
-                if (ground) tctx.drawImage(ground, px, py, tw, th);
-                // Dither only on bare terrain, matching the live path's `canDither`
-                // (no structure/resource/zone/floor). Bakeable tiles already exclude
-                // structure/resource/zone, so only the floor case must be excluded
-                // here. Dither depends solely on neighbor terrain, so it is static.
-                if (!tile.floor) {
-                    this._drawTerrainDither(tctx, tile, wx, wy, px, py, tw, th, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
-                }
+    _dropTerrainChunks() {
+        for (const chunk of this._terrainChunks.values()) chunk.canvas.width = 0;
+        this._terrainChunks.clear();
+        this._chunkPx = 0;
+    }
+
+    // Bakes every tile of chunk `ci` into its canvas (creating it if needed).
+    _bakeChunk(game, ci) {
+        const C = this._chunkTiles;
+        const P = this._bakeTileP;
+        const cx = ci % this._chunksX;
+        const cy = (ci - cx) / this._chunksX;
+        const x0 = cx * C;
+        const y0 = cy * C;
+        const x1 = Math.min(CONFIG.MAP_WIDTH, x0 + C);
+        const y1 = Math.min(CONFIG.MAP_HEIGHT, y0 + C);
+        let chunk = this._terrainChunks.get(ci);
+        if (!chunk) {
+            const canvas = document.createElement('canvas');
+            canvas.width = (x1 - x0) * P;
+            canvas.height = (y1 - y0) * P;
+            const cctx = canvas.getContext('2d');
+            cctx.imageSmoothingEnabled = false;
+            chunk = { canvas, ctx: cctx, lastUsed: 0 };
+            this._terrainChunks.set(ci, chunk);
+            this._chunkPx += canvas.width * canvas.height;
+        } else {
+            chunk.ctx.clearRect(0, 0, chunk.canvas.width, chunk.canvas.height);
+        }
+        for (let wy = y0; wy < y1; wy++) {
+            for (let wx = x0; wx < x1; wx++) {
+                this._bakeTile(game, wx, wy, chunk.ctx, (wx - x0) * P, (wy - y0) * P, false);
             }
         }
+        this._chunkBaked[ci] = 1;
+        return chunk;
+    }
 
-        this._terrainDirty = false;
-        return true;
+    // Evicts least-recently-used chunks that weren't drawn this frame until the
+    // chunk canvases fit TERRAIN_CHUNK_BUDGET_PX (visible chunks are never evicted).
+    _evictTerrainChunks() {
+        while (this._chunkPx > TERRAIN_CHUNK_BUDGET_PX) {
+            let oldestKey = -1;
+            let oldest = null;
+            for (const [k, chunk] of this._terrainChunks) {
+                if (chunk.lastUsed === this._frameNo) continue;
+                if (!oldest || chunk.lastUsed < oldest.lastUsed) { oldest = chunk; oldestKey = k; }
+            }
+            if (!oldest) return;
+            this._chunkPx -= oldest.canvas.width * oldest.canvas.height;
+            oldest.canvas.width = 0;
+            this._terrainChunks.delete(oldestKey);
+            this._chunkBaked[oldestKey] = 0;
+        }
+    }
+
+    // Bakes one tile at (px, py) of `tctx` (physical pixels) and records the
+    // state it was baked from, so the tile loop can tell when it goes stale.
+    // Non-bakeable tiles are left transparent (they draw live). `clear` wipes the
+    // tile first (needed when patching in place, not when baking a whole chunk).
+    _bakeTile(game, wx, wy, tctx, px, py, clear) {
+        const P = this._bakeTileP;
+        const season = this._bakeSeason;
+        const map = game.map;
+        const tile = map[wy][wx];
+        const k = wy * CONFIG.MAP_WIDTH + wx;
+        if (clear) tctx.clearRect(px, py, P, P);
+        this._bakedFloor[k] = tile.floor;
+        this._bakedTerrain[k] = tile.terrain;
+        if (!this._isBakeableGround(tile)) {
+            this._bakedKind[k] = 0;
+            return;
+        }
+        // Bake the terrain background color under the ground sprite, exactly
+        // as the live path fills it before drawing the sprite. This keeps
+        // output pixel-identical even if a terrain sprite is semi-transparent
+        // (its gaps show the terrain bg, not the main canvas color).
+        const tv = writeTileVisuals(tile, season, this._tileVisuals);
+        let bakeBg = tv.bg;
+        if (tile.terrain === 'grass' && !tile.snowCovered && season && SEASON_EFFECTS[season] && bakeBg === '#1a2a12') {
+            bakeBg = SEASON_EFFECTS[season].grassBg;
+        }
+        if (bakeBg) {
+            tctx.fillStyle = bakeBg;
+            tctx.fillRect(px, py, P, P);
+        }
+        // The live path draws the shadow sprite under the ground sprite for
+        // every bare tile (noShadow is false without a structure). Bake it
+        // too so output matches even where the ground sprite has transparency.
+        const shadow = this.skinManager.getSprite('effects', 'shadow');
+        if (shadow) tctx.drawImage(shadow, px, py, P, P);
+        const ground = this._resolveGroundSprite(tile, season);
+        if (ground) tctx.drawImage(ground, px, py, P, P);
+        // Dither only on bare terrain, matching the live path's `canDither`
+        // (no structure/resource/zone/floor). Bakeable tiles already exclude
+        // structure/resource/zone, so only the floor case must be excluded
+        // here. Dither depends solely on neighbor terrain, so it is static.
+        if (!tile.floor) {
+            const [ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize] = this._bakeDither;
+            this._drawTerrainDither(tctx, tile, wx, wy, px, py, P, P, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+        }
+        this._bakedKind[k] = BAKE_GROUND | (ground ? BAKE_SPRITE : 0) | (tile.snowCovered ? BAKE_SNOW : 0);
+    }
+
+    // True when a tile no longer matches what the ground cache baked for it.
+    _isBakeStale(tile, k) {
+        if (tile.terrain !== this._bakedTerrain[k]) return true;
+        const kind = this._bakedKind[k];
+        if (!this._isBakeableGround(tile)) return kind !== 0;
+        return (kind & BAKE_GROUND) === 0
+            || tile.floor !== this._bakedFloor[k]
+            || !!tile.snowCovered !== ((kind & BAKE_SNOW) !== 0);
+    }
+
+    // Applies queued single-tile patches (markTileDirty + stale tiles found by the
+    // tile loop), at most `budget` per frame. Leftovers stay queued: until patched
+    // those tiles are stale, so the tile loop keeps drawing them live.
+    _flushTilePatches(game, budget) {
+        const pending = this._pendingTilePatches;
+        if (pending.size === 0) return;
+        const mapW = CONFIG.MAP_WIDTH;
+        const mapH = CONFIG.MAP_HEIGHT;
+        let done = 0;
+        for (const k of pending) {
+            if (done >= budget) break;
+            pending.delete(k);
+            const wx = k % mapW;
+            const wy = (k - wx) / mapW;
+            // Tiles in an unbaked chunk get baked fresh with it; nothing to patch.
+            const ci = this._chunkOf(wx, wy);
+            if (!this._chunkBaked[ci]) continue;
+            // A terrain change alters the dither of all four neighbors as well.
+            if (game.map[wy][wx].terrain !== this._bakedTerrain[k]) {
+                for (const [dx, dy] of NEIGHBOR_OFFSETS) {
+                    const nx = wx + dx, ny = wy + dy;
+                    if (nx >= 0 && ny >= 0 && nx < mapW && ny < mapH) pending.add(ny * mapW + nx);
+                }
+            }
+            const C = this._chunkTiles;
+            const P = this._bakeTileP;
+            const chunk = this._terrainChunks.get(ci);
+            this._bakeTile(game, wx, wy, chunk.ctx, (wx % C) * P, (wy % C) * P, true);
+            done++;
+        }
     }
 
     // Generates per-direction alpha masks for terrain edge dithering using ordered
     // (Bayer matrix) dithering. Each mask is a 1-tile canvas with white pixels where
     // the neighbor terrain should "bleed through". The 4x4 Bayer matrix provides a
     // perceptually even dot pattern that avoids banding artifacts at low densities.
+    // The pattern is computed on an integer logical grid (the cell size in CSS
+    // pixels, rounded) so per-pixel indexing is exact even when the CSS cell size
+    // is fractional (non-integer DPR), then scaled nearest-neighbour up to the
+    // physical tile size (_tileP) the bake and the live path draw at.
     _generateDitherMasks(ditherDepthFraction, blockSize) {
-        const cw = this.charWidth;
-        const ch = this.charHeight;
+        const P = this._tileP;
+        const cw = Math.max(1, Math.round(P / this._dpr));
+        const ch = cw;
         const depthFrac = ditherDepthFraction ?? RENDER_CONFIG.ditherDepth;
         const bs = blockSize || 1;
         const depth = Math.max(1, Math.round(cw * depthFrac));
-        this._ditherTileSize = cw;
+        this._ditherTileSize = P;
         this._ditherDepthFraction = depthFrac;
-        this._ditherBlockSize = bs;
+        this._ditherBlockSize = blockSize;
         this._ditherMasks = {};
 
         const bayer = [
@@ -450,7 +658,16 @@ export class Renderer {
                 }
             }
             mctx.putImageData(imageData, 0, 0);
-            this._ditherMasks[dir] = canvas;
+            let mask = canvas;
+            if (cw !== P) {
+                mask = document.createElement('canvas');
+                mask.width = P;
+                mask.height = P;
+                const sctx = mask.getContext('2d');
+                sctx.imageSmoothingEnabled = false;
+                sctx.drawImage(canvas, 0, 0, P, P);
+            }
+            this._ditherMasks[dir] = mask;
         }
     }
 
@@ -458,8 +675,8 @@ export class Renderer {
         const key = terrain + ':' + dir;
         if (this._ditherCache.has(key)) return this._ditherCache.get(key);
 
-        const cw = this.charWidth;
-        const ch = this.charHeight;
+        const cw = this._tileP;
+        const ch = this._tileP;
         const sprite = this.skinManager.getSprite('terrain', terrain);
         if (!sprite) { this._ditherCache.set(key, null); return null; }
 
@@ -480,7 +697,9 @@ export class Renderer {
     // the neighbor's sprite through the directional dither mask (from _generateDitherMasks).
     _drawTerrainDither(ctx, tile, wx, wy, px, py, cw, ch, map, game, distSetting, depthFrac, qualSetting, blockSize) {
         if (!RENDER_CONFIG.terrainDithering) return;
-        if (distSetting === 'none') return;
+        // Callers pass the resolved `ditherOn` flag here; false means 'none' (and
+        // the masks were never generated).
+        if (!distSetting || distSetting === 'none' || !this._ditherMasks) return;
 
         const baseTerrain = tile.terrain;
 
@@ -494,7 +713,7 @@ export class Renderer {
             const cached = this._getDitherTile(neighbor.terrain, dir);
             if (!cached) continue;
 
-            ctx.drawImage(cached, px, py);
+            ctx.drawImage(cached, px, py, cw, ch);
         }
     }
 
@@ -535,19 +754,8 @@ export class Renderer {
             || sm.getSprite('effects', 'grass_tuft');
         if (!tuft) return false;
         const rot = getGrassSway(now, tileKey, wind, this._grassBoostAt(now, tileKey));
-        if (rot !== 0) {
-            // Sway about the tuft base (bottom-center).
-            const pivotX = px + cw / 2;
-            const pivotY = py + ch;
-            ctx.save();
-            ctx.translate(pivotX, pivotY);
-            ctx.rotate(rot);
-            ctx.translate(-pivotX, -pivotY);
-            ctx.drawImage(tuft, px, py, cw, ch);
-            ctx.restore();
-        } else {
-            ctx.drawImage(tuft, px, py, cw, ch);
-        }
+        // Sway about the tuft base (bottom-center).
+        this._drawSwayed(ctx, tuft, rot, px, py, cw, ch, px + cw / 2, py + ch);
         return true;
     }
 
@@ -560,40 +768,45 @@ export class Renderer {
             boost += Math.sin(t * Math.PI) * boostEntry.amp;
         }
         const rot = getCropSway(now, tileKey, wind, boost);
-        if (rot !== 0) {
-            const pivotX = px + cw / 2;
-            const pivotY = py + ch;
-            ctx.save();
-            ctx.translate(pivotX, pivotY);
-            ctx.rotate(rot);
-            ctx.translate(-pivotX, -pivotY);
-            ctx.drawImage(sprite, px, py, cw, ch);
-            ctx.restore();
-        } else {
-            ctx.drawImage(sprite, px, py, cw, ch);
-        }
+        this._drawSwayed(ctx, sprite, rot, px, py, cw, ch, px + cw / 2, py + ch);
     }
 
-    // Draw all active water ripples (rain impacts + footsteps).
-    _drawWaterRipples(ctx, camera, cw, ch) {
-        if (this._waterRipples.length === 0) return;
+    // Draw all active water ripples (rain impacts + footsteps). Growth and fade
+    // are per second (tuned as per-frame at 60 fps), so refresh rate doesn't
+    // change how they look. Ripples are bucketed by alpha and each bucket is
+    // stroked as one path rather than one stroke per ripple.
+    _drawWaterRipples(ctx, camera, cw, ch, dt) {
+        const ripples = this._waterRipples;
+        if (ripples.length === 0) return;
+        const f = dt * 60;
+        let usedBuckets = 0;
+        for (let i = ripples.length - 1; i >= 0; i--) {
+            const r = ripples[i];
+            r.r += r.speed * f;
+            r.alpha -= r.decay * f;
+            if (r.alpha <= 0 || r.r > r.maxR) {
+                ripples[i] = ripples[ripples.length - 1];
+                ripples.length--;
+                continue;
+            }
+            r.bucket = Math.min(RIPPLE_ALPHA_BUCKETS - 1, Math.floor(r.alpha / 0.6 * RIPPLE_ALPHA_BUCKETS));
+            usedBuckets |= 1 << r.bucket;
+        }
+        if (usedBuckets === 0) return;
         ctx.save();
         ctx.strokeStyle = 'rgba(120, 180, 255, 0.5)';
         ctx.lineWidth = 1;
-        for (let i = this._waterRipples.length - 1; i >= 0; i--) {
-            const r = this._waterRipples[i];
-            r.r += r.speed;
-            r.alpha -= r.decay;
-            if (r.alpha <= 0 || r.r > r.maxR) {
-                this._waterRipples[i] = this._waterRipples[this._waterRipples.length - 1];
-                this._waterRipples.length--;
-                continue;
-            }
-            const sx = (r.x - camera.x + 0.5) * cw;
-            const sy = (r.y - camera.y + 0.5) * ch;
-            ctx.globalAlpha = r.alpha;
+        for (let bk = 0; bk < RIPPLE_ALPHA_BUCKETS; bk++) {
+            if ((usedBuckets & (1 << bk)) === 0) continue;
+            ctx.globalAlpha = (bk + 0.5) / RIPPLE_ALPHA_BUCKETS * 0.6;
             ctx.beginPath();
-            ctx.ellipse(sx, sy, r.r, r.r * 0.4, 0, 0, Math.PI * 2);
+            for (const r of ripples) {
+                if (r.bucket !== bk) continue;
+                const sx = (r.x - camera.x + 0.5) * cw;
+                const sy = (r.y - camera.y + 0.5) * ch;
+                ctx.moveTo(sx + r.r, sy);
+                ctx.ellipse(sx, sy, r.r, r.r * 0.4, 0, 0, Math.PI * 2);
+            }
             ctx.stroke();
         }
         ctx.globalAlpha = 1;
@@ -601,6 +814,7 @@ export class Renderer {
     }
 
     _spawnWaterRipple(wx, wy, cw, maxRMult) {
+        if (this._waterRipples.length >= MAX_WATER_RIPPLES) return;
         this._waterRipples.push({
             x: wx + (Math.random() - 0.5) * 0.6,
             y: wy + (Math.random() - 0.5) * 0.3,
@@ -609,6 +823,7 @@ export class Renderer {
             speed: cw * 0.025,
             alpha: 0.6,
             decay: 0.025,
+            bucket: 0,
         });
     }
 
@@ -632,17 +847,38 @@ export class Renderer {
 
     // Draws a sprite swaying about its base (bottom-center), like a tree in wind.
     // `rot` is the sway rotation in radians. When 0 the sprite is drawn flat.
+    // Main-canvas only: the rotation is written as one setTransform (with the DPR
+    // scale folded in) and reset to the base DPR transform afterwards, which is
+    // much cheaper per swaying tile than save/translate/rotate/restore.
     _drawSwayed(ctx, sprite, rot, dx, dy, dw, dh, pivotX, pivotY) {
         if (rot !== 0) {
-            ctx.save();
-            ctx.translate(pivotX, pivotY);
-            ctx.rotate(rot);
-            ctx.translate(-pivotX, -pivotY);
+            const d = this._dpr;
+            const c = Math.cos(rot);
+            const s = Math.sin(rot);
+            ctx.setTransform(d * c, d * s, -d * s, d * c,
+                d * (pivotX - c * pivotX + s * pivotY), d * (pivotY - s * pivotX - c * pivotY));
             ctx.drawImage(sprite, dx, dy, dw, dh);
-            ctx.restore();
+            ctx.setTransform(d, 0, 0, d, 0, 0);
         } else {
             ctx.drawImage(sprite, dx, dy, dw, dh);
         }
+    }
+
+    // Draws an entity sprite under its composed action transform `xf` (see
+    // getEntityTransform): translate(pivot + offset) · rotate · scale ·
+    // translate(-pivot), pivoting on the feet. Same single-setTransform approach
+    // as _drawSwayed, main canvas only.
+    _drawEntityXf(ctx, sprite, xf, dx, dy, dw, dh, pivotX, pivotY) {
+        const d = this._dpr;
+        const c = Math.cos(xf.rotation);
+        const s = Math.sin(xf.rotation);
+        const a = c * xf.scaleX, b = s * xf.scaleX;
+        const cc = -s * xf.scaleY, dd = c * xf.scaleY;
+        ctx.setTransform(d * a, d * b, d * cc, d * dd,
+            d * (pivotX + xf.offsetX - a * pivotX - cc * pivotY),
+            d * (pivotY + xf.offsetY - b * pivotX - dd * pivotY));
+        ctx.drawImage(sprite, dx, dy, dw, dh);
+        ctx.setTransform(d, 0, 0, d, 0, 0);
     }
 
     // Draws the melee attack effect over an attacking entity, chosen by the weapon's
@@ -689,6 +925,32 @@ export class Renderer {
         } else {
             this._attackFx.push({ sprite, px, py, cw, ch, alpha });
         }
+    }
+
+    // A radial glow (color at the center fading to transparent at the edge) baked
+    // once per color into a small canvas, so the per-frame working-building glow
+    // is one scaled drawImage instead of a new gradient per building per frame.
+    // A radial gradient scales with its radius, so drawing this at any size
+    // matches a gradient built at that size.
+    _getGlowSprite(color) {
+        if (!this._glowSprites) this._glowSprites = new Map();
+        let c = this._glowSprites.get(color);
+        if (!c) {
+            const size = 128;
+            c = document.createElement('canvas');
+            c.width = c.height = size;
+            const g = c.getContext('2d');
+            const r = size / 2;
+            const grd = g.createRadialGradient(r, r, 0, r, r, r);
+            grd.addColorStop(0, color);
+            grd.addColorStop(1, 'transparent');
+            g.fillStyle = grd;
+            g.beginPath();
+            g.arc(r, r, r, 0, Math.PI * 2);
+            g.fill();
+            this._glowSprites.set(color, c);
+        }
+        return c;
     }
 
     // Draws every deferred melee attack effect collected this frame, then clears the
@@ -746,7 +1008,6 @@ export class Renderer {
         if (e.char === COMBAT_VISUALS.deathChar && e.color === COMBAT_VISUALS.deathColor) return this.skinManager.getSprite('effects', 'death');
         if (e.char === COMBAT_VISUALS.summonArriveChar) return this.skinManager.getSprite('effects', 'summon_arrive');
         if (e.char === COMBAT_VISUALS.lootDropChar && e.color === COMBAT_VISUALS.lootDropColor) return this.skinManager.getSprite('effects', 'loot_drop');
-        if (e.char === COMBAT_VISUALS.fireIgniteChar && e.color === COMBAT_VISUALS.fireIgniteColor) return this.skinManager.getSprite('effects', 'fire_ignite');
         if (e.char === COMBAT_VISUALS.golemActivateChar) return this.skinManager.getSprite('effects', 'golem_activate');
         if (e.char === COMBAT_VISUALS.xpGainChar && e.color === COMBAT_VISUALS.xpGainColor) return this.skinManager.getSprite('effects', 'xp_gain');
         if (e.char === COMBAT_VISUALS.needCriticalChar && e.color === COMBAT_VISUALS.needCriticalColor) return this.skinManager.getSprite('effects', 'need_critical');
@@ -853,7 +1114,10 @@ export class Renderer {
         this.ctx.imageSmoothingEnabled = !skinActive;
 
         const { map, camera, colonists, entities, raiders, cursor } = game;
-        const camKey = `${camera.x},${camera.y},${game.tick},${CONFIG.VIEWPORT_WIDTH},${CONFIG.VIEWPORT_HEIGHT},${this.charWidth}`;
+        // Entity/effect caches rebuild per tick, not per frame. Nothing in them
+        // depends on the sub-tile camera offset, so key on the floored camera:
+        // a camera gliding between tiles must not force a rebuild every frame.
+        const camKey = `${Math.floor(camera.x)},${Math.floor(camera.y)},${game.tick},${CONFIG.VIEWPORT_WIDTH},${CONFIG.VIEWPORT_HEIGHT},${this.charWidth},${settings.showEquipmentOverlays}`;
         const settingsKey = `${showOverlays},${game.settings.showCombatParticles},${game.settings.showEquipmentOverlays}`;
         const ctx = this.ctx;
         const cw = this.charWidth;
@@ -888,6 +1152,11 @@ export class Renderer {
         const nowMs = now;
         const dt = this._lastFrameTime ? Math.min((nowMs - this._lastFrameTime) / 1000, 0.1) : 0.016;
         this._lastFrameTime = nowMs;
+        // Ambient particle/ripple spawn chances below are tuned as per-frame odds
+        // at 60 fps. Scaling them by dt*60 makes them per-second rates, so the
+        // spawn rate doesn't depend on refresh rate. Nothing new spawns while the
+        // game is paused (existing particles still play out).
+        const spawnScale = game.paused ? 0 : dt * 60;
 
         // Notify sway phase continuity when wind changes so grass/crops don't jump
         const rawWind = windStrengthFor(weather.currentWeather);
@@ -915,7 +1184,7 @@ export class Renderer {
             if (c.hp > 0 && !c.onExpedition && c.state === 'working' && c.currentTaskId != null) {
                 const task = game.taskQueue.getById(c.currentTaskId);
                 if (task && task.x != null && task.y != null) {
-                    this._workingBuildingSet.add(`${task.x},${task.y}`);
+                    this._workingBuildingSet.add(task.y * mapW + task.x);
                 }
             }
         }
@@ -931,7 +1200,7 @@ export class Renderer {
         const ditherQualSetting = (game && game.settings.ditherQuality) || 'high';
         const ditherBlockSize = DITHER_QUALITY_MAP[game.settings.ditherQuality] ?? 1;
         // Regenerate masks here, once, if inputs changed. Moved out of the per-tile call:
-        if (ditherOn && (!this._ditherMasks || this._ditherTileSize !== cw ||
+        if (ditherOn && (!this._ditherMasks || this._ditherTileSize !== this._tileP ||
             this._ditherDepthFraction !== ditherDepthFrac || this._ditherBlockSize !== ditherBlockSize)) {
             this._generateDitherMasks(ditherDepthFrac, ditherBlockSize);
             this._ditherCache.clear();
@@ -1038,7 +1307,13 @@ export class Renderer {
                 for (const p of game.waves.portals) {
                     portalMap.set(p.y * mapW + p.x, true);
                 }
-                const pathPoints = game.waves.getPathPreview(game);
+                // getPathPreview ages its cache per call; call it at most once per
+                // tick so the preview refreshes on game time, not on cache rebuilds.
+                if (this._pathPreviewTick !== game.tick || !this._pathPreviewPoints) {
+                    this._pathPreviewTick = game.tick;
+                    this._pathPreviewPoints = game.waves.getPathPreview(game);
+                }
+                const pathPoints = this._pathPreviewPoints;
                 for (const pt of pathPoints) {
                     const key = pt.y * mapW + pt.x;
                     if (!portalMap.has(key)) portalPathMap.set(key, true);
@@ -1078,51 +1353,71 @@ export class Renderer {
         
         if (rprof) { const t = performance.now(); rprof.add('render:setup+entityMap', t - rmark); rmark = t; }
 
-        // --- Static ground cache: rebuild if needed, then blit the visible region ---
-        // The baked buffer holds the static ground layer for every bakeable-ground
+        // --- Static ground cache: bake visible chunks if needed, then blit them ---
+        // The baked chunks hold the static ground layer for every bakeable-ground
         // tile (see _isBakeableGround). When active, the tile loop skips the live
-        // ground draw + dither for those tiles and relies on this one blit instead.
+        // ground draw + dither for those tiles and relies on these blits instead.
         // Only in skin mode: ASCII ground is a single fill per tile, already cheap.
-        // The key re-bakes the buffer when the cell size, season, or dither settings
-        // change (anything that alters a baked tile's appearance); markTerrainDirty()
-        // handles content changes (build, snow, fire).
+        // The key invalidates every chunk when the cell size, season, or dither
+        // settings change (anything that alters every baked tile's appearance), as
+        // does a replaced or resized map (load / new game). markTerrainDirty()
+        // invalidates every chunk; markTileDirty() and stale tiles patch one tile.
+        const dpr = this._dpr;
+        const tileP = this._tileP;
         let terrainCacheActive = false;
         if (skinActive) {
-            const terrainKey = `${cw}x${ch}|${season}|${ditherOn}|${ditherDepthFrac}|${ditherQualSetting}|${ditherBlockSize}`;
+            const terrainKey = `${tileP}|${season}|${ditherOn}|${ditherDepthFrac}|${ditherQualSetting}|${ditherBlockSize}`;
             if (terrainKey !== this._terrainKey) {
                 this._terrainKey = terrainKey;
                 this._terrainDirty = true;
             }
-            // Defer the full-map rebuild while zoom is still changing: a bake per zoom
-            // step is a burst of heavy frames. Once zoom has been stable for
-            // _zoomSettleMs we bake once and blit thereafter. A dirty flag from a
-            // content change (build, season, fire) has _lastZoomChangeMs far in the
-            // past, so it rebuilds immediately (zoomSettled is true).
+            if (this._bakedMap !== map || this._bakeMapW !== mapW || this._bakeMapH !== CONFIG.MAP_HEIGHT) {
+                this._terrainDirty = true;
+            }
+            // Defer re-baking while zoom is still changing: a bake per zoom step is
+            // a burst of heavy frames. Once zoom has been stable for _zoomSettleMs
+            // the cache restarts and chunks bake as they are drawn. A dirty flag
+            // from a content change (season, skin, load) has _lastZoomChangeMs far
+            // in the past, so it restarts immediately (zoomSettled is true). While
+            // dirty, terrainCacheActive stays false and ground draws live.
             const zoomSettled = (now - this._lastZoomChangeMs) >= this._zoomSettleMs;
             if (this._terrainDirty && zoomSettled) {
-                this._rebuildTerrainCache(game, season, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+                this._resetTerrainCache(game, season, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
             }
-            // Only blit when the buffer is clean (not stale): a dirty buffer is either
-            // still at the previous zoom's cell size or awaiting settle, so blitting it
-            // with the current cw/ch would scale wrong. While dirty, terrainCacheActive
-            // stays false and the tile loop draws ground live for this frame.
-            if (this._terrainCanvas && !this._terrainDirty) {
-                // Blit only the visible sub-region of the full-map buffer. Source rect
-                // is clamped to the buffer; the loop already skips out-of-bounds tiles,
-                // so off-map margins simply show the cleared background.
-                const srcX = Math.round(Math.max(0, camera.x * cw));
-                const srcY = Math.round(Math.max(0, camera.y * ch));
-                const dstX = camera.x < 0 ? Math.round(-camera.x * cw) : 0;
-                const dstY = camera.y < 0 ? Math.round(-camera.y * ch) : 0;
-                const availW = this._terrainCanvas.width - srcX;
-                const availH = this._terrainCanvas.height - srcY;
-                const wantW = (vw + 2) * cw - dstX;
-                const wantH = (vh + 2) * ch - dstY;
-                const w = Math.min(availW, wantW);
-                const h = Math.min(availH, wantH);
-                if (w > 0 && h > 0) {
-                    ctx.drawImage(this._terrainCanvas, srcX, srcY, w, h, dstX, dstY, w, h);
+            if (this._chunkBaked && !this._terrainDirty) {
+                this._flushTilePatches(game, 2048);
+                // Blit the visible chunks 1:1 in physical pixels. World tile (0,0)
+                // lands at physical (camOffX, camOffY); the tile loop uses the same
+                // offsets, so baked and live tiles share exact pixel edges. Chunks
+                // not baked yet bake now within a small time budget; the rest of
+                // their tiles draw live this frame (the loop checks _chunkBaked).
+                const camOffX = Math.round(-camera.x * tileP);
+                const camOffY = Math.round(-camera.y * tileP);
+                const C = this._chunkTiles;
+                const fx = Math.floor(camera.x), fy = Math.floor(camera.y);
+                const cx0 = Math.max(0, Math.floor(fx / C));
+                const cy0 = Math.max(0, Math.floor(fy / C));
+                const cx1 = Math.min(this._chunksX - 1, Math.floor(Math.min(mapW - 1, fx + vw + 1) / C));
+                const cy1 = Math.min(Math.ceil(CONFIG.MAP_HEIGHT / C) - 1, Math.floor(Math.min(CONFIG.MAP_HEIGHT - 1, fy + vh + 1) / C));
+                const frame = ++this._frameNo;
+                const bakeStart = performance.now();
+                let baked = 0;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                for (let cy = cy0; cy <= cy1; cy++) {
+                    for (let cx = cx0; cx <= cx1; cx++) {
+                        const ci = cy * this._chunksX + cx;
+                        let chunk = this._terrainChunks.get(ci);
+                        if (!this._chunkBaked[ci]) {
+                            if (baked > 0 && performance.now() - bakeStart > TERRAIN_CHUNK_BAKE_BUDGET_MS) continue;
+                            chunk = this._bakeChunk(game, ci);
+                            baked++;
+                        }
+                        chunk.lastUsed = frame;
+                        ctx.drawImage(chunk.canvas, cx * C * tileP + camOffX, cy * C * tileP + camOffY);
+                    }
                 }
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                this._evictTerrainChunks();
                 terrainCacheActive = true;
             }
         }
@@ -1132,25 +1427,29 @@ export class Renderer {
         // (skin active) or an ASCII character. Layering order for sprites:
         //   ground → structure/entity → dither → pedestal item overlay → designation tint
         // Effects (combat hits, shots, portals) draw as overlays on top of the base.
-        // Pixel origin of the camera: the exact canvas pixel where world tile (0,0)
-        // would sit. Subtracting camera.x*cw from a world tile's canvas pixel gives a
-        // sub-pixel-accurate screen position. All tile positions are then derived as
-        // Math.round(wx*cw - camOriginX) so adjacent tiles always share exact integer
-        // pixel boundaries, eliminating anti-aliased seams at fractional positions.
-        const camOriginX = camera.x * cw;
-        const camOriginY = camera.y * ch;
+        // Tile positions are snapped in physical (device) pixels: world tile (0,0)
+        // sits at physical (tileOffX, tileOffY) and each tile is exactly tileP
+        // physical pixels (an integer), so adjacent tiles always share exact pixel
+        // boundaries at any DPR or fractional camera, and match the baked ground
+        // blit above. px/py/cw1/ch1 are those positions in CSS pixels (the context
+        // is scaled by dpr).
+        const tileOffX = Math.round(-camera.x * tileP);
+        const tileOffY = Math.round(-camera.y * tileP);
+        const cw1 = tileP / dpr;
+        const ch1 = cw1;
+        const bakedKind = this._bakedKind;
+        const chunkBaked = this._chunkBaked;
+        const chunkTiles = this._chunkTiles;
+        const chunksX = this._chunksX;
+        const pendingPatches = this._pendingTilePatches;
         let lastColor = '';
         for (let sy = 0; sy <= vh + 1; sy++) {
             for (let sx = 0; sx <= vw + 1; sx++) {
                 // Keep track of the x,y coordinate for the tile we are currently drawing on and its relation to the player camera.
                 const wx = Math.floor(camera.x) + sx;
                 const wy = Math.floor(camera.y) + sy;
-                const px = Math.round(wx * cw - camOriginX);
-                const py = Math.round(wy * ch - camOriginY);
-                // Per-tile pixel dimensions derived from adjacent tile boundaries so
-                // adjacent tiles always abut exactly (no sub-pixel gap or overlap).
-                const cw1 = Math.round((wx + 1) * cw - camOriginX) - px;
-                const ch1 = Math.round((wy + 1) * ch - camOriginY) - py;
+                const px = (wx * tileP + tileOffX) / dpr;
+                const py = (wy * tileP + tileOffY) / dpr;
 
                 if (wx < 0 || wx >= mapW || wy < 0 || wy >= CONFIG.MAP_HEIGHT) {
                     continue;
@@ -1277,14 +1576,19 @@ export class Renderer {
                 // this draws fully live, exactly as before, so highlighted/occupied
                 // tiles are pixel-identical. The common zoomed-out case (bare terrain)
                 // takes the blit and skips the expensive per-tile ground + dither.
+                // A tile whose bake is stale (it changed without markTileDirty) is
+                // queued for a patch and drawn live this frame, never as a hole.
                 const onCursor = !!(cursor && cursor.x === wx && cursor.y === wy);
-                const bakedGround = terrainCacheActive && !entity && !effect
-                    && this._isBakeableGround(tile)
+                let bakeUsable = false;
+                if (terrainCacheActive && chunkBaked[((wy / chunkTiles) | 0) * chunksX + ((wx / chunkTiles) | 0)]) {
+                    if (this._isBakeStale(tile, tileKey)) pendingPatches.add(tileKey);
+                    else bakeUsable = (bakedKind[tileKey] & BAKE_SPRITE) !== 0;
+                }
+                const bakedGround = bakeUsable && !entity && !effect
                     && !portalMap.has(tileKey)
                     && !(showPortalPath && portalPathMap.has(tileKey))
                     && !(spellRangeSet && spellRangeSet.has(tileKey))
-                    && !inSelection && !onCursor
-                    && !!this._resolveGroundSprite(tile, season);
+                    && !inSelection && !onCursor;
 
                 /*
                 Each tile can contain several elements that may overlap. Most sprites will not take up the entire tile, so we
@@ -1341,7 +1645,7 @@ export class Renderer {
                         // Grass tufts also sprout under trees on grass terrain: draw the
                         // swaying tuft here so the tree sprite (drawn below) covers it.
                         if (showTerrainDetail && tile.resource.type === 'tree'
-                            && GRASS_TERRAIN.has(tile.terrain) && !tile.snowCovered && !tile.onFire) {
+                            && GRASS_TERRAIN.has(tile.terrain) && !tile.snowCovered) {
                             this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season, tile.terrain);
                         }
                     } else if (tile.zone) {
@@ -1358,7 +1662,7 @@ export class Renderer {
                         // waves on water. Water also keeps its `in_water` overlay on top
                         // (drawn after the sprite), giving a swimmer both effects.
                         if (showTerrainDetail && !tile.structure && !tile.resource
-                            && !tile.zone && !tile.floor && !tile.onFire) {
+                            && !tile.zone && !tile.floor) {
                             if (GRASS_TERRAIN.has(tile.terrain) && !tile.snowCovered) {
                                 this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season, tile.terrain);
                             } else if (tile.terrain === 'water' || tile.terrain === 'shallow_water') {
@@ -1471,15 +1775,7 @@ export class Renderer {
                         }
                         if (xf && !xf.identity) {
                             // Rotate/scale about the feet (bottom-center), translate by offset.
-                            const pivotX = px + cw / 2;
-                            const pivotY = py + ch;
-                            ctx.save();
-                            ctx.translate(pivotX + xf.offsetX, pivotY + xf.offsetY);
-                            if (xf.rotation !== 0) ctx.rotate(xf.rotation);
-                            if (xf.scaleX !== 1 || xf.scaleY !== 1) ctx.scale(xf.scaleX, xf.scaleY);
-                            ctx.translate(-pivotX, -pivotY);
-                            ctx.drawImage(sprite, dx, dy, dw, dh);
-                            ctx.restore();
+                            this._drawEntityXf(ctx, sprite, xf, dx, dy, dw, dh, px + cw / 2, py + ch);
                         } else {
                             // Tree tiles sway about the trunk base (bottom-center) so the
                             // canopy leans while the roots stay put. treeRot is 0 otherwise
@@ -1525,7 +1821,7 @@ export class Renderer {
 
                         // Mining/chopping debris particles
                         if (entity && entity._sim && entity._sim.state === 'working') {
-                            if (Math.random() < 0.25) {
+                            if (Math.random() < 0.25 * spawnScale) {
                                     const sim2 = entity._sim;
                                     const task2 = (game.taskQueue && sim2.currentTaskId != null) ? game.taskQueue.getById(sim2.currentTaskId) : null;
                                     const taskType = task2 ? task2.type : null;
@@ -1571,7 +1867,7 @@ export class Renderer {
                             if (sim.activeEffects) {
                                 for (const eff of sim.activeEffects) {
                                     if (eff.type === 'burning' || eff.source === 'fire') {
-                                        if (Math.random() < 0.08) {
+                                        if (Math.random() < 0.08 * spawnScale) {
                                             spawnParticle(game, {
                                                 x: wx + 0.3 + Math.random() * 0.4,
                                                 y: wy + 0.1,
@@ -1591,7 +1887,7 @@ export class Renderer {
                         }
                         // Eating crumb particles
                         if (entity && entity._sim && entity._sim.state === 'eating') {
-                            if (Math.random() < 0.10) {
+                            if (Math.random() < 0.10 * spawnScale) {
                                 const crumbColors = ['#c8a46e', '#e8c87a', '#b87040', '#d4905a', '#f0d090', '#a06828', '#d4b870'];
                                 spawnParticle(game, {
                                     x: wx + 0.3 + Math.random() * 0.4,
@@ -1639,7 +1935,7 @@ export class Renderer {
                     // wind. Water waves bob up and down. Both use new `effects`
                     // sprites and skip gracefully when the art is absent.
                     if (showTerrainDetail && !entity && !tile.structure && !tile.resource
-                        && !tile.zone && !tile.floor && !tile.onFire) {
+                        && !tile.zone && !tile.floor) {
                         if (GRASS_TERRAIN.has(tile.terrain) && !tile.snowCovered) {
                             if (this._drawGrassTuft(ctx, now, tileKey, detailWind, px, py, cw1, ch1, season, tile.terrain)) {
                                 spriteDrawn = true;
@@ -1649,7 +1945,7 @@ export class Renderer {
                                 spriteDrawn = true;
                                 // Spawn rain ripples on water tiles during rain/thunderstorm
                                 const rainChance = weather.currentWeather === 'thunderstorm' ? 0.04 : weather.currentWeather === 'rain' ? 0.02 : 0;
-                                if (rainChance > 0 && Math.random() < rainChance) {
+                                if (rainChance > 0 && Math.random() < rainChance * spawnScale) {
                                     this._spawnWaterRipple(wx, wy, cw, 0.8);
                                 }
                             }
@@ -1657,7 +1953,7 @@ export class Renderer {
                     }
 
                     // Snow shimmer: random bright flecks on blizzard snow-covered tiles
-                    if (detailLod && !entity && tile.snowCovered && weather.currentWeather === 'blizzard' && Math.random() < 0.005) {
+                    if (detailLod && !entity && tile.snowCovered && weather.currentWeather === 'blizzard' && Math.random() < 0.005 * spawnScale) {
                         ctx.save();
                         ctx.fillStyle = 'rgba(255,255,255,0.85)';
                         ctx.beginPath();
@@ -1684,7 +1980,7 @@ export class Renderer {
                     }
 
                     // Creeping miasma spore particles on blighted crop tiles
-                    if (detailLod && tile.zone && tile.zone.blighted && Math.random() < 0.06) {
+                    if (detailLod && tile.zone && tile.zone.blighted && Math.random() < 0.06 * spawnScale) {
                         spawnParticle(game, {
                             x: wx + 0.2 + Math.random() * 0.6,
                             y: wy + 0.2 + Math.random() * 0.4,
@@ -1704,9 +2000,9 @@ export class Renderer {
                         const bDef = BUILDINGS[tile.structure];
                         if (bDef && bDef.smokeEmitter) {
                             const smokeCfg = RENDER_CONFIG.chimneySmoke;
-                            const active = this._workingBuildingSet.has(`${wx},${wy}`);
+                            const active = this._workingBuildingSet.has(tileKey);
                             const sp = active ? smokeCfg.active : smokeCfg.idle;
-                            if (Math.random() < sp.spawnChance) {
+                            if (Math.random() < sp.spawnChance * spawnScale) {
                                 const windDrift = (detailWind - 0.5) * 0.3;
                                 const [tr, tg, tb] = sp.tint;
                                 const jit = () => Math.floor((Math.random() - 0.5) * 30);
@@ -1728,7 +2024,7 @@ export class Renderer {
                     // Candle wisp and campfire ember particles
                     if (tile.structure && !entity) {
                         const bDef = BUILDINGS[tile.structure];
-                        if (bDef && bDef.candleEmitter && Math.random() < 0.03) {
+                        if (bDef && bDef.candleEmitter && Math.random() < 0.03 * spawnScale) {
                             spawnParticle(game, {
                                 x: wx + 0.4 + Math.random() * 0.2,
                                 y: wy + 0.15 + Math.random() * 0.1,
@@ -1741,7 +2037,7 @@ export class Renderer {
                                 shape: 'square',
                             });
                         }
-                        if (tile.structure === 'campfire' && Math.random() < 0.1) {
+                        if (tile.structure === 'campfire' && Math.random() < 0.1 * spawnScale) {
                             spawnParticle(game, {
                                 x: wx + 0.3 + Math.random() * 0.4,
                                 y: wy + 0.2 + Math.random() * 0.2,
@@ -1758,7 +2054,7 @@ export class Renderer {
 
                     // Falling leaves: trees in autumn with enough wind
                     if (tile.resource && tile.resource.type === 'tree' && season === 'autumn'
-                        && detailWind > 0.3 && Math.random() < 0.003) {
+                        && detailWind > 0.3 && Math.random() < 0.003 * spawnScale) {
                         const leafColors = ['#cc7722', '#dd9922', '#bb5511', '#eeaa22'];
                         spawnParticle(game, {
                             x: wx + 0.3 + Math.random() * 0.4,
@@ -1777,24 +2073,18 @@ export class Renderer {
                     if (tile.structure) {
 
                         // Working building pulse glow
-                        if (this._workingBuildingSet.has(`${wx},${wy}`)) {
+                        if (this._workingBuildingSet.has(tileKey)) {
                             const bDef = BUILDINGS[tile.structure];
                             // Reduced motion: hold the glow steady instead of pulsing.
                             const pulse = reduceMotion ? 0.8 : 0.6 + 0.4 * Math.sin(now * 0.004);
                             const glowColor = bDef?.workGlowColor || (tile.structure.includes('forge') || tile.structure.includes('smelter') ? '#ff8833' : tile.structure.includes('lab') || tile.structure.includes('library') ? '#4488ff' : tile.structure.includes('kitchen') || tile.structure.includes('cook') ? '#ffcc22' : '#88ff88');
                             const radius = cw * 0.9 * pulse;
+                            const glow = this._getGlowSprite(glowColor);
                             ctx.save();
                             ctx.globalCompositeOperation = 'lighter';
                             ctx.globalAlpha = 0.18 * pulse;
-                            const wcx = px + cw / 2;
-                            const wcy = py + ch / 2;
-                            const grd = ctx.createRadialGradient(wcx, wcy, 0, wcx, wcy, radius);
-                            grd.addColorStop(0, glowColor);
-                            grd.addColorStop(1, 'transparent');
-                            ctx.fillStyle = grd;
-                            ctx.beginPath();
-                            ctx.arc(wcx, wcy, radius, 0, Math.PI * 2);
-                            ctx.fill();
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.drawImage(glow, px + cw / 2 - radius, py + ch / 2 - radius, radius * 2, radius * 2);
                             ctx.restore();
                         }
 
@@ -1971,7 +2261,7 @@ export class Renderer {
         if (rprof) { const t = performance.now(); rprof.add('render:tileLoop', t - rmark); rmark = t; }
 
         // Draw water ripples on top of all tiles (rain impacts + footsteps)
-        this._drawWaterRipples(ctx, camera, cw, ch);
+        this._drawWaterRipples(ctx, camera, cw, ch, dt);
 
         // --- Tile-entry detection: detect when a lerping entity arrives at its destination ---
         // Used for footstep ripples, disturbed grass, and door flash.
@@ -2109,8 +2399,9 @@ export class Renderer {
             const sPxE = atkShakePx;
             const shakeX = shakeActive ? ((game.tick * 7) % (sPxE * 2 + 1)) - sPxE : 0;
             const shakeY = shakeActive ? ((game.tick * 13) % (sPxE + 1)) - Math.floor(sPxE / 2) : 0;
-            const rpx = Math.round(sx * cw) + shakeX;
-            const rpy = Math.round(sy * ch) + shakeY;
+            // Snapped like the tile loop so a step ends exactly on its tile's pixels.
+            const rpx = (Math.round(pos.x * tileP) + tileOffX) / dpr + shakeX;
+            const rpy = (Math.round(pos.y * tileP) + tileOffY) / dpr + shakeY;
             if (skinActive) {
                 const destTile = map[ent.y]?.[ent.x];
                 const meHl = !!(me.type === 'colonist' && game.settings.showColonistHighlight);
@@ -2155,15 +2446,7 @@ export class Renderer {
                         ctx.clip();
                     }
                     if (!xf.identity) {
-                        const pivotX = rpx + cw / 2;
-                        const pivotY = rpy + ch;
-                        ctx.save();
-                        ctx.translate(pivotX + xf.offsetX, pivotY + xf.offsetY);
-                        if (xf.rotation !== 0) ctx.rotate(xf.rotation);
-                        if (xf.scaleX !== 1 || xf.scaleY !== 1) ctx.scale(xf.scaleX, xf.scaleY);
-                        ctx.translate(-pivotX, -pivotY);
-                        ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
-                        ctx.restore();
+                        this._drawEntityXf(ctx, sprite, xf, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow, rpx + cw / 2, rpy + ch);
                     } else {
                         ctx.drawImage(sprite, rpx - meHlOff, rpy - meHlOff - grow, cw + meHlOff * 2, ch + meHlOff * 2 + grow);
                     }
@@ -2222,8 +2505,8 @@ export class Renderer {
                 const sx = ent.x - camera.x;
                 const sy = ent.y - camera.y;
                 if (sx < -1 || sx >= vw + 1 || sy < -1 || sy >= vh + 1) continue;
-                const rpx = Math.round(sx * cw);
-                const rpy = Math.round(sy * ch);
+                const rpx = (ent.x * tileP + tileOffX) / dpr;
+                const rpy = (ent.y * tileP + tileOffY) / dpr;
                 const sprite = this._resolveSprite(game.map[ent.y]?.[ent.x] || {}, { type: ent.type || 'raider', entityType: ent.type, char: ent.char, color: ent.color }, season, false);
                 if (!sprite) continue;
                 const toppleRot = t * 1.4;
@@ -2387,12 +2670,6 @@ export class Renderer {
                     nb = Math.round(nb + (wb - nb) * warmth);
                 }
             }
-            // Pre-build the style strings for each quantized darkness level
-            const darkStyles = [];
-            for (let i = 1; i <= steps; i++) {
-                darkStyles.push(`rgba(${nr},${ng},${nb},${(darkness * i / steps).toFixed(3)})`);
-            }
-
             // Light grid: each cell holds the max illumination (0..1) from any source.
             // Sources stamp their radius using Manhattan distance (matches the game's
             // tile-based movement so light feels consistent with gameplay distances).
@@ -2499,10 +2776,11 @@ export class Renderer {
             const prevSmoothing = ctx.imageSmoothingEnabled;
             ctx.imageSmoothingEnabled = false;
             // Shift the overlay by the sub-tile fractional camera offset so darkness
-            // tiles align with the tile sprites (which are drawn at Math.round(wx*cw - camOriginX)).
-            const nightOffX = Math.round((camFloorX - camera.x) * cw);
-            const nightOffY = Math.round((camFloorY - camera.y) * ch);
-            ctx.drawImage(this._nightCanvas, 0, 0, nightW, nightH, nightOffX, nightOffY, nightW * cw, nightH * ch);
+            // tiles align with the tile sprites (snapped the same way as the tile loop:
+            // physical tile pitch tileP, world origin at physical tileOffX/tileOffY).
+            const nightOffX = (camFloorX * tileP + tileOffX) / dpr;
+            const nightOffY = (camFloorY * tileP + tileOffY) / dpr;
+            ctx.drawImage(this._nightCanvas, 0, 0, nightW, nightH, nightOffX, nightOffY, nightW * cw1, nightH * ch1);
             ctx.imageSmoothingEnabled = prevSmoothing;
         }
 
@@ -2518,7 +2796,7 @@ export class Renderer {
     renderFps(fps) {
         const ctx = this.ctx;
         ctx.save();
-        const fpsFontSize = Math.round(12 * (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1));
+        const fpsFontSize = Math.round(12 * uiFontScale());
         ctx.font = `bold ${fpsFontSize}px monospace`;
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#ff3333';
@@ -2535,12 +2813,13 @@ export class Renderer {
         const y0 = camera.y - margin;
         const x1 = camera.x + CONFIG.VIEWPORT_WIDTH + margin;
         const y1 = camera.y + CONFIG.VIEWPORT_HEIGHT + margin;
-        const structureCamKey = `${camera.x},${camera.y},${game.tick},${CONFIG.VIEWPORT_WIDTH},${CONFIG.VIEWPORT_HEIGHT},${this.charWidth}`;
-        
-        if (this._lastStructureCamKey === structureCamKey) {
+        // The structure list is world-wide (the bounds test below culls it), so it
+        // only needs refreshing when the simulation ticks, not as the camera moves.
+        if (this._lastStructureTick === game.tick && this._lastStructureIndex === game.mapIndex) {
             // allStructures is still valid, skip rebuilding them.
         } else {
-            this._lastStructureCamKey = structureCamKey;
+            this._lastStructureTick = game.tick;
+            this._lastStructureIndex = game.mapIndex;
             this._structureMap = game.mapIndex ? game.mapIndex.getAllStructurePositions() : [];
         }
 
@@ -2588,14 +2867,6 @@ export class Renderer {
                 if (s.x < x0 || s.x > x1 || s.y < y0 || s.y > y1) continue;
                 const radius = COMPLEX_STRUCTURES[s.key]?.activeLightRadius;
                 if (radius) sources.push({ x: s.x, y: s.y, radius });
-            }
-        }
-
-        const firePositions = game.mapIndex ? game.mapIndex.getFirePositions() : null;
-        if (firePositions) {
-            for (const { x, y } of firePositions) {
-                if (x < x0 || x > x1 || y < y0 || y > y1) continue;
-                sources.push({ x, y, radius: RENDER_CONFIG.fireLightRadius });
             }
         }
 

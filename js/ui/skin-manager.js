@@ -70,7 +70,13 @@ export class SkinManager {
         }
     }
 
+    // Overlapping switches: each call takes a token and only the latest one may
+    // swap in its sprites, so a slow earlier load can't win. A failed load
+    // keeps the previous skin active.
+    // Resolves true when skinName became the active skin, false when loading
+    // failed or a newer switchSkin call superseded this one.
     async switchSkin(skinName) {
+        const token = this._switchToken = (this._switchToken || 0) + 1;
         if (skinName === 'ascii') {
             this._sprites.clear();
             this._activeSkin = 'ascii';
@@ -83,13 +89,16 @@ export class SkinManager {
             this._shirtCount = 0;
             this._itemDataURLCache = null;
             this._compositeCache.clear();
-            return;
+            return true;
         }
-        await this._loadSkin(skinName);
+        const loaded = await this._loadSkin(skinName, token);
+        if (!loaded || token !== this._switchToken) return false;
         await this.loadModSprites();
+        if (token !== this._switchToken) return false;
         this._activeSkin = skinName;
         this._itemDataURLCache = null;
         this._compositeCache.clear();
+        return true;
     }
 
     async loadModSprites() {
@@ -116,7 +125,11 @@ export class SkinManager {
                                 ? modDirHandle.getDirectoryHandle('assets').then(d => d.getDirectoryHandle('sprites')).then(d => d.getDirectoryHandle(category)).then(d => d.getFileHandle(`${key}.png`)).then(f => f.getFile()).then(f => URL.createObjectURL(f)).catch(() => null)
                                 : Promise.resolve(`${spritesBase}/${category}/${key}.png`);
                             imgLoads.push(
-                                urlPromise.then(url => url ? this._loadImage(url) : null).then(img => {
+                                urlPromise.then(async url => {
+                                    if (!url) return;
+                                    const img = await this._loadImage(url);
+                                    // Decoded images stay usable after the blob URL is revoked.
+                                    if (modDirHandle) URL.revokeObjectURL(url);
                                     if (img) this._sprites.set(`${category}:${key}`, img);
                                 }).catch(() => {})
                             );
@@ -400,12 +413,15 @@ export class SkinManager {
         }
     }
 
-    async _loadSkin(skinName) {
+    // Returns true if the skin loaded and was swapped in. Returns false (and
+    // leaves current sprites alone) on failure or if a newer switchSkin call
+    // superseded this one (`token`).
+    async _loadSkin(skinName, token) {
         // Load into a staging map so the current sprites remain visible until
         // the entire skin is ready, preventing a flash back to ASCII mid-load.
         const staging = new Map();
         const loaded = await this._tryLoadFromZip(skinName, staging) || await this._tryLoadFromFolder(skinName, staging);
-        if (!loaded) return;
+        if (!loaded || token !== this._switchToken) return false;
 
         // Atomic swap: old sprites stay live until the new set is fully decoded.
         this._sprites = staging;
@@ -425,6 +441,7 @@ export class SkinManager {
         this._bufosBodyCount = bB;
         this._hairCount = h;
         this._shirtCount = s;
+        return true;
     }
 
     async _tryLoadFromZip(skinName, target) {

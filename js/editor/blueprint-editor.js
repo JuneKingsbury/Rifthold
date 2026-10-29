@@ -6,6 +6,8 @@ const STRUCTURE_EFFECT_KEYS = [
     'workSpeedBonus', 'damageBonusMult', 'lightRadius',
 ];
 import { EditorRenderer } from './editor-renderer.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { toJsLiteral } from './config-source.js';
 
 const GRID_WIDTH = 100;
 const GRID_HEIGHT = 100;
@@ -132,7 +134,7 @@ class BlueprintEditor {
                     <div class="bp-section-title">Building Palette</div>
                     <div id="bp-category-filter">
                         <button class="bp-cat active" data-cat="All">All</button>
-                        ${BUILD_CATEGORIES.map(c => `<button class="bp-cat" data-cat="${c}">${c}</button>`).join('')}
+                        ${BUILD_CATEGORIES.map(c => `<button class="bp-cat" data-cat="${escapeAttr(c)}">${escapeHtml(c)}</button>`).join('')}
                     </div>
                     <div id="bp-palette"></div>
                     <button id="bp-new-building">+ New Building</button>
@@ -184,8 +186,8 @@ class BlueprintEditor {
             const def = this.customBuildings[i];
             if (this.categoryFilter !== 'All' && def.category !== this.categoryFilter) continue;
             const active = this.activeBrush?.isCustom && this.activeBrush.customIndex === i ? ' active' : '';
-            html += `<div class="bp-palette-item${active}" data-custom="${i}" title="${def.description || def.key}">
-                <span style="color:${def.color}">${def.char}</span> <span class="bp-custom-tag">✦</span>${def.key}
+            html += `<div class="bp-palette-item${active}" data-custom="${i}" title="${escapeAttr(def.description || def.key)}">
+                <span style="color:${escapeAttr(def.color)}">${escapeHtml(def.char)}</span> <span class="bp-custom-tag">✦</span>${escapeHtml(def.key)}
             </div>`;
         }
 
@@ -193,8 +195,8 @@ class BlueprintEditor {
         for (const [key, def] of Object.entries(BUILDINGS)) {
             if (this.categoryFilter !== 'All' && def.category !== this.categoryFilter) continue;
             const active = !this.activeBrush?.isCustom && this.activeBrush?.buildingKey === key ? ' active' : '';
-            html += `<div class="bp-palette-item${active}" data-key="${key}" title="${def.description}">
-                <span style="color:${def.color}">${def.char}</span> ${key.replace(/_/g, ' ')}
+            html += `<div class="bp-palette-item${active}" data-key="${escapeAttr(key)}" title="${escapeAttr(def.description)}">
+                <span style="color:${escapeAttr(def.color)}">${escapeHtml(def.char)}</span> ${escapeHtml(key.replace(/_/g, ' '))}
             </div>`;
         }
         palette.innerHTML = html;
@@ -269,7 +271,7 @@ class BlueprintEditor {
         canvas.addEventListener('mousedown', (e) => this._onMouseDown(e));
         canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
         canvas.addEventListener('mouseup', (e) => this._onMouseUp(e));
-        canvas.addEventListener('mouseleave', () => { this.hoveredCell = null; this._mouseDown = false; this._middleDown = false; });
+        canvas.addEventListener('mouseleave', () => { this.hoveredCell = null; this._finishStroke(); this._middleDown = false; });
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         canvas.addEventListener('wheel', (e) => { e.preventDefault(); this._onWheel(e); });
 
@@ -329,6 +331,12 @@ class BlueprintEditor {
 
     _onMouseUp(e) {
         if (e.button === 1) { this._middleDown = false; this._lastDragPos = null; return; }
+        this._finishStroke();
+    }
+
+    // Record the current stroke as the undoable action. Also called on mouseleave
+    // so a drag that exits the canvas is still undoable and autosaved.
+    _finishStroke() {
         this._mouseDown = false;
         if (this._strokeCells && this._strokeCells.size > 0) {
             const after = new Map();
@@ -442,7 +450,8 @@ class BlueprintEditor {
                 const cell = this.grid[y][x];
                 if (cell) {
                     if (cell.isCustom) {
-                        this.activeBrush = { isCustom: true, customIndex: cell.customIndex, customDef: cell.customDef };
+                        const idx = this.customBuildings.findIndex(d => d.key === cell.customDef?.key);
+                        this.activeBrush = { isCustom: true, customIndex: idx, customDef: idx >= 0 ? this.customBuildings[idx] : cell.customDef };
                     } else {
                         this.activeBrush = { buildingKey: cell.buildingKey };
                     }
@@ -521,26 +530,26 @@ class BlueprintEditor {
 
         let html = '';
         if (cell._floorOnly) {
-            html += `<div><span style="color:${def.color}">${def.char}</span> <strong>${key.replace(/_/g, ' ')}</strong> <span style="color:#999">(floor)</span></div>`;
-            html += `<div class="bp-muted">floor | ${def.category || 'Walls & Floors'}</div>`;
+            html += `<div><span style="color:${escapeAttr(def.color)}">${escapeHtml(def.char)}</span> <strong>${escapeHtml(key.replace(/_/g, ' '))}</strong> <span style="color:#999">(floor)</span></div>`;
+            html += `<div class="bp-muted">floor | ${escapeHtml(def.category || 'Walls & Floors')}</div>`;
         } else {
-            html += `<div><span style="color:${def.color}">${def.char}</span> <strong>${key.replace(/_/g, ' ')}</strong>`;
+            html += `<div><span style="color:${escapeAttr(def.color)}">${escapeHtml(def.char)}</span> <strong>${escapeHtml(key.replace(/_/g, ' '))}</strong>`;
             if (isCore) html += ` <span class="bp-core-badge">CORE</span>`;
             html += `</div>`;
-            html += `<div class="bp-muted">${def.structureType} | ${def.category}</div>`;
+            html += `<div class="bp-muted">${escapeHtml(def.structureType)} | ${escapeHtml(def.category)}</div>`;
 
             if (cell.floorKey) {
                 const floorDef = cell.floorKey.isCustom ? cell.floorKey.customDef : BUILDINGS[cell.floorKey.buildingKey];
                 const floorName = cell.floorKey.isCustom ? cell.floorKey.customDef.key : cell.floorKey.buildingKey;
                 if (floorDef) {
-                    html += `<div style="margin-top:4px;color:#999;font-size:0.85em">Floor: <span style="color:${floorDef.color}">${floorDef.char}</span> ${floorName.replace(/_/g, ' ')}</div>`;
+                    html += `<div style="margin-top:4px;color:#999;font-size:0.85em">Floor: <span style="color:${escapeAttr(floorDef.color)}">${escapeHtml(floorDef.char)}</span> ${escapeHtml(floorName.replace(/_/g, ' '))}</div>`;
                 }
             }
         }
 
         html += `<label>Layout req:
             <select id="bp-req-override" data-pos="${reqKey}">
-                <option value="${key}"${currentReq === key ? ' selected' : ''}>Specific: ${key}</option>
+                <option value="${escapeAttr(key)}"${currentReq === key ? ' selected' : ''}>Specific: ${escapeHtml(key)}</option>
                 <option value="wall"${currentReq === 'wall' ? ' selected' : ''}>Any wall</option>
                 <option value="door"${currentReq === 'door' ? ' selected' : ''}>Any door</option>
                 <option value="floor"${currentReq === 'floor' ? ' selected' : ''}>Any floor</option>
@@ -569,7 +578,9 @@ class BlueprintEditor {
         this.coreCell = null;
         this.selectedCell = null;
         this.reqOverrides = {};
+        this._lastAction = null;
         this._updateCellProps();
+        this._autoSave();
         this._updateLiveExport();
     }
 
@@ -640,7 +651,7 @@ class BlueprintEditor {
         for (const cat of categories) {
             html += `<div class="bp-ref-category-title">${cat.title}</div>`;
             for (const id of cat.ids) {
-                html += `<span class="bp-ref-id" data-ref-id="${id}">${id}</span>`;
+                html += `<span class="bp-ref-id" data-ref-id="${escapeAttr(id)}">${escapeHtml(id)}</span>`;
             }
         }
         container.innerHTML = html;
@@ -668,13 +679,18 @@ class BlueprintEditor {
         el.textContent = code;
     }
 
-    _generateExportCode() {
+    _collectCells() {
         const cells = [];
         for (let y = 0; y < GRID_HEIGHT; y++) {
             for (let x = 0; x < GRID_WIDTH; x++) {
                 if (this.grid[y][x]) cells.push({ x, y, cell: this.grid[y][x] });
             }
         }
+        return cells;
+    }
+
+    _generateExportCode() {
+        const cells = this._collectCells();
         if (cells.length === 0) return '// Place buildings to see export';
 
         const name = this.blueprintName || 'unnamed_structure';
@@ -682,15 +698,16 @@ class BlueprintEditor {
 
         let output = '';
 
-        const usedCustoms = new Set();
+        // Cells carry their own custom def, so export from those rather than by
+        // index into customBuildings (indices go stale when a blueprint is loaded).
+        const usedCustoms = new Map();
         cells.forEach(c => {
-            if (c.cell.isCustom) usedCustoms.add(c.cell.customIndex);
-            if (c.cell.floorKey?.isCustom) usedCustoms.add(c.cell.floorKey.customIndex);
+            if (c.cell.isCustom && c.cell.customDef) usedCustoms.set(c.cell.customDef.key, c.cell.customDef);
+            if (c.cell.floorKey?.isCustom && c.cell.floorKey.customDef) usedCustoms.set(c.cell.floorKey.customDef.key, c.cell.floorKey.customDef);
         });
         if (usedCustoms.size > 0) {
             output += '// === Add to BUILDINGS in config.js ===\n';
-            for (const idx of usedCustoms) {
-                const def = this.customBuildings[idx];
+            for (const def of usedCustoms.values()) {
                 output += this._formatBuildingDef(def) + '\n';
             }
             output += '\n';
@@ -699,6 +716,7 @@ class BlueprintEditor {
         if (cells.length === 1 && !cells[0].cell.isCustom) {
             const key = cells[0].cell.buildingKey;
             output += `// Single building: ${key} (already exists in config)\n`;
+            output += `// No export needed. Use existing "${key}" definition.\n`;
             return output;
         }
         if (cells.length === 1 && cells[0].cell.isCustom) {
@@ -728,34 +746,39 @@ class BlueprintEditor {
 
         layout.sort((a, b) => a.dy - b.dy || a.dx - b.dx);
 
-        let effectStr = '{}';
+        let effect = {};
+        let effectComment = '';
         if (this.structureEffects.trim()) {
-            try { JSON.parse(this.structureEffects); effectStr = this.structureEffects.trim(); }
-            catch { effectStr = '{ /* invalid JSON */ }'; }
+            try { effect = JSON.parse(this.structureEffects); }
+            catch { effectComment = ' // invalid effects JSON, fix manually'; }
         }
 
-        output += '// === Add to COMPLEX_STRUCTURES in config.js ===\n';
-        output += `${id}: {\n`;
-        output += `    name: '${name.replace(/'/g, "\\'")}',\n`;
-        if (this.structureResearch) output += `    research: '${this.structureResearch}',\n`;
-        output += `    coreBuild: '${coreBuild}',\n`;
+        // All strings go through toJsLiteral so quotes and newlines in names or
+        // descriptions can't produce invalid JS.
+        const def = { name };
+        if (this.structureResearch) def.research = this.structureResearch;
+        def.coreBuild = coreBuild;
         if (coreCell.floorKey) {
-            const coreFloor = coreCell.floorKey.isCustom ? coreCell.floorKey.customDef.key : coreCell.floorKey.buildingKey;
-            output += `    coreFloor: '${coreFloor}',\n`;
+            def.coreFloor = coreCell.floorKey.isCustom ? coreCell.floorKey.customDef.key : coreCell.floorKey.buildingKey;
         }
-        output += `    layout: [\n`;
-        for (const l of layout) {
-            let line = `        { dx: ${l.dx}, dy: ${l.dy}, req: '${l.req}'`;
-            if (l.floor) line += `, floor: '${l.floor}'`;
-            line += ` },`;
-            output += line + '\n';
-        }
-        output += `    ],\n`;
-        output += `    effect: ${effectStr},\n`;
-        output += `    description: '${(this.structureDescription || '').replace(/'/g, "\\'")}',\n`;
-        output += `},\n`;
+        def.layout = layout;
+        def.effect = effect;
+        def.description = this.structureDescription || '';
+
+        const lines = Object.entries(def).map(([k, v]) => {
+            const value = k === 'layout'
+                ? `[\n${v.map(l => `        ${toJsLiteral(l, { inline: true })},`).join('\n')}\n    ]`
+                : toJsLiteral(v, { indent: '    ' });
+            return `    ${k}: ${value},${k === 'effect' ? effectComment : ''}`;
+        });
+        output += '// === Add to COMPLEX_STRUCTURES in config.js ===\n';
+        output += `${this._jsKey(id)}: {\n${lines.join('\n')}\n},\n`;
 
         return output;
+    }
+
+    _jsKey(key) {
+        return /^[A-Za-z_$][\w$]*$/.test(key) ? key : toJsLiteral(String(key));
     }
 
     // --- New Building Form ---
@@ -862,120 +885,32 @@ class BlueprintEditor {
 
     // --- Export ---
     _export() {
-        const cells = [];
-        for (let y = 0; y < GRID_HEIGHT; y++) {
-            for (let x = 0; x < GRID_WIDTH; x++) {
-                if (this.grid[y][x]) cells.push({ x, y, cell: this.grid[y][x] });
-            }
-        }
+        const cells = this._collectCells();
         if (cells.length === 0) { alert('Nothing to export. Place some buildings first.'); return; }
-
-        const name = this.blueprintName || 'unnamed_structure';
-        const id = this.blueprintId || name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-
-        let output = '';
-
-        // Export custom building definitions
-        const usedCustoms = new Set();
-        cells.forEach(c => {
-            if (c.cell.isCustom) usedCustoms.add(c.cell.customIndex);
-            if (c.cell.floorKey?.isCustom) usedCustoms.add(c.cell.floorKey.customIndex);
-        });
-        if (usedCustoms.size > 0) {
-            output += '// === Add to BUILDINGS in config.js ===\n';
-            for (const idx of usedCustoms) {
-                const def = this.customBuildings[idx];
-                output += this._formatBuildingDef(def) + '\n';
-            }
-            output += '\n';
-        }
-
-        // Single cell export (just a building definition)
-        if (cells.length === 1 && !cells[0].cell.isCustom) {
-            const key = cells[0].cell.buildingKey;
-            output += `// Single building: ${key} (already exists in config)\n`;
-            output += `// No export needed. Use existing "${key}" definition.\n`;
-            this._showExportModal(output);
-            return;
-        }
-        if (cells.length === 1 && cells[0].cell.isCustom) {
-            if (!output) output += '// === Add to BUILDINGS in config.js ===\n';
-            this._showExportModal(output);
-            return;
-        }
-
-        // Multi-cell: complex structure
-        if (!this.coreCell || !this.grid[this.coreCell.y]?.[this.coreCell.x]) {
+        if (cells.length > 1 && (!this.coreCell || !this.grid[this.coreCell.y]?.[this.coreCell.x])) {
             alert('Set a core cell first (tool 4). It defines the center of the complex structure.');
             this._setTool('setCore');
             return;
         }
-
-        const coreCell = this.grid[this.coreCell.y][this.coreCell.x];
-        const coreBuild = coreCell.isCustom ? coreCell.customDef.key : coreCell.buildingKey;
-
-        const layout = [];
-        for (const { x, y, cell } of cells) {
-            if (x === this.coreCell.x && y === this.coreCell.y) continue;
-            const dx = x - this.coreCell.x;
-            const dy = y - this.coreCell.y;
-            const posKey = `${x},${y}`;
-            const req = this.reqOverrides[posKey] || (cell.isCustom ? cell.customDef.key : cell.buildingKey);
-            const entry = { dx, dy, req };
-            if (cell.floorKey) {
-                entry.floor = cell.floorKey.isCustom ? cell.floorKey.customDef.key : cell.floorKey.buildingKey;
-            }
-            layout.push(entry);
-        }
-
-        layout.sort((a, b) => a.dy - b.dy || a.dx - b.dx);
-
-        let effectStr = '{}';
-        if (this.structureEffects.trim()) {
-            try { JSON.parse(this.structureEffects); effectStr = this.structureEffects.trim(); }
-            catch { effectStr = '{ /* invalid JSON, fix manually */ }'; }
-        }
-
-        output += '// === Add to COMPLEX_STRUCTURES in config.js ===\n';
-        output += `${id}: {\n`;
-        output += `    name: '${name.replace(/'/g, "\\'")}',\n`;
-        if (this.structureResearch) output += `    research: '${this.structureResearch}',\n`;
-        output += `    coreBuild: '${coreBuild}',\n`;
-        if (coreCell.floorKey) {
-            const coreFloor = coreCell.floorKey.isCustom ? coreCell.floorKey.customDef.key : coreCell.floorKey.buildingKey;
-            output += `    coreFloor: '${coreFloor}',\n`;
-        }
-        output += `    layout: [\n`;
-        for (const l of layout) {
-            let line = `        { dx: ${l.dx}, dy: ${l.dy}, req: '${l.req}'`;
-            if (l.floor) line += `, floor: '${l.floor}'`;
-            line += ` },`;
-            output += line + '\n';
-        }
-        output += `    ],\n`;
-        output += `    effect: ${effectStr},\n`;
-        output += `    description: '${(this.structureDescription || '').replace(/'/g, "\\'")}',\n`;
-        output += `},\n`;
-
-        this._showExportModal(output);
+        this._showExportModal(this._generateExportCode());
     }
 
     _formatBuildingDef(def) {
-        let parts = [];
-        parts.push(`char: '${def.char}'`);
-        parts.push(`color: '${def.color}'`);
-        if (def.bg) parts.push(`bg: '${def.bg}'`);
-        parts.push(`cost: ${JSON.stringify(def.cost)}`);
-        parts.push(`work: ${def.work}`);
-        if (def.hp) parts.push(`hp: ${def.hp}`);
-        parts.push(`structureType: '${def.structureType}'`);
-        parts.push(`category: '${def.category}'`);
-        if (def.passable) parts.push(`passable: ${JSON.stringify(def.passable)}`);
-        if (def.breakable) parts.push(`breakable: true`);
-        if (def.lightRadius) parts.push(`lightRadius: ${def.lightRadius}`);
-        if (def.research) parts.push(`research: '${def.research}'`);
-        parts.push(`description: '${(def.description || '').replace(/'/g, "\\'")}'`);
-        return `${def.key}: { ${parts.join(', ')} },`;
+        const out = {};
+        out.char = def.char;
+        out.color = def.color;
+        if (def.bg) out.bg = def.bg;
+        out.cost = def.cost || {};
+        out.work = def.work;
+        if (def.hp) out.hp = def.hp;
+        out.structureType = def.structureType;
+        out.category = def.category;
+        if (def.passable) out.passable = def.passable;
+        if (def.breakable) out.breakable = true;
+        if (def.lightRadius) out.lightRadius = def.lightRadius;
+        if (def.research) out.research = def.research;
+        out.description = def.description || '';
+        return `${this._jsKey(def.key)}: ${toJsLiteral(out, { inline: true })},`;
     }
 
     _showExportModal(text) {
@@ -988,7 +923,7 @@ class BlueprintEditor {
         modal.innerHTML = `
             <div class="bp-modal-content bp-export-content">
                 <h3>Export: Copy to config.js</h3>
-                <textarea id="bp-export-text" rows="20" readonly>${text}</textarea>
+                <textarea id="bp-export-text" rows="20" readonly>${escapeHtml(text)}</textarea>
                 <div style="margin-top:8px">
                     <button id="bp-export-copy">Copy to Clipboard</button>
                     <button id="bp-export-close">Close</button>
@@ -1052,10 +987,27 @@ class BlueprintEditor {
         document.getElementById('bp-struct-desc').value = this.structureDescription;
 
         this._deserializeGrid(bp.grid);
-        this._buildPalette();
+        this._afterGridReplaced();
         this._updateCellProps();
+        this._autoSave();
+        this._updateLiveExport();
 
         document.getElementById('bp-load-select').value = '';
+    }
+
+    // The grid and customBuildings were swapped out wholesale: the last stroke's
+    // undo data refers to the old grid, and a custom brush may point at an index
+    // that no longer exists (or now holds a different building).
+    _afterGridReplaced() {
+        this._lastAction = null;
+        const brush = this.activeBrush;
+        if (brush?.isCustom) {
+            const idx = this.customBuildings.findIndex(d => d.key === brush.customDef?.key);
+            this.activeBrush = idx >= 0
+                ? { isCustom: true, customIndex: idx, customDef: this.customBuildings[idx] }
+                : { buildingKey: 'wood_wall' };
+        }
+        this._buildPalette();
     }
 
     _deleteSaved() {
@@ -1080,17 +1032,11 @@ class BlueprintEditor {
         if (!sel) return;
         const saved = this._getSaved();
         sel.innerHTML = '<option value="">Load Blueprint...</option>' +
-            saved.map(s => `<option value="${s.id}">${s.name || s.id}</option>`).join('');
+            saved.map(s => `<option value="${escapeAttr(s.id)}">${escapeHtml(s.name || s.id)}</option>`).join('');
     }
 
     _serializeGrid() {
-        const cells = [];
-        for (let y = 0; y < GRID_HEIGHT; y++) {
-            for (let x = 0; x < GRID_WIDTH; x++) {
-                if (this.grid[y][x]) cells.push({ x, y, cell: this.grid[y][x] });
-            }
-        }
-        return cells;
+        return this._collectCells();
     }
 
     _deserializeGrid(cells) {
@@ -1155,7 +1101,7 @@ class BlueprintEditor {
             if (resEl) resEl.value = this.structureResearch;
             if (effEl) effEl.value = this.structureEffects;
             if (descEl) descEl.value = this.structureDescription;
-            this._buildPalette();
+            this._afterGridReplaced();
         } catch {}
     }
 }

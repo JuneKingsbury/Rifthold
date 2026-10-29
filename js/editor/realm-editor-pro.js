@@ -1,13 +1,29 @@
-import { REALMS, EXPLORATION_CONFIG, EXPEDITION_DIFFICULTY, EXPLORATION_EVENTS, WAVE_CONFIG, STORY_MILESTONES } from '../core/config/exploration.js';
 import { RESEARCH } from '../core/config/magic.js';
-import { TRINKETS } from '../core/config/equipment.js';
+import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
+import { getLoadedManifests } from '../core/mod-registry.js';
+import { importPristineConfig, fetchConfigSource, spliceExportObject, toJsLiteral } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_realm_pro';
+
+// Base (unmodded) realms and enemies, so exports never bake mod content into exploration.js.
+const PRISTINE = await importPristineConfig('exploration.js');
+const EXPLORATION = PRISTINE || await import('../core/config/exploration.js');
+// Without the unmodded copy the editor shows live config, which includes any loaded mods' content.
+const MODDED_FALLBACK = !PRISTINE && getLoadedManifests().length > 0;
+const { REALMS, EXPEDITION_ENEMIES } = EXPLORATION;
 const CHAIN_COLORS = { crystal: '#88ccff', verdant: '#66cc66', arcane: '#cc88ff', shadow: '#aa66cc' };
 const DIFFICULTY_COLORS = ['', '#66cc66', '#cccc44', '#ff8844', '#ff4444', '#cc33cc'];
 const DIFFICULTY_LABELS = ['', 'Easy', 'Normal', 'Hard', 'Deadly', 'Extreme'];
 
 let editorInstance = null;
+
+// Point a loot entry at `key`, keeping its field order when the loot type is unchanged.
+function setLootKey(entry, type, key) {
+    if (!(type in entry)) {
+        delete entry.resource; delete entry.item; delete entry.artifact;
+    }
+    entry[type] = key;
+}
 
 export function launchRealmEditorPro() {
     document.getElementById('start-screen').style.display = 'none';
@@ -49,7 +65,15 @@ class RealmEditorPro {
             const saved = JSON.parse(raw);
             if (saved.realms) {
                 for (const [key, realm] of Object.entries(saved.realms)) {
-                    this.realms.set(key, realm);
+                    // Drafts from before v2 were saved by a lossy form (old enemies
+                    // schema, no boss); restore what it dropped from the base realm.
+                    const base = saved.v >= 2 ? null : this.originalRealms.get(key);
+                    if (base) {
+                        const orig = JSON.parse(base);
+                        this.realms.set(key, { ...orig, ...realm, enemies: orig.enemies });
+                    } else {
+                        this.realms.set(key, realm);
+                    }
                 }
             }
             if (saved.deleted) {
@@ -70,7 +94,11 @@ class RealmEditorPro {
         for (const [key, realm] of this.realms) {
             if (!this.originalRealms.has(key)) modified[key] = realm;
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ realms: modified, deleted }));
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 2, realms: modified, deleted }));
+        } catch (err) {
+            console.warn('Realm editor: draft autosave failed', err);
+        }
     }
 
     _buildDOM() {
@@ -86,6 +114,8 @@ class RealmEditorPro {
             <button id="rlm-redo" title="Redo (Ctrl+Y)">↪</button>
             <span class="fe-sep"></span>
             <button id="rlm-export">Export exploration.js</button>
+            ${MODDED_FALLBACK ? '<span style="color:#ff8844;font-size:10px;margin-left:8px;">Could not load base data separately from mods: showing modded data, full-file export disabled.</span>' : ''}
+            <span id="rlm-status" style="margin-left:12px;color:#ccaa44;font-size:10px;"></span>
             <span style="margin-left:auto;color:#666;font-size:10px;">${this.realms.size} realms loaded</span>
         `;
         this.container.appendChild(toolbar);
@@ -112,11 +142,11 @@ class RealmEditorPro {
         let options = '';
         for (const [chain, realms] of chains) {
             const color = CHAIN_COLORS[chain] || '#aaa';
-            options += `<optgroup label="${chain.charAt(0).toUpperCase() + chain.slice(1)} Chain">`;
+            options += `<optgroup label="${escapeAttr(chain.charAt(0).toUpperCase() + chain.slice(1))} Chain">`;
             for (const [key, realm] of realms) {
                 const dirty = this._isDirty(key) ? ' •' : '';
                 const sel = key === this.selectedKey ? ' selected' : '';
-                options += `<option value="${key}"${sel}>${realm.name || key} (${realm.difficulty || 1})${dirty}</option>`;
+                options += `<option value="${escapeAttr(key)}"${sel}>${escapeHtml(realm.name || key)} (${escapeHtml(realm.difficulty || 1)})${dirty}</option>`;
             }
             options += `</optgroup>`;
         }
@@ -151,8 +181,16 @@ class RealmEditorPro {
         document.getElementById('rlm-export').addEventListener('click', () => this._showExportModal());
         this._bindSelectorEvents();
 
+        // Form listeners are bound once: #rlm-fields survives re-renders (only its innerHTML is replaced).
+        const fields = document.getElementById('rlm-fields');
+        fields.addEventListener('input', () => this._scheduleUpdate());
+        fields.addEventListener('change', () => this._scheduleUpdate());
+
         window.addEventListener('keydown', (e) => {
             if (this.container.style.display === 'none') return;
+            // Leave typing keys to the focused field: native text undo and Esc to blur.
+            const t = e.target;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); this._undo(); }
             if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); this._redo(); }
             if (e.key === 'Escape' && !this.container.querySelector('.fe-export-modal')) this._goBack();
@@ -199,7 +237,8 @@ class RealmEditorPro {
             difficulty: 1, chain: chain.toLowerCase().trim(), chainOrder: maxOrder + 1,
             duration: [200, 400], encounters: 3,
             vis: { wall: 'stone_wall', floor: 'stone_floor' },
-            loot: [], enemies: { hp: [40, 60], damage: [5, 8], count: [2, 4] },
+            combatEncounters: [1, 2],
+            loot: [], enemies: { count: [2, 4], types: [{ key: Object.keys(EXPEDITION_ENEMIES)[0], weight: 100 }] },
             events: { ambient: [], discoveries: [], traps: [], rare: [] },
         };
         this.realms.set(key, realm);
@@ -220,19 +259,20 @@ class RealmEditorPro {
         const realm = this.realms.get(this.selectedKey);
         if (!realm) return;
 
-        const realmOptions = [...this.realms.entries()].filter(([k]) => k !== this.selectedKey).map(([k, r]) => `<option value="${k}"${realm.requiresRealm === k ? ' selected' : ''}>${r.name || k}</option>`).join('');
-        const researchOptions = Object.entries(RESEARCH).map(([k, r]) => `<option value="${k}"${realm.research === k ? ' selected' : ''}>${r.name}</option>`).join('');
+        const realmOptions = [...this.realms.entries()].filter(([k]) => k !== this.selectedKey).map(([k, r]) => `<option value="${escapeAttr(k)}"${realm.requiresRealm === k ? ' selected' : ''}>${escapeHtml(r.name || k)}</option>`).join('');
+        const researchOptions = Object.entries(RESEARCH).map(([k, r]) => `<option value="${escapeAttr(k)}"${realm.research === k ? ' selected' : ''}>${escapeHtml(r.name)}</option>`).join('');
+        const textareaStyle = 'width:100%;background:#1a1a2e;color:#ccc;border:1px solid #333;font-size:11px;font-family:monospace;box-sizing:border-box;';
 
         let html = `
             <div class="fe-section-title">Realm Info</div>
             <div class="fe-row">
-                <div class="fe-field"><label>Key</label><input type="text" id="rlm-key" value="${realm.key}"></div>
-                <div class="fe-field"><label>Name</label><input type="text" id="rlm-name" value="${realm.name || ''}"></div>
+                <div class="fe-field"><label>Key</label><input type="text" id="rlm-key" value="${escapeAttr(realm.key)}"></div>
+                <div class="fe-field"><label>Name</label><input type="text" id="rlm-name" value="${escapeAttr(realm.name || '')}"></div>
             </div>
             <div class="fe-row">
-                <div class="fe-field"><label>Chain</label><input type="text" id="rlm-chain" value="${realm.chain || ''}"></div>
-                <div class="fe-field"><label>Chain Order</label><input type="number" id="rlm-chainOrder" min="1" value="${realm.chainOrder || 1}"></div>
-                <div class="fe-field"><label>Difficulty (1-5)</label><input type="number" id="rlm-difficulty" min="1" max="5" value="${realm.difficulty || 1}"></div>
+                <div class="fe-field"><label>Chain</label><input type="text" id="rlm-chain" value="${escapeAttr(realm.chain || '')}"></div>
+                <div class="fe-field"><label>Chain Order</label><input type="number" id="rlm-chainOrder" min="1" value="${escapeAttr(realm.chainOrder || 1)}"></div>
+                <div class="fe-field"><label>Difficulty (1-5)</label><input type="number" id="rlm-difficulty" min="1" max="5" value="${escapeAttr(realm.difficulty || 1)}"></div>
             </div>
             <div class="fe-row">
                 <div class="fe-field"><label>Requires Realm</label><select id="rlm-requiresRealm"><option value="">(none)</option>${realmOptions}</select></div>
@@ -241,53 +281,66 @@ class RealmEditorPro {
 
             <div class="fe-section-title">Timing & Encounters</div>
             <div class="fe-row">
-                <div class="fe-field"><label>Duration Min</label><input type="number" id="rlm-durMin" value="${realm.duration?.[0] || 200}"></div>
-                <div class="fe-field"><label>Duration Max</label><input type="number" id="rlm-durMax" value="${realm.duration?.[1] || 400}"></div>
-                <div class="fe-field"><label>Encounters</label><input type="number" id="rlm-encounters" value="${realm.encounters || 3}"></div>
+                <div class="fe-field"><label>Duration Min</label><input type="number" id="rlm-durMin" value="${escapeAttr(realm.duration?.[0] || 200)}"></div>
+                <div class="fe-field"><label>Duration Max</label><input type="number" id="rlm-durMax" value="${escapeAttr(realm.duration?.[1] || 400)}"></div>
+                <div class="fe-field"><label>Encounters</label><input type="number" id="rlm-encounters" value="${escapeAttr(realm.encounters || 3)}"></div>
             </div>
 
             <div class="fe-section-title">Visuals</div>
             <div class="fe-row">
-                <div class="fe-field"><label>Wall Type</label><input type="text" id="rlm-visWall" value="${realm.vis?.wall || 'stone_wall'}"></div>
-                <div class="fe-field"><label>Floor Type</label><input type="text" id="rlm-visFloor" value="${realm.vis?.floor || 'stone_floor'}"></div>
+                <div class="fe-field"><label>Wall Type</label><input type="text" id="rlm-visWall" value="${escapeAttr(realm.vis?.wall || 'stone_wall')}"></div>
+                <div class="fe-field"><label>Floor Type</label><input type="text" id="rlm-visFloor" value="${escapeAttr(realm.vis?.floor || 'stone_floor')}"></div>
             </div>
 
-            <div class="fe-section-title">Enemies</div>
+            <div class="fe-section-title">Enemies${realm.boss ? ` <span style="color:#888;font-size:10px;">(boss: ${escapeHtml(realm.boss.name || '?')}, kept as-is)</span>` : ''}</div>
             <div class="fe-row">
-                <div class="fe-field"><label>HP Min</label><input type="number" id="rlm-enemyHpMin" value="${realm.enemies?.hp?.[0] || 40}"></div>
-                <div class="fe-field"><label>HP Max</label><input type="number" id="rlm-enemyHpMax" value="${realm.enemies?.hp?.[1] || 60}"></div>
-                <div class="fe-field"><label>Dmg Min</label><input type="number" id="rlm-enemyDmgMin" value="${realm.enemies?.damage?.[0] || 5}"></div>
-                <div class="fe-field"><label>Dmg Max</label><input type="number" id="rlm-enemyDmgMax" value="${realm.enemies?.damage?.[1] || 8}"></div>
+                <div class="fe-field"><label>Count Min</label><input type="number" id="rlm-enemyCntMin" value="${escapeAttr(realm.enemies?.count?.[0] ?? 2)}"></div>
+                <div class="fe-field"><label>Count Max</label><input type="number" id="rlm-enemyCntMax" value="${escapeAttr(realm.enemies?.count?.[1] ?? 4)}"></div>
             </div>
-            <div class="fe-row">
-                <div class="fe-field"><label>Count Min</label><input type="number" id="rlm-enemyCntMin" value="${realm.enemies?.count?.[0] || 2}"></div>
-                <div class="fe-field"><label>Count Max</label><input type="number" id="rlm-enemyCntMax" value="${realm.enemies?.count?.[1] || 4}"></div>
-            </div>
+            <div id="rlm-enemy-rows">`;
 
-            <div class="fe-section-title">Loot Table</div>
+        // Per-render copies of the list entries; rows reference them by index so
+        // fields the row doesn't show are merged back on collect.
+        this._enemyOrig = (realm.enemies?.types || []).slice();
+        this._lootOrig = (realm.loot || []).slice();
+        this._rareOrig = (realm.events?.rare || []).slice();
+
+        this._enemyOrig.forEach((t, i) => { html += this._enemyRowHtml(t, i); });
+        html += `</div>`;
+        html += `<button class="fe-add-btn" id="rlm-add-enemy" style="margin-top:4px;">+ Enemy Type</button>`;
+
+        html += `<div class="fe-section-title">Loot Table</div>
             <div id="rlm-loot-rows">`;
-
-        (realm.loot || []).forEach((loot, i) => { html += this._lootRowHtml(loot, i); });
+        this._lootOrig.forEach((loot, i) => { html += this._lootRowHtml(loot, i); });
         html += `</div>`;
         html += `<button class="fe-add-btn" id="rlm-add-loot" style="margin-top:4px;">+ Loot Entry</button>`;
 
         html += `<div class="fe-section-title">Events — Ambient</div>`;
-        html += `<textarea id="rlm-ambient" rows="4" style="width:100%;background:#1a1a2e;color:#ccc;border:1px solid #333;font-size:11px;font-family:monospace;box-sizing:border-box;">${(realm.events?.ambient || []).join('\n')}</textarea>`;
+        html += `<textarea id="rlm-ambient" rows="4" style="${textareaStyle}">${escapeHtml((realm.events?.ambient || []).join('\n'))}</textarea>`;
 
         html += `<div class="fe-section-title">Events — Discoveries</div>`;
-        html += `<textarea id="rlm-discoveries" rows="3" style="width:100%;background:#1a1a2e;color:#ccc;border:1px solid #333;font-size:11px;font-family:monospace;box-sizing:border-box;">${(realm.events?.discoveries || []).join('\n')}</textarea>`;
+        html += `<textarea id="rlm-discoveries" rows="3" style="${textareaStyle}">${escapeHtml((realm.events?.discoveries || []).join('\n'))}</textarea>`;
 
         html += `<div class="fe-section-title">Events — Traps</div>`;
-        html += `<textarea id="rlm-traps" rows="3" style="width:100%;background:#1a1a2e;color:#ccc;border:1px solid #333;font-size:11px;font-family:monospace;box-sizing:border-box;">${(realm.events?.traps || []).join('\n')}</textarea>`;
+        html += `<textarea id="rlm-traps" rows="3" style="${textareaStyle}">${escapeHtml((realm.events?.traps || []).join('\n'))}</textarea>`;
 
         html += `<div class="fe-section-title">Rare Events</div>`;
         html += `<div id="rlm-rare-rows">`;
-        (realm.events?.rare || []).forEach((r, i) => { html += this._rareRowHtml(r, i); });
+        this._rareOrig.forEach((r, i) => { html += this._rareRowHtml(r, i); });
         html += `</div>`;
         html += `<button class="fe-add-btn" id="rlm-add-rare" style="margin-top:4px;">+ Rare Event</button>`;
 
         document.getElementById('rlm-fields').innerHTML = html;
         this._bindFormEvents();
+    }
+
+    _enemyRowHtml(t, i) {
+        const keys = [...new Set([...Object.keys(EXPEDITION_ENEMIES), t.key].filter(Boolean))];
+        return `<div class="fe-list-row" data-idx="${i}" style="margin-bottom:4px;align-items:center;">
+            <select class="rlm-enemy-key" style="flex:1;">${keys.map(k => `<option value="${escapeAttr(k)}"${k === t.key ? ' selected' : ''}>${escapeHtml(EXPEDITION_ENEMIES[k]?.name || k)}</option>`).join('')}</select>
+            <input type="number" class="rlm-enemy-weight" value="${escapeAttr(t.weight ?? 10)}" title="Weight" style="width:50px;">
+            <button class="fe-remove-btn rlm-enemy-del">✕</button>
+        </div>`;
     }
 
     _lootRowHtml(loot, i) {
@@ -296,12 +349,12 @@ class RealmEditorPro {
         const weight = loot.weight || 10;
         const amtMin = loot.amount ? loot.amount[0] : 1;
         const amtMax = loot.amount ? loot.amount[1] : 1;
-        return `<div class="fe-list-row" style="margin-bottom:4px;align-items:center;">
+        return `<div class="fe-list-row" data-idx="${i}" style="margin-bottom:4px;align-items:center;">
             <select class="rlm-loot-type" style="width:70px;"><option value="resource"${type === 'resource' ? ' selected' : ''}>Resource</option><option value="item"${type === 'item' ? ' selected' : ''}>Item</option></select>
-            <input type="text" class="rlm-loot-key" value="${key}" placeholder="key" style="flex:1;">
-            <input type="number" class="rlm-loot-weight" value="${weight}" title="Weight" style="width:45px;">
-            <input type="number" class="rlm-loot-min" value="${amtMin}" title="Min" style="width:40px;">
-            <input type="number" class="rlm-loot-max" value="${amtMax}" title="Max" style="width:40px;">
+            <input type="text" class="rlm-loot-key" value="${escapeAttr(key)}" placeholder="key" style="flex:1;">
+            <input type="number" class="rlm-loot-weight" value="${escapeAttr(weight)}" title="Weight" style="width:45px;">
+            <input type="number" class="rlm-loot-min" value="${escapeAttr(amtMin)}" title="Min" style="width:40px;">
+            <input type="number" class="rlm-loot-max" value="${escapeAttr(amtMax)}" title="Max" style="width:40px;">
             <button class="fe-remove-btn rlm-loot-del">✕</button>
         </div>`;
     }
@@ -311,45 +364,41 @@ class RealmEditorPro {
         const key = r.loot?.resource || r.loot?.artifact || r.loot?.item || '';
         const amtMin = r.loot?.amount ? r.loot.amount[0] : 1;
         const amtMax = r.loot?.amount ? r.loot.amount[1] : 1;
-        return `<div class="fe-list-row" style="margin-bottom:6px;flex-wrap:wrap;">
-            <input type="number" class="rlm-rare-chance" value="${r.chance || 0.05}" step="0.005" title="Chance" style="width:55px;">
-            <input type="text" class="rlm-rare-text" value="${(r.text || '').replace(/"/g, '&quot;')}" placeholder="Event text..." style="flex:1;min-width:200px;">
+        return `<div class="fe-list-row" data-idx="${i}" style="margin-bottom:6px;flex-wrap:wrap;">
+            <input type="number" class="rlm-rare-chance" value="${escapeAttr(r.chance || 0.05)}" step="0.005" title="Chance" style="width:55px;">
+            <input type="text" class="rlm-rare-text" value="${escapeAttr(r.text || '')}" placeholder="Event text..." style="flex:1;min-width:200px;">
             <select class="rlm-rare-type" style="width:70px;"><option value="resource"${type === 'resource' ? ' selected' : ''}>Resource</option><option value="item"${type === 'item' ? ' selected' : ''}>Item</option></select>
-            <input type="text" class="rlm-rare-key" value="${key}" placeholder="key" style="width:100px;">
-            <input type="number" class="rlm-rare-min" value="${amtMin}" style="width:35px;">
-            <input type="number" class="rlm-rare-max" value="${amtMax}" style="width:35px;">
+            <input type="text" class="rlm-rare-key" value="${escapeAttr(key)}" placeholder="key" style="width:100px;">
+            <input type="number" class="rlm-rare-min" value="${escapeAttr(amtMin)}" style="width:35px;">
+            <input type="number" class="rlm-rare-max" value="${escapeAttr(amtMax)}" style="width:35px;">
             <button class="fe-remove-btn rlm-rare-del">✕</button>
         </div>`;
     }
 
     _bindFormEvents() {
-        const fields = document.getElementById('rlm-fields');
-        fields.addEventListener('input', () => this._scheduleUpdate());
-        fields.addEventListener('change', () => this._scheduleUpdate());
-
+        document.getElementById('rlm-add-enemy')?.addEventListener('click', () => {
+            const container = document.getElementById('rlm-enemy-rows');
+            container.insertAdjacentHTML('beforeend', this._enemyRowHtml({ key: Object.keys(EXPEDITION_ENEMIES)[0], weight: 10 }, -1));
+            this._bindRowDelEvents();
+            this._scheduleUpdate();
+        });
         document.getElementById('rlm-add-loot')?.addEventListener('click', () => {
             const container = document.getElementById('rlm-loot-rows');
-            container.insertAdjacentHTML('beforeend', this._lootRowHtml({ resource: 'stone', weight: 10, amount: [1, 5] }, container.children.length));
-            this._bindLootDelEvents();
+            container.insertAdjacentHTML('beforeend', this._lootRowHtml({ resource: 'stone', weight: 10, amount: [1, 5] }, -1));
+            this._bindRowDelEvents();
             this._scheduleUpdate();
         });
         document.getElementById('rlm-add-rare')?.addEventListener('click', () => {
             const container = document.getElementById('rlm-rare-rows');
-            container.insertAdjacentHTML('beforeend', this._rareRowHtml({ chance: 0.05, text: '{name} finds something...', loot: { resource: 'stone', amount: [1, 3] } }, container.children.length));
-            this._bindRareDelEvents();
+            container.insertAdjacentHTML('beforeend', this._rareRowHtml({ chance: 0.05, text: '{name} finds something...', loot: { resource: 'stone', amount: [1, 3] } }, -1));
+            this._bindRowDelEvents();
             this._scheduleUpdate();
         });
-        this._bindLootDelEvents();
-        this._bindRareDelEvents();
+        this._bindRowDelEvents();
     }
 
-    _bindLootDelEvents() {
-        document.getElementById('rlm-loot-rows')?.querySelectorAll('.rlm-loot-del').forEach(btn => {
-            btn.onclick = () => { btn.closest('.fe-list-row').remove(); this._scheduleUpdate(); };
-        });
-    }
-    _bindRareDelEvents() {
-        document.getElementById('rlm-rare-rows')?.querySelectorAll('.rlm-rare-del').forEach(btn => {
+    _bindRowDelEvents() {
+        document.getElementById('rlm-fields')?.querySelectorAll('.rlm-enemy-del, .rlm-loot-del, .rlm-rare-del').forEach(btn => {
             btn.onclick = () => { btn.closest('.fe-list-row').remove(); this._scheduleUpdate(); };
         });
     }
@@ -369,18 +418,52 @@ class RealmEditorPro {
         const realm = this._collectFormData();
         if (!realm) return;
         const oldKey = this.selectedKey;
-        if (realm.key !== oldKey) {
-            this.realms.delete(oldKey);
-            this.selectedKey = realm.key;
+        const keyInput = document.getElementById('rlm-key');
+        if (realm.key !== oldKey && this.realms.has(realm.key)) {
+            // Refuse a rename onto another realm's key; keep editing under the old key.
+            keyInput.style.borderColor = '#ff4444';
+            keyInput.title = `"${realm.key}" is already used by another realm`;
+            realm.key = oldKey;
+        } else if (keyInput) {
+            keyInput.style.borderColor = '';
+            keyInput.title = '';
         }
-        this.realms.set(realm.key, realm);
+        if (realm.key !== oldKey) {
+            this._renameRealm(oldKey, realm);
+        } else {
+            this.realms.set(realm.key, realm);
+        }
         this._saveToStorage();
     }
 
+    // Rename in place: the realm keeps its slot in the list and, via _origKey, its
+    // position in exploration.js. Other realms' requiresRealm links follow it.
+    _renameRealm(oldKey, realm) {
+        const origKey = realm._origKey ?? (Object.hasOwn(REALMS, oldKey) ? oldKey : undefined);
+        if (origKey && origKey !== realm.key) realm._origKey = origKey;
+        else delete realm._origKey;
+        this.realms = new Map([...this.realms].map(([k, v]) => (k === oldKey ? [realm.key, realm] : [k, v])));
+        this.selectedKey = realm.key;
+
+        let links = 0;
+        for (const r of this.realms.values()) {
+            if (r.requiresRealm === oldKey) { r.requiresRealm = realm.key; links++; }
+        }
+        const notes = [];
+        if (links) notes.push(`updated ${links} requiresRealm link(s)`);
+        const story = Object.values(EXPLORATION.STORY_MILESTONES || {}).filter(m => m.trigger === `realm_${oldKey}`).length;
+        if (story) notes.push(`${story} story milestone(s) still trigger on "realm_${oldKey}" and need a manual update`);
+        const status = document.getElementById('rlm-status');
+        if (status) status.textContent = `Renamed "${oldKey}" to "${realm.key}"${notes.length ? `: ${notes.join('; ')}` : ''}. Code that names the old key is not updated.`;
+    }
+
+    // Form values are merged over the realm being edited, so fields the form
+    // doesn't show (boss, combatEncounters, scoutingMode, ...) survive the round-trip.
     _collectFormData() {
         const key = document.getElementById('rlm-key')?.value.trim();
         if (!key) return null;
-        const realm = { key };
+        const base = this.realms.get(this.selectedKey) || {};
+        const realm = { ...base, key };
         realm.name = document.getElementById('rlm-name')?.value.trim() || key;
         realm.difficulty = parseInt(document.getElementById('rlm-difficulty')?.value) || 1;
         realm.chain = document.getElementById('rlm-chain')?.value.trim() || 'unknown';
@@ -391,44 +474,55 @@ class RealmEditorPro {
         ];
         realm.encounters = parseInt(document.getElementById('rlm-encounters')?.value) || 3;
         realm.vis = {
+            ...base.vis,
             wall: document.getElementById('rlm-visWall')?.value.trim() || 'stone_wall',
             floor: document.getElementById('rlm-visFloor')?.value.trim() || 'stone_floor',
         };
 
         const reqRealm = document.getElementById('rlm-requiresRealm')?.value;
-        if (reqRealm) realm.requiresRealm = reqRealm;
+        if (reqRealm) realm.requiresRealm = reqRealm; else delete realm.requiresRealm;
         const research = document.getElementById('rlm-research')?.value;
-        if (research) realm.research = research;
+        if (research) realm.research = research; else delete realm.research;
 
+        const types = [];
+        document.getElementById('rlm-enemy-rows')?.querySelectorAll('.fe-list-row').forEach(row => {
+            const orig = this._enemyOrig?.[row.dataset.idx] || {};
+            const enemyKey = row.querySelector('.rlm-enemy-key')?.value;
+            if (!enemyKey) return;
+            types.push({ ...orig, key: enemyKey, weight: parseInt(row.querySelector('.rlm-enemy-weight')?.value) || 10 });
+        });
         realm.enemies = {
-            hp: [parseInt(document.getElementById('rlm-enemyHpMin')?.value) || 40, parseInt(document.getElementById('rlm-enemyHpMax')?.value) || 60],
-            damage: [parseInt(document.getElementById('rlm-enemyDmgMin')?.value) || 5, parseInt(document.getElementById('rlm-enemyDmgMax')?.value) || 8],
+            ...base.enemies,
             count: [parseInt(document.getElementById('rlm-enemyCntMin')?.value) || 2, parseInt(document.getElementById('rlm-enemyCntMax')?.value) || 4],
+            types,
         };
 
         realm.loot = [];
         document.getElementById('rlm-loot-rows')?.querySelectorAll('.fe-list-row').forEach(row => {
+            const orig = this._lootOrig?.[row.dataset.idx] || {};
             const type = row.querySelector('.rlm-loot-type')?.value || 'resource';
             const lootKey = row.querySelector('.rlm-loot-key')?.value.trim();
             if (!lootKey) return;
-            const entry = { weight: parseInt(row.querySelector('.rlm-loot-weight')?.value) || 10 };
-            entry[type] = lootKey;
+            const entry = { ...orig };
+            setLootKey(entry, type, lootKey);
+            entry.weight = parseInt(row.querySelector('.rlm-loot-weight')?.value) || 10;
             const min = parseInt(row.querySelector('.rlm-loot-min')?.value) || 1;
             const max = parseInt(row.querySelector('.rlm-loot-max')?.value) || 1;
-            if (min > 0 && max > 0) entry.amount = [min, max];
+            // Single items carry no amount in config; only write one when it says something.
+            if (orig.amount || min !== 1 || max !== 1) entry.amount = [min, max];
+            else delete entry.amount;
             realm.loot.push(entry);
         });
 
-        realm.events = {};
-        const ambientText = document.getElementById('rlm-ambient')?.value || '';
-        realm.events.ambient = ambientText.split('\n').map(s => s.trim()).filter(Boolean);
-        const discText = document.getElementById('rlm-discoveries')?.value || '';
-        realm.events.discoveries = discText.split('\n').map(s => s.trim()).filter(Boolean);
-        const trapsText = document.getElementById('rlm-traps')?.value || '';
-        realm.events.traps = trapsText.split('\n').map(s => s.trim()).filter(Boolean);
+        realm.events = { ...base.events };
+        const lines = (id) => (document.getElementById(id)?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+        realm.events.ambient = lines('rlm-ambient');
+        realm.events.discoveries = lines('rlm-discoveries');
+        realm.events.traps = lines('rlm-traps');
 
         realm.events.rare = [];
         document.getElementById('rlm-rare-rows')?.querySelectorAll('.fe-list-row').forEach(row => {
+            const orig = this._rareOrig?.[row.dataset.idx] || {};
             const chance = parseFloat(row.querySelector('.rlm-rare-chance')?.value) || 0.05;
             const text = row.querySelector('.rlm-rare-text')?.value || '';
             const type = row.querySelector('.rlm-rare-type')?.value || 'resource';
@@ -436,12 +530,17 @@ class RealmEditorPro {
             const min = parseInt(row.querySelector('.rlm-rare-min')?.value) || 1;
             const max = parseInt(row.querySelector('.rlm-rare-max')?.value) || 1;
             if (!text) return;
-            const loot = {};
+            const entry = { ...orig, chance, text };
             if (rareKey) {
-                loot[type] = rareKey;
-                loot.amount = [min, max];
+                const loot = { ...orig.loot };
+                setLootKey(loot, type, rareKey);
+                if (orig.loot?.amount || min !== 1 || max !== 1) loot.amount = [min, max];
+                else delete loot.amount;
+                entry.loot = loot;
+            } else {
+                delete entry.loot;
             }
-            realm.events.rare.push({ chance, text, loot });
+            realm.events.rare.push(entry);
         });
 
         return realm;
@@ -453,7 +552,7 @@ class RealmEditorPro {
         if (!realm) { panel.innerHTML = ''; return; }
 
         const chainColor = CHAIN_COLORS[realm.chain] || '#aaa';
-        const diff = realm.difficulty || 1;
+        const diff = Math.min(5, Math.max(1, parseInt(realm.difficulty) || 1));
         const diffColor = DIFFICULTY_COLORS[diff];
         const diffLabel = DIFFICULTY_LABELS[diff];
 
@@ -461,7 +560,7 @@ class RealmEditorPro {
 
         html += `<div class="fe-preview-section-title">Rifts Panel View</div>`;
         html += `<div class="fe-preview-ingame" style="padding:12px;">`;
-        html += `<div style="color:${chainColor};font-weight:bold;margin-bottom:8px;">${(realm.chain || 'unknown').toUpperCase()} CHAIN</div>`;
+        html += `<div style="color:${chainColor};font-weight:bold;margin-bottom:8px;">${escapeHtml((realm.chain || 'unknown').toUpperCase())} CHAIN</div>`;
 
         const chainRealms = [...this.realms.values()].filter(r => r.chain === realm.chain).sort((a, b) => (a.chainOrder || 0) - (b.chainOrder || 0));
         for (const cr of chainRealms) {
@@ -471,11 +570,11 @@ class RealmEditorPro {
             const border = isSelf ? `border:1px solid ${chainColor}` : 'border:1px solid #333';
             const nameColor = isSelf ? '#88ddff' : '#666';
             html += `<div style="margin-left:${indent}px;margin-bottom:4px;padding:4px 8px;background:${bg};${border};border-radius:3px;">`;
-            html += `<span style="color:${nameColor};">${cr.name || cr.key}</span>`;
-            html += `<span style="color:${DIFFICULTY_COLORS[cr.difficulty || 1]};font-size:10px;margin-left:6px;">(${cr.difficulty || 1})</span>`;
+            html += `<span style="color:${nameColor};">${escapeHtml(cr.name || cr.key)}</span>`;
+            html += `<span style="color:${DIFFICULTY_COLORS[cr.difficulty] || '#aaa'};font-size:10px;margin-left:6px;">(${escapeHtml(cr.difficulty || 1)})</span>`;
             if (cr.requiresRealm) {
                 const reqName = this.realms.get(cr.requiresRealm)?.name || cr.requiresRealm;
-                html += `<span style="color:#666;font-size:9px;margin-left:6px;">🔒 ${reqName}</span>`;
+                html += `<span style="color:#666;font-size:9px;margin-left:6px;">🔒 ${escapeHtml(reqName)}</span>`;
             }
             html += `</div>`;
         }
@@ -486,11 +585,11 @@ class RealmEditorPro {
         html += `<span class="fe-preview-badge difficulty" style="color:${diffColor}">${'★'.repeat(diff)}${'☆'.repeat(5 - diff)} ${diffLabel}</span>`;
         if (realm.research) {
             const rName = RESEARCH[realm.research]?.name || realm.research;
-            html += `<span class="fe-preview-badge research">🔬 ${rName}</span>`;
+            html += `<span class="fe-preview-badge research">🔬 ${escapeHtml(rName)}</span>`;
         }
         if (realm.requiresRealm) {
             const reqName = this.realms.get(realm.requiresRealm)?.name || realm.requiresRealm;
-            html += `<span class="fe-preview-badge realm-req">🔗 ${reqName}</span>`;
+            html += `<span class="fe-preview-badge realm-req">🔗 ${escapeHtml(reqName)}</span>`;
         }
         html += `</div>`;
 
@@ -499,7 +598,7 @@ class RealmEditorPro {
         for (let i = 0; i < chainRealms.length; i++) {
             const cr = chainRealms[i];
             const isSelf = cr.key === realm.key;
-            html += `<span style="color:${isSelf ? chainColor : '#555'};font-weight:${isSelf ? 'bold' : 'normal'};">${cr.name || cr.key}</span>`;
+            html += `<span style="color:${isSelf ? chainColor : '#555'};font-weight:${isSelf ? 'bold' : 'normal'};">${escapeHtml(cr.name || cr.key)}</span>`;
             if (i < chainRealms.length - 1) html += `<span style="color:#444;"> → </span>`;
         }
         html += `</div>`;
@@ -514,7 +613,7 @@ class RealmEditorPro {
             const color = type === 'item' ? '#88ccff' : '#ccc';
             const amt = loot.amount ? `(${loot.amount[0]}-${loot.amount[1]})` : '';
             html += `<div style="display:flex;justify-content:space-between;padding:2px 0;">`;
-            html += `<span style="color:${color};">${lootKey} ${amt}</span>`;
+            html += `<span style="color:${color};">${escapeHtml(lootKey)} ${escapeHtml(amt)}</span>`;
             html += `<span style="color:#888;">${pct}%</span>`;
             html += `</div>`;
         }
@@ -523,86 +622,47 @@ class RealmEditorPro {
             for (const r of realm.events.rare) {
                 const rKey = r.loot?.resource || r.loot?.item || '';
                 html += `<div style="color:#886;font-size:10px;padding:1px 0;">`;
-                html += `<span style="color:#aa66cc;">${(r.chance * 100).toFixed(1)}%</span> `;
-                html += `${rKey}`;
+                html += `<span style="color:#aa66cc;">${(Number(r.chance) * 100).toFixed(1)}%</span> `;
+                html += `${escapeHtml(rKey)}`;
                 html += `</div>`;
             }
         }
         html += `</div>`;
 
         html += `<div class="fe-preview-section-title">Code</div>`;
-        html += `<div class="fe-preview-code" style="margin:0 12px 12px;padding:10px;font-size:10px;max-height:180px;overflow-y:auto;">${this._serializeRealm(realm.key, realm)}</div>`;
+        html += `<div class="fe-preview-code" style="margin:0 12px 12px;padding:10px;font-size:10px;max-height:180px;overflow-y:auto;white-space:pre;">${escapeHtml(this._serializeRealm(realm.key, realm))}</div>`;
 
         panel.innerHTML = html;
     }
 
-    _serializeRealm(key, realm) {
-        const lines = [];
-        lines.push(`${key}: {`);
-        lines.push(`    name: '${(realm.name || key).replace(/'/g, "\\'")}', difficulty: ${realm.difficulty || 1},`);
-        lines.push(`    chain: '${realm.chain}', chainOrder: ${realm.chainOrder || 1},`);
-        lines.push(`    duration: [${realm.duration?.[0] || 200}, ${realm.duration?.[1] || 400}], encounters: ${realm.encounters || 3},`);
-        lines.push(`    vis: { wall: '${realm.vis?.wall || 'stone_wall'}', floor: '${realm.vis?.floor || 'stone_floor'}' },`);
-        if (realm.requiresRealm) lines.push(`    requiresRealm: '${realm.requiresRealm}',`);
-        if (realm.research) lines.push(`    research: '${realm.research}',`);
-
-        if (realm.loot?.length) {
-            lines.push(`    loot: [`);
-            for (const l of realm.loot) {
-                const type = l.resource ? 'resource' : 'item';
-                const lk = l.resource || l.artifact || l.item || '';
-                let entry = `        { ${type}: '${lk}', weight: ${l.weight || 10}`;
-                if (l.amount) entry += `, amount: [${l.amount[0]}, ${l.amount[1]}]`;
-                entry += ` },`;
-                lines.push(entry);
-            }
-            lines.push(`    ],`);
-        } else {
-            lines.push(`    loot: [],`);
-        }
-
-        const e = realm.enemies || {};
-        lines.push(`    enemies: { hp: [${e.hp?.[0] || 40}, ${e.hp?.[1] || 60}], damage: [${e.damage?.[0] || 5}, ${e.damage?.[1] || 8}], count: [${e.count?.[0] || 2}, ${e.count?.[1] || 4}] },`);
-
-        lines.push(`    events: {`);
-        const events = realm.events || {};
-        for (const etype of ['ambient', 'discoveries', 'traps']) {
-            const arr = events[etype] || [];
-            if (arr.length) {
-                lines.push(`        ${etype}: [`);
-                for (const s of arr) lines.push(`            '${s.replace(/'/g, "\\'")}',`);
-                lines.push(`        ],`);
-            } else {
-                lines.push(`        ${etype}: [],`);
-            }
-        }
-        if (events.rare?.length) {
-            lines.push(`        rare: [`);
-            for (const r of events.rare) {
-                const type = r.loot?.resource ? 'resource' : 'item';
-                const rk = r.loot?.resource || r.loot?.item || '';
-                let entry = `            { chance: ${r.chance}, text: '${(r.text || '').replace(/'/g, "\\'")}', loot: { ${type}: '${rk}'`;
-                if (r.loot?.amount) entry += `, amount: [${r.loot.amount[0]}, ${r.loot.amount[1]}]`;
-                entry += ` } },`;
-                lines.push(entry);
-            }
-            lines.push(`        ],`);
-        } else {
-            lines.push(`        rare: [],`);
-        }
-        lines.push(`    },`);
-        lines.push(`},`);
-        return lines.join('\n');
+    // Config definition without the editor's own bookkeeping field.
+    _toDef(realm) {
+        const { key, _origKey, ...def } = realm;
+        return def;
     }
 
-    _showExportModal() {
-        const output = this._generateFullFile();
+    _serializeRealm(key, realm) {
+        return `${key}: ${toJsLiteral(this._toDef(realm))},`;
+    }
+
+    async _showExportModal() {
+        if (MODDED_FALLBACK) {
+            alert('Export disabled: base exploration.js data could not be loaded separately from the enabled mods, so the file would include mod content. Disable mods and reload to export.');
+            return;
+        }
+        let output;
+        try {
+            output = await this._generateFullFile();
+        } catch (err) {
+            alert(`Export failed: ${err.message}`);
+            return;
+        }
         const modal = document.createElement('div');
         modal.className = 'fe-export-modal';
         modal.innerHTML = `
             <div class="fe-export-modal-content" style="width:800px;">
                 <div style="color:#ffcc00;font-weight:bold;margin-bottom:12px;">Export exploration.js (${this.realms.size} realms)</div>
-                <textarea readonly style="min-height:400px;">${output}</textarea>
+                <textarea readonly style="min-height:400px;">${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="rlm-modal-download">Download File</button>
                     <button id="rlm-modal-copy">Copy to Clipboard</button>
@@ -627,54 +687,27 @@ class RealmEditorPro {
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     }
 
-    _generateFullFile() {
-        let out = `// Exploration / realms. Used by exploration.js.\n`;
-        out += `export const REALMS = {\n`;
-        for (const [key, realm] of this.realms) {
-            out += '    ' + this._serializeRealm(key, realm).replace(/\n/g, '\n    ').replace(/\n    $/, '\n');
-        }
-        out += `};\n\n`;
-
-        out += `export const EXPLORATION_CONFIG = ${JSON.stringify(EXPLORATION_CONFIG, null, 4)};\n\n`;
-
-        out += `export const EXPEDITION_DIFFICULTY = {\n`;
-        for (const [level, cfg] of Object.entries(EXPEDITION_DIFFICULTY)) {
-            const parts = Object.entries(cfg).map(([k, v]) => `${k}: ${typeof v === 'string' ? `'${v}'` : v}`);
-            out += `    ${level}: { ${parts.join(', ')} },\n`;
-        }
-        out += `};\n\n`;
-
-        out += `export const EXPLORATION_EVENTS = {\n`;
-        for (const [etype, arr] of Object.entries(EXPLORATION_EVENTS)) {
-            out += `    ${etype}: [\n`;
-            for (const s of arr) out += `        '${s.replace(/'/g, "\\'")}',\n`;
-            out += `    ],\n`;
-        }
-        out += `};\n\n`;
-
-        out += `// Wave defense (void nexus) tuning. Used by waves.js.\n`;
-        out += `export const WAVE_CONFIG = {\n`;
-        for (const [k, v] of Object.entries(WAVE_CONFIG)) {
-            if (typeof v === 'object') {
-                out += `    ${k}: { ${Object.entries(v).map(([sk, sv]) => `${sk}: ${sv}`).join(', ')} },\n`;
+    // Start from the real exploration.js source and splice in only the realms the
+    // user changed, so every other export (enemies, events, story, helpers) and
+    // all comments stay exactly as shipped.
+    async _generateFullFile() {
+        const src = await fetchConfigSource('exploration.js');
+        const changed = new Map(), removed = new Set(), added = new Map(), renamed = new Map();
+        const byOrigKey = new Map([...this.realms].filter(([k, r]) => r._origKey && r._origKey !== k).map(([k, r]) => [r._origKey, [k, r]]));
+        for (const key of Object.keys(REALMS)) {
+            if (this.realms.has(key)) {
+                if (this._isDirty(key)) changed.set(key, this._toDef(this.realms.get(key)));
+            } else if (byOrigKey.has(key)) {
+                const [newKey, realm] = byOrigKey.get(key);
+                renamed.set(key, { key: newKey, value: this._toDef(realm) });
             } else {
-                out += `    ${k}: ${typeof v === 'string' ? `'${v}'` : v},\n`;
+                removed.add(key);
             }
         }
-        out += `};\n\n`;
-
-        out += `export const STORY_MILESTONES = {\n`;
-        for (const [key, ms] of Object.entries(STORY_MILESTONES)) {
-            out += `    ${key}: {\n`;
-            out += `        tab: '${ms.tab}',\n`;
-            out += `        title: '${ms.title.replace(/'/g, "\\'")}',\n`;
-            out += `        trigger: '${ms.trigger}',\n`;
-            out += `        text: '${ms.text.replace(/'/g, "\\'")}',\n`;
-            out += `    },\n`;
+        for (const [key, realm] of this.realms) {
+            if (!Object.hasOwn(REALMS, key) && !(realm._origKey && renamed.get(realm._origKey)?.key === key)) added.set(key, this._toDef(realm));
         }
-        out += `};\n`;
-
-        return out;
+        return spliceExportObject(src, 'REALMS', { changed, removed, added, renamed, multiline: true });
     }
 
     _pushUndoState() {

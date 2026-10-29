@@ -338,7 +338,9 @@ export function completeTask(colonist, task, game) {
         }
         case 'harvest': {
             const tile = game.map[task.y][task.x];
-            if (tile.zone) {
+            // Only a ready crop yields. A duplicate harvest task on an already
+            // harvested tile must not pay out a second time.
+            if (tile.zone && tile.zone.state === 'ready') {
                 const crop = tile.zone.crop;
                 const yields = {};
                 yields[crop] = getHarvestYield(game, crop);
@@ -447,14 +449,6 @@ export function completeTask(colonist, task, game) {
             }
             break;
         }
-        case 'extinguish': {
-            const tile = game.map[task.y][task.x];
-            tile.onFire = false;
-            tile.fireTimer = 0;
-            if (game.mapIndex) game.mapIndex.removeFire(task.x, task.y);
-            applyThought(colonist, 'put_out_fire', game.tick);
-            break;
-        }
         case 'cleanse_blight': {
             const tile = game.map[task.y][task.x];
             if (tile.zone && tile.zone.blighted) {
@@ -488,7 +482,6 @@ export function completeTask(colonist, task, game) {
                 game.notifications.push({ text: `Research complete: ${name}!`, tick: game.tick, type: 'success' });
                 game.eventLog.add(game, `Research unlocked: ${name}`, 'success', null);
                 game.story.checkMilestone(`research_${completedKey}`, game);
-                if (completedKey === 'deep_delving' && game.combat) game.combat.armCrusaderRaid(game);
                 game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.researchCompleteChar, color: COMBAT_VISUALS.researchCompleteColor, ttl: COMBAT_VISUALS.researchCompleteTtl });
                 window.soundManager?.playSFXAt('research_complete', colonist.x, colonist.y);
                 if (!game.events.pendingEvent) {
@@ -634,14 +627,16 @@ export function completeTask(colonist, task, game) {
             if (task.colonistId) {
                 const target = game.getColonist(task.colonistId);
                 if (target && target.trinketBroken) {
-                    target.trinketBroken = false;
                     target._repairQueued = false;
-                    invalidateEquipStatCache(target);
-                    if (game.resources.stockpile.runite >= 1) {
+                    // The runite cost is paid on completion. If stock ran out while the
+                    // task was in progress, the trinket stays broken and is re-queued later.
+                    if ((game.resources.stockpile.runite || 0) >= 1) {
                         game.resources.stockpile.runite -= 1;
+                        target.trinketBroken = false;
+                        invalidateEquipStatCache(target);
+                        const artName = target.trinket?.name || 'trinket';
+                        game.eventLog.add(game, `${artName} repaired at the anvil`, 'success', null);
                     }
-                    const artName = target.trinket?.name || 'trinket';
-                    game.eventLog.add(game, `${artName} repaired at the anvil`, 'success', null);
                 }
             }
             applyThought(colonist, 'crafted', game.tick);
