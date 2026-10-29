@@ -1,4 +1,4 @@
-import { CONFIG, CROPS, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, BUILDINGS, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
+import { CONFIG, CROPS, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, BUILDINGS, PLANT_STRUCTURES, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { isPassable } from '../world/map.js';
@@ -149,7 +149,9 @@ export class InputHandler {
                 if (def.structureType === 'floor') {
                     if (tile.floor) { blocked.add(key); continue; }
                 } else {
-                    if (tile.structure) { blocked.add(key); continue; }
+                    // Plants are replaced by the build, like any other structure
+                    // designateBuild accepts; only show real obstacles as blocked.
+                    if (tile.structure && !PLANT_STRUCTURES.has(tile.structure)) { blocked.add(key); continue; }
                 }
                 let canAfford = true;
                 for (const [res, amt] of Object.entries(def.cost)) {
@@ -177,7 +179,7 @@ export class InputHandler {
                 if (this._rightDrag) {
                     // Right-drag removes farm zones: flag existing zones as the removal target.
                     if (tile.zone) blocked.add(key);
-                } else if (!FARMABLE_TERRAIN.has(tile.terrain) || tile.structure || tile.resource || tile.zone) {
+                } else if (!FARMABLE_TERRAIN.has(tile.terrain) || (tile.structure && !PLANT_STRUCTURES.has(tile.structure)) || tile.resource || tile.zone) {
                     blocked.add(key);
                 } else {
                     affordable.add(key);
@@ -1073,7 +1075,7 @@ export class InputHandler {
                                     const tx = pos.x + dx, ty = pos.y + dy;
                                     if (tx >= 0 && ty >= 0 && tx < CONFIG.MAP_WIDTH && ty < CONFIG.MAP_HEIGHT) {
                                         const tile = this.game.map[ty]?.[tx];
-                                        if (tile && !tile.structure && !tile.designation) {
+                                        if (tile && (!tile.structure || PLANT_STRUCTURES.has(tile.structure)) && !tile.designation) {
                                             designateBuild(this.game, tx, ty, 'ritual_chalk');
                                         }
                                     }

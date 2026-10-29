@@ -1,4 +1,4 @@
-import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS, INDESTRUCTIBLE_STRUCTURES, TERRAIN } from '../core/config.js';
+import { CONFIG, EVENTS, WEATHER_TYPES, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, FIRE_CONFIG, BLIGHT_CONFIG, COMBAT_VISUALS, TRAITS, ARRIVAL_BONDS, INDESTRUCTIBLE_STRUCTURES, PLANT_STRUCTURES, TERRAIN } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
@@ -215,8 +215,12 @@ export class EventSystem {
                 if (nx < 0 || nx >= CONFIG.MAP_WIDTH || ny < 0 || ny >= CONFIG.MAP_HEIGHT) continue;
                 const tile = game.map[ny][nx];
                 if (!def.terrain.includes(tile.terrain)) continue;
-                if (tile.resource || tile.structure) continue;
+                if (tile.resource || (tile.structure && !PLANT_STRUCTURES.has(tile.structure))) continue;
                 if (Math.random() >= def.fillChance) continue;
+                if (tile.structure) {
+                    game.mapIndex?.removeStructure(nx, ny, tile.structure);
+                    tile.structure = null;
+                }
 
                 const deposit = pickWeighted(def.deposits);
                 tile.resource = { type: deposit.type, amount: randRange(deposit.amount) };
@@ -1103,6 +1107,8 @@ export function updateFires(game) {
         }
 
         tile.fireTimer--;
+        // Captured before burnout clears the structure; see the spread check below.
+        const burningPlant = PLANT_STRUCTURES.has(tile.structure);
 
         const wDef = WEATHER_TYPES[game.weather.currentWeather];
         if (wDef && wDef.extinguishesFire) {
@@ -1132,13 +1138,15 @@ export function updateFires(game) {
             }
         }
 
+        // Plants catch fire but never pass it to other plants, so a meadow only
+        // burns where it borders a real fire instead of sweeping away.
         if (tile.onFire && Math.random() < FIRE_CONFIG.spreadChance) {
             const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
             const dir = dirs[Math.floor(Math.random() * 4)];
             const nx = x + dir[0], ny = y + dir[1];
             if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
                 const neighbor = game.map[ny][nx];
-                if (!neighbor.onFire && !neighbor.sealed && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
+                if (!neighbor.onFire && !neighbor.sealed && !(burningPlant && PLANT_STRUCTURES.has(neighbor.structure)) && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
                     neighbor.onFire = true;
                     neighbor.fireTimer = FIRE_CONFIG.spreadTimerMin + Math.floor(Math.random() * (FIRE_CONFIG.spreadTimerMax - FIRE_CONFIG.spreadTimerMin));
                     game.mapIndex.addFire(nx, ny);
@@ -1176,6 +1184,8 @@ function _updateFiresFallback(game) {
             if (!tile.onFire) continue;
 
             tile.fireTimer--;
+            // Captured before burnout clears the structure; see the spread check below.
+            const burningPlant = PLANT_STRUCTURES.has(tile.structure);
 
             const wDef = WEATHER_TYPES[game.weather.currentWeather];
             if (wDef && wDef.extinguishesFire) {
@@ -1205,7 +1215,7 @@ function _updateFiresFallback(game) {
                 const nx = x + dir[0], ny = y + dir[1];
                 if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
                     const neighbor = game.map[ny][nx];
-                    if (!neighbor.onFire && !neighbor.sealed && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
+                    if (!neighbor.onFire && !neighbor.sealed && !(burningPlant && PLANT_STRUCTURES.has(neighbor.structure)) && (neighbor.resource?.type === 'tree' || (neighbor.structure && neighbor.structure !== 'wall'))) {
                         neighbor.onFire = true;
                         neighbor.fireTimer = FIRE_CONFIG.spreadTimerMin + Math.floor(Math.random() * (FIRE_CONFIG.spreadTimerMax - FIRE_CONFIG.spreadTimerMin));
                         game.combatEffects.push({ x: nx, y: ny, char: COMBAT_VISUALS.fireIgniteChar, color: COMBAT_VISUALS.fireIgniteColor, ttl: COMBAT_VISUALS.fireIgniteTtl });

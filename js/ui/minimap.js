@@ -543,7 +543,8 @@ export class Minimap {
     getTileColor(tile, season) {
         if (tile.sealed) return [8, 8, 12];
         if (tile.onFire && this.layerOn('fires')) return [255, 68, 0];
-        if (tile.structure && this.layerOn('buildings')) {
+        // Decorative plants show the terrain beneath rather than a building pixel.
+        if (tile.structure && this.layerOn('buildings') && BUILDINGS[tile.structure]?.structureType !== 'plant') {
             const bDef = BUILDINGS[tile.structure];
             if (bDef) {
                 const type = bDef.structureType;

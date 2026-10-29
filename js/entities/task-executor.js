@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, INDESTRUCTIBLE_STRUCTURES, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, INDESTRUCTIBLE_STRUCTURES, PLANT_STRUCTURES, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
 import { spawnParticle, spawnYieldFloaty } from '../ui/overlay-renderer.js';
 import { completeTame, finalizeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
@@ -204,6 +204,11 @@ export function completeTask(colonist, task, game) {
                 // Replacing an existing floor: it was kept in place until now.
                 if (tile.floor) recoverReplaced(game, tile.floor);
                 tile.floor = task.buildType;
+                // A floor clears any decorative plant growing on the tile.
+                if (PLANT_STRUCTURES.has(tile.structure)) {
+                    if (game.mapIndex) game.mapIndex.removeStructure(task.x, task.y, tile.structure);
+                    tile.structure = null;
+                }
             } else {
                 // Replacing an existing structure: it was kept in place until now.
                 if (tile.structure) {

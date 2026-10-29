@@ -112,6 +112,8 @@ export const RENDER_CONFIG = {
         grassCalmSwayRad: 0.05,   // ~2.9deg in still air
         grassStormSwayRad: 0.22,  // ~12.6deg at full wind (lighter than a whole tree)
         grassPhaseSpread: 6.28,
+        // Rigid plants (plant.sway 'stiff', e.g. cacti): grass sway scaled by this.
+        stiffSwayScale: 0.35,     // ~1deg calm, ~4.4deg at full wind
         // Water waves: slow vertical bob (px) + subtle alpha shimmer. No wind term.
         waterPeriodMs: 3000,
         waterBobPx: 1.5,          // peak vertical rise/fall

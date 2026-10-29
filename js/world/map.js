@@ -1,4 +1,4 @@
-import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, MAP_GENERATORS, BIOMES, BIOME_TRANSITIONS, GRASS_TERRAIN, LANDMARK_BLUEPRINTS, CRYPT_CONFIG, CRYPT_BLUEPRINTS, RUIN_LOOT, CROPS } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, PLANT_STRUCTURES, MAP_GENERATORS, BIOMES, BIOME_TRANSITIONS, GRASS_TERRAIN, UNBUILDABLE_TERRAIN, LANDMARK_BLUEPRINTS, CRYPT_CONFIG, CRYPT_BLUEPRINTS, RUIN_LOOT, CROPS } from '../core/config.js';
 
 // Background of a sealed (unexplored) crypt tile, shared by the renderer.
 export const SEALED_BG = '#050507';
@@ -65,6 +65,8 @@ export function generateMap() {
     // Last, so nothing painted above (start-area clearing, landmark and ruin floors)
     // can leave water touching normal terrain.
     generateWaterShores(map);
+    // After shores, so every pass that repaints or clears tiles has already run.
+    generatePlants(map);
     return map;
 }
 
@@ -1373,21 +1375,80 @@ function generateCrypts(map) {
 }
 
 // --- Always runs last to ensure spawn area is clear ---
+const START_AREA_RADIUS = 6;
+
+// True inside the diamond clearStartingArea keeps free around the map centre.
+function isInStartArea(x, y) {
+    const cx = Math.floor(CONFIG.MAP_WIDTH / 2);
+    const cy = Math.floor(CONFIG.MAP_HEIGHT / 2);
+    return Math.abs(x - cx) + Math.abs(y - cy) <= START_AREA_RADIUS;
+}
+
 function clearStartingArea(map) {
     const cx = Math.floor(CONFIG.MAP_WIDTH / 2);
     const cy = Math.floor(CONFIG.MAP_HEIGHT / 2);
-    const radius = 6;
+    const radius = START_AREA_RADIUS;
 
     for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
             const nx = cx + dx, ny = cy + dy;
             if (nx >= 0 && nx < CONFIG.MAP_WIDTH && ny >= 0 && ny < CONFIG.MAP_HEIGHT) {
-                if (Math.abs(dx) + Math.abs(dy) <= radius) {
+                if (isInStartArea(nx, ny)) {
                     map[ny][nx].terrain = 'grass';
                     map[ny][nx].resource = null;
                     map[ny][nx].structure = null;
                     map[ny][nx].passable = true;
                 }
+            }
+        }
+    }
+}
+
+// Scatter decorative plants (BUILDINGS with structureType 'plant') over open land
+// by biome and terrain. Each species' chance is scaled by its own smooth noise
+// field, so the same plant clusters into patches instead of salting every tile.
+function generatePlants(map) {
+    const W = CONFIG.MAP_WIDTH, H = CONFIG.MAP_HEIGHT;
+    const seed = (Math.random() * 0x7fffffff) | 0;
+    const species = [...PLANT_STRUCTURES].map((key, i) => ({ key, i, def: BUILDINGS[key].plant })).filter(s => s.def);
+    if (!species.length) return;
+
+    const isWater = (x, y) => x >= 0 && x < W && y >= 0 && y < H
+        && (map[y][x].terrain === 'water' || map[y][x].terrain === 'shallow_water');
+    const weights = new Array(species.length);
+
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const tile = map[y][x];
+            if (!tile.biome || !tile.passable || tile.sealed) continue;
+            if (tile.structure || tile.floor || tile.resource || tile.zone) continue;
+            if (UNBUILDABLE_TERRAIN.has(tile.terrain) || isInStartArea(x, y)) continue;
+
+            let nearWater = null;
+            let total = 0;
+            for (let n = 0; n < species.length; n++) {
+                const { def, i } = species[n];
+                let w = 0;
+                if (def.biomes.includes(tile.biome) && def.terrain.includes(tile.terrain)) {
+                    if (def.nearWater) {
+                        if (nearWater === null) nearWater = isWater(x - 1, y) || isWater(x + 1, y) || isWater(x, y - 1) || isWater(x, y + 1);
+                        if (!nearWater) { weights[n] = 0; continue; }
+                    }
+                    // 0.25x..1.75x of base density, varying smoothly across ~7-tile patches.
+                    w = def.density * (0.25 + 1.5 * smoothNoise(x, y, seed + i * 97, 7));
+                }
+                weights[n] = w;
+                total += w;
+            }
+            if (total <= 0) continue;
+
+            const roll = valueNoise(x + 70000, y + 70000, seed);
+            if (roll >= total) continue;
+            // Reuse the spawn roll to pick the species, weighted by its share.
+            let acc = 0;
+            for (let n = 0; n < species.length; n++) {
+                acc += weights[n];
+                if (roll < acc) { tile.structure = species[n].key; break; }
             }
         }
     }
@@ -1422,6 +1483,8 @@ export function writeTileVisuals(tile, season, out) {
         color = TILE_COLORS[tile.structure] || '#fff';
         const bDef = BUILDINGS[tile.structure];
         if (bDef && bDef.bg) bg = bDef.bg;
+        // A plant on snowy grass keeps the snow behind it.
+        else if (tile.snowCovered && bDef && bDef.structureType === 'plant' && GRASS_TERRAIN.has(tile.terrain)) bg = TILE_COLORS.snowBg;
     }
     else if (tile.zone) {
         if (tile.zone.state === 'ready') {

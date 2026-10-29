@@ -3,7 +3,7 @@
  * crop growth/blight. updateFarming is called from simulationTick every 5th
  * tick; ready crops become harvest tasks for colonists.
  */
-import { CONFIG, CROPS, TERRAIN, FARMABLE_TERRAIN, WORK_CONFIG, BLIGHT_CONFIG } from '../core/config.js';
+import { CONFIG, CROPS, TERRAIN, FARMABLE_TERRAIN, WORK_CONFIG, BLIGHT_CONFIG, PLANT_STRUCTURES } from '../core/config.js';
 import { getFoodProductionMult } from './complexBuildings.js';
 
 // Derived from the 'research' field on each crop entry
@@ -29,7 +29,14 @@ export function designateFarmZone(game, x1, y1, x2, y2, cropType) {
         for (let x = minX; x <= maxX; x++) {
             const tile = game.map[y][x];
             if (!FARMABLE_TERRAIN.has(tile.terrain)) continue;
-            if (tile.sealed || tile.structure || tile.resource || tile.zone) continue;
+            // Decorative plants are cleared to make room; any other structure blocks.
+            const isPlant = PLANT_STRUCTURES.has(tile.structure);
+            if (tile.sealed || (tile.structure && !isPlant) || tile.resource || tile.zone) continue;
+            if (isPlant) {
+                if (tile.designation) continue;
+                if (game.mapIndex) game.mapIndex.removeStructure(x, y, tile.structure);
+                tile.structure = null;
+            }
 
             tile.zone = {
                 type: 'growing',

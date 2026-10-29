@@ -1,4 +1,4 @@
-import { CONFIG, GRASS_TERRAIN, TILE_COLORS, BUILDINGS, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
+import { CONFIG, GRASS_TERRAIN, TILE_COLORS, BUILDINGS, PLANT_STRUCTURES, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
 import { writeTileVisuals, SEALED_BG } from '../world/map.js';
 import { OverlayRenderer, spawnParticle } from './overlay-renderer.js';
 import { CrtRenderer } from './crt-renderer.js';
@@ -196,6 +196,7 @@ export class Renderer {
                 const openSprite = sm.getSprite('buildings', tile.structure + '_open');
                 if (openSprite) return openSprite;
             }
+            if (PLANT_STRUCTURES.has(tile.structure)) return this._resolvePlantSprite(tile.structure, season);
             return sm.getSprite('buildings', tile.structure);
         }
         if (tile.zone) {
@@ -216,6 +217,13 @@ export class Renderer {
             return sm.getSprite('terrain', tile.terrain + '_autumn') || sm.getSprite('terrain', tile.terrain);
         }
         return sm.getSprite('terrain', tile.terrain);
+    }
+
+    // Plants try `<key>_<season>` first, so a skin can draw seasonal variants for
+    // only the plants it wants, then fall back to the plain `<key>` sprite.
+    _resolvePlantSprite(key, season) {
+        const sm = this.skinManager;
+        return (season && sm.getSprite('buildings', key + '_' + season)) || sm.getSprite('buildings', key);
     }
 
     _resolveGroundSprite(tile, season) {
@@ -498,6 +506,26 @@ export class Renderer {
     // `<terrain>_tuft_autumn` in autumn), e.g. swamp_grass_tuft, forest_grass_tuft.
     // When the skin lacks it the tuft falls back to the regular grass art, so every
     // grass terrain animates without new art.
+    // Extra sway from an entity walking through or past the tile (0 when none).
+    _grassBoostAt(now, tileKey) {
+        const boostEntry = this._grassBoost.get(tileKey);
+        if (!boostEntry) return 0;
+        const t = Math.min((now - boostEntry.startTime) / boostEntry.duration, 1);
+        return Math.sin(t * Math.PI) * boostEntry.amp;
+    }
+
+    // Wind rotation for a plant structure from its `plant.sway` profile: 'grass'
+    // flutters like a tuft (and rustles when walked past), 'stiff' is the grass
+    // flutter scaled down for rigid plants, 'shrub' leans like a tree, 'none'
+    // stays still. Each is gated by its own animation setting.
+    _plantSway(now, tileKey, structure, showTerrainDetail, showTreeSway, detailWind, treeWind) {
+        const sway = BUILDINGS[structure]?.plant?.sway;
+        if (sway === 'grass' && showTerrainDetail) return getGrassSway(now, tileKey, detailWind, this._grassBoostAt(now, tileKey));
+        if (sway === 'stiff' && showTerrainDetail) return getGrassSway(now, tileKey, detailWind, this._grassBoostAt(now, tileKey)) * (RENDER_CONFIG.terrainDetail.stiffSwayScale ?? 0.35);
+        if (sway === 'shrub' && showTreeSway) return getTreeSway(now, tileKey, treeWind);
+        return 0;
+    }
+
     _drawGrassTuft(ctx, now, tileKey, wind, px, py, cw, ch, season, terrain) {
         const sm = this.skinManager;
         const own = terrain && terrain !== 'grass';
@@ -506,13 +534,7 @@ export class Renderer {
             || (season === 'autumn' && sm.getSprite('effects', 'grass_tuft_autumn'))
             || sm.getSprite('effects', 'grass_tuft');
         if (!tuft) return false;
-        const boostEntry = this._grassBoost.get(tileKey);
-        let boostAdd = 0;
-        if (boostEntry) {
-            const t = Math.min((now - boostEntry.startTime) / boostEntry.duration, 1);
-            boostAdd = Math.sin(t * Math.PI) * boostEntry.amp;
-        }
-        const rot = getGrassSway(now, tileKey, wind, boostAdd);
+        const rot = getGrassSway(now, tileKey, wind, this._grassBoostAt(now, tileKey));
         if (rot !== 0) {
             // Sway about the tuft base (bottom-center).
             const pivotX = px + cw / 2;
@@ -1296,6 +1318,11 @@ export class Renderer {
                     if (needsGround || entity) {
                         const ground = this._resolveGroundSprite(tile, season);
                         if (ground) ctx.drawImage(ground, px, py, cw1, ch1);
+                        // Plants sit on open terrain, so blend biome edges beneath them
+                        // like a bare tile (bare tiles dither after the sprite instead).
+                        if (PLANT_STRUCTURES.has(tile.structure) && !tile.floor) {
+                            this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw1, ch1, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
+                        }
                         const material = this._resolveMaterialSprite(tile, season);
                         if (material) {
                             // A tree on a tile that also holds an entity sways behind the
@@ -1363,6 +1390,7 @@ export class Renderer {
                             const isDoorOpen = this._doorFlash.get(tileKey) > 0
                                 && BUILDINGS[tile.structure]?.structureType === 'door';
                             const structSprite = (isDoorOpen && sm.getSprite('buildings', tile.structure + '_open'))
+                                || (PLANT_STRUCTURES.has(tile.structure) && this._resolvePlantSprite(tile.structure, season))
                                 || sm.getSprite('buildings', tile.structure);
                             if (structSprite) ctx.drawImage(structSprite, px, py, cw1, ch1);
                         }
@@ -1412,9 +1440,12 @@ export class Renderer {
                         const flameRot = isFlame
                             ? Math.sin(now * 0.0006 + (tileKey % 100) * 0.63) * flameAmp
                             : 0;
-                        const treeRot = flameRot || (!entity && showTreeSway
-                            && tile.resource && tile.resource.type === 'tree')
-                            ? flameRot || getTreeSway(now, tileKey, treeWind) : 0;
+                        const isPlant = !entity && PLANT_STRUCTURES.has(tile.structure);
+                        const treeRot = isPlant
+                            ? this._plantSway(now, tileKey, tile.structure, showTerrainDetail, showTreeSway, detailWind, treeWind)
+                            : flameRot || (!entity && showTreeSway
+                                && tile.resource && tile.resource.type === 'tree')
+                                ? flameRot || getTreeSway(now, tileKey, treeWind) : 0;
                         // Breathing: stretch height, anchor feet by nudging y up by the same amount.
                         const grow = xf ? xf.growPx : 0;
                         const dx = px + shakeX - hlOff;

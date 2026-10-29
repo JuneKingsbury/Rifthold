@@ -1,4 +1,4 @@
-import { CONFIG, GRASS_TERRAIN, SEASONS, SEASON_EFFECTS, WEATHER_TYPES, SEASON_WEATHER } from '../core/config.js';
+import { CONFIG, GRASS_TERRAIN, PLANT_STRUCTURES, SEASONS, SEASON_EFFECTS, WEATHER_TYPES, SEASON_WEATHER } from '../core/config.js';
 
 export class Weather {
     constructor() {
@@ -71,7 +71,7 @@ export class Weather {
             for (let y = 0; y < map.length; y++) {
                 for (let x = 0; x < map[y].length; x++) {
                     const tile = map[y][x];
-                    if (GRASS_TERRAIN.has(tile.terrain) && !tile.structure && !tile.zone) {
+                    if (GRASS_TERRAIN.has(tile.terrain) && (!tile.structure || PLANT_STRUCTURES.has(tile.structure)) && !tile.zone) {
                         tile.snowCovered = true;
                     }
                 }

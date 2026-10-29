@@ -48,7 +48,7 @@ import { renderGlossaryHTML, initGlossaryInteraction } from '../ui/glossary.js';
 import { spawnProjectileImpact, spawnParticle } from '../ui/overlay-renderer.js';
 import { renderChangelogHTML, initChangelogInteraction, renderCreditsHTML } from '../ui/changelog.js';
 import { checkComplexStructures, hasRitualAltar } from '../systems/complexBuildings.js';
-import { COMPLEX_STRUCTURES } from './config.js';
+import { COMPLEX_STRUCTURES, PLANT_STRUCTURES } from './config.js';
 import { updateAutoRepair } from '../systems/auto-repair.js';
 import { StorySystem } from '../systems/story.js';
 import { TutorialSystem } from '../systems/tutorial.js';
@@ -3163,7 +3163,12 @@ class Game {
                         const ty = pos.y + dy;
                         if (tx < 0 || ty < 0 || tx >= CONFIG.MAP_WIDTH || ty >= CONFIG.MAP_HEIGHT) continue;
                         const tile = this.map[ty][tx];
-                        if (tile.terrain !== spell.targetTerrain && !tile.structure) {
+                        const plant = PLANT_STRUCTURES.has(tile.structure);
+                        if (tile.terrain !== spell.targetTerrain && (!tile.structure || plant)) {
+                            if (plant) {
+                                this.mapIndex?.removeStructure(tx, ty, tile.structure);
+                                tile.structure = null;
+                            }
                             tile.terrain = spell.targetTerrain;
                             tile.resource = null;
                             tile.passable = true;

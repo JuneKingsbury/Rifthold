@@ -4,7 +4,7 @@
  * queues the resulting build/gather tasks. Driven by player input, not the tick
  * loop. Colonists later execute the queued tasks.
  */
-import { BUILDINGS, RESOURCES, UNBUILDABLE_TERRAIN, WORK_CONFIG, INDESTRUCTIBLE_STRUCTURES } from '../core/config.js';
+import { BUILDINGS, RESOURCES, UNBUILDABLE_TERRAIN, WORK_CONFIG, INDESTRUCTIBLE_STRUCTURES, PLANT_STRUCTURES } from '../core/config.js';
 
 // Extra maxCount slots a building gets beyond its base def.maxCount: a
 // research-driven bonus stored on game[maxCountBonusKey], plus a special-case
@@ -170,7 +170,8 @@ export function cancelDesignation(game, x, y) {
             type: 'deconstruct',
             skillRequired: 'building',
             x, y,
-            workAmount: WORK_CONFIG.deconstructWork,
+            // Clearing a plant is a quick pull, not a teardown.
+            workAmount: PLANT_STRUCTURES.has(tile.structure) ? BUILDINGS[tile.structure].work : WORK_CONFIG.deconstructWork,
         });
     }
 }

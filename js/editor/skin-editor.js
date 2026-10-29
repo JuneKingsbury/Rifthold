@@ -549,7 +549,7 @@ class SkinEditor {
     }
 
     _buildCategoryFilter() {
-        const categories = ['Buildings', 'Terrain', 'Resources', 'Entities', 'Items', 'Materials', 'Floors', 'Farms', 'Effects', 'Icons', 'Overlays', 'Equipment Worn', 'Portraits'];
+        const categories = ['Buildings', 'Plants', 'Terrain', 'Resources', 'Entities', 'Items', 'Materials', 'Floors', 'Farms', 'Effects', 'Icons', 'Overlays', 'Equipment Worn', 'Portraits'];
         const container = document.getElementById('se-category-filter');
         container.innerHTML = categories.map(c =>
             `<button class="bp-cat${c === this.categoryFilter ? ' active' : ''}" data-cat="${c}">${c}</button>`
@@ -563,7 +563,7 @@ class SkinEditor {
         switch (this.categoryFilter) {
             case 'Buildings':
                 for (const [key, def] of Object.entries(BUILDINGS)) {
-                    if (def.structureType === 'floor') continue;
+                    if (def.structureType === 'floor' || def.structureType === 'plant') continue;
                     items.push({ key, char: def.char, color: def.color, desc: def.description || key, category: 'buildings' });
                 }
                 items.push({ key: 'scouting_wall', char: '.', color: '#444444', desc: '', category: 'buildings' });
@@ -577,6 +577,25 @@ class SkinEditor {
                 items.push({ key: 'void_door_open', char: '▒', color: '#7733bb', desc: 'Void Door (open) — shown while a colonist passes through', category: 'buildings' });
                 items.push({ key: 'fence_gate_open', char: '╪', color: '#886644', desc: 'Fence Gate (open) — shown while a colonist passes through', category: 'buildings' });
                 break;
+            case 'Plants': {
+                // Worldgen plants live in the buildings sprite category. Seasonal
+                // slots are optional: the renderer falls back to the base sprite.
+                const BIOME_ORDER = ['grassland', 'forest', 'mountain', 'swamp', 'desert', 'tundra'];
+                const biomeRank = def => {
+                    const i = BIOME_ORDER.indexOf(def.plant?.biomes?.[0]);
+                    return i < 0 ? BIOME_ORDER.length : i;
+                };
+                const plants = Object.entries(BUILDINGS).filter(([, def]) => def.structureType === 'plant')
+                    .sort(([, a], [, b]) => biomeRank(a) - biomeRank(b));
+                for (const [key, def] of plants) {
+                    const biomes = (def.plant?.biomes || []).join(', ');
+                    items.push({ key, char: def.char, color: def.color, desc: `${def.name || key} (${biomes}): ${def.description || ''}`, category: 'buildings' });
+                    for (const season of ['spring', 'summer', 'autumn', 'winter']) {
+                        items.push({ key: key + '_' + season, char: def.char, color: def.color, desc: `${def.name || key} (${season}; falls back to ${key})`, category: 'buildings' });
+                    }
+                }
+                break;
+            }
             case 'Terrain':
                 for (const [key, def] of Object.entries(TERRAIN)) {
                     items.push({ key, char: def.char, color: def.color, desc: key, category: 'terrain' });

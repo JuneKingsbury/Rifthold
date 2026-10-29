@@ -10,7 +10,7 @@ import {
     SPELLS, SPELL_TOMES, RITUALS,
     CROPS, FOODSTUFFS, NON_FOOD_CROPS,
     BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES,
-    WALL_STRUCTURES, FURNITURE_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS,
+    WALL_STRUCTURES, FURNITURE_STRUCTURES, PLANT_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS,
 } from './config.js';
 import { SOUND_MANIFEST } from './sound-manifest.js';
 import {
@@ -358,6 +358,7 @@ function _mergeBuildings(modId, data) {
         if (def.structureType === 'wall') WALL_STRUCTURES.add(key);
         if (def.structureType === 'furniture') FURNITURE_STRUCTURES.add(key);
         if (def.structureType === 'door') DOOR_STRUCTURES.add(key);
+        if (def.structureType === 'plant') PLANT_STRUCTURES.add(key);
     }
 }
 
