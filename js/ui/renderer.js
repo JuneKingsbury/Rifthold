@@ -1290,7 +1290,7 @@ export class Renderer {
                     } else {
                         entityMap.set(c.y * mapW + c.x, entData);
                     }
-                    if (drafted && c.draftTarget) {
+                    if (drafted && c.draftTarget && !game.input?._recordingMode) {
                         rallySet.set(c.draftTarget.y * mapW + c.draftTarget.x, true);
                     }
                 }

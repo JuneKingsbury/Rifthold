@@ -1,10 +1,34 @@
-import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, BUILDINGS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS, STATION_GROUPS, FLOOR_QUALITY_VALUES } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, BUILDINGS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS, STATION_GROUPS, FLOOR_QUALITY_VALUES, ROOM_REQUIREMENTS } from '../core/config.js';
 
 export const ROOM_SCORE_CAPS = {
     bedroom:  { size: 20, floor: 25, light: 20, decor: 25, coherence: 10 },
     townhall: { size: 20, floor: 25, light: 20, decor: 25, coherence: 10 },
     workshop: { size: 15, floor: 20, light: 15, focus: 25, support: 25 },
 };
+
+// Size scoring bands per room type. `metric` is what gets measured (tiles per
+// bed, total tiles, or tiles per station); bands are checked in order and the
+// first whose `max` fits the value wins. Shared with the room info panel so the
+// ideal range it shows always matches the scoring.
+export const ROOM_SIZE_BANDS = {
+    bedroom:  { metric: 'perBed',     unit: 'tiles per bed',     bands: [{ max: 3.99, score: 0 }, { max: 5, score: 10 }, { max: 12, score: 20 }, { max: 16, score: 15 }, { max: 20, score: 10 }, { max: Infinity, score: 5 }] },
+    townhall: { metric: 'total',      unit: 'tiles',             bands: [{ max: 5.99, score: 0 }, { max: 12, score: 8 }, { max: 30, score: 20 }, { max: 60, score: 15 }, { max: Infinity, score: 10 }] },
+    workshop: { metric: 'perStation', unit: 'tiles per station', bands: [{ max: 4.99, score: 0 }, { max: 7, score: 8 }, { max: 15, score: 15 }, { max: 20, score: 10 }, { max: Infinity, score: 5 }] },
+};
+
+// Score a room's size against its bands. Also reports the ideal (top-scoring)
+// range and whether the room falls short of it, inside it, or past it.
+function scoreSize(roomType, value) {
+    const bands = ROOM_SIZE_BANDS[roomType].bands;
+    let best = 0;
+    for (let i = 1; i < bands.length; i++) if (bands[i].score > bands[best].score) best = i;
+    const idealMin = best > 0 ? Math.floor(bands[best - 1].max) + 1 : 0;
+    const idealMax = bands[best].max;
+    let idx = bands.findIndex(b => value <= b.max);
+    if (idx < 0) idx = bands.length - 1;
+    const verdict = idx < best ? 'too small' : (idx > best ? 'too large' : 'ideal');
+    return { score: bands[idx].score, value, idealMin, idealMax, verdict };
+}
 
 // Reusable scratch buffers for detectRooms, sized to the map on first use and
 // kept across calls to avoid re-allocating ~200KB of typed arrays on every
@@ -162,6 +186,29 @@ function decorBenefits(bDef, roomType) {
     return bDef.decorRooms.includes(roomType);
 }
 
+// Whether a piece of furniture counts toward a room type's requirements: it
+// must already contribute to that room's score (decor for bedrooms and town
+// halls, workshop support for workshops).
+export function furnitureCountsFor(bDef, roomType) {
+    if (!bDef || !bDef.furnitureType || bDef.furnitureType === 'misc') return false;
+    if (roomType === 'workshop') return !!bDef.workshopBonus;
+    return !!bDef.roomQuality && decorBenefits(bDef, roomType);
+}
+
+function evaluateRequirements(a, roomType) {
+    const { needs, ceiling } = ROOM_REQUIREMENTS[roomType];
+    const have = {};
+    for (const [type, count] of Object.entries(a.furniture)) {
+        const bDef = BUILDINGS[type];
+        if (!furnitureCountsFor(bDef, roomType)) continue;
+        have[bDef.furnitureType] = (have[bDef.furnitureType] || 0) + count;
+    }
+    const list = Object.entries(needs).map(([type, need]) => ({
+        type, need, have: have[type] || 0, met: (have[type] || 0) >= need,
+    }));
+    return { list, allMet: list.every(r => r.met), ceiling };
+}
+
 export function getRoomContents(map, roomId) {
     const contents = { beds: [], stations: [], size: 0 };
     for (let y = 0; y < CONFIG.MAP_HEIGHT; y++) {
@@ -234,6 +281,7 @@ function analyzeRoom(map, tiles, lightSources) {
     const floorTypes = {};
     const decorations = {};
     const workshopSupport = {};
+    const furniture = {};
     const stationTypes = new Set();
     const wallTypes = new Set();
     let allWallsSturdy = true;
@@ -266,6 +314,9 @@ function analyzeRoom(map, tiles, lightSources) {
         }
         if (bDef && bDef.workshopBonus) {
             workshopSupport[tile.structure] = (workshopSupport[tile.structure] || 0) + 1;
+        }
+        if (bDef && bDef.furnitureType) {
+            furniture[tile.structure] = (furniture[tile.structure] || 0) + 1;
         }
 
         let isLit = false;
@@ -300,22 +351,14 @@ function analyzeRoom(map, tiles, lightSources) {
 
     return {
         size, bedCount, townHallCount, stationCount, flooredTiles, floorCoverage, litTiles, litRatio,
-        floorTypes, decorations, workshopSupport, stationTypes,
+        floorTypes, decorations, workshopSupport, furniture, stationTypes,
         wallTypes, allWallsSturdy, uniformFloor, floorTypeNames,
     };
 }
 
 function computeBedroomQuality(a) {
-    let sizeScore = 0;
-    if (a.bedCount > 0) {
-        const tilesPerBed = a.size / a.bedCount;
-        if (tilesPerBed < 4) sizeScore = 0;
-        else if (tilesPerBed <= 5) sizeScore = 10;
-        else if (tilesPerBed <= 12) sizeScore = 20;
-        else if (tilesPerBed <= 16) sizeScore = 15;
-        else if (tilesPerBed <= 20) sizeScore = 10;
-        else sizeScore = 5;
-    }
+    const size = scoreSize('bedroom', a.size / Math.max(1, a.bedCount));
+    const sizeScore = size.score;
 
     let floorScore = 0;
     if (a.floorCoverage > 0) {
@@ -356,7 +399,9 @@ function computeBedroomQuality(a) {
     if (a.uniformFloor && a.floorCoverage >= 0.8) coherenceScore += 5;
     if (a.allWallsSturdy && a.wallTypes.size > 0) coherenceScore += 5;
 
-    const total = Math.min(100, sizeScore + floorScore + lightScore + decorScore + coherenceScore);
+    let total = Math.min(100, sizeScore + floorScore + lightScore + decorScore + coherenceScore);
+    const requirements = evaluateRequirements(a, 'bedroom');
+    if (!requirements.allMet) total = Math.min(total, requirements.ceiling);
 
     let tier = ROOM_QUALITY_TIERS[0];
     for (let i = ROOM_QUALITY_TIERS.length - 1; i >= 0; i--) {
@@ -368,18 +413,16 @@ function computeBedroomQuality(a) {
         moodEffect: tier.moodEffect, duration: tier.duration,
         breakdown: { size: sizeScore, floor: floorScore, light: lightScore, decor: decorScore, coherence: coherenceScore },
         decorList: Object.keys(a.decorations),
+        size: { ...size, tiles: a.size, count: a.bedCount },
+        requirements,
     };
 }
 
 function computeTownHallQuality(a) {
     // A community hall wants to be roomy: score by raw tile count rather than
     // tiles-per-object (there's no per-occupant target like beds/stations).
-    let sizeScore = 0;
-    if (a.size < 6) sizeScore = 0;
-    else if (a.size <= 12) sizeScore = 8;
-    else if (a.size <= 30) sizeScore = 20;
-    else if (a.size <= 60) sizeScore = 15;
-    else sizeScore = 10;
+    const size = scoreSize('townhall', a.size);
+    const sizeScore = size.score;
 
     let floorScore = 0;
     if (a.floorCoverage > 0) {
@@ -418,7 +461,9 @@ function computeTownHallQuality(a) {
     if (a.uniformFloor && a.floorCoverage >= 0.8) coherenceScore += 5;
     if (a.allWallsSturdy && a.wallTypes.size > 0) coherenceScore += 5;
 
-    const total = Math.min(100, sizeScore + floorScore + lightScore + decorScore + coherenceScore);
+    let total = Math.min(100, sizeScore + floorScore + lightScore + decorScore + coherenceScore);
+    const requirements = evaluateRequirements(a, 'townhall');
+    if (!requirements.allMet) total = Math.min(total, requirements.ceiling);
 
     let tier = TOWN_HALL_QUALITY_TIERS[0];
     for (let i = TOWN_HALL_QUALITY_TIERS.length - 1; i >= 0; i--) {
@@ -430,18 +475,14 @@ function computeTownHallQuality(a) {
         moodEffect: tier.moodEffect, duration: tier.duration,
         breakdown: { size: sizeScore, floor: floorScore, light: lightScore, decor: decorScore, coherence: coherenceScore },
         decorList: Object.keys(a.decorations),
+        size: { ...size, tiles: a.size },
+        requirements,
     };
 }
 
 function computeWorkshopQuality(a) {
-    const tilesPerStation = a.size / Math.max(1, a.stationCount);
-
-    let sizeScore = 0;
-    if (tilesPerStation < 5) sizeScore = 0;
-    else if (tilesPerStation <= 7) sizeScore = 8;
-    else if (tilesPerStation <= 15) sizeScore = 15;
-    else if (tilesPerStation <= 20) sizeScore = 10;
-    else sizeScore = 5;
+    const size = scoreSize('workshop', a.size / Math.max(1, a.stationCount));
+    const sizeScore = size.score;
 
     let floorScore = 0;
     if (a.floorCoverage > 0) {
@@ -486,7 +527,9 @@ function computeWorkshopQuality(a) {
     }
     supportScore = Math.min(ROOM_SCORE_CAPS.workshop.support, supportScore);
 
-    const total = Math.min(100, sizeScore + floorScore + lightScore + focusScore + supportScore);
+    let total = Math.min(100, sizeScore + floorScore + lightScore + focusScore + supportScore);
+    const requirements = evaluateRequirements(a, 'workshop');
+    if (!requirements.allMet) total = Math.min(total, requirements.ceiling);
 
     let tier = WORKSHOP_QUALITY_TIERS[0];
     for (let i = WORKSHOP_QUALITY_TIERS.length - 1; i >= 0; i--) {
@@ -498,5 +541,7 @@ function computeWorkshopQuality(a) {
         speedMult: tier.speedMult, qualityBonus: tier.qualityBonus,
         breakdown: { size: sizeScore, floor: floorScore, light: lightScore, focus: focusScore, support: supportScore },
         focusGroup, supportList,
+        size: { ...size, tiles: a.size, count: a.stationCount },
+        requirements,
     };
 }

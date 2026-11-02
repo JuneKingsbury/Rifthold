@@ -96,6 +96,66 @@ ipcMain.handle('quit', () => {
   app.quit();
 });
 
+// Dev-only: the trailer director (js/dev/trailer, excluded from release builds)
+// streams recorded takes here. Never registered in packaged builds. Files go to
+// ~/Movies/Rifthold Trailer and are remuxed with ffmpeg, when installed, so
+// video editors get a regular MP4 with a proper duration and seek index.
+if (!app.isPackaged) {
+  const { execFile } = require('child_process');
+  const clipDir = () => path.join(app.getPath('videos'), 'Rifthold Trailer');
+  const clips = new Map();   // id -> { fd, tmpPath, finalPath }
+  let nextClipId = 1;
+  const findFfmpeg = () => ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg']
+    .find(p => fs.existsSync(p)) || 'ffmpeg';
+
+  ipcMain.handle('trailer:clip-begin', (_, fileName) => {
+    if (!/^[\w.-]+\.(mp4|webm)$/.test(fileName)) throw new Error('bad clip name');
+    fs.mkdirSync(clipDir(), { recursive: true });
+    // Never overwrite an earlier clip (take counters restart with a new profile).
+    const ext = path.extname(fileName), base = fileName.slice(0, -ext.length);
+    let finalPath = path.join(clipDir(), fileName);
+    for (let n = 2; fs.existsSync(finalPath) || fs.existsSync(finalPath + '.part'); n++) finalPath = path.join(clipDir(), `${base}-${n}${ext}`);
+    const tmpPath = finalPath + '.part';
+    const id = nextClipId++;
+    clips.set(id, { fd: fs.openSync(tmpPath, 'w'), tmpPath, finalPath });
+    return id;
+  });
+  ipcMain.handle('trailer:clip-append', (_, id, bytes) => {
+    const clip = clips.get(id);
+    if (clip) fs.writeSync(clip.fd, Buffer.from(bytes));
+  });
+  ipcMain.handle('trailer:clip-discard', (_, id) => {
+    const clip = clips.get(id);
+    if (!clip) return;
+    clips.delete(id);
+    fs.closeSync(clip.fd);
+    fs.rmSync(clip.tmpPath, { force: true });
+  });
+  ipcMain.handle('trailer:clip-end', async (_, id, opts = {}) => {
+    const clip = clips.get(id);
+    if (!clip) return null;
+    clips.delete(id);
+    fs.closeSync(clip.fd);
+    // Constant frame rate needs a re-encode (near-lossless); otherwise just remux.
+    const video = opts.constantFps && path.extname(clip.finalPath) === '.mp4'
+      ? ['-vf', `fps=${Number(opts.fps) || 60}`, '-c:v', 'libx264', '-preset', 'fast', '-crf', '14', '-pix_fmt', 'yuv420p', '-c:a', 'copy']
+      : ['-c', 'copy'];
+    const remuxed = await new Promise(resolve => {
+      // Low CPU priority, so a clip finishing in the background doesn't make the next take stutter.
+      const args = ['-y', '-loglevel', 'error', '-i', clip.tmpPath, ...video, '-movflags', '+faststart', '-f', path.extname(clip.finalPath).slice(1), clip.finalPath];
+      const [cmd, cmdArgs] = fs.existsSync('/usr/bin/nice') ? ['/usr/bin/nice', ['-n', '15', findFfmpeg(), ...args]] : [findFfmpeg(), args];
+      execFile(cmd, cmdArgs, (err) => resolve(!err));
+    });
+    if (remuxed) fs.rmSync(clip.tmpPath, { force: true });
+    else fs.renameSync(clip.tmpPath, clip.finalPath);   // no ffmpeg: keep the raw recording
+    return { path: clip.finalPath, remuxed };
+  });
+  ipcMain.handle('trailer:open-clips', () => {
+    fs.mkdirSync(clipDir(), { recursive: true });
+    return shell.openPath(clipDir());
+  });
+}
+
 ipcMain.handle('steam:available', () => steamBridge.steamAvailable);
 ipcMain.handle('steam:player-info', () => steamBridge.getPlayerInfo());
 ipcMain.handle('steam:get-achievements', () => steamBridge.getAchievements());

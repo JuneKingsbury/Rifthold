@@ -583,6 +583,16 @@ export async function saveToSlot(game, slotKey, opts = {}) {
     return true;
 }
 
+// Dev tooling (trailer director): encode or apply a whole game state without
+// touching save slots, slot meta or cloud sync.
+export async function serializeGame(game) {
+    return _encodeSave(JSON.stringify(_buildSaveData(game), _saveReplacer));
+}
+
+export async function applySerializedGame(game, stored) {
+    return _applyLoadData(game, JSON.parse(await _decodeSave(stored)));
+}
+
 export async function loadFromSlot(game, slotKey) {
     try {
         const stored = localStorage.getItem(slotKey);

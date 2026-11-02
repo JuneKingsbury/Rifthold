@@ -74,6 +74,27 @@ export const STATION_GROUPS = {
     loom: 'Clothier',
 };
 
+// Furniture type categories. A building's `furnitureType` names which of these
+// it counts as, so several pieces (shelf, bookcase, wardrobe) can satisfy the
+// same room requirement. `misc` pieces add decor only and never meet one.
+export const FURNITURE_TYPES = {
+    seating: 'Seating',
+    surface: 'Table / Desk',
+    storage: 'Storage',
+    tools: 'Tools',
+    centerpiece: 'Centerpiece',
+    misc: 'Misc',
+};
+
+// Furniture each room type needs to reach its top quality tiers. A room
+// missing any requirement has its total capped at `ceiling` (just below the
+// first tier that should demand a fully furnished room).
+export const ROOM_REQUIREMENTS = {
+    bedroom:  { needs: { seating: 1, surface: 1, storage: 1 }, ceiling: 74 },
+    townhall: { needs: { seating: 4, surface: 1, centerpiece: 1 }, ceiling: 74 },
+    workshop: { needs: { tools: 1, storage: 1, seating: 1 }, ceiling: 69 },
+};
+
 export const FLOOR_QUALITY_VALUES = {
     wood_floor: 15,
     stone_floor: 20,

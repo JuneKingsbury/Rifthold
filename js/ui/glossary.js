@@ -93,9 +93,10 @@ export const GLOSSARY = [
             {
                 subtitle: 'Room & Workshop Quality',
                 entries: [
-                    ['Bedrooms', 'Enclosed bedrooms (walls + door + floor + bed) have a quality score based on furnishings and decorations inside. Better bedrooms give a bigger mood bonus when colonists sleep there.'],
-                    ['Workshops', 'Crafting stations in furnished rooms gain speed and quality bonuses. Nearby tool racks, chairs, tables, and material shelves all improve workshop effectiveness.'],
-                    ['Town Hall', 'Place a Town Hall Banner in a furnished room to designate it as a gathering space. Idle colonists spend time here to socialize and get mood boosts. Better decorations improve the effect.'],
+                    ['Bedrooms', 'Enclosed bedrooms (walls + door + floor + bed) have a quality score based on furnishings and decorations inside. Better bedrooms give a bigger mood bonus when colonists sleep there. Ideal size is 6–12 tiles per bed. Requires 1 Seating, 1 Table / Desk, and 1 Storage to rise above Comfortable.'],
+                    ['Workshops', 'Crafting stations in furnished rooms gain speed and quality bonuses. Nearby tool racks, chairs, tables, and material shelves all improve workshop effectiveness. Ideal size is 8–15 tiles per station. Requires 1 Tools, 1 Storage, and 1 Seating to rise above Professional.'],
+                    ['Town Hall', 'Place a Town Hall Banner in a furnished room to designate it as a gathering space. Idle colonists spend time here to socialize and get mood boosts. Better decorations improve the effect. Ideal size is 13–30 tiles. Requires 4 Seating, 1 Table / Desk, and 1 Centerpiece to become Majestic.'],
+                    ['Furniture Types', 'Each furnishing counts as a type: Seating (chair, stool, bench, armchair), Table / Desk (table, nightstand, desk), Storage (shelf, bookcase, wardrobe, material shelf, crate), Tools (tool rack, weapon rack, grindstone), or Centerpiece (podium, statue, war table). A piece only meets a requirement in rooms it improves. Misc pieces (potted plant, personal chest, painting, tapestry) add decoration but never meet a requirement. Click a room to see what it still needs.'],
                 ]
             },
         ]

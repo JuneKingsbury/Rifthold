@@ -2524,6 +2524,9 @@ function updateWorking(colonist, game) {
         }
     }
 
+    // Dev-only work multiplier (trailer director). Unset in normal play.
+    if (game.devWorkMult) speed *= game.devWorkMult;
+
     task.workDone += speed;
     colonist.workProgress = task.workDone / task.workAmount;
 
@@ -3230,6 +3233,8 @@ export function colonistTakeDamage(colonist, damage, game, attacker, isDot = fal
         }
     }
     colonist.hp -= actualDmg;
+    // Dev-only no-death flag (trailer director). Unset in normal play.
+    if (game.devNoDeath && colonist.hp < 1) colonist.hp = 1;
     colonist._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
     // Show every hit (matching enemy damage text). Previously gated at >= 5, which
     // hid low-damage hits like raider-archer arrows (~2 dmg after rebalancing).

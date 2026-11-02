@@ -1001,6 +1001,8 @@ export class ExplorationSystem {
     }
 
     _checkExpeditionRevive(exp, member, game) {
+        // Dev-only no-death flag (trailer director). Unset in normal play.
+        if (game?.devNoDeath) { member.hp = 1; return; }
         const slots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
         for (const slot of slots) {
             const item = member[slot];

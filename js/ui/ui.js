@@ -1,5 +1,6 @@
 import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
-import { ROOM_SCORE_CAPS } from '../world/rooms.js';
+import { ROOM_SCORE_CAPS, ROOM_SIZE_BANDS, furnitureCountsFor } from '../world/rooms.js';
+import { FURNITURE_TYPES } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getItemTradeValue } from '../entities/item-roll.js';
@@ -2472,6 +2473,45 @@ export class UI {
         return html;
     }
 
+    // Size row for a room section: points earned plus the room's actual size
+    // and the ideal range for its type, so players can see what to aim for.
+    _roomSizeRowHtml(q, roomType, cap) {
+        const sz = q.size;
+        const band = ROOM_SIZE_BANDS[roomType];
+        const noun = roomType === 'bedroom' ? 'bed' : 'station';
+        let actual = `${sz.tiles} tiles`;
+        if (band.metric !== 'total') {
+            const per = Math.round(sz.value * 10) / 10;
+            actual += `, ${sz.count} ${noun}${sz.count === 1 ? '' : 's'} (${per}/${noun})`;
+        }
+        const ideal = sz.idealMax === Infinity ? `${sz.idealMin}+` : `${sz.idealMin}–${sz.idealMax}`;
+        const ok = sz.verdict === 'ideal';
+        const verdict = ok ? '' : ` <span style="color:#ffaa44;">(${sz.verdict})</span>`;
+        return `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${sz.score} / ${cap} — ${actual}. <span style="color:${ok ? '#88ff88' : '#888'};">Ideal ${ideal} ${band.unit}</span>${verdict}</div>`;
+    }
+
+    // Required-furniture checklist for a room section. Missing entries list the
+    // pieces that would satisfy them in this room type.
+    _roomRequirementsHtml(q, roomType) {
+        const req = q.requirements;
+        let html = `<div class="info-row" style="color:#888;font-size:0.85em;">  Required furniture:</div>`;
+        for (const r of req.list) {
+            const label = escapeHtml(FURNITURE_TYPES[r.type] || r.type);
+            if (r.met) {
+                html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">    ✓ ${label} ${r.have}/${r.need}</div>`;
+            } else {
+                const options = Object.entries(BUILDINGS)
+                    .filter(([, b]) => b.furnitureType === r.type && !b.noBuild && furnitureCountsFor(b, roomType))
+                    .map(([k, b]) => (b.name || k).replace(/_/g, ' '));
+                html += `<div class="info-row" style="color:#ff7766;font-size:0.85em;">    ✗ ${label} ${r.have}/${r.need}${options.length ? ` (${escapeHtml(options.join(', '))})` : ''}</div>`;
+            }
+        }
+        if (!req.allMet) {
+            html += `<div class="info-row" style="color:#ffaa44;font-size:0.85em;">  Max quality ${req.ceiling} until all required furniture is placed</div>`;
+        }
+        return html;
+    }
+
     _buildRoomQualityHtml(roomId) {
         let html = '';
         const rq = this.game.roomQualities[roomId];
@@ -2486,7 +2526,8 @@ export class UI {
             html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → Mood +${th.moodEffect} for ${th.duration} ticks when relaxing here</div>`;
             const b = th.breakdown;
             const thCaps = ROOM_SCORE_CAPS.townhall;
-            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${thCaps.size}</div>`;
+            html += this._roomRequirementsHtml(th, 'townhall');
+            html += this._roomSizeRowHtml(th, 'townhall', thCaps.size);
             if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${thCaps.floor}</div>`;
             if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${thCaps.light}</div>`;
             if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${thCaps.decor} (${escapeHtml(th.decorList.map(d => d.replace(/_/g, ' ')).join(', '))})</div>`;
@@ -2497,7 +2538,8 @@ export class UI {
             html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → Mood +${rq.moodEffect} for ${rq.duration} ticks when sleeping here</div>`;
             const b = rq.breakdown;
             const rqCaps = ROOM_SCORE_CAPS.bedroom;
-            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${rqCaps.size}</div>`;
+            html += this._roomRequirementsHtml(rq, 'bedroom');
+            html += this._roomSizeRowHtml(rq, 'bedroom', rqCaps.size);
             if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${rqCaps.floor}</div>`;
             if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${rqCaps.light}</div>`;
             if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${rqCaps.decor} (${escapeHtml(rq.decorList.map(d => d.replace(/_/g, ' ')).join(', '))})</div>`;
@@ -2508,7 +2550,8 @@ export class UI {
             html += `<div class="info-row" style="color:#ffcc44;font-weight:bold;">Workshop — ${label} (${wq.total}/100)</div>`;
             const b = wq.breakdown;
             const wqCaps = ROOM_SCORE_CAPS.workshop;
-            if (b.size > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${b.size} / ${wqCaps.size}</div>`;
+            html += this._roomRequirementsHtml(wq, 'workshop');
+            html += this._roomSizeRowHtml(wq, 'workshop', wqCaps.size);
             if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${wqCaps.floor}</div>`;
             if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${wqCaps.light}</div>`;
             if (b.focus > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Focus: +${b.focus} / ${wqCaps.focus}${wq.focusGroup ? ` (${escapeHtml(wq.focusGroup)})` : ''}</div>`;
@@ -4857,6 +4900,7 @@ export class UI {
         general += `<button onclick="window.game.cheatAdvanceTime(parseInt(document.getElementById('debug-time-amount').value)||300)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Advance Ticks</button>`;
         general += `<span style="color:#666;font-size:10px;">(300=1 day)</span>`;
         general += `</div>`;
+        if (window.trailerDirectorAvailable) general += `<button onclick="window.toggleTrailerDirector?.()" class="settings-btn settings-btn-danger">Toggle Trailer Director</button>`;
         general += `<button onclick="window.game.cheatUnlockAllStory()" class="settings-btn settings-btn-danger">Unlock All Story Milestones</button>`;
         general += `<button onclick="window.game.cheatUnlockAllBestiary()" class="settings-btn settings-btn-danger">Unlock All Bestiary Entries</button>`;
         const curMax = this.game.debugMaxSpeed || 3;

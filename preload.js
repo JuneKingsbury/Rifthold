@@ -21,6 +21,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cloudList:   ()               => ipcRenderer.invoke('gdrive:list'),
   },
   writePortrait: (filename, base64Data) => ipcRenderer.invoke('write-portrait', filename, base64Data),
+  // Dev-only trailer clip saving; the handlers only exist in unpackaged builds.
+  trailer: {
+    beginClip:   (fileName)  => ipcRenderer.invoke('trailer:clip-begin', fileName),
+    appendClip:  (id, bytes) => ipcRenderer.invoke('trailer:clip-append', id, bytes),
+    endClip:     (id, opts)  => ipcRenderer.invoke('trailer:clip-end', id, opts),
+    discardClip: (id)        => ipcRenderer.invoke('trailer:clip-discard', id),
+    openFolder:  ()          => ipcRenderer.invoke('trailer:open-clips'),
+  },
   scanModsDir: (dirPath) => ipcRenderer.invoke('mods:scan-dir', dirPath),
   readModFile: (fileUrl) => ipcRenderer.invoke('mods:read-file', fileUrl),
   getDefaultModsPath: () => ipcRenderer.invoke('mods:default-path'),

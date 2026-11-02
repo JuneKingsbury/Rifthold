@@ -4338,6 +4338,13 @@ function zoomOut() {
 window.zoomIn = zoomIn;
 window.zoomOut = zoomOut;
 window.fitGameFont = fitGameFont;
+// Exact zoom for dev tooling (trailer director). Snaps, no smoothing.
+window.setZoomFont = (font) => {
+    currentZoomFont = Math.max(MIN_FONT, Math.min(MAX_FONT, font));
+    _zoomTarget = null;
+    fitGameFont();
+};
+window.getZoomFont = () => currentZoomFont ?? 14;
 
 function resetMinimapSize() {
     const container = document.getElementById('minimap-container');
@@ -6280,6 +6287,9 @@ _onDOMReady(() => {
         PATHFINDING_CONFIG.maxNodes         = p.maxNodes;
         PATHFINDING_CONFIG.raiderSearchRadius = p.raiderSearchRadius;
     }
+
+    // Dev tooling (trailer director) starts games from code, skipping the start screens.
+    window.__riftholdDev = { launchGame, applyWorldPreset };
 
     function promptWorldSize(onChoose) {
         const modal = document.getElementById('world-size-modal');
