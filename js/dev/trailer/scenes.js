@@ -53,6 +53,13 @@ function homePlan(ctx) {
     return p;
 }
 
+// The village before the time-lapse grows it: the first cabin and the
+// single-tile stations around it.
+function villageCore(p) {
+    const one = q => ({ x: q.x, y: q.y, w: 1, h: 1 });
+    return [p.cabin, ...[p.campfire, p.workbench, p.anvil, ...(p.crystals || [])].filter(Boolean).map(one)];
+}
+
 // Puts the first structures down instantly, for scenes loaded without the
 // gathering take before them.
 function ensureHome(ctx) {
@@ -345,21 +352,28 @@ export const SCENES = [
             ensureMidgame(ctx);
             undraftAll(ctx);
             for (const c of s.colonists()) s.priorities(c, { building: 1, farming: 2, animals: 2 });
-            const avoid = [p.cabin];
-            const pick = (w, h, near, opts = {}) => {
-                const r = s.findOpenRect(w, h, near, { margin: 1, avoid, ...opts });
-                if (r) avoid.push(r);
+            // Packed around the first cabin, biggest first, each on the spot
+            // that grows the closing frame least, so the camera can stay close.
+            // Trees and rocks on a site don't rule it out: the colonists clear
+            // them on camera (see run). Plants are simply built over.
+            const placed = villageCore(p);
+            const pick = (w, h) => {
+                const r = s.findCompactRect(w, h, placed, s.rectCenter(p.cabin));
+                if (r) placed.push(r);
                 return r;
             };
-            const v = s.rectCenter(p.cabin);
-            p.expansion = {
-                cabin2: pick(7, 5, { x: v.x - 9, y: v.y }),
-                cabin3: pick(7, 5, { x: v.x + 9, y: v.y - 5 }),
-                farm: pick(6, 4, { x: v.x - 7, y: v.y + 8 }),
-                pen: pick(7, 6, { x: v.x + 9, y: v.y + 7 }),
-                hall: pick(9, 6, { x: v.x, y: v.y - 9 }),
-                workshop: pick(8, 6, { x: v.x - 10, y: v.y - 9 }),
-            };
+            const e = p.expansion = {};
+            e.hall = pick(9, 6);
+            e.workshop = pick(8, 6);
+            // The pen, with a paddock beside it for the animals waiting to be tamed.
+            const ranch = pick(13, 6);
+            if (ranch) {
+                e.pen = { x: ranch.x, y: ranch.y, w: 7, h: 6 };
+                e.paddock = { x: ranch.x + 9, y: ranch.y, w: 4, h: 6 };
+            }
+            e.cabin2 = pick(7, 5);
+            e.cabin3 = pick(7, 5);
+            e.farm = pick(6, 4);
         },
         shot: ctx => at(ctx.stage.rectCenter(ctx.plan.cabin), 22),
         async run(ctx) {
@@ -368,11 +382,17 @@ export const SCENES = [
             ctx.speed(15);
             ctx.mark('timelapse start');
             // Long pull-back across the whole time-lapse, ending on a frame that
-            // holds every new building. findOpenRect can push one well away from
-            // its target spot when space is tight, so frame where they landed.
-            const sites = [ctx.plan.cabin, ...Object.values(e).filter(Boolean)];
-            if (e.pen) sites.push({ x: e.pen.x + e.pen.w + 3, y: e.pen.y + 1, w: 4, h: 4 });   // animals waiting to be tamed
-            ctx.cam.move(frameRects(sites, { margin: 2, maxZoom: 16 }), 32, 'sine');
+            // holds every new building and the animals' paddock.
+            const sites = [...villageCore(ctx.plan), ...Object.values(e).filter(Boolean)];
+            ctx.cam.move(frameRects(sites, { margin: 2, maxZoom: 20 }), 32, 'sine');
+            // Every site (and the path around it) is marked for clearing up front,
+            // so the crew chops and mines ahead of the builds; each build waits
+            // for its own ground. A site that won't clear in time is built anyway
+            // (blueprint drops whatever is left on a tile).
+            const clearing = new Map(Object.values(e).filter(Boolean).map(r =>
+                [r, s.clearSite({ x: r.x - 1, y: r.y - 1, w: r.w + 2, h: r.h + 2 })]));
+            if ([...clearing.values()].some(t => t.length)) ctx.mark('clearing');
+            const siteReady = (r) => ctx.until(() => s.cleared(clearing.get(r)), 20);
             const place = async (tiles) => { for (const t of tiles) { s.blueprint(t.x, t.y, t.type); await ctx.sleep(0.02); } };
             // Shell (walls, door, floor) first; the furniture goes in once the
             // floor under it is down, like a player furnishing a finished room.
@@ -386,12 +406,13 @@ export const SCENES = [
                 job.catch(() => {});   // a cancelled take rejects it; the final await reports that
                 furnishing.push(job);
             };
-            const build = async (tiles) => {
+            const build = async (site, tiles) => {
+                await siteReady(site);
                 const furniture = tiles.filter(t => t.furniture);
                 await place(tiles.filter(t => !t.furniture));
                 if (furniture.length) furnishWhenBuilt(furniture, furniture);
             };
-            if (e.cabin2) await build(s.roomPlan(e.cabin2, { doorSide: 'right', floor: 'wood_floor', furniture: ['bed', 'bed', 'nightstand', 'wardrobe', 'chair', 'candle'] }));
+            if (e.cabin2) await build(e.cabin2, s.roomPlan(e.cabin2, { doorSide: 'right', floor: 'wood_floor', furniture: ['bed', 'bed', 'nightstand', 'wardrobe', 'chair', 'candle'] }));
             await ctx.sleep(1.5);
             // Decorate the first cabin: floor it, then fill it out around the beds.
             ctx.mark('decorate bedroom');
@@ -399,29 +420,30 @@ export const SCENES = [
             await place(firstFloor);
             furnishWhenBuilt(firstFloor, () => s.decorPlan(ctx.plan.cabin, ['wardrobe', 'nightstand', 'chair', 'rug', 'candle', 'potted_plant']));
             await ctx.sleep(1.5);
-            if (e.farm) { s.farm(e.farm, 'wheat'); ctx.mark('farm'); }
+            if (e.farm) { await siteReady(e.farm); s.farm(e.farm, 'wheat'); ctx.mark('farm'); }
             await ctx.sleep(1.5);
             if (e.pen) {
                 ctx.mark('animal pen');
-                await build(s.roomPlan(e.pen, { wall: 'fence', door: 'fence_gate', doorSide: 'left' }));
+                await build(e.pen, s.roomPlan(e.pen, { wall: 'fence', door: 'fence_gate', doorSide: 'left' }));
                 s.blueprint(e.pen.x + 3, e.pen.y + 2, 'beast_circle');
             }
             await ctx.sleep(2);
             s.spawnColonist(Math.round(v.x - 30), Math.round(v.y + 4), 'farming');
             ctx.mark('newcomer');
-            if (e.cabin3) await build(s.roomPlan(e.cabin3, { doorSide: 'left', floor: 'wood_floor', furniture: ['bed', 'bed', 'table', 'chair', 'shelf', 'candle'] }));
+            if (e.cabin3) await build(e.cabin3, s.roomPlan(e.cabin3, { doorSide: 'left', floor: 'wood_floor', furniture: ['bed', 'bed', 'table', 'chair', 'shelf', 'candle'] }));
             // Animals to tame once the beast circle is up.
+            if (e.paddock) await siteReady(e.paddock);
             const animals = e.pen ? ['cow', 'sheep', 'chicken', 'deer'].map((type, i) =>
-                s.spawnAnimal(type, e.pen.x + e.pen.w + 3 + i, e.pen.y + 1 + (i % 2) * 3)) : [];
+                s.spawnAnimal(type, e.paddock.x + i, e.paddock.y + 1 + (i % 2) * 3)) : [];
             await ctx.sleep(2);
             if (e.workshop) {
                 ctx.mark('workshop');
-                await build(s.roomPlan(e.workshop, { floor: 'wood_floor', furniture: ['workbench', 'loom', 'alchemy_table', 'tool_rack', 'crate', 'stool', 'candle'] }));
+                await build(e.workshop, s.roomPlan(e.workshop, { floor: 'wood_floor', furniture: ['workbench', 'loom', 'alchemy_table', 'tool_rack', 'crate', 'stool', 'candle'] }));
             }
             await ctx.sleep(1);
             if (e.hall) {
                 ctx.mark('town hall');
-                await build(s.roomPlan(e.hall, { wall: 'stone_wall', floor: 'wood_floor', furniture: ['town_hall_banner', 'statue', 'table', 'chair', 'chair', 'bench', 'bench', 'candle', 'potted_plant'] }));
+                await build(e.hall, s.roomPlan(e.hall, { wall: 'stone_wall', floor: 'wood_floor', furniture: ['town_hall_banner', 'statue', 'table', 'chair', 'chair', 'bench', 'bench', 'candle', 'potted_plant'] }));
             }
             if (e.pen) {
                 await ctx.until(() => !!s.find('beast_circle'), 20);

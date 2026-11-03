@@ -47,13 +47,28 @@ export class Stage {
 
     inBounds(x, y) { return x > 1 && y > 1 && x < CONFIG.MAP_WIDTH - 2 && y < CONFIG.MAP_HEIGHT - 2; }
 
-    isOpen(x, y, { allowResource = false } = {}) {
+    // `clearable` also counts trees, rocks and plants as open: clearRect
+    // removes them before building. Rock terrain with nothing to mine stays solid.
+    isOpen(x, y, { allowResource = false, clearable = false } = {}) {
         const t = this.tile(x, y);
         if (!t || !this.inBounds(x, y)) return false;
         if (UNBUILDABLE_TERRAIN.has(t.terrain)) return false;
-        if (t.terrain === 'rock' || t.terrain === 'red_rock') return false;
-        if (t.sealed || t.structure || t.zone || t.designation) return false;
-        if (t.resource && !allowResource) return false;
+        if ((t.terrain === 'rock' || t.terrain === 'red_rock') && !(clearable && t.resource)) return false;
+        if (t.sealed || t.zone || t.designation) return false;
+        if (t.structure && !(clearable && PLANT_STRUCTURES.has(t.structure))) return false;
+        if (t.resource && !allowResource && !clearable) return false;
+        return true;
+    }
+
+    // True if the w×h rect at (x0, y0), plus `margin` tiles around it, is open
+    // ground with nobody standing on it.
+    _rectOpen(x0, y0, w, h, margin, opts) {
+        for (let y = y0 - margin; y < y0 + h + margin; y++) {
+            for (let x = x0 - margin; x < x0 + w + margin; x++) {
+                if (!this.isOpen(x, y, opts)) return false;
+                if (this.game.colonists.some(c => c.hp > 0 && !c.onExpedition && c.x === x && c.y === y)) return false;
+            }
+        }
         return true;
     }
 
@@ -61,12 +76,7 @@ export class Stage {
     // outward in rings. `avoid` rects are kept clear too (planned buildings).
     findOpenRect(w, h, near = this.anchor, { minDist = 0, maxDist = 60, margin = 1, avoid = [], allowResource = false } = {}) {
         const fits = (x0, y0) => {
-            for (let y = y0 - margin; y < y0 + h + margin; y++) {
-                for (let x = x0 - margin; x < x0 + w + margin; x++) {
-                    if (!this.isOpen(x, y, { allowResource })) return false;
-                    if (this.game.colonists.some(c => c.hp > 0 && !c.onExpedition && c.x === x && c.y === y)) return false;
-                }
-            }
+            if (!this._rectOpen(x0, y0, w, h, margin, { allowResource })) return false;
             for (const r of avoid) {
                 if (x0 < r.x + r.w + margin && x0 + w + margin > r.x && y0 < r.y + r.h + margin && y0 + h + margin > r.y) return false;
             }
@@ -86,6 +96,35 @@ export class Stage {
     }
 
     rectCenter(r) { return { x: r.x + r.w / 2, y: r.y + r.h / 2 }; }
+
+    // Spot for a w×h rect that keeps a group of rects tight in a 16:9 shot:
+    // of the open spots within maxDist of `near`, the one that grows the
+    // frame around `placed` least, then the one nearest `near`. Keeps `gap`
+    // tiles from every placed rect. Trees, rocks and plants count as open
+    // ground: clear the result (clearSite, or clearRect off camera) before
+    // building on it.
+    findCompactRect(w, h, placed, near = this.anchor, { maxDist = 30, gap = 2, margin = 1, aspect = 16 / 9 } = {}) {
+        const box = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+        for (const r of placed) {
+            box.x0 = Math.min(box.x0, r.x); box.x1 = Math.max(box.x1, r.x + r.w);
+            box.y0 = Math.min(box.y0, r.y); box.y1 = Math.max(box.y1, r.y + r.h);
+        }
+        const cx = Math.round(near.x - w / 2), cy = Math.round(near.y - h / 2);
+        let best = null;
+        for (let y = cy - maxDist; y <= cy + maxDist; y++) {
+            for (let x = cx - maxDist; x <= cx + maxDist; x++) {
+                // Score first: the tile checks are the slow part.
+                const fw = Math.max(box.x1, x + w) - Math.min(box.x0, x);
+                const fh = Math.max(box.y1, y + h) - Math.min(box.y0, y);
+                const frame = Math.max(fw, fh * aspect), dist = Math.hypot(x - cx, y - cy);
+                if (best && (frame > best.frame || (frame === best.frame && dist >= best.dist))) continue;
+                if (placed.some(r => x < r.x + r.w + gap && x + w + gap > r.x && y < r.y + r.h + gap && y + h + gap > r.y)) continue;
+                if (!this._rectOpen(x, y, w, h, margin, { clearable: true })) continue;
+                best = { x, y, frame, dist };
+            }
+        }
+        return best && { x: best.x, y: best.y, w, h };
+    }
 
     // Nearest open, walkable tile to `p` (for spawning things that must stand somewhere).
     openNear(p) {
@@ -389,6 +428,18 @@ export class Stage {
         }
         return n;
     }
+
+    // Chop and mine orders for every tree and rock in a rectangle, the way a
+    // player clears a building site. Returns the tiles that got an order.
+    clearSite(r) {
+        const tiles = [];
+        for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (this.tile(x, y)?.resource) tiles.push({ x, y });
+        this.designate(tiles);
+        return tiles.filter(p => this.tile(p.x, p.y)?.designation);
+    }
+
+    // True once none of these tiles holds a tree or rock.
+    cleared(tiles) { return tiles.every(p => !this.tile(p.x, p.y)?.resource); }
 
     farm(r, crop = 'wheat') {
         return designateFarmZone(this.game, r.x, r.y, r.x + r.w - 1, r.y + r.h - 1, crop);

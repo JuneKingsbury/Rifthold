@@ -2,7 +2,8 @@ import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAM
 import { spawnParticle, spawnDamageText, spawnImpactSpray } from '../ui/overlay-renderer.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist, wasLastSearchExhausted } from '../world/pathfinding.js';
-import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture } from '../world/map.js';
+import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture, isDraftBreakableWall } from '../world/map.js';
+import { attackStructure } from './combat.js';
 import { moveEntity, computeMoveDuration, computeMoveCooldown, teleportEntity } from '../systems/movement-lerp.js';
 import { FOODSTUFFS } from '../systems/resources.js';
 import { spawnSummon } from './summons.js';
@@ -179,6 +180,7 @@ export function createColonist(x, y, skillBias, existingNames = [], forcedRace =
         group: null,
         drafted: false,
         draftTarget: null,
+        draftBreakTarget: null,
         guardMode: false,
         guardPost: null,
         stateTimer: 0,
@@ -242,7 +244,7 @@ export function createGolem(type, x, y) {
         currentTaskId: null, path: [], workProgress: 0,
         assignedBed: null,
         weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null,
-        drafted: false, draftTarget: null,
+        drafted: false, draftTarget: null, draftBreakTarget: null,
         guardMode: false, guardPost: null,
         stateTimer: 0, wanderCooldown: 0, moveCooldown: 0,
         golem: true, golemType: type,
@@ -3055,6 +3057,7 @@ function updateFleeing(colonist, game) {
 function updateDrafted(colonist, game) {
     if (!colonist.drafted) {
         colonist.state = 'idle';
+        colonist.draftBreakTarget = null;
         return;
     }
     const threat = findNearestHostile(colonist, game);
@@ -3069,6 +3072,10 @@ function updateDrafted(colonist, game) {
     }
     if (colonist.moveCooldown > 0) {
         colonist.moveCooldown--;
+        return;
+    }
+    if (colonist.draftBreakTarget) {
+        updateDraftBreak(colonist, game);
         return;
     }
     if (colonist.draftTarget) {
@@ -3119,6 +3126,60 @@ function updateDrafted(colonist, game) {
         }
         if (colonist.x === colonist.draftTarget.x && colonist.y === colonist.draftTarget.y) {
             colonist.draftTarget = null;
+        }
+    }
+}
+
+// Drafted wall-break order (right-click a wall): walk beside the wall and bash it
+// on the colonist's attack cooldown until it falls, the way raiders breach walls.
+// Uses attackStructure so a wall broken here is cleaned up like a raider-broken one.
+function updateDraftBreak(colonist, game) {
+    const bt = colonist.draftBreakTarget;
+    if (!isDraftBreakableWall(game.map, bt.x, bt.y)) {
+        colonist.draftBreakTarget = null;
+        return;
+    }
+    if (manhattanDist(colonist.x, colonist.y, bt.x, bt.y) > 1) {
+        fightStepToward(colonist, bt, true, game);
+        // No free tile beside the wall can be reached: drop the order rather than stand idle.
+        if (colonist._fightPath.length === 0 && colonist._fightPathRetryAt > game.tick) {
+            colonist.draftBreakTarget = null;
+            game.notifications.push({ text: `${colonist.name} can't reach that wall`, tick: game.tick, type: 'warning' });
+        }
+        return;
+    }
+
+    const weapon = colonist.weapon;
+    const baseCooldown = (weapon && weapon.attackCooldown) || COLONIST_CONFIG.baseAttackCooldown;
+    let atkSpeed = 1 + getEquipmentStat(colonist, 'attackSpeed');
+    let atkSlowDiv = 1;
+    if (colonist.activeEffects) {
+        for (const e of colonist.activeEffects) {
+            if (e.type === 'attackSpeed' && e.attackSpeed) atkSpeed += e.attackSpeed;
+            if (e.type === 'slow' && e.attackSlowMult) atkSlowDiv = Math.min(atkSlowDiv, e.attackSlowMult);
+        }
+    }
+    const effectiveCooldown = Math.max(1, Math.round((baseCooldown / atkSpeed) / atkSlowDiv));
+    if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
+    colonist._lastAttackTick = game.tick;
+    colonist._lastAttackKind = (weapon && !weapon.ranged && weapon.attackAnim) || 'Swing';
+    colonist._lastAttackDir = { dx: Math.sign(bt.x - colonist.x), dy: Math.sign(bt.y - colonist.y) };
+    colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
+
+    let dmg = weapon ? weapon.damage : WEAPONS.fists.damage;
+    for (const item of getEquippedItems(colonist)) {
+        if (item !== weapon && item.damage) dmg += item.damage;
+    }
+    dmg += Math.floor(Math.random() * COLONIST_CONFIG.combatDamageVariance);
+    if (colonist.pedestalDamageBonus > 1) dmg = Math.floor(dmg * colonist.pedestalDamageBonus);
+    dmg = Math.max(1, Math.floor(dmg * getTraitDamageMult(colonist)));
+    attackStructure(game, bt.x, bt.y, dmg);
+    if (!isDraftBreakableWall(game.map, bt.x, bt.y)) {
+        // The wall is down: clear the order for everyone else who was bashing it too.
+        for (const c of game.colonists) {
+            if (c.draftBreakTarget && c.draftBreakTarget.x === bt.x && c.draftBreakTarget.y === bt.y) {
+                c.draftBreakTarget = null;
+            }
         }
     }
 }

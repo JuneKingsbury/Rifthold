@@ -96,6 +96,7 @@ export class Renderer {
         // Reusable Maps cleared each frame to avoid GC pressure
         this._entityMap = new Map();
         this._rallySet = new Map();
+        this._breakTargetSet = new Map();
         this._portalMap = new Map();
         this._portalPathMap = new Map();
         this._effectMap = new Map();
@@ -1221,6 +1222,7 @@ export class Renderer {
         const entityMap = this._entityMap;
         const movingEntities = this._movingEntities;
         const rallySet = this._rallySet;
+        const breakTargetSet = this._breakTargetSet;
         const portalMap = this._portalMap;
         const portalPathMap = this._portalPathMap;
         if (!this._dyingEntities) this._dyingEntities = [];
@@ -1276,6 +1278,7 @@ export class Renderer {
             }
             
             rallySet.clear();
+            breakTargetSet.clear();
             for (const c of colonists) {
                 if (c.hp > 0 && !c.onExpedition) {
                     const drafted = c.drafted;
@@ -1300,6 +1303,10 @@ export class Renderer {
                     }
                     if (drafted && c.draftTarget && !game.input?._recordingMode) {
                         rallySet.set(c.draftTarget.y * mapW + c.draftTarget.x, true);
+                    }
+                    if (drafted && c.draftBreakTarget && !game.input?._recordingMode) {
+                        const bt = c.draftBreakTarget;
+                        breakTargetSet.set(bt.y * mapW + bt.x, bt);
                     }
                 }
             }
@@ -2814,6 +2821,43 @@ export class Renderer {
         }
 
         if (rprof) { const t = performance.now(); rprof.add('render:night', t - rmark); rmark = t; }
+
+        // Crosshair on each wall drafted colonists were ordered to break (right-click a
+        // wall). Drawn after entities and the night overlay so it stays readable, in
+        // both ASCII and sprite modes. A dark under-stroke keeps it visible on any wall.
+        if (breakTargetSet.size > 0) {
+            const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
+            const lw = Math.max(2, cw1 * 0.1);
+            ctx.save();
+            ctx.lineCap = 'round';
+            for (const bt of breakTargetSet.values()) {
+                if (bt.x < camera.x - 1 || bt.x > camera.x + vw + 1 || bt.y < camera.y - 1 || bt.y > camera.y + vh + 1) continue;
+                const tx = (bt.x * tileP + tileOffX) / dpr;
+                const ty = (bt.y * tileP + tileOffY) / dpr;
+                const cx = tx + cw1 / 2;
+                const cy = ty + ch1 / 2;
+                const r = cw1 * (0.34 + 0.05 * pulse);
+                ctx.globalAlpha = 0.18 + 0.14 * pulse;
+                ctx.fillStyle = '#ff2222';
+                ctx.fillRect(tx, ty, cw1, ch1);
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                // Four ticks crossing the ring, leaving the centre open.
+                for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    ctx.moveTo(cx + dx * r * 0.4, cy + dy * r * 0.4);
+                    ctx.lineTo(cx + dx * r * 1.5, cy + dy * r * 1.5);
+                }
+                ctx.globalAlpha = 0.85;
+                ctx.strokeStyle = '#1a0000';
+                ctx.lineWidth = lw + 2;
+                ctx.stroke();
+                ctx.globalAlpha = 0.8 + 0.2 * pulse;
+                ctx.strokeStyle = '#ff3b3b';
+                ctx.lineWidth = lw;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
 
         this.overlayRenderer.render(game, cw, ch, game.camera);
 

@@ -1583,6 +1583,14 @@ export function isBreakableByEnemies(map, x, y) {
     return BREAKABLE_STRUCTURES.has(map[y][x].structure);
 }
 
+// True when drafted colonists can be ordered to bash down the structure at (x,y):
+// a breakable wall (not a door, which colonists walk through) outside a sealed crypt.
+export function isDraftBreakableWall(map, x, y) {
+    if (!isBreakableByEnemies(map, x, y)) return false;
+    const tile = map[y][x];
+    return WALL_STRUCTURES.has(tile.structure) && !tile.sealed;
+}
+
 // True when the tile holds a furniture structure entities can walk through (beds,
 // chairs, workbenches, etc.). Impassable furniture is excluded by isPassable
 // before this is consulted, so callers use it only to add a soft routing penalty

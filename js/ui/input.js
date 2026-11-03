@@ -1,7 +1,7 @@
 import { CONFIG, CROPS, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, BUILDINGS, PLANT_STRUCTURES, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
-import { isPassable } from '../world/map.js';
+import { isPassable, isDraftBreakableWall } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getSpellCooldownMult } from '../systems/complexBuildings.js';
 
@@ -1358,6 +1358,18 @@ export class InputHandler {
             removeFarmZone(this.game, pos.x, pos.y);
         } else if (this.mode === 'normal') {
             const drafted = this.game.colonists.filter(c => c.drafted && c.hp > 0);
+            // Right-clicking a breakable wall orders the drafted colonists to bash it down.
+            if (drafted.length > 0 && isDraftBreakableWall(this.game.map, pos.x, pos.y)) {
+                for (const c of drafted) {
+                    c.draftBreakTarget = { x: pos.x, y: pos.y };
+                    c.draftTarget = null;
+                    c.path = [];
+                }
+                const who = drafted.length === 1 ? drafted[0].name : `${drafted.length} colonists`;
+                this.game.notifications.push({ text: `${who} ordered to break the wall`, tick: this.game.tick, type: 'success' });
+                return;
+            }
+            for (const c of drafted) c.draftBreakTarget = null;
             if (drafted.length <= 1) {
                 for (const c of drafted) {
                     c.draftTarget = { x: pos.x, y: pos.y };
