@@ -1478,12 +1478,12 @@ export class UI {
         if (!ruin) return '';
         let text = '';
         if (tile.structure === 'ancient_chest') {
-            text = tile.designation ? 'Marked for looting.' : 'A sealed chest. In Build mode, right-click it to have a colonist loot it.';
+            text = tile.designation ? 'Marked for looting.' : 'A sealed chest. Right-click it in Build mode, or with colonists drafted, to have it looted.';
         } else if (tile.structure === 'rift_anchor') {
             const name = CRYPT_CONFIG.chainNames[ruin.anchor?.chain] || 'a';
             text = tile.designation
                 ? 'Marked for attuning.'
-                : `A dormant rift anchor to the ${name} realms. In Build mode, right-click it to have a colonist attune it.`;
+                : `A dormant rift anchor to the ${name} realms. Right-click it in Build mode, or with colonists drafted, to have it attuned.`;
         } else if (tile.structure === 'warded_wall' && ruin.ward) {
             text = `Warded wall. ${this.game.ruins.wardText(ruin)}`;
         }

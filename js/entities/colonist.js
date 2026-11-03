@@ -2,7 +2,7 @@ import { CONFIG, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAM
 import { spawnParticle, spawnDamageText, spawnImpactSpray } from '../ui/overlay-renderer.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { findPath, findPathAdjacent, manhattanDist, wasLastSearchExhausted } from '../world/pathfinding.js';
-import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture, isDraftBreakableWall } from '../world/map.js';
+import { isPassable, getMoveCost, hasLineOfSight, findLineOfSightTile, isWalkableFurniture, isDraftBreakableWall, isDraftInteractable } from '../world/map.js';
 import { attackStructure } from './combat.js';
 import { moveEntity, computeMoveDuration, computeMoveCooldown, teleportEntity } from '../systems/movement-lerp.js';
 import { FOODSTUFFS } from '../systems/resources.js';
@@ -181,6 +181,7 @@ export function createColonist(x, y, skillBias, existingNames = [], forcedRace =
         drafted: false,
         draftTarget: null,
         draftBreakTarget: null,
+        draftInteractTarget: null,
         guardMode: false,
         guardPost: null,
         stateTimer: 0,
@@ -244,7 +245,7 @@ export function createGolem(type, x, y) {
         currentTaskId: null, path: [], workProgress: 0,
         assignedBed: null,
         weapon: null, armor: null, helmet: null, clothes: null, tool: null, trinket: null, boots: null,
-        drafted: false, draftTarget: null, draftBreakTarget: null,
+        drafted: false, draftTarget: null, draftBreakTarget: null, draftInteractTarget: null,
         guardMode: false, guardPost: null,
         stateTimer: 0, wanderCooldown: 0, moveCooldown: 0,
         golem: true, golemType: type,
@@ -3058,6 +3059,7 @@ function updateDrafted(colonist, game) {
     if (!colonist.drafted) {
         colonist.state = 'idle';
         colonist.draftBreakTarget = null;
+        colonist.draftInteractTarget = null;
         return;
     }
     const threat = findNearestHostile(colonist, game);
@@ -3076,6 +3078,10 @@ function updateDrafted(colonist, game) {
     }
     if (colonist.draftBreakTarget) {
         updateDraftBreak(colonist, game);
+        return;
+    }
+    if (colonist.draftInteractTarget) {
+        updateDraftInteract(colonist, game);
         return;
     }
     if (colonist.draftTarget) {
@@ -3180,6 +3186,50 @@ function updateDraftBreak(colonist, game) {
             if (c.draftBreakTarget && c.draftBreakTarget.x === bt.x && c.draftBreakTarget.y === bt.y) {
                 c.draftBreakTarget = null;
             }
+        }
+    }
+}
+
+// Drafted crypt order (right-click an ancient chest or dormant rift anchor): walk
+// beside it and work it at building speed, then loot or attune it through the same
+// RuinSystem calls the Build-mode tasks use. Progress lives on the order itself, so
+// it survives a fight that interrupts the work and resets when the order changes.
+function updateDraftInteract(colonist, game) {
+    const it = colonist.draftInteractTarget;
+    const tile = game.map[it.y]?.[it.x];
+    if (!isDraftInteractable(game.map, it.x, it.y)) {
+        colonist.draftInteractTarget = null;
+        return;
+    }
+    if (manhattanDist(colonist.x, colonist.y, it.x, it.y) > 1) {
+        fightStepToward(colonist, it, true, game);
+        // No free tile beside the target can be reached: drop the order rather than stand idle.
+        if (colonist._fightPath.length === 0 && colonist._fightPathRetryAt > game.tick) {
+            colonist.draftInteractTarget = null;
+            game.notifications.push({ text: `${colonist.name} can't reach that ${tile.structure === 'rift_anchor' ? 'rift anchor' : 'chest'}`, tick: game.tick, type: 'warning' });
+        }
+        return;
+    }
+
+    const anchor = tile.structure === 'rift_anchor';
+    let speed = getWorkSpeed(colonist, game);
+    speed *= (1 + (colonist.skills.building || 1) * COLONIST_CONFIG.skillWorkBonus);
+    if (game.devWorkMult) speed *= game.devWorkMult;
+    it.work = (it.work || 0) + speed;
+    if (it.work < (anchor ? WORK_CONFIG.attuneAnchorWork : WORK_CONFIG.lootChestWork)) return;
+
+    // A Build-mode order on the same tile is now moot: drop its designation and task.
+    if (tile.designation) {
+        const task = game.taskQueue.getAllByPosition(it.x, it.y).find(t => t.type === tile.designation.type);
+        if (task) game.taskQueue.remove(task.id);
+        tile.designation = null;
+    }
+    if (anchor) game.ruins.attuneAnchor(game, it.x, it.y);
+    else game.ruins.lootChest(game, it.x, it.y);
+    // Clear the order for everyone else who was working the same target.
+    for (const c of game.colonists) {
+        if (c.draftInteractTarget && c.draftInteractTarget.x === it.x && c.draftInteractTarget.y === it.y) {
+            c.draftInteractTarget = null;
         }
     }
 }

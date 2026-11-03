@@ -1591,6 +1591,14 @@ export function isDraftBreakableWall(map, x, y) {
     return WALL_STRUCTURES.has(tile.structure) && !tile.sealed;
 }
 
+// True when drafted colonists can be ordered to work the crypt structure at (x,y):
+// an unlooted ancient chest or a dormant rift anchor in a crypt that has been opened.
+export function isDraftInteractable(map, x, y) {
+    const tile = map[y]?.[x];
+    if (!tile || tile.sealed) return false;
+    return tile.structure === 'ancient_chest' || tile.structure === 'rift_anchor';
+}
+
 // True when the tile holds a furniture structure entities can walk through (beds,
 // chairs, workbenches, etc.). Impassable furniture is excluded by isPassable
 // before this is consulted, so callers use it only to add a soft routing penalty

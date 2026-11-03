@@ -208,6 +208,20 @@ async function play(opts, out, log, setShotResolve) {
                     if (milestone('first_mental_break')) requestShot('first_mental_break');
                 }
             }
+            // A colonist stuck "fighting" for a whole day is worth a closer look.
+            if (c.hp > 0 && c.state === 'fighting') {
+                p.fightSince ??= g.tick;
+                if (g.tick - p.fightSince === TPD()) {
+                    let t = null, td = Infinity;
+                    const hostiles = [...g.raiders, ...g.waves.enemies, ...g.entities.filter(e => e.hostile && !e.tamed)].filter(e => e.hp > 0);
+                    for (const e of hostiles) { const d = Math.abs(e.x - c.x) + Math.abs(e.y - c.y); if (d < td) { td = d; t = e; } }
+                    const info = { name: c.name, at: { x: c.x, y: c.y }, nearest: t ? { type: t.type || t.category, guardian: !!t.guardian, hp: t.hp, at: { x: t.x, y: t.y }, dist: td, sealedTile: !!g.map[t.y]?.[t.x]?.sealed } : null, drafted: !!c.drafted };
+                    summary.stuckFighting = summary.stuckFighting || [];
+                    summary.stuckFighting.push({ tick: g.tick, day: day(), ...info });
+                    event('stuck_fighting', info);
+                    requestShot('stuck_fighting', (gm) => gm.camera.centerOn(c.x, c.y));
+                }
+            } else p.fightSince = undefined;
             p.hp = c.hp; p.state = c.state;
             if (c.hp > 0 && !c.onExpedition) {
                 homeTicks++;

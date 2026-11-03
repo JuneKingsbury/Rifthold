@@ -1,7 +1,7 @@
 import { CONFIG, CROPS, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, BUILDINGS, PLANT_STRUCTURES, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
-import { isPassable, isDraftBreakableWall } from '../world/map.js';
+import { isPassable, isDraftBreakableWall, isDraftInteractable } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getSpellCooldownMult } from '../systems/complexBuildings.js';
 
@@ -1362,6 +1362,7 @@ export class InputHandler {
             if (drafted.length > 0 && isDraftBreakableWall(this.game.map, pos.x, pos.y)) {
                 for (const c of drafted) {
                     c.draftBreakTarget = { x: pos.x, y: pos.y };
+                    c.draftInteractTarget = null;
                     c.draftTarget = null;
                     c.path = [];
                 }
@@ -1369,7 +1370,23 @@ export class InputHandler {
                 this.game.notifications.push({ text: `${who} ordered to break the wall`, tick: this.game.tick, type: 'success' });
                 return;
             }
-            for (const c of drafted) c.draftBreakTarget = null;
+            // Right-clicking an ancient chest or dormant rift anchor orders them to loot or attune it.
+            if (drafted.length > 0 && isDraftInteractable(this.game.map, pos.x, pos.y)) {
+                for (const c of drafted) {
+                    c.draftInteractTarget = { x: pos.x, y: pos.y, work: 0 };
+                    c.draftBreakTarget = null;
+                    c.draftTarget = null;
+                    c.path = [];
+                }
+                const who = drafted.length === 1 ? drafted[0].name : `${drafted.length} colonists`;
+                const what = this.game.map[pos.y][pos.x].structure === 'rift_anchor' ? 'attune the rift anchor' : 'loot the chest';
+                this.game.notifications.push({ text: `${who} ordered to ${what}`, tick: this.game.tick, type: 'success' });
+                return;
+            }
+            for (const c of drafted) {
+                c.draftBreakTarget = null;
+                c.draftInteractTarget = null;
+            }
             if (drafted.length <= 1) {
                 for (const c of drafted) {
                     c.draftTarget = { x: pos.x, y: pos.y };

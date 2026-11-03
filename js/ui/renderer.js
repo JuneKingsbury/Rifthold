@@ -1306,7 +1306,11 @@ export class Renderer {
                     }
                     if (drafted && c.draftBreakTarget && !game.input?._recordingMode) {
                         const bt = c.draftBreakTarget;
-                        breakTargetSet.set(bt.y * mapW + bt.x, bt);
+                        breakTargetSet.set(bt.y * mapW + bt.x, { x: bt.x, y: bt.y, fill: '#ff2222', stroke: '#ff3b3b', under: '#1a0000' });
+                    }
+                    if (drafted && c.draftInteractTarget && !game.input?._recordingMode) {
+                        const it = c.draftInteractTarget;
+                        breakTargetSet.set(it.y * mapW + it.x, { x: it.x, y: it.y, fill: '#ffcc33', stroke: '#ffd24a', under: '#1a1200' });
                     }
                 }
             }
@@ -2823,7 +2827,8 @@ export class Renderer {
         if (rprof) { const t = performance.now(); rprof.add('render:night', t - rmark); rmark = t; }
 
         // Crosshair on each wall drafted colonists were ordered to break (right-click a
-        // wall). Drawn after entities and the night overlay so it stays readable, in
+        // wall), in red, and on each chest or rift anchor they were ordered to loot or
+        // attune, in gold. Drawn after entities and the night overlay so it stays readable, in
         // both ASCII and sprite modes. A dark under-stroke keeps it visible on any wall.
         if (breakTargetSet.size > 0) {
             const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
@@ -2838,7 +2843,7 @@ export class Renderer {
                 const cy = ty + ch1 / 2;
                 const r = cw1 * (0.34 + 0.05 * pulse);
                 ctx.globalAlpha = 0.18 + 0.14 * pulse;
-                ctx.fillStyle = '#ff2222';
+                ctx.fillStyle = bt.fill;
                 ctx.fillRect(tx, ty, cw1, ch1);
                 ctx.beginPath();
                 ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -2848,11 +2853,11 @@ export class Renderer {
                     ctx.lineTo(cx + dx * r * 1.5, cy + dy * r * 1.5);
                 }
                 ctx.globalAlpha = 0.85;
-                ctx.strokeStyle = '#1a0000';
+                ctx.strokeStyle = bt.under;
                 ctx.lineWidth = lw + 2;
                 ctx.stroke();
                 ctx.globalAlpha = 0.8 + 0.2 * pulse;
-                ctx.strokeStyle = '#ff3b3b';
+                ctx.strokeStyle = bt.stroke;
                 ctx.lineWidth = lw;
                 ctx.stroke();
             }

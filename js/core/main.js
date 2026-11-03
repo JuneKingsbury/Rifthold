@@ -1144,6 +1144,7 @@ class Game {
             c.state = 'idle';
             c.draftTarget = null;
             c.draftBreakTarget = null;
+            c.draftInteractTarget = null;
         }
         if (this.selectedColonists.length > 1) {
             this.ui.showMultiColonistInfo(this.selectedColonists);
@@ -1161,6 +1162,7 @@ class Game {
             c.drafted = false;
             c.draftTarget = null;
             c.draftBreakTarget = null;
+            c.draftInteractTarget = null;
             if (c.currentTaskId) {
                 this.taskQueue.release(c.currentTaskId);
                 c.currentTaskId = null;
@@ -3402,6 +3404,7 @@ class Game {
             if (c.hp > 0 && c.drafted) {
                 c.draftTarget = { x, y };
                 c.draftBreakTarget = null;
+                c.draftInteractTarget = null;
             }
         }
         this.notifications.push({ text: `Rally point set at (${x},${y})`, tick: this.tick, type: 'success' });

@@ -263,6 +263,10 @@ class Strategy {
                 this.api.event('bot_void_pact', { accept });
             }
         }
+        // Returned expeditions wait in a "Collect" list; the loot is already banked, Collect shows the summary.
+        if (!g.exploration.pendingSummary && g.exploration.pendingAutoSummaries?.length) {
+            g.collectAutoExpedition(g.exploration.pendingAutoSummaries[0].id);
+        }
         if (g.exploration.pendingSummary) {
             const exp = g.exploration.pendingSummary;
             if (!this.firstPrompt.has('exp_summary')) {
@@ -328,7 +332,8 @@ class Strategy {
             realm: exp.realmKey || exp.dimensionKey || exp.realm, tick: this.g.tick, day: +this.day().toFixed(2),
             started: exp.startTick, durationTicks: exp.startTick ? this.g.tick - exp.startTick : null,
             difficulty: exp.difficulty, auto: !!exp.autoMode, result: exp.result || exp.outcome || exp.status,
-            party, summary: flat,
+            party, summary: flat, loot: exp.loot ? Object.fromEntries(Object.entries(exp.loot).filter(([k]) => k !== '_items')) : null,
+            items: exp.loot?._items || [], realmName: exp.realmName,
         };
         this.api.summary.expeditions.push(rec);
         this.api.event('expedition_result', { realm: rec.realm, result: rec.result, partyDead: party.filter(p => p.hp <= 0).length });
@@ -555,12 +560,19 @@ class Strategy {
     hostilesNear(radius = 18) {
         const g = this.g;
         const near = (e) => e.hp > 0 && Math.abs(e.x - this.home.x) + Math.abs(e.y - this.home.y) <= radius;
-        return g.raiders.some(near) || g.waves.enemies.some(near) || g.entities.some(e => e.hostile && !e.tamed && near(e));
+        // Crypt guardians stay home, so they only count while the bot is fighting them on purpose.
+        return g.raiders.some(near) || g.waves.enemies.some(near) || g.entities.some(e => e.hostile && !e.tamed && !e.guardian && near(e));
     }
     defend() {
         const g = this.g;
         const guardianFight = this.crypt?.phase === 'fight';
-        const threat = g.combat.raidActive || (g.waves.active && g.waves.enemies.length > 0) || this.hostilesNear() || guardianFight;
+        const hardThreat = g.combat.raidActive || (g.waves.active && g.waves.enemies.length > 0);
+        let threat = hardThreat || this.hostilesNear(12) || guardianFight;
+        // Never hold a soft draft (wildlife, guardians) for more than half a day: drafted colonists don't eat or sleep.
+        if (threat && !hardThreat) {
+            if (this._softDraftSince === undefined) this._softDraftSince = g.tick;
+            if (g.tick - this._softDraftSince > CONFIG.TICKS_PER_DAY / 2) { threat = false; this.api.note('soft_draft_timeout'); }
+        } else if (!threat) this._softDraftSince = undefined;
         const drafted = this.homeColonists().some(c => c.drafted);
         if (threat && !drafted) {
             // The novice drafts only when the tutorial says to, or when a raid is plainly on.
@@ -584,7 +596,7 @@ class Strategy {
         if (!this.crypt) {
             const minDay = this.novice ? 20 : 6;
             if (this.day() < minDay || !armed || homeC.length < Math.min(3, this.alive().length) || g.combat.raidActive || g.waves.active) return;
-            const candidates = g.ruins.list.filter(r => r.kind === 'crypt' && r.state === 'sealed' && !r.ward);
+            const candidates = g.ruins.list.filter(r => r.kind === 'crypt' && r.state === 'sealed' && !r.ward && !r._botSkip);
             if (!candidates.length) return;
             const dist = r => Math.abs(r.x + r.w / 2 - this.home.x) + Math.abs(r.y + r.h / 2 - this.home.y);
             // Prefer crypts with a rift anchor once Planar Rifts is close; otherwise the nearest.
@@ -602,7 +614,12 @@ class Strategy {
         const ruin = c.ruin;
         if (c.phase === 'breach') {
             if (ruin.state !== 'sealed') { c.phase = 'fight'; c.since = g.tick; this.api.milestone('first_crypt_breached'); }
-            else if (g.tick - c.since > 3 * CONFIG.TICKS_PER_DAY) { this.api.note('crypt_breach_timeout'); this.crypt = null; }
+            else if (g.tick - c.since > 8 * CONFIG.TICKS_PER_DAY) {
+                // Give up on this crypt for good, so the bot doesn't keep opening new ones.
+                this.api.note('crypt_breach_timeout');
+                this.api.event('bot_crypt_gave_up', { phase: 'breach' });
+                ruin._botSkip = true; this.crypt = null;
+            }
             return;
         }
         if (c.phase === 'fight') {
