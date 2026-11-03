@@ -261,7 +261,9 @@ export const SCENES = [
             const len = Math.hypot(dx, dy) || 1;
             p.raidBiome = field?.biome || 'village';
             p.raidLine = s.openNear(line);
-            p.raidFrom = s.openNear({ x: line.x + (dx / len) * 16, y: line.y + (dy / len) * 16 });
+            // Close enough that the whole line is inside the drafted engage range
+            // (8 tiles) a step or two after the raiders appear.
+            p.raidFrom = s.openNear({ x: line.x + (dx / len) * 9, y: line.y + (dy / len) * 9 });
             const cols = s.colonists();
             s.gather(cols, p.raidLine, 1);
             for (const c of cols) s.draft(c, true);
@@ -317,6 +319,7 @@ export const SCENES = [
                 farm: pick(6, 4, { x: v.x - 7, y: v.y + 8 }),
                 pen: pick(7, 6, { x: v.x + 9, y: v.y + 7 }),
                 hall: pick(9, 6, { x: v.x, y: v.y - 9 }),
+                workshop: pick(8, 6, { x: v.x - 10, y: v.y - 9 }),
             };
         },
         shot: ctx => at(ctx.stage.rectCenter(ctx.plan.cabin), 22),
@@ -327,9 +330,32 @@ export const SCENES = [
             ctx.mark('timelapse start');
             // Long pull-back across the whole time-lapse.
             ctx.cam.move(at(v, 16), 32, 'sine');
-            const build = async (tiles) => { for (const t of tiles) { s.blueprint(t.x, t.y, t.type); await ctx.sleep(0.02); } };
-            if (e.cabin2) await build(s.roomPlan(e.cabin2, { doorSide: 'right', floor: 'wood_floor', furniture: ['bed', 'bed', 'candle'] }));
-            await ctx.sleep(2);
+            const place = async (tiles) => { for (const t of tiles) { s.blueprint(t.x, t.y, t.type); await ctx.sleep(0.02); } };
+            // Shell (walls, door, floor) first; the furniture goes in once the
+            // floor under it is down, like a player furnishing a finished room.
+            // These run alongside the rest of the take and are awaited at the end.
+            const furnishing = [];
+            const furnishWhenBuilt = (under, tiles) => {
+                const job = (async () => {
+                    await ctx.until(() => s.built(under), 40);
+                    await place(typeof tiles === 'function' ? tiles() : tiles);
+                })();
+                job.catch(() => {});   // a cancelled take rejects it; the final await reports that
+                furnishing.push(job);
+            };
+            const build = async (tiles) => {
+                const furniture = tiles.filter(t => t.furniture);
+                await place(tiles.filter(t => !t.furniture));
+                if (furniture.length) furnishWhenBuilt(furniture, furniture);
+            };
+            if (e.cabin2) await build(s.roomPlan(e.cabin2, { doorSide: 'right', floor: 'wood_floor', furniture: ['bed', 'bed', 'nightstand', 'wardrobe', 'chair', 'candle'] }));
+            await ctx.sleep(1.5);
+            // Decorate the first cabin: floor it, then fill it out around the beds.
+            ctx.mark('decorate bedroom');
+            const firstFloor = s.floorPlan(ctx.plan.cabin, 'wood_floor');
+            await place(firstFloor);
+            furnishWhenBuilt(firstFloor, () => s.decorPlan(ctx.plan.cabin, ['wardrobe', 'nightstand', 'chair', 'rug', 'candle', 'potted_plant']));
+            await ctx.sleep(1.5);
             if (e.farm) { s.farm(e.farm, 'wheat'); ctx.mark('farm'); }
             await ctx.sleep(1.5);
             if (e.pen) {
@@ -340,14 +366,19 @@ export const SCENES = [
             await ctx.sleep(2);
             s.spawnColonist(Math.round(v.x - 30), Math.round(v.y + 4), 'farming');
             ctx.mark('newcomer');
-            if (e.cabin3) await build(s.roomPlan(e.cabin3, { doorSide: 'left', floor: 'wood_floor', furniture: ['bed', 'bed', 'table'] }));
+            if (e.cabin3) await build(s.roomPlan(e.cabin3, { doorSide: 'left', floor: 'wood_floor', furniture: ['bed', 'bed', 'table', 'chair', 'shelf', 'candle'] }));
             // Animals to tame once the beast circle is up.
             const animals = e.pen ? ['cow', 'sheep', 'chicken', 'deer'].map((type, i) =>
                 s.spawnAnimal(type, e.pen.x + e.pen.w + 3 + i, e.pen.y + 1 + (i % 2) * 3)) : [];
             await ctx.sleep(2);
+            if (e.workshop) {
+                ctx.mark('workshop');
+                await build(s.roomPlan(e.workshop, { floor: 'wood_floor', furniture: ['workbench', 'loom', 'alchemy_table', 'tool_rack', 'crate', 'stool', 'candle'] }));
+            }
+            await ctx.sleep(1);
             if (e.hall) {
                 ctx.mark('town hall');
-                await build(s.roomPlan(e.hall, { wall: 'stone_wall', floor: 'wood_floor', furniture: ['town_hall_banner', 'table', 'chair', 'research_desk', 'cooking_pot'] }));
+                await build(s.roomPlan(e.hall, { wall: 'stone_wall', floor: 'wood_floor', furniture: ['town_hall_banner', 'statue', 'table', 'chair', 'chair', 'bench', 'bench', 'candle', 'potted_plant'] }));
             }
             if (e.pen) {
                 await ctx.until(() => !!s.find('beast_circle'), 20);
@@ -356,6 +387,7 @@ export const SCENES = [
             }
             await ctx.sleep(2);
             s.spawnColonist(Math.round(v.x + 30), Math.round(v.y - 2), 'crafting');
+            await Promise.all(furnishing);
             await ctx.until(() => s.pendingBuilds() === 0 && animals.every(a => !game.entities.includes(a) || a.tamed), 30);
             ctx.mark('village grown');
             await ctx.sleep(2);
@@ -568,8 +600,11 @@ export const SCENES = [
             const party = s.colonists().slice(0, 4);
             const exp = s.expedition(this.realm, party, gate);
             if (!exp) { ctx.log('Expedition refused to launch (check the console).'); return; }
-            // A handful of event nodes, one fight, then the boss.
-            s.shapeExpedition(exp, { events: cfg.events, fights: cfg.fights, fightHp: cfg.fightHp });
+            // A handful of event nodes and one fight, in the order the realm rolled
+            // them, then the boss. The game's own pacing runs the route; only the
+            // walk between nodes is shortened.
+            const gapTicks = Math.round(cfg.nodeGapSeconds * 5 * 2);   // 5 ticks/s at 1x, running at 2x
+            s.shapeExpedition(exp, { events: cfg.events, fights: cfg.fights, fightHp: cfg.fightHp, gapTicks });
             ctx.mark('party heads to the rift');
             ctx.cam.move(at(gate, 36), 5, 'inOut');
             await ctx.until(() => exp.status !== 'gathering', 30);
@@ -578,15 +613,13 @@ export const SCENES = [
             ctx.openExpeditionView();
             ctx.mark('expedition view');
             ctx.speed(2);
+            // The view starts the party's walk from the moment it opens, so the
+            // first node waits a full gap from here too (no lurch on arrival).
+            exp.nextEncounterTick = game.tick + gapTicks;
 
-            // Walk the nodes briskly: shorten each gap between encounters. Choice
-            // nodes are held briefly on screen, then resolved by the director.
-            const gapTicks = Math.round(cfg.nodeGapSeconds * 5 * 2);   // 5 ticks/s at 1x, running at 2x
+            // Choice nodes are held briefly on screen, then resolved by the director.
             let lastNode = -1;
             while (!exp.bossTriggered && exp.status === 'exploring') {
-                if (!exp.combat && !exp.pendingDecision && exp.nextEncounterTick > game.tick + gapTicks) {
-                    exp.nextEncounterTick = game.tick + gapTicks;
-                }
                 if (exp.currentEncounter !== lastNode) {
                     lastNode = exp.currentEncounter;
                     const enc = exp.encounters[lastNode - 1];

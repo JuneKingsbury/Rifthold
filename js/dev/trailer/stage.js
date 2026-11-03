@@ -4,7 +4,7 @@
 // preconditions off camera.
 
 import {
-    BUILDINGS, IMPASSABLE_STRUCTURES, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, RESOURCES, ALL_ITEMS, RECIPES, CONFIG, getCryptTiles,
+    BUILDINGS, IMPASSABLE_STRUCTURES, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, RESOURCES, ALL_ITEMS, RECIPES, CONFIG, EXPLORATION_CONFIG, getCryptTiles,
 } from '../../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../../systems/building.js';
 import { queueCraftingOrder } from '../../systems/crafting.js';
@@ -248,32 +248,76 @@ export class Stage {
 
     // Tile list for a walled room: perimeter walls in walking order (so placing
     // them one by one reads like a drag), a door on the given side, and
-    // furniture slots inside. Floor tiles are the interior.
+    // furniture slots inside. Floor tiles are the interior. Furniture entries
+    // carry `furniture: true`: a tile with a pending floor order refuses a
+    // second order, so place those once the floor under them is built.
     roomPlan(r, { wall = 'wood_wall', door = 'door', doorSide = 'bottom', floor = null, furniture = [] } = {}) {
         const walls = [];
         for (let x = r.x; x < r.x + r.w; x++) walls.push({ x, y: r.y });
         for (let y = r.y + 1; y < r.y + r.h; y++) walls.push({ x: r.x + r.w - 1, y });
         for (let x = r.x + r.w - 2; x >= r.x; x--) walls.push({ x, y: r.y + r.h - 1 });
         for (let y = r.y + r.h - 2; y > r.y; y--) walls.push({ x: r.x, y });
-        const mid = { x: r.x + Math.floor(r.w / 2), y: r.y + Math.floor(r.h / 2) };
-        const doorPos = {
-            bottom: { x: mid.x, y: r.y + r.h - 1 },
-            top: { x: mid.x, y: r.y },
-            left: { x: r.x, y: mid.y },
-            right: { x: r.x + r.w - 1, y: mid.y },
-        }[doorSide];
+        const doorPos = this._doorPos(r, doorSide);
         const out = [];
         for (const p of walls) {
             const isDoor = p.x === doorPos.x && p.y === doorPos.y;
             out.push({ ...p, type: isDoor ? door : wall });
         }
-        const interior = [];
-        for (let y = r.y + 1; y < r.y + r.h - 1; y++) for (let x = r.x + 1; x < r.x + r.w - 1; x++) interior.push({ x, y });
-        if (floor) for (const p of interior) out.push({ ...p, type: floor });
-        // Furniture along the back wall, left to right, skipping the door column.
-        const slots = interior.filter(p => p.y === r.y + 1 && Math.abs(p.x - doorPos.x) > 0);
-        furniture.forEach((type, i) => { if (slots[i]) out.push({ ...slots[i], type }); });
+        if (floor) for (const p of this._interior(r)) out.push({ ...p, type: floor });
+        const slots = this._furnitureSlots(r, doorSide);
+        furniture.forEach((type, i) => { if (slots[i]) out.push({ ...slots[i], type, furniture: true }); });
         return out;
+    }
+
+    // Furniture for a room that's already standing: fills the free slots (no
+    // structure, no pending order) in the same layout order roomPlan uses.
+    decorPlan(r, furniture, { doorSide = 'bottom' } = {}) {
+        const free = this._furnitureSlots(r, doorSide).filter(p => { const t = this.tile(p.x, p.y); return t && !t.structure && !t.designation; });
+        return furniture.slice(0, free.length).map((type, i) => ({ ...free[i], type, furniture: true }));
+    }
+
+    // Floor orders for a standing room's interior, skipping tiles already
+    // floored with `floor` or busy with another order.
+    floorPlan(r, floor = 'wood_floor') {
+        return this._interior(r).filter(p => { const t = this.tile(p.x, p.y); return t && t.floor !== floor && !t.designation; })
+            .map(p => ({ ...p, type: floor }));
+    }
+
+    // True once nothing is left to build on these tiles.
+    built(tiles) { return tiles.every(p => this.tile(p.x, p.y)?.designation?.type !== 'build'); }
+
+    _doorPos(r, doorSide) {
+        const mid = { x: r.x + Math.floor(r.w / 2), y: r.y + Math.floor(r.h / 2) };
+        return {
+            bottom: { x: mid.x, y: r.y + r.h - 1 },
+            top: { x: mid.x, y: r.y },
+            left: { x: r.x, y: mid.y },
+            right: { x: r.x + r.w - 1, y: mid.y },
+        }[doorSide];
+    }
+
+    _interior(r) {
+        const out = [];
+        for (let y = r.y + 1; y < r.y + r.h - 1; y++) for (let x = r.x + 1; x < r.x + r.w - 1; x++) out.push({ x, y });
+        return out;
+    }
+
+    // Interior tiles for furniture, in placement order: along the wall opposite
+    // the door first, then down the side walls, then the door wall. The line
+    // from the door across the room stays clear so colonists can walk in.
+    _furnitureSlots(r, doorSide) {
+        const door = this._doorPos(r, doorSide);
+        const vertical = doorSide === 'top' || doorSide === 'bottom';
+        const x0 = r.x + 1, x1 = r.x + r.w - 2, y0 = r.y + 1, y1 = r.y + r.h - 2;
+        // Distance from the back wall (0) to the door wall, and position along it.
+        const depth = p => vertical ? (doorSide === 'bottom' ? p.y - y0 : y1 - p.y) : (doorSide === 'right' ? p.x - x0 : x1 - p.x);
+        const along = p => vertical ? p.x : p.y;
+        const maxDepth = vertical ? y1 - y0 : x1 - x0;
+        const onSide = p => vertical ? (p.x === x0 || p.x === x1) : (p.y === y0 || p.y === y1);
+        const rank = p => depth(p) === 0 ? 0 : onSide(p) && depth(p) < maxDepth ? 1 : depth(p) === maxDepth ? 2 : 3;
+        return this._interior(r)
+            .filter(p => along(p) !== along(door) && rank(p) < 3)
+            .sort((a, b) => rank(a) - rank(b) || depth(a) - depth(b) || along(a) - along(b));
     }
 
     // Instantly completes every pending build order (off-camera catch-up).
@@ -528,19 +572,26 @@ export class Stage {
         return exp;
     }
 
-    // Rebuilds the expedition route: the first `events` non-combat encounters,
-    // then `fights` combats (weakened to `fightHp`), then the boss. Call before
-    // the party departs.
-    shapeExpedition(exp, { events = 3, fights = 1, fightHp = 1 } = {}) {
-        const pickEvents = exp.encounters.filter(e => e.type !== 'combat').slice(0, events);
-        const pickFights = exp.encounters.filter(e => e.type === 'combat' && !e.isBoss).slice(0, fights);
-        for (const f of pickFights) for (const en of f.enemies || []) {
+    // Trims the expedition route to the first `events` non-combat encounters and
+    // `fights` combats (weakened to `fightHp`), kept in the order the game rolled
+    // them, then the boss. `gapTicks` shortens the walk between nodes by shrinking
+    // the expedition's duration, which is what the game paces both encounters and
+    // the visualizer's walk from, so the party arrives at each node exactly as it
+    // fires. Call before the party departs.
+    shapeExpedition(exp, { events = 3, fights = 1, fightHp = 1, gapTicks = null } = {}) {
+        let nEvents = 0, nFights = 0;
+        exp.encounters = exp.encounters.filter(e => {
+            if (e.isBoss) return false;
+            if (e.type === 'combat') return nFights++ < fights;
+            return nEvents++ < events;
+        });
+        for (const f of exp.encounters) if (f.type === 'combat') for (const en of f.enemies || []) {
             en.hp = Math.max(1, Math.round(en.hp * fightHp));
             if (en.maxHp) en.maxHp = Math.max(1, Math.round(en.maxHp * fightHp));
         }
-        exp.encounters = [...pickEvents, ...pickFights];
         exp.currentEncounter = 0;
         exp.nodeMap = this.game.exploration._generateNodeMap(exp.encounters, exp.bossEncounter);
+        if (gapTicks) exp.duration = Math.max(1, Math.round(gapTicks / EXPLORATION_CONFIG.encounterSpacing));
     }
 
     // Drops every regular encounter so the next exploring tick starts the boss.
