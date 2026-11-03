@@ -211,7 +211,13 @@ export const COLONIST_CONFIG = {
     sleptInBedMoodBonus: 5,
     sleptInBedMoodDuration: 200,
     sleptOnGroundMoodPenalty: -15,
+    // Milder while the colony has no beds at all: nobody expects one on day one.
+    sleptOnGroundNoBedsMoodPenalty: -8,
     sleptOnGroundMoodDuration: 400,
+    // Starting colonists arrive hopeful: a mood buffer for the first three days,
+    // before shelter and routines exist. Playtests saw first mental breaks on day 1-3.
+    freshStartMoodBonus: 15,
+    freshStartMoodDuration: 1440,
     deathMoodPenalty: -40,
     deathMoodDuration: 2000,
     nameColors: ['#ff3300', '#00ff00', '#00ffff', '#ffff00', '#a600ff', '#ababab'],
@@ -292,7 +298,11 @@ export const MOOD_SPEED_MULT = {
 export const WORK_CONFIG = {
     plantWork: 5,
     harvestWork: 8,
-    researchWork: 60,
+    // One research task is a longer sitting worth researchSessionsPerTask of the old
+    // 60-work tasks (RP and tome study scale with it), so colonists walk to the desk a
+    // third as often for the same research rate.
+    researchSessionsPerTask: 3,
+    researchWork: 180,
     deconstructWork: 10,
     lootChestWork: 8,
     attuneAnchorWork: 20,

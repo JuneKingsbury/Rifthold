@@ -59,6 +59,7 @@ export function generateMap() {
     }
 
     clearStartingArea(map);
+    ensureStartingDeposits(map);
     restoreLandmarkRituals(map);
     // Last, so nothing painted above (start-area clearing, landmark and ruin floors)
     // can leave water touching normal terrain.
@@ -338,13 +339,29 @@ function generateBiomeLayout(map, params) {
         }
     }
 
-    // Desert: rare iron_ore in red_rock tiles.
+    // Desert: red_rock tiles hold plain stone often and iron_ore now and then
+    // (40% of red_rock gets a deposit: ~25% stone, ~15% iron).
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             const tile = map[y][x];
             if (tile.biome !== 'desert' || tile.terrain !== 'red_rock') continue;
-            if (valueNoise(x + 70000, y + 70000, seed) < 0.15) {
-                tile.resource = { type: 'iron_ore', amount: 2 + Math.floor(valueNoise(x + 71000, y + 71000, seed) * 2) };
+            if (valueNoise(x + 70000, y + 70000, seed) < 0.40) {
+                tile.resource = valueNoise(x + 72000, y + 72000, seed) < 0.375
+                    ? { type: 'iron_ore', amount: 2 + Math.floor(valueNoise(x + 71000, y + 71000, seed) * 2) }
+                    : { type: 'stone', amount: 3 + Math.floor(valueNoise(x + 73000, y + 73000, seed) * 3) };
+            }
+        }
+    }
+
+    // Grassland: rare small stone outcrops. Patches come from thresholding smooth
+    // noise, so stones cluster into a few outcrops instead of a scatter. The start
+    // is always grassland, so this is usually the colony's first stone.
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const tile = map[y][x];
+            if (tile.biome !== 'grassland' || !GRASS_TERRAIN.has(tile.terrain) || tile.resource) continue;
+            if (smoothNoise(x + 90000, y + 90000, seed, 8) > 0.86 && valueNoise(x + 91000, y + 91000, seed) < 0.5) {
+                tile.resource = { type: 'stone', amount: 3 + Math.floor(valueNoise(x + 92000, y + 92000, seed) * 3) };
             }
         }
     }
@@ -1398,6 +1415,44 @@ function clearStartingArea(map) {
                     map[ny][nx].passable = true;
                 }
             }
+        }
+    }
+}
+
+// Within this many tiles (Manhattan) of the start, the colony is promised at least
+// STARTING_DEPOSITS of each resource, so the first buildings never hinge on a
+// long trek to the nearest mountain.
+const STARTING_DEPOSIT_RANGE = 25;
+const STARTING_DEPOSITS = { stone: 6, iron_ore: 3 };
+
+// Tops up stone and iron near the map centre when biome generation left too few,
+// as one small outcrop per resource on open ground just outside the start area.
+function ensureStartingDeposits(map) {
+    const W = CONFIG.MAP_WIDTH, H = CONFIG.MAP_HEIGHT;
+    const cx = Math.floor(W / 2), cy = Math.floor(H / 2);
+    const inRange = [];
+    const counts = {};
+    for (let y = Math.max(0, cy - STARTING_DEPOSIT_RANGE); y <= Math.min(H - 1, cy + STARTING_DEPOSIT_RANGE); y++) {
+        for (let x = Math.max(0, cx - STARTING_DEPOSIT_RANGE); x <= Math.min(W - 1, cx + STARTING_DEPOSIT_RANGE); x++) {
+            const d = Math.abs(x - cx) + Math.abs(y - cy);
+            if (d > STARTING_DEPOSIT_RANGE) continue;
+            const tile = map[y][x];
+            if (tile.resource) counts[tile.resource.type] = (counts[tile.resource.type] || 0) + 1;
+            else if (d >= START_AREA_RADIUS + 4 && GRASS_TERRAIN.has(tile.terrain) && !tile.structure && !tile.sealed && tile.passable) inRange.push({ x, y });
+        }
+    }
+    for (const [type, want] of Object.entries(STARTING_DEPOSITS)) {
+        let missing = want - (counts[type] || 0);
+        if (missing <= 0 || inRange.length === 0) continue;
+        // Grow the outcrop outward from one random open tile, nearest tiles first.
+        const seedTile = inRange[Math.floor(Math.random() * inRange.length)];
+        const spots = inRange
+            .filter(t => !map[t.y][t.x].resource)
+            .sort((a, b) => (Math.abs(a.x - seedTile.x) + Math.abs(a.y - seedTile.y)) - (Math.abs(b.x - seedTile.x) + Math.abs(b.y - seedTile.y)));
+        for (const { x, y } of spots) {
+            if (missing <= 0) break;
+            map[y][x].resource = { type, amount: type === 'stone' ? 3 + Math.floor(Math.random() * 3) : 2 + Math.floor(Math.random() * 3) };
+            missing--;
         }
     }
 }

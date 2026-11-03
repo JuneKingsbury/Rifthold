@@ -122,6 +122,9 @@ export class TaskQueue {
             // Urgent tasks (e.g. lead_animal) use a fixed very-low prio so they beat all others.
             // cleanse_blight gets a 25% bonus so it beats plant/harvest at the same farming priority.
             let prio = t.urgent ? 0.5 : colonist.priorities[t.skillRequired];
+            // Player-marked "do first" orders beat every normal priority band, but only
+            // for colonists who do that job at all (unlike urgent tasks).
+            if (t.doFirst && !t.urgent) prio = 0.75;
             if (t.type === 'cleanse_blight') prio = Math.max(prio * 0.75, 0.6);
             // Golems beat colonists for their specialty tasks (0.75 * 10000 = 7500 < colonist priority-1 score of 10000).
             if (colonist.golem && colonist.golemType) {

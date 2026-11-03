@@ -124,6 +124,9 @@ class Game {
         this.settings = {
             autoPauseHostile: true,
             autoPauseEvent: true,
+            // Caravans only toast by default: they arrived about every 5 days in
+            // playtests and are rarely urgent. Their popup still waits for the player.
+            autoPauseCaravan: false,
             pauseOnDeath: true,
             pauseOnLowHealth: true,
             pauseOnResearch: true,
@@ -408,6 +411,7 @@ class Game {
             }
             c.priorities[biases[i]] = 1;
             refreshCustomColonist(c);
+            addThought(c, 'A fresh start', COLONIST_CONFIG.freshStartMoodBonus, COLONIST_CONFIG.freshStartMoodDuration, this.tick);
             this.addColonist(c);
         }
     }
@@ -754,10 +758,17 @@ class Game {
             }
         }
 
+        // Spoilage is summed and logged once a day, so it doesn't crowd the event log.
         if (this.tick % FOOD_DECAY_CONFIG.decayInterval === 0) {
-            const lost = this.resources.decayFood(this);
+            this._spoiledToday = (this._spoiledToday || 0) + this.resources.decayFood(this);
+        }
+        if (this.tick % CONFIG.TICKS_PER_DAY === 0 && this._spoiledToday) {
+            const lost = this._spoiledToday;
+            this._spoiledToday = 0;
             if (lost >= 5) {
-                this.eventLog.add(this, `${lost} food spoiled`, 'warning', null);
+                const chests = this.mapIndex.getStructurePositions('food_chest').size;
+                const hint = chests < 2 ? ' Food Chests slow spoilage.' : '';
+                this.eventLog.add(this, `${lost} food spoiled today.${hint}`, 'warning', null);
             }
         }
 
@@ -1719,6 +1730,8 @@ class Game {
             }
         } else if (evt.type === 'void_whisper') {
             this.events.resolveVoidWhisper(this, choice === 0);
+        } else if (evt.type === 'tip') {
+            this.events.pendingEvent = null;
         }
         this._unpauseFromEvent();
     }
@@ -3701,7 +3714,7 @@ class Game {
         const craftTargets = this.settings.craftTargets || {};
         const potionAutoUse = this.settings.potionAutoUse || {};
         Object.assign(this.settings, {
-            autoPauseHostile: true, autoPauseEvent: true, pauseOnDeath: true, pauseOnLowHealth: true, pauseOnResearch: true,
+            autoPauseHostile: true, autoPauseEvent: true, autoPauseCaravan: false, pauseOnDeath: true, pauseOnLowHealth: true, pauseOnResearch: true,
             uiFontScale: 1, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
             showWeatherParticles: true, particleDensity: 100, showColonistNames: 'selected', showMinimap: true, showFps: false,
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
@@ -5882,6 +5895,7 @@ _onDOMReady(() => {
             const s = JSON.parse(localStorage.getItem('colony_settings') || '{}');
             s.autoPauseHostile = document.getElementById('start-autopause-hostile').checked;
             s.autoPauseEvent = document.getElementById('start-autopause-event').checked;
+            s.autoPauseCaravan = document.getElementById('start-autopause-caravan').checked;
             s.pauseOnDeath = document.getElementById('start-pause-death').checked;
             s.pauseOnLowHealth = document.getElementById('start-pause-low-health').checked;
             s.pauseOnResearch = document.getElementById('start-pause-research').checked;
@@ -5952,6 +5966,7 @@ _onDOMReady(() => {
             if (!s) return;
             if (s.autoPauseHostile != null) document.getElementById('start-autopause-hostile').checked = s.autoPauseHostile;
             if (s.autoPauseEvent != null) document.getElementById('start-autopause-event').checked = s.autoPauseEvent;
+            if (s.autoPauseCaravan != null) document.getElementById('start-autopause-caravan').checked = s.autoPauseCaravan;
             if (s.pauseOnDeath != null) document.getElementById('start-pause-death').checked = s.pauseOnDeath;
             if (s.pauseOnLowHealth != null) document.getElementById('start-pause-low-health').checked = s.pauseOnLowHealth;
             if (s.pauseOnResearch != null) document.getElementById('start-pause-research').checked = s.pauseOnResearch;
@@ -6090,6 +6105,7 @@ _onDOMReady(() => {
         document.getElementById('start-ui-font-val').textContent = 'Medium';
         document.getElementById('start-autopause-hostile').checked = true;
         document.getElementById('start-autopause-event').checked = true;
+        document.getElementById('start-autopause-caravan').checked = false;
         document.getElementById('start-pause-death').checked = true;
         document.getElementById('start-pause-low-health').checked = true;
         document.getElementById('start-pause-research').checked = true;
@@ -6395,6 +6411,7 @@ _onDOMReady(() => {
         const startSettings = {
             autoPauseHostile: document.getElementById('start-autopause-hostile').checked,
             autoPauseEvent: document.getElementById('start-autopause-event').checked,
+            autoPauseCaravan: document.getElementById('start-autopause-caravan').checked,
             pauseOnDeath: document.getElementById('start-pause-death').checked,
             pauseOnLowHealth: document.getElementById('start-pause-low-health').checked,
             pauseOnResearch: document.getElementById('start-pause-research').checked,
@@ -6447,6 +6464,9 @@ _onDOMReady(() => {
         } else if (tutorialLevel) {
             startSettings.showTutorial = true;
             startSettings.tutorialLevel = tutorialLevel;
+            // New players rarely find the auto-cook setting before their first hungry
+            // winter, so walkthrough games start with it on unless the player chose a target.
+            if (tutorialLevel !== 'veteran' && !startSettings.autoCookTarget) startSettings.autoCookTarget = 10;
         }
         if (tutorialLevel) {
             // Remember the choice so the next New Game pre-selects it.

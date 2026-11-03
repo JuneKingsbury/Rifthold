@@ -126,6 +126,8 @@ export function updateResearch(game) {
                 x: desk.x,
                 y: desk.y,
                 workAmount: WORK_CONFIG.researchWork,
+                // The generic XP formula caps at 2 per task; a sitting counts as several tasks.
+                skillXpGain: 2 * (WORK_CONFIG.researchSessionsPerTask || 1),
                 diminished,
             });
         }

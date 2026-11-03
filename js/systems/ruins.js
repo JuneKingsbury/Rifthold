@@ -66,11 +66,54 @@ function cryptTiles(ruin) {
     return tiles;
 }
 
-function ringBroken(map, ruin) {
-    return cryptTiles(ruin).ring.some(({ x, y }) => {
-        const tile = map[y][x];
-        return !tile.structure || tile.passable;
-    });
+const ORTHO = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+
+/**
+ * Checks the crypt's wall ring for gaps.
+ *
+ * Movement is 4-directional, so a gap only opens the crypt if broken ring tiles
+ * connect, edge to edge, an outside tile to an interior tile. A lone broken corner
+ * on a round crypt touches neither side squarely and leads nowhere.
+ *
+ * @param {Array<Array<object>>} map Game map.
+ * @param {object} ruin A crypt record.
+ * @return {'open'|'dead'|null} 'open' if some gap leads inside, 'dead' if the ring has
+ *   gaps but none of them do, null if the ring is intact.
+ */
+function ringBreach(map, ruin) {
+    const { ring, interior } = cryptTiles(ruin);
+    const key = (x, y) => y * 100000 + x;
+    const ringSet = new Set(ring.map(t => key(t.x, t.y)));
+    const interiorSet = new Set(interior.map(t => key(t.x, t.y)));
+    const isGap = (x, y) => { const t = map[y]?.[x]; return !!t && (!t.structure || t.passable); };
+    const seen = new Set();
+    let anyGap = false;
+    for (const start of ring) {
+        const startKey = key(start.x, start.y);
+        if (seen.has(startKey) || !isGap(start.x, start.y)) continue;
+        anyGap = true;
+        // Flood the run of connected gap tiles and note which sides it touches.
+        let touchesInside = false, touchesOutside = false;
+        const stack = [start];
+        seen.add(startKey);
+        while (stack.length) {
+            const { x, y } = stack.pop();
+            for (const [dx, dy] of ORTHO) {
+                const nx = x + dx, ny = y + dy;
+                const k = key(nx, ny);
+                if (ringSet.has(k)) {
+                    if (!seen.has(k) && isGap(nx, ny)) { seen.add(k); stack.push({ x: nx, y: ny }); }
+                } else if (interiorSet.has(k)) {
+                    // A pillar right behind the gap blocks it like a wall would.
+                    if (map[ny]?.[nx]?.passable) touchesInside = true;
+                } else if (map[ny]?.[nx]?.passable) {
+                    touchesOutside = true;
+                }
+            }
+        }
+        if (touchesInside && touchesOutside) return 'open';
+    }
+    return anyGap ? 'dead' : null;
 }
 
 export class RuinSystem {
@@ -112,8 +155,17 @@ export class RuinSystem {
                     else this._checkDiscovery(game, ruin);
                     continue;
                 }
-                if (ringBroken(game.map, ruin)) this._breach(game, ruin);
-                else this._checkDiscovery(game, ruin);
+                const breach = ringBreach(game.map, ruin);
+                if (breach === 'open') {
+                    this._breach(game, ruin);
+                } else {
+                    if (breach === 'dead' && !ruin.deadGapNoted) {
+                        // Say so once, so the player isn't left waiting for a breach that won't come.
+                        ruin.deadGapNoted = true;
+                        game.eventLog.add(game, 'That gap in the crypt wall leads nowhere. Break a wall that faces the inside directly.', 'warning', { type: 'position', x: ruin.x, y: ruin.y });
+                    }
+                    this._checkDiscovery(game, ruin);
+                }
             } else {
                 this._updateTraps(game, ruin);
             }

@@ -1358,6 +1358,12 @@ export class InputHandler {
             removeFarmZone(this.game, pos.x, pos.y);
         } else if (this.mode === 'normal') {
             const drafted = this.game.colonists.filter(c => c.drafted && c.hp > 0);
+            // With nobody drafted, right-clicking an order toggles "do first", so a far
+            // job (a crypt wall, a distant mine) isn't starved by nearer work of the same kind.
+            if (drafted.length === 0) {
+                this.toggleDoFirst(pos);
+                return;
+            }
             // Right-clicking a breakable wall orders the drafted colonists to bash it down.
             if (drafted.length > 0 && isDraftBreakableWall(this.game.map, pos.x, pos.y)) {
                 for (const c of drafted) {
@@ -1400,6 +1406,16 @@ export class InputHandler {
                 }
             }
         }
+    }
+
+    toggleDoFirst(pos) {
+        const tile = this.game.map[pos.y]?.[pos.x];
+        if (!tile?.designation) return;
+        const task = this.game.taskQueue.getAllByPosition(pos.x, pos.y).find(t => t.type === tile.designation.type);
+        if (!task) return;
+        task.doFirst = !task.doFirst;
+        const label = tile.designation.type.replace(/_/g, ' ');
+        this.game.notifications.push({ text: task.doFirst ? `Marked ${label} to do first` : `${label} back to normal priority`, tick: this.game.tick, type: 'success' });
     }
 
     getSpreadPositions(cx, cy, count) {

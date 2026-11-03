@@ -270,7 +270,7 @@ export const RESEARCH = {
 
     // Spells
     arcane_studies: { name: 'Arcane Studies', cost: 100, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
-    arcane_infusion: { name: 'Arcane Infusion', cost: 400, requires: ['arcane_studies', 'ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
+    arcane_infusion: { name: 'Arcane Infusion', cost: 300, requires: ['arcane_studies', 'ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
     advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
     ritual_magic: { name: 'Ritual Magic', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Unlock complex arcane rituals patterns for powerful colony-wide effects' },
     void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands and void staves', requiresTabCount: 2 },
@@ -292,8 +292,8 @@ export const RESEARCH = {
     void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['fortification'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
     void_forging: { name: 'Void Shaping', cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
-    wayfinding: { name: 'Wayfinding', cost: 120, requires: [], tab: 'rifts', description: 'Scout the wild lands beyond the colony. Send small scouting parties to forage and explore nearby wilderness.' },
-    planar_rift: { name: 'Planar Rifts', cost: 400, requires: ['arcane_infusion', 'wayfinding'], tab: 'rifts', description: 'Stabilize rifts so expeditions can launch from attuned rift anchors, which are found inside ancient crypts' },
+    wayfinding: { name: 'Wayfinding', cost: 80, requires: [], tab: 'rifts', description: 'Scout the wild lands beyond the colony. Send small scouting parties to forage and explore nearby wilderness.' },
+    planar_rift: { name: 'Planar Rifts', cost: 300, requires: ['arcane_infusion', 'wayfinding'], tab: 'rifts', description: 'Stabilize rifts so expeditions can launch from attuned rift anchors, which are found inside ancient crypts' },
     auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually', requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, },
     auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['auto_expedition'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
     auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions' },

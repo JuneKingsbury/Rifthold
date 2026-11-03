@@ -1,4 +1,4 @@
-import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG } from '../core/config.js';
+import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG, WAVE_TYPES, WORLD_SIZE_COLONY } from '../core/config.js';
 import { ROOM_SCORE_CAPS, ROOM_SIZE_BANDS, furnitureCountsFor } from '../world/rooms.js';
 import { FURNITURE_TYPES } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
@@ -13,6 +13,7 @@ import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
 import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
 import { getRoleInfoHtml, getEffectInfoHtml } from '../entities/roles.js';
+import { waveScaling } from '../entities/entity-factory.js';
 import { keybindingRowsHtml, beginRebindCapture, cancelRebindCapture, formatKeyLabel } from './keybindings-ui.js';
 import { statBarHtml, runStatBarPass, statBarFactors } from './stat-bar.js';
 import { installArcanePanel } from './ui-arcane.js';
@@ -1378,10 +1379,44 @@ export class UI {
         if (panel) panel.style.display = 'none';
     }
 
+    // Enemy count, per-type HP and a rough threat rating for a wave. Uses the same
+    // composition (WAVE_TYPES) and scaling (waveScaling) as the spawner.
     getWavePreview(waveNum) {
         const enemies = WAVE_CONFIG.baseEnemies + WAVE_CONFIG.enemiesPerWave * (waveNum - 1);
-        const hp = WAVE_CONFIG.baseHp + WAVE_CONFIG.hpPerWave * (waveNum - 1);
-        return `${enemies} enemies, ${hp} HP each`;
+        const { hpMult, damageMult } = waveScaling(waveNum);
+        // Every wave type's eligible entries, weighted, as the spawner rolls them.
+        const weights = {};
+        for (const wt of Object.values(WAVE_TYPES)) {
+            for (const c of wt.composition) {
+                if (c.minWave && waveNum < c.minWave) continue;
+                weights[c.entity] = (weights[c.entity] || 0) + (c.weight || 1);
+            }
+        }
+        const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
+        const parts = [];
+        let wavePower = 0;
+        for (const [type, w] of Object.entries(weights)) {
+            const def = ENTITIES[type];
+            if (!def) continue;
+            const hp = Math.floor(def.hp * (1 + hpMult));
+            const dmg = Math.floor((def.damage || 0) * (1 + damageMult));
+            parts.push(`${def.name} ${hp} HP`);
+            wavePower += enemies * (w / totalWeight) * hp * dmg;
+        }
+        let text = `${enemies} enemies (${parts.join(', ')})`;
+        // Threat compares wave HP x damage against the fighters at home (HP x weapon DPS).
+        // It ignores turrets, spells and terrain, so it is a rough guide, not a forecast.
+        const fighters = this.game.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.golem);
+        const colonyPower = fighters.reduce((sum, c) => {
+            const w = c.weapon || WEAPONS.fists;
+            return sum + c.maxHp * (w.damage / (w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown));
+        }, 0);
+        if (colonyPower > 0 && wavePower > 0) {
+            const ratio = wavePower / colonyPower;
+            const [label, color] = ratio < 0.5 ? ['Low', '#66dd66'] : ratio < 1 ? ['Manageable', '#ccdd55'] : ratio < 2 ? ['Risky', '#ffaa44'] : ['Deadly', '#ff4444'];
+            text += ` <span style="color:${color}">Threat: ${label} (~${ratio.toFixed(1)}x your fighters)</span>`;
+        }
+        return text;
     }
 
     _refreshRiftGateInfo() {
@@ -2268,9 +2303,20 @@ export class UI {
         if (hungry > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${hungryId}" style="color:#ccaa44;cursor:pointer">${hungry} hungry</div>`);
         if (lowRest > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowRestId}" style="color:#ccaa44;cursor:pointer">${lowRest} exhausted</div>`);
         if (idle > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${idleId}" style="color:#88aaff;cursor:pointer">${idle} idle</div>`);
-        if (homeless > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${homelessId}" style="color:#ccaa44;cursor:pointer">${homeless} without a home</div>`);
-        if (noTome > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${noTomeId}" style="color:#88aaff;cursor:pointer">${noTome} without a tome</div>`);
-        if (missingAttune > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${missingAttuneId}" style="color:#bb88ff;cursor:pointer">${missingAttune} missing attunement${missingAttune > 1 ? 's' : ''}</div>`);
+        // Housing, tome and attunement alerts wait out the first day, and while the
+        // walkthrough is on they wait until it has taught that topic, so a new colony
+        // doesn't open on a list of things the player hasn't been shown yet.
+        const tut = this.game.tutorial;
+        const walkthrough = this.game.settings.showTutorial && tut && !tut.isChecklist && !tut.isFinished();
+        const taught = (...ids) => !walkthrough || ids.some(id => tut.completed.has(id));
+        const settled = this.game.tick >= CONFIG.TICKS_PER_DAY;
+        if (homeless > 0 && settled && taught('bedroom', 'bedroom_bed')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${homelessId}" style="color:#ccaa44;cursor:pointer">${homeless} without a home</div>`);
+        if (noTome > 0 && settled && taught('tome')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${noTomeId}" style="color:#88aaff;cursor:pointer">${noTome} without a tome</div>`);
+        // At the cap, wanderers get turned away; point at the way to grow.
+        if (alive >= cap && settled && taught('colony_growth') && cap < (WORLD_SIZE_COLONY[this.game.map[0].length]?.capMax ?? Infinity)) {
+            alerts.push(`<div class="info-row" style="color:#ff8866">At colonist cap (${alive}/${cap}). Hearth Shrines make room.</div>`);
+        }
+        if (missingAttune > 0 && settled && taught('attunement')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${missingAttuneId}" style="color:#bb88ff;cursor:pointer">${missingAttune} missing attunement${missingAttune > 1 ? 's' : ''}</div>`);
         if (pendingTasks > 0) alerts.push(`<div class="info-row" style="color:#ccaa44">${pendingTasks} pending task${pendingTasks > 1 ? 's' : ''}</div>`);
         if (alerts.length === 0) alerts.push('<div class="info-row" style="color:#88cc44">All is well.</div>');
         html += alerts.join('');
@@ -4723,7 +4769,8 @@ export class UI {
         }
         general += `</select></div>`;
         general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', 'Auto-pause on hostile event (raids)');
-        general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, caravans)');
+        general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, void whispers)');
+        general += this._settingsCheck('set-pause-caravan', s.autoPauseCaravan, 'window.game.settings.autoPauseCaravan=this.checked', 'Auto-pause when a caravan arrives');
         general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', 'Auto-pause on colonist death');
         general += this._settingsCheck('set-pause-low-health', s.pauseOnLowHealth, 'window.game.settings.pauseOnLowHealth=this.checked', 'Auto-pause on critically low health');
         general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
@@ -5090,7 +5137,10 @@ export class UI {
         const parts = [tile.sealed ? `(${x},${y}) unexplored` : `(${x},${y}) ${tile.terrain}`];
         if (tile.structure && !tile.sealed) parts.push(`Structure: ${tile.structure.replace(/_/g, ' ')}`);
         if (tile.resource) parts.push(`Resource: ${tile.resource.type}${tile.resource.amount > 1 ? ' x' + tile.resource.amount : ''}`);
-        if (tile.designation) parts.push(`[${tile.designation.type}]`);
+        if (tile.designation) {
+            const task = this.game.taskQueue.getAllByPosition(x, y).find(t => t.type === tile.designation.type);
+            parts.push(task?.doFirst ? `[${tile.designation.type}, do first]` : `[${tile.designation.type}] right-click to do first`);
+        }
         if (tile.zone) parts.push(`Farm: ${tile.zone.crop}`);
         const nameMode = this.game.settings.showColonistNames;
         if (nameMode === 'selected' || nameMode === 'always') {

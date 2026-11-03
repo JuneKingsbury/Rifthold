@@ -13,9 +13,9 @@
 
 import {
     CONFIG, BUILDINGS, RESEARCH, RECIPES, WEAPONS, ARMORS, HELMETS, SPELL_TOMES, SPELLS, REALMS,
-    COLONIST_CONFIG, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, WALL_STRUCTURES, MAGIC_SKILLS,
+    COLONIST_CONFIG, EXPLORATION_CONFIG, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, WALL_STRUCTURES, MAGIC_SKILLS,
 } from '../../js/core/config.js';
-import { designateBuild, designateGather, cancelDesignation } from '../../js/systems/building.js';
+import { designateBuild, designateGather, cancelDesignation, getMaxCountBonus } from '../../js/systems/building.js';
 import { designateFarmZone } from '../../js/systems/farming.js';
 import { getAvailableRecipes } from '../../js/systems/crafting.js';
 
@@ -369,6 +369,8 @@ class Strategy {
         const cs = this.alive();
         const best = cs.slice().sort((a, b) => (b.skills.research || 0) - (a.skills.research || 0))[0];
         for (const c of cs) {
+            // The researcher keeps research as their only top job; distance otherwise breaks ties.
+            if (c === best) for (const k of Object.keys(c.priorities)) if (c.priorities[k] === 1) c.priorities[k] = 2;
             c.priorities.research = c === best ? 1 : 3;
             c.priorities.cooking = Math.min(c.priorities.cooking ?? 3, 2);
         }
@@ -416,7 +418,8 @@ class Strategy {
         else if (!this.count('cooking_pot')) this.build('cooking_pot');
         else if (!this.count('research_desk')) this.build('research_desk');
 
-        // Materials. Keep gather orders topped up while stocks are low.
+        // Materials. Keep gather orders topped up while stocks are low. Crypt orders are
+        // marked Do First (markDoFirst) so these don't starve them.
         const chop = this.pendingTasks('chop'), mine = this.pendingTasks('mine');
         const woodWant = this.novice ? 25 : 60;
         if (this.stock('wood') < woodWant && chop < 6) this.gather(['tree'], 8);
@@ -445,7 +448,7 @@ class Strategy {
         // Shelter and comfort.
         if (this.bedrooms < Math.min(n, this.novice ? 1 : n) && this.day() > (this.novice ? 6 : 2)) this.buildBedroom();
         if (this.count('food_chest') < (this.novice ? 0 : 2) && this.day() > 3) this.build('food_chest');
-        if ((season === 'autumn' || season === 'winter') && this.count('campfire') < (this.novice ? 1 : 2)) this.build('campfire', { minR: 2, maxR: 8 });
+        if ((season === 'autumn' || season === 'winter') && this.count('campfire') < (this.novice ? 1 : 2)) this.build('campfire', { minR: 2, maxR: 16 });
         if (!this.novice && this.count('research_desk') < 2 && n >= 3 && this.day() > 5) this.build('research_desk');
 
         // Tech buildings as research unlocks them.
@@ -455,7 +458,8 @@ class Strategy {
             const want = this.researched('arcane_infusion') ? (spare < 4 ? this.count('mana_crystal') + 1 : 0) : 2;
             if (this.count('mana_crystal') < Math.min(4 + (g.mana_crystalBonus || 0), Math.max(2, want))) this.build('mana_crystal');
             // Hearth Shrine slots open with milestones; designateBuild enforces the cap.
-            if (this.alive().length >= g.waves.getColonistCap(g) && this.has(BUILDINGS.hearth_shrine.cost)) {
+            const shrineSlots = BUILDINGS.hearth_shrine.maxCount + getMaxCountBonus(BUILDINGS.hearth_shrine, 'hearth_shrine', g);
+            if (this.count('hearth_shrine') < shrineSlots && this.alive().length >= g.waves.getColonistCap(g) && this.has(BUILDINGS.hearth_shrine.cost)) {
                 if (this.build('hearth_shrine')) this.api.milestone(`shrine_${this.count('hearth_shrine')}`);
             }
         }
@@ -565,9 +569,29 @@ class Strategy {
     }
     defend() {
         const g = this.g;
+        // A player would notice someone stuck swinging at nothing for a day and pull them back.
+        for (const c of this.homeColonists()) {
+            if (c.state === 'fighting') {
+                c._botFightSince ??= g.tick;
+                if (g.tick - c._botFightSince > CONFIG.TICKS_PER_DAY && !c.drafted) {
+                    g.toggleDraft(c.id);
+                    c.draftTarget = { x: this.home.x, y: this.home.y };
+                    c._botRescueUntil = g.tick + 60;
+                    this.api.note('rescued_stuck_fighter');
+                    this.api.event('bot_rescue_stuck_fighter', { name: c.name });
+                }
+            } else if (!c._botRescueUntil || g.tick > c._botRescueUntil) c._botFightSince = undefined;
+            if (c._botRescueUntil && g.tick > c._botRescueUntil && c.drafted && !g.combat.raidActive && !g.waves.active) {
+                c._botRescueUntil = undefined; c._botFightSince = undefined;
+                g.toggleDraft(c.id);
+            }
+        }
         const guardianFight = this.crypt?.phase === 'fight';
-        const hardThreat = g.combat.raidActive || (g.waves.active && g.waves.enemies.length > 0);
-        let threat = hardThreat || this.hostilesNear(12) || guardianFight;
+        // Raiders walk in from the map edge, so a sensible player drafts when they get close, not at the alert.
+        const raidClose = g.combat.raidActive && g.raiders.some(r => r.hp > 0 && Math.abs(r.x - this.home.x) + Math.abs(r.y - this.home.y) <= 25);
+        const hardThreat = raidClose || (g.waves.active && g.waves.enemies.length > 0);
+        // Wildlife is left to colonists' own self-defence; only raids, waves and crypt fights get a draft.
+        let threat = hardThreat || guardianFight;
         // Never hold a soft draft (wildlife, guardians) for more than half a day: drafted colonists don't eat or sleep.
         if (threat && !hardThreat) {
             if (this._softDraftSince === undefined) this._softDraftSince = g.tick;
@@ -580,9 +604,16 @@ class Strategy {
             g.draftAll();
             if (g.waves.active && g.waves.nexusPosition) g.rallyDrafted(g.waves.nexusPosition.x, g.waves.nexusPosition.y + 2);
             else if (guardianFight && this.crypt.entry) g.rallyDrafted(this.crypt.entry.x, this.crypt.entry.y);
-            this.api.event('bot_draft', { reason: g.combat.raidActive ? 'raid' : g.waves.active ? 'wave' : guardianFight ? 'guardians' : 'hostile_near' });
+            this.api.event('bot_draft', { reason: raidClose ? 'raid' : g.waves.active ? 'wave' : guardianFight ? 'guardians' : 'hostile_near' });
+        } else if (threat && drafted && raidClose && this.every(30)) {
+            // Close on the nearest raider, as the tutorial suggests.
+            let t = null, td = Infinity;
+            for (const r of g.raiders) { if (r.hp <= 0) continue; const d = Math.abs(r.x - this.home.x) + Math.abs(r.y - this.home.y); if (d < td) { td = d; t = r; } }
+            if (t) g.rallyDrafted(t.x, t.y);
         } else if (!threat && drafted) {
-            if (this.novice && g.settings.showTutorial && !g.tutorial.isFinished()) return; // tutorial handles undraft
+            // While the tutorial's own raid steps are up, it decides when to undraft.
+            const tutId = g.settings.showTutorial ? g.tutorial.getCurrentTask()?.id : null;
+            if (this.novice && (tutId === 'draft' || tutId === 'fight' || tutId === 'undraft')) return;
             g.undraftAll();
             this.api.event('bot_undraft', {});
         }
@@ -605,6 +636,7 @@ class Strategy {
             const entry = this.cryptEntry(ruin);
             if (!entry) { this.api.note('crypt_no_entry'); return; }
             cancelDesignation(g, entry.wall.x, entry.wall.y);
+            this.markDoFirst(entry.wall.x, entry.wall.y);
             this.crypt = { ruin, entry: entry.outside, phase: 'breach', since: g.tick };
             this.api.event('bot_crypt_breach', { tier: ruin.tier, anchor: ruin.anchor?.chain || null, dist: Math.round(dist(ruin)) });
             this.api.summary.crypts.push({ tick: g.tick, day: +this.day().toFixed(2), tier: ruin.tier, anchor: ruin.anchor?.chain || null, guardians: (ruin.guardians || []).length });
@@ -636,7 +668,7 @@ class Strategy {
             for (let y = ruin.y; y < ruin.y + ruin.h; y++) {
                 for (let x = ruin.x; x < ruin.x + ruin.w; x++) {
                     const t = g.map[y][x];
-                    if ((t.structure === 'ancient_chest' || t.structure === 'rift_anchor') && !t.designation) { cancelDesignation(g, x, y); queued++; }
+                    if ((t.structure === 'ancient_chest' || t.structure === 'rift_anchor') && !t.designation) { cancelDesignation(g, x, y); this.markDoFirst(x, y); queued++; }
                 }
             }
             if (queued) this.api.event('bot_crypt_loot', { queued });
@@ -646,6 +678,14 @@ class Strategy {
                 this.crypt = null;
             }
         }
+    }
+
+    /** The right-click "Do First" toggle on an order. A new player doesn't know about it. */
+    markDoFirst(x, y) {
+        if (this.novice) return;
+        const tile = this.g.map[y][x];
+        const task = tile.designation && this.g.taskQueue.getAllByPosition(x, y).find(t => t.type === tile.designation.type);
+        if (task && !task.doFirst) { this.g.input.toggleDoFirst({ x, y }); this.api.note('used_do_first'); }
     }
 
     /** A wall tile on the crypt ring with an open, reachable tile outside it, nearest home. */
@@ -660,6 +700,9 @@ class Strategy {
                     const ox = x + dx, oy = y + dy;
                     const o = g.map[oy]?.[ox];
                     if (!o || g.ruins.getRuinAt(ox, oy) === ruin || !o.passable) continue;
+                    // The tile straight through the wall must be crypt interior, or the gap leads nowhere.
+                    const inside = g.map[y - dy]?.[x - dx];
+                    if (!inside || !inside.sealed || (inside.structure && WALL_STRUCTURES.has(inside.structure))) continue;
                     const d = Math.abs(ox - this.home.x) + Math.abs(oy - this.home.y);
                     if (d < bd) { bd = d; best = { wall: { x, y }, outside: { x: ox, y: oy } }; }
                 }
@@ -697,7 +740,19 @@ class Strategy {
         const blockedFresh = ex.getAvailableRealms(g).filter(r => !ex.completedRealms.has(r.key) && !ex.canSend(g, r.key));
         // Before Planar Rifts every anchored realm is unsendable by design, so only flag it after.
         if (this.researched('planar_rift')) this.blockGoal(`expedition(${blockedFresh.map(r => r.key).join(',')})`, blockedFresh.length > 0 && fresh.length === 0);
-        let target = fresh[0];
+        // After two wipes in a realm, wait 10 days (a player would gear up) before trying it again.
+        const wipes = (key) => this.api.summary.expeditions.filter(e => e.realm === key && e.party.length && e.party.every(p => p.hp <= 0) && g.tick - e.tick < 10 * CONFIG.TICKS_PER_DAY).length;
+        // The party this send would actually get (same rules as below).
+        const homeNow = this.homeColonists();
+        const keepHomeN = homeNow.length >= 5 ? 2 : homeNow.length >= 3 ? 1 : 0;
+        const readyNow = homeNow.filter(c => !c.drafted && c.weapon && c.hp >= c.maxHp * 0.7 && !ex.isFatigued(c.id, g.tick) && !(c.traits || []).includes('pacifist'));
+        const partyNow = Math.min(5, readyNow.length, homeNow.length - keepHomeN);
+        // A competent player heeds the boss warning and waits for a full-size party.
+        const bossOk = (r) => this.novice || !r.boss || partyNow >= EXPLORATION_CONFIG.bossRecommendedParty;
+        const freshOk = fresh.filter(r => wipes(r.key) < 2 && bossOk(r));
+        if (fresh.some(r => r.boss && !bossOk(r))) this.api.note('waiting_for_boss_party');
+        if (fresh.length && !freshOk.length) this.api.note('expedition_backoff_after_wipes');
+        let target = freshOk[0];
         let auto = false;
         if (!target && realms.length && g.tick - this.lastExpeditionTick > 3 * CONFIG.TICKS_PER_DAY && !this.novice) {
             // Nothing new to clear: farm the hardest cleared realm for loot.
@@ -772,7 +827,7 @@ class Strategy {
         const id = step.id;
         const hint = (w, h) => this.findRect(w, h, { minR: 2, maxR: 30, margin: 0 });
         switch (id) {
-            case 'welcome': case 'threats': case 'finish': g.tutorial.acknowledge(g); break;
+            case 'welcome': case 'threats': case 'colony_growth': case 'finish': g.tutorial.acknowledge(g); break;
             case 'pan_camera': g.camera.centerOn(this.home.x + 6, this.home.y + 3); break;
             case 'start_time': break;
             case 'select_colonist': g.selectedColonist = cs[0]; g.selectedColonists = [cs[0]]; g.ui.showColonistInfo(cs[0]); break;

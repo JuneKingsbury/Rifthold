@@ -1381,6 +1381,9 @@ export const REALMS = {
 };
 
 export const EXPLORATION_CONFIG = {
+    // Party size the Rifts panel recommends before a chain's boss realm. Playtests
+    // wiped 53-88% of 3-colonist parties on boss realms and ~11% at 4-5.
+    bossRecommendedParty: 4,
     returnTimeMult: 1.3,
     retreatTicks: 200,
     encounterSpacing: 0.2,
@@ -2750,20 +2753,12 @@ export const NODE_MAP_CONFIG = {
 export const WAVE_CONFIG = {
     baseEnemies: 4,              // enemies in wave 1
     enemiesPerWave: 2,           // additional enemies per wave after wave 1
-    baseHp: 60,                  // enemy HP in wave 1
-    hpPerWave: 15,               // additional HP per wave
-    baseDamage: 6,               // enemy damage in wave 1
-    damagePerWave: 2,            // additional damage per wave
     spawnInterval: 15,           // ticks between enemy spawns during a wave
     essencePerKill: 1,           // void essence earned per kill
     nexusHp: 200,                // starting HP of the void nexus
     nexusHpPerWave: 0,           // additional nexus HP per wave (0 = static)
     colonistCapBase: 3,          // starting colonist cap before any waves
-    colonistCapScale: 0,          // waves no longer directly grant cap (use hearth shrines)
     colonistCapMax: 12,          // fallback maximum colonist cap (used when the map width has no entry below)
-    enemySpeed: 0.45,            // wave enemy movement speed (lower = slower)
-    enemyChar: 'E',              // character displayed for wave enemies
-    enemyColor: '#ff2222',       // color of wave enemies
     repathInterval: 20,          // ticks before wave enemies recalculate path
     spawnDistance: { near: 25, far: 50, offsetRange: 10 }, // portal spawn distances from nexus
     maxPathNodes: 2000,          // A* node limit for wave enemy pathfinding

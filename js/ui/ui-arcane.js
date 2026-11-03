@@ -1,7 +1,7 @@
 import { CRYPT_CONFIG, BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMORS, HELMETS, CLOTHES, TOOLS, TRINKETS, POTIONS, SPELL_TOMES, ITEM_CHARS, EXPEDITION_DIFFICULTY, ALL_ITEMS, SPELLS,
     EXPEDITION_MUTATORS, EXPEDITION_POTIONS, POTION_CARRY_CONFIG, FORMATION_CONFIG,
     ELITE_MODIFIERS, NODE_MAP_CONFIG, EXPEDITION_XP_CONFIG, BESTIARY_CONFIG,
-    getItemStatLines, RENDER_CONFIG, HEARTH_SHRINE_MILESTONES,
+    getItemStatLines, RENDER_CONFIG, HEARTH_SHRINE_MILESTONES, EXPLORATION_CONFIG,
 } from '../core/config.js';
 import { estimatePartyStrength, getExpeditionSlotItem } from '../systems/exploration.js';
 import { getOmens } from '../systems/omens.js';
@@ -530,8 +530,8 @@ const arcaneMethods = {
                 const lootStr = lootParts.length > 0 ? lootParts.slice(0, 4).join(', ') + (lootParts.length > 4 ? '…' : '') : 'nothing';
                 const modeTag = aExp.autoMode ? `<span style="color:#66ccaa;font-size:0.75em;margin-right:4px;">[auto]</span>` : '';
                 html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0;border-top:1px solid #1a3322;">`;
-                html += `<span style="color:#aaa;font-size:0.85em;">${modeTag}${escapeHtml(aExp.realmName)}: ${lootStr}</span>`;
-                html += `<button onclick="window.game.collectAutoExpedition(${aExp.id})" style="background:#225533;color:#88ff88;padding:2px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;white-space:nowrap;margin-left:8px;">Collect</button>`;
+                html += `<span style="color:#aaa;font-size:0.85em;">${modeTag}${escapeHtml(aExp.realmName)}: ${lootStr} <span style="color:#668866;">(already in stockpile)</span></span>`;
+                html += `<button onclick="window.game.collectAutoExpedition(${aExp.id})" style="background:#225533;color:#88ff88;padding:2px 10px;border:none;border-radius:3px;cursor:pointer;font-size:0.85em;white-space:nowrap;margin-left:8px;">View report</button>`;
                 html += `</div>`;
             }
             html += `</div>`;
@@ -559,7 +559,7 @@ const arcaneMethods = {
         const canSendAuto = expl.canSendAuto(this.game);
         const canSendWatched = !watchedExp;
 
-        if (dims.length > 0 && this.game.power.powered) {
+        if (dims.length > 0) {
             html += `<div class="info-row" style="margin-top:8px;font-weight:bold;color:#33ccff;">Send Expedition:</div>`;
             const allRealms = Object.entries(REALMS).map(([k, r], i) => ({ key: k, ...r, _defIdx: i }));
             const chains = [...new Set(allRealms.map(r => r.chain))];
@@ -586,6 +586,8 @@ const arcaneMethods = {
                     const sendable = available && expl.canSend(this.game, realm.key);
                     const completed = expl.completedRealms.has(realm.key);
                     const badge = completed ? `<span style="color:#44cc44;font-size:0.8em;"> ✓</span>` : '';
+                    // Boss realms are a big step up from the rest of their chain; small parties rarely survive them.
+                    const bossTag = realm.boss && !completed ? `<span style="color:#ffaa44;font-size:0.8em;margin-left:6px;">⚠ Boss · ${EXPLORATION_CONFIG.bossRecommendedParty}+ colonists</span>` : '';
                     const indentPx = (realm.chainOrder - 1) * 16;
                     const indent = indentPx > 0 ? `margin-left:${indentPx}px;border-left:2px solid #446;padding-left:8px;` : '';
                     if (sendable) {
@@ -598,6 +600,7 @@ const arcaneMethods = {
                         if (canSendAuto && completed) {
                             html += `<button onclick="window.game.showExpeditionSetupInPanel(${jsArg(realm.key)}, true)" style="background:#1a3322;color:#66dd99;padding:6px 10px;border:1px solid #336644;border-radius:3px;cursor:pointer;margin:2px 0;font-size:0.85em;">Auto</button>`;
                         }
+                        html += bossTag;
                         html += `</div>`;
                     } else if (available && !realm.scoutingMode && (!expl.findLaunchPosition(this.game, realm) || (this.game.ruins.getAnchor(realm.chain) && !this.game.research.isResearched('planar_rift')))) {
                         const anchor = this.game.ruins.getAnchor(realm.chain);
@@ -620,8 +623,6 @@ const arcaneMethods = {
                     }
                 }
             }
-        } else if (!this.game.power.powered) {
-            html += `<div class="info-row" style="color:#ff4444;margin-top:8px;">No mana — cannot send expeditions</div>`;
         } else {
             html += `<div class="info-row" style="color:#888;margin-top:8px;">No realms available yet</div>`;
         }
@@ -814,6 +815,9 @@ const arcaneMethods = {
             html += `</div>`;
         }
 
+        if (REALMS[realmKey]?.boss) {
+            html += `<div class="info-row" style="margin-top:10px;padding:6px 8px;background:#2a1a0a;border:1px solid #664422;border-radius:4px;color:#ffaa44;font-size:0.9em;">⚠ Boss realm. Parties of fewer than ${EXPLORATION_CONFIG.bossRecommendedParty} colonists are usually wiped out here. Bring ${EXPLORATION_CONFIG.bossRecommendedParty}+ and your best gear.</div>`;
+        }
         html += `<div class="info-row" style="margin-top:10px;color:#ffaa33;font-weight:bold;">Difficulty</div>`;
         html += `<div class="info-row" style="display:flex;align-items:center;gap:8px;">`;
         html += `<input type="range" id="exp-difficulty" min="1" max="5" value="${this._expDifficulty || 1}" style="flex:1;accent-color:#ffaa33;">`;

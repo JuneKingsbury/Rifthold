@@ -9,6 +9,7 @@
 
 import { CONFIG, MOOD_THRESHOLDS, RESEARCH, REALMS } from '../../js/core/config.js';
 import { createStrategy, PROFILES } from './strategies.js';
+import { findPathAdjacent } from '../../js/world/pathfinding.js';
 
 const SAMPLE_EVERY = 120;   // ticks between metric samples (a quarter day)
 const STRATEGY_EVERY = 10;  // ticks between strategy steps
@@ -142,8 +143,11 @@ async function play(opts, out, log, setShotResolve) {
         pendingShots.push({ name, prep });
     };
     const home = { x: Math.round(g.colonists.reduce((s, c) => s + c.x, 0) / g.colonists.length), y: Math.round(g.colonists.reduce((s, c) => s + c.y, 0) / g.colonists.length) };
+    // Opening panels for a screenshot can pause the game; that isn't a game auto-pause.
+    let inShot = false;
     async function takeShot({ name, prep }) {
         let cleanup = null;
+        inShot = true;
         try { cleanup = prep ? prep(g) : null; } catch (e) { log(`shot prep ${name} failed: ${e.message}`); }
         g._uiDirty = true;
         await frames(4);
@@ -153,6 +157,8 @@ async function play(opts, out, log, setShotResolve) {
         try { cleanup?.(); } catch { /* best effort */ }
         g._uiDirty = true;
         await frames(1);
+        inShot = false;
+        if (g.paused && !g._gameOver) { botToggling = true; g.togglePause(true); botToggling = false; }
     }
 
     // How generous is the map near the start? Nearest node of each resource and counts within 30 tiles.
@@ -175,7 +181,7 @@ async function play(opts, out, log, setShotResolve) {
 
     // ---- Per-tick bookkeeping ----------------------------------------------
     const prev = new Map(); // colonist id -> { hp, state, breaking }
-    let stateCounts = {}, homeTicks = 0, idleTicks = 0;
+    let stateCounts = {}, homeTicks = 0, idleTicks = 0, taskTime = {};
     let simMs = 0, simTicks = 0;
     let lastWaveCompleted = 0, lastRaidActive = false, lastRealmCount = 0, lastAlive = g.colonists.length;
     let gameOverTick = null;
@@ -215,7 +221,7 @@ async function play(opts, out, log, setShotResolve) {
                     let t = null, td = Infinity;
                     const hostiles = [...g.raiders, ...g.waves.enemies, ...g.entities.filter(e => e.hostile && !e.tamed)].filter(e => e.hp > 0);
                     for (const e of hostiles) { const d = Math.abs(e.x - c.x) + Math.abs(e.y - c.y); if (d < td) { td = d; t = e; } }
-                    const info = { name: c.name, at: { x: c.x, y: c.y }, nearest: t ? { type: t.type || t.category, guardian: !!t.guardian, hp: t.hp, at: { x: t.x, y: t.y }, dist: td, sealedTile: !!g.map[t.y]?.[t.x]?.sealed } : null, drafted: !!c.drafted };
+                    const info = { name: c.name, at: { x: c.x, y: c.y }, nearest: t ? { type: t.type || t.category, guardian: !!t.guardian, hp: t.hp, at: { x: t.x, y: t.y }, dist: td, sealedTile: !!g.map[t.y]?.[t.x]?.sealed, reachable: !!findPathAdjacent(g.map, c.x, c.y, t.x, t.y, g._occupiedTiles)?.length } : null, drafted: !!c.drafted };
                     summary.stuckFighting = summary.stuckFighting || [];
                     summary.stuckFighting.push({ tick: g.tick, day: day(), ...info });
                     event('stuck_fighting', info);
@@ -227,14 +233,38 @@ async function play(opts, out, log, setShotResolve) {
                 homeTicks++;
                 stateCounts[c.state] = (stateCounts[c.state] || 0) + 1;
                 if (c.state === 'idle' && !c.currentTaskId) idleTicks++;
+                // Where colonist time goes: the task being walked to or worked on.
+                if (c.currentTaskId) {
+                    const task = g.taskQueue.getById(c.currentTaskId);
+                    const k = task ? `${c.state === 'working' ? 'work' : 'walk'}:${task.type}` : 'stale';
+                    taskTime[k] = (taskTime[k] || 0) + 1;
+                }
+            }
+        }
+    }
+
+    // Warning toasts (unreachable tasks, cancellations) never reach the event log, so copy them.
+    const seenNotes = new WeakSet();
+    function trackNotifications() {
+        for (const n of g.notifications) {
+            if (seenNotes.has(n)) continue;
+            seenNotes.add(n);
+            if (n.type === 'danger' || n.type === 'warning') {
+                const text = String(n.text).replace(/<[^>]+>/g, '').replace(/&#\d+;/g, '');
+                out.events.push({ tick: g.tick, day: day(), kind: 'notify', type: n.type, text });
+                const key = text.replace(/^[A-Z][a-z]+ can't reach/, "can't reach").replace(/\d+/g, 'N');
+                summary.warnings = summary.warnings || {};
+                summary.warnings[key] = (summary.warnings[key] || 0) + 1;
             }
         }
     }
 
     function trackWorld() {
+        trackNotifications();
         const raid = !!g.combat.raidActive;
         if (raid && !lastRaidActive) {
-            summary.raids.push({ tick: g.tick, day: day(), type: g.combat.activeRaidType || 'raid', raiders: g.raiders.length, scripted: !!g.tutorial.flags.trainingRaid && summary.raids.length === 0 && !!profile.tutorial });
+            const dists = g.raiders.filter(r => r.hp > 0).map(r => Math.abs(r.x - home.x) + Math.abs(r.y - home.y));
+            summary.raids.push({ tick: g.tick, day: day(), type: g.combat.activeRaidType || 'raid', raiders: g.raiders.length, startDist: dists.length ? Math.min(...dists) : null, scripted: !!g.tutorial.flags.trainingRaid && summary.raids.length === 0 && !!profile.tutorial });
             event('raid_start', { type: g.combat.activeRaidType, raiders: g.raiders.length });
             if (milestone('first_raid')) requestShot('first_raid', (gm) => { gm.camera.centerOn(home.x, home.y); });
         }
@@ -242,6 +272,10 @@ async function play(opts, out, log, setShotResolve) {
             const r = summary.raids[summary.raids.length - 1];
             if (r) { r.endTick = g.tick; r.durationTicks = g.tick - r.tick; r.colonistsAlive = g.colonists.filter(c => c.hp > 0).length; }
             event('raid_end', {});
+        }
+        if (raid) {
+            const r = summary.raids[summary.raids.length - 1];
+            if (r && r.arrivedTick === undefined && g.raiders.some(x => x.hp > 0 && Math.abs(x.x - home.x) + Math.abs(x.y - home.y) <= 20)) r.arrivedTick = g.tick - r.tick;
         }
         lastRaidActive = raid;
 
@@ -284,15 +318,29 @@ async function play(opts, out, log, setShotResolve) {
         return 'other';
     }
 
-    let lastPauseReason = null;
+    // Count every time the game pauses itself, at the moment it does, even if the
+    // prompt behind it is answered (and the game unpaused) within the same tick.
+    let botToggling = false, pausedViaToggle = false;
+    const origToggle = g.togglePause.bind(g);
+    g.togglePause = (silent) => {
+        if (!g.paused && !botToggling && !inShot) {
+            const reason = pauseReason();
+            pausedViaToggle = true;
+            if (reason !== 'game_over') {
+                summary.pauses[reason] = (summary.pauses[reason] || 0) + 1;
+                event('auto_pause', { reason });
+            }
+        }
+        return origToggle(silent);
+    };
     function checkPause() {
-        if (!g.paused) return;
-        const reason = pauseReason();
-        if (reason === 'game_over') return;
-        summary.pauses[reason] = (summary.pauses[reason] || 0) + 1;
-        event('auto_pause', { reason });
-        lastPauseReason = reason;
-        g.togglePause(true);
+        if (!g.paused) { pausedViaToggle = false; return; }
+        if (inShot) return;
+        if (pauseReason() === 'game_over') return;
+        // Code that sets paused directly (death) bypasses togglePause.
+        if (!pausedViaToggle) { const r = 'direct:' + pauseReason(); summary.pauses[r] = (summary.pauses[r] || 0) + 1; event('auto_pause', { reason: r }); }
+        pausedViaToggle = false;
+        botToggling = true; g.togglePause(true); botToggling = false;
     }
 
     // ---- Sampling & stall detection --------------------------------------
@@ -337,7 +385,10 @@ async function play(opts, out, log, setShotResolve) {
         for (const [k, v] of Object.entries(stateCounts)) states[k] = +(v / Math.max(1, homeTicks)).toFixed(3);
         const active = g.research.activeResearch;
         const available = g.research.getAvailable().map(t => t.key);
+        const tasksShare = {};
+        for (const [k, v] of Object.entries(taskTime)) tasksShare[k] = +(v / Math.max(1, homeTicks)).toFixed(3);
         const m = {
+            tasksShare,
             tick: g.tick, day: day(), season: g.weather.season, year: g.weather.year, weather: g.weather.currentWeather,
             alive: alive.length, home: homeC.length, cap,
             moodAvg: moods.length ? +(moods.reduce((a, b) => a + b, 0) / moods.length).toFixed(1) : null,
@@ -381,12 +432,12 @@ async function play(opts, out, log, setShotResolve) {
         const blocked = strategy.blockedGoals?.() || [];
         stall('goal_blocked', blocked.length > 0, { goals: blocked });
 
-        rpInterval = 0; stateCounts = {}; homeTicks = 0; idleTicks = 0; simMs = 0; simTicks = 0; renderMs = 0; renderFrames = 0;
+        rpInterval = 0; stateCounts = {}; taskTime = {}; homeTicks = 0; idleTicks = 0; simMs = 0; simTicks = 0; renderMs = 0; renderFrames = 0;
     }
 
     // ---- Main loop ---------------------------------------------------------
     g.speed = 0;
-    if (g.paused) g.togglePause(true);
+    if (g.paused) { botToggling = true; g.togglePause(true); botToggling = false; }
     g.camera.centerOn(home.x, home.y);
     requestShot('start');
     const endTick = Math.round(opts.days * TPD());

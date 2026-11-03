@@ -3,6 +3,7 @@ import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
 import { createColonist, addThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { getPedestalEffect } from './artifacts.js';
+import { isPassable } from '../world/map.js';
 
 /**
  * Computes effective trade rates for the current game state.
@@ -423,7 +424,7 @@ export class EventSystem {
             return;
         }
 
-        const edge = getRandomEdge();
+        const edge = getReachableEdge(game);
         const skillKeys = Object.keys(SKILLS);
         const bias = skillKeys[Math.floor(Math.random() * skillKeys.length)];
         const existingNames = game.colonists.map(c => c.name);
@@ -594,7 +595,7 @@ export class EventSystem {
         };
         game.notifications.push({ text: `${merchant.name} arrived!`, tick: game.tick, type: 'event' });
         game.eventLog.add(game, `${merchant.name} arrived`, 'event', null);
-        if (game.settings.autoPauseEvent && !game.paused) {
+        if (game.settings.autoPauseCaravan && !game.paused) {
             game.togglePause();
             game._eventPaused = true;
         }
@@ -1056,6 +1057,42 @@ function getRandomEdge() {
         case 3: return { x: 0, y: Math.floor(Math.random() * CONFIG.MAP_HEIGHT) };
         default: return { x: Math.floor(CONFIG.MAP_WIDTH / 2), y: 0 };
     }
+}
+
+/**
+ * A spawn tile for someone walking in to join the colony: a random map-border tile
+ * that is connected on foot to the colony, so a wanderer never arrives somewhere
+ * (across a river, behind mountains) they can't leave. Falls back to a connected
+ * tile 30-60 tiles from the colony when its land doesn't reach the border, and to
+ * a plain random edge if there are no colonists to measure from.
+ *
+ * @param {object} game Game instance.
+ * @return {{x:number, y:number}} Spawn tile.
+ */
+function getReachableEdge(game) {
+    const W = CONFIG.MAP_WIDTH, H = CONFIG.MAP_HEIGHT;
+    const from = game.colonists.find(c => c.hp > 0 && !c.onExpedition && isPassable(game.map, c.x, c.y));
+    if (!from) return getRandomEdge();
+    // Flood the colony's walkable area (4-directional, like pathfinding). This runs
+    // only when a wanderer event fires, so a full-map fill is affordable.
+    const seen = new Uint8Array(W * H);
+    const stack = [from.y * W + from.x];
+    seen[stack[0]] = 1;
+    const border = [], midRange = [];
+    while (stack.length) {
+        const i = stack.pop();
+        const x = i % W, y = (i - x) / W;
+        if (x === 0 || y === 0 || x === W - 1 || y === H - 1) border.push({ x, y });
+        const d = Math.abs(x - from.x) + Math.abs(y - from.y);
+        if (d >= 30 && d <= 60) midRange.push({ x, y });
+        if (x > 0 && !seen[i - 1] && isPassable(game.map, x - 1, y)) { seen[i - 1] = 1; stack.push(i - 1); }
+        if (x < W - 1 && !seen[i + 1] && isPassable(game.map, x + 1, y)) { seen[i + 1] = 1; stack.push(i + 1); }
+        if (y > 0 && !seen[i - W] && isPassable(game.map, x, y - 1)) { seen[i - W] = 1; stack.push(i - W); }
+        if (y < H - 1 && !seen[i + W] && isPassable(game.map, x, y + 1)) { seen[i + W] = 1; stack.push(i + W); }
+    }
+    const pool = border.length ? border : midRange;
+    if (!pool.length) return { x: from.x, y: from.y };
+    return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function getRandomEdgeZone() {

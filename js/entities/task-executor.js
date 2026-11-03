@@ -123,7 +123,8 @@ function autoAssignNewBed(game, x, y) {
     if (nearest) nearest.assignedBed = { x, y };
 }
 
-function advanceTomeStudy(colonist, game, rate) {
+// `sessions` scales the per-call magic XP, for tasks that bundle several study sittings.
+function advanceTomeStudy(colonist, game, rate, sessions = 1) {
     if (!colonist.equippedTome) return;
     const tomeKey = colonist.equippedTome;
     const tomeDef = SPELL_TOMES[tomeKey];
@@ -143,7 +144,7 @@ function advanceTomeStudy(colonist, game, rate) {
 
     if (!colonist.magicXpAccumulator) colonist.magicXpAccumulator = {};
     if (!colonist.magicXpAccumulator[school]) colonist.magicXpAccumulator[school] = 0;
-    let studyXpGain = MAGIC_STUDY_CONFIG.xpPerStudyTick;
+    let studyXpGain = MAGIC_STUDY_CONFIG.xpPerStudyTick * sessions;
     if (colonist.traits.includes('scholar')) studyXpGain *= TRAITS.scholar.magicXpMult;
     if (colonist.traits.includes('prodigy')) studyXpGain *= TRAITS.prodigy.magicXpMult;
     if (colonist.traits.includes('magically_inept')) studyXpGain *= TRAITS.magically_inept.magicXpMult;
@@ -474,6 +475,7 @@ export function completeTask(colonist, task, game) {
             if (researchMult > 0) researchPts = Math.floor(researchPts * researchMult);
             if (task.diminished) researchPts = Math.max(1, Math.floor(researchPts * 0.5));
             researchPts = Math.floor(researchPts * getResearchSpeedMult(game));
+            researchPts *= WORK_CONFIG.researchSessionsPerTask || 1;
             const completedKey = game.research.addProgress(researchPts);
             if (completedKey) {
                 const tech = RESEARCH[completedKey];
@@ -501,7 +503,8 @@ export function completeTask(colonist, task, game) {
                 : MAGIC_STUDY_CONFIG.tomeStudyBonus;
             const tomeSpeedMult = getEquipmentStat(colonist, 'tomeStudySpeed');
             if (tomeSpeedMult > 0) tomeRate *= tomeSpeedMult;
-            advanceTomeStudy(colonist, game, tomeRate);
+            const sessions = WORK_CONFIG.researchSessionsPerTask || 1;
+            advanceTomeStudy(colonist, game, tomeRate * sessions, sessions);
             break;
         }
         case 'tame': {

@@ -554,6 +554,25 @@ function updateThoughts(colonist, game) {
     }
 }
 
+// Each colonist toasts a given alert at most once per game day, and same-kind
+// toasts that land within ALERT_MERGE_TICKS of each other merge into one
+// ("3 colonists are overheating!"). Playtests saw ~5 such toasts per game day.
+const ALERT_TOAST_COOLDOWN = CONFIG.TICKS_PER_DAY;
+const ALERT_MERGE_TICKS = 30;
+function pushColonistAlert(game, colonist, kind, singular, plural, type) {
+    const last = game._alertToastTicks || (game._alertToastTicks = new Map());
+    const key = `${kind}:${colonist.id}`;
+    if (last.has(key) && game.tick - last.get(key) < ALERT_TOAST_COOLDOWN) return;
+    last.set(key, game.tick);
+    const recent = game.notifications.find(n => n._alertKind === kind && game.tick - n.tick <= ALERT_MERGE_TICKS);
+    if (recent) {
+        if (!recent._alertNames.includes(colonist.name)) recent._alertNames.push(colonist.name);
+        recent.text = recent._alertNames.length === 1 ? `${recent._alertNames[0]} ${singular}` : `${recent._alertNames.length} colonists ${plural}`;
+        return;
+    }
+    game.notifications.push({ text: `${colonist.name} ${singular}`, tick: game.tick, type, _alertKind: kind, _alertNames: [colonist.name] });
+}
+
 function checkCriticalAlerts(colonist, game) {
     if (!colonist._alertFlags) colonist._alertFlags = {};
     const flags = colonist._alertFlags;
@@ -568,7 +587,7 @@ function checkCriticalAlerts(colonist, game) {
 
     if (colonist.mood < 30 && colonist.mood > 20 && !flags.mood) {
         flags.mood = true;
-        game.notifications.push({ text: `${colonist.name} is near breaking!`, tick: game.tick, type: 'warning' });
+        pushColonistAlert(game, colonist, 'mood', 'is near breaking!', 'are near breaking!', 'warning');
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Low mood!', color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
     } else if (colonist.mood >= 40) {
         flags.mood = false;
@@ -577,7 +596,7 @@ function checkCriticalAlerts(colonist, game) {
     const freezing = colonist.thoughts.some(t => t.text === 'Freezing outside');
     if (freezing && !flags.freezing) {
         flags.freezing = true;
-        game.notifications.push({ text: `${colonist.name} is freezing!`, tick: game.tick, type: 'danger' });
+        pushColonistAlert(game, colonist, 'freezing', 'is freezing!', 'are freezing!', 'danger');
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Freezing!', color: '#88ddff', fontSize: 11, ttl: 12, maxTtl: 12 });
         window.soundManager?.playSFX('freezing');
     } else if (!freezing) {
@@ -587,7 +606,7 @@ function checkCriticalAlerts(colonist, game) {
     const overheating = colonist.thoughts.some(t => t.text === 'Overheating outside');
     if (overheating && !flags.overheating) {
         flags.overheating = true;
-        game.notifications.push({ text: `${colonist.name} is overheating!`, tick: game.tick, type: 'warning' });
+        pushColonistAlert(game, colonist, 'overheating', 'is overheating!', 'are overheating!', 'warning');
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Overheating!', color: '#ff8844', fontSize: 11, ttl: 12, maxTtl: 12 });
     } else if (!overheating) {
         flags.overheating = false;
@@ -2076,6 +2095,12 @@ function updateIdle(colonist, game) {
 const SOCIAL_PATH_RETRY_TICKS = 60;
 const DRAFT_PATH_RETRY_TICKS = 30;
 const FIGHT_PATH_RETRY_TICKS = 10;
+// Failed searches toward the same hostile before a colonist gives up on it, and how
+// long it then ignores that hostile. Without this a colonist in engage range of a
+// target it cannot reach (a crypt guardian behind walls, a wolf across water) stays
+// in 'fighting' forever and never eats, sleeps or works.
+const FIGHT_UNREACHABLE_FAILS = 3;
+const FIGHT_UNREACHABLE_TICKS = 150;
 // Move attempts a hunter may spend without getting closer before giving up.
 const HUNT_STUCK_LIMIT = 60;
 
@@ -2555,7 +2580,7 @@ function updateEating(colonist, game) {
             let mealDuration = COLONIST_CONFIG.mealMoodDuration;
             if (colonist.traits.includes('chef')) mealDuration = Math.round(mealDuration * TRAITS.chef.mealMoodDurationMult);
             addThought(colonist, colonist.traits.includes('gourmand') ? 'Delicious meal' : 'Ate a meal', mealMood, mealDuration, game.tick);
-            colonist._eatTicksLeft = 30;  // ~½s at 60fps to show the animation
+            colonist._eatTicksLeft = 15;  // simulation ticks: 3 s of game time at 1x
         } else {
             const eaten = eatRawFoodstuff(game);
             if (eaten) {
@@ -2568,7 +2593,7 @@ function updateEating(colonist, game) {
                     const rawPenalty = getRaceModifier(colonist, 'rawFoodMoodPenalty', COLONIST_CONFIG.rawFoodMoodPenalty);
                     addThought(colonist, 'Ate raw food', rawPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
                 }
-                colonist._eatTicksLeft = 45;
+                colonist._eatTicksLeft = 23;  // raw food takes a little longer (~4.6 s)
             } else {
                 colonist.state = 'idle';
                 addThought(colonist, 'Starving', COLONIST_CONFIG.starvingMoodPenalty, COLONIST_CONFIG.starvingMoodDuration, game.tick);
@@ -2655,7 +2680,9 @@ function updateSleeping(colonist, game) {
                 addThought(colonist, 'Slept in bed', COLONIST_CONFIG.sleptInBedMoodBonus, COLONIST_CONFIG.sleptInBedMoodDuration, game.tick);
             }
         } else {
-            addThought(colonist, 'Slept on the ground', COLONIST_CONFIG.sleptOnGroundMoodPenalty, COLONIST_CONFIG.sleptOnGroundMoodDuration, game.tick);
+            const noBeds = game.mapIndex.getStructurePositions('bed').size === 0;
+            const penalty = noBeds ? COLONIST_CONFIG.sleptOnGroundNoBedsMoodPenalty : COLONIST_CONFIG.sleptOnGroundMoodPenalty;
+            addThought(colonist, 'Slept on the ground', penalty, COLONIST_CONFIG.sleptOnGroundMoodDuration, game.tick);
         }
     }
 }
@@ -2669,6 +2696,8 @@ function updateSleeping(colonist, game) {
 // is cached on the colonist and recomputed only when the target shifts, the path
 // runs out, or the colonist is no longer standing on it. A* isn't re-run every
 // tick for every fighter during a wave.
+// Returns false only when a fresh path search found no route, so the caller can
+// count failures against the target. Waiting out a retry backoff is not a failure.
 function fightStepToward(colonist, dest, adjacent, game) {
     const targetMoved = !colonist._fightDest
         || manhattanDist(dest.x, dest.y, colonist._fightDest.x, colonist._fightDest.y) > 1;
@@ -2684,12 +2713,13 @@ function fightStepToward(colonist, dest, adjacent, game) {
         colonist._fightPath = fresh || [];
         colonist._fightDest = { x: dest.x, y: dest.y };
         colonist._fightPathRetryAt = fresh ? 0 : game.tick + FIGHT_PATH_RETRY_TICKS;
+        if (!fresh) return false;
     }
     if (!colonist._fightPath) colonist._fightPath = [];
-    if (colonist._fightPath.length === 0) return;
+    if (colonist._fightPath.length === 0) return true;
     const next = colonist._fightPath[0];
-    if (!isPassable(game.map, next.x, next.y)) { colonist._fightPath = []; return; }
-    if (game.isTileOccupied(next.x, next.y)) return; // blocked by another entity, wait a tick
+    if (!isPassable(game.map, next.x, next.y)) { colonist._fightPath = []; return true; }
+    if (game.isTileOccupied(next.x, next.y)) return true; // blocked by another entity, wait a tick
     colonist._fightPath.shift();
     const cost = getMoveCost(game.map, next.x, next.y);
     const moveBonus = getMoveSpeedBonus(colonist);
@@ -2697,6 +2727,39 @@ function fightStepToward(colonist, dest, adjacent, game) {
     moveEntity(colonist, next.x, next.y, dur);
     colonist.moveCooldown = computeMoveCooldown(cost, moveBonus);
     colonist._lastMoveTick = game.tick;
+    return true;
+}
+
+// Counts failed searches toward one hostile. After FIGHT_UNREACHABLE_FAILS in a row
+// the colonist marks it unreachable (findNearestHostile then skips it) and stands down.
+function noteFightPathResult(colonist, target, found, game) {
+    if (target.id === undefined) return;
+    if (found) {
+        if (colonist._fightFailTarget === target.id) colonist._fightFails = 0;
+        return;
+    }
+    if (colonist._fightFailTarget !== target.id) {
+        colonist._fightFailTarget = target.id;
+        colonist._fightFails = 0;
+    }
+    colonist._fightFails++;
+    if (colonist._fightFails < FIGHT_UNREACHABLE_FAILS) return;
+    if (!(colonist._unreachableHostiles instanceof Map)) colonist._unreachableHostiles = new Map();
+    colonist._unreachableHostiles.set(target.id, game.tick + FIGHT_UNREACHABLE_TICKS);
+    colonist._fightFails = 0;
+    colonist._fightPath = [];
+    colonist._fightDest = null;
+    colonist.state = 'idle';
+}
+
+function isMarkedUnreachable(colonist, entity, tick) {
+    const marks = colonist._unreachableHostiles;
+    if (!(marks instanceof Map)) return false;
+    const until = marks.get(entity.id);
+    if (until === undefined) return false;
+    if (tick < until) return true;
+    marks.delete(entity.id);
+    return false;
 }
 
 function updateFighting(colonist, game) {
@@ -2806,17 +2869,16 @@ function updateFighting(colonist, game) {
         // still and falling through to a melee swing. If no shootable tile exists
         // within range, close on the target (path adjacent) to round the obstruction.
         const losTile = findLineOfSightTile(game.map, colonist.x, colonist.y, target.x, target.y, weaponRange, isPassable);
-        if (losTile) {
-            fightStepToward(colonist, losTile, false, game);
-        } else {
-            fightStepToward(colonist, target, true, game);
-        }
+        const found = losTile
+            ? fightStepToward(colonist, losTile, false, game)
+            : fightStepToward(colonist, target, true, game);
+        noteFightPathResult(colonist, target, found, game);
         return;
     } else if (dist > 1 && (!isRanged || dist > weaponRange)) {
         // Route to a tile adjacent to the target so the colonist walks out through
         // any door and around walls, rather than greedily stepping into a wall when
         // the raider approaches from a side the door doesn't face.
-        fightStepToward(colonist, target, true, game);
+        noteFightPathResult(colonist, target, fightStepToward(colonist, target, true, game), game);
         return;
     } else {
         if (game.tick - (colonist._lastAttackTick || 0) < effectiveCooldown) return;
@@ -3244,8 +3306,13 @@ function updateWandering(colonist, game) {
 }
 
 function findNearestHostile(colonist, game) {
+    // Skip hostiles this colonist recently failed to reach (see noteFightPathResult).
+    const marks = colonist._unreachableHostiles;
+    const reachable = marks instanceof Map && marks.size > 0
+        ? (e) => !isMarkedUnreachable(colonist, e, game.tick)
+        : null;
     if (game.spatial) {
-        return game.spatial.hostiles.findNearest(colonist.x, colonist.y, COLONIST_CONFIG.hostileSearchRadius, null);
+        return game.spatial.hostiles.findNearest(colonist.x, colonist.y, COLONIST_CONFIG.hostileSearchRadius, reachable);
     }
     let nearest = null;
     let minDist = Infinity;
@@ -3254,6 +3321,7 @@ function findNearestHostile(colonist, game) {
     for (const entity of [...hostileEntities, ...game.raiders, ...waveEnemies]) {
         if (entity.hp <= 0) continue;
         if (!entity.hostile && !waveEnemies.includes(entity)) continue;
+        if (reachable && !reachable(entity)) continue;
         const dist = manhattanDist(colonist.x, colonist.y, entity.x, entity.y);
         if (dist < minDist) {
             minDist = dist;

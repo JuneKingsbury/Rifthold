@@ -1,4 +1,4 @@
-import { CONFIG, BUILDINGS, RECIPES, RECIPE_CATEGORIES, MAGIC_SKILLS, MAGIC_STUDY_CONFIG } from '../core/config.js';
+import { CONFIG, BUILDINGS, RECIPES, RECIPE_CATEGORIES, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, RESEARCH } from '../core/config.js';
 import { findOpenRect, findNearestResource } from './tutorial-hints.js';
 
 /**
@@ -11,6 +11,33 @@ export const TUTORIAL_LEVELS = ['none', 'some', 'veteran'];
 
 // Ticks a step can sit unfinished before the note offers extra help.
 const STUCK_TICKS = 900;
+
+// "A, B, C and D": the techs with no prerequisites, read from the tree so the
+// research step never names techs that don't exist.
+function starterTechList() {
+    const names = Object.values(RESEARCH).filter(t => !t.requires || t.requires.length === 0).map(t => t.name);
+    return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : (names[0] || '');
+}
+const STARTER_TECHS = starterTechList();
+const WEAPONS_RECIPE_CLUB = RECIPES.craft_wooden_club ? 'craft_wooden_club' : null;
+
+// Shown when a research step has sat for a while. Research is slow by nature, so
+// point at the two levers that actually speed it up.
+const RESEARCH_STUCK_HELP = 'Research takes a while. To speed it up, build a second Research Desk, or open Priority [P] and set one colonist\'s Research to 1. You can also skip this step.';
+
+// One-time popups raised by game state rather than step order. `when(game)` is
+// checked on every tutorial update; the tip shows once, while nothing else is pending.
+const TUTORIAL_TIPS = [
+    {
+        id: 'first_winter',
+        // Two days before the first winter.
+        when(game) {
+            const w = game.weather;
+            return w.year === 1 && w.season === 'autumn' && CONFIG.TICKS_PER_SEASON - w.seasonTick <= 2 * CONFIG.TICKS_PER_DAY;
+        },
+        text: 'Winter is two days away. Crops stop growing in winter, so stock up now: plant extra fields while you still can, build Food Chests (Furniture tab) to slow spoilage, set an auto-cook target in Craft\'s Food & Potions tab, and put a campfire where colonists spend their time so they don\'t freeze outside.',
+    },
+];
 
 // Order of the original tutorial. Old saves stored a step *index*; this maps it to an id.
 const LEGACY_STEP_IDS = [
@@ -285,7 +312,7 @@ const TUTORIAL_STEPS = [
         id: 'start_time',
         levels: ['none'],
         title: 'Start the Clock',
-        description: 'The game starts paused so you can get your barrings. Press [Space] or click the 1x button to resume the game. You can pause again whenever you need a moment. Remember that orders can be given while the game is paused.',
+        description: 'The game starts paused so you can get your bearings. Press [Space] or click the 1x button to resume the game. You can pause again whenever you need a moment. Remember that orders can be given while the game is paused.',
         highlight: null,
         isComplete(game) { return !game.paused; },
         goTo(game) { if (game.paused) game.togglePause(); },
@@ -374,7 +401,7 @@ const TUTORIAL_STEPS = [
         id: 'cook',
         levels: ['none', 'some'],
         title: 'Cook a Meal',
-        description: 'Press [C] or click Craft in the mode bar, then queue "Cook Meal". Meals restore more hunger and give a mood bonus. Tip: set an auto-cook target in Settings so colonists will automatically cook more food when they run low.',
+        description: 'Press [C] or click Craft in the mode bar, then queue "Cook Meal". Meals restore more hunger and give a mood bonus. Tip: set an auto-cook target at the bottom of Craft\'s Food & Potions tab so colonists cook more meals on their own when stocks run low.',
         highlight: 'craft',
         isComplete(game) { return !!game.tutorial.flags.cookedMeal; },
         goTo(game) { game.ui.toggleCraftPanel(); },
@@ -398,8 +425,9 @@ const TUTORIAL_STEPS = [
         id: 'research',
         levels: ['none', 'some'],
         title: 'Start Researching',
-        description: 'Open Research [R] and pick a technology to study. Stonework, Runecraft, and Druidcraft have no prerequisites so pick whichever sounds useful!',
-        descriptionNone: 'Research unlocks new buildings, recipes and abilities. Open Research [R] and press Select on a technology. Stonework, Runecraft, and Druidcraft have no prerequisites so pick whichever sounds useful. Colonists earn the points at the Research Desk.',
+        stuckHelp: RESEARCH_STUCK_HELP,
+        description: `Open Research [R] and pick a technology to study. ${STARTER_TECHS} have no prerequisites, so pick whichever sounds useful!`,
+        descriptionNone: `Research unlocks new buildings, recipes and abilities. Open Research [R] and press Select on a technology. ${STARTER_TECHS} have no prerequisites, so pick whichever sounds useful. Colonists earn the points at the Research Desk.`,
         highlight: 'research',
         // Wait for the panel to close so the next step's arrows don't land on top of it.
         isComplete(game) { return startedResearch(game) && !game.ui?.researchPanelVisible; },
@@ -445,6 +473,13 @@ const TUTORIAL_STEPS = [
         id: 'weapon',
         levels: ['none', 'some'],
         title: 'Craft Weapons for Everyone',
+        // Stone can be a long walk away, and the spear is the only weapon named above.
+        helpText(game) {
+            const club = WEAPONS_RECIPE_CLUB && RECIPES[WEAPONS_RECIPE_CLUB];
+            if (!club || (game.resources.stockpile.stone || 0) >= 2) return null;
+            const cost = Object.entries(club.input).map(([k, v]) => `${v} ${k}`).join(' and ');
+            return `Short on stone? A Wooden Club needs only ${cost}.`;
+        },
         description: 'Open Craft [C], find the Weapons section, and craft a weapon for each colonist. The x5 button queues several at once. A Stone Spear only costs 2 stone and 1 wood.',
         descriptionNone: 'Your colonists will need to defend themselves from raiders, and unarmed colonists fight with their fists. Open Craft [C], find the Weapons section, and craft a weapon for each colonist. The x5 button queues several at once, and a Stone Spear only costs 2 stone and 1 wood.',
         highlight: 'craft',
@@ -616,6 +651,7 @@ const TUTORIAL_STEPS = [
         id: 'wayfinding',
         levels: ['none', 'some'],
         title: 'Research Wayfinding',
+        stuckHelp: RESEARCH_STUCK_HELP,
         description: 'Rifts lead to other lands. Open Research [R], switch to the Rifts tab, and research Wayfinding. It lets you send small scouting parties beyond the colony.',
         highlight: 'research',
         isComplete(game) { return game.research.isResearched('wayfinding'); },
@@ -634,6 +670,12 @@ const TUTORIAL_STEPS = [
         goTo(game) { game.ui.toggleArcanePanel?.(); },
         pointer: expeditionPointer,
     },
+    manualStep({
+        id: 'colony_growth',
+        levels: ['none', 'some'],
+        title: 'Growing the Colony',
+        description: 'Your colony has room for 3 colonists. To make room for more, build Hearth Shrines (Build, Arcane tab, after Ley Channeling). Each shrine needs a free slot and 3 spare mana. Slots unlock as you reach milestones: surviving Void Nexus waves, venturing into new realms and conquering realm chains. With room to spare, wanderers who come by can join you.',
+    }),
     manualStep({
         id: 'finish',
         levels: ['none'],
@@ -741,6 +783,7 @@ export class TutorialSystem {
 
     update(game) {
         if (!game.settings.showTutorial) return;
+        this._checkTips(game);
         if (this.isFinished()) return;
 
         this._trackFlags(game);
@@ -794,6 +837,21 @@ export class TutorialSystem {
         }
     }
 
+    /** Raises the first due tip as an event popup (pausing like other events), once per colony. */
+    _checkTips(game) {
+        if (this.isChecklist || game.events.pendingEvent) return;
+        for (const tip of TUTORIAL_TIPS) {
+            if (this.flags[`tip_${tip.id}`] || !tip.when(game)) continue;
+            this.flags[`tip_${tip.id}`] = true;
+            game.events.pendingEvent = { type: 'tip', text: tip.text, choices: ['Got it'] };
+            if (game.settings.autoPauseEvent && !game.paused) {
+                game.togglePause();
+                game._eventPaused = true;
+            }
+            return;
+        }
+    }
+
     getHighlight() {
         const task = this.getCurrentTask();
         return task ? task.highlight : null;
@@ -802,6 +860,17 @@ export class TutorialSystem {
     goTo(game) {
         const task = this.getCurrentTask();
         if (task && task.goTo) task.goTo(game);
+    }
+
+    /**
+     * True while the walkthrough has a drafting lesson still ahead of it. Regular
+     * raids wait until then, so the first raid a new player meets is the scripted
+     * training raid, after weapons have been crafted and equipped.
+     */
+    holdsRaids(game) {
+        if (!game.settings.showTutorial || this.isChecklist || this.isFinished()) return false;
+        const draftIdx = this.steps.findIndex(s => s.id === 'draft');
+        return draftIdx >= 0 && !this.completed.has('draft') && this.currentStep <= draftIdx;
     }
 
     /** Dismisses the current "Got it" step. */
@@ -860,12 +929,15 @@ export class TutorialSystem {
     getHelpText(game) {
         const task = this.getCurrentTask();
         if (!task || task.manual) return null;
+        // Step-specific hints that depend on the colony's state come first.
+        const hint = typeof task.helpText === 'function' ? task.helpText(game) : null;
+        if (hint) return hint;
         if (task.cost && game.resources?.has && !game.resources.has(task.cost)) {
             const need = Object.entries(task.cost).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`).join(', ');
             return `You don't have enough materials yet. This needs ${need}.`;
         }
         if (this._stepStartTick !== null && game.tick - this._stepStartTick > STUCK_TICKS) {
-            return 'This can take a while, since colonists need time to do the work. If nothing is happening, check Priority [P] to make sure the right jobs are turned on. You can also skip this step.';
+            return task.stuckHelp || 'This can take a while, since colonists need time to do the work. If nothing is happening, check Priority [P] to make sure the right jobs are turned on. You can also skip this step.';
         }
         return null;
     }

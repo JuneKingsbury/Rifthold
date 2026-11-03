@@ -51,6 +51,11 @@ export class CombatSystem {
         if (this.raidActive) {
             this.updateRaid(game);
         } else if (game.tick >= this.nextRaidTick) {
+            // While the tutorial has yet to teach drafting, its own training raid comes first.
+            if (game.tutorial?.holdsRaids?.(game)) {
+                this.nextRaidTick = game.tick + CONFIG.TICKS_PER_DAY / 4;
+                return;
+            }
             const mods = game.divinationModifiers || [];
             const raidDelay = mods.reduce((sum, m) => sum + (m.raidDelay || 0), 0);
             if (raidDelay > 0) {
@@ -139,6 +144,8 @@ export class CombatSystem {
             Math.floor(RAID_CONFIG.baseRaiders + scaledRaiders));
 
         const edge = Math.floor(Math.random() * 4);
+        const small = numRaiders <= RAID_CONFIG.smallRaidSize;
+        const spawnAt = (offset) => small ? nearRaidPosition(game, edge, offset) : getEdgePosition(edge, offset);
         const raidTypeKeys = Object.keys(RAID_TYPES).filter(k => !RAID_TYPES[k].scripted);
         const raidType = raidTypeKeys.length > 0 ? RAID_TYPES[raidTypeKeys[Math.floor(Math.random() * raidTypeKeys.length)]] : null;
 
@@ -151,7 +158,7 @@ export class CombatSystem {
                 const [minCount, maxCount] = entry.count;
                 const count = minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
                 for (let i = 0; i < count && spawned < numRaiders; i++) {
-                    const pos = getEdgePosition(edge, spawned);
+                    const pos = spawnAt(spawned);
                     const entity = createRaidEntity(entry.entity, pos.x, pos.y, raidLevel, raidType.scaling);
                     if (entity) {
                         game.raiders.push(entity);
@@ -163,7 +170,7 @@ export class CombatSystem {
 
         if (spawned === 0) {
             for (let i = 0; i < numRaiders; i++) {
-                const pos = getEdgePosition(edge, i);
+                const pos = spawnAt(i);
                 const entity = createRaidEntity('raider_brute', pos.x, pos.y, raidLevel, { hpMult: 0.1, damageMult: 0.05 });
                 if (entity) { game.raiders.push(entity); spawned++; }
             }
@@ -177,16 +184,19 @@ export class CombatSystem {
         game.notifications.push({ text: `Raid! ${spawned} raiders approaching!`, tick: game.tick, type: 'danger' });
         game.eventLog.add(game, `Raid! ${spawned} raiders attacking!`, 'danger', { type: 'position', ...raidPos });
 
-        game.events.pendingEvent = {
-            type: 'raid',
-            text: `Raid! ${spawned} raiders are approaching from the ${['north','east','south','west'][edge]}!`,
-            choices: ['Go To Raiders', 'Dismiss'],
-            data: raidPos,
-        };
+        // A raid of one or two is a nuisance, not an emergency: toast and log only.
+        if (!small) {
+            game.events.pendingEvent = {
+                type: 'raid',
+                text: `Raid! ${spawned} raiders are approaching from the ${['north','east','south','west'][edge]}!`,
+                choices: ['Go To Raiders', 'Dismiss'],
+                data: raidPos,
+            };
 
-        if (game.settings.autoPauseHostile && !game.paused) {
-            game.togglePause();
-            game._eventPaused = true;
+            if (game.settings.autoPauseHostile && !game.paused) {
+                game.togglePause();
+                game._eventPaused = true;
+            }
         }
 
         this.nextRaidTick = game.tick + RAID_CONFIG.minInterval +
@@ -579,6 +589,24 @@ export function attackStructure(game, x, y, damage) {
             game.waves.invalidatePathPreview();
         }
     }
+}
+
+// Spawn point for a small raid: smallRaidSpawnDistance tiles from the colony toward
+// `side`, on the nearest passable tile, falling back to the map edge.
+function nearRaidPosition(game, side, offset) {
+    const present = game.colonists.filter(c => c.hp > 0 && !c.onExpedition);
+    if (!present.length) return getEdgePosition(side, offset);
+    const cx = Math.round(present.reduce((s, c) => s + c.x, 0) / present.length);
+    const cy = Math.round(present.reduce((s, c) => s + c.y, 0) / present.length);
+    const [dx, dy] = [[0, -1], [1, 0], [0, 1], [-1, 0]][side] || [0, -1];
+    const spread = offset * 2;
+    for (let d = RAID_CONFIG.smallRaidSpawnDistance; d < Math.max(CONFIG.MAP_WIDTH, CONFIG.MAP_HEIGHT); d += 2) {
+        const x = cx + dx * d + (dx === 0 ? spread : 0);
+        const y = cy + dy * d + (dy === 0 ? spread : 0);
+        if (x < 1 || y < 1 || x > CONFIG.MAP_WIDTH - 2 || y > CONFIG.MAP_HEIGHT - 2) break;
+        if (isPassableForEnemies(game.map, x, y)) return { x, y };
+    }
+    return getEdgePosition(side, offset);
 }
 
 function getEdgePosition(side, offset) {

@@ -195,6 +195,11 @@ export const RAID_CONFIG = {
     fleeHpFraction: 0.15,
     routThreshold: 0.8,
     timeout: 900,
+    // Raids this small skip the auto-pause popup and spawn this many tiles from the
+    // colony instead of at the map edge, so a lone raider doesn't idle a drafted
+    // colony for a whole day while it walks in.
+    smallRaidSize: 2,
+    smallRaidSpawnDistance: 40,
 };
 
 // How much each stockpiled resource contributes to raid attraction.

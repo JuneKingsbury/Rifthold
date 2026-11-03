@@ -121,7 +121,6 @@ export class ExplorationSystem {
         if (!this._chainOpen(game, dim)) return false;
         if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) return false;
         if (dim.scoutingMode) return true;
-        if (!game.power || !game.power.powered) return false;
         // Anchors skip the Rift Gate (which needed Planar Rifts to build), so the
         // research gate moves to the launch itself and early chains don't open on day one.
         if (game.ruins.getAnchor(dim.chain) && !game.research.isResearched('planar_rift')) return false;

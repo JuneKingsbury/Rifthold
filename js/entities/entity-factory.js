@@ -138,12 +138,15 @@ export function createRaidEntity(type, x, y, raidLevel, scaling) {
     return entity;
 }
 
+// Per-wave stat growth for wave enemies. Shared with the Nexus wave preview so the
+// numbers it shows are the numbers that spawn.
+export function waveScaling(waveNumber) {
+    return { hpMult: (waveNumber - 1) * 0.15, damageMult: (waveNumber - 1) * 0.1 };
+}
+
 export function createWaveEntity(type, x, y, waveNumber) {
     const def = ENTITIES[type];
     if (!def) return null;
 
-    const hpMult = (waveNumber - 1) * 0.15;
-    const damageMult = (waveNumber - 1) * 0.1;
-
-    return createEntity(type, x, y, { hpMult, damageMult });
+    return createEntity(type, x, y, waveScaling(waveNumber));
 }
