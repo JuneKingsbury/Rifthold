@@ -2785,7 +2785,7 @@ function updateFighting(colonist, game) {
         target._dmgFlashUntil = game.tick + COMBAT_VISUALS.dmgFlashTtl;
         colonist._atkShakeUntil = game.tick + COMBAT_VISUALS.atkShakeTtl;
         const sfxName = (weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
-        window.soundManager?.playSFXAt(sfxName);
+        window.soundManager?.playSFXAt(sfxName, colonist.x, colonist.y);
         const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
         game.projectiles.push({
             fromX: colonist.x, fromY: colonist.y, toX: target.x, toY: target.y,
@@ -2989,7 +2989,7 @@ function updateHunting(colonist, game) {
 
     if (isRanged && dist >= 2) {
         const huntSfxName = (weapon && weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
-        window.soundManager?.playSFXAt(huntSfxName);
+        window.soundManager?.playSFXAt(huntSfxName, colonist.x, colonist.y);
         const projDuration = (dist / COMBAT_VISUALS.projectileSpeed) * 1000;
         game.projectiles.push({
             fromX: colonist.x, fromY: colonist.y, toX: animal.x, toY: animal.y,

@@ -9,12 +9,13 @@
   "scripts": {
     "start": "electron .",
     "icons": "python3 scripts/make-icons.py",
+    "trailer:batch": "electron scripts/trailer-batch/launch.js",
     "build": "python3 scripts/build-all.py",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
     "dist:all": "electron-builder --mac --win --linux",
-    "copy:web": "rsync -a --delete --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='android' --exclude='www' --exclude='electron-main.js' --exclude='preload.js' --exclude='.claude' --exclude='js/dev' --exclude='BUILD_INSTRUCTIONS.txt' --exclude='Todo.md' --exclude='README.md' --exclude='package.json' --exclude='package-lock.json' --exclude='capacitor.config.ts' --exclude='.gitignore' --exclude='.DS_Store' --exclude='client_secret*.json' . www/",
+    "copy:web": "rsync -a --delete --exclude='node_modules' --exclude='dist' --exclude='.git' --exclude='android' --exclude='www' --exclude='electron-main.js' --exclude='preload.js' --exclude='.claude' --exclude='js/dev' --exclude='scripts/trailer-batch' --exclude='BUILD_INSTRUCTIONS.txt' --exclude='Todo.md' --exclude='README.md' --exclude='package.json' --exclude='package-lock.json' --exclude='capacitor.config.ts' --exclude='.gitignore' --exclude='.DS_Store' --exclude='client_secret*.json' . www/",
     "cap:sync": "npm run copy:web && npx cap sync android",
     "cap:android": "npm run cap:sync && npx cap open android",
     "postinstall": "electron-builder install-app-deps"
@@ -35,6 +36,7 @@
       "!.git/**",
       "!.claude/**",
       "!js/dev/**",
+      "!scripts/trailer-batch/**",
       "!.DS_Store",
       "!Todo.md",
       "!README.md",

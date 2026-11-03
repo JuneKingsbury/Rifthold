@@ -129,6 +129,7 @@ export const RENDER_CONFIG = {
         // water (the animated water waves drawn behind it show through the gap). The
         // waterline bobs gently with the same wave motion so entities appear to float.
         submergeFrac: 0.4,        // fraction of sprite height hidden below the waterline
+        shallowSubmergeFrac: 0.3, // same, for shallow water (wading, between dry land and deep water)
         submergeBobPx: 1.0,       // peak waterline rise/fall (px) for the float effect
     },
     // Attack swing: a quick lunge-and-return rotation on an entity's sprite when

@@ -17,9 +17,16 @@
 // which is saved with every snapshot, so later scenes reuse the same spots.
 
 import { MIDGAME_RESEARCH } from './stage.js';
+import { zoomToFit } from './cine-camera.js';
 
 const at = (p, zoom) => ({ x: p.x + 0.5, y: p.y + 0.5, zoom });
 const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+// Shot framing every rect (with `margin` tiles around them), never closer than `maxZoom`.
+function frameRects(rects, { margin = 2, maxZoom = 48 } = {}) {
+    const x0 = Math.min(...rects.map(r => r.x)) - margin, x1 = Math.max(...rects.map(r => r.x + r.w)) + margin;
+    const y0 = Math.min(...rects.map(r => r.y)) - margin, y1 = Math.max(...rects.map(r => r.y + r.h)) + margin;
+    return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, zoom: Math.min(maxZoom, zoomToFit(x1 - x0, y1 - y0)) };
+}
 const centroid = (pts) => pts.length
     ? { x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length }
     : null;
@@ -72,6 +79,14 @@ const FIGHTER_KITS = [
     ['hunting_bow', 'leather_vest', 'leather_cap', 'leather_boots'],
     ['iron_sword', 'iron_brigandine', 'leather_cap', 'leather_boots'],
     ['hunting_bow', 'leather_vest', 'iron_helmet', 'leather_boots'],
+];
+
+// The raid's front three, one per fighting style: the hero keeps the sword
+// forged and equipped in the earlier scenes, then a spear and a bow.
+const RAID_KITS = [
+    ['iron_sword', 'iron_chainmail', 'iron_helmet', 'leather_boots'],
+    ['poison_tipped_spear', 'iron_brigandine', 'leather_cap', 'leather_boots'],
+    ['hunting_bow', 'leather_vest', 'leather_cap', 'leather_boots'],
 ];
 
 // Arms everyone who is missing a weapon, so later scenes always look geared up.
@@ -178,9 +193,16 @@ export const SCENES = [
     // ------------------------------------------------------------------ 3
     {
         id: 'crafting',
-        name: 'Crafting gear at a workstation',
+        name: 'Crafting gear and gearing up',
         timeOfDay: 0.45,
         workMult: 1.5,
+        // Crafted in order; each piece goes on the moment it comes off the station.
+        gear: [
+            { recipe: 'craft_iron_sword', item: 'iron_sword' },
+            { recipe: 'craft_iron_helmet', item: 'iron_helmet' },
+            { recipe: 'craft_iron_chainmail', item: 'iron_chainmail' },
+            { recipe: 'craft_leather_boots', item: 'leather_boots' },
+        ],
         prepare(ctx) {
             const s = ctx.stage, p = homePlan(ctx);
             ensureForge(ctx);
@@ -195,95 +217,112 @@ export const SCENES = [
         },
         shot: ctx => at(ctx.plan.anvil, 34),
         async run(ctx) {
-            const s = ctx.stage;
-            ctx.mark('order placed');
-            s.craft('craft_iron_sword');
-            // Slow push-in on the anvil while the sword is forged.
-            ctx.cam.move(at(ctx.plan.anvil, 42), 9, 'sine');
-            await ctx.until(() => ctx.game.resources.weapons.some(w => w.key === 'iron_sword'), 40);
-            ctx.mark('sword done');
-            await ctx.sleep(1.5);
-        },
-    },
-
-    // ------------------------------------------------------------------ 4
-    {
-        id: 'equipping',
-        name: 'Equipping gear on a colonist',
-        timeOfDay: 0.45,
-        workMult: 1,
-        prepare(ctx) {
-            const s = ctx.stage, p = homePlan(ctx);
-            ensureForge(ctx);
-            const h = hero(ctx);
-            s.strip(h);
-            for (const k of ['iron_sword', 'iron_helmet', 'iron_chainmail', 'leather_boots']) if (!s.hasItem(k)) s.giveItem(k);
-            s.teleport(h, p.anvil.x - 1, p.anvil.y);
-            s.draft(h, true);
-        },
-        shot: ctx => at(ctx.plan.anvil, 40),
-        async run(ctx) {
-            const s = ctx.stage, p = ctx.plan, h = hero(ctx);
-            const dest = { x: p.campfire.x + 1, y: p.campfire.y };
-            ctx.cam.follow(h, { zoom: 42, lag: 0.5 });
-            s.walkTo(h, dest.x, dest.y);
-            await ctx.until(() => s.arrived(h, dest.x, dest.y, 1), 15);
-            await ctx.sleep(0.5);
-            for (const k of ['iron_sword', 'iron_helmet', 'iron_chainmail', 'leather_boots']) {
-                s.equip(h, k, { fx: true });
-                ctx.mark(`equip ${k}`);
-                await ctx.sleep(0.9);
+            const s = ctx.stage, h = hero(ctx);
+            // Stay on the crafter as they move between the anvil and the workbench.
+            ctx.cam.follow(h, { zoom: 40, lag: 0.6 });
+            const game = ctx.game, gear = this.gear;
+            const had = gear.map(g => s.itemCount(g.item));
+            const order = (i) => { s.craft(gear[i].recipe); ctx.mark(`craft ${gear[i].item}`); };
+            // True once the hero has picked up the order (it's no longer waiting in the queue).
+            const claimed = () => !game.taskQueue.tasks.some(t => t.type === 'craft' && t.status === 'pending');
+            order(0);
+            for (let i = 0; i < gear.length; i++) {
+                // Queue the next piece while this one is being made, so the hero
+                // goes straight from one job to the next. With nothing queued they'd
+                // go idle for a tick and wander off the tile between crafts.
+                if (i + 1 < gear.length) {
+                    await ctx.until(claimed, 20);
+                    order(i + 1);
+                }
+                await ctx.until(() => s.itemCount(gear[i].item) > had[i], 40);
+                s.equip(h, gear[i].item, { fx: true });
+                ctx.mark(`equip ${gear[i].item}`);
             }
             await ctx.sleep(0.6);
-            ctx.cam.move(at(dest, 30), 3, 'inOut');
+            ctx.cam.move(at({ x: h.x, y: h.y }, 30), 3, 'inOut');
             await ctx.sleep(3);
         },
     },
 
-    // ------------------------------------------------------------------ 5
+    // ------------------------------------------------------------------ 4
     {
         id: 'raid',
         name: 'Fighting a raid',
         timeOfDay: 0.55,
         workMult: 1,
         raidType: 'warband_raid',
+        raidDistance: 9,          // grid steps from the colonists' line to where the raiders appear
+        // Exactly who shows up, every take: sword raiders and bow raiders.
+        raidLineup: { raider_brute: 4, raider_archer: 2 },
         biomes: ['swamp', 'desert'],
         prepare(ctx) {
             const s = ctx.stage, p = homePlan(ctx);
             ensureHome(ctx);
+            // Sword, spear and bow on the first three (hero first), whatever they carried before.
+            const h = hero(ctx);
+            const front = [h, ...s.colonists().filter(c => c !== h)].filter(Boolean).slice(0, RAID_KITS.length);
+            front.forEach((c, i) => s.kit(c, RAID_KITS[i]));
             armColony(ctx);
+            // Fast boots (+35% move speed) on the whole line, so they run down raiders instead of trailing them.
+            for (const c of s.colonists()) s.equip(c, 'void_treads');
             const village = s.rectCenter(p.cabin);
             // Colonists head out to meet the raiders in the preferred biome;
             // without one nearby, they hold a line east of the village.
-            const field = s.findPreferredBiomeSpot(this.biomes, village, { w: 20, h: 8, minDist: 12, maxDist: 60, minFrac: 0.6 });
+            // Open ground only: in a gap between rocks and water the fighters queue
+            // single file and the ones behind never reach the raiders.
+            const field = s.findPreferredBiomeSpot(this.biomes, village, { w: 20, h: 8, minDist: 12, maxDist: 60, minFrac: 0.6, open: true });
             const line = field || { x: village.x + 10, y: village.y + 2 };
             const dx = line.x - village.x, dy = line.y - village.y;
             const len = Math.hypot(dx, dy) || 1;
             p.raidBiome = field?.biome || 'village';
             p.raidLine = s.openNear(line);
-            // Close enough that the whole line is inside the drafted engage range
-            // (8 tiles) a step or two after the raiders appear.
-            p.raidFrom = s.openNear({ x: line.x + (dx / len) * 9, y: line.y + (dy / len) * 9 });
+            // `raidDistance` grid steps out (Manhattan, which is how the game
+            // measures its 8-tile engage range), whichever direction they come from.
+            const ux = dx / len, uy = dy / len, k = this.raidDistance / (Math.abs(ux) + Math.abs(uy));
+            p.raidFrom = s.walkableNear({ x: p.raidLine.x + ux * k, y: p.raidLine.y + uy * k });
             const cols = s.colonists();
-            s.gather(cols, p.raidLine, 1);
-            for (const c of cols) s.draft(c, true);
+            // A battle line across the raiders' approach: melee side by side in
+            // front, archers a row behind. Bunched any other way, whoever is at the
+            // back of a column waits behind the colonist in front (colonists can't
+            // walk through each other) while the rest are already fighting.
+            const side = { x: -uy, y: ux };
+            const rows = [cols.filter(c => !c.weapon?.ranged), cols.filter(c => c.weapon?.ranged)];
+            const taken = new Set();
+            rows.forEach((row, r) => row.forEach((c, i) => {
+                const off = i - (row.length - 1) / 2;
+                const spot = s.walkableNear({ x: p.raidLine.x + side.x * off - ux * r * 2, y: p.raidLine.y + side.y * off - uy * r * 2 }, 12, taken);
+                s.teleport(c, spot.x, spot.y);
+            }));
+            // Undrafted, so the game's own raid response runs: each colonist takes
+            // on raiders within reach and goes to help any friend fighting nearby,
+            // which pulls the whole group in. (Drafted colonists hold position
+            // unless a raider is within 8 tiles.) Held tasks are dropped so nobody
+            // walks off to resume work first.
+            for (const c of cols) {
+                s.draft(c, false);
+                if (c.currentTaskId) ctx.game.taskQueue.release(c.currentTaskId);
+                c.currentTaskId = null;
+                c.path = [];
+                c.state = 'idle';
+            }
         },
-        shot: ctx => at(mid(ctx.plan.raidLine, ctx.plan.raidFrom), 18),
+        shot: ctx => at(mid(ctx.plan.raidLine, ctx.plan.raidFrom), 28),
         async run(ctx) {
             const s = ctx.stage, p = ctx.plan, game = ctx.game;
-            const raiders = s.raid(this.raidType, p.raidFrom);
-            // Shorter fight: raiders arrive at 40% health.
-            for (const r of raiders) { r.hp = Math.ceil(r.hp * 0.4); }
+            const raiders = s.raid(this.raidType, p.raidFrom, 8, { lineup: this.raidLineup });
+            // Shorter fight: raiders are 40% as tough. Max HP shrinks with HP, so
+            // they arrive at full health and only flee when the game normally would
+            // (15% of max); cutting HP alone sent them fleeing after a hit or two.
+            for (const r of raiders) { r.maxHp = r.hp = Math.ceil(r.maxHp * 0.4); }
             ctx.mark('raiders appear');
-            ctx.cam.move(at(mid(p.raidLine, p.raidFrom), 22), 5, 'inOut');
+            ctx.cam.move(at(mid(p.raidLine, p.raidFrom), 34), 5, 'inOut');
             await ctx.until(() => game.raiders.some(r => game.colonists.some(c => c.hp > 0 && Math.abs(c.x - r.x) + Math.abs(c.y - r.y) <= 3)), 30);
             ctx.mark('clash');
             ctx.cam.shake(0.35, 0.3);
-            // The whole line charges in, including anyone hanging back at range.
-            const foe = centroid(game.raiders.filter(r => r.hp > 0));
-            if (foe) s.colonists().forEach((c, i) => s.walkTo(c, Math.round(foe.x) + (i % 3) - 1, Math.round(foe.y) + Math.floor(i / 3)));
+            // No scripted moves: the raiders start inside the drafted engage range,
+            // so every colonist fights with their normal in-game behavior.
             // Frame the whole melee as it moves.
-            ctx.cam.follow(() => centroid([...game.raiders, ...s.colonists()].filter(e => e.hp > 0)), { zoom: 24, lag: 1.2 });
+            ctx.cam.follow(() => centroid([...game.raiders, ...s.colonists()].filter(e => e.hp > 0)), { zoom: 34, lag: 1.2 });
             await ctx.until(() => s.raidOver(), 60);
             ctx.mark('raid defeated');
             await ctx.sleep(1);
@@ -294,7 +333,7 @@ export const SCENES = [
         },
     },
 
-    // ------------------------------------------------------------------ 6
+    // ------------------------------------------------------------------ 5
     {
         id: 'timelapse',
         name: 'Village time-lapse (buildings + taming)',
@@ -328,8 +367,12 @@ export const SCENES = [
             const v = s.rectCenter(ctx.plan.cabin);
             ctx.speed(15);
             ctx.mark('timelapse start');
-            // Long pull-back across the whole time-lapse.
-            ctx.cam.move(at(v, 16), 32, 'sine');
+            // Long pull-back across the whole time-lapse, ending on a frame that
+            // holds every new building. findOpenRect can push one well away from
+            // its target spot when space is tight, so frame where they landed.
+            const sites = [ctx.plan.cabin, ...Object.values(e).filter(Boolean)];
+            if (e.pen) sites.push({ x: e.pen.x + e.pen.w + 3, y: e.pen.y + 1, w: 4, h: 4 });   // animals waiting to be tamed
+            ctx.cam.move(frameRects(sites, { margin: 2, maxZoom: 16 }), 32, 'sine');
             const place = async (tiles) => { for (const t of tiles) { s.blueprint(t.x, t.y, t.type); await ctx.sleep(0.02); } };
             // Shell (walls, door, floor) first; the furniture goes in once the
             // floor under it is down, like a player furnishing a finished room.
@@ -395,7 +438,7 @@ export const SCENES = [
         },
     },
 
-    // ------------------------------------------------------------------ 7
+    // ------------------------------------------------------------------ 6
     {
         id: 'nexus_build',
         name: 'Building the Nexus and defenses',
@@ -442,7 +485,7 @@ export const SCENES = [
         },
     },
 
-    // ------------------------------------------------------------------ 8
+    // ------------------------------------------------------------------ 7
     {
         id: 'nexus_defend',
         name: 'Protecting the Nexus',
@@ -479,7 +522,7 @@ export const SCENES = [
         },
     },
 
-    // ------------------------------------------------------------------ 9
+    // ------------------------------------------------------------------ 8
     {
         id: 'crypt',
         name: 'Breach & clear a crypt',
@@ -552,7 +595,7 @@ export const SCENES = [
         },
     },
 
-    // ------------------------------------------------------------------ 10
+    // ------------------------------------------------------------------ 9
     {
         id: 'expedition',
         name: 'Expedition → Crystal Colossus → title card',

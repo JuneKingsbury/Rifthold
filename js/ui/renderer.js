@@ -44,6 +44,14 @@ const RIPPLE_ALPHA_BUCKETS = 12;
 // Memoized `<terrain>_autumn` sprite keys, so the live ground path doesn't
 // concatenate a string per tile per frame.
 const _autumnKeys = new Map();
+// Fraction of an entity's sprite hidden below the waterline on this terrain
+// (0 on dry land). Shallow water sits between land and deep water.
+function submergeFracFor(terrain, detailCfg) {
+    if (terrain === 'water') return detailCfg.submergeFrac || 0;
+    if (terrain === 'shallow_water') return detailCfg.shallowSubmergeFrac || 0;
+    return 0;
+}
+
 function autumnKey(terrain) {
     let k = _autumnKeys.get(terrain);
     if (k === undefined) { k = terrain + '_autumn'; _autumnKeys.set(terrain, k); }
@@ -1720,9 +1728,10 @@ export class Renderer {
                         // A swimming entity has its shadow raised to the waterline so it
                         // reads as sitting on the surface (half-submerged illusion).
                         const detailCfg = RENDER_CONFIG.terrainDetail;
-                        const submerge = !!(entity && tile.terrain === 'water' && showTerrainDetail
-                            && detailCfg && detailCfg.enabled && detailCfg.submergeFrac > 0);
-                        const shadowLift = submerge ? ch * detailCfg.submergeFrac : 0;
+                        const submergeFrac = entity && showTerrainDetail && detailCfg && detailCfg.enabled
+                            ? submergeFracFor(tile.terrain, detailCfg) : 0;
+                        const submerge = submergeFrac > 0;
+                        const shadowLift = submerge ? ch * submergeFrac : 0;
                         if (shadowSprite) ctx.drawImage(shadowSprite, px, py - shadowLift, cw1, ch1);
                         // Determine any shake effects that need to be applied to the entity sprite before we draw it.
                         const shakeActive = showOverlays && enableScreenShake && entity && entity._atkShakeUntil > game.tick;
@@ -1766,7 +1775,7 @@ export class Renderer {
                             const wavePhase = (now / detailCfg.waterPeriodMs) * Math.PI * 2
                                 + (tileKey % 1000) / 1000 * detailCfg.waterPhaseSpread;
                             const bob = Math.sin(wavePhase) * detailCfg.submergeBobPx;
-                            const waterlineY = py + ch - ch * detailCfg.submergeFrac + bob;
+                            const waterlineY = py + ch - ch * submergeFrac + bob;
                             const clipTop = py - ch - grow;   // generous: never clip the head
                             ctx.save();
                             ctx.beginPath();
@@ -1789,6 +1798,10 @@ export class Renderer {
                             // water" overlay drawn on top of the entity.
                             const waterSprite = sm.getSprite('effects', 'in_water');
                             if (waterSprite) ctx.drawImage(waterSprite, px, py, cw1, ch1);
+                        } else if (entity && tile.terrain === 'shallow_water') {
+                            // Same fallback for wading in shallow water, with its own art.
+                            const wadeSprite = sm.getSprite('effects', 'in_shallow_water');
+                            if (wadeSprite) ctx.drawImage(wadeSprite, px, py, cw1, ch1);
                         }
                         if (!entity && canDither) {
                             this._drawTerrainDither(ctx, tile, wx, wy, px, py, cw1, ch1, map, game, ditherOn, ditherDepthFrac, ditherQualSetting, ditherBlockSize);
@@ -2413,23 +2426,35 @@ export class Renderer {
                     const destWater = destTile && destTile.terrain === 'water';
                     const prevTile = (ent._prevX != null) ? map[ent._prevY]?.[ent._prevX] : null;
                     const inWater = destWater && (ent._prevX == null || (prevTile && prevTile.terrain === 'water'));
-                    // Submerge: clip the lower part of the sprite at a bobbing waterline
-                    // (matching the static path) so a swimmer reads as half-submerged.
-                    const detailCfg = RENDER_CONFIG.terrainDetail;
-                    const submerge = !!(inWater && showTerrainDetail
-                        && detailCfg && detailCfg.enabled && detailCfg.submergeFrac > 0);
-                    // Draw entity shadow, raised to the waterline while submerged.
-                    const shadowSprite = sm.getSprite('effects', 'shadow');
-                    const shadowLift = submerge ? ch * detailCfg.submergeFrac : 0;
-                    if (shadowSprite) ctx.drawImage(shadowSprite, rpx, rpy - shadowLift, cw, ch);
-                    // Draw entity.
-                    const meHlOff = meHl ? 1 : 0;
-                    // Move progress (0→1) drives the walk-sway. Recomputed here because
-                    // getEntityRenderPos leaves _moveStartTime/_moveDuration intact.
-                    // Clamp so a just-finished step reads 1 (upright).
+                    // "Wading" when stepping into shallow water from shallow or deep water
+                    // (or standing in it). Only picks the fallback overlay below.
+                    const inShallow = !!(destTile && destTile.terrain === 'shallow_water'
+                        && (ent._prevX == null || (prevTile && (prevTile.terrain === 'shallow_water' || prevTile.terrain === 'water'))));
+                    // Move progress (0→1) drives the walk-sway and the waterline slide.
+                    // Recomputed here because getEntityRenderPos leaves
+                    // _moveStartTime/_moveDuration intact. Clamp so a just-finished step
+                    // reads 1 (upright).
                     const moveT = ent._moveDuration > 0
                         ? Math.min(1, Math.max(0, (now - ent._moveStartTime) / ent._moveDuration))
                         : 1;
+                    // Submerge: clip the lower part of the sprite at a bobbing waterline
+                    // (matching the static path). The depth slides from the source tile's
+                    // to the destination's over the step, so walking land -> shallow ->
+                    // deep sinks the entity gradually instead of popping.
+                    const detailCfg = RENDER_CONFIG.terrainDetail;
+                    let submergeFrac = 0;
+                    if (showTerrainDetail && detailCfg && detailCfg.enabled) {
+                        const toFrac = submergeFracFor(destTile && destTile.terrain, detailCfg);
+                        const fromFrac = prevTile ? submergeFracFor(prevTile.terrain, detailCfg) : toFrac;
+                        submergeFrac = fromFrac + (toFrac - fromFrac) * moveT;
+                    }
+                    const submerge = submergeFrac > 0;
+                    // Draw entity shadow, raised to the waterline while submerged.
+                    const shadowSprite = sm.getSprite('effects', 'shadow');
+                    const shadowLift = submerge ? ch * submergeFrac : 0;
+                    if (shadowSprite) ctx.drawImage(shadowSprite, rpx, rpy - shadowLift, cw, ch);
+                    // Draw entity.
+                    const meHlOff = meHl ? 1 : 0;
                     // Composed transform: breathe grow + walk-sway + one-shot action + work bob.
                     // Wraps only the sprite draw so the shadow (above) and overlays (below) stay flat.
                     const xf = getEntityTransform(ent, now, game, moveT, ent.id || 0, animFlags);
@@ -2438,7 +2463,7 @@ export class Renderer {
                         const wavePhase = (now / detailCfg.waterPeriodMs) * Math.PI * 2
                             + ((ent.x + ent.y * mapW) % 1000) / 1000 * detailCfg.waterPhaseSpread;
                         const bob = Math.sin(wavePhase) * detailCfg.submergeBobPx;
-                        const waterlineY = rpy + ch - ch * detailCfg.submergeFrac + bob;
+                        const waterlineY = rpy + ch - ch * submergeFrac + bob;
                         const clipTop = rpy - ch - grow;   // generous: never clip the head
                         ctx.save();
                         ctx.beginPath();
@@ -2456,6 +2481,10 @@ export class Renderer {
                         // Fallback when terrain detail is off: legacy overlay on top.
                         const waterSprite = sm.getSprite('effects', 'in_water');
                         if (waterSprite) ctx.drawImage(waterSprite, rpx, rpy, cw, ch);
+                    } else if (inShallow) {
+                        // Wading fallback overlay (matching the static path).
+                        const wadeSprite = sm.getSprite('effects', 'in_shallow_water');
+                        if (wadeSprite) ctx.drawImage(wadeSprite, rpx, rpy, cw, ch);
                     }
                     // Optional per-school cast overlay (null art → skipped gracefully).
                     if (xf.overlayKey) {

@@ -30,6 +30,16 @@ function cellSizeFor(font) {
     return Math.round(Math.ceil(font * RENDER_CONFIG.fontHeightMult) * dpr) / dpr;
 }
 
+// Zoom at which a w×h tile area fills the frame. Fits the 16:9 part of the game
+// area the clip recorder keeps, so the framing holds on screen and in clips.
+export function zoomToFit(w, h) {
+    const area = document.getElementById('game-area');
+    let aw = area?.clientWidth || 1280, ah = area?.clientHeight || 720;
+    if (aw / ah > 16 / 9) aw = ah * 16 / 9; else ah = aw * 9 / 16;
+    const zoom = Math.min(aw / w, ah / h) / RENDER_CONFIG.fontHeightMult;
+    return Math.max(MIN_FONT, Math.min(MAX_FONT, zoom));
+}
+
 export class CineCamera {
     constructor() {
         this.active = false;

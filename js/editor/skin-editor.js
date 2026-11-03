@@ -231,6 +231,7 @@ const EFFECT_ITEMS = [
     { key: 'health_regen', char: '♥', color: '#66ff66', desc: 'Natural health regeneration' },
     { key: 'shadow', char: '1', color: '#0606065c', desc: 'Drop shadow for entities' },
     { key: 'in_water', char: '2', color: '#0606065c', desc: 'Partially underwater for entities' },
+    { key: 'in_shallow_water', char: '3', color: '#0606065c', desc: 'Wading in shallow water for entities (only when terrain detail is off; no fallback)' },
     { key: 'slash', char: '✕', color: '#ffff44', desc: 'Expedition: melee attack X slash' },
     { key: 'loot', char: '◆', color: '#ffcc44', desc: 'Expedition: loot found diamond' },
     { key: 'danger', char: '!', color: '#ff2222', desc: 'Expedition: danger/trap flash' },

@@ -4,13 +4,13 @@
 // preconditions off camera.
 
 import {
-    BUILDINGS, IMPASSABLE_STRUCTURES, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, RESOURCES, ALL_ITEMS, RECIPES, CONFIG, EXPLORATION_CONFIG, getCryptTiles,
+    BUILDINGS, IMPASSABLE_STRUCTURES, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, RESOURCES, ALL_ITEMS, RECIPES, CONFIG, EXPLORATION_CONFIG, RAID_TYPES, getCryptTiles,
 } from '../../core/config.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../../systems/building.js';
 import { queueCraftingOrder } from '../../systems/crafting.js';
 import { designateFarmZone } from '../../systems/farming.js';
 import { designateTame } from '../../entities/taming.js';
-import { createWildAnimal } from '../../entities/entity-factory.js';
+import { createWildAnimal, createRaidEntity } from '../../entities/entity-factory.js';
 import { createColonist } from '../../entities/colonist.js';
 import { teleportEntity } from '../../systems/movement-lerp.js';
 import { isPassable } from '../../world/map.js';
@@ -93,16 +93,40 @@ export class Stage {
         return r ? { x: r.x, y: r.y } : { x: Math.round(p.x), y: Math.round(p.y) };
     }
 
+    // Nearest tile to `p`, by grid steps, that someone can stand on: walkable
+    // and unoccupied. Plants and loose rocks don't matter, unlike openNear,
+    // which looks for building ground and can drift several tiles off. `taken`
+    // (a Set of "x,y") skips tiles already handed out this tick, which the
+    // game's occupancy check doesn't know about yet.
+    walkableNear(p, maxDist = 12, taken = null) {
+        const x0 = Math.round(p.x), y0 = Math.round(p.y);
+        for (let d = 0; d <= maxDist; d++) {
+            for (let dx = -d; dx <= d; dx++) {
+                for (const dy of new Set([d - Math.abs(dx), Math.abs(dx) - d])) {
+                    const x = x0 + dx, y = y0 + dy;
+                    if (taken?.has(`${x},${y}`)) continue;
+                    if (this.inBounds(x, y) && isPassable(this.game.map, x, y) && !this.game.isTileOccupied(x, y)) { taken?.add(`${x},${y}`); return { x, y }; }
+                }
+            }
+        }
+        return { x: x0, y: y0 };
+    }
+
     // ---- Biomes ------------------------------------------------------------------
 
     // Center of the nearest w×h area (at least minDist from `near`) where most
     // tiles belong to one of `biomes` and stand on usable ground. `buildable`
     // also rules out structures and unbuildable terrain (for building sites).
-    // Returns { x, y, biome } or null if no such area is within maxDist.
-    findBiomeSpot(biomes, near = this.anchor, { w = 12, h = 8, minDist = 10, maxDist = 70, minFrac = 0.7, buildable = false } = {}) {
+    // `open` asks for ground you can walk across freely (no boulders, trees or
+    // walls) on at least `openFrac` of the area, so a fight there has room to
+    // spread out instead of filing through a gap. Returns { x, y, biome } or
+    // null if no such area is within maxDist.
+    findBiomeSpot(biomes, near = this.anchor, { w = 12, h = 8, minDist = 10, maxDist = 70, minFrac = 0.7, buildable = false, open = false, openFrac = 0.9 } = {}) {
         const want = new Set([].concat(biomes));
         const usable = (t) => t && !t.sealed && !UNBUILDABLE_TERRAIN.has(t.terrain)
-            && (buildable ? (!t.structure || PLANT_STRUCTURES.has(t.structure)) : (t.passable !== false || t.resource));
+            && (buildable ? (!t.structure || PLANT_STRUCTURES.has(t.structure))
+                : open ? (t.passable !== false && !t.resource)
+                : (t.passable !== false || t.resource));
         for (let r = minDist; r <= maxDist; r += 2) {
             let best = null;
             for (let dy = -r; dy <= r; dy += 2) {
@@ -121,7 +145,7 @@ export class Stage {
                         }
                     }
                     const area = w * h;
-                    if (ok < area * (buildable ? 1 : minFrac) || hits < area * minFrac) continue;
+                    if (ok < area * (buildable ? 1 : open ? openFrac : minFrac) || hits < area * minFrac) continue;
                     if (!best || hits > best.hits) {
                         const biome = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
                         best = { x: x0 + Math.floor(w / 2), y: y0 + Math.floor(h / 2), biome, hits };
@@ -427,6 +451,12 @@ export class Stage {
         return !!slot && this.game.resources[slot.list].some(i => i.key === key);
     }
 
+    // Copies of an item in the stockpile (equipped ones don't count).
+    itemCount(key) {
+        const slot = GEAR_SLOTS[ALL_ITEMS[key]?.type];
+        return slot ? this.game.resources[slot.list].filter(i => i.key === key).length : 0;
+    }
+
     giveItem(key) {
         const def = ALL_ITEMS[key];
         if (!def) { console.warn('[trailer] unknown item', key); return null; }
@@ -490,11 +520,30 @@ export class Stage {
 
     // Starts a scripted raid and regroups the raiders around `from` so they
     // enter frame from a chosen direction instead of a random map edge.
-    raid(type = 'warband_raid', from = null, level = 8) {
+    // `lineup` fixes exactly who shows up ({ raider_brute: 4, raider_archer: 2 })
+    // instead of the raid type's random counts. They're built by the game's own
+    // factory at the raid's level and scaling.
+    raid(type = 'warband_raid', from = null, level = 8, { lineup = null } = {}) {
         const game = this.game;
         const before = new Set(game.raiders.map(r => r.id));
         game.combat.startScriptedRaid(game, type, level);
         game.events.pendingEvent = null;
+        if (lineup) {
+            const spawned = game.raiders.filter(r => !before.has(r.id));
+            const at = spawned[0] || from || this.anchor;
+            const scaling = RAID_TYPES[type]?.scaling;
+            const chosen = [];
+            for (const [kind, n] of Object.entries(lineup)) {
+                for (let i = 0; i < n; i++) {
+                    const r = createRaidEntity(kind, at.x, at.y, level, scaling);
+                    if (r) chosen.push(r);
+                    else console.warn('[trailer] unknown raider type', kind);
+                }
+            }
+            game.raiders = [...game.raiders.filter(r => before.has(r.id)), ...chosen];
+            // The raid marches at its slowest member's pace; recompute for the new lineup.
+            game.combat._initMarch(game);
+        }
         const fresh = game.raiders.filter(r => !before.has(r.id));
         if (from) {
             const spots = game.input.getSpreadPositions(Math.round(from.x), Math.round(from.y), fresh.length * 2);

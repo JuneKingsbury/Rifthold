@@ -96,7 +96,10 @@ function closeCraftPointer(game) {
 const needsAttunement = (c) => c.hp > 0 && !c.golem
     && (Array.isArray(c.attunedSchools) ? c.attunedSchools.length : 0) < MAGIC_STUDY_CONFIG.attunementSlots;
 
-/** Priority button -> Attunement tab -> a school cell in the first colonist who still has a free slot. */
+/**
+ * Priority button -> Attunement tab -> a school cell in the first colonist who still has a free slot.
+ * Each colonist gets their own pair of columns (1-2, 3-4, 5-6, ...) so the colony covers more schools.
+ */
 function attunePointer(game) {
     const ui = game.ui;
     if (!ui.priorityPanelVisible) return modeBtn('priority', 'Open Priority');
@@ -106,9 +109,10 @@ function attunePointer(game) {
     const colonist = game.colonists.find(needsAttunement);
     if (!colonist) return null;
     const attuned = colonist.attunedSchools || [];
-    // Suggest the school they know best, since that is the one most likely to be useful.
-    const level = (school) => (colonist.magicSkills && colonist.magicSkills[school]) || 0;
-    const school = Object.keys(MAGIC_SKILLS).filter(k => !attuned.includes(k)).sort((a, b) => level(b) - level(a))[0];
+    // Columns follow MAGIC_SKILLS order and rows follow aliveColonists, matching the attunement grid.
+    const schools = Object.keys(MAGIC_SKILLS);
+    const start = (aliveColonists(game).indexOf(colonist) * MAGIC_STUDY_CONFIG.attunementSlots) % schools.length;
+    const school = [...schools.slice(start), ...schools.slice(0, start)].find(k => !attuned.includes(k));
     return {
         selector: `#priority-panel td[data-colonist-id="${colonist.id}"][data-attune="${school}"]`,
         label: 'Click a school to attune',
@@ -165,6 +169,11 @@ function wayfindingPointer(game) {
         return { selector: '#research-panel [data-research-tab="rifts"]', label: 'Open the Rifts tab' };
     }
     return { selector: `#research-panel button[onclick*="selectResearch('wayfinding')"]`, label: 'Research Wayfinding' };
+}
+
+function closePriorityPointer(game) {
+    if (!game.ui.priorityPanelVisible) return null;
+    return { selector: '#priority-panel .panel-close[data-panel-close="priority"]', label: 'Close the menu' };
 }
 
 function closeResearchPointer(game) {
@@ -226,6 +235,12 @@ const buildCount = (game, type) => game.mapIndex.getStructurePositions(type).siz
 const queued = (game, matches) => game.taskQueue.tasks.some(matches);
 const queuedBuild = (game, type) => queued(game, t => t.type === 'build' && t.buildType === type);
 const queuedGather = (game) => queued(game, t => t.type === 'chop' || t.type === 'mine');
+const startedResearch = game => game.research.activeResearch !== null || game.research.completed.size > 0;
+const changedPriorities = (game) => {
+    const base = game.tutorial.flags.prioBaseline;
+    return base !== undefined && base !== prioSnapshot(game);
+};
+const attunedEveryone = (game) => !game.colonists.some(needsAttunement);
 const queuedCraft = (game, recipeKey) => queued(game, t => (t.type === 'craft' || t.type === 'cook') && t.recipe === RECIPES[recipeKey]);
 const queuedCraftCount = (game, category) => game.taskQueue.tasks.filter(t => (t.type === 'craft' || t.type === 'cook') && t.recipe?.category === category).length;
 const queuedCraftIn = (game, category) => queued(game, t => (t.type === 'craft' || t.type === 'cook') && t.recipe?.category === category);
@@ -386,8 +401,11 @@ const TUTORIAL_STEPS = [
         description: 'Open Research [R] and pick a technology to study. Stonework, Runecraft, and Druidcraft have no prerequisites so pick whichever sounds useful!',
         descriptionNone: 'Research unlocks new buildings, recipes and abilities. Open Research [R] and press Select on a technology. Stonework, Runecraft, and Druidcraft have no prerequisites so pick whichever sounds useful. Colonists earn the points at the Research Desk.',
         highlight: 'research',
-        isComplete(game) { return game.research.activeResearch !== null || game.research.completed.size > 0; },
+        // Wait for the panel to close so the next step's arrows don't land on top of it.
+        isComplete(game) { return startedResearch(game) && !game.ui?.researchPanelVisible; },
         goTo(game) { game.ui.toggleResearchPanel(); },
+        acted: startedResearch,
+        actedPointer: closeResearchPointer,
         pointer(game) {
             if (!game.ui.researchPanelVisible) return modeBtn('research', 'Open Research');
             return { selector: '#research-panel .research-node-btn', text: 'Select', label: 'Select a technology' };
@@ -404,10 +422,8 @@ const TUTORIAL_STEPS = [
         onEnter(game) {
             if (game.tutorial.flags.prioBaseline === undefined) game.tutorial.flags.prioBaseline = prioSnapshot(game);
         },
-        isComplete(game) {
-            const base = game.tutorial.flags.prioBaseline;
-            return base !== undefined && base !== prioSnapshot(game);
-        },
+        // Wait for the panel to close so the next step's arrows don't land on top of it.
+        isComplete(game) { return changedPriorities(game) && !game.ui?.priorityPanelVisible; },
         goTo(game) {
             const ui = game.ui;
             ui._prioTab = 'work';
@@ -415,6 +431,8 @@ const TUTORIAL_STEPS = [
             if (!ui.priorityPanelVisible) ui.togglePriorityPanel();
             else ui.updatePriorityPanel();
         },
+        acted: changedPriorities,
+        actedPointer: closePriorityPointer,
         pointer: workPriorityPointer,
     },
     manualStep({
@@ -485,13 +503,13 @@ const TUTORIAL_STEPS = [
         id: 'fight',
         levels: ['none', 'some'],
         title: 'Defend the Colony',
-        description: 'Press [Space] to unpause and let your drafted colonists deal with them. You can right-click the map to move drafted colonists somewhere better.',
+        description: 'Press [Space] or click the 1x button to unpause and let your drafted colonists deal with them. You can right-click the map to move drafted colonists somewhere better.',
         highlight: null,
         applies() { return !CONFIG.PEACEFUL_MODE; },
         isComplete(game) { return !game.combat.raidActive; },
         goTo(game) { if (game.paused) game.togglePause(); },
         pointer(game) {
-            return game.paused ? { selector: '#btn-pause', label: 'Unpause' } : null;
+            return game.paused ? { selector: '#btn-speed-1', label: 'Unpause' } : null;
         },
     },
     {
@@ -531,10 +549,10 @@ const TUTORIAL_STEPS = [
         id: 'attunement',
         levels: ['none', 'some'],
         title: 'Set Magic Attunements',
-        description: 'Spells only autocast from schools a colonist is attuned to, and each colonist has 2 attunement slots. Open Priority [P], switch to the Attunement tab, and click schools in each colonist\'s row until both slots are full. A ★ marks an attuned school, and you can change them for free at any time.',
-        descriptionNone: 'A colonist can learn spells from tomes, but a spell only casts on its own if its school is one they\'re attuned to. This applies at home and on expeditions. Each colonist has 2 attunement slots. Open Priority [P], switch to the Attunement tab, and click a school in each colonist\'s row to attune them. A ★ marks an attuned school. Pick schools that match the tomes you plan to use. You can change them for free at any time.',
+        description: 'Spells only autocast from schools a colonist is attuned to, and each colonist has 2 attunement slots. Open Priority [P], switch to the Attunement tab, and click schools in each colonist\'s row until both slots are full. Give each colonist different schools so your colony can cast a wider range of spells. A ★ marks an attuned school, and you can change them for free at any time.',
+        descriptionNone: 'A colonist can learn spells from tomes, but a spell only casts on its own if its school is one they\'re attuned to. This applies at home and on expeditions. Each colonist has 2 attunement slots. Open Priority [P], switch to the Attunement tab, and click a school in each colonist\'s row to attune them. A ★ marks an attuned school. Give each colonist different schools so that between them your colony can cast a wider range of spells, and pick ones that match the tomes you plan to use. You can change them for free at any time.',
         highlight: 'priority',
-        isComplete(game) { return !game.colonists.some(needsAttunement); },
+        isComplete(game) { return attunedEveryone(game) && !game.ui?.priorityPanelVisible; },
         goTo(game) {
             const ui = game.ui;
             ui._prioTab = 'attune';
@@ -542,6 +560,8 @@ const TUTORIAL_STEPS = [
             if (!ui.priorityPanelVisible) ui.togglePriorityPanel();
             else ui.updatePriorityPanel();
         },
+        acted: attunedEveryone,
+        actedPointer: closePriorityPointer,
         pointer: attunePointer,
     },
     // Combined bedroom step for players who know the genre.
