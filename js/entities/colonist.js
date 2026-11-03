@@ -296,7 +296,10 @@ export function updateColonist(colonist, game) {
     }
 
     if (game.tick % 15 === 0) {
-        if (colonist.needs.hunger < COLONIST_CONFIG.hungerMoodThreshold ) {
+        // Skip while eating; drafted colonists only nag every 5th pulse (~15s at 1x).
+        const starvingPulse = colonist.state !== 'eating' &&
+            (colonist.state !== 'drafted' || game.tick % 75 === 0);
+        if (starvingPulse && colonist.needs.hunger < COLONIST_CONFIG.hungerMoodThreshold) {
             game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Starving!', color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
         }
         if (colonist.thoughts && colonist.thoughts.some(t => t.text === 'Freezing outside')) {
