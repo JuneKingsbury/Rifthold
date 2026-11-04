@@ -856,6 +856,9 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
                     const tile = map[wy][wx];
                     if (isWaterTerrain(tile.terrain)) continue;
                     tile.terrain = blueprint.floorTerrain;
+                    // Reset passability too: the ground painted over may have been
+                    // impassable (tall_rock), and a stale flag blocks building.
+                    tile.passable = TERRAIN[blueprint.floorTerrain].passable.colonist;
                     tile.resource = null;
                 }
             }
@@ -1177,6 +1180,9 @@ function generateRuins(map, params) {
                     const tile = map[wy][wx];
                     if (isWaterTerrain(tile.terrain)) continue;
                     tile.terrain = blueprint.floorTerrain;
+                    // Reset passability too: the ground painted over may have been
+                    // impassable (tall_rock), and a stale flag blocks building.
+                    tile.passable = TERRAIN[blueprint.floorTerrain].passable.colonist;
                     tile.resource = null;
                 }
             }
@@ -1329,6 +1335,7 @@ function generateCrypts(map) {
         for (const t of [...bp.ring, ...bp.interior]) {
             const tile = map[spot.y + t.y][spot.x + t.x];
             tile.terrain = theme.terrain;
+            tile.passable = TERRAIN[theme.terrain].passable.colonist;
             tile.resource = null;
         }
         // Blueprints are authored in stone: swap in the theme's wall and floor.

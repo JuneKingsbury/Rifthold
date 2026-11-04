@@ -1,4 +1,4 @@
-import { CONFIG, ENTITIES, WILDLIFE_CONFIG, PATHFINDING_CONFIG, RESEARCH } from './config.js';
+import { CONFIG, ENTITIES, WILDLIFE_CONFIG, PATHFINDING_CONFIG, RESEARCH, TERRAIN } from './config.js';
 import { createTile } from '../world/map.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
@@ -1225,6 +1225,10 @@ function deserializeMap(data) {
             tile.pedestalArtifact = t.pa || null;
             if (t.b) tile.biome = t.b;
             if (t.sl === 1) tile.sealed = true;
+            // Older saves carry ruin and crypt floors painted over tall_rock that
+            // kept its impassable flag. A tile with no structure takes its
+            // passability from its terrain.
+            if (!tile.structure && !tile.passable && TERRAIN[tile.terrain]?.passable.colonist) tile.passable = true;
             tile.roomId = null;
             tile.items = [];
             row.push(tile);
