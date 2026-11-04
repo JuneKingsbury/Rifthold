@@ -13,6 +13,14 @@ const FOODSTUFFS_BY_DECAY = [...FOODSTUFFS].sort(
     (a, b) => (FOOD_DECAY_CONFIG.decayMultipliers[b] || 1) - (FOOD_DECAY_CONFIG.decayMultipliers[a] || 1)
 );
 
+// Ice boxes preserve food only while the grid supplies them. Before the first
+// grid update (just after load) every built ice box counts.
+function poweredIceBoxCount(game) {
+    if (!game.mapIndex) return 0;
+    if (!game.power?.ready) return game.mapIndex.getStructurePositions('ice_box').size;
+    return game.power.countPowered(game, 'ice_box');
+}
+
 export class ResourceManager {
     constructor() {
         this.stockpile = { ...CONFIG.START_RESOURCES };
@@ -294,13 +302,10 @@ export class ResourceManager {
         const seasonMult = FOOD_DECAY_CONFIG.seasonDecayMult[season] || 1.0;
 
         const foodChestCount = game.mapIndex ? game.mapIndex.getStructurePositions('food_chest').size : 0;
-        const iceBoxCount = game.mapIndex ? game.mapIndex.getStructurePositions('ice_box').size : 0;
-        const noPower = game.power && !game.power.powered;
+        const iceBoxCount = poweredIceBoxCount(game);
 
         let reduction = Math.min(FOOD_DECAY_CONFIG.foodChestMaxReduction, foodChestCount * FOOD_DECAY_CONFIG.foodChestReduction);
-        if (!noPower) {
-            reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
-        }
+        reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
         reduction = Math.min(FOOD_DECAY_CONFIG.maxTotalReduction, reduction);
         const storageMult = 1.0 - reduction;
 
@@ -335,13 +340,10 @@ export class ResourceManager {
         const seasonMult = FOOD_DECAY_CONFIG.seasonDecayMult[season] || 1.0;
 
         const foodChestCount = game.mapIndex ? game.mapIndex.getStructurePositions('food_chest').size : 0;
-        const iceBoxCount = game.mapIndex ? game.mapIndex.getStructurePositions('ice_box').size : 0;
-        const noPower = game.power && !game.power.powered;
+        const iceBoxCount = poweredIceBoxCount(game);
 
         let reduction = Math.min(FOOD_DECAY_CONFIG.foodChestMaxReduction, foodChestCount * FOOD_DECAY_CONFIG.foodChestReduction);
-        if (!noPower) {
-            reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
-        }
+        reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
         reduction = Math.min(FOOD_DECAY_CONFIG.maxTotalReduction, reduction);
         const storageMult = 1.0 - reduction;
 
@@ -366,11 +368,10 @@ export class ResourceManager {
         const seasonMult = FOOD_DECAY_CONFIG.seasonDecayMult[season] || 1.0;
 
         const foodChestCount = game.mapIndex ? game.mapIndex.getStructurePositions('food_chest').size : 0;
-        const iceBoxCount = game.mapIndex ? game.mapIndex.getStructurePositions('ice_box').size : 0;
-        const noPower = game.power && !game.power.powered;
+        const iceBoxCount = poweredIceBoxCount(game);
 
         let reduction = Math.min(FOOD_DECAY_CONFIG.foodChestMaxReduction, foodChestCount * FOOD_DECAY_CONFIG.foodChestReduction);
-        if (!noPower) reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
+        reduction += iceBoxCount * FOOD_DECAY_CONFIG.iceBoxReduction;
         reduction = Math.min(FOOD_DECAY_CONFIG.maxTotalReduction, reduction);
         const storageMult = 1.0 - reduction;
 

@@ -1,4 +1,5 @@
 import { CONFIG, RENDER_CONFIG, BUILDINGS, ALL_ITEMS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS } from '../core/config.js';
+import { getTilePedestalStats } from '../systems/artifacts.js';
 import { drawBarFill } from './bar-fx.js';
 
 // Pre-built O(1) tier-key → index maps so _renderRoomOverlay avoids a
@@ -732,7 +733,6 @@ export class OverlayRenderer {
         // Collect all active warmth sources: passive (campfire) and powered (ember_heater etc.)
         const sources = [];
         const isWinter = game.weather.season === 'winter';
-        const isPowered = game.power.hasPower();
 
         const allStructures = this._structurePositions(game);
         for (const { x, y, type } of allStructures) {
@@ -742,8 +742,8 @@ export class OverlayRenderer {
             if (bDef.warmRadius) {
                 sources.push({ x, y, radius: bDef.warmRadius, passive: true });
             }
-            // Powered warmth. Only active when grid is powered. Seasonal heaters only in winter.
-            if (bDef.power?.warmRadius && isPowered) {
+            // Powered warmth. Only active while the grid supplies this heater. Seasonal heaters only in winter.
+            if (bDef.power?.warmRadius && game.power.isPowered(x, y)) {
                 if (!bDef.power.seasonalHeat || isWinter) {
                     sources.push({ x, y, radius: bDef.power.warmRadius, passive: false });
                 }
@@ -840,8 +840,8 @@ export class OverlayRenderer {
         ctx.globalAlpha = 1;
     }
 
+    // The power grid lists only supplied defenses, so dark turrets drop out on their own.
     _renderDefenseOverlay(ctx, game, cw, ch, camera) {
-        if (!game.power.powered) return;
         ctx.save();
         // Arcane sentinels (red)
         for (const t of game.power.turrets) {
@@ -950,7 +950,6 @@ export class OverlayRenderer {
 
     _renderAuraOverlay(ctx, game, cw, ch, camera) {
         ctx.save();
-        const isPowered = game.power.hasPower();
 
         // Mana relay discount zones (purple)
         for (const r of game.power.relays) {
@@ -959,9 +958,8 @@ export class OverlayRenderer {
 
         // Light radius buildings (candle, glowstone, beacon, campfire light), yellow
         // Only show buildings that have lightRadius but NOT warmRadius (campfire already on warmth overlay)
-        // and NOT power.damage (defense overlay). Use passiveLamps + powered lamps when grid is on.
-        const lightSources = [...game.power.passiveLamps];
-        if (isPowered) lightSources.push(...game.power.poweredLamps);
+        // and NOT power.damage (defense overlay). poweredLamps holds only lamps the grid supplies.
+        const lightSources = [...game.power.passiveLamps, ...game.power.poweredLamps];
         for (const l of lightSources) {
             this._drawRadiusZone(ctx, l.x, l.y, l.radius, 0.10, '#ffee44', '#ffdd55', cw, ch, camera);
         }
@@ -972,9 +970,9 @@ export class OverlayRenderer {
             if (type !== 'artifact_pedestal') continue;
             const tile = game.map[y]?.[x];
             if (!tile?.pedestalArtifact) continue;
-            const artDef = ALL_ITEMS[tile.pedestalArtifact];
-            if (!artDef?.pedestal?.radius || artDef.pedestal.radius === 'global') continue;
-            this._drawRadiusZone(ctx, x, y, artDef.pedestal.radius, 0.14, '#ccaa44', '#eedd66', cw, ch, camera);
+            const stats = getTilePedestalStats(tile);
+            if (!stats?.radius || stats.radius === 'global') continue;
+            this._drawRadiusZone(ctx, x, y, stats.radius, 0.14, '#ccaa44', '#eedd66', cw, ch, camera);
         }
 
         // Colonist-carried trinket pedestals (moving aura sources), gold, slightly brighter

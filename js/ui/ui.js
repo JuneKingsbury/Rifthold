@@ -1,6 +1,6 @@
 import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG, WAVE_TYPES, WORLD_SIZE_COLONY } from '../core/config.js';
 import { ROOM_SCORE_CAPS, ROOM_SIZE_BANDS, furnitureCountsFor } from '../world/rooms.js';
-import { FURNITURE_TYPES } from '../core/config.js';
+import { FURNITURE_TYPES, POWER_PRIORITY, PEDESTAL_CHARGE } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getItemTradeValue } from '../entities/item-roll.js';
@@ -10,7 +10,8 @@ import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
 import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
-import { getPedestalEffect } from '../systems/artifacts.js';
+import { getPedestalEffect, getPedestalCharge, getMaxPedestalCharge, getTilePedestalStats } from '../systems/artifacts.js';
+import { getPowerTier } from '../systems/power.js';
 import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
 import { getRoleInfoHtml, getEffectInfoHtml } from '../entities/roles.js';
 import { waveScaling } from '../entities/entity-factory.js';
@@ -1016,6 +1017,7 @@ export class UI {
             const reservoirBonus = this.game.research.isResearched('mana_reservoir') ? 3 : 0;
             const crystalMax = 4 + (this.game.manaCrystalBonus || 0) + reservoirBonus;
             manaStr = `Mana:${power.getNetPower()} (${crystalCount}/${crystalMax})`;
+            if (power.unpowered.length > 0) manaStr += ` ${power.unpowered.length} dark`;
         }
         const waves = this.game.waves;
         const voidEssence = r.void_essence || 0;
@@ -1599,14 +1601,12 @@ export class UI {
 
         const dims = expl.getAvailableRealms(this.game)
             .filter(d => expl.canSend(this.game, d.key) && (!this._riftPortalChain || d.chain === this._riftPortalChain));
-        if (dims.length > 0 && this.game.power.powered) {
+        if (dims.length > 0) {
             html += `<div class="info-row" style="margin-top:6px;"><b>Send Expedition:</b></div>`;
             const sortedDims = dims.slice().sort((a, b) => a.difficulty - b.difficulty);
             for (const dim of sortedDims) {
                 html += `<div class="info-actions"><button onclick="window.game.showExpeditionSetup(${jsArg(dim.key)})" style="background:#1a4466;color:#88ddff;">${escapeHtml(dim.name)} (Diff ${dim.difficulty})</button></div>`;
             }
-        } else if (!this.game.power.powered) {
-            html += `<div class="info-row" style="color:#ff4444;">No mana — cannot send expeditions</div>`;
         }
 
         if (expl.completedExpeditions.length > 0 && expl.expeditions.length === 0) {
@@ -1676,10 +1676,9 @@ export class UI {
         return parts.join(' | ');
     }
 
-    getStructureDescription(structure) {
+    getStructureDescription(structure, x, y) {
         const def = BUILDINGS[structure];
         if (!def) return '';
-        const powered = this.game.power.hasPower();
         let html = '';
         if (def.description) {
             html += `<div class="info-row" style="color:#999;font-size:11px;">${escapeHtml(def.description)}</div>`;
@@ -1695,10 +1694,47 @@ export class UI {
                 html += `<div class="info-row" style="color:#88ff88;">Generates ${def.power.generates} mana</div>`;
             }
             if (def.power.consumes) {
-                const status = powered ? '<span style="color:#88ff88;">Powered</span>' : '<span style="color:#ff4444;">No power!</span>';
-                html += `<div class="info-row">Consumes ${def.power.consumes} mana — ${status}</div>`;
+                const isWinter = this.game.weather.season === 'winter';
+                let status;
+                if (def.power.seasonalHeat && !isWinter) status = '<span style="color:#888;">Idle until winter</span>';
+                else if (x === undefined) status = '';
+                else if (this.game.power.isPowered(x, y)) status = '<span style="color:#88ff88;">Powered</span>';
+                else status = '<span style="color:#ff4444;">No power! (grid short on mana)</span>';
+                html += `<div class="info-row">Consumes ${def.power.consumes} mana${status ? ` — ${status}` : ''}</div>`;
+                if (x !== undefined) html += this._buildPowerPriorityHtml(structure, x, y);
             }
         }
+        return html;
+    }
+
+    // Segmented button row; the active option is highlighted and inert.
+    _choiceButtonsHtml(options, activeValue, onclickFor) {
+        const btns = options.map(o => {
+            const active = o.value === activeValue;
+            const style = active
+                ? `background:#3a3355;color:${o.color || '#ffffff'};border:1px solid ${o.color || '#aa88ff'};`
+                : 'opacity:0.75;';
+            const title = o.title ? ` title="${escapeAttr(o.title)}"` : '';
+            return `<button${title} style="${style}" ${active ? 'disabled' : `onclick="${onclickFor(o.value)}"`}>${escapeHtml(o.label)}</button>`;
+        });
+        return `<div class="info-actions">${btns.join(' ')}</div>`;
+    }
+
+    // Power priority picker for a mana consumer. Relays always draw first, so they get none.
+    _buildPowerPriorityHtml(structure, x, y) {
+        if (structure === 'mana_relay') return `<div class="info-row" style="color:#888;font-size:11px;">Relays always draw mana first.</div>`;
+        const tile = this.game.map[y][x];
+        const current = getPowerTier(tile, structure);
+        const fallback = POWER_PRIORITY.byBuilding[structure] || POWER_PRIORITY.defaultTier;
+        let html = `<div class="info-row" style="font-size:11px;color:#aa88ff;">Power priority${tile.powerPriority ? '' : ' (default)'}:</div>`;
+        const options = POWER_PRIORITY.tiers.map(t => ({
+            value: t,
+            label: POWER_PRIORITY.labels[t] + (t === fallback ? '*' : ''),
+            title: t === fallback ? 'Default for this building' : '',
+        }));
+        // Picking the default tier clears the override so later default changes still apply.
+        html += this._choiceButtonsHtml(options, current, t =>
+            `window.game.setPowerPriority(${x},${y},${t === fallback ? 'null' : jsArg(t)})`);
         return html;
     }
 
@@ -2316,7 +2352,7 @@ export class UI {
         if (noTome > 0 && settled && taught('tome')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${noTomeId}" style="color:#88aaff;cursor:pointer">${noTome} without a tome</div>`);
         // At the cap, wanderers get turned away; point at the way to grow.
         if (alive >= cap && settled && taught('colony_growth') && cap < (WORLD_SIZE_COLONY[this.game.map[0].length]?.capMax ?? Infinity)) {
-            alerts.push(`<div class="info-row" style="color:#ff8866">At colonist cap (${alive}/${cap}). Hearth Shrines make room.</div>`);
+            alerts.push(`<div class="info-row" style="color:#ff8866">At colonist cap (${alive}/${cap}). Reach milestones to grow (Rifts panel).</div>`);
         }
         if (missingAttune > 0 && settled && taught('attunement')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${missingAttuneId}" style="color:#bb88ff;cursor:pointer">${missingAttune} missing attunement${missingAttune > 1 ? 's' : ''}</div>`);
         if (pendingTasks > 0) alerts.push(`<div class="info-row" style="color:#ccaa44">${pendingTasks} pending task${pendingTasks > 1 ? 's' : ''}</div>`);
@@ -2655,13 +2691,19 @@ export class UI {
         if (tile.pedestalArtifact) {
             const artDef = ALL_ITEMS[tile.pedestalArtifact];
             const broken = tile.pedestalInactive ? ' <span style="color:#ff4444;">(No Power)</span>' : '';
-            html += `<div class="info-row" style="color:#ccaa44;">Placed: ${this._itemIcon(tile.pedestalArtifact, artDef?.type || 'trinket')}${escapeHtml(artDef?.name || tile.pedestalArtifact)}${broken}</div>`;
-            html += this.getPedestalEffectDescription(artDef);
-            if (artDef?.pedestal?.radius && artDef.pedestal.radius !== 'global') {
-                html += `<div class="info-row">Radius: ${artDef.pedestal.radius} | Mana: -${artDef.pedestal.manaCost || 0}</div>`;
-            } else if (artDef?.pedestal?.radius === 'global') {
-                html += `<div class="info-row">Effect: Colony-wide | Mana: -${artDef.pedestal.manaCost || 0}</div>`;
+            const stats = getTilePedestalStats(tile);
+            const level = getPedestalCharge(tile);
+            const lv = PEDESTAL_CHARGE.levels[level];
+            const chargeTag = level > 0 ? ` <span style="color:${lv.color};">[${escapeHtml(lv.name)}]</span>` : '';
+            html += `<div class="info-row" style="color:#ccaa44;">Placed: ${this._itemIcon(tile.pedestalArtifact, artDef?.type || 'trinket')}${escapeHtml(artDef?.name || tile.pedestalArtifact)}${chargeTag}${broken}</div>`;
+            html += this.getPedestalEffectDescription({ pedestal: stats });
+            if (stats?.radius && stats.radius !== 'global') {
+                html += `<div class="info-row">Radius: ${stats.radius} | Mana: -${stats.manaCost || 0}</div>`;
+            } else if (stats?.radius === 'global') {
+                html += `<div class="info-row">Effect: Colony-wide | Mana: -${stats.manaCost || 0}</div>`;
             }
+            html += this._buildPedestalChargeHtml(artDef?.pedestal, level, x, y);
+            if (stats?.manaCost) html += this._buildPowerPriorityHtml('artifact_pedestal', x, y);
             html += `<div class="info-actions"><button onclick="window.game.retrievePedestalItem(${x},${y})">Retrieve Item</button></div>`;
         } else {
             html += `<div class="info-row" style="color:#888;">Empty — place an item</div>`;
@@ -2705,13 +2747,31 @@ export class UI {
         return html;
     }
 
+    // Overcharge picker: each level shows its mana cost so the trade-off is visible up front.
+    _buildPedestalChargeHtml(pedestal, level, x, y) {
+        if (!pedestal?.manaCost) return '';
+        const max = getMaxPedestalCharge(pedestal);
+        const options = PEDESTAL_CHARGE.levels.slice(0, max + 1).map((lv, i) => ({
+            value: i,
+            label: `${lv.name} (${pedestal.manaCost * lv.costMult})`,
+            color: lv.color,
+            title: i === 0 ? 'Base effect' : `${lv.costMult}x mana: effects x${lv.strength}${pedestal.radius !== 'global' ? `, radius +${lv.radiusBonus}` : ''}`,
+        }));
+        let html = `<div class="info-row" style="font-size:11px;color:#ccaa44;">Overcharge (mana):</div>`;
+        html += this._choiceButtonsHtml(options, level, i => `window.game.setPedestalCharge(${x},${y},${i})`);
+        if (max < PEDESTAL_CHARGE.levels.length - 1) {
+            html += `<div class="info-row" style="color:#888;font-size:11px;">Colony-wide trinkets can't go past ${escapeHtml(PEDESTAL_CHARGE.levels[max].name)}.</div>`;
+        }
+        return html;
+    }
+
     _buildTradeRiftInfoHtml(tile, x, y) {
         let html = '';
         html += `<div class="info-row" style="color:#66ccaa;font-weight:bold;">Trade Rift</div>`;
         const requests = this.game.tradeRift.requests;
         const open = requests.filter(r => !r.fulfilled).length;
         html += `<div class="info-row">${open} open request${open === 1 ? '' : 's'}</div>`;
-        if (!this.game.power.hasPower()) {
+        if (!this.game.power.isPowered(x, y)) {
             html += `<div class="info-row" style="color:#ff8844;">Unpowered — no mana to open the rift.</div>`;
         }
         html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('requests')" style="background:#1a5544;color:#88ddcc;">Open Rifts Panel</button></div>`;
@@ -2879,7 +2939,7 @@ export class UI {
                 const hpColor = currentHp >= maxHp ? '#88ff88' : currentHp > maxHp * 0.5 ? '#ffcc00' : '#ff4444';
                 html += `<div class="info-row" style="color:${hpColor}">HP: ${currentHp} / ${maxHp}</div>`;
             }
-            html += this.getStructureDescription(tile.structure);
+            html += this.getStructureDescription(tile.structure, x, y);
         }
         if (tile.floor) {
             html += `<div class="info-row" style="color:#999">Floor: ${escapeHtml(tile.floor.replace(/_/g,' '))}</div>`;
@@ -3171,7 +3231,7 @@ export class UI {
                 const hpColor = currentHp >= maxHp ? '#88ff88' : currentHp > maxHp * 0.5 ? '#ffcc00' : '#ff4444';
                 html += `<div class="info-row" style="color:${hpColor}">HP: ${currentHp} / ${maxHp}</div>`;
             }
-            html += this.getStructureDescription(tile.structure);
+            html += this.getStructureDescription(tile.structure, x, y);
             if (tile.structure === 'arcane_core') {
                 const cs = getComplexStructureAt(this.game, x, y);
                 if (cs) {
@@ -4100,10 +4160,10 @@ export class UI {
         let html = '';
         const foodChestCount = this.game.mapIndex ? this.game.mapIndex.getStructurePositions('food_chest').size : 0;
         const iceBoxCount = this.game.mapIndex ? this.game.mapIndex.getStructurePositions('ice_box').size : 0;
-        const noPower = this.game.power && !this.game.power.powered;
+        const poweredIceBoxes = this.game.power?.ready ? this.game.power.countPowered(this.game, 'ice_box') : iceBoxCount;
         if (foodChestCount > 0 || iceBoxCount > 0) {
             let reduction = Math.min(0.6, foodChestCount * 0.15);
-            if (!noPower) reduction += iceBoxCount * 0.4;
+            reduction += poweredIceBoxes * 0.4;
             reduction = Math.min(0.9, reduction);
             const pct = Math.round(reduction * 100);
             const seasonLabel = this.game.weather.season === 'summer' ? ' (summer +50% rot)' : this.game.weather.season === 'winter' ? ' (winter -50% rot)' : '';

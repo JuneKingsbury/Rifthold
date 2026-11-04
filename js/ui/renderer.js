@@ -1,4 +1,5 @@
 import { CONFIG, GRASS_TERRAIN, TILE_COLORS, BUILDINGS, PLANT_STRUCTURES, ALL_ITEMS, RENDER_CONFIG, COMBAT_VISUALS, COMPLEX_STRUCTURES, SEASON_EFFECTS } from '../core/config.js';
+import { getTilePedestalStats } from '../systems/artifacts.js';
 import { writeTileVisuals, SEALED_BG } from '../world/map.js';
 import { OverlayRenderer, spawnParticle, uiFontScale } from './overlay-renderer.js';
 import { CrtRenderer } from './crt-renderer.js';
@@ -2902,13 +2903,12 @@ export class Renderer {
         }
 
         const allStructures = this._structureMap;
-        const noPower = game.power && !game.power.powered;
 
         for (const { x, y, type } of allStructures) {
             if (x < x0 || x > x1 || y < y0 || y > y1) continue;
             const bDef = BUILDINGS[type];
             if (!bDef || !bDef.lightRadius) continue;
-            if (bDef.power && bDef.power.consumes && noPower) continue;
+            if (bDef.power && bDef.power.consumes && game.power && !game.power.isPowered(x, y)) continue;
             sources.push({ x, y, radius: bDef.lightRadius });
         }
 
@@ -2917,9 +2917,9 @@ export class Renderer {
             if (x < x0 || x > x1 || y < y0 || y > y1) continue;
             const tile = game.map[y][x];
             if (!tile.pedestalArtifact || tile.pedestalInactive) continue;
-            const artDef = ALL_ITEMS[tile.pedestalArtifact];
-            if (artDef?.pedestal?.lightRadius) {
-                sources.push({ x, y, radius: artDef.pedestal.lightRadius });
+            const stats = getTilePedestalStats(tile);
+            if (stats?.lightRadius) {
+                sources.push({ x, y, radius: stats.lightRadius });
             }
         }
 

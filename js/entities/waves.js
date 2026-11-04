@@ -1,4 +1,4 @@
-import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS, HEARTH_SHRINE_MILESTONES, WORLD_SIZE_COLONY, REALMS, countCompletedChains } from '../core/config.js';
+import { CONFIG, WAVE_CONFIG, WAVE_TYPES, COMBAT_VISUALS, COLONIST_CONFIG, BUILDINGS, COLONY_MILESTONES, WORLD_SIZE_COLONY, REALMS, countCompletedChains } from '../core/config.js';
 import { isPassableForEnemies, isBreakableByEnemies } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { colonistTakeDamage, getEquipmentStat, releaseColonistTasks } from './colonist.js';
@@ -7,18 +7,18 @@ import { createWaveEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 import { attackStructure, getColonistTargetPriority, tickHostileStatusEffects } from './combat.js';
 
-// Evaluates all unearned Hearth Shrine milestones against the current game state.
-// Grants one extra shrine build slot per newly satisfied milestone.
-// Returns the number of new slots unlocked this call.
-export function checkHearthShrineMilestones(game) {
-    if (!game.hearthShrineMilestonesReached) game.hearthShrineMilestonesReached = new Set();
+// Evaluates all unearned colony milestones against the current game state.
+// Each newly satisfied milestone raises the colonist cap (see getColonistCap).
+// Returns the number of milestones reached this call.
+export function checkColonyMilestones(game) {
+    if (!game.colonyMilestonesReached) game.colonyMilestonesReached = new Set();
     const completedRealms = game.exploration?.completedRealms || new Set();
     const highestWave = game.waves?.highestWaveCompleted || 0;
     const chainsDone = countCompletedChains(completedRealms);
 
-    let newSlots = 0;
-    for (const ms of HEARTH_SHRINE_MILESTONES) {
-        if (game.hearthShrineMilestonesReached.has(ms.key)) continue;
+    let reached = 0;
+    for (const ms of COLONY_MILESTONES) {
+        if (game.colonyMilestonesReached.has(ms.key)) continue;
 
         let satisfied = false;
         if (ms.type === 'wave') {
@@ -32,14 +32,18 @@ export function checkHearthShrineMilestones(game) {
         }
 
         if (satisfied) {
-            game.hearthShrineMilestonesReached.add(ms.key);
-            game.hearthShrineBonus = game.hearthShrineMilestonesReached.size;
-            game.notifications?.push({ text: `${ms.label}: a new Hearth Shrine slot is available!`, tick: game.tick, type: 'success' });
-            newSlots++;
+            const before = game.waves?.getColonistCap(game);
+            game.colonyMilestonesReached.add(ms.key);
+            const after = game.waves?.getColonistCap(game);
+            // On medium worlds the cap rises 1.5 per milestone, so some milestones only bank half a colonist.
+            const text = after > before
+                ? `${ms.label}: colony cap raised to ${after}!`
+                : `${ms.label}: milestone reached, the next one raises your colony cap.`;
+            game.notifications?.push({ text, tick: game.tick, type: 'success' });
+            reached++;
         }
     }
-    if (newSlots > 0) game.ui?.updateBuildPanel?.(game.input);
-    return newSlots;
+    return reached;
 }
 
 export class WaveSystem {
@@ -59,26 +63,14 @@ export class WaveSystem {
         this.lastWaveResult = null;
     }
 
+    // Base cap plus the world's step for every colony milestone reached, floored and clamped.
     getColonistCap(game) {
-        let base = WAVE_CONFIG.colonistCapBase;
         // Derive world size from the live map so loaded saves match the world they were made on.
         const worldWidth = game?.map?.[0]?.length ?? CONFIG.MAP_WIDTH;
         const world = WORLD_SIZE_COLONY[worldWidth];
-        const bonusScale = world?.shrineCapMultiplier ?? 1;
-        if (game && game.mapIndex) {
-            for (const [key, def] of Object.entries(BUILDINGS)) {
-                if (def.colonistCapBonus) {
-                    let count = game.mapIndex.getStructurePositions(key).size;
-                    if (def.power?.consumes && game.power) {
-                        const shrineManaTotal = count * def.power.consumes;
-                        const otherConsumption = game.power.totalConsumed - shrineManaTotal;
-                        const manaAvailableForShrines = Math.max(0, game.power.totalGenerated - otherConsumption);
-                        count = Math.min(count, Math.floor(manaAvailableForShrines / def.power.consumes));
-                    }
-                    base += def.colonistCapBonus * bonusScale * count;
-                }
-            }
-        }
+        const perMilestone = world?.capPerMilestone ?? 1;
+        const reached = game?.colonyMilestonesReached?.size || 0;
+        const base = WAVE_CONFIG.colonistCapBase + reached * perMilestone;
         const max = game?.settings?.demoMode ? 8 : (world?.capMax ?? WAVE_CONFIG.colonistCapMax);
         return Math.floor(Math.min(max, base));
     }
@@ -376,7 +368,7 @@ export class WaveSystem {
                 .reduce((best, c) => Math.max(best, getEquipmentStat(c, 'voidEssenceGainMult') || 1), 1);
             const bonusEssence = Math.round(this.currentWave * WAVE_CONFIG.bonusEssencePerWave * voidMult * (this.forcedWaveBonusMult || 1));
             game.resources.add({ void_essence: bonusEssence });
-            checkHearthShrineMilestones(game);
+            checkColonyMilestones(game);
             game.notifications.push({ text: `Wave ${this.currentWave} complete! +${bonusEssence} bonus void essence.`, tick: game.tick, type: 'success' });
             game.eventLog.add(game, `Wave ${this.currentWave} defeated!`, 'success', null);
             game.story.checkMilestone('first_wave_completed', game);

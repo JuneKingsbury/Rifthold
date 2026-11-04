@@ -1,4 +1,5 @@
-import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, PLANT_STRUCTURES, MAP_GENERATORS, BIOMES, BIOME_TRANSITIONS, GRASS_TERRAIN, UNBUILDABLE_TERRAIN, LANDMARK_BLUEPRINTS, CRYPT_CONFIG, CRYPT_BLUEPRINTS, RUIN_LOOT, CROPS } from '../core/config.js';
+import { CONFIG, WALL_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS, TERRAIN, RESOURCES, BUILDINGS, IMPASSABLE_STRUCTURES, ENEMY_BLOCKED_STRUCTURES, BREAKABLE_STRUCTURES, FURNITURE_STRUCTURES, PLANT_STRUCTURES, MAP_GENERATORS, BIOMES, BIOME_TRANSITIONS, GRASS_TERRAIN, UNBUILDABLE_TERRAIN, LANDMARK_BLUEPRINTS, COMPLEX_STRUCTURES, CRYPT_CONFIG, CRYPT_BLUEPRINTS, RUIN_LOOT, CROPS } from '../core/config.js';
+import { patternMatches } from '../systems/complexBuildings.js';
 
 // Background of a sealed (unexplored) crypt tile, shared by the renderer.
 export const SEALED_BG = '#050507';
@@ -755,7 +756,7 @@ function _stampLandmarkPiece(map, W, H, blueprint, ox, oy, piece, decayChance, f
     const wx = ox + piece.x, wy = oy + piece.y;
     if (wx < 0 || wx >= W || wy < 0 || wy >= H) return;
     const tile = map[wy][wx];
-    const ritual = isRitualPiece(piece.type);
+    const ritual = isRitualPiece(piece.type) || piece.pattern;
     if (isWaterTerrain(tile.terrain)) {
         if (!ritual) return;
         tile.terrain = blueprint.floorTerrain || 'dirt';
@@ -773,6 +774,50 @@ function _stampLandmarkPiece(map, W, H, blueprint, ox, oy, piece, decayChance, f
         }
     }
     tile.resource = null;
+}
+
+// Floor laid under every tile of a landmark's full chalk pattern, so the slots the
+// player still has to chalk stand out from the stone floor around them.
+const LANDMARK_PATTERN_FLOOR = 'brick_floor';
+
+// Chance that each chalk tile of a landmark's pattern survives worldgen, so on
+// average a quarter of the pattern is already drawn and the player lays the rest.
+const LANDMARK_CHALK_SURVIVAL = 0.25;
+const LANDMARK_CHALK_ROLLS = 50;
+
+// Stamps LANDMARK_PATTERN_FLOOR under the blueprint's full `structure` shape, offset
+// from its core. Like core and chalk it never decays and overrides water, or a
+// missing chalk slot could end up unbuildable.
+function _stampLandmarkPattern(map, W, H, blueprint, ox, oy) {
+    const shape = COMPLEX_STRUCTURES[blueprint.structure];
+    const core = blueprint.layout.find(p => p.type === 'arcane_core');
+    if (!shape || !core) return;
+    for (const { dx, dy } of shape.layout) {
+        const piece = { x: core.x + dx, y: core.y + dy, type: LANDMARK_PATTERN_FLOOR, pattern: true };
+        _stampLandmarkPiece(map, W, H, blueprint, ox, oy, piece, 0, 0);
+    }
+}
+
+// Picks which of the blueprint's pattern chalk tiles survive, as blueprint-relative
+// 'ritual_chalk' pieces. Patterns nest (Scholar's Ring holds Watcher's Eye, Ritual
+// Circle holds Star Ward), so a roll that would activate any structure, its own
+// included, is thrown away. If every roll fails the ruin gets no chalk: the pattern
+// floor still shows the shape, and no structure activates without chalk.
+function _rollLandmarkChalk(blueprint) {
+    const shape = COMPLEX_STRUCTURES[blueprint.structure];
+    const core = blueprint.layout.find(p => p.type === 'arcane_core');
+    if (!shape || !core) return [];
+    // A scratch grid around the core, big enough for every shape's bounding box.
+    const R = 4, N = R * 2 + 1;
+    for (let i = 0; i < LANDMARK_CHALK_ROLLS; i++) {
+        const kept = shape.layout.filter(() => Math.random() < LANDMARK_CHALK_SURVIVAL);
+        const grid = Array.from({ length: N }, () => Array.from({ length: N }, () => ({ structure: null })));
+        grid[R][R].structure = 'arcane_core';
+        for (const { dx, dy } of kept) grid[R + dy][R + dx].structure = 'ritual_chalk';
+        const activates = Object.values(COMPLEX_STRUCTURES).some(def => patternMatches(grid, R, R, def.layout));
+        if (!activates) return kept.map(({ dx, dy }) => ({ x: core.x + dx, y: core.y + dy, type: 'ritual_chalk' }));
+    }
+    return [];
 }
 
 // Places every LANDMARK_BLUEPRINTS ruin (one per ritual shape, each holding an
@@ -844,7 +889,8 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
         const pick = candidates[Math.floor(Math.random() * candidates.length)];
         const cx2 = pick.x, cy2 = pick.y;
         placed.push({ x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
-        placedLandmarks.push({ blueprint, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
+        const chalk = _rollLandmarkChalk(blueprint);
+        placedLandmarks.push({ blueprint, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height, chalk });
         generatedRuins.push({ kind: 'landmark', blueprint: blueprint.name, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
 
         // Paint floor terrain under the footprint.
@@ -868,19 +914,22 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
         for (const piece of blueprint.layout) {
             _stampLandmarkPiece(map, W, H, blueprint, cx2, cy2, piece, decayChance, floorDecayChance);
         }
+        _stampLandmarkPattern(map, W, H, blueprint, cx2, cy2);
+        for (const piece of chalk) _stampLandmarkPiece(map, W, H, blueprint, cx2, cy2, piece, 0, 0);
     }
 }
 
-// Re-stamps every landmark's Arcane Core and chalk. Generators that run after
+// Re-stamps every landmark's Arcane Core, chalk and pattern floor. Generators that run after
 // biome_layout (rivers, rock and mountain passes, generic ruins, the start-area
 // clear) can paint over them; this runs after all of those so the world always
 // ends up with one intact core per landmark.
 function restoreLandmarkRituals(map) {
     const W = CONFIG.MAP_WIDTH, H = CONFIG.MAP_HEIGHT;
-    for (const { blueprint, x, y } of placedLandmarks) {
-        for (const piece of blueprint.layout) {
+    for (const { blueprint, x, y, chalk } of placedLandmarks) {
+        for (const piece of [...blueprint.layout, ...chalk]) {
             if (isRitualPiece(piece.type)) _stampLandmarkPiece(map, W, H, blueprint, x, y, piece, 0, 0);
         }
+        _stampLandmarkPattern(map, W, H, blueprint, x, y);
     }
 }
 

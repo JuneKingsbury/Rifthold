@@ -2768,20 +2768,20 @@ export const WAVE_CONFIG = {
 };
 
 // Per-world-size colony tuning, keyed by map width (matches the world-size presets).
-// shrineCapMultiplier scales a building's colonistCapBonus (Hearth Shrine: +1 / +1.5 / +2 each);
-// the summed cap is floored, so fractional bonuses never yield a fractional colonist.
-// capMax is the world's colonist ceiling: base 3 + 9 shrines (one per milestone, no free slot) at the size's bonus, floored.
+// capPerMilestone is how much each reached COLONY_MILESTONES entry raises the colonist cap;
+// the summed cap is floored, so fractional steps never yield a fractional colonist.
+// capMax is the world's colonist ceiling: base 3 + all 9 milestones at the size's step, floored.
 export const WORLD_SIZE_COLONY = {
-    128: { shrineCapMultiplier: 1,   capMax: 12 },
-    256: { shrineCapMultiplier: 1.5, capMax: 16 },
-    384: { shrineCapMultiplier: 2,   capMax: 21 },
+    128: { capPerMilestone: 1,   capMax: 12 },
+    256: { capPerMilestone: 1.5, capMax: 16 },
+    384: { capPerMilestone: 2,   capMax: 21 },
 };
 
-// Ordered list of milestones that each unlock one additional Hearth Shrine build slot.
+// Ordered list of milestones that each raise the colonist cap by the world's capPerMilestone.
 // type 'wave': fires when game.waves.highestWaveCompleted >= threshold
 // type 'realm_order': fires when any realm with chainOrder === order has been completed
 // type 'chains_completed': fires when countCompletedChains() >= count
-export const HEARTH_SHRINE_MILESTONES = [
+export const COLONY_MILESTONES = [
     { key: 'wave_1',        label: 'Survive Wave 1',                  type: 'wave',            threshold: 1 },
     { key: 'realm_order_1', label: 'Venture into a new realm',        type: 'realm_order',     order: 1 },
     { key: 'wave_3',        label: 'Survive Wave 3',                  type: 'wave',            threshold: 3 },

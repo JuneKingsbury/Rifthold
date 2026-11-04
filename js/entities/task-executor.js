@@ -225,6 +225,9 @@ export function completeTask(colonist, task, game) {
                 }
                 tile.structure = task.buildType;
                 tile.passable = !IMPASSABLE_STRUCTURES.has(task.buildType);
+                // A new structure starts on its building's default power settings.
+                tile.powerPriority = undefined;
+                tile.pedestalCharge = 0;
                 // Only index tiles whose type lands in tile.structure. Floors are
                 // written to tile.floor and are not tracked by mapIndex (which
                 // scans tile.structure on rebuild), so indexing them here would

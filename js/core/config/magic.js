@@ -24,6 +24,39 @@ export const MANA_CONFIG = {
     regenWhileSleeping: 3.0,
 };
 
+// Mana grid supply order. When generation falls short, consumers are powered
+// tier by tier and whatever no longer fits goes dark, instead of the whole grid
+// failing at once. Mana relays are always powered first because their discount
+// changes everyone else's cost. A tile can override its building's default tier
+// (tile.powerPriority).
+export const POWER_PRIORITY = {
+    tiers: ['high', 'normal', 'low'],
+    labels: { high: 'High', normal: 'Normal', low: 'Low' },
+    defaultTier: 'normal',
+    byBuilding: {
+        arcane_sentinel: 'high', void_turret: 'high', inferno_ward: 'high',
+        ember_heater: 'high',
+        glowstone: 'low', beacon: 'low',
+    },
+};
+
+// Pedestal overcharge levels (tile.pedestalCharge indexes into levels). Each
+// level multiplies the trinket's mana cost. Fractional effects scale by
+// strength, *Mult effects scale their distance from 1, whole-number bonuses
+// gain flatBonus and finite radii grow by radiusBonus. Colony-wide trinkets
+// stop at maxGlobalLevel so global effects don't snowball.
+export const PEDESTAL_CHARGE = {
+    levels: [
+        { name: 'Normal',    color: '#ccaa44', costMult: 1, strength: 1,   flatBonus: 0, radiusBonus: 0 },
+        { name: 'Empowered', color: '#ffcc55', costMult: 2, strength: 1.5, flatBonus: 1, radiusBonus: 2 },
+        { name: 'Radiant',   color: '#ffee99', costMult: 3, strength: 2,   flatBonus: 2, radiusBonus: 4 },
+    ],
+    maxGlobalLevel: 1,
+    flatKeys: ['harvestYieldBonus', 'craftOutputBonus', 'cookingBonusFood'],
+    radiusKeys: ['lightRadius'],
+    caps: { blightDamageReduction: 0.9 },
+};
+
 export const SPELLS = {
     // Evocation
     spark: { name: 'Spark', school: 'evocation', minLevel: 0, manaCost: 4, cooldown: 25, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 6, range: 4, projectileColor: '#ffaa33', projectileChar: '.' },

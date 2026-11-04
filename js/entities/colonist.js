@@ -2146,8 +2146,8 @@ export function getRelaxActivityLabel(colonist) {
     return info ? info.label : 'Relaxing';
 }
 
-const WARMTH_SOURCES = ['campfire', 'hearth_shrine', 'ember_heater', 'inferno_ward'];
-const WARMTH_SEEK_TYPES = ['campfire', 'ember_heater', 'inferno_ward', 'hearth_shrine'];
+const WARMTH_SOURCES = ['campfire', 'ember_heater', 'inferno_ward'];
+const WARMTH_SEEK_TYPES = ['campfire', 'ember_heater', 'inferno_ward'];
 const WARMTH_SEEK_RADIUS = 20;
 
 function randRange(range) {

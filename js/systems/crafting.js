@@ -31,7 +31,7 @@ function recipeCacheKey(game) {
         _recipeInputs = { resources: [...resources], stations: [...stations] };
     }
     const stock = game.resources.stockpile;
-    const parts = [game._recipeCacheVersion || 0, game.research.completed.size, game.power.hasPower() ? 1 : 0];
+    const parts = [game._recipeCacheVersion || 0, game.research.completed.size, game.power.countPowered(game, 'enchanting_table') > 0 ? 1 : 0];
     for (const st of _recipeInputs.stations) parts.push(game.mapIndex.getStructurePositions(st).size > 0 ? 1 : 0);
     for (const res of _recipeInputs.resources) parts.push(res === 'foodstuffs' ? game.resources.getFoodstuffTotal() : (stock[res] || 0));
     return parts.join(',');
@@ -96,7 +96,7 @@ export function queueEnchantingOrder(game, itemKey, itemQuality, itemType, itemT
 }
 
 function findAvailableStation(game, stationType) {
-    let usePowered = stationType === 'workbench' && game.research.isResearched('arcane_infusion') && game.power.hasPower();
+    let usePowered = stationType === 'workbench' && game.research.isResearched('arcane_infusion') && game.power.countPowered(game, 'enchanting_table') > 0;
 
     const pendingTasks = game.taskQueue.getAll().filter(t => t.type === 'craft' || t.type === 'cook' || t.type === 'enchant');
     const taskCountAt = (x, y) => pendingTasks.filter(t => t.x === x && t.y === y).length;
@@ -104,12 +104,15 @@ function findAvailableStation(game, stationType) {
     if (stationType === 'enchanting_table' || usePowered) {
         const stations = game.mapIndex.findAll('enchanting_table');
         let best = null, bestCount = Infinity;
-        // Enchanting tables draw grid mana, so they only count as powered while
-        // the grid is net-positive.
-        const powered = game.power.hasPower();
+        // Enchanting tables draw grid mana, so each counts as powered only while
+        // the grid supplies it. Powered workbench jobs skip dark tables.
         for (const { x, y } of stations) {
+            const powered = game.power.isPowered(x, y);
+            if (usePowered && !powered) continue;
             const count = taskCountAt(x, y);
-            if (count < bestCount) { best = { x, y, powered }; bestCount = count; }
+            // Prefer a supplied table over a dark one, then the least busy.
+            const better = !best || (powered && !best.powered) || (powered === best.powered && count < bestCount);
+            if (better) { best = { x, y, powered }; bestCount = count; }
         }
         if (best) return best;
     }

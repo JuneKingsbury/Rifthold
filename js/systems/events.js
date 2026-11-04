@@ -449,7 +449,7 @@ export class EventSystem {
             const aliveColonists = game.colonists.filter(c => c.hp > 0 && !c.golem);
             const cap = game.waves.getColonistCap(game);
             if (aliveColonists.length >= cap) {
-                game.notifications.push({ text: `Colony is at capacity (${cap})! Complete more waves to expand.`, tick: game.tick, type: 'danger' });
+                game.notifications.push({ text: `Colony is at capacity (${cap})! Reach more milestones to expand.`, tick: game.tick, type: 'danger' });
                 this.pendingEvent = null;
                 return;
             }

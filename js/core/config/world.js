@@ -295,14 +295,15 @@ export const MAP_GENERATORS = [
 // `biome` and falls back to the nearest free space. The generic temple/watchtower
 // ruins in MAP_GENERATORS are the random, space-scaled ones and hold no core.
 //
-// Each landmark centres on an 'arcane_core' ringed by a deliberately unfinished
-// 'ritual_chalk' pattern of the shape named in its comment. Cores are the only ones
+// Each landmark centres on an 'arcane_core'. `structure` names the COMPLEX_STRUCTURES
+// shape it belongs to: every tile of that full shape gets a distinct floor, and only a
+// random share of its chalk survives (see _stampLandmarkPattern and _rollLandmarkChalk
+// in map.js), so the player has to finish most of the pattern. Cores are the only ones
 // in the world: the player cannot build or destroy them, only finish the chalk.
-// Core and chalk are exempt from ruin decay so the authored gaps are the only gaps.
-// Keep every partial pattern from completing a different shape (see patternMatches).
 export const LANDMARK_BLUEPRINTS = {
-    // Grassland: Waystone Shrine — 5×5 stone ring, core with 3 of 4 Scholar's Ring chalk
+    // Grassland: Waystone Shrine — 5×5 stone ring, core for Scholar's Ring
     waystone_shrine: {
+        structure: 'scholars_ring',
         biome: 'grassland',
         name: 'Waystone Shrine',
         width: 5, height: 5,
@@ -314,12 +315,12 @@ export const LANDMARK_BLUEPRINTS = {
             l.push({ x: 2, y: 4, type: 'door' });
             for (let y = 1; y < 4; y++) { for (let x = 1; x < 4; x++) { l.push({ x, y, type: 'stone_floor' }); } }
             l.push({ x: 2, y: 2, type: 'arcane_core' });
-            l.push({ x: 2, y: 1, type: 'ritual_chalk' }); l.push({ x: 1, y: 2, type: 'ritual_chalk' }); l.push({ x: 3, y: 2, type: 'ritual_chalk' });
             return l;
         })(),
     },
-    // Forest: Woodcutter's Lodge — 7×5 wood cabin, core with 3 of 5 Harvest Sigil chalk
+    // Forest: Woodcutter's Lodge — 7×5 wood cabin, core for Harvest Sigil
     woodcutters_lodge: {
+        structure: 'harvest_sigil',
         biome: 'forest',
         name: "Woodcutter's Lodge",
         width: 7, height: 5,
@@ -331,12 +332,12 @@ export const LANDMARK_BLUEPRINTS = {
             l.push({ x: 3, y: 4, type: 'door' });
             for (let y = 1; y < 4; y++) { for (let x = 1; x < 6; x++) { l.push({ x, y, type: 'stone_floor' }); } }
             l.push({ x: 2, y: 2, type: 'arcane_core' });
-            l.push({ x: 3, y: 2, type: 'ritual_chalk' }); l.push({ x: 4, y: 2, type: 'ritual_chalk' }); l.push({ x: 5, y: 1, type: 'ritual_chalk' });
             return l;
         })(),
     },
-    // Mountain: Dwarven Vault — 11×9, stone outer wall, brick inner vault, reinforced door, core with 3 of 4 Anvil Shrine chalk
+    // Mountain: Dwarven Vault — 11×9, stone outer wall, brick inner vault, reinforced door, core for Anvil Shrine
     dwarven_vault: {
+        structure: 'anvil_shrine',
         biome: 'mountain',
         name: 'Dwarven Vault',
         width: 11, height: 9,
@@ -351,12 +352,12 @@ export const LANDMARK_BLUEPRINTS = {
             for (let y = 3; y < 6; y++) { l.push({ x: 3, y, type: 'brick_wall' }); l.push({ x: 7, y, type: 'brick_wall' }); }
             l.push({ x: 5, y: 6, type: 'reinforced_door' });
             l.push({ x: 5, y: 4, type: 'arcane_core' });
-            l.push({ x: 4, y: 3, type: 'ritual_chalk' }); l.push({ x: 5, y: 3, type: 'ritual_chalk' }); l.push({ x: 5, y: 5, type: 'ritual_chalk' });
             return l;
         })(),
     },
-    // Swamp: Witch's Hut — 7×7 wood hut, irregular shape, core with 5 of 8 Ritual Circle chalk
+    // Swamp: Witch's Hut — 7×7 wood hut, irregular shape, core for Ritual Circle
     witchs_hut: {
+        structure: 'ritual_circle',
         biome: 'swamp',
         name: "Witch's Hut",
         width: 7, height: 7,
@@ -370,14 +371,12 @@ export const LANDMARK_BLUEPRINTS = {
             l.push({ x: 3, y: 6, type: 'door' });
             for (let y = 1; y < 6; y++) { for (let x = 1; x < 6; x++) { l.push({ x, y, type: 'stone_floor' }); } }
             l.push({ x: 3, y: 3, type: 'arcane_core' });
-            l.push({ x: 3, y: 1, type: 'ritual_chalk' });
-            l.push({ x: 2, y: 2, type: 'ritual_chalk' }); l.push({ x: 4, y: 2, type: 'ritual_chalk' });
-            l.push({ x: 2, y: 4, type: 'ritual_chalk' }); l.push({ x: 4, y: 4, type: 'ritual_chalk' });
             return l;
         })(),
     },
-    // Desert: Desert Obelisk — 5×9 brick tower, core with 6 of 8 Great Forge chalk (side tiles missing)
+    // Desert: Desert Obelisk — 5×9 brick tower, core for Great Forge
     desert_obelisk: {
+        structure: 'great_forge',
         biome: 'desert',
         name: 'Desert Obelisk',
         width: 5, height: 9,
@@ -389,13 +388,12 @@ export const LANDMARK_BLUEPRINTS = {
             l.push({ x: 2, y: 8, type: 'door' });
             for (let y = 1; y < 8; y++) { for (let x = 1; x < 4; x++) { l.push({ x, y, type: 'stone_floor' }); } }
             l.push({ x: 2, y: 4, type: 'arcane_core' });
-            l.push({ x: 1, y: 3, type: 'ritual_chalk' }); l.push({ x: 2, y: 3, type: 'ritual_chalk' }); l.push({ x: 3, y: 3, type: 'ritual_chalk' });
-            l.push({ x: 1, y: 5, type: 'ritual_chalk' }); l.push({ x: 2, y: 5, type: 'ritual_chalk' }); l.push({ x: 3, y: 5, type: 'ritual_chalk' });
             return l;
         })(),
     },
-    // Tundra: Frozen Cairn — 7×5 stone ruin, open roof feel, core with 1 of 2 Watcher's Eye chalk
+    // Tundra: Frozen Cairn — 7×5 stone ruin, open roof feel, core for Watcher's Eye
     frozen_cairn: {
+        structure: 'watchers_eye',
         biome: 'tundra',
         name: 'Frozen Cairn',
         width: 7, height: 5,
@@ -407,14 +405,14 @@ export const LANDMARK_BLUEPRINTS = {
             l.push({ x: 3, y: 4, type: 'door' });
             for (let y = 1; y < 4; y++) { for (let x = 1; x < 6; x++) { l.push({ x, y, type: 'stone_floor' }); } }
             l.push({ x: 3, y: 2, type: 'arcane_core' });
-            l.push({ x: 3, y: 1, type: 'ritual_chalk' });
             l.push({ x: 1, y: 1, type: 'stone_wall' }); l.push({ x: 5, y: 1, type: 'stone_wall' });
             l.push({ x: 1, y: 3, type: 'stone_wall' }); l.push({ x: 5, y: 3, type: 'stone_wall' });
             return l;
         })(),
     },
-    // Mountain: Sentinel Ring — 7×7 open ring of standing stones, core with 3 of 4 Star Ward chalk
+    // Mountain: Sentinel Ring — 7×7 open ring of standing stones, core for Star Ward
     sentinel_ring: {
+        structure: 'star_ward',
         biome: 'mountain',
         name: 'Sentinel Ring',
         width: 7, height: 7,
@@ -424,12 +422,12 @@ export const LANDMARK_BLUEPRINTS = {
             for (let y = 1; y < 6; y++) { for (let x = 1; x < 6; x++) { l.push({ x, y, type: 'stone_floor' }); } }
             for (const [x, y] of [[0, 0], [3, 0], [6, 0], [0, 3], [6, 3], [0, 6], [3, 6], [6, 6]]) { l.push({ x, y, type: 'stone_wall' }); }
             l.push({ x: 3, y: 3, type: 'arcane_core' });
-            l.push({ x: 3, y: 1, type: 'ritual_chalk' }); l.push({ x: 1, y: 3, type: 'ritual_chalk' }); l.push({ x: 5, y: 3, type: 'ritual_chalk' });
             return l;
         })(),
     },
-    // Desert: Sun Altar — 9×9 brick terrace, core with 5 of 8 Grand Altar chalk
+    // Desert: Sun Altar — 9×9 brick terrace, core for Grand Altar
     sun_altar: {
+        structure: 'grand_ritual',
         biome: 'desert',
         name: 'Sun Altar',
         width: 9, height: 9,
@@ -441,7 +439,6 @@ export const LANDMARK_BLUEPRINTS = {
             l.push({ x: 4, y: 8, type: 'door' });
             for (let y = 1; y < 8; y++) { for (let x = 1; x < 8; x++) { l.push({ x, y, type: 'stone_floor' }); } }
             l.push({ x: 4, y: 4, type: 'arcane_core' });
-            for (const [x, y] of [[2, 2], [3, 3], [5, 3], [6, 2], [3, 5]]) { l.push({ x, y, type: 'ritual_chalk' }); }
             return l;
         })(),
     },

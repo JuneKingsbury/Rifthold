@@ -1,7 +1,7 @@
 import { ROOM_QUALITY_TIERS } from './config.js';
 import { CONFIG, GAME_VERSION, RESEARCH, EASTER_EGG_COLONISTS, FOOD_DECAY_CONFIG, BLIGHT_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, COMBAT_VISUALS, GOLEM_TYPES, TRINKETS, WEAPONS, ARMORS, HELMETS, TOOLS, SKILLS, EVENTS, TERRAIN, RENDER_CONFIG, RECIPES, SALVAGE_RATE, COLONIST_CONFIG, ALL_ITEMS, TRAITS, TRAIT_EXCLUSIONS, RACES, HUMAN_NAMES, NYMPH_NAMES, FERIN_NAMES, KOBALOS_NAMES, BUFOS_NAMES, WORK_CONFIG, STORY_MILESTONES, TRADE_RIFT_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, RITUALS, SEASONS, SEASON_ADVANCE_NOTICE, PRIORITY_PROFILES } from './config.js';
 import { WILDLIFE_CONFIG, LANDMARK_BLUEPRINTS, MAP_GENERATORS, CRYPT_CONFIG } from './config.js';
-import { PATHFINDING_CONFIG } from './config.js';
+import { PATHFINDING_CONFIG, POWER_PRIORITY } from './config.js';
 import { initModsUI } from '../ui/ui-mods.js';
 import { getLoadedManifests, getDiscoveredManifests, setModEnabled, markModsInitialized } from './mod-registry.js';
 import { generateMap, getTileVisuals, takeGeneratedRuins } from '../world/map.js';
@@ -31,6 +31,7 @@ import { completeTask } from '../entities/task-executor.js';
 import { CROPS, WINTER_FEAST_CONFIG } from './config.js';
 import { syncEntityIdCounter, createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { PowerSystem } from '../systems/power.js';
+import { getTilePedestalStats, getMaxPedestalCharge } from '../systems/artifacts.js';
 import { ExplorationSystem } from '../systems/exploration.js';
 import { EXPEDITION_ENEMIES, NPC_ENCOUNTERS, REALMS, WORLD_SIZE_COLONY } from './config/exploration.js';
 import { ENTITIES } from './config/entities.js';
@@ -288,8 +289,7 @@ class Game {
         };
 
         this.manaCrystalBonus = 0;
-        this.hearthShrineBonus = 0;
-        this.hearthShrineMilestonesReached = new Set();
+        this.colonyMilestonesReached = new Set();
         this.discoveredLoot = new Set();
         this.stats = { raidsDefeated: 0, wavesCompleted: 0, expeditionsCompleted: 0, superiorItemsCrafted: 0, masterworkItemsCrafted: 0, itemsEnchanted: 0 };
 
@@ -913,9 +913,7 @@ class Game {
         }
         if (prof) prof.mark('power+tamed+auto+pedestals(%10)');
 
-        if (this.power.hasPower()) {
-            this.power.updateTurrets(this);
-        }
+        this.power.updateTurrets(this);
 
         this._buildOccupancySet();
         if (prof) prof.mark('turrets+occupancy');
@@ -1251,7 +1249,30 @@ class Game {
         if (!ALL_ITEMS[itemKey]?.pedestal) return;
         this.resources.removeItem(itemKey);
         tile.pedestalArtifact = itemKey;
+        tile.pedestalCharge = 0;
+        this.power.update(this);
         this.notifications.push({ text: `Placed ${ALL_ITEMS[itemKey].name} on pedestal`, tick: this.tick, type: 'success' });
+        this.ui.showTileInfo(tile, x, y);
+    }
+
+    // Sets a pedestal's overcharge level (index into PEDESTAL_CHARGE.levels),
+    // clamped to what the placed trinket allows.
+    setPedestalCharge(x, y, level) {
+        const tile = this.map[y][x];
+        if (tile.structure !== 'artifact_pedestal' || !tile.pedestalArtifact) return;
+        const pedestal = ALL_ITEMS[tile.pedestalArtifact]?.pedestal;
+        if (!pedestal) return;
+        tile.pedestalCharge = Math.max(0, Math.min(level | 0, getMaxPedestalCharge(pedestal)));
+        this.power.update(this);
+        this.ui.showTileInfo(tile, x, y);
+    }
+
+    // Overrides the power priority tier for the consumer at (x, y); null restores its default.
+    setPowerPriority(x, y, tier) {
+        const tile = this.map[y][x];
+        if (!tile.structure) return;
+        tile.powerPriority = POWER_PRIORITY.tiers.includes(tier) ? tier : undefined;
+        this.power.update(this);
         this.ui.showTileInfo(tile, x, y);
     }
 
@@ -1261,6 +1282,7 @@ class Game {
         const key = tile.pedestalArtifact;
         tile.pedestalArtifact = null;
         tile.pedestalInactive = false;
+        tile.pedestalCharge = 0;
         this.resources.addItem({ ...ALL_ITEMS[key], key });
         this.notifications.push({ text: `Retrieved ${ALL_ITEMS[key]?.name || key} from pedestal`, tick: this.tick, type: 'success' });
         this.ui.showTileInfo(tile, x, y);
@@ -1269,7 +1291,7 @@ class Game {
     fulfillTradeRiftRequest(x, y, requestId) {
         const tile = this.map[y][x];
         if (tile.structure !== 'trade_rift') return;
-        if (!this.power.hasPower()) {
+        if (!this.power.isPowered(x, y)) {
             this.notifications.push({ text: 'The Trade Rift is unpowered and has no mana to open the rift.', tick: this.tick, type: 'warning' });
             this.ui.updateArcanePanel();
             return;
@@ -4160,24 +4182,21 @@ function updatePedestals(game, structurePositions = game.mapIndex.getAllStructur
         const tile = game.map[y][x];
         const def = ALL_ITEMS[tile.pedestalArtifact];
         if (!def?.pedestal) continue;
-        const mana = def.pedestal.manaCost || 0;
-        if (mana > 0 && !game.power.hasPower()) {
-            tile.pedestalInactive = true;
-            continue;
-        }
-        tile.pedestalInactive = false;
+        // The power grid sets pedestalInactive each cycle from its priority allocation.
+        if (tile.pedestalInactive) continue;
+        const stats = getTilePedestalStats(tile);
         const auraLabel = { name: def.name, key: tile.pedestalArtifact, sourceType: 'pedestal', x, y };
-        if (def.pedestal.radius === 'global') {
+        if (stats.radius === 'global') {
             for (const c of game.colonists) {
                 if (c.hp > 0) c.activeAuras.push(auraLabel);
             }
             continue;
         }
-        const radius = def.pedestal.radius;
-        applyAuraToColonists(game, def.pedestal, radius, x, y, auraLabel);
-        if (def.pedestal.blightImmunity) applyBlightImmunity(game, radius, x, y);
-        if (def.pedestal.blightDamageReduction) applyBlightDamageReduction(game, def.pedestal.blightDamageReduction, radius, x, y);
-        if (def.pedestal.blightBloomDamage) applyBloomPedestalDamage(game, def.pedestal.blightBloomDamage, radius, x, y);
+        const radius = stats.radius;
+        applyAuraToColonists(game, stats, radius, x, y, auraLabel);
+        if (stats.blightImmunity) applyBlightImmunity(game, radius, x, y);
+        if (stats.blightDamageReduction) applyBlightDamageReduction(game, stats.blightDamageReduction, radius, x, y);
+        if (stats.blightBloomDamage) applyBloomPedestalDamage(game, stats.blightBloomDamage, radius, x, y);
     }
 
     for (const carrier of game.colonists) {
@@ -6355,7 +6374,7 @@ _onDOMReady(() => {
                 `Ritual core ruins: ${cores}`,
                 `Other ruins: ~${ruins}`,
                 `Major rivers: ${rivers}`,
-                `Max colonists: ${colony.capMax} (Hearth Shrines +${colony.shrineCapMultiplier} each)`,
+                `Max colonists: ${colony.capMax} (+${colony.capPerMilestone} per milestone)`,
             ];
             el.replaceChildren(...lines.map(text => {
                 const row = document.createElement('div');

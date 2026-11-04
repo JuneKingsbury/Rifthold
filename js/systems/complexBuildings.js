@@ -25,7 +25,7 @@ export function checkComplexStructures(game) {
     game.activeComplexStructures = active;
 }
 
-function patternMatches(map, cx, cy, layout) {
+export function patternMatches(map, cx, cy, layout) {
     // Check all required positions exist
     const requiredChalk = new Set();
     for (const cell of layout) {

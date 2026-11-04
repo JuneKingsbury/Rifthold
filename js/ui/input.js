@@ -1,4 +1,5 @@
 import { CONFIG, CROPS, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, BUILDINGS, PLANT_STRUCTURES, BUILD_CATEGORIES, DRAG_BUILD_TYPES, SPELLS, ALL_ITEMS, DEFAULT_KEYMAP, COMPLEX_STRUCTURES } from '../core/config.js';
+import { getTilePedestalStats } from '../systems/artifacts.js';
 import { designateBuild, designateChop, designateMine, cancelDesignation } from '../systems/building.js';
 import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { isPassable, isDraftBreakableWall, isDraftInteractable } from '../world/map.js';
@@ -1513,9 +1514,9 @@ export class InputHandler {
 
     _getRadiusHighlight(pos, tile, colonistsHere) {
         if (tile.structure === 'artifact_pedestal' && tile.pedestalArtifact) {
-            const def = ALL_ITEMS[tile.pedestalArtifact];
-            if (def?.pedestal?.radius && def.pedestal.radius !== 'global') {
-                return { x: pos.x, y: pos.y, radius: def.pedestal.radius, color: '#ccaa4466' };
+            const stats = getTilePedestalStats(tile);
+            if (stats?.radius && stats.radius !== 'global') {
+                return { x: pos.x, y: pos.y, radius: stats.radius, color: '#ccaa4466' };
             }
         }
         if (colonistsHere.length > 0) {

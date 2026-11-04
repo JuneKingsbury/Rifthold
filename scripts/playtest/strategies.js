@@ -457,11 +457,6 @@ class Strategy {
             const spare = g.power.totalGenerated - g.power.totalConsumed;
             const want = this.researched('arcane_infusion') ? (spare < 4 ? this.count('mana_crystal') + 1 : 0) : 2;
             if (this.count('mana_crystal') < Math.min(4 + (g.mana_crystalBonus || 0), Math.max(2, want))) this.build('mana_crystal');
-            // Hearth Shrine slots open with milestones; designateBuild enforces the cap.
-            const shrineSlots = BUILDINGS.hearth_shrine.maxCount + getMaxCountBonus(BUILDINGS.hearth_shrine, 'hearth_shrine', g);
-            if (this.count('hearth_shrine') < shrineSlots && this.alive().length >= g.waves.getColonistCap(g) && this.has(BUILDINGS.hearth_shrine.cost)) {
-                if (this.build('hearth_shrine')) this.api.milestone(`shrine_${this.count('hearth_shrine')}`);
-            }
         }
         if (this.researched('arcane_studies') && !this.count('scriptorium')) { const ok = this.build('scriptorium'); this.blockGoal('scriptorium(leather)', !ok && !this.count('scriptorium')); }
         if (this.researched('arcane_infusion') && !this.count('enchanting_table')) this.build('enchanting_table');

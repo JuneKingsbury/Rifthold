@@ -676,7 +676,7 @@ const TUTORIAL_STEPS = [
         id: 'expedition',
         levels: ['none', 'some'],
         title: 'Complete Your First Expedition',
-        description: 'Open Rifts [V], pick The Wild Frontiers, and add all of your armed colonists to the party before you launch. The panel rates a lone colonist as Dangerous. The party fights on its own and stops now and then for you to make a choice. Keep the difficulty low for your first run. If the whole party falls, you can send everyone out again.',
+        description: 'Open Rifts [V], pick The Wild Frontiers, and add all of your armed colonists to the party before you launch. The panel rates a lone colonist as Dangerous. The party fights on its own and stops now and then for you to make a choice. Keep the difficulty low for your first run. If the whole party falls, you can send everyone out again. Coming home safely from a new realm is a colony milestone and raises your colony population cap, like surviving Void Nexus waves and conquering realm chains. The Glossary (Settings, View Glossary, under Colonists & Needs) has the full list of milestones that raise the cap.',
         highlight: 'arcane',
         isComplete(game) { return (game.stats?.expeditionsCompleted || 0) >= 1; },
         goTo(game) { game.ui.toggleArcanePanel?.(); },
@@ -686,7 +686,7 @@ const TUTORIAL_STEPS = [
         id: 'colony_growth',
         levels: ['none', 'some'],
         title: 'Growing the Colony',
-        description: 'Your colony has room for 3 colonists. To make room for more, build Hearth Shrines (Build, Arcane tab, after Ley Channeling). Each shrine needs a free slot and 3 spare mana. Slots unlock as you reach milestones: surviving Void Nexus waves, venturing into new realms and conquering realm chains. With room to spare, wanderers who come by can join you.',
+        description: 'Your colony has room for 3 colonists. The cap rises as you reach milestones: surviving Void Nexus waves, venturing into new realms and conquering realm chains. The Rifts panel shows the next one. The Glossary (Settings, View Glossary, under Colonists & Needs) has the full list of milestones that raise the cap. With room to spare, wanderers who come by can join you.',
     }),
     manualStep({
         id: 'finish',

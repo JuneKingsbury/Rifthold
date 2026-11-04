@@ -12,7 +12,7 @@ const GDRIVE_LAST_SYNC_KEY = 'gdrive_last_sync_ts';
 // versions below 11 predate the ladder and are discarded one final time on load
 // (see _applyLoadData). From v11 onward, schema changes add a MIGRATIONS step and
 // bump SAVE_VERSION instead of invalidating saves.
-const SAVE_VERSION = 12;
+const SAVE_VERSION = 13;
 const SLOT_META_KEY = 'colony_slot_meta';
 const SLOT_AUTO_NEXT_KEY = 'colony_slot_auto_next';
 
@@ -402,8 +402,7 @@ function _buildSaveData(game) {
 
         stats: game.stats,
         manaCrystalBonus: game.manaCrystalBonus || 0,
-        hearthShrineBonus: game.hearthShrineBonus || 0,
-        hearthShrineMilestonesReached: [...(game.hearthShrineMilestonesReached || [])],
+        colonyMilestonesReached: [...(game.colonyMilestonesReached || [])],
         discoveredLoot: [...(game.discoveredLoot || [])],
 
         story: {
@@ -659,7 +658,31 @@ export async function saveGame(game) {
 const MIGRATIONS = {
     // v12 adds the ruin registry. Older maps keep their ruins as plain tiles.
     12: (d) => { d.ruins = d.ruins || []; },
+    // v13 removes Hearth Shrines: milestones raise the cap directly. Built
+    // shrines are cleared and their materials refunded.
+    13: (d) => {
+        d.colonyMilestonesReached = d.colonyMilestonesReached || d.hearthShrineMilestonesReached || [];
+        delete d.hearthShrineMilestonesReached;
+        delete d.hearthShrineBonus;
+        let removed = 0;
+        for (const row of d.map || []) {
+            for (const t of row) {
+                if (t?.s !== 'hearth_shrine') continue;
+                delete t.s;
+                delete t.shp;
+                delete t.pp;
+                removed++;
+            }
+        }
+        const stock = d.resources?.stockpile;
+        if (removed && stock) {
+            for (const [res, qty] of Object.entries(HEARTH_SHRINE_REFUND)) stock[res] = (stock[res] || 0) + qty * removed;
+        }
+    },
 };
+
+// Build cost of the removed Hearth Shrine, refunded per shrine by the v13 migration.
+const HEARTH_SHRINE_REFUND = { stone: 6, planks: 4, runite: 2 };
 
 // Walk `data` up the migration ladder to SAVE_VERSION, applying each step in
 // order. A missing step is a no-op (versions with no schema change). Returns the
@@ -902,8 +925,7 @@ function _applyValidatedData(game, data) {
         Object.assign(game.stats, data.stats);
     }
     game.manaCrystalBonus = data.manaCrystalBonus || 0;
-    game.hearthShrineBonus = data.hearthShrineBonus || 0;
-    game.hearthShrineMilestonesReached = new Set(data.hearthShrineMilestonesReached || []);
+    game.colonyMilestonesReached = new Set(data.colonyMilestonesReached || []);
     game.discoveredLoot = new Set(data.discoveredLoot || []);
 
     if (data.story) {
@@ -1194,6 +1216,8 @@ function serializeMap(map) {
             if (tile.zone) t.z = tile.zone;
             if (tile.snowCovered) t.sn = 1;
             if (tile.pedestalArtifact) t.pa = tile.pedestalArtifact;
+            if (tile.pedestalCharge) t.pc = tile.pedestalCharge;
+            if (tile.powerPriority) t.pp = tile.powerPriority;
             if (tile.biome) t.b = tile.biome;
             if (tile.sealed) t.sl = 1;
             row.push(t);
@@ -1223,6 +1247,8 @@ function deserializeMap(data) {
             tile.zone = t.z || null;
             tile.snowCovered = t.sn === 1;
             tile.pedestalArtifact = t.pa || null;
+            if (t.pc) tile.pedestalCharge = t.pc;
+            if (t.pp) tile.powerPriority = t.pp;
             if (t.b) tile.biome = t.b;
             if (t.sl === 1) tile.sealed = true;
             // Older saves carry ruin and crypt floors painted over tall_rock that
