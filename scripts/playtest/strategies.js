@@ -28,7 +28,7 @@ export const PROFILES = {
 };
 
 const COMPETENT_RESEARCH = [
-    'runecraft', 'metalworking', 'wayfinding', 'arcane_studies', 'ley_channeling', 'warrior_training',
+    'runecraft', 'metalworking', 'arcane_studies', 'ley_channeling', 'warrior_training',
     'alchemy', 'arcane_implements', 'runeforging', 'arcane_infusion', 'planar_rift', 'void_summoning',
     'textiles', 'auto_expedition', 'marksmanship', 'warding', 'irrigation', 'domestic_alchemy', 'herbalism',
     'fortification', 'luminance', 'arcane_conduits', 'advanced_arcana', 'void_forging', 'battle_brewing',
@@ -729,9 +729,9 @@ class Strategy {
         const g = this.g;
         const ex = g.exploration;
         if (g.combat.raidActive || g.waves.active || this.crypt?.phase === 'fight') return;
-        // Every launch needs a Gathering Circle, so build one as soon as Wayfinding allows.
+        // Every launch needs a Gathering Circle, so build one first.
         if (!ex.findGatheringSpot(g)) {
-            if (this.researched('wayfinding') && !g.taskQueue.tasks.some(t => t.type === 'build' && t.buildType === 'gathering_circle')) this.build('gathering_circle');
+            if (!g.taskQueue.tasks.some(t => t.type === 'build' && t.buildType === 'gathering_circle')) this.build('gathering_circle');
             return;
         }
         const manualOut = ex.expeditions.some(e => e.status !== 'complete' && !e.autoMode);
@@ -864,7 +864,6 @@ class Strategy {
             case 'bedroom_walls': case 'bedroom_door': case 'bedroom_bed': case 'bedroom':
                 if (!this._tutorialRoom) { if (this.buildBedroom()) this._tutorialRoom = true; else this.gather(['tree'], 10); }
                 break;
-            case 'wayfinding': g.research.selectResearch('wayfinding'); break;
             case 'expedition': {
                 const armed = this.homeColonists().filter(c => c.weapon && !c.drafted);
                 if (armed.length && g.exploration.canSend(g, 'wild_frontiers')) {

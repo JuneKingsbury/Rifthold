@@ -284,7 +284,7 @@ export const RESEARCH = {
     battle_brewing: { name: 'Battle Brewing', cost: 500, requires: ['domestic_alchemy', 'herbalism'], tab: 'foundations', description: 'Brew potions for expeditions, making it easier for your colonists to go further' },
 
     // Wildlife
-    beast_binding: { name: 'Beast Binding', cost: 280, requires: ['wayfinding'], tab: 'nature', description: 'Bind and pen creatures' },
+    beast_binding: { name: 'Beast Binding', cost: 280, requires: [], tab: 'nature', description: 'Bind and pen creatures' },
     pack_binding: { name: 'Pack Binding', cost: 350, requires: ['husbandry'], tab: 'nature', description: 'Each colonist can bond with up to two pets.' },
     husbandry: { name: 'Husbandry', cost: 350, requires: ['beast_binding'], tab: 'nature', description: 'Tamed animals produce 50% more resources' },
     wolf_mastery: { name: 'Wolf Mastery', cost: 350, requires: ['pack_binding'], tab: 'nature', description: 'Wolf tame chance +20%, tamed wolves deal +4 damage' },
@@ -325,8 +325,7 @@ export const RESEARCH = {
     void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
     void_architecture: { name: 'Void Architecture', cost: 400, requires: ['fortification'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
     void_forging: { name: 'Void Shaping', cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
-    wayfinding: { name: 'Wayfinding', cost: 80, requires: [], tab: 'rifts', description: 'Scout the wild lands beyond the colony. Send small scouting parties to forage and explore nearby wilderness.' },
-    planar_rift: { name: 'Planar Rifts', cost: 300, requires: ['arcane_infusion', 'wayfinding'], tab: 'rifts', description: 'Stabilize rifts so expeditions can launch from attuned rift anchors, which are found inside ancient crypts' },
+    planar_rift: { name: 'Planar Rifts', cost: 300, requires: ['arcane_infusion'], tab: 'rifts', description: 'Stabilize rifts so expeditions can launch from attuned rift anchors, which are found inside ancient crypts' },
     auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually', requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, },
     auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['auto_expedition'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
     auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions' },

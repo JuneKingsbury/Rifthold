@@ -135,7 +135,8 @@ export class PowerSystem {
             let cost = c.base;
             // Pedestals pay their trinket's full cost; relay discounts only cover buildings.
             if (!c.pedestal && poweredRelays.some(r => manhattanDist(c.x, c.y, r.x, r.y) <= r.radius)) {
-                cost = Math.max(1, cost - 1);
+                // Discount down to 1, but never raise a sub-1 cost (0.5-mana glowstones) up to it.
+                cost = Math.min(cost, Math.max(1, cost - 1));
             }
             const on = take(c, cost);
             if (c.pedestal) {
@@ -184,8 +185,9 @@ export class PowerSystem {
     }
 
     // Generation minus full demand; negative means some consumers are dark.
+    // Rounded to one decimal so fractional costs (0.5-mana glowstones) don't show float noise.
     getNetPower() {
-        return this.totalGenerated - this.totalConsumed;
+        return Math.round((this.totalGenerated - this.totalConsumed) * 10) / 10;
     }
 
     isTileWarmed(game, x, y) {

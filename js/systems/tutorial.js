@@ -188,16 +188,6 @@ function workPriorityPointer(game) {
     return { selector: `#priority-panel td[data-colonist-id="${colonist.id}"][data-skill="farming"]`, label: 'Click to change a priority' };
 }
 
-/** Research button -> Rifts tab -> the Wayfinding Select button. */
-function wayfindingPointer(game) {
-    const ui = game.ui;
-    if (!ui.researchPanelVisible) return modeBtn('research', 'Open Research');
-    if ((ui._researchTab || 'foundations') !== 'rifts') {
-        return { selector: '#research-panel [data-research-tab="rifts"]', label: 'Open the Rifts tab' };
-    }
-    return { selector: `#research-panel button[onclick*="selectResearch('wayfinding')"]`, label: 'Research Wayfinding' };
-}
-
 function closePriorityPointer(game) {
     if (!game.ui.priorityPanelVisible) return null;
     return { selector: '#priority-panel .panel-close[data-panel-close="priority"]', label: 'Close the menu' };
@@ -648,19 +638,6 @@ const TUTORIAL_STEPS = [
         pointer: buildPointer('bed', null),
     },
     {
-        id: 'wayfinding',
-        levels: ['none', 'some'],
-        title: 'Research Wayfinding',
-        stuckHelp: RESEARCH_STUCK_HELP,
-        description: 'Rifts lead to other lands. Open Research [R], switch to the Rifts tab, and research Wayfinding. It lets you send small scouting parties beyond the colony.',
-        highlight: 'research',
-        isComplete(game) { return game.research.isResearched('wayfinding'); },
-        goTo(game) { game.ui.toggleResearchPanel(); },
-        acted(game) { return game.research.activeResearch === 'wayfinding'; },
-        actedPointer: closeResearchPointer,
-        pointer: wayfindingPointer,
-    },
-    {
         id: 'gathering_circle',
         levels: ['none', 'some'],
         title: 'Build a Gathering Circle',
@@ -721,7 +698,7 @@ const VETERAN_GOALS = [
     },
     {
         id: 'v_gathering_circle',
-        title: 'Build a Gathering Circle (Arcane tab, after Wayfinding)',
+        title: 'Build a Gathering Circle (Arcane tab)',
         isComplete(game) { return buildCount(game, 'gathering_circle') > 0; },
     },
     {

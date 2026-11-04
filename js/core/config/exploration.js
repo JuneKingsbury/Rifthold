@@ -74,7 +74,6 @@ export const REALMS = {
         chain: 'scouting',
         chainOrder: 1,
         scoutingMode: true,
-        research: 'wayfinding',
         duration: [120, 240],
         encounters: 4,
         combatEncounters: [1, 2],

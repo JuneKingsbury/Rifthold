@@ -348,11 +348,12 @@ const arcaneMethods = {
 
         // A portal is a legacy Rift Gate or any attuned rift anchor.
         const hasPortal = hasGate || this.game.ruins.list.some(r => r.anchor?.attuned);
-        const hasWayfinding = this.game.research.isResearched('wayfinding');
-        if (!hasPortal && !hasWayfinding) {
+        // Every expedition, scouting included, gathers at and launches from the Gathering Circle.
+        const hasCircle = !!this.game.exploration.findGatheringSpot(this.game);
+        if (!hasPortal && !hasCircle) {
             html += `<div class="arcane-section" style="color:#888;padding:20px 0;text-align:center;">`;
-            html += `<div style="font-size:1.2em;color:#33ccff;margin-bottom:8px;">Wayfinding Required</div>`;
-            html += `<div>Research Wayfinding to send scouting parties into the wilderness.</div>`;
+            html += `<div style="font-size:1.2em;color:#33ccff;margin-bottom:8px;">Gathering Circle Required</div>`;
+            html += `<div>Build a <b>Gathering Circle</b> (Build, Arcane tab) to send scouting parties into the wilderness. Parties gather there, then teleport out together.</div>`;
             html += `<div style="margin-top:6px;color:#666;">Explore for treasure, rare items, and rare materials.</div>`;
             html += `</div>`;
             return html;
@@ -559,7 +560,6 @@ const arcaneMethods = {
         const canSendAuto = expl.canSendAuto(this.game);
         const canSendWatched = !watchedExp;
 
-        const hasCircle = !!expl.findGatheringSpot(this.game);
         if (dims.length > 0) {
             if (!hasCircle) {
                 html += `<div class="info-row" style="margin-top:8px;padding:6px 8px;background:#10202a;border:1px solid #1a4466;border-radius:4px;color:#88ddff;font-size:0.9em;">Build a <b>Gathering Circle</b> (Build, Arcane tab) to launch expeditions. Parties gather there, then teleport into the rift together.</div>`;
@@ -633,7 +633,7 @@ const arcaneMethods = {
             html += `<div class="info-row" style="color:#888;margin-top:8px;">No realms available yet</div>`;
         }
 
-        if (!hasPortal && hasWayfinding) {
+        if (!hasPortal) {
             const hint = this.game.ruins.hasAnchors()
                 ? 'Find an ancient crypt, breach it, and attune its <span style="color:#888;">rift anchor</span> to open expeditions to other realms.'
                 : 'Build a <span style="color:#888;">Rift Gate</span> to unlock expeditions to other realms.';
