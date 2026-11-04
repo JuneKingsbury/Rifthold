@@ -1503,8 +1503,8 @@ export class Renderer {
                     color = TILE_COLORS[`designation_${tile.designation.type}`] || '#ffff00';
                 }
 
-                // Update tile color if this tile has a Rift Gate and it is actively being used.
-                if ((tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active') && game.exploration && game.exploration.expeditions.length > 0) {
+                // Update tile color if this tile has a Rift Gate, anchor or Gathering Circle and it is actively being used.
+                if ((tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active' || tile.structure === 'gathering_circle') && game.exploration && game.exploration.expeditions.length > 0) {
                     color = game.tick % RENDER_CONFIG.riftPulsePeriod < RENDER_CONFIG.riftPulseDuty ? '#33ccff' : '#1a6688';
                 }
 

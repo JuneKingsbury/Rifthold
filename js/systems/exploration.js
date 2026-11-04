@@ -3,7 +3,7 @@ import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFI
     EXPEDITION_DECISIONS, PUZZLE_ENCOUNTERS, NPC_ENCOUNTERS,
     EXPEDITION_POTIONS, POTION_CARRY_CONFIG, EXPEDITION_MUTATORS,
     FATIGUE_CONFIG, STREAK_CONFIG, EXPEDITION_XP_CONFIG, ANIMAL_XP_CONFIG,
-    REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS, CRYPT_CONFIG,
+    REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS, CRYPT_CONFIG, COMBAT_VISUALS,
 } from '../core/config.js';
 import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit, addThought } from '../entities/colonist.js';
 import { checkHearthShrineMilestones } from '../entities/waves.js';
@@ -47,7 +47,7 @@ function expeditionCooldownFactor(member, spell) {
     const gearReduction = member.spellCooldownReduction || 0;
     return Math.max(0.1, (1 - reduction) * (1 - gearReduction));
 }
-import { findPathAdjacent, manhattanDist } from '../world/pathfinding.js';
+import { findPathAdjacent } from '../world/pathfinding.js';
 import { getTargetPriority } from '../ui/ui-utils.js';
 import { getSpellCooldownMult, getExpeditionLuckBonus } from './complexBuildings.js';
 
@@ -120,6 +120,7 @@ export class ExplorationSystem {
         if (dim.research && !game.research.isResearched(dim.research)) return false;
         if (!this._chainOpen(game, dim)) return false;
         if (dim.requiresEvent && !this._checkEvent(game, dim.requiresEvent)) return false;
+        if (!this.findGatheringSpot(game)) return false;
         if (dim.scoutingMode) return true;
         // Anchors skip the Rift Gate (which needed Planar Rifts to build), so the
         // research gate moves to the launch itself and early chains don't open on day one.
@@ -208,6 +209,8 @@ export class ExplorationSystem {
 
         let gatePos = dim.scoutingMode ? null : this.findLaunchPosition(game, dim);
         if (!dim.scoutingMode && !gatePos) return null;
+        const gatherPos = this.findGatheringSpot(game);
+        if (!gatherPos) return null;
 
         const packAnimals = [];
         for (const id of cappedPacks) {
@@ -261,14 +264,7 @@ export class ExplorationSystem {
             if (c.equipmentSets?.Expedition && c.activeSet !== 'Expedition') {
                 game.switchEquipmentSet(c.id, 'Expedition');
             }
-            if (gatePos) {
-                const path = findPathAdjacent(game.map, c.x, c.y, gatePos.x, gatePos.y, game._occupiedTiles);
-                if (path && path.length > 0) {
-                    c.path = path;
-                    c.state = 'moving';
-                    c._expeditionMove = true;
-                }
-            }
+            this._walkToGathering(game, c, gatherPos);
         }
 
         let duration = randInt(dim.duration[0], dim.duration[1]);
@@ -338,6 +334,7 @@ export class ExplorationSystem {
             warBeasts,
             partySnapshot: [],
             gatePos,
+            gatherPos,
             gatherStartTick: game.tick,
             consumedItems,
             enemyStatMults: computeEnemyStatMults(diffSettings, mutators, this.activeRealmEvents, realmKey),
@@ -352,8 +349,8 @@ export class ExplorationSystem {
             loot: {},
             defeated: [],
             log: packAnimals.length > 0
-                ? [{ tick: 0, text: `Party heading to the rift (${packAnimals.length} pack animal${packAnimals.length > 1 ? 's' : ''})`, type: 'info' }]
-                : [{ tick: 0, text: `Party heading to the rift`, type: 'info' }],
+                ? [{ tick: 0, text: `Party gathering at the circle (${packAnimals.length} pack animal${packAnimals.length > 1 ? 's' : ''})`, type: 'info' }]
+                : [{ tick: 0, text: `Party gathering at the circle`, type: 'info' }],
             combat: null,
             summons: [],
             lastMicroEventTick: 0,
@@ -404,6 +401,17 @@ export class ExplorationSystem {
         const anchor = game.ruins.getAnchor(dim.chain);
         if (anchor) return anchor.attuned ? { x: anchor.x, y: anchor.y } : null;
         return this._findRiftGatePosition(game);
+    }
+
+    /**
+     * The colony's Gathering Circle, where every party assembles before teleporting
+     * into the rift and where it reappears on return. Launching requires one.
+     *
+     * @param {object} game Game instance.
+     * @return {{x: number, y: number}|null} The circle's tile, or null if none is built.
+     */
+    findGatheringSpot(game) {
+        return game.mapIndex.findFirst('gathering_circle');
     }
 
     _findRiftGatePosition(game) {
@@ -1096,6 +1104,7 @@ export class ExplorationSystem {
         delete c.expeditionPending;
         const wasWalking = !!c._expeditionMove;
         delete c._expeditionMove;
+        delete c._gatherStranded;
         if (c.hp <= 0 || c.state === 'dead') return;
         if (wasWalking) {
             c.path = [];
@@ -1141,100 +1150,104 @@ export class ExplorationSystem {
         }
     }
 
+    // Send a gathering member toward the circle. Returns false when no path exists
+    // (walled off), in which case the member waits in place to be pulled in.
+    _walkToGathering(game, c, pos) {
+        if (this._isGathered(c, pos)) return true;
+        const path = findPathAdjacent(game.map, c.x, c.y, pos.x, pos.y, game._occupiedTiles);
+        if (!path || path.length === 0) return false;
+        c.path = path;
+        c.state = 'moving';
+        c._expeditionMove = true;
+        return true;
+    }
+
+    _isGathered(c, pos) {
+        const r = EXPLORATION_CONFIG.gatherRadius;
+        return Math.abs(c.x - pos.x) <= r && Math.abs(c.y - pos.y) <= r;
+    }
+
+    // The party walks to the Gathering Circle and waits there, then everyone
+    // teleports into the rift together. A member with no path, or still walking at
+    // the timeout, is pulled in from where they stand so no one is left behind.
+    // Expeditions saved mid-gather from before the circle existed depart at once.
     _updateGathering(exp, game) {
-        // Scouting expeditions have no gate. Colonists depart immediately.
-        if (!exp.gatePos) {
-            for (const id of exp.partyIds) {
-                const c = game.getColonist(id);
-                if (c && c.hp > 0 && !c.onExpedition) {
-                    c.hp = c.maxHp;
-                    if (c.maxMana) c.mana = c.maxMana;
-                    c.onExpedition = true;
-                    c.state = 'idle';
-                    c.path = [];
-                    delete c._expeditionMove;
-                    delete c.expeditionPending;
-                }
-            }
-            exp.status = 'exploring';
-            exp.startTick = game.tick;
-            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
-            exp.partySnapshot = this._buildPartySnapshot(exp, game);
-            this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
-            game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
-            return;
-        }
-        const gx = exp.gatePos.x;
-        const gy = exp.gatePos.y;
+        const pos = exp.gatherPos;
         if (exp.gatherStartTick == null) exp.gatherStartTick = game.tick;
-        // Members who can't reach the gate (walled off, path blocked) would hold the
-        // party here forever. After the timeout the party leaves without them.
-        const timedOut = game.tick - exp.gatherStartTick >= EXPLORATION_CONFIG.gatherTimeoutTicks;
-        let allArrived = true;
+        const timedOut = !pos || game.tick - exp.gatherStartTick >= EXPLORATION_CONFIG.gatherTimeoutTicks;
+        let allReady = true;
 
         for (const id of [...exp.partyIds]) {
             const c = game.getColonist(id);
             if (!c || c.hp <= 0) {
-                // Colonist died or was removed during gathering. Drop them from the
+                // Colonist died or was removed before departure. Drop them from the
                 // party and clear the pending flag so they aren't permanently locked
                 // out of future tasks.
                 if (c) { c.onExpedition = false; this._dropGatheringMember(exp, game, c); }
                 else exp.partyIds = exp.partyIds.filter(pid => pid !== id);
                 continue;
             }
-            if (c.onExpedition) continue;
-
-            const dist = manhattanDist(c.x, c.y, gx, gy);
-            if (dist <= 1) {
-                c.onExpedition = true;
-                c.state = 'idle';
-                c.path = [];
-                delete c._expeditionMove;
-                delete c.expeditionPending;
-            } else if (timedOut) {
-                this._addLog(exp, game, `${c.name} couldn't reach the rift and stays behind.`, 'danger');
-                this._dropGatheringMember(exp, game, c);
-            } else {
-                allArrived = false;
-                if (c.state === 'idle' || (c.state === 'moving' && (!c.path || c.path.length === 0))) {
-                    const path = findPathAdjacent(game.map, c.x, c.y, gx, gy, game._occupiedTiles);
-                    if (path && path.length > 0) {
-                        c.path = path;
-                        c.state = 'moving';
-                        c._expeditionMove = true;
-                    }
+            if (c.onExpedition || timedOut || c._gatherStranded) continue;
+            if (this._isGathered(c, pos)) {
+                if (c._expeditionMove) {
+                    c.path = [];
+                    c.state = 'idle';
+                    delete c._expeditionMove;
                 }
+                continue;
             }
+            if (c.state === 'idle' || (c.state === 'moving' && (!c.path || c.path.length === 0))) {
+                if (!this._walkToGathering(game, c, pos)) { c._gatherStranded = true; continue; }
+            }
+            allReady = false;
         }
 
         if (exp.partyIds.length === 0) {
-            this._cancelGathering(exp, game, 'no one reached the rift');
+            this._cancelGathering(exp, game, 'no one survived to depart');
             return;
         }
+        if (!allReady && !timedOut) return;
 
-        if (allArrived) {
-            // Heal at departure rather than on arrival, so a cancelled gathering
-            // can't be used as a free full heal.
-            for (const id of exp.partyIds) {
-                const c = game.getColonist(id);
-                if (!c) continue;
-                c.hp = c.maxHp;
-                if (c.maxMana) c.mana = c.maxMana;
-            }
-            exp.status = 'exploring';
-            exp.startTick = game.tick;
-            exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
-            exp.partySnapshot = this._buildPartySnapshot(exp, game);
-            this._addLog(exp, game, `Party entered ${REALMS[exp.realm].name}`, 'info');
-            game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
-            exp.lastMicroEventTick = game.tick;
-            // Consume void whisper rare loot bonus if one was promised.
-            if (game._voidWhisperNextExpRareMult) {
-                if (!exp.potionLootBoosts) exp.potionLootBoosts = { lootMult: 1, rareEncounterMult: 1 };
-                exp.potionLootBoosts.rareEncounterMult = (exp.potionLootBoosts.rareEncounterMult || 1) * game._voidWhisperNextExpRareMult;
-                game._voidWhisperNextExpRareMult = null;
-            }
+        for (const id of exp.partyIds) {
+            const c = game.getColonist(id);
+            if (!c || c.onExpedition) continue;
+            game.combatEffects.push({ x: c.x, y: c.y, char: COMBAT_VISUALS.spellTeleportChar, color: COMBAT_VISUALS.spellTeleportColor, ttl: 3 });
+            c.onExpedition = true;
+            c.state = 'idle';
+            c.path = [];
+            delete c._expeditionMove;
+            delete c._gatherStranded;
+            delete c.expeditionPending;
         }
+        if (pos) window.soundManager?.playSFXAt('spell_teleport', pos.x, pos.y);
+
+        // Heal at departure rather than at launch, so a cancelled gathering
+        // can't be used as a free full heal.
+        for (const id of exp.partyIds) {
+            const c = game.getColonist(id);
+            if (!c) continue;
+            c.hp = c.maxHp;
+            if (c.maxMana) c.mana = c.maxMana;
+        }
+        exp.status = 'exploring';
+        exp.startTick = game.tick;
+        exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
+        exp.partySnapshot = this._buildPartySnapshot(exp, game);
+        this._addLog(exp, game, `Party teleported into ${REALMS[exp.realm].name}`, 'info');
+        game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
+        exp.lastMicroEventTick = game.tick;
+        // Consume void whisper rare loot bonus if one was promised.
+        if (game._voidWhisperNextExpRareMult) {
+            if (!exp.potionLootBoosts) exp.potionLootBoosts = { lootMult: 1, rareEncounterMult: 1 };
+            exp.potionLootBoosts.rareEncounterMult = (exp.potionLootBoosts.rareEncounterMult || 1) * game._voidWhisperNextExpRareMult;
+            game._voidWhisperNextExpRareMult = null;
+        }
+    }
+
+    // Where a returning party reappears: the Gathering Circle, or the launch anchor
+    // if the circle was torn down while they were away. Null keeps them in place.
+    _returnPos(exp, game) {
+        return this.findGatheringSpot(game) || exp.gatePos || null;
     }
 
     _generateEncounters(dim, diffSettings, mutators = [], realmKey = '') {
@@ -2935,8 +2948,9 @@ export class ExplorationSystem {
             if (game.stats) game.stats.expeditionsCompleted++;
             checkHearthShrineMilestones(game);
         }
-        const gx = exp.gatePos ? exp.gatePos.x : null;
-        const gy = exp.gatePos ? exp.gatePos.y : null;
+        const returnPos = this._returnPos(exp, game);
+        const gx = returnPos ? returnPos.x : null;
+        const gy = returnPos ? returnPos.y : null;
 
         const fatigueTicks = this._calculateFatigueCooldown(exp);
         for (const snapshot of exp.partySnapshot) {
@@ -2949,7 +2963,7 @@ export class ExplorationSystem {
             if (colonist.equipmentSets?.Colony && colonist.activeSet !== 'Colony') {
                 game.switchEquipmentSet(colonist.id, 'Colony');
             }
-            // Only reposition to gate if one exists (scouting expeditions have none).
+            // Reappear at the Gathering Circle (or the anchor if it's gone).
             if (gx !== null && gy !== null) {
                 colonist.x = gx;
                 colonist.y = gy;
@@ -3091,9 +3105,10 @@ export class ExplorationSystem {
         for (const itemKey of items) {
             game.resources.addItem({ ...ALL_ITEMS[itemKey], key: itemKey });
         }
-        if (exp.gatePos) {
+        const lootPos = this._returnPos(exp, game);
+        if (lootPos) {
             for (const [res, amt] of Object.entries(lootResources)) {
-                game.overlays.push({ type: 'floating_text', x: exp.gatePos.x, y: exp.gatePos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
+                game.overlays.push({ type: 'floating_text', x: lootPos.x, y: lootPos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
             }
         }
         if (game.discoveredLoot) {

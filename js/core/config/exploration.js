@@ -1392,9 +1392,11 @@ export const EXPLORATION_CONFIG = {
     // COLONIST_CONFIG.baseAttackCooldown). Status durations, DoTs, boss/elite
     // ability rolls, chaos ticks and "per round" regen advance once per round.
     combatRoundTicks: 3,
-    // A gathering party leaves without members who haven't reached the rift
-    // after this long (one in-game day), and is called off if no one has.
-    gatherTimeoutTicks: 480,
+    // Party members gather within this many tiles (Chebyshev) of the Gathering
+    // Circle. After the timeout (half an in-game day), anyone still walking is
+    // pulled into the rift from where they stand.
+    gatherRadius: 2,
+    gatherTimeoutTicks: 240,
     // Finished expeditions keep at most this many log lines, and at most this
     // many uncollected "Expeditions Returned" summaries are kept.
     completedLogCap: 300,

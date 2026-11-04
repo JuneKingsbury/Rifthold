@@ -661,13 +661,17 @@ export class Stage {
         // Crystals placed during prepare haven't been counted yet (power updates on a tick cadence).
         this.game.power.update(this.game);
         for (const c of cols) this.draft(c, false);
+        // The party gathers at and departs from the gate tile, whatever the map holds.
         const origFind = expl.findLaunchPosition;
+        const origSpot = expl.findGatheringSpot;
         expl.findLaunchPosition = () => ({ x: gate.x, y: gate.y });
+        expl.findGatheringSpot = () => ({ x: gate.x, y: gate.y });
         let exp;
         try {
             exp = expl.sendExpedition(this.game, realm, cols.map(c => c.id), [], difficulty, {});
         } finally {
             expl.findLaunchPosition = origFind;
+            expl.findGatheringSpot = origSpot;
         }
         return exp;
     }

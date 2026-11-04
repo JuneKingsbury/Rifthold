@@ -661,6 +661,18 @@ const TUTORIAL_STEPS = [
         pointer: wayfindingPointer,
     },
     {
+        id: 'gathering_circle',
+        levels: ['none', 'some'],
+        title: 'Build a Gathering Circle',
+        description: 'Expedition parties gather at a Gathering Circle, then teleport into an expedition together, and come back to it when they return. Order one from the Build menu\'s Arcane tab. Every expedition needs one, scouting included.',
+        highlight: 'build',
+        cost: BUILDINGS.gathering_circle.cost,
+        isComplete(game) { return buildCount(game, 'gathering_circle') > 0; },
+        goTo(game) { openBuild(game, 'gathering_circle'); },
+        acted(game) { return queuedBuild(game, 'gathering_circle'); },
+        pointer: buildPointer('gathering_circle', [1, 1]),
+    },
+    {
         id: 'expedition',
         levels: ['none', 'some'],
         title: 'Complete Your First Expedition',
@@ -706,6 +718,11 @@ const VETERAN_GOALS = [
         id: 'v_bedroom',
         title: 'Build a valid bedroom',
         isComplete(game) { return Object.keys(game.roomQualities).length > 0; },
+    },
+    {
+        id: 'v_gathering_circle',
+        title: 'Build a Gathering Circle (Arcane tab, after Wayfinding)',
+        isComplete(game) { return buildCount(game, 'gathering_circle') > 0; },
     },
     {
         id: 'v_expedition',

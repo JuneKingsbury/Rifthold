@@ -559,7 +559,11 @@ const arcaneMethods = {
         const canSendAuto = expl.canSendAuto(this.game);
         const canSendWatched = !watchedExp;
 
+        const hasCircle = !!expl.findGatheringSpot(this.game);
         if (dims.length > 0) {
+            if (!hasCircle) {
+                html += `<div class="info-row" style="margin-top:8px;padding:6px 8px;background:#10202a;border:1px solid #1a4466;border-radius:4px;color:#88ddff;font-size:0.9em;">Build a <b>Gathering Circle</b> (Build, Arcane tab) to launch expeditions. Parties gather there, then teleport into the rift together.</div>`;
+            }
             html += `<div class="info-row" style="margin-top:8px;font-weight:bold;color:#33ccff;">Send Expedition:</div>`;
             const allRealms = Object.entries(REALMS).map(([k, r], i) => ({ key: k, ...r, _defIdx: i }));
             const chains = [...new Set(allRealms.map(r => r.chain))];
@@ -620,6 +624,8 @@ const arcaneMethods = {
                     } else if (realm.requiresRealm && !expl.completedRealms.has(realm.requiresRealm) && (!realm.research || this.game.research.isResearched(realm.research))) {
                         const reqName = escapeHtml(REALMS[realm.requiresRealm]?.name || realm.requiresRealm);
                         html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.5;"><span style="color:#666;padding:6px 12px;display:inline-block;">${escapeHtml(realm.name)} - complete ${reqName} to unlock</span></div>`;
+                    } else if (available && !hasCircle) {
+                        html += `<div class="info-actions" style="${indent}border-left-color:#333;opacity:0.6;"><span style="color:#666;padding:6px 12px;display:inline-block;">${escapeHtml(realm.name)} - <span style="color:#888;">requires Gathering Circle</span></span></div>`;
                     }
                 }
             }

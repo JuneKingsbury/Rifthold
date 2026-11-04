@@ -1529,7 +1529,9 @@ export class UI {
         this._riftPortalChain = tile.structure === 'rift_anchor_active'
             ? (this.game.ruins.getRuinAt(x, y)?.anchor?.chain || null)
             : null;
-        return tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active';
+        this._riftPortalTitle = tile.structure === 'gathering_circle' ? 'Gathering Circle'
+            : this._riftPortalChain ? 'Rift Anchor' : 'Rift Gate';
+        return tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active' || tile.structure === 'gathering_circle';
     }
 
     _buildRiftGateHtml() {
@@ -1538,7 +1540,7 @@ export class UI {
 
     _buildRiftGateInnerHtml() {
         const expl = this.game.exploration;
-        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalChain ? 'Rift Anchor' : 'Rift Gate'}</div>`;
+        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalTitle || 'Rift Gate'}</div>`;
 
         const watchedExps = expl.expeditions.filter(e => !e.autoMode);
         const autoRunning = expl.expeditions.filter(e => e.autoMode).length;
@@ -2686,7 +2688,7 @@ export class UI {
 
     _buildRiftGateInfoHtml() {
         let html = '';
-        html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalChain ? 'Rift Anchor' : 'Rift Gate'}</div>`;
+        html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalTitle || 'Rift Gate'}</div>`;
         const expl = this.game.exploration;
         const watchedExp = expl.expeditions.find(e => !e.autoMode);
         const autoCount = expl.expeditions.filter(e => e.autoMode).length;
@@ -2907,7 +2909,7 @@ export class UI {
             html += this._buildPedestalInfoHtml(tile, x, y);
         }
 
-        if (tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active') {
+        if (tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active' || tile.structure === 'gathering_circle') {
             html += this._buildRiftGateInfoHtml();
         }
         html += this._buildCryptInfoHtml(tile, x, y);
@@ -3210,7 +3212,7 @@ export class UI {
             html += this._buildPedestalInfoHtml(tile, x, y);
         }
 
-        if (tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active') {
+        if (tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active' || tile.structure === 'gathering_circle') {
             html += this._buildRiftGateInfoHtml();
         }
         html += this._buildCryptInfoHtml(tile, x, y);

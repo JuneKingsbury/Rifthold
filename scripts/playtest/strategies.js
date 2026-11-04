@@ -734,6 +734,11 @@ class Strategy {
         const g = this.g;
         const ex = g.exploration;
         if (g.combat.raidActive || g.waves.active || this.crypt?.phase === 'fight') return;
+        // Every launch needs a Gathering Circle, so build one as soon as Wayfinding allows.
+        if (!ex.findGatheringSpot(g)) {
+            if (this.researched('wayfinding') && !g.taskQueue.tasks.some(t => t.type === 'build' && t.buildType === 'gathering_circle')) this.build('gathering_circle');
+            return;
+        }
         const manualOut = ex.expeditions.some(e => e.status !== 'complete' && !e.autoMode);
         const realms = ex.getAvailableRealms(g).filter(r => ex.canSend(g, r.key));
         const fresh = realms.filter(r => !ex.completedRealms.has(r.key)).sort((a, b) => (a.difficulty - b.difficulty) || ((a.chainOrder || 0) - (b.chainOrder || 0)));
@@ -833,6 +838,10 @@ class Strategy {
             case 'select_colonist': g.selectedColonist = cs[0]; g.selectedColonists = [cs[0]]; g.ui.showColonistInfo(cs[0]); break;
             case 'farm': this.plantFarm(4, 3, 'wheat'); break;
             case 'gather': this.gather(['tree'], 9); break;
+            case 'gathering_circle': {
+                if (!this.build(id)) { if (!this.has({ stone: BUILDINGS[id].cost.stone })) this.gather(['stone'], 4); else this.gather(['tree'], 6); }
+                break;
+            }
             case 'workbench': case 'cooking_pot': case 'research_desk': {
                 if (!this.build(id)) this.gather(['tree'], 6) || this.gather(['stone'], 4);
                 break;
