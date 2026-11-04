@@ -1765,6 +1765,12 @@ class Game {
         this.ui._tradeStep = 1;
         this.ui._tradeDirty = true;
         window.soundManager?.playSFXPitched('open_close_click', 3);
+        // Bartering takes a while, so pause regardless of autoPauseCaravan.
+        // dismissTrader() resumes via _unpauseFromEvent().
+        if (!this.paused) {
+            this.togglePause(true);
+            this._eventPaused = true;
+        }
     }
 
     tradeOffer(resource, amount) {
