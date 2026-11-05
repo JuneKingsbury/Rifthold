@@ -233,7 +233,8 @@ export function createGolem(type, x, y) {
         magicSkills: Object.fromEntries(Object.keys(MAGIC_SKILLS).map(k => [k, { level: 0, xp: 0 }])),
         magicBias: null, traits: def.traits || [],
         nameColor: def.color,
-        priorities: Object.fromEntries(Object.keys(SKILLS).map(k => [k, k === def.specialty ? 1 : 5])),
+        // Non-specialty skills are disabled (0) so golems only ever take their specialty work.
+        priorities: Object.fromEntries(Object.keys(SKILLS).map(k => [k, k === def.specialty ? 1 : 0])),
         needs: { hunger: 100, rest: 100 },
         mood: 60,
         thoughts: [],

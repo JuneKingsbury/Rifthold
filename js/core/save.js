@@ -1,4 +1,4 @@
-import { CONFIG, ENTITIES, WILDLIFE_CONFIG, PATHFINDING_CONFIG, RESEARCH, TERRAIN } from './config.js';
+import { CONFIG, ENTITIES, WILDLIFE_CONFIG, PATHFINDING_CONFIG, RESEARCH, TERRAIN, GOLEM_TYPES } from './config.js';
 import { createTile } from '../world/map.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
@@ -820,6 +820,13 @@ function _applyValidatedData(game, data) {
     for (const c of game.colonists) {
         // The pyromaniac trait was removed along with map fires.
         if (Array.isArray(c.traits)) c.traits = c.traits.filter(t => t !== 'pyromaniac');
+        // Golems used to default non-specialty work to 5; they now only do their specialty.
+        if (c.golem && c.priorities) {
+            const specialty = GOLEM_TYPES[c.golemType]?.specialty;
+            for (const skill of Object.keys(c.priorities)) {
+                if (skill !== specialty) c.priorities[skill] = 0;
+            }
+        }
         _restoreTransient(c, TRANSIENT_COLONIST_DEFAULTS);
         recalcMaxMana(c);
         invalidateEquipStatCache(c);
