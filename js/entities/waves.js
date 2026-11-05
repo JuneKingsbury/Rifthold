@@ -6,6 +6,7 @@ import { moveEntity } from '../systems/movement-lerp.js';
 import { createWaveEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 import { attackStructure, getColonistTargetPriority, tickHostileStatusEffects } from './combat.js';
+import { haptic } from '../ui/ui-utils.js';
 
 // Evaluates all unearned colony milestones against the current game state.
 // Each newly satisfied milestone raises the colonist cap (see getColonistCap).
@@ -150,6 +151,7 @@ export class WaveSystem {
         game.eventLog.add(game, `Wave ${this.currentWave} started. ${this.enemiesToSpawn} enemies incoming!`, 'danger', { type: 'position', ...nexus });
         game.overlays.push({ type: 'screenFlash', color: COMBAT_VISUALS.waveAlertColor, alpha: 0.2, ttl: COMBAT_VISUALS.waveAlertTtl });
         window.soundManager?.playSFX('wave_alert');
+        haptic([80, 60, 80]);
 
         if (game.settings.autoPauseHostile && !game.paused) {
             game.togglePause();

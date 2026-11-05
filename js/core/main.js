@@ -96,8 +96,47 @@ function _setFullscreen(enabled) {
 }
 
 const _isMobileApp = !!window.Capacitor?.isNativePlatform();
+// Starting map font size (px) on narrow touch screens. 13 gives about 15px tiles.
+const TOUCH_START_ZOOM_FONT = 13;
 // Default interface text scale on touch screens, where 12px text is hard to read and hit.
 const TOUCH_UI_FONT_SCALE = 1.15;
+// First-run defaults on phones (app or browser): half the frames for battery and heat, larger
+// interface text, and lighter effects. The barrel warp is a full-screen filter on every
+// frame, so it starts off. The scanlines are cheap and stay on.
+const TOUCH_FIRST_RUN_SETTINGS = {
+    fpsCap: 30,
+    uiFontScale: TOUCH_UI_FONT_SCALE,
+    particleDensity: 50,
+    showCrtWarp: false,
+    largeClickTargets: true,
+};
+// Touch screens no taller than this (px) are phones held sideways. Auto layout gives them
+// the tabbed phone layout, since the desktop layout leaves the map a thin strip.
+const PHONE_LANDSCAPE_MAX_HEIGHT = 500;
+
+// Whether Layout mode: Auto should use the tabbed (phone) layout right now.
+function _autoWantsTabbed() {
+    return window.innerWidth <= 768 || (isTouchUI() && window.innerHeight <= PHONE_LANDSCAPE_MAX_HEIGHT);
+}
+
+// The stylesheet's phone rules are (max-width: 768px) media queries, which a phone held
+// sideways is too wide for. Auto mode gives those screens the same rules through the
+// Layout mode: Tabbed class instead.
+function _syncAutoTabbedClass(mode) {
+    if (mode !== 'auto') return;
+    document.body.classList.toggle('force-tabbed', window.innerWidth > 768 && _autoWantsTabbed());
+}
+
+// The start screen's settings form, set to the phone defaults above.
+function _applyTouchStartScreenDefaults() {
+    document.getElementById('start-fps-cap').checked = true;
+    document.getElementById('start-ui-font-size').value = TOUCH_UI_FONT_SCALE;
+    document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(TOUCH_UI_FONT_SCALE);
+    document.getElementById('start-particle-density').value = TOUCH_FIRST_RUN_SETTINGS.particleDensity;
+    document.getElementById('start-particle-density-val').textContent = `${TOUCH_FIRST_RUN_SETTINGS.particleDensity}%`;
+    document.getElementById('start-crt-warp').checked = false;
+    document.getElementById('start-large-clicks').checked = true;
+}
 // Leaving the app saves at most this often (ms), so flipping between apps doesn't re-save every time.
 const BACKGROUND_SAVE_MIN_MS = 15000;
 if (_isMobileApp) {
@@ -207,6 +246,7 @@ class Game {
             showCrtScanlines: true,
             showCrtWarp: true,
             keepScreenAwake: false,
+            haptics: true,
         };
         try {
             const saved = JSON.parse(localStorage.getItem('colony_settings'));
@@ -218,16 +258,7 @@ class Game {
                 }
                 Object.assign(this.settings, saved);
             }
-            if (_isMobileApp && !saved) {
-                this.settings.particleDensity = 50;
-                this.settings.showCrtScanlines = false;
-                this.settings.showCrtWarp = false;
-            }
-            if ((_isMobileApp || isTouchUI()) && !saved) {
-                // Phones: half the frames for battery and heat, and larger interface text.
-                this.settings.fpsCap = 30;
-                this.settings.uiFontScale = TOUCH_UI_FONT_SCALE;
-            }
+            if ((_isMobileApp || isTouchUI()) && !saved) Object.assign(this.settings, TOUCH_FIRST_RUN_SETTINGS);
         } catch (e) {}
         this._fpsFrames = 0;
         this._fpsLastTime = 0;
@@ -535,8 +566,9 @@ class Game {
         body.classList.remove('force-tabbed', 'force-separate');
         if (mode === 'tabbed') body.classList.add('force-tabbed');
         else if (mode === 'separate') body.classList.add('force-separate');
+        _syncAutoTabbedClass(mode);
 
-        const shouldTab = mode === 'tabbed' || (mode === 'auto' && window.innerWidth <= 768);
+        const shouldTab = mode === 'tabbed' || (mode === 'auto' && _autoWantsTabbed());
         const footer = document.getElementById('game-footer');
         const isTabbed = footer && footer.classList.contains('tabbed');
         if (shouldTab && !isTabbed) setFooterMode(true);
@@ -3820,15 +3852,12 @@ class Game {
             showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, showActionAnimations: true, showTreeSway: true, showTerrainDetail: true, showExpeditionExtras: true, reduceMotion: false, layoutMode: 'auto',
             musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
             ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true, showTutorialArrows: true,
-            enableFullscreen: false, keepScreenAwake: false,
+            enableFullscreen: false, keepScreenAwake: false, haptics: true,
         });
         this.settings.keyBindings = keep;
         this.settings.craftTargets = craftTargets;
         this.settings.potionAutoUse = potionAutoUse;
-        if (_isMobileApp || isTouchUI()) {
-            this.settings.fpsCap = 30;
-            this.settings.uiFontScale = TOUCH_UI_FONT_SCALE;
-        }
+        if (_isMobileApp || isTouchUI()) Object.assign(this.settings, TOUCH_FIRST_RUN_SETTINGS);
         this._syncWakeLock();
         this.saveSettingsToStorage();
         // Re-apply live effects that have side effects beyond the settings object.
@@ -3836,7 +3865,7 @@ class Game {
         window.setUIFontScale?.(this.settings.uiFontScale);
         if (window.soundManager) { window.soundManager.setMusicVolume(50); window.soundManager.setSFXVolume(50); }
         document.getElementById('game')?.classList.toggle('paused', this.paused && this.settings.darkenOnPause);
-        document.getElementById('game-container')?.classList.toggle('large-targets', false);
+        document.getElementById('game-container')?.classList.toggle('large-targets', !!this.settings.largeClickTargets);
         document.getElementById('game-container')?.setAttribute('data-colorblind', 'none');
         const mm = document.getElementById('minimap-container'); if (mm) mm.style.display = '';
         const tb = document.getElementById('touch-toolbar'); if (tb) tb.style.display = '';
@@ -4409,8 +4438,9 @@ function fitGameFont() {
 
     if (currentZoomFont === null) {
         const layoutMode = window.game?.settings?.layoutMode || 'auto';
-        const isSmall = layoutMode === 'tabbed' || (layoutMode === 'auto' && window.innerWidth <= 768);
-        currentZoomFont = isSmall ? 8 : 14;
+        const isSmall = layoutMode === 'tabbed' || (layoutMode === 'auto' && _autoWantsTabbed());
+        // Narrow touch screens start closer in, so colonists are big enough to tap.
+        currentZoomFont = isSmall ? (isTouchUI() ? TOUCH_START_ZOOM_FONT : 8) : 14;
     }
 
     const fontSize = Math.max(MIN_FONT, Math.min(MAX_FONT, currentZoomFont));
@@ -4518,7 +4548,7 @@ function initFooterTabs() {
     const infoPanel = document.getElementById('info-panel');
     const footerContent = document.getElementById('footer-content');
 
-    if (window.innerWidth <= 768) {
+    if (_autoWantsTabbed()) {
         footer.classList.add('tabbed');
         container.classList.add('tabbed-mode');
         footerContent.insertBefore(infoPanel, footerContent.firstChild);
@@ -4531,7 +4561,7 @@ function initFooterTabs() {
     footer.addEventListener('transitionend', () => fitGameFont());
 
     footer.addEventListener('click', (e) => {
-        const isTabbed = footer.classList.contains('tabbed') || window.innerWidth <= 768;
+        const isTabbed = footer.classList.contains('tabbed') || _autoWantsTabbed();
         if (e.target.closest('[data-footer-size]')) {
             if (!isTabbed) return;
             if (footer.classList.contains('collapsed')) {
@@ -4599,6 +4629,8 @@ function setFooterMode(tabbed) {
 
     if (tabbed) {
         if (!footer.classList.contains('tabbed')) footer.classList.add('collapsed');
+        // A width left over from dragging the desktop info panel would fight the phone grid.
+        container.style.gridTemplateColumns = '';
         footer.classList.add('tabbed');
         container.classList.add('tabbed-mode');
         footerContent.insertBefore(infoPanel, footerContent.firstChild);
@@ -6067,6 +6099,7 @@ _onDOMReady(() => {
             s.darkenOnPause = document.getElementById('start-darken-pause').checked;
             s.toolbarMode = document.getElementById('start-toolbar-mode').value;
             s.largeClickTargets = document.getElementById('start-large-clicks').checked;
+            s.haptics = document.getElementById('start-haptics').checked;
             s.pauseOnFocusLoss = document.getElementById('start-pause-focus').checked;
             s.colorblindMode = document.getElementById('start-colorblind').value;
             s.notificationDuration = parseInt(document.getElementById('start-notif-dur').value) || 100;
@@ -6099,11 +6132,7 @@ _onDOMReady(() => {
             const s = JSON.parse(localStorage.getItem('colony_settings'));
             if (!s) {
                 // First run on a phone: match the Game defaults for touch screens.
-                if (_isMobileApp || isTouchUI()) {
-                    document.getElementById('start-fps-cap').checked = true;
-                    document.getElementById('start-ui-font-size').value = TOUCH_UI_FONT_SCALE;
-                    document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(TOUCH_UI_FONT_SCALE);
-                }
+                if (_isMobileApp || isTouchUI()) _applyTouchStartScreenDefaults();
                 return;
             }
             if (s.autoPauseHostile != null) document.getElementById('start-autopause-hostile').checked = s.autoPauseHostile;
@@ -6146,6 +6175,7 @@ _onDOMReady(() => {
             if (s.darkenOnPause != null) document.getElementById('start-darken-pause').checked = s.darkenOnPause;
             if (s.toolbarMode != null) document.getElementById('start-toolbar-mode').value = s.toolbarMode;
             if (s.largeClickTargets != null) document.getElementById('start-large-clicks').checked = s.largeClickTargets;
+            if (s.haptics != null) document.getElementById('start-haptics').checked = s.haptics;
             if (s.pauseOnFocusLoss != null) document.getElementById('start-pause-focus').checked = s.pauseOnFocusLoss;
             if (s.colorblindMode != null) document.getElementById('start-colorblind').value = s.colorblindMode;
             if (s.notificationDuration != null) document.getElementById('start-notif-dur').value = s.notificationDuration;
@@ -6287,6 +6317,8 @@ _onDOMReady(() => {
         document.getElementById('start-colorblind').value = 'none';
         document.getElementById('start-notif-dur').value = '100';
         document.getElementById('start-layout-mode').value = 'auto';
+        document.getElementById('start-haptics').checked = true;
+        if (_isMobileApp || isTouchUI()) _applyTouchStartScreenDefaults();
         document.getElementById('start-temp-unit').value = 'F';
         document.getElementById('start-music-vol').value = 50;
         document.getElementById('start-music-vol-val').textContent = '50';
@@ -6328,7 +6360,9 @@ _onDOMReady(() => {
             initPanelOverlay();
             initResizeHandles(fitGameFont);
         }
-        if (window.innerWidth <= 768) setFooterMode(true);
+        // A non-auto Layout mode is applied once the game's settings load (setLayoutMode).
+        _syncAutoTabbedClass('auto');
+        if (_autoWantsTabbed()) setFooterMode(true);
         requestAnimationFrame(async () => {
             fitGameFont();
             const game = new Game();
@@ -6359,9 +6393,7 @@ _onDOMReady(() => {
             const toolbar = document.getElementById('touch-toolbar');
             if (tm === 'always') toolbar.style.display = 'flex';
             else if (tm === 'never') toolbar.style.display = 'none';
-            if (game.settings.largeClickTargets) {
-                document.getElementById('game-container').classList.add('large-targets');
-            }
+            document.getElementById('game-container').classList.toggle('large-targets', !!game.settings.largeClickTargets);
             if (game.settings.colorblindMode && game.settings.colorblindMode !== 'none') {
                 document.getElementById('game-container').setAttribute('data-colorblind', game.settings.colorblindMode);
             }
@@ -6593,6 +6625,7 @@ _onDOMReady(() => {
             darkenOnPause: document.getElementById('start-darken-pause').checked,
             toolbarMode: document.getElementById('start-toolbar-mode').value,
             largeClickTargets: document.getElementById('start-large-clicks').checked,
+            haptics: document.getElementById('start-haptics').checked,
             pauseOnFocusLoss: document.getElementById('start-pause-focus').checked,
             colorblindMode: document.getElementById('start-colorblind').value,
             notificationDuration: parseInt(document.getElementById('start-notif-dur').value) || 100,
@@ -6722,7 +6755,8 @@ _onDOMReady(() => {
             return;
         }
         const isTabbed = footer.classList.contains('tabbed');
-        const shouldTab = window.innerWidth <= 768;
+        const shouldTab = _autoWantsTabbed();
+        _syncAutoTabbedClass('auto');
         if (shouldTab && !isTabbed) setFooterMode(true);
         else if (!shouldTab && isTabbed) setFooterMode(false);
         else requestAnimationFrame(() => resetMinimapSize());

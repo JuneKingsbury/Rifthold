@@ -6,6 +6,10 @@ import { colonistTakeDamage } from './colonist.js';
 import { moveEntity } from '../systems/movement-lerp.js';
 import { createRaidEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
+import { haptic } from '../ui/ui-utils.js';
+
+// Phone buzz when a raid arrives: two long pulses (ms on, off, on).
+const RAID_HAPTIC = [80, 60, 80];
 
 let _crusaderTriggerRealm;
 function crusaderTriggerRealm() {
@@ -112,6 +116,7 @@ export class CombatSystem {
         _startleNearbyColonists(game, raidPos.x, raidPos.y);
         game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
         game.notifications.push({ text: `${raidType.name}! ${spawned} ${raidType.name === 'Crusader Raid' ? 'crusaders' : 'enemies'} approaching!`, tick: game.tick, type: 'danger' });
+        haptic(RAID_HAPTIC);
         game.eventLog.add(game, `${raidType.name}! ${spawned} enemies attacking!`, 'danger', { type: 'position', ...raidPos });
 
         if (raidTypeKey === 'crusader_raid') {
@@ -182,6 +187,7 @@ export class CombatSystem {
         _startleNearbyColonists(game, raidPos.x, raidPos.y);
         game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
         game.notifications.push({ text: `Raid! ${spawned} raiders approaching!`, tick: game.tick, type: 'danger' });
+        haptic(RAID_HAPTIC);
         game.eventLog.add(game, `Raid! ${spawned} raiders attacking!`, 'danger', { type: 'position', ...raidPos });
 
         // A raid of one or two is a nuisance, not an emergency: toast and log only.

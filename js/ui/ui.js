@@ -8,7 +8,7 @@ import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
-import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml, isTouchUI, isCompactLayout, keyHint } from './ui-utils.js';
+import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml, isTouchUI, isCompactLayout, keyHint, haptic } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { getPedestalEffect, getPedestalCharge, getMaxPedestalCharge, getTilePedestalStats } from '../systems/artifacts.js';
 import { getPowerTier } from '../systems/power.js';
@@ -363,6 +363,8 @@ export class UI {
             }
         });
 
+        this._listen(this.elements.notifications, 'click', (e) => this._onNotificationTap(e));
+
         // Drag-to-reorder colonist rows
         let _dragColonistId = null;
         this._listen(this.elements.colonistHud, 'dragstart', (e) => {
@@ -410,52 +412,76 @@ export class UI {
             e.preventDefault();
             _clearDropIndicators();
             if (_dragColonistId == null) return;
-            const draggedColonist = this.game.getColonist(_dragColonistId);
-            if (!draggedColonist) return;
+            this._applyColonistDrop(_dragColonistId, e.target, e.clientY);
+        });
 
-            // Drop onto a group header → move colonist to top of that group
-            const groupHeader = e.target.closest('.hud-group-header[data-group-name]');
-            if (groupHeader) {
-                const groupName = groupHeader.dataset.groupName;
-                draggedColonist.group = groupName || null;
-                // Move dragged colonist to just after the first member of that group (or end)
-                const cols = this.game.colonists;
-                const fromIdx = cols.indexOf(draggedColonist);
-                if (fromIdx !== -1) cols.splice(fromIdx, 1);
-                const firstMemberIdx = cols.findIndex(c => c.group === (groupName || null));
-                cols.splice(firstMemberIdx === -1 ? cols.length : firstMemberIdx, 0, draggedColonist);
-                this.game.rebuildColonistIndex();
-                this.forceUpdateColonistHud();
-                if (this.game.selectedColonist) this.game.ui.showColonistInfo(this.game.selectedColonist);
+        // Touch has no HTML5 drag-and-drop: hold a row to pick it up, slide, and lift to drop.
+        // The list holds its re-renders while a row is up, as it does under a hovering mouse.
+        let touchDrag = null;
+        const indicateDropAt = (x, y) => {
+            _clearDropIndicators();
+            const el = document.elementFromPoint(x, y);
+            const header = el?.closest('#colonist-hud .hud-group-header');
+            if (header) { header.classList.add('hud-drop-target'); return; }
+            const row = el?.closest('#colonist-hud [data-drag-colonist-id]');
+            if (!row) return;
+            const r = row.getBoundingClientRect();
+            row.classList.add(y < r.top + r.height / 2 ? 'hud-drop-before' : 'hud-drop-after');
+        };
+        const endTouchDrag = () => {
+            if (!touchDrag) return;
+            clearTimeout(touchDrag.timer);
+            touchDrag.row.style.opacity = '';
+            _clearDropIndicators();
+            if (touchDrag.lifted) {
+                this._colonistHudHovered = false;
+                if (this._pendingHudHtml) {
+                    this.elements.colonistHud.innerHTML = this._pendingHudHtml;
+                    this._pendingHudHtml = null;
+                }
+            }
+            touchDrag = null;
+        };
+        this._listen(this.elements.colonistHud, 'touchstart', (e) => {
+            endTouchDrag();
+            if (e.touches.length !== 1 || this._colonistHudLocked) return;
+            const row = e.target.closest('[data-drag-colonist-id]');
+            if (!row) return;
+            const t = e.touches[0];
+            const drag = { id: parseInt(row.dataset.dragColonistId), row, x: t.clientX, y: t.clientY, startX: t.clientX, startY: t.clientY, lifted: false };
+            drag.timer = setTimeout(() => {
+                drag.lifted = true;
+                this._colonistHudHovered = true;
+                row.style.opacity = '0.4';
+                this._suppressClickUntil = performance.now() + 5000;
+                haptic(15);
+            }, UI_LONG_PRESS_MS);
+            touchDrag = drag;
+        }, { passive: true });
+        this._listen(this.elements.colonistHud, 'touchmove', (e) => {
+            if (!touchDrag) return;
+            const t = e.touches[0];
+            if (!touchDrag.lifted) {
+                // Moving before the hold completes is a scroll, not a pick-up.
+                if (Math.hypot(t.clientX - touchDrag.startX, t.clientY - touchDrag.startY) > 8) endTouchDrag();
                 return;
             }
-
-            // Drop onto another colonist row → place before/after that colonist and take their group
-            const targetRow = e.target.closest('[data-drag-colonist-id]');
-            if (targetRow) {
-                const targetId = parseInt(targetRow.dataset.dragColonistId);
-                if (targetId === _dragColonistId) return;
-                const targetColonist = this.game.getColonist(targetId);
-                if (!targetColonist) return;
-
-                // Determine insert before or after based on mouse Y within the target row
-                const rect = targetRow.getBoundingClientRect();
-                const insertBefore = e.clientY < rect.top + rect.height / 2;
-
-                draggedColonist.group = targetColonist.group || null;
-
-                const cols = this.game.colonists;
-                const fromIdx = cols.indexOf(draggedColonist);
-                if (fromIdx !== -1) cols.splice(fromIdx, 1);
-                let toIdx = cols.indexOf(targetColonist);
-                if (!insertBefore) toIdx += 1;
-                cols.splice(toIdx, 0, draggedColonist);
-
-                this.game.rebuildColonistIndex();
-                this.forceUpdateColonistHud();
-                if (this.game.selectedColonist) this.game.ui.showColonistInfo(this.game.selectedColonist);
-            }
-        });
+            e.preventDefault();
+            touchDrag.x = t.clientX;
+            touchDrag.y = t.clientY;
+            indicateDropAt(t.clientX, t.clientY);
+        }, { passive: false });
+        this._listen(this.elements.colonistHud, 'touchend', (e) => {
+            if (!touchDrag) return;
+            const { lifted, id, x, y } = touchDrag;
+            endTouchDrag();
+            if (!lifted) return;
+            e.preventDefault();
+            this._suppressClickUntil = performance.now() + 350;
+            const el = document.elementFromPoint(x, y);
+            if (el && this.elements.colonistHud.contains(el)) this._applyColonistDrop(id, el, y);
+        }, { passive: false });
+        this._listen(this.elements.colonistHud, 'touchcancel', endTouchDrag, { passive: true });
 
         this._listen(this.elements.eventLog, 'click', (e) => {
             const row = e.target.closest('[data-entity]');
@@ -505,6 +531,10 @@ export class UI {
         const buildOptClick = (e) => {
             if (e.target.closest('[data-mode-action="pan"]')) {
                 this.game.input.toggleTouchPanMode();
+                return;
+            }
+            if (e.target.closest('[data-mode-action="undo"]')) {
+                this.game.input.undoLastPlacement();
                 return;
             }
             const closeBtn = e.target.closest('[data-mode-action="back"]');
@@ -858,7 +888,7 @@ export class UI {
             press.fired = true;
             // Swallow the click the release may still produce (until shortly after touchend).
             this._suppressClickUntil = performance.now() + 5000;
-            navigator.vibrate?.(10);
+            haptic(10);
             if (kind === 'menu') {
                 this._suppressContextMenuUntil = performance.now() + 1000;
                 // The panel may have re-rendered during the hold, so find the cell under the finger again.
@@ -888,6 +918,8 @@ export class UI {
             if (sheet && t.clientY - sheet.getBoundingClientRect().top <= SHEET_GRAB_PX) {
                 sheetDrag = { sheet, startY: t.clientY, startH: sheet.getBoundingClientRect().height, moved: false };
             }
+            // Colonist rows use the hold to pick the row up (see the colonist list's touch drag).
+            if (!this._colonistHudLocked && e.target.closest?.('#colonist-hud [data-drag-colonist-id]')) return;
             const menuEl = e.target.closest?.(PRESS_MENU_TARGETS);
             const tipEl = !menuEl && e.target.closest?.('.skill-tip[data-tip], .skill-tip[data-compare], .research-node[data-tip], [data-build-opt], [title]');
             const el = menuEl || tipEl;
@@ -942,6 +974,56 @@ export class UI {
         this._listen(document, 'pointerdown', (e) => {
             if (this._moreMenuOpen && !e.target.closest?.('.more-menu, [data-mode-action="more"]')) this.closeMoreMenu();
         }, { capture: true });
+    }
+
+    // Moves a dragged colonist row to where it was dropped: onto a group header (top of that
+    // group) or onto another row (before or after it, by which half `clientY` is in).
+    _applyColonistDrop(draggedId, target, clientY) {
+        const draggedColonist = this.game.getColonist(draggedId);
+        if (!draggedColonist) return;
+
+        // Drop onto a group header → move colonist to top of that group
+        const groupHeader = target.closest('.hud-group-header[data-group-name]');
+        if (groupHeader) {
+            const groupName = groupHeader.dataset.groupName;
+            draggedColonist.group = groupName || null;
+            // Move dragged colonist to just after the first member of that group (or end)
+            const cols = this.game.colonists;
+            const fromIdx = cols.indexOf(draggedColonist);
+            if (fromIdx !== -1) cols.splice(fromIdx, 1);
+            const firstMemberIdx = cols.findIndex(c => c.group === (groupName || null));
+            cols.splice(firstMemberIdx === -1 ? cols.length : firstMemberIdx, 0, draggedColonist);
+            this.game.rebuildColonistIndex();
+            this.forceUpdateColonistHud();
+            if (this.game.selectedColonist) this.game.ui.showColonistInfo(this.game.selectedColonist);
+            return;
+        }
+
+        // Drop onto another colonist row → place before/after that colonist and take their group
+        const targetRow = target.closest('[data-drag-colonist-id]');
+        if (targetRow) {
+            const targetId = parseInt(targetRow.dataset.dragColonistId);
+            if (targetId === draggedId) return;
+            const targetColonist = this.game.getColonist(targetId);
+            if (!targetColonist) return;
+
+            // Determine insert before or after based on mouse Y within the target row
+            const rect = targetRow.getBoundingClientRect();
+            const insertBefore = clientY < rect.top + rect.height / 2;
+
+            draggedColonist.group = targetColonist.group || null;
+
+            const cols = this.game.colonists;
+            const fromIdx = cols.indexOf(draggedColonist);
+            if (fromIdx !== -1) cols.splice(fromIdx, 1);
+            let toIdx = cols.indexOf(targetColonist);
+            if (!insertBefore) toIdx += 1;
+            cols.splice(toIdx, 0, draggedColonist);
+
+            this.game.rebuildColonistIndex();
+            this.forceUpdateColonistHud();
+            if (this.game.selectedColonist) this.game.ui.showColonistInfo(this.game.selectedColonist);
+        }
     }
 
     // Back to the stylesheet's sheet heights (used when leaving the narrow layout).
@@ -1456,6 +1538,7 @@ export class UI {
             case 'back': input.setMode('normal'); break;
             case 'cancel-target': input.handleEscape(); break;
             case 'pan': input.toggleTouchPanMode(); break;
+            case 'undo': input.undoLastPlacement(); break;
             case 'build': input.setMode('build'); break;
             case 'zone': input.setMode('zone'); break;
             case 'gather': input.setMode('designate'); break;
@@ -1656,7 +1739,10 @@ export class UI {
         const pan = isTouchUI()
             ? `<span class="build-panel-pan${this.game.input?.touchPanMode ? ' active' : ''}" data-mode-action="pan">Pan</span>`
             : '';
-        return `${pan}<span class="build-panel-close" data-mode-action="back">${keyHint('Esc')}${isTouchUI() ? '' : ' '}Close</span>`;
+        const undo = isTouchUI() && this.game.input?.canUndoPlacement
+            ? '<span class="build-panel-undo" data-mode-action="undo">Undo</span>'
+            : '';
+        return `${undo}${pan}<span class="build-panel-close" data-mode-action="back">${keyHint('Esc')}${isTouchUI() ? '' : ' '}Close</span>`;
     }
 
     _hideBuildPanel() {
@@ -5143,6 +5229,7 @@ export class UI {
         general += `<div class="settings-section"><div class="settings-section-title">Accessibility</div>`;
         general += this._settingsCheck('set-darken-pause', s.darkenOnPause, 'window.game.settings.darkenOnPause=this.checked;if(window.game.paused)document.getElementById("game").classList.toggle("paused",this.checked)', 'Darken screen when paused');
         general += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', 'Pause when window loses focus');
+        general += this._settingsCheck('set-haptics', s.haptics !== false, 'window.game.settings.haptics=this.checked', 'Vibration feedback (phones)');
         if (navigator.wakeLock) general += this._settingsCheck('set-keep-awake', s.keepScreenAwake, 'window.game.settings.keepScreenAwake=this.checked;window.game._syncWakeLock()', 'Keep screen awake while unpaused');
         general += `<div class="settings-row"><label for="set-toolbar-mode">Mobile button bar:</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['auto','Auto'],['always','Always'],['never','Never']]) {
@@ -5553,14 +5640,45 @@ export class UI {
         const prevKeys = this._notifKeys || (this._notifKeys = new Set());
         // Reduced motion (item 24): skip the slide-in, render statically.
         const reduceMotion = !!this.game.settings.reduceMotion;
-        this.elements.notifications.innerHTML = shown.map(n => {
+        this.elements.notifications.innerHTML = shown.map((n, i) => {
             const key = `${n.tick}${n.text}`;
             // Only notifs that weren't shown last render get the enter animation.
             const enter = (!reduceMotion && !prevKeys.has(key)) ? ' notif-enter' : '';
-            return `<div class="notif notif-${escapeAttr(n.type)}${enter}">${escapeHtmlKeepEntities(n.text)}</div>`;
+            return `<div class="notif notif-${escapeAttr(n.type)}${enter}" data-notif-index="${i}">${escapeHtmlKeepEntities(n.text)}</div>`;
         }).join('') + (compact && hiddenCount > 0 ? `<div class="notif notif-more">+${hiddenCount} more in Log</div>` : '');
         this._notifKeys = new Set(shown.map(n => `${n.tick}${n.text}`));
         this._notifSig = sig;
+        this._notifShown = shown;
+    }
+
+    // Where a toast points: its own `linked` entity, else the event-log entry logged with it
+    // (same tick, with a location). Most alerts push a toast and a linked log line together.
+    _notificationLink(n) {
+        if (n.linked) return n.linked;
+        const sameTick = this.game.eventLog.entries.filter(e => e.tick === n.tick && e.linkedEntity);
+        if (sameTick.length <= 1) return sameTick[0]?.linkedEntity || null;
+        const words = (t) => new Set(String(t).replace(/<[^>]+>|&[a-z#0-9]+;/gi, ' ').toLowerCase().split(/\W+/).filter(w => w.length > 2));
+        const mine = words(n.text);
+        let best = null;
+        let bestScore = 0;
+        for (const e of sameTick) {
+            const score = [...words(e.text)].filter(w => mine.has(w)).length;
+            if (score > bestScore) { bestScore = score; best = e.linkedEntity; }
+        }
+        return best;
+    }
+
+    // Tapping a toast jumps to what it is about. Toasts with nowhere to go open the Log.
+    _onNotificationTap(e) {
+        const el = e.target.closest('.notif');
+        if (!el) return;
+        const n = this._notifShown?.[parseInt(el.dataset.notifIndex)];
+        const link = n && this._notificationLink(n);
+        if (link) {
+            this.game.jumpToEntity(link.type, link.type === 'colonist' ? link.id : link);
+            return;
+        }
+        if (isCompactLayout()) document.querySelector('#footer-tabs .footer-tab[data-tab="log"]')?.click();
     }
 
     updateEventPanel() {

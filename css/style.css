@@ -6117,6 +6117,16 @@ details.settings-debug > summary::marker {
     white-space: nowrap;
     flex-shrink: 0;
 }
+.build-panel-undo {
+    color: #fc8;
+    font-size: 0.85em;
+    padding: 4px 10px;
+    border: 1px solid #a74;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
 .build-panel-pan.active {
     background: #2a5a2a;
     border-color: #6f6;
@@ -6236,7 +6246,7 @@ details.settings-debug > summary::marker {
     :is(.craft-tab, .arcane-tab, .story-tab-btn, .research-tab-btn, .inv-tab-btn, .build-tab) {
         min-height: 38px;
     }
-    .build-panel-close, .build-panel-pan {
+    .build-panel-close, .build-panel-pan, .build-panel-undo {
         min-height: 36px;
         display: inline-flex;
         align-items: center;
@@ -6249,8 +6259,77 @@ details.settings-debug > summary::marker {
     .craft-row button, .craft-row input { min-height: 36px; }
     .craft-row button.craft-multi { min-width: 40px; }
     .event-choices button { min-height: 44px; }
+    /* Toasts take taps on touch: they jump to what they are about (ui._onNotificationTap). */
+    #notifications .notif {
+        pointer-events: auto;
+        cursor: pointer;
+    }
     #tile-tooltip {
         white-space: normal;
         max-width: 80vw;
+    }
+    /* Settings checkboxes toggle from their label too, so make the whole row the target. */
+    .settings-row {
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .settings-row label { flex: 1 1 auto; padding: 6px 0; }
+    input[type="range"] { min-height: 32px; }
+    #game-container #touch-toolbar :is(#touch-prev-btn, #touch-next-btn) { min-width: 44px; }
+}
+
+/* --- Phone held sideways: one status row, and the nav and button bar share the bottom row --- */
+@media (orientation: landscape) and (max-height: 500px) {
+    #game-container.tabbed-mode {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+    #game-container.tabbed-mode > :is(#status-bar, #game-area, #game-footer) {
+        grid-column: 1 / -1;
+    }
+    #game-container.tabbed-mode > #bottom-bar {
+        grid-column: 1;
+        grid-row: 4;
+    }
+    #game-container.tabbed-mode > #touch-toolbar {
+        grid-column: 2;
+        grid-row: 4;
+        border-top: 1px solid #333;
+        border-left: 1px solid #333;
+    }
+    #game-container.tabbed-mode #touch-toolbar button {
+        flex: 0 0 auto;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    #game-container.tabbed-mode #status-bar .hud-row-break {
+        display: none;
+    }
+    #game-container.tabbed-mode #game-footer.footer-tall {
+        height: 70vh;
+    }
+    /* The build panel would cover half the map: one row of cards that scrolls sideways. */
+    #game-container.tabbed-mode #build-panel {
+        padding: 6px 10px;
+    }
+    #game-container.tabbed-mode #build-panel .build-panel-header {
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+    }
+    #game-container.tabbed-mode #build-panel .build-grid {
+        grid-auto-flow: column;
+        grid-template-columns: none;
+        grid-template-rows: auto;
+        grid-auto-columns: 92px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        max-height: none;
+    }
+    #game-container.tabbed-mode #tutorial-note,
+    #game-container.tabbed-mode #tutorial-note.expanded {
+        left: auto;
+        width: 340px;
+        max-height: 80%;
     }
 }

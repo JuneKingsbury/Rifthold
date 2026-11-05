@@ -5,6 +5,7 @@ import { designateFarmZone, removeFarmZone, CROP_RESEARCH_REQS } from '../system
 import { isPassable, isDraftBreakableWall, isDraftInteractable } from '../world/map.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getSpellCooldownMult } from '../systems/complexBuildings.js';
+import { haptic } from './ui-utils.js';
 
 // Minimum cursor travel (px) in normal mode before a mouse gesture counts as a
 // box-select rather than a click. Guards clicks near a tile boundary, where
@@ -28,6 +29,16 @@ const WHEEL_GESTURE_GAP_MS = 200;
 // long press, and how long it must be held to count as a long press (a right-click).
 const TOUCH_SLOP_PX = 8;
 const LONG_PRESS_MS = 450;
+// A tap this close (px) to a colonist selects it, since tiles are smaller than a fingertip.
+const TAP_SNAP_PX = 22;
+// Dragging a selection within this many px of the map's edge scrolls the map, up to
+// EDGE_PAN_MAX_TILES_PER_SEC when the finger is right at the edge.
+const EDGE_PAN_ZONE_PX = 36;
+const EDGE_PAN_MAX_TILES_PER_SEC = 18;
+// How many touch placements Undo remembers, and how far (tiles) around a placement to look
+// for what it added (multi-tile buildings and chalk patterns reach past the tapped tile).
+const UNDO_LIMIT = 20;
+const UNDO_MARGIN = 6;
 
 // <input> types that take typed text. Other inputs (checkboxes, sliders,
 // buttons, colour pickers) keep focus after a click but don't consume keys, so
@@ -47,6 +58,7 @@ export class InputHandler {
         this.dragging = false;
         this.keysDown = new Set();
         this.touchPanMode = false;
+        this._undoStack = [];
         this._gesturePanning = false;
         this._gesturePanLast = null;
         this._gestureDecided = false;
@@ -999,11 +1011,16 @@ export class InputHandler {
                 this.dragEnd = pos;
             }
         }
+        if (this.dragging) {
+            this._lastTouch = { clientX: t.clientX, clientY: t.clientY };
+            this._updateEdgePan();
+        }
     }
 
     onTouchEnd(e) {
         e.preventDefault();
         this._cancelLongPress();
+        this._stopEdgePan();
         if (this._isPinching) {
             if (e.touches.length === 0) {
                 this._isPinching = false;
@@ -1037,7 +1054,9 @@ export class InputHandler {
                 return;
             }
             const tapPos = this._clickPos || this.game.cursor;
-            if (this._tapMovesDrafted(tapPos)) this.handleRightClick(tapPos);
+            const snapped = this._snapTapToColonist(tapPos);
+            if (snapped) this.handleLeftClick(snapped);
+            else if (this._tapMovesDrafted(tapPos)) this.handleRightClick(tapPos);
             else this.handleLeftClick(tapPos);
             this._gestureDecided = false;
             this._touchMoved = false;
@@ -1048,6 +1067,12 @@ export class InputHandler {
         const pos = this.game.cursor;
         if (!pos) return;
 
+        // Build, farm and gather placements go on the Undo stack.
+        const from = this.dragging && this.dragStart ? this.dragStart : pos;
+        this._trackPlacement(from, pos, () => this._finishTouchPlacement(pos));
+    }
+
+    _finishTouchPlacement(pos) {
         if (this.dragging && this.dragStart) {
             const wasDrag = this._touchMoved && (this.dragStart.x !== pos.x || this.dragStart.y !== pos.y);
             if (wasDrag) {
@@ -1079,6 +1104,7 @@ export class InputHandler {
     // The OS took the touch (a system gesture or a dialog), so drop it without acting on it.
     onTouchCancel() {
         this._cancelLongPress();
+        this._stopEdgePan();
         this._longPressFired = false;
         this._isPinching = false;
         this._pinch = null;
@@ -1138,7 +1164,7 @@ export class InputHandler {
             this.dragging = false;
             this.dragStart = null;
             this.dragEnd = null;
-            navigator.vibrate?.(15);
+            haptic(15);
             const tile = this.game.map[pos.y]?.[pos.x];
             const anyDrafted = this.game.colonists.some(c => c.drafted && c.hp > 0);
             if (this.mode === 'normal' && !this.rallyMode && !anyDrafted && !tile?.designation) {
@@ -1152,6 +1178,123 @@ export class InputHandler {
     _cancelLongPress() {
         clearTimeout(this._longPressTimer);
         this._longPressTimer = null;
+    }
+
+    // A tap that just misses a colonist (by up to TAP_SNAP_PX) selects the nearest one.
+    // Returns that colonist's tile, or null when the tap already hit one or none is near.
+    // Off while drafted colonists are selected: then a tap is a move order, often right
+    // beside other colonists.
+    _snapTapToColonist(pos) {
+        if (!pos || !this._touchStartPos || this.spellTargeting || this.guardPointTargeting ||
+            this.penReassignTargeting || this.rallyMode || this.destroyMode) return null;
+        if ((this.game.selectedColonists || []).some(c => c.drafted && c.hp > 0)) return null;
+        const live = this.game.colonists.filter(c => c.hp > 0 && !c.onExpedition);
+        if (live.some(c => c.x === pos.x && c.y === pos.y)) return null;
+        const rect = this.pre.getBoundingClientRect();
+        const cam = this.game.camera;
+        let best = null;
+        let bestDist = TAP_SNAP_PX;
+        for (const c of live) {
+            const cx = rect.left + (c.x - cam.x + 0.5) * this.charWidth;
+            const cy = rect.top + (c.y - cam.y + 0.5) * this.charHeight;
+            const d = Math.hypot(cx - this._touchStartPos.x, cy - this._touchStartPos.y);
+            if (d < bestDist) { bestDist = d; best = c; }
+        }
+        return best ? { x: best.x, y: best.y } : null;
+    }
+
+    // While a selection drag sits near the map's edge, keep scrolling that way and stretch
+    // the selection to the tile under the finger, so one drag can cover more than a screen.
+    _updateEdgePan() {
+        const v = this._edgePanVelocity();
+        if (!v) { this._stopEdgePan(); return; }
+        this._edgePanV = v;
+        if (this._edgePanRaf) return;
+        let last = performance.now();
+        const step = (now) => {
+            if (!this.dragging || !this._edgePanV || !this._lastTouch) { this._edgePanRaf = null; return; }
+            const dt = Math.min(0.05, (now - last) / 1000);
+            last = now;
+            this.game.camera.pan(this._edgePanV.x * dt, this._edgePanV.y * dt);
+            const pos = this.getTouchTile(this._lastTouch);
+            if (pos.x < CONFIG.MAP_WIDTH && pos.y < CONFIG.MAP_HEIGHT) {
+                this.game.cursor = pos;
+                this.dragEnd = pos;
+            }
+            this._edgePanRaf = requestAnimationFrame(step);
+        };
+        this._edgePanRaf = requestAnimationFrame(step);
+    }
+
+    // Tiles per second to scroll for the finger's current spot, or null away from the edges.
+    // The bottom edge is the top of the build panel, which covers the lower map.
+    _edgePanVelocity() {
+        const t = this._lastTouch;
+        if (!t) return null;
+        const r = this.pre.getBoundingClientRect();
+        let bottom = r.bottom;
+        const panel = document.getElementById('build-panel');
+        if (panel && panel.style.display !== 'none') bottom = Math.min(bottom, panel.getBoundingClientRect().top);
+        const push = (dist) => (dist < EDGE_PAN_ZONE_PX ? (1 - Math.max(0, dist) / EDGE_PAN_ZONE_PX) * EDGE_PAN_MAX_TILES_PER_SEC : 0);
+        const x = push(t.clientX - r.left) > 0 ? -push(t.clientX - r.left) : push(r.right - t.clientX);
+        const y = push(t.clientY - r.top) > 0 ? -push(t.clientY - r.top) : push(bottom - t.clientY);
+        return x || y ? { x, y } : null;
+    }
+
+    _stopEdgePan() {
+        if (this._edgePanRaf) cancelAnimationFrame(this._edgePanRaf);
+        this._edgePanRaf = null;
+        this._edgePanV = null;
+        this._lastTouch = null;
+    }
+
+    // Runs a touch placement and records what it added (designations and farm tiles) as one
+    // Undo step, by comparing the tiles around the placement before and after.
+    _trackPlacement(from, to, act) {
+        const minX = Math.max(0, Math.min(from.x, to.x) - UNDO_MARGIN);
+        const maxX = Math.min(CONFIG.MAP_WIDTH - 1, Math.max(from.x, to.x) + UNDO_MARGIN);
+        const minY = Math.max(0, Math.min(from.y, to.y) - UNDO_MARGIN);
+        const maxY = Math.min(CONFIG.MAP_HEIGHT - 1, Math.max(from.y, to.y) + UNDO_MARGIN);
+        const map = this.game.map;
+        const before = [];
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) before.push(map[y][x].designation, map[y][x].zone);
+        }
+        act();
+        const added = [];
+        let i = 0;
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++, i += 2) {
+                const tile = map[y][x];
+                const designation = tile.designation && tile.designation !== before[i] ? tile.designation : null;
+                const zone = tile.zone && !before[i + 1] ? tile.zone : null;
+                if (designation || zone) added.push({ x, y, designation, zone });
+            }
+        }
+        if (added.length === 0) return;
+        this._undoStack.push(added);
+        if (this._undoStack.length > UNDO_LIMIT) this._undoStack.shift();
+        haptic(12);
+        this.game.ui.updateBuildPanel(this);
+    }
+
+    // Removes what the last touch placement added, unless colonists already finished it.
+    // Build designations refund their cost, as cancelling them by hand does.
+    undoLastPlacement() {
+        const added = this._undoStack.pop();
+        if (!added) return;
+        let undone = 0;
+        for (const { x, y, designation, zone } of added) {
+            const tile = this.game.map[y][x];
+            if (designation && tile.designation === designation) { cancelDesignation(this.game, x, y); undone++; }
+            if (zone && tile.zone === zone) { removeFarmZone(this.game, x, y); undone++; }
+        }
+        this.game.notifications.push({ text: undone ? `Undid ${undone} placement${undone === 1 ? '' : 's'}` : 'Nothing left to undo there', tick: this.game.tick, type: 'info' });
+        this.game.ui.updateBuildPanel(this);
+    }
+
+    get canUndoPlacement() {
+        return this._undoStack.length > 0;
     }
 
     // On touch there is no right button, so with drafted colonists selected a tap on

@@ -163,7 +163,7 @@ export function sanitizeHtml(html) {
 // (long-press tips, no keyboard hints, bigger tap targets) keys off this, so a
 // laptop with a touchscreen but a mouse or trackpad keeps the desktop UI.
 export function isTouchUI() {
-    return !!window.matchMedia?.('(pointer: coarse)').matches;
+    return !!globalThis.window?.matchMedia?.('(pointer: coarse)').matches;
 }
 
 // True when the narrow tabbed layout is active (phones, or Layout mode: Tabbed).
@@ -197,4 +197,12 @@ export function touchText(text) {
         .replace(/\bClick(ing)?\b/g, (_, ing) => (ing ? 'Tapping' : 'Tap'));
     if (isCompactLayout()) t = t.replace(new RegExp(`\\bOpen (${MORE_MENU_PANELS})\\b`, 'g'), 'Open $1 from the More menu');
     return t;
+}
+
+// A short buzz on phones (placing, long-press, raids), unless the player turned
+// "Vibration feedback" off. `pattern` is ms, or [on, off, on, ...] like navigator.vibrate.
+// Uses globalThis so headless sims (scripts/expsim, Node) can call it safely.
+export function haptic(pattern) {
+    if (globalThis.window?.game?.settings?.haptics === false) return;
+    globalThis.navigator?.vibrate?.(pattern);
 }

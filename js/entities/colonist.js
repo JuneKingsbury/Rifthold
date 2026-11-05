@@ -10,6 +10,7 @@ import { spawnSummon } from './summons.js';
 import { getNextId } from './entity-factory.js';
 import { completeTask } from './task-executor.js';
 import { getCraftSpeedBonus, getSpellCooldownMult, getGatherSpeedBonus, getDefenseBonusMult } from '../systems/complexBuildings.js';
+import { haptic } from '../ui/ui-utils.js';
 
 function hslToHex(h, s, l) {
     s /= 100; l /= 100;
@@ -3508,6 +3509,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker, isDot = fal
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.deathChar, color: COMBAT_VISUALS.deathColor, ttl: COMBAT_VISUALS.deathTtl });
             window.soundManager?.playSFXAt('colonist_death', colonist.x, colonist.y);
             game.eventLog.add(game, `${colonist.name} has died!`, 'danger', { type: 'colonist', id: colonist.id });
+            haptic(200);
             game.story.checkMilestone('first_colonist_death', game);
             if (game.settings.pauseOnDeath && !game.paused) {
                 game.paused = true;
