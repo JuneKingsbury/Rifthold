@@ -482,7 +482,10 @@ export function recalcMaxMana(colonist) {
     const focusedLevels = maxLevel + (combinedLevel - maxLevel) * MANA_CONFIG.manaFocusFactor;
     colonist.maxMana = MANA_CONFIG.baseMana + focusedLevels * MANA_CONFIG.manaPerMagicLevel;
     if (colonist.traits.includes('attuned')) colonist.maxMana = Math.round(colonist.maxMana * TRAITS.attuned.maxManaMult);
-    colonist.maxMana = Math.round(colonist.maxMana);
+    // Flat pool from gear (staves). Added after the Attuned multiplier so the
+    // tooltip's "+N Max Mana" is exactly what the colonist gains.
+    colonist.maxMana = Math.round(colonist.maxMana + getEquipmentStat(colonist, 'maxManaBonus'));
+    if (colonist.mana > colonist.maxMana) colonist.mana = colonist.maxMana;
 }
 
 function updateThoughts(colonist, game) {
@@ -1424,8 +1427,10 @@ function applySpellEffect(colonist, spell, game) {
             if (!summonDef) break;
             const sx = colonist.x + (Math.random() > 0.5 ? 1 : -1);
             const sy = colonist.y + (Math.random() > 0.5 ? 1 : -1);
-            const sumHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
-            const sumDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
+            // Conjuration mastery strengthens summons like it does damage spells.
+            const sumPower = getSpellPower(colonist, spell);
+            const sumHpMult = (1 + getEquipmentStat(colonist, 'summonHpBonus')) * sumPower;
+            const sumDmgMult = (1 + getEquipmentStat(colonist, 'summonDamageBonus')) * sumPower;
             const sumDurMult = 1 + getEquipmentStat(colonist, 'summonDurationBonus');
             if (!spawnSummon(spell.summonType, sx, sy, colonist.id, game, sumHpMult, sumDmgMult, sumDurMult)) return false;
             break;
@@ -1618,8 +1623,9 @@ function applySpellEffect(colonist, spell, game) {
             if (!summonDef) break;
             const count = spell.swarmCount || 3;
             const ring = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
-            const swarmHpMult = 1 + getEquipmentStat(colonist, 'summonHpBonus');
-            const swarmDmgMult = 1 + getEquipmentStat(colonist, 'summonDamageBonus');
+            const swarmPower = getSpellPower(colonist, spell);
+            const swarmHpMult = (1 + getEquipmentStat(colonist, 'summonHpBonus')) * swarmPower;
+            const swarmDmgMult = (1 + getEquipmentStat(colonist, 'summonDamageBonus')) * swarmPower;
             const swarmDurMult = 1 + getEquipmentStat(colonist, 'summonDurationBonus');
             let spawned = 0;
             for (let i = 0; i < count; i++) {

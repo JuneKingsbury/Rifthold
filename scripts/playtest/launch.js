@@ -17,7 +17,7 @@ const fs = require('fs');
 const APP_DIR = path.resolve(__dirname, '..', '..');
 
 function parseArgs(argv) {
-  const opts = { profile: 'competent', days: 120, world: null, shotsEvery: 5, show: false, userData: null, out: null, label: null };
+  const opts = { profile: 'competent', days: 120, world: null, shotsEvery: 5, show: false, userData: null, out: null, label: null, bot: 'scripts/playtest/bot.js' };
   for (const arg of argv) {
     const [k, v] = arg.replace(/^--/, '').split('=');
     if (k === 'profile') opts.profile = v;
@@ -28,6 +28,8 @@ function parseArgs(argv) {
     else if (k === 'user-data') opts.userData = v;
     else if (k === 'out') opts.out = v;
     else if (k === 'label') opts.label = v;
+    // In-page module to run instead of the playtest bot (same run()/poll() contract).
+    else if (k === 'bot') opts.bot = v;
   }
   return opts;
 }
@@ -78,7 +80,7 @@ app.on('browser-window-created', (_, win) => {
     const botOpts = { profile: opts.profile, days: opts.days, world: opts.world, shotsEvery: opts.shotsEvery };
     // The bot runs inside the page as an ES module so it shares the game's module instances.
     wc.executeJavaScript(`window.__playtestOpts = ${JSON.stringify(botOpts)};
-      import('./scripts/playtest/bot.js').then(m => m.run(window.__playtestOpts))
+      import('./${opts.bot.replace(/^\.?\//, '')}').then(m => m.run(window.__playtestOpts))
         .catch(e => { console.error('[playtest] bot crashed: ' + (e && e.stack || e)); window.__pt = { poll: () => ({ done: true, error: String(e && e.stack || e) }) }; });`, true);
     poll(wc);
   });

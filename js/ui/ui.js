@@ -190,6 +190,10 @@ export class UI {
         this.initTutorialNote();
 
         this._listen(this.elements.storyPanel, 'click', (e) => {
+            if (e.target.closest('[data-story-action="outro"]')) {
+                this.game.startOutro();
+                return;
+            }
             const tab = e.target.closest('[data-story-tab]');
             if (tab) {
                 this._storyTab = tab.dataset.storyTab;
@@ -1767,7 +1771,7 @@ export class UI {
         const higherIsBetter = new Set([
             'damageReduction', 'moodBonus', 'workSpeedBonus', 'moveSpeedBonus', 'damage', 'spellDamageBonus',
             'manaRegen', 'maxMana', 'warmth', 'critChance', 'critMultiplier', 'blockChance', 'gatherBonus',
-            'craftSpeedBonus', 'qualityBonus', 'lightRadius', 'maxHpBonus',
+            'craftSpeedBonus', 'qualityBonus', 'lightRadius', 'maxHpBonus', 'maxManaBonus', 'spellCooldownReduction',
         ]);
         if (!equippedItem && !candidateItem) return escapeHtml(slotLabel) + ': empty';
         if (!candidateItem) {
@@ -3415,7 +3419,7 @@ export class UI {
 
         const body = this._prioTab === 'attune' ? this._attunementGridHtml() : this._prioTab === 'groups' ? this._colonistGroupsHtml() : this._workPriorityGridHtml();
         const heading = this._prioTab === 'attune'
-            ? `<h3>Magic Attunement (click to toggle, max ${MAGIC_STUDY_CONFIG.attunementSlots})</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Only spells from attuned schools autocast in the world and on expeditions. Free to change anytime.</div>`
+            ? `<h3>Magic Attunement (${MAGIC_STUDY_CONFIG.attunementSlots === 1 ? 'click a school to attune; one per colonist' : `click to toggle, max ${MAGIC_STUDY_CONFIG.attunementSlots}`})</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Only spells from attuned schools autocast in the world and on expeditions. Free to change anytime.</div>`
             : this._prioTab === 'groups' ? ''
             : '<h3>Work Priorities (click to cycle, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">1 = highest priority, 5 = lowest. Note: Golem priorities are locked to their specialization</div>';
         let profileToolbar = '';
@@ -3627,7 +3631,7 @@ export class UI {
     _attunementGridHtml() {
         const schools = Object.keys(MAGIC_SKILLS);
         let html = '<table><tr><th>Colonist</th>';
-        schools.forEach(s => { html += `<th>${MAGIC_SKILLS[s].name.substring(0, 8)}</th>`; });
+        schools.forEach(s => { html += `<th><span class="skill-tip" data-tip="${escapeAttr(MAGIC_SKILLS[s].summary || MAGIC_SKILLS[s].description)}" style="color:${MAGIC_SKILLS[s].color}">${MAGIC_SKILLS[s].name.substring(0, 8)}</span></th>`; });
         html += '</tr>';
 
         for (const c of this.game.colonists) {
@@ -6004,6 +6008,9 @@ export class UI {
                             const realmNewBadge = isNew ? `<span class="story-new-badge">NEW</span> ` : '';
                             html += `<div class="story-entry-title">${realmNewBadge}${escapeHtml(milestone.title)}</div>`;
                             html += `<div class="story-entry-text">${sanitizeHtml(milestone.text)}</div>`;
+                            if (milestone.epilogueButton) {
+                                html += `<div style="text-align:center;margin-top:12px;"><button data-story-action="outro" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">Return Home (Epilogue)</button></div>`;
+                            }
                             html += `</div>`;
                         } else {
                             html += `<div class="story-entry locked">`;

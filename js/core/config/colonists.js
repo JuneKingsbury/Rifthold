@@ -337,8 +337,9 @@ export const MAGIC_STUDY_CONFIG = {
     cooldownReductionPerLevel: 0.02,   // -2% cooldown per level over minLevel
     cooldownReductionCap: 0.3,
     breadthLearningPenalty: 0.15,      // +15% tome work per other school already known
-    // How many schools a colonist can actively autocast from at once.
-    attunementSlots: 2,
+    // How many schools a colonist can actively autocast from at once. One, so each
+    // caster commits to a role (evoker, healer, summoner...); switching is free.
+    attunementSlots: 1,
 };
 
 export const TASK_CONFIG = {

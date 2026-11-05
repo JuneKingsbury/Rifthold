@@ -4,6 +4,7 @@ import { CRYPT_CONFIG, BUILDINGS, REALMS, ANIMALS, TAMED_ANIMALS, WEAPONS, ARMOR
     getItemStatLines, RENDER_CONFIG, COLONY_MILESTONES, EXPLORATION_CONFIG,
 } from '../core/config.js';
 import { estimatePartyStrength, getExpeditionSlotItem } from '../systems/exploration.js';
+import { createExpeditionForecast } from '../systems/expedition-forecast.js';
 import { getOmens } from '../systems/omens.js';
 import { getTargetPriority, getThreatDisplayHtml, escapeHtml, escapeAttr, jsArg } from './ui-utils.js';
 import { statBarHtml } from './stat-bar.js';
@@ -1001,6 +1002,9 @@ const arcaneMethods = {
             }
             this._expPresetMutators = null;
         }
+        panel.querySelectorAll('.exp-mutator').forEach(cb => cb.addEventListener('change', updateStrength));
+        // Presets above change potions/mutators after the first preview, so refresh it.
+        updateStrength();
     },
 
     _toggleFormationRow(colonistId) {
@@ -1017,32 +1021,36 @@ const arcaneMethods = {
     _updateStrengthPreview(realmKey) {
         const el = document.getElementById('exp-strength-preview');
         if (!el) return;
-        const ids = [...document.querySelectorAll('.exp-check:checked')].map(cb => parseInt(cb.value));
-        const diff = this._expDifficulty || 1;
+        const panel = this.elements.arcanePanel;
+        const ids = [...panel.querySelectorAll('.exp-check:checked')].map(cb => parseInt(cb.value));
         if (ids.length === 0) {
             el.innerHTML = '<span style="color:#666;">Select colonists to see party strength</span>';
             return;
         }
 
-        // Collect selected potions from the setup panel
+        // Gather the setup exactly as launchExpeditionFromPanel does, so the forecast
+        // plays the expedition the player would actually launch.
         const potions = {};
-        document.querySelectorAll('.exp-potion').forEach(inp => {
+        panel.querySelectorAll('.exp-potion').forEach(inp => {
             const count = parseInt(inp.value) || 0;
             if (count > 0 && inp.dataset.potion) potions[inp.dataset.potion] = count;
         });
+        const backRowSet = this._expBackRowIds || new Set();
+        const setup = {
+            realmKey,
+            colonistIds: ids,
+            difficulty: this._expDifficulty || 1,
+            mutators: [...panel.querySelectorAll('.exp-mutator:checked')].map(cb => cb.value),
+            potions,
+            formation: { front: ids.filter(id => !backRowSet.has(id)), back: ids.filter(id => backRowSet.has(id)) },
+            packAnimalIds: [...panel.querySelectorAll('.exp-pack-check:checked')].map(cb => parseInt(cb.value)),
+            warBeastIds: [...panel.querySelectorAll('.exp-war-check:checked')].map(cb => parseInt(cb.value)),
+        };
 
-        // Collect selected war beast snapshots from the setup panel using the
-        // level-adjusted stats embedded as data attributes on each checkbox.
-        const warBeastSnapshots = [...document.querySelectorAll('.exp-war-check:checked')].map(cb => ({
-            hp: parseInt(cb.dataset.hp) || 50,
-            damage: parseInt(cb.dataset.damage) || 8,
-        }));
-
-        const mutators = [...document.querySelectorAll('.exp-mutator:checked')].map(cb => cb.value);
-        const result = estimatePartyStrength(this.game, ids, realmKey, diff, mutators, potions, warBeastSnapshots);
+        const result = estimatePartyStrength(this.game, ids, realmKey);
         if (!result) { el.innerHTML = ''; return; }
 
-        let html = `<div style="color:${result.color};font-weight:bold;font-size:1.1em;">${result.rating} <span style="font-size:0.85em;opacity:0.85;">(${result.victoryChance}%)</span></div>`;
+        let html = '<div id="exp-forecast-line"></div>';
         html += `<div style="color:#aaa;font-size:0.85em;margin-top:2px;">Dmg/round: ${result.totalDmg} | HP: ${result.totalHp} | DR: ${result.avgDR}%</div>`;
 
         html += '<div style="margin-top:6px;border-top:1px solid #333;padding-top:4px;">';
@@ -1101,6 +1109,53 @@ const arcaneMethods = {
         }
 
         el.innerHTML = html;
+        this._runExpForecast(setup);
+    },
+
+    // Plays the expedition setup through the real simulation a few hundred times,
+    // a slice per frame, and keeps #exp-forecast-line showing the running result.
+    // The job is memoized by setup, so a panel re-render with the same party picks
+    // up where it left off instead of starting over.
+    _runExpForecast(setup) {
+        const key = JSON.stringify(setup);
+        if (!this._expForecast || this._expForecast.key !== key) {
+            this._expForecast = { key, job: createExpeditionForecast(this.game, setup), last: null, running: false };
+        }
+        const fc = this._expForecast;
+        const render = () => {
+            const line = document.getElementById('exp-forecast-line');
+            if (line && fc.last) line.innerHTML = this._expForecastHtml(fc.last);
+            return line;
+        };
+        if (fc.running) { render(); return; }
+        const step = () => {
+            // Stop when superseded by a new setup or the panel was closed; the next
+            // preview for this setup resumes from the runs done so far.
+            if (this._expForecast !== fc || !document.getElementById('exp-forecast-line')) { fc.running = false; return; }
+            fc.last = fc.job.step(12);
+            render();
+            if (fc.last.done) fc.running = false;
+            else requestAnimationFrame(step);
+        };
+        if (fc.last?.done) { render(); return; }
+        fc.running = true;
+        step();
+    },
+
+    _expForecastHtml(f) {
+        if (f.invalid) return '<span style="color:#ff8844;">No one in this party can depart (fatigued or unwilling).</span>';
+        const pct = Math.round(f.winChance * 100);
+        let rating, color;
+        if (pct >= 85) { rating = 'Easy'; color = '#44cc44'; }
+        else if (pct >= 65) { rating = 'Fair'; color = '#88cc44'; }
+        else if (pct >= 40) { rating = 'Tough'; color = '#cccc44'; }
+        else if (pct >= 20) { rating = 'Dangerous'; color = '#ff8844'; }
+        else { rating = 'Suicidal'; color = '#ff4444'; }
+        const approx = f.done ? '' : '~';
+        const progress = f.done ? '' : ` <span style="color:#666;font-size:0.75em;">simulating ${f.runs}/${f.targetRuns}</span>`;
+        let html = `<div style="color:${color};font-weight:bold;font-size:1.1em;">${rating} <span style="font-size:0.85em;opacity:0.85;">(${approx}${pct}% success)</span>${progress}</div>`;
+        html += `<div style="color:#999;font-size:0.8em;">Typical return: ${Math.round(f.avgHpLeft * 100)}% party HP left, ${f.avgFallen.toFixed(1)} knocked out</div>`;
+        return html;
     },
 
     _buildNodeMapHtml(exp) {

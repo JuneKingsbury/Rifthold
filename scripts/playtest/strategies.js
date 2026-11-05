@@ -13,7 +13,7 @@
 
 import {
     CONFIG, BUILDINGS, RESEARCH, RECIPES, WEAPONS, ARMORS, HELMETS, SPELL_TOMES, SPELLS, REALMS,
-    COLONIST_CONFIG, EXPLORATION_CONFIG, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, WALL_STRUCTURES, MAGIC_SKILLS,
+    COLONIST_CONFIG, EXPLORATION_CONFIG, FARMABLE_TERRAIN, UNBUILDABLE_TERRAIN, PLANT_STRUCTURES, WALL_STRUCTURES, MAGIC_SKILLS, MAGIC_STUDY_CONFIG,
 } from '../../js/core/config.js';
 import { designateBuild, designateGather, cancelDesignation, getMaxCountBonus } from '../../js/systems/building.js';
 import { designateFarmZone } from '../../js/systems/farming.js';
@@ -35,10 +35,13 @@ const COMPETENT_RESEARCH = [
 ];
 
 // Attunement pairs handed out by colonist index, so the colony covers several schools.
-const SCHOOL_PAIRS = [
-    ['evocation', 'abjuration'], ['evocation', 'enchantment'], ['abjuration', 'transmutation'],
-    ['conjuration', 'evocation'], ['divination', 'abjuration'], ['enchantment', 'evocation'],
-];
+// Schools handed out in turn, attunementSlots at a time per colonist, so a
+// colony covers combat (evocation, abjuration, conjuration) first.
+const SCHOOL_ROTATION = ['evocation', 'abjuration', 'conjuration', 'enchantment', 'transmutation', 'divination'];
+const schoolsFor = (i) => {
+    const n = MAGIC_STUDY_CONFIG.attunementSlots;
+    return Array.from({ length: n }, (_, k) => SCHOOL_ROTATION[(i * n + k) % SCHOOL_ROTATION.length]);
+};
 
 const WEAPON_DPS = (w) => (w.damage || 0) / (w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown || 3);
 
@@ -533,8 +536,8 @@ class Strategy {
         if (this.novice && this.day() < 10) return;
         homeC.forEach((c, i) => {
             if (!Array.isArray(c.attunedSchools)) c.attunedSchools = [];
-            if (c.attunedSchools.length < 2) {
-                for (const s of SCHOOL_PAIRS[i % SCHOOL_PAIRS.length]) if (!c.attunedSchools.includes(s)) g.toggleAttunement(c.id, s);
+            if (c.attunedSchools.length < MAGIC_STUDY_CONFIG.attunementSlots) {
+                for (const s of schoolsFor(i)) if (!c.attunedSchools.includes(s)) g.toggleAttunement(c.id, s);
             }
         });
         // Hand out stored tomes, then craft one for a colonist with nothing to study.
@@ -860,7 +863,7 @@ class Strategy {
                 break;
             }
             case 'equip_tome': if (g.resources.tomes.length) g.equipTome(cs[0].id, 0); break;
-            case 'attunement': cs.forEach((c, i) => { for (const s of SCHOOL_PAIRS[i % SCHOOL_PAIRS.length]) if (!(c.attunedSchools || []).includes(s)) g.toggleAttunement(c.id, s); }); break;
+            case 'attunement': cs.forEach((c, i) => { for (const s of schoolsFor(i)) if (!(c.attunedSchools || []).includes(s)) g.toggleAttunement(c.id, s); }); break;
             case 'bedroom_walls': case 'bedroom_door': case 'bedroom_bed': case 'bedroom':
                 if (!this._tutorialRoom) { if (this.buildBedroom()) this._tutorialRoom = true; else this.gather(['tree'], 10); }
                 break;

@@ -1622,6 +1622,7 @@ class Game {
         }
         c.maxHp = baseHp + bonus;
         if (c.hp > c.maxHp) c.hp = c.maxHp;
+        if (!c.golem && c.magicSkills) recalcMaxMana(c);
     }
 
     _updateColonistRadiusHighlight(c) {
@@ -3684,7 +3685,9 @@ class Game {
         this.overlays = [];
         this.worldParticles = [];
         this.alertRipple = null;
-        this.notifications = [];
+        // Notices the save loader queued (e.g. a migration the player should know about).
+        this.notifications = this._loadNotices || [];
+        this._loadNotices = null;
         this.activeComplexStructures = [];
         this.roomQualities = {};
         this.workshopQualities = {};

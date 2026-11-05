@@ -3,12 +3,24 @@ import { RECIPES } from './equipment.js';
 import { CROPS } from './world.js';
 
 export const MAGIC_SKILLS = {
-    evocation:     { name: 'Evocation', baseLevel: [0, 0], biasBonus: 2, color: '#ff6644', description: 'Combat magic' },
-    enchantment:   { name: 'Enchantment', baseLevel: [0, 0], biasBonus: 2, color: '#88ffff', description: 'Supportive magic' },
-    abjuration:    { name: 'Abjuration', baseLevel: [0, 0], biasBonus: 2, color: '#44ff44', description: 'Healing and protective magic' },
-    conjuration:   { name: 'Conjuration', baseLevel: [0, 0], biasBonus: 2, color: '#9966ff', description: 'Summoning and teleportation magic' },
-    transmutation: { name: 'Transmutation', baseLevel: [0, 0], biasBonus: 2, color: '#88ff88', description: 'Environmental and growth magic' },
-    divination:    { name: 'Divination', baseLevel: [0, 0], biasBonus: 2, color: '#ccaaff', description: 'Influencing fate with magic' },
+    evocation:     { name: 'Evocation', baseLevel: [0, 0], biasBonus: 2, color: '#ff6644', description: 'Combat magic',
+        // Fuller role summary: attunement grid tooltip and the glossary entry.
+        summary: 'Damage spells: bolts, fireballs and chain lightning that strike enemies at range, in raids and on expeditions. They hit harder as the caster\'s Evocation level rises.' },
+    enchantment:   { name: 'Enchantment', baseLevel: [0, 0], biasBonus: 2, color: '#88ffff', description: 'Supportive magic',
+        // Fuller role summary: attunement grid tooltip and the glossary entry.
+        summary: 'Buffs and crowd control. At home it speeds up work, improves crafting quality and wards off tiredness. On expeditions it gives the whole party dodges, attack speed and extra damage, and stuns the most dangerous foes. Also sets equipment enchantment tiers.' },
+    abjuration:    { name: 'Abjuration', baseLevel: [0, 0], biasBonus: 2, color: '#44ff44', description: 'Healing and protective magic',
+        // Fuller role summary: attunement grid tooltip and the glossary entry.
+        summary: 'Healing, cleansing and shields. Mends wounded allies at home and in combat. On expeditions, Shield guards whoever enemies target most, and Guardian Ward covers the whole party.' },
+    conjuration:   { name: 'Conjuration', baseLevel: [0, 0], biasBonus: 2, color: '#9966ff', description: 'Summoning and teleportation magic',
+        // Fuller role summary: attunement grid tooltip and the glossary entry.
+        summary: 'Summons that fight beside your colonists (familiars, ghosts, wisps and monsters), decoys that draw enemy attacks, and short-range teleports. An expedition party can have up to 3 summons at once, and summons grow stronger with Conjuration level.' },
+    transmutation: { name: 'Transmutation', baseLevel: [0, 0], biasBonus: 2, color: '#88ff88', description: 'Environmental and growth magic',
+        // Fuller role summary: attunement grid tooltip and the glossary entry.
+        summary: 'Colony magic that speeds crop growth, enriches soil, shapes stone and terrain, and transmutes materials. Little use on expeditions.' },
+    divination:    { name: 'Divination', baseLevel: [0, 0], biasBonus: 2, color: '#ccaaff', description: 'Influencing fate with magic',
+        // Fuller role summary: attunement grid tooltip and the glossary entry.
+        summary: 'Colony magic that bends fate to delay raids, draw in traders, ward off disasters, shift the weather, and reveal Omens of what\'s coming. Little use on expeditions.' },
 };
 
 export const MANA_CONFIG = {
@@ -75,16 +87,16 @@ export const SPELLS = {
     frost_lance: { name: 'Frost Lance', school: 'evocation', minLevel: 3, manaCost: 12, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_slow', damage: 12, range: 6, slowMult: 0.5, slowDuration: 60, slowRounds: 2, projectileColor: '#aaddff', projectileChar: '❄' },
 
     // Abjuration
-    mend: { name: 'Mend', school: 'abjuration', minLevel: 0, manaCost: 5, cooldown: 60, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.5, effect: 'heal', healAmount: 8, range: 4 },
-    renewal: { name: 'Renewal', school: 'abjuration', minLevel: 3, manaCost: 14, cooldown: 90, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.6, effect: 'heal', healAmount: 28, range: 6 },
-    shield: { name: 'Shield', school: 'abjuration', minLevel: 4, manaCost: 15, cooldown: 150, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense', damageReduction: 0.3, duration: 60, radius: 4 },
+    mend: { name: 'Mend', school: 'abjuration', minLevel: 0, manaCost: 4, cooldown: 60, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.5, effect: 'heal', healAmount: 8, range: 4 },
+    renewal: { name: 'Renewal', school: 'abjuration', minLevel: 3, manaCost: 10, cooldown: 90, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.6, effect: 'heal', healAmount: 28, range: 6 },
+    shield: { name: 'Shield', school: 'abjuration', minLevel: 4, manaCost: 15, cooldown: 150, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense', expeditionTarget: 'tank', damageReduction: 0.3, duration: 60, radius: 4 },
     // Chain Heal is the abjuration counterpart to Chain Lightning: it mends the most
     // wounded ally, then bounces to further wounded allies, each bounce healing
     // chainFalloff× the previous. chainTargets counts the primary heal.
-    chain_heal: { name: 'Chain Heal', school: 'abjuration', minLevel: 5, manaCost: 18, cooldown: 100, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.7, effect: 'chain_heal', healAmount: 16, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 5 },
+    chain_heal: { name: 'Chain Heal', school: 'abjuration', minLevel: 5, manaCost: 13, cooldown: 100, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.7, effect: 'chain_heal', healAmount: 16, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 5 },
     fortify: { name: 'Fortify', school: 'abjuration', minLevel: 2, manaCost: 8, cooldown: 100, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense_self', damageReduction: 0.25, duration: 80 },
     // Mending Aura pulses a small heal-over-time to nearby wounded allies each cast.
-    mending_aura: { name: 'Mending Aura', school: 'abjuration', minLevel: 2, manaCost: 10, cooldown: 120, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.8, effect: 'heal_aura', healPerRound: 4, auraRounds: 3, healPerTick: 0.12, range: 5, duration: 90 },
+    mending_aura: { name: 'Mending Aura', school: 'abjuration', minLevel: 2, manaCost: 8, cooldown: 120, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.8, effect: 'heal_aura', healPerRound: 4, auraRounds: 3, healPerTick: 0.12, range: 5, duration: 90 },
     // Cleanse strips harmful statuses (bleed/poison/burn/slow/debuff DoTs) from the most
     // afflicted ally in range. Fires whenever an ally nearby is suffering a debuff.
     cleanse: { name: 'Cleanse', school: 'abjuration', minLevel: 1, manaCost: 8, cooldown: 50, castType: 'auto', trigger: 'debuffNearby', effect: 'cleanse', range: 6 },
@@ -94,7 +106,7 @@ export const SPELLS = {
 
     // Enchantment
     quicken: { name: 'Quicken', school: 'enchantment', minLevel: 0, manaCost: 6, cooldown: 80, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', moveSpeedBonus: 0, workSpeedBonus: 0.2, duration: 40, radius: 3 },
-    haste: { name: 'Haste', school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 200, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', moveSpeedBonus: 0.4, workSpeedBonus: 0.2, duration: 80, idleExclude: true, radius: 5 },
+    haste: { name: 'Haste', school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 200, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', expeditionAttackSpeed: 0.2, expeditionRounds: 4, moveSpeedBonus: 0.4, workSpeedBonus: 0.2, duration: 80, idleExclude: true, radius: 5 },
     // Diligence: aura that improves craft/build quality odds for working allies (read in
     // task-executor applyQuality via a 'quality' activeEffect). Fires while working.
     diligence: { name: 'Diligence', school: 'enchantment', minLevel: 1, manaCost: 8, cooldown: 120, castType: 'auto', trigger: 'hasTask', effect: 'buff_quality', qualityBonus: 3, duration: 150, radius: 4 },
@@ -102,7 +114,7 @@ export const SPELLS = {
     tireless: { name: 'Tireless', school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'buff_rest', restDecayMult: 0.4, duration: 300, idleExclude: true, radius: 5 },
     // Mind Shroud clouds nearby enemies' senses, granting the caster a chance to evade
     // incoming attacks (dodge charges in expedition; evasion aura in colony).
-    mind_shroud: { name: 'Mind Shroud', school: 'enchantment', minLevel: 3, manaCost: 11, cooldown: 120, castType: 'auto', trigger: 'inCombat', effect: 'buff_miss_chance', dodgeBonus: 0.25, dodgeRounds: 2, duration: 80 },
+    mind_shroud: { name: 'Mind Shroud', school: 'enchantment', minLevel: 3, manaCost: 11, cooldown: 120, castType: 'auto', trigger: 'inCombat', effect: 'buff_miss_chance', expeditionTarget: 'tank', dodgeBonus: 0.25, dodgeRounds: 2, duration: 80 },
     // Mesmerize: brief stun/pacify on a foe (skips its turn / freezes it). Light CC.
     mesmerize: { name: 'Mesmerize', school: 'enchantment', minLevel: 3, manaCost: 12, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'stun', range: 6, stunDuration: 45, stunRounds: 1, projectileColor: '#ffccff', projectileChar: '✦' },
 
@@ -116,11 +128,11 @@ export const SPELLS = {
     // Conjure Decoy spawns a short-lived illusory construct that draws enemy attacks.
     // In expeditions enemies strongly prefer targeting it over party members.
     conjure_decoy: { name: 'Conjure Decoy', school: 'conjuration', minLevel: 1, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'inCombat', effect: 'summon_decoy', summonType: 'decoy' },
-    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 1, manaCost: 15, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
+    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 1, manaCost: 10, cooldown: 250, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
     warp: { name: 'Warp', school: 'conjuration', minLevel: 2, manaCost: 15, cooldown: 100, castType: 'targeted', effect: 'teleport', range: 15 },
-    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 3, manaCost: 25, cooldown: 300, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
+    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 3, manaCost: 15, cooldown: 200, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
     gate: { name: 'Gate', school: 'conjuration', minLevel: 4, manaCost: 25, cooldown: 200, castType: 'targeted', effect: 'teleport', range: 30 },
-    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 5, manaCost: 40, cooldown: 600, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
+    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 5, manaCost: 25, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
     // Spectral Swarm conjures several weak, short-lived skirmishers at once (vs. the single
     // summon of the other conjuration spells). swarmCount uses the spectral_wisp entity.
     spectral_swarm: { name: 'Spectral Swarm', school: 'conjuration', minLevel: 3, manaCost: 22, cooldown: 350, castType: 'auto', trigger: 'inCombat', effect: 'summon_swarm', summonType: 'spectral_wisp', swarmCount: 3 },

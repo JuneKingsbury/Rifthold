@@ -1,4 +1,4 @@
-import { CONFIG, ENTITIES, WILDLIFE_CONFIG, PATHFINDING_CONFIG, RESEARCH, TERRAIN, GOLEM_TYPES } from './config.js';
+import { CONFIG, ENTITIES, WILDLIFE_CONFIG, PATHFINDING_CONFIG, RESEARCH, TERRAIN, GOLEM_TYPES, MAGIC_SKILLS, MAGIC_STUDY_CONFIG } from './config.js';
 import { createTile } from '../world/map.js';
 import { syncEntityIdCounter } from '../entities/entity-factory.js';
 import { ensureEntityRoles } from '../entities/roles.js';
@@ -817,7 +817,19 @@ function _applyValidatedData(game, data) {
 
     game.colonistGroups = data.colonistGroups || [];
     game.colonists = data.colonists;
+    const trimmedAttunements = [];
     for (const c of game.colonists) {
+        // Attunement slots dropped from 2 to 1. Keep the colonist's strongest attuned
+        // school; on a tie keep the most recently attuned (toggling appends).
+        const cap = MAGIC_STUDY_CONFIG.attunementSlots;
+        if (Array.isArray(c.attunedSchools) && c.attunedSchools.length > cap) {
+            const ranked = c.attunedSchools
+                .map((school, i) => ({ school, i, level: c.magicSkills?.[school] || 0 }))
+                .sort((a, b) => b.level - a.level || b.i - a.i);
+            const kept = ranked.slice(0, cap).sort((a, b) => a.i - b.i).map(r => r.school);
+            c.attunedSchools = kept;
+            trimmedAttunements.push(`${c.name} (${kept.map(k => MAGIC_SKILLS[k]?.name || k).join(', ')})`);
+        }
         // The pyromaniac trait was removed along with map fires.
         if (Array.isArray(c.traits)) c.traits = c.traits.filter(t => t !== 'pyromaniac');
         // Golems used to default non-specialty work to 5; they now only do their specialty.
@@ -830,6 +842,14 @@ function _applyValidatedData(game, data) {
         _restoreTransient(c, TRANSIENT_COLONIST_DEFAULTS);
         recalcMaxMana(c);
         invalidateEquipStatCache(c);
+    }
+    if (trimmedAttunements.length > 0) {
+        // Queued, not pushed: the load path resets transient state (including
+        // notifications) right after this runs; _resetTransientState posts these.
+        (game._loadNotices ||= []).push({
+            text: `Colonists can now attune to one magic school at a time. Kept: ${trimmedAttunements.join('; ')}. Change it in Priority [P] > Attunement.`,
+            tick: game.tick, type: 'warning',
+        });
     }
     game.rebuildColonistIndex();
     game.entities = data.entities || [];

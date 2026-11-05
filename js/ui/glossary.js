@@ -1,3 +1,5 @@
+import { MAGIC_SKILLS } from '../core/config.js';
+
 export const GLOSSARY = [
     {
         title: 'Colonists & Needs',
@@ -177,14 +179,14 @@ export const GLOSSARY = [
                 entries: [
                     ['Learning Spells', 'Colonists learn spells by studying Spell Tomes at a Research Desk, prioritized by the Research skill. Each tome teaches one spell. Progress persists per-colonist, and completing a tome permanently grants that spell, destroying the tome in the process. Colonists will slowly study their tome while contributing to research topic progress. Colonists will study their tome at a faster pace if there\'s no research topic to contribute to.'],
                     ['Colonist Mana', 'Each colonist has a personal mana pool that grows as they level magic skills. Spells consume mana and go on cooldown. Mana regenerates passively over time or can be restored instantly via potions.'],
-                    ['Auto-Cast', 'Colonists auto-cast known spells when appropriate conditions are met (healing when allies are hurt, buffing speed when working). Each colonist can attune to two magic schools at a time and will be able to auto-cast spells from those schools. Disable specific spells to conserve mana for higher-priority casts.'],
-                    ['Magic Schools', 'Six schools of magic, each with a distinct role: Evocation (damage), Enchantment (work/movement buffs), Abjuration (healing and shields), Conjuration (summons and teleportation), Transmutation (crop growth and terrain manipulation), Divination (influencing fate and events).'],
-                    ['Evocation', 'Offensive combat spells that damage enemies at range. Scales with the caster\'s Evocation skill level.'],
-                    ['Enchantment', 'Buff spells that increase movement and work speed for everyday productivity. Helps colonists complete tasks faster. This skill is also used when determining equipment enchantment tiers.'],
-                    ['Abjuration', 'Healing and defensive spells that keep colonists alive during raids and combat encounters.'],
-                    ['Conjuration', 'Summon familiars, spirits, and golems to fight alongside your colonists or teleport them to safety.'],
-                    ['Transmutation', 'Accelerate crop growth and reshape terrain. Powerful for farming-focused colonies.'],
-                    ['Divination', 'Influence fate itself to delay incoming raids, attract trade caravans, suppress disasters, or shift the weather in your favor. Colonists with Divination skill also generate Omens: prophecies visible in the Arcane panel (V) that give advance warning of incoming raids, weather shifts, and events. Higher Divination skill reveals finer timing and unlocks more omen categories, including hints about what lurks in expedition realms.'],
+                    ['Auto-Cast', 'Colonists auto-cast known spells when appropriate conditions are met (healing when allies are hurt, buffing speed when working). Each colonist attunes to one magic school at a time and auto-casts spells from that school only. Switching is free. Disable specific spells to conserve mana for higher-priority casts.'],
+                    ['Magic Schools', 'Six schools of magic, each with a distinct role: Evocation (damage), Enchantment (buffs and crowd control), Abjuration (healing and shields), Conjuration (summons and teleportation), Transmutation (crop growth and terrain manipulation), Divination (influencing fate and events).'],
+                    ['Evocation', MAGIC_SKILLS.evocation.summary],
+                    ['Enchantment', MAGIC_SKILLS.enchantment.summary],
+                    ['Abjuration', MAGIC_SKILLS.abjuration.summary],
+                    ['Conjuration', MAGIC_SKILLS.conjuration.summary],
+                    ['Transmutation', MAGIC_SKILLS.transmutation.summary],
+                    ['Divination', `${MAGIC_SKILLS.divination.summary} Colonists with Divination skill also generate Omens: prophecies visible in the Arcane panel (V) that give advance warning of incoming raids, weather shifts, and events. Higher Divination skill reveals finer timing and unlocks more omen categories, including hints about what lurks in expedition realms.`],
                 ]
             },
             {

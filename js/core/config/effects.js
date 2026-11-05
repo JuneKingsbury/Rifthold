@@ -31,6 +31,7 @@ export const STAT_META = {
     divinationBonus:      { label: 'Divination',         format: 'plus_percent' },
     manaRegen:            { label: 'Mana Regen',         format: 'plus_per_tick' },
     manaRegenBonus:       { label: 'Mana Regen',         format: 'plus_percent' },
+    maxManaBonus:         { label: 'Max Mana',           format: 'plus_flat' },
     // ── Sustain ──
     healthRegen:          { label: 'Health Regen',       format: 'plus_per_tick' },
     healthRegenBonus:     { label: 'Health Regen',       format: 'plus_percent' },

@@ -31,6 +31,7 @@ Note the `--` before the options: npm needs it to pass them through.
 | `--label=<text>` | Name for the output folder. Defaults to the profile. |
 | `--user-data=<dir>` | Electron profile dir. Give each run its own when running several at once. |
 | `--show` | Show the window and play sound. |
+| `--bot=<path>` | In-page module to run instead of `bot.js`, with the same `run()`/`poll()` contract. Used by `scripts/expsim/inapp-probe.js`. |
 
 ## Profiles
 

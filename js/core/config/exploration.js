@@ -1414,6 +1414,9 @@ export const EXPLORATION_CONFIG = {
     // free opening shot. Makes bows/crossbows feel distinct from melee in
     // expeditions. Damage is scaled by this multiplier (1.0 = a normal hit).
     rangedFirstStrikeDamageMult: 1.0,
+    // Summons the whole party can have out at once, from any mix of casters. A
+    // caster may have several of them; each swarm wisp and decoy takes a slot.
+    maxPartySummons: 3,
     // Party synergies: relationship-driven combat modifiers applied per member
     // based on who else is in the party. A member fighting alongside a friend or
     // lover gains a small outgoing-damage bonus; fighting alongside a rival takes
@@ -3706,11 +3709,10 @@ export const STORY_MILESTONES = {
         realmGroup: 'The Kingdom',
         title: 'Palace Fortress',
         trigger: 'realm_palace_fortress',
+        // The story panel renders the "Return Home (Epilogue)" button for this
+        // entry. It can't live in `text`: sanitizeHtml strips buttons and handlers.
+        epilogueButton: true,
         text: `<img class="pixel-art" src="portraits/realm_palace_fortress.png" alt="A drawing depicting the Palace Fortress">
-        TODO: Write lore text for exploring the Kingdom.
-        <br><br>
-        <div style="text-align:center;margin-top:12px;">
-            <button onclick="window.game.startOutro()" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">Return Home (Epilogue)</button>
-        </div>`,
+        TODO: Write lore text for exploring the Kingdom.`,
     },
 };
