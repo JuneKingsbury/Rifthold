@@ -62,19 +62,19 @@ const GUARDIAN_STATS = {
 };
 const CHAIN_GUARDIANS = {
     thorn_warden:     ['light', 'Thorn Warden',     'T', '#6fbf5a', 'A tangle of living briar that guards the roots of a forgotten grove.'],
-    briar_sentinel:   ['heavy', 'Briar Sentinel',   'B', '#3f8f3a', 'Old heartwood grown into a hulking guardian. It does not forget trespassers.'],
-    crystal_warden:   ['light', 'Crystal Warden',   'c', '#8fd8ff', 'A shard-bodied watcher that hums when the deep stone is disturbed.'],
-    crystal_sentinel: ['heavy', 'Crystal Sentinel', 'C', '#58b8ee', 'A towering facet of living crystal, slow to wake and slower to fall.'],
-    rune_automaton:   ['light', 'Rune Automaton',   'r', '#ffaa66', 'A scribe-built construct still following its last instruction.'],
-    arcane_sentinel:  ['heavy', 'Arcane Sentinel',  'A', '#ff8844', 'A warding engine, rune-etched and wound tight with old spells.'],
-    shade_warden:     ['light', 'Shade Warden',     's', '#8877bb', 'A shadow with weight to it. It lingers where the light never reached.'],
-    gloom_sentinel:   ['heavy', 'Gloom Sentinel',   'G', '#5d4f99', 'Something tall and patient, made of the dark between torches.'],
+    briar_sentinel:   ['heavy', 'Briar Sentinel',   'B', '#3f8f3a', 'Old heartwood grown into a hulking guardian.'],
+    crystal_warden:   ['light', 'Crystal Warden',   'c', '#8fd8ff', 'TODO.'],
+    crystal_sentinel: ['heavy', 'Crystal Sentinel', 'C', '#58b8ee', 'TODO.'],
+    rune_automaton:   ['light', 'Rune Automaton',   'r', '#ffaa66', 'A scholar-built construct still following its last instructions.'],
+    arcane_sentinel:  ['heavy', 'Arcane Sentinel',  'A', '#ff8844', 'An engine wound tight with old spells.'],
+    shade_warden:     ['light', 'Shade Warden',     's', '#8877bb', 'TODO.'],
+    gloom_sentinel:   ['heavy', 'Gloom Sentinel',   'G', '#5d4f99', 'TODO.'],
     void_acolyte:     ['light', 'Void Acolyte',     'v', '#aa66ee', 'A hollowed servant of the pact, still murmuring its vows.'],
-    void_sentinel:    ['heavy', 'Void Sentinel',    'V', '#7722cc', 'A bound horror kept awake by the pact it sealed.'],
-    fracture_wraith:  ['light', 'Fracture Wraith',  'f', '#ff7766', 'A flickering thing that is never quite where you struck it.'],
-    fracture_horror:  ['heavy', 'Fracture Horror',  'F', '#ee3355', 'A body torn and stitched wrong by the rift. It hits like it knows you.'],
-    palace_husk:      ['light', 'Palace Husk',      'p', '#ddc060', 'The ghost of a palace guard, drilling its last watch.'],
-    revenant_knight:  ['heavy', 'Revenant Knight',  'K', '#c9a227', 'A knight of the old crown, risen and still loyal.'],
+    void_sentinel:    ['heavy', 'Void Sentinel',    'V', '#7722cc', 'A bound horror kept awake by the pact it signed an eon ago.'],
+    fracture_wraith:  ['light', 'Fracture Wraith',  'f', '#ff7766', 'A flickering thing constantly jumping in and out of our world.'],
+    fracture_horror:  ['heavy', 'Fracture Horror',  'F', '#ee3355', 'A body torn and stitched back together by the rift.'],
+    palace_husk:      ['light', 'Palace Husk',      'p', '#ddc060', 'The remains of a palace guard, rusted armor continuing its final watch.'],
+    revenant_knight:  ['heavy', 'Revenant Knight',  'K', '#c9a227', 'A long dead knight brought back to serve its kingdom once more.'],
 };
 for (const [key, [weight, name, char, color, lore]] of Object.entries(CHAIN_GUARDIANS)) {
     ENTITIES[key] = { name, char, color, ...GUARDIAN_STATS[weight], category: 'animal', hostile: true, guardian: true, meatYield: 0, spawnWeight: 0, lore };
