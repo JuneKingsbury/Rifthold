@@ -24,6 +24,11 @@ const SELECT_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 
 const EMPTY_SET = new Set();
 const WHEEL_GESTURE_GAP_MS = 200;
 
+// Touch: how far (px) a finger may wander before a touch stops counting as a tap or
+// long press, and how long it must be held to count as a long press (a right-click).
+const TOUCH_SLOP_PX = 8;
+const LONG_PRESS_MS = 450;
+
 // <input> types that take typed text. Other inputs (checkboxes, sliders,
 // buttons, colour pickers) keep focus after a click but don't consume keys, so
 // they must not swallow hotkeys or Esc.
@@ -87,8 +92,9 @@ export class InputHandler {
         preElement.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
         preElement.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false });
         preElement.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: false });
+        preElement.addEventListener('touchcancel', () => this.onTouchCancel(), { passive: true });
 
-        this._lastPinchDist = 0;
+        this._pinch = null;
         preElement.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
         preElement.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
 
@@ -152,6 +158,7 @@ export class InputHandler {
         document.removeEventListener('keyup', this._onDocKeyUp);
         window.removeEventListener('mouseup', this._onWindowMouseUp);
         window.removeEventListener('blur', this._onWindowBlur);
+        this._cancelLongPress();
         this.cancelPointerDrag();
     }
 
@@ -580,6 +587,7 @@ export class InputHandler {
         if (this.guardPointTargeting) { this.cancelGuardPointTargeting(); return; }
         if (this.penReassignTargeting) { this.cancelPenReassignTargeting(); return; }
         const ui = this.game.ui;
+        if (ui.closeMoreMenu?.()) return;
         const hadPanel = ui.priorityPanelVisible || ui.craftPanelVisible ||
             ui.researchPanelVisible || ui.inventoryVisible ||
             ui.settingsPanelVisible ||
@@ -700,6 +708,7 @@ export class InputHandler {
     setMode(mode) {
         this.mode = mode;
         this.deconstructMode = false;
+        this.touchPanMode = false;
         this.dragStart = null;
         this.dragEnd = null;
         this.dragging = false;
@@ -896,12 +905,12 @@ export class InputHandler {
     onTouchStart(e) {
         this._dragPreviewKey = null;
         e.preventDefault();
+        this.game.ui.dismissTouchTooltips?.();
         if (e.touches.length === 2) {
-            const dx = e.touches[0].clientX - e.touches[1].clientX;
-            const dy = e.touches[0].clientY - e.touches[1].clientY;
-            this._lastPinchDist = Math.hypot(dx, dy);
-            this._isPinching = true;
+            this._cancelLongPress();
+            this._beginPinch(e.touches[0], e.touches[1]);
             this._touchPanning = false;
+            this._gesturePanning = false;
             this.dragging = false;
             this.dragStart = null;
             this.dragEnd = null;
@@ -909,6 +918,7 @@ export class InputHandler {
         }
         if (e.touches.length !== 1) return;
         this._isPinching = false;
+        this._longPressFired = false;
         this._touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         this._touchMoved = false;
 
@@ -922,6 +932,8 @@ export class InputHandler {
         if (pos.x < 0 || pos.x >= CONFIG.MAP_WIDTH || pos.y < 0 || pos.y >= CONFIG.MAP_HEIGHT) return;
 
         this.game.cursor = pos;
+        this.game.ui.onMapTouched?.();
+        this._startLongPress(pos, e.touches[0]);
         if (this.mode === 'normal') {
             this._gesturePanning = false;
             this._gestureDecided = false;
@@ -940,55 +952,47 @@ export class InputHandler {
     onTouchMove(e) {
         e.preventDefault();
         if (e.touches.length === 2) {
-            const dx = e.touches[0].clientX - e.touches[1].clientX;
-            const dy = e.touches[0].clientY - e.touches[1].clientY;
-            const dist = Math.hypot(dx, dy);
-            if (this._lastPinchDist > 0) {
-                const delta = dist - this._lastPinchDist;
-                if (delta > 20) {
-                    window.zoomIn?.();
-                    this._lastPinchDist = dist;
-                } else if (delta < -20) {
-                    window.zoomOut?.();
-                    this._lastPinchDist = dist;
-                }
-            }
-            this._lastPinchDist = dist;
-            this._isPinching = true;
+            if (!this._isPinching) this._beginPinch(e.touches[0], e.touches[1]);
+            this._movePinch(e.touches[0], e.touches[1]);
             return;
         }
         if (e.touches.length !== 1 || this._isPinching) return;
 
+        const t = e.touches[0];
+        if (Math.hypot(t.clientX - this._touchStartPos.x, t.clientY - this._touchStartPos.y) > TOUCH_SLOP_PX) {
+            this._cancelLongPress();
+        }
+        if (this._longPressFired) return;
         this._touchMoved = true;
 
         if (this._touchPanning) {
-            const dx = e.touches[0].clientX - this._touchPanLast.x;
-            const dy = e.touches[0].clientY - this._touchPanLast.y;
+            const dx = t.clientX - this._touchPanLast.x;
+            const dy = t.clientY - this._touchPanLast.y;
             this.game.camera.pan(-dx / this.charWidth, -dy / this.charHeight);
-            this._touchPanLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            this._touchPanLast = { x: t.clientX, y: t.clientY };
             return;
         }
 
         if (this.mode === 'normal') {
             if (!this._gestureDecided) {
-                const dx = e.touches[0].clientX - this._touchStartPos.x;
-                const dy = e.touches[0].clientY - this._touchStartPos.y;
-                if (Math.hypot(dx, dy) > 8) {
+                const dx = t.clientX - this._touchStartPos.x;
+                const dy = t.clientY - this._touchStartPos.y;
+                if (Math.hypot(dx, dy) > TOUCH_SLOP_PX) {
                     this._gestureDecided = true;
                     this._gesturePanning = true;
-                    this._gesturePanLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    this._gesturePanLast = { x: t.clientX, y: t.clientY };
                 }
             }
             if (this._gesturePanning) {
-                const dx = e.touches[0].clientX - this._gesturePanLast.x;
-                const dy = e.touches[0].clientY - this._gesturePanLast.y;
+                const dx = t.clientX - this._gesturePanLast.x;
+                const dy = t.clientY - this._gesturePanLast.y;
                 this.game.camera.pan(-dx / this.charWidth, -dy / this.charHeight);
-                this._gesturePanLast = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                this._gesturePanLast = { x: t.clientX, y: t.clientY };
             }
             return;
         }
 
-        const pos = this.getTouchTile(e.touches[0]);
+        const pos = this.getTouchTile(t);
         if (pos.x >= 0 && pos.x < CONFIG.MAP_WIDTH && pos.y >= 0 && pos.y < CONFIG.MAP_HEIGHT) {
             this.game.cursor = pos;
             if (this.dragging) {
@@ -999,11 +1003,24 @@ export class InputHandler {
 
     onTouchEnd(e) {
         e.preventDefault();
+        this._cancelLongPress();
         if (this._isPinching) {
             if (e.touches.length === 0) {
                 this._isPinching = false;
-                this._lastPinchDist = 0;
+                this._pinch = null;
             }
+            return;
+        }
+
+        // The long press already acted (right-click or tile info), so lifting the finger does nothing.
+        if (this._longPressFired) {
+            this._longPressFired = false;
+            this.dragStart = null;
+            this.dragEnd = null;
+            this.dragging = false;
+            this._clickPos = null;
+            this._gestureDecided = false;
+            this._gesturePanning = false;
             return;
         }
 
@@ -1019,7 +1036,9 @@ export class InputHandler {
                 this._touchMoved = false;
                 return;
             }
-            this.handleLeftClick(this._clickPos || this.game.cursor);
+            const tapPos = this._clickPos || this.game.cursor;
+            if (this._tapMovesDrafted(tapPos)) this.handleRightClick(tapPos);
+            else this.handleLeftClick(tapPos);
             this._gestureDecided = false;
             this._touchMoved = false;
             this._clickPos = null;
@@ -1057,6 +1076,94 @@ export class InputHandler {
         }
     }
 
+    // The OS took the touch (a system gesture or a dialog), so drop it without acting on it.
+    onTouchCancel() {
+        this._cancelLongPress();
+        this._longPressFired = false;
+        this._isPinching = false;
+        this._pinch = null;
+        this._touchPanning = false;
+        this._gesturePanning = false;
+        this._gestureDecided = false;
+        this.dragging = false;
+        this.dragStart = null;
+        this.dragEnd = null;
+        this._clickPos = null;
+    }
+
+    // Two fingers zoom and pan together: the map point between the fingers stays under them,
+    // so spreading zooms toward that point and moving both fingers drags the map. Works in
+    // every mode, since one finger draws the selection box in build, farm and gather modes.
+    _beginPinch(a, b) {
+        const rect = this.pre.getBoundingClientRect();
+        const mx = (a.clientX + b.clientX) / 2 - rect.left;
+        const my = (a.clientY + b.clientY) / 2 - rect.top;
+        const cam = this.game.camera;
+        this._isPinching = true;
+        this._pinch = {
+            dist: Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)),
+            font: window.getZoomFont?.() ?? 14,
+            worldX: cam.x + mx / this.charWidth,
+            worldY: cam.y + my / this.charHeight,
+        };
+    }
+
+    _movePinch(a, b) {
+        const p = this._pinch;
+        if (!p) { this._beginPinch(a, b); return; }
+        const dist = Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY));
+        const font = p.font * dist / p.dist;
+        if (Math.abs(font - (window.getZoomFont?.() ?? font)) >= 0.25) window.setZoomFont?.(font);
+        const rect = this.pre.getBoundingClientRect();
+        const mx = (a.clientX + b.clientX) / 2 - rect.left;
+        const my = (a.clientY + b.clientY) / 2 - rect.top;
+        const cam = this.game.camera;
+        cam.x = p.worldX - mx / this.charWidth;
+        cam.y = p.worldY - my / this.charHeight;
+        cam.clamp();
+        cam.targetX = cam.x;
+        cam.targetY = cam.y;
+    }
+
+    // A finger held still stands in for the right mouse button: it cancels a designation,
+    // removes a farm zone, toggles "do first", or orders drafted colonists. On a tile with
+    // nothing to act on it shows the tile's info instead, as hovering does with a mouse.
+    _startLongPress(pos, touch) {
+        this._cancelLongPress();
+        const rect = this.pre.getBoundingClientRect();
+        const at = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+        this._longPressTimer = setTimeout(() => {
+            this._longPressTimer = null;
+            this._longPressFired = true;
+            this.dragging = false;
+            this.dragStart = null;
+            this.dragEnd = null;
+            navigator.vibrate?.(15);
+            const tile = this.game.map[pos.y]?.[pos.x];
+            const anyDrafted = this.game.colonists.some(c => c.drafted && c.hp > 0);
+            if (this.mode === 'normal' && !this.rallyMode && !anyDrafted && !tile?.designation) {
+                this.game.ui.showTileTooltipAt?.(pos.x, pos.y, at.x, at.y);
+            } else {
+                this.handleRightClick(pos);
+            }
+        }, LONG_PRESS_MS);
+    }
+
+    _cancelLongPress() {
+        clearTimeout(this._longPressTimer);
+        this._longPressTimer = null;
+    }
+
+    // On touch there is no right button, so with drafted colonists selected a tap on
+    // anything but a colonist sends them there (a tap on a colonist still selects it).
+    _tapMovesDrafted(pos) {
+        if (!pos || this.spellTargeting || this.guardPointTargeting || this.penReassignTargeting ||
+            this.rallyMode || this.destroyMode) return false;
+        const selected = this.game.selectedColonists || [];
+        if (!selected.some(c => c.drafted && c.hp > 0)) return false;
+        return !this.game.colonists.some(c => c.x === pos.x && c.y === pos.y && c.hp > 0);
+    }
+
     toggleDeconstructMode() {
         this.deconstructMode = !this.deconstructMode;
         this.game.ui.updateModeDisplay(this);
@@ -1070,8 +1177,9 @@ export class InputHandler {
 
     toggleTouchPanMode() {
         this.touchPanMode = !this.touchPanMode;
-        const btn = document.getElementById('touch-pan-btn');
-        if (btn) btn.classList.toggle('active', this.touchPanMode);
+        for (const btn of document.querySelectorAll('#touch-pan-btn, [data-mode-action="pan"]')) {
+            btn.classList.toggle('active', this.touchPanMode);
+        }
     }
 
     toggleRallyMode() {

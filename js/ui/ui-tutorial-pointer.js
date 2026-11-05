@@ -3,6 +3,8 @@
 // from this module, and map targets are handed to OverlayRenderer through
 // `game.tutorialMapHint`, because tiles have no DOM element to anchor to.
 
+import { touchText, isCompactLayout } from './ui-utils.js';
+
 const POLL_MS = 150;
 const NOTE_REFRESH_EVERY = 7; // polls (~1s), so affordability/stuck hints stay current
 const EDGE = 6; // keep the arrow this far from the window edge
@@ -90,11 +92,26 @@ const pointerMethods = {
                 target = this._resolveTarget(desc);
             }
         }
+        if (!target && isCompactLayout()) {
+            // Narrow screens hide some of these behind a footer tab or the More button.
+            desc = this._compactPointerFallback(desc);
+            if (desc) target = this._resolveTarget(desc);
+        }
         if (!target) {
             this._hideTutorialPointer();
             return;
         }
         this._placePointer(target, desc.label);
+    },
+
+    // On narrow screens the colonist list and info panel are footer tabs, and some panel
+    // buttons are in the More menu. Point at what reveals the target instead.
+    _compactPointerFallback(desc) {
+        const sel = desc.selector || '';
+        if (sel.includes('#colonist-hud')) return { selector: '#footer-tabs .footer-tab[data-tab="colonists"]', label: 'Open Colonists' };
+        if (sel.includes('.info-actions') || sel.includes('data-tut-slot')) return { selector: '#footer-tabs .footer-tab[data-tab="info"]', label: 'Open Info' };
+        if (sel.startsWith('#mode-bar')) return { selector: '#mode-bar [data-mode-action="more"]', label: 'Open More' };
+        return null;
     },
 
     // The settings dialog and similar modals sit on top of the game; an arrow floating over them is confusing.
@@ -151,7 +168,7 @@ const pointerMethods = {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
 
-        this._tpLabel.textContent = label || '';
+        this._tpLabel.textContent = touchText(label || '');
         this._tpLabel.style.display = label ? '' : 'none';
         el.classList.toggle('tp-static', !!this.game.settings.reduceMotion);
         el.style.display = 'block';

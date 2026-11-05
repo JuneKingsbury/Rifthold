@@ -158,3 +158,43 @@ export function sanitizeHtml(html) {
     _sanitizeCache.set(src, out);
     return out;
 }
+
+// True when the primary pointer is a finger (phones, tablets). Touch-only UI
+// (long-press tips, no keyboard hints, bigger tap targets) keys off this, so a
+// laptop with a touchscreen but a mouse or trackpad keeps the desktop UI.
+export function isTouchUI() {
+    return !!window.matchMedia?.('(pointer: coarse)').matches;
+}
+
+// True when the narrow tabbed layout is active (phones, or Layout mode: Tabbed).
+export function isCompactLayout() {
+    return !!(document.getElementById('game-footer')?.classList.contains('tabbed')
+        || document.getElementById('game-container')?.classList.contains('tabbed-mode'));
+}
+
+// "[F]"-style key hints are noise without a keyboard.
+export function keyHint(key) {
+    return isTouchUI() ? '' : `[${key}]`;
+}
+
+// Panels that sit behind the More button on narrow screens (see COMPACT_NAV_PRIMARY in ui.js).
+const MORE_MENU_PANELS = 'Priority|Rifts|Story|Inventory';
+
+// Rewrites mouse-and-keyboard wording for touch screens: drops key hints, and turns
+// clicks into taps and right-clicks into long presses. Steps that need more than a
+// word swap have their own descriptionTouch.
+export function touchText(text) {
+    if (!text || !isTouchUI()) return text;
+    let t = text
+        .replace(/Press \[[^\]]+\] or click ([^,.]+?) in the mode bar/g, 'Tap $1 at the bottom of the screen')
+        .replace(/Press \[Space\] or click the 1x button/g, 'Tap the 1x button')
+        .replace(/press \[Q\] to draft/g, 'tap Draft on the bottom bar to draft')
+        .replace(/\s?\[(?:[A-Z]|Space|Esc|Tab)\]/g, '')
+        .replace(/right-click/g, 'long-press')
+        .replace(/Right-click/g, 'Long-press')
+        .replace(/Click and drag/g, 'Drag')
+        .replace(/\bclick(ing)?\b/g, (_, ing) => (ing ? 'tapping' : 'tap'))
+        .replace(/\bClick(ing)?\b/g, (_, ing) => (ing ? 'Tapping' : 'Tap'));
+    if (isCompactLayout()) t = t.replace(new RegExp(`\\bOpen (${MORE_MENU_PANELS})\\b`, 'g'), 'Open $1 from the More menu');
+    return t;
+}

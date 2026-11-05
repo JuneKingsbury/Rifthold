@@ -293,6 +293,7 @@ const TUTORIAL_STEPS = [
         levels: ['none'],
         title: 'Look Around',
         description: 'Move the camera with [WASD], the arrow keys, or by dragging with the middle mouse button. The mouse wheel zooms in and out. Touch screens can swipe to move the camera and pinch to zoom.',
+        descriptionTouch: 'Drag the map with one finger to look around, and pinch to zoom in and out. While you are building or farming, one finger draws on the map, so use two fingers to move it.',
         highlight: null,
         isComplete(game) { return !!game.tutorial.flags.cameraMoved; },
         goTo() {},
@@ -750,8 +751,9 @@ export class TutorialSystem {
             : this.currentStep >= this.steps.length;
     }
 
-    getDescription(task) {
-        return (this.level === 'none' && task.descriptionNone) || task.description;
+    // `touch`: the player is on a touch screen, for steps whose text is about the mouse.
+    getDescription(task, touch = false) {
+        return (touch && task.descriptionTouch) || (this.level === 'none' && task.descriptionNone) || task.description;
     }
 
     _skipCompleted() {

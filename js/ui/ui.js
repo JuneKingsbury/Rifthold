@@ -8,7 +8,7 @@ import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
-import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml } from './ui-utils.js';
+import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml, isTouchUI, isCompactLayout, keyHint } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { getPedestalEffect, getPedestalCharge, getMaxPedestalCharge, getTilePedestalStats } from '../systems/artifacts.js';
 import { getPowerTier } from '../systems/power.js';
@@ -26,6 +26,15 @@ import { getAllSlotsMeta, exportSlot, getLastSyncTime, forceSyncNow } from '../c
 
 // How long the cursor must rest on a tile before its info tooltip appears.
 const TILE_TOOLTIP_DELAY_MS = 600;
+// Touch: hold time for a long press on the interface, and how far down from a bottom
+// sheet's top edge a drag resizes the sheet rather than scrolling it.
+const UI_LONG_PRESS_MS = 450;
+const SHEET_GRAB_PX = 28;
+// Where a long press stands in for right-click (priority cells cycle backwards).
+const PRESS_MENU_TARGETS = '#priority-panel [data-colonist-id][data-skill], #priority-panel [data-profile-skill]';
+const SHEET_PANELS = '#priority-panel, #craft-panel, #research-panel, #inventory-panel, #taming-panel, #settings-panel, #arcane-panel, #story-panel, #map-panel, #save-slot-ingame-panel';
+// Mode-bar buttons that stay on the bar on narrow screens. The rest go in the More menu.
+const COMPACT_NAV_PRIMARY = ['build', 'zone', 'gather', 'craft', 'research'];
 const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '❄', blizzard: '❅', heatwave: '♨' };
 
 // Skill/magic XP tooltip text, shared by the colonist tooltip refresh and the
@@ -468,24 +477,15 @@ export class UI {
                 this.updateModeDisplay(this.game.input);
                 return;
             }
+            const overlayOpt = e.target.closest('[data-overlay]');
+            if (overlayOpt) {
+                this.game.input.actions[`toggle${overlayOpt.dataset.overlay}`]?.();
+                this.updateModeDisplay(this.game.input);
+                return;
+            }
             const modeOpt = e.target.closest('[data-mode-action]');
             if (modeOpt) {
-                const action = modeOpt.dataset.modeAction;
-                switch (action) {
-                    case 'back': this.game.input.setMode('normal'); break;
-                    case 'build': this.game.input.setMode('build'); break;
-                    case 'zone': this.game.input.setMode('zone'); break;
-                    case 'gather': this.game.input.setMode('designate'); break;
-                    case 'deconstruct': this.game.input.toggleDeconstructMode(); break;
-                    case 'priority': this.togglePriorityPanel(); break;
-                    case 'craft': this.toggleCraftPanel(); break;
-                    case 'research': this.toggleResearchPanel(); break;
-                    case 'inventory': this.toggleInventoryPanel(); break;
-                    case 'settings': this.toggleSettingsPanel(); break;
-                    case 'arcane': this.toggleArcanePanel(); break;
-                    case 'story': this.toggleStoryPanel(); break;
-                    case 'map': this.toggleMapPanel(); break;
-                }
+                this._runModeAction(modeOpt.dataset.modeAction);
                 return;
             }
             const desOpt = e.target.closest('[data-designate-mode]');
@@ -503,6 +503,10 @@ export class UI {
         this._buildTooltipTimer = null;
 
         const buildOptClick = (e) => {
+            if (e.target.closest('[data-mode-action="pan"]')) {
+                this.game.input.toggleTouchPanMode();
+                return;
+            }
             const closeBtn = e.target.closest('[data-mode-action="back"]');
             if (closeBtn) {
                 this.game.input.setMode('normal');
@@ -536,10 +540,11 @@ export class UI {
             this.game.input.buildType = buildType;
             this.updateModeDisplay(this.game.input);
             window.soundManager?.playSFXPitched('button_click', 0);
-            if ('ontouchstart' in window) {
+            if (isTouchUI() || 'ontouchstart' in window) {
+                // No hover on touch: the tip stays up until the next touch elsewhere.
                 clearTimeout(this._buildTooltipTimer);
                 this._showBuildTooltip(opt);
-                this._buildTooltipTimer = setTimeout(() => this._hideBuildTooltip(), 2000);
+                this._touchTipShown = true;
             }
         };
         const buildOptHover = (e) => {
@@ -836,6 +841,148 @@ export class UI {
             if (related && related.closest && related.closest('.skill-tip[data-tip]')) return;
             uiTooltip.style.opacity = '0';
         });
+        this._initTouchHelpers(uiTooltip, _positionTooltip);
+    }
+
+    // Touch has no hover and no right button. A held finger shows the tooltip a mouse would
+    // get on hover (it stays until the next touch), and on a priority cell it lowers the
+    // value the way right-click does. Bottom-sheet panels can be dragged by their top edge.
+    _initTouchHelpers(uiTooltip, positionTooltip) {
+        let press = null;
+        let sheetDrag = null;
+        this._touchTipShown = false;
+        this._suppressContextMenuUntil = 0;
+        const cancel = () => { if (press) clearTimeout(press.timer); press = null; };
+        const fire = () => {
+            const { el, kind, x, y } = press;
+            press.fired = true;
+            // Swallow the click the release may still produce (until shortly after touchend).
+            this._suppressClickUntil = performance.now() + 5000;
+            navigator.vibrate?.(10);
+            if (kind === 'menu') {
+                this._suppressContextMenuUntil = performance.now() + 1000;
+                // The panel may have re-rendered during the hold, so find the cell under the finger again.
+                const cell = document.elementFromPoint(x, y)?.closest(PRESS_MENU_TARGETS);
+                if (!cell) return;
+                cell.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+                return;
+            }
+            if (kind === 'build') {
+                this._showBuildTooltip(el);
+                this._touchTipShown = true;
+                return;
+            }
+            if (el.dataset.compare) uiTooltip.innerHTML = el.dataset.compare;
+            else uiTooltip.textContent = el.dataset.tip || el.getAttribute('title') || '';
+            if (!uiTooltip.textContent.trim()) return;
+            uiTooltip.style.opacity = '1';
+            positionTooltip(el.getBoundingClientRect());
+            this._touchTipShown = true;
+        };
+        this._listen(document, 'touchstart', (e) => {
+            cancel();
+            if (e.touches.length !== 1) return;
+            const t = e.touches[0];
+            if (!e.target.closest?.('#ui-tooltip, #build-tooltip, #tile-tooltip')) this.dismissTouchTooltips();
+            const sheet = isCompactLayout() && e.target.closest?.(SHEET_PANELS);
+            if (sheet && t.clientY - sheet.getBoundingClientRect().top <= SHEET_GRAB_PX) {
+                sheetDrag = { sheet, startY: t.clientY, startH: sheet.getBoundingClientRect().height, moved: false };
+            }
+            const menuEl = e.target.closest?.(PRESS_MENU_TARGETS);
+            const tipEl = !menuEl && e.target.closest?.('.skill-tip[data-tip], .skill-tip[data-compare], .research-node[data-tip], [data-build-opt], [title]');
+            const el = menuEl || tipEl;
+            if (!el) return;
+            const kind = menuEl ? 'menu' : el.dataset.buildOpt ? 'build' : 'tip';
+            press = { el, kind, x: t.clientX, y: t.clientY, fired: false, timer: setTimeout(fire, UI_LONG_PRESS_MS) };
+        }, { capture: true, passive: true });
+        this._listen(document, 'touchmove', (e) => {
+            const t = e.touches[0];
+            if (press && !press.fired && Math.hypot(t.clientX - press.x, t.clientY - press.y) > 8) cancel();
+            if (!sheetDrag) return;
+            // The top strip is the handle: it never scrolls the sheet's content.
+            e.preventDefault();
+            const dy = t.clientY - sheetDrag.startY;
+            if (!sheetDrag.moved && Math.abs(dy) < 8) return;
+            sheetDrag.moved = true;
+            const h = Math.max(120, Math.min(window.innerHeight * 0.94, sheetDrag.startH - dy));
+            this._setSheetHeight(sheetDrag.sheet, h);
+        }, { capture: true, passive: false });
+        const end = (e) => {
+            if (press?.fired) {
+                e.preventDefault(); // the long press acted, so no click follows
+                this._suppressClickUntil = performance.now() + 350;
+            }
+            cancel();
+            if (sheetDrag?.moved) {
+                const h = sheetDrag.sheet.getBoundingClientRect().height;
+                // Dragged well down: treat it as a swipe to close.
+                if (h < sheetDrag.startH * 0.55) {
+                    this._setSheetHeight(sheetDrag.sheet, null);
+                    this.game.input.handleEscape();
+                }
+            }
+            sheetDrag = null;
+        };
+        this._listen(document, 'touchend', end, { capture: true, passive: false });
+        this._listen(document, 'touchcancel', () => { cancel(); sheetDrag = null; }, { capture: true, passive: true });
+        this._listen(document, 'click', (e) => {
+            if (performance.now() >= (this._suppressClickUntil || 0)) return;
+            this._suppressClickUntil = 0;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }, { capture: true });
+        // Android also fires its own contextmenu on a long press. One decrement is enough.
+        this._listen(document, 'contextmenu', (e) => {
+            if (e.isTrusted && performance.now() < this._suppressContextMenuUntil) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+        }, { capture: true });
+        // A tap outside the More menu closes it.
+        this._listen(document, 'pointerdown', (e) => {
+            if (this._moreMenuOpen && !e.target.closest?.('.more-menu, [data-mode-action="more"]')) this.closeMoreMenu();
+        }, { capture: true });
+    }
+
+    // Back to the stylesheet's sheet heights (used when leaving the narrow layout).
+    resetSheetHeights() {
+        for (const sheet of document.querySelectorAll(SHEET_PANELS)) this._setSheetHeight(sheet, null);
+    }
+
+    _setSheetHeight(sheet, h) {
+        sheet.style.height = h == null ? '' : `${h}px`;
+        sheet.style.maxHeight = h == null ? '' : `${h}px`;
+        if (h == null) sheet.style.removeProperty('--sheet-h');
+        else sheet.style.setProperty('--sheet-h', `${h}px`);
+    }
+
+    // Hides tooltips a long press (or a tap on a build card) left open.
+    dismissTouchTooltips() {
+        if (this._touchTipShown) {
+            this._touchTipShown = false;
+            const uiTooltip = document.getElementById('ui-tooltip');
+            if (uiTooltip) uiTooltip.style.opacity = '0';
+            this._hideBuildTooltip();
+        }
+        if (this._tileTipFromTouch) {
+            this._tileTipFromTouch = false;
+            this.hideTileTooltip();
+        }
+    }
+
+    // Tile info for a long press on the map. px/py are relative to the map element.
+    showTileTooltipAt(x, y, px, py) {
+        this.hideTileTooltip();
+        this._tipTile = { x, y };
+        this._tipPos = { left: `${Math.max(4, px - 60)}px`, top: `${Math.max(4, py - 56)}px` };
+        this._showTileTooltip(x, y);
+        this._tileTipFromTouch = true;
+        const tip = document.getElementById('tile-tooltip');
+        const area = document.getElementById('game-area');
+        if (tip && area) {
+            const maxLeft = area.clientWidth - tip.offsetWidth - 4;
+            tip.style.left = `${Math.max(4, Math.min(px - tip.offsetWidth / 2, maxLeft))}px`;
+        }
     }
 
     // Tear down the listeners (document and persistent panels) and body-level
@@ -921,6 +1068,7 @@ export class UI {
             this.elements.eventPanel.style.display = 'none';
             this.elements.eventPanel.className = '';
         }
+        document.body.classList.remove('event-open');
 
         // Arcane / expedition panel.
         this._lastArcaneHtml = '';
@@ -938,6 +1086,7 @@ export class UI {
 
     update(skipArcane) {
         this.updateStatusBar();
+        this.updateTouchToolbar();
         this.updateNotifications();
         this.updateEventPanel();
         if (this.priorityPanelVisible) this.updatePriorityPanel();
@@ -1165,69 +1314,190 @@ export class UI {
     updateModeDisplay(input) {
         this._buildTooltipTarget = null;
         this._hideBuildTooltip();
+        this.updateTouchToolbar(true);
+        const touch = isTouchUI();
+        // No Esc key on a phone, so targeting gets a button to back out.
+        const cancelBtn = touch ? '<span class="mode-opt mode-back" data-mode-action="cancel-target">Cancel</span>' : '';
         if (input.spellTargeting) {
             const { spell } = input.spellTargeting;
-            let html = `<span class="mode-label" style="color:#bb88ff">SPELL TARGET: ${escapeHtml(spell.name)}</span>`;
-            html += `<span class="mode-hint" style="color:#aa88ff">Click target tile (range: ${spell.range || '∞'}) | [Esc] Cancel</span>`;
+            let html = `<span class="mode-label" style="color:#bb88ff">SPELL TARGET: ${escapeHtml(spell.name)}</span>${cancelBtn}`;
+            html += touch
+                ? `<span class="mode-hint" style="color:#aa88ff">Tap target tile (range: ${spell.range || '∞'})</span>`
+                : `<span class="mode-hint" style="color:#aa88ff">Click target tile (range: ${spell.range || '∞'}) | [Esc] Cancel</span>`;
             this.elements.modeBar.innerHTML = html;
             return;
         }
         if (input.guardPointTargeting) {
             const colonist = this.game.getColonist(input.guardPointTargeting.colonistId);
-            let html = `<span class="mode-label" style="color:#88ff88">SET GUARD POINT: ${escapeHtml(colonist.name)}</span>`;
-            html += `<span class="mode-hint" style="color:#66ff66">Click passable tile to set guard point | [Esc] Cancel</span>`;
+            let html = `<span class="mode-label" style="color:#88ff88">SET GUARD POINT: ${escapeHtml(colonist.name)}</span>${cancelBtn}`;
+            html += touch
+                ? '<span class="mode-hint" style="color:#66ff66">Tap passable tile to set guard point</span>'
+                : '<span class="mode-hint" style="color:#66ff66">Click passable tile to set guard point | [Esc] Cancel</span>';
             this.elements.modeBar.innerHTML = html;
             return;
         }
+        if (input.mode !== 'normal') this._moreMenuOpen = false;
         let html = `<span class="mode-label">Mode: ${input.mode.toUpperCase()}</span>`;
         if (input.mode === 'build') {
-            html += '<span class="mode-opt mode-back" data-mode-action="back">[Esc]Back</span>';
+            html += `<span class="mode-opt mode-back" data-mode-action="back">${keyHint('Esc')}Back</span>`;
             const deconActive = input.deconstructMode ? ' active' : '';
-            html += `<span class="mode-opt${deconActive}" data-mode-action="deconstruct" style="margin-left:8px;color:#ff6666">[X]Deconstruct</span>`;
-            html += '<span class="mode-hint">[Tab]Cycle category | Right-click to deconstruct or loot chests</span>';
+            html += `<span class="mode-opt${deconActive}" data-mode-action="deconstruct" style="margin-left:8px;color:#ff6666">${keyHint('X')}Deconstruct</span>`;
+            html += touch
+                ? '<span class="mode-hint">Long-press to deconstruct or loot chests</span>'
+                : '<span class="mode-hint">[Tab]Cycle category | Right-click to deconstruct or loot chests</span>';
             this._updateBuildPanel(input);
         } else if (input.mode === 'zone') {
-            html += '<span class="mode-opt mode-back" data-mode-action="back">[Esc]Back</span>';
-            html += '<span class="mode-hint">Click+drag to designate farm area</span>';
+            html += `<span class="mode-opt mode-back" data-mode-action="back">${keyHint('Esc')}Back</span>`;
+            html += `<span class="mode-hint">${touch ? 'Drag to designate farm area' : 'Click+drag to designate farm area'}</span>`;
             this._updateFarmPanel(input);
         } else if (input.mode === 'designate') {
-            html += '<span class="mode-opt mode-back" data-mode-action="back">[Esc]Back</span>';
-            html += '<span class="mode-hint">Click+drag to select area</span>';
+            html += `<span class="mode-opt mode-back" data-mode-action="back">${keyHint('Esc')}Back</span>`;
+            html += `<span class="mode-hint">${touch ? 'Drag to select area' : 'Click+drag to select area'}</span>`;
             this._updateGatherPanel(input);
+        } else if (isCompactLayout()) {
+            html = this._compactNavHtml();
         } else {
+            const nav = this._navItems();
             html += '<span class="mode-options">';
-            const storyPulse = this.game.story.hasUnviewed() ? ' story-new-pulse' : '';
-            html += `<span class="mode-opt${storyPulse}" data-mode-action="story">[J]Story${this.game.story.hasUnviewed() ? ' ✦' : ''}</span>`;
-            html += `<span class="mode-opt" data-mode-action="build">[B]Build</span>`;
-            html += `<span class="mode-opt" data-mode-action="zone">[F]Farm</span>`;
-            html += `<span class="mode-opt" data-mode-action="gather">[G]Gather</span>`;
-            html += `<span class="mode-opt" data-mode-action="priority">[P]Priority</span>`;
-            html += `<span class="mode-opt" data-mode-action="craft">[C]Craft</span>`;
-            const researchNeedsAttention = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
-            const researchStyle = researchNeedsAttention ? ' style="color:#ffcc44"' : '';
-            html += `<span class="mode-opt" data-mode-action="research"${researchStyle}>[R]Research${researchNeedsAttention ? ' •' : ''}</span>`;
-            html += `<span class="mode-opt" data-mode-action="inventory">[I]Inventory</span>`;
-            const pendingAutoCount = this.game.exploration?.pendingAutoSummaries?.length || 0;
-            const arcaneStyle = pendingAutoCount > 0 ? ' style="color:#44ff88"' : '';
-            const arcaneBadge = pendingAutoCount > 0 ? ` <span style="background:#44ff88;color:#000;border-radius:8px;padding:0 4px;font-size:0.75em;">${pendingAutoCount}</span>` : '';
-            html += `<span class="mode-opt" data-mode-action="arcane"${arcaneStyle}>[V]Rifts${arcaneBadge}</span>`;
-            html += `<span class="mode-opt" data-mode-action="map">[M]Map</span>`;
+            for (const item of nav) {
+                const pulse = item.action === 'story' && item.badge ? ' story-new-pulse' : '';
+                html += `<span class="mode-opt${pulse}" data-mode-action="${item.action}"${item.style ? ` style="${item.style}"` : ''}>${keyHint(item.key)}${item.label}${item.badgeHtml || ''}</span>`;
+            }
             html += '</span>';
         }
         if (input.mode !== 'build' && input.mode !== 'zone' && input.mode !== 'designate') this._hideBuildPanel();
         this.elements.modeBar.innerHTML = html;
+        if (this._moreMenuOpen) this._positionMoreMenu();
 
+        const highlight = (action) => {
+            const btn = this.elements.modeBar.querySelector(`[data-mode-action="${action}"]`)
+                || this.elements.modeBar.querySelector('[data-mode-action="more"]');
+            if (btn) btn.classList.add('tutorial-highlight');
+        };
         if (input.mode === 'normal' && this.game.settings.showTutorial && this.game.tutorial) {
             const hl = this.game.tutorial.getHighlight();
-            if (hl) {
-                const btn = this.elements.modeBar.querySelector(`[data-mode-action="${hl}"]`);
-                if (btn) btn.classList.add('tutorial-highlight');
-            }
+            if (hl) highlight(hl);
         }
         if (this.game.exploration?.expeditions?.some(e => !e.autoMode && (e.pendingDecision || e.pendingVoidPactChoice))) {
-            const btn = this.elements.modeBar.querySelector('[data-mode-action="arcane"]');
-            if (btn) btn.classList.add('tutorial-highlight');
+            highlight('arcane');
         }
+    }
+
+    // The normal-mode buttons, in mode-bar order, with whatever badge each needs right now.
+    _navItems() {
+        const storyNew = this.game.story.hasUnviewed();
+        const researchNeedsAttention = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
+        const pendingAutoCount = this.game.exploration?.pendingAutoSummaries?.length || 0;
+        return [
+            { action: 'story', key: 'J', label: 'Story', badge: storyNew, badgeHtml: storyNew ? ' ✦' : '' },
+            { action: 'build', key: 'B', label: 'Build' },
+            { action: 'zone', key: 'F', label: 'Farm' },
+            { action: 'gather', key: 'G', label: 'Gather' },
+            { action: 'priority', key: 'P', label: 'Priority' },
+            { action: 'craft', key: 'C', label: 'Craft' },
+            { action: 'research', key: 'R', label: 'Research', badge: researchNeedsAttention, style: researchNeedsAttention ? 'color:#ffcc44' : '', badgeHtml: researchNeedsAttention ? ' •' : '' },
+            { action: 'inventory', key: 'I', label: 'Inventory' },
+            {
+                action: 'arcane', key: 'V', label: 'Rifts', badge: pendingAutoCount > 0, style: pendingAutoCount > 0 ? 'color:#44ff88' : '',
+                badgeHtml: pendingAutoCount > 0 ? ` <span style="background:#44ff88;color:#000;border-radius:8px;padding:0 4px;font-size:0.75em;">${pendingAutoCount}</span>` : '',
+            },
+            { action: 'map', key: 'M', label: 'Map' },
+        ];
+    }
+
+    // Narrow screens: one row of buttons that fits, with the rest (and the map overlays,
+    // which otherwise only have hotkeys) in a More menu. The menu lives inside #mode-bar
+    // so the tutorial's mode-bar selectors still find its items when it is open.
+    _compactNavHtml() {
+        const items = this._navItems();
+        const primary = items.filter(i => COMPACT_NAV_PRIMARY.includes(i.action));
+        const rest = items.filter(i => !COMPACT_NAV_PRIMARY.includes(i.action));
+        const btn = (i) => `<button class="nav-btn" data-mode-action="${i.action}"${i.style ? ` style="${i.style}"` : ''}>${i.label}${i.badgeHtml || ''}</button>`;
+        let html = '<div class="compact-nav">' + primary.map(btn).join('');
+        const moreBadge = rest.some(i => i.badge) ? ' •' : '';
+        html += `<button class="nav-btn${this._moreMenuOpen ? ' active' : ''}" data-mode-action="more"${moreBadge ? ' style="color:#ffcc44"' : ''}>More${moreBadge}</button></div>`;
+        if (this._moreMenuOpen) {
+            const s = this.game.settings;
+            html += '<div class="more-menu">';
+            html += '<div class="more-menu-grid">' + rest.map(btn).join('') + '</div>';
+            html += '<div class="more-menu-title">Map overlays</div><div class="more-menu-grid">';
+            for (const [name, label, on] of [
+                ['WarmthOverlay', 'Warmth', s.showWarmthOverlay], ['DefenseOverlay', 'Defense', s.showDefenseOverlay],
+                ['RoomOverlay', 'Rooms', s.showRoomOverlay], ['AuraOverlay', 'Auras', s.showAuraOverlay],
+            ]) {
+                html += `<button class="nav-btn${on ? ' active' : ''}" data-overlay="${name}">${label}</button>`;
+            }
+            html += '</div><div class="more-menu-grid"><button class="nav-btn" data-mode-action="settings">Settings</button></div></div>';
+        }
+        return html;
+    }
+
+    _positionMoreMenu() {
+        const menu = this.elements.modeBar.querySelector('.more-menu');
+        if (menu) menu.style.bottom = `${Math.max(0, window.innerHeight - this.elements.modeBar.getBoundingClientRect().top) + 4}px`;
+    }
+
+    // Returns true if the menu was open (so Esc / Back stops there).
+    closeMoreMenu() {
+        if (!this._moreMenuOpen) return false;
+        this._moreMenuOpen = false;
+        this.updateModeDisplay(this.game.input);
+        return true;
+    }
+
+    _runModeAction(action) {
+        const input = this.game.input;
+        if (action !== 'more' && this._moreMenuOpen) {
+            this._moreMenuOpen = false;
+            this.updateModeDisplay(input);
+        }
+        switch (action) {
+            case 'more': this._moreMenuOpen = !this._moreMenuOpen; this.updateModeDisplay(input); break;
+            case 'back': input.setMode('normal'); break;
+            case 'cancel-target': input.handleEscape(); break;
+            case 'pan': input.toggleTouchPanMode(); break;
+            case 'build': input.setMode('build'); break;
+            case 'zone': input.setMode('zone'); break;
+            case 'gather': input.setMode('designate'); break;
+            case 'deconstruct': input.toggleDeconstructMode(); break;
+            case 'priority': this.togglePriorityPanel(); break;
+            case 'craft': this.toggleCraftPanel(); break;
+            case 'research': this.toggleResearchPanel(); break;
+            case 'inventory': this.toggleInventoryPanel(); break;
+            case 'settings': this.toggleSettingsPanel(); break;
+            case 'arcane': this.toggleArcanePanel(); break;
+            case 'story': this.toggleStoryPanel(); break;
+            case 'map': this.toggleMapPanel(); break;
+        }
+    }
+
+    // Phone button bar: only the buttons that do something right now, so it stays one row.
+    // `force` re-applies even if nothing changed (after the layout or mode changes).
+    updateTouchToolbar(force) {
+        const bar = document.getElementById('touch-toolbar');
+        if (!bar) return;
+        const input = this.game.input;
+        const selected = (this.game.selectedColonists || []).filter(c => c.hp > 0);
+        const hasSel = selected.length > 0;
+        const allDrafted = hasSel && selected.every(c => c.drafted);
+        const mode = input?.mode || 'normal';
+        const sig = `${mode}|${hasSel}|${allDrafted}|${input?.rallyMode}|${input?.destroyMode}`;
+        if (!force && sig === this._toolbarSig) return;
+        this._toolbarSig = sig;
+        const normal = mode === 'normal';
+        const show = (id, on) => { const b = document.getElementById(id); if (b) b.hidden = !on; };
+        show('touch-destroy-btn', normal && !hasSel);
+        show('touch-selectall-btn', normal && !hasSel);
+        show('touch-rally-btn', normal && (hasSel || input?.rallyMode));
+        show('touch-draft-btn', normal && hasSel);
+        show('touch-prev-btn', normal && hasSel);
+        show('touch-next-btn', normal && hasSel);
+        show('touch-center-btn', normal && hasSel);
+        show('touch-idle-btn', normal);
+        const draft = document.getElementById('touch-draft-btn');
+        if (draft) draft.textContent = allDrafted ? 'Undraft' : 'Draft';
+        // Build, farm and gather have their own bottom panel.
+        bar.classList.toggle('toolbar-hidden', !normal);
     }
 
     _updateBuildPanel(input) {
@@ -1238,7 +1508,7 @@ export class UI {
             const active = cat === input.buildCategory ? ' active' : '';
             html += `<span class="build-tab${active}" data-build-cat="${cat}">${cat}</span>`;
         });
-        html += '</div><span class="build-panel-close" data-mode-action="back">[Esc] Close</span></div>';
+        html += '</div>' + this._buildPanelControls() + '</div>';
         html += '<div class="build-grid">';
         input.buildOptions.forEach((opt, i) => {
             const active = opt === input.buildType ? ' active' : '';
@@ -1307,7 +1577,7 @@ export class UI {
         const panel = this.elements.buildPanel;
         if (!panel) return;
         let html = '<div class="build-panel-header"><div class="build-panel-title">Farm Crops</div>';
-        html += '<span class="build-panel-close" data-mode-action="back">[Esc] Close</span></div>';
+        html += this._buildPanelControls() + '</div>';
         html += '<div class="build-grid">';
         input.cropOptions.forEach((opt, i) => {
             const crop = CROPS[opt];
@@ -1345,7 +1615,7 @@ export class UI {
         const panel = this.elements.buildPanel;
         if (!panel) return;
         let html = '<div class="build-panel-header"><div class="build-panel-title">Gather</div>';
-        html += '<span class="build-panel-close" data-mode-action="back">[Esc] Close</span></div>';
+        html += this._buildPanelControls() + '</div>';
         html += '<div class="build-grid">';
         const chopActive = input.designateMode === 'chop' ? ' active' : '';
         const mineActive = input.designateMode === 'mine' ? ' active' : '';
@@ -1378,6 +1648,15 @@ export class UI {
         } else {
             panel.style.bottom = '0';
         }
+    }
+
+    // Header buttons for the build, farm and gather panels. On touch a Pan toggle lets one
+    // finger move the map instead of drawing a selection (two fingers always pan).
+    _buildPanelControls() {
+        const pan = isTouchUI()
+            ? `<span class="build-panel-pan${this.game.input?.touchPanMode ? ' active' : ''}" data-mode-action="pan">Pan</span>`
+            : '';
+        return `${pan}<span class="build-panel-close" data-mode-action="back">${keyHint('Esc')}${isTouchUI() ? '' : ' '}Close</span>`;
     }
 
     _hideBuildPanel() {
@@ -1918,14 +2197,17 @@ export class UI {
         return lines.join(' | ') || art.name;
     }
 
-    _switchToInfoTab() {
+    // `expand`: also unfold a collapsed footer. The colony overview (shown on start and
+    // when tapping bare ground) doesn't, so it never pops the footer open over the map.
+    _switchToInfoTab(expand = true) {
         const container = document.getElementById('game-container');
         const isTabbed = container.classList.contains('tabbed-mode');
         if (!isTabbed) return;
 
         const footer = document.getElementById('game-footer');
-        if (footer.classList.contains('collapsed')) {
+        if (expand && footer.classList.contains('collapsed')) {
             footer.classList.remove('collapsed');
+            window.updateFooterSizeButton?.(footer);
         }
         const tabs = footer.querySelectorAll('.footer-tab[data-tab]');
         const panels = footer.querySelectorAll('#footer-content > .footer-panel, #minimap-container');
@@ -2368,7 +2650,7 @@ export class UI {
     // Select nothing: clear the info panel and let the persistent summary footer
     // stand on its own. The summary itself is driven every frame by update().
     showColonyOverview() {
-        this._switchToInfoTab();
+        this._switchToInfoTab(false);
         this._viewingColonistId = null;
         this._pendingColonistInfoHtml = null;
         this._viewingRiftGate = false;
@@ -3421,7 +3703,7 @@ export class UI {
         const heading = this._prioTab === 'attune'
             ? `<h3>Magic Attunement (${MAGIC_STUDY_CONFIG.attunementSlots === 1 ? 'click a school to attune; one per colonist' : `click to toggle, max ${MAGIC_STUDY_CONFIG.attunementSlots}`})</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Only spells from attuned schools autocast in the world and on expeditions. Free to change anytime.</div>`
             : this._prioTab === 'groups' ? ''
-            : '<h3>Work Priorities (click to cycle, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">1 = highest priority, 5 = lowest. Note: Golem priorities are locked to their specialization</div>';
+            : `<h3>Work Priorities (${isTouchUI() ? 'tap to cycle, long-press to reverse' : 'click to cycle'}, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">1 = highest priority, 5 = lowest. Note: Golem priorities are locked to their specialization</div>`;
         let profileToolbar = '';
         if (this._prioTab === 'work') {
             const customProfiles = this.game.priorityProfiles || {};
@@ -3455,7 +3737,7 @@ export class UI {
             if (this._prioProfileDraft) {
                 const hint = isBuiltIn
                     ? '<span style="color:#666;font-size:10px;">Built-in profile (read-only)</span>'
-                    : '<span style="color:#666;font-size:10px;">Click to cycle (1=highest, 5=lowest, -=off). Right-click to reverse.</span>';
+                    : `<span style="color:#666;font-size:10px;">${isTouchUI() ? 'Tap to cycle (1=highest, 5=lowest, -=off). Long-press to reverse.' : 'Click to cycle (1=highest, 5=lowest, -=off). Right-click to reverse.'}</span>`;
                 const cells = skills.map(s => {
                     const v = this._prioProfileDraft[s] ?? 0;
                     const display = v === 0 ? '-' : v;
@@ -3489,7 +3771,11 @@ export class UI {
         const fullHtml = '<div class="panel-close" data-panel-close="priority">&times;</div>' + tabs + heading + profileToolbar + body;
         if (fullHtml !== this._lastPrioHtml) {
             this._lastPrioHtml = fullHtml;
+            // The grid scrolls sideways on narrow screens. Keep its place across re-renders.
+            const scrollLeft = this.elements.priorityPanel.querySelector('.prio-grid')?.scrollLeft ?? 0;
             this.elements.priorityPanel.innerHTML = fullHtml;
+            const grid = this.elements.priorityPanel.querySelector('.prio-grid');
+            if (grid) grid.scrollLeft = scrollLeft;
         }
     }
 
@@ -3600,7 +3886,7 @@ export class UI {
 
     _workPriorityGridHtml() {
         const skills = Object.keys(SKILLS);
-        let html = '<table><tr><th>Colonist</th>';
+        let html = '<table class="prio-grid"><tr><th>Colonist</th>';
         skills.forEach(s => { html += `<th>${s.substring(0, 8)}</th>`; });
         html += '<th></th></tr>';
 
@@ -3630,7 +3916,7 @@ export class UI {
 
     _attunementGridHtml() {
         const schools = Object.keys(MAGIC_SKILLS);
-        let html = '<table><tr><th>Colonist</th>';
+        let html = '<table class="prio-grid"><tr><th>Colonist</th>';
         schools.forEach(s => { html += `<th><span class="skill-tip" data-tip="${escapeAttr(MAGIC_SKILLS[s].summary || MAGIC_SKILLS[s].description)}" style="color:${MAGIC_SKILLS[s].color}">${MAGIC_SKILLS[s].name.substring(0, 8)}</span></th>`; });
         html += '</tr>';
 
@@ -4303,9 +4589,13 @@ export class UI {
         this._buildTooltip.style.display = 'block';
         if (e) this._positionBuildTooltip(e);
         else {
+            // No pointer position (a tap): sit above the card, since the build panel is at the
+            // bottom of the screen, and keep the tip inside the window.
             const rect = card.getBoundingClientRect();
-            this._buildTooltip.style.left = rect.left + 'px';
-            this._buildTooltip.style.top = (rect.bottom + 4) + 'px';
+            const tt = this._buildTooltip;
+            const above = rect.top - tt.offsetHeight - 4;
+            tt.style.left = Math.max(4, Math.min(rect.left, window.innerWidth - tt.offsetWidth - 4)) + 'px';
+            tt.style.top = (above >= 4 ? above : rect.bottom + 4) + 'px';
         }
     }
 
@@ -4853,6 +5143,7 @@ export class UI {
         general += `<div class="settings-section"><div class="settings-section-title">Accessibility</div>`;
         general += this._settingsCheck('set-darken-pause', s.darkenOnPause, 'window.game.settings.darkenOnPause=this.checked;if(window.game.paused)document.getElementById("game").classList.toggle("paused",this.checked)', 'Darken screen when paused');
         general += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', 'Pause when window loses focus');
+        if (navigator.wakeLock) general += this._settingsCheck('set-keep-awake', s.keepScreenAwake, 'window.game.settings.keepScreenAwake=this.checked;window.game._syncWakeLock()', 'Keep screen awake while unpaused');
         general += `<div class="settings-row"><label for="set-toolbar-mode">Mobile button bar:</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['auto','Auto'],['always','Always'],['never','Never']]) {
             general += `<option value="${val}"${(s.toolbarMode || 'auto') === val ? ' selected' : ''}>${label}</option>`;
@@ -5205,7 +5496,7 @@ export class UI {
         if (tile.resource) parts.push(`Resource: ${tile.resource.type}${tile.resource.amount > 1 ? ' x' + tile.resource.amount : ''}`);
         if (tile.designation) {
             const task = this.game.taskQueue.getAllByPosition(x, y).find(t => t.type === tile.designation.type);
-            parts.push(task?.doFirst ? `[${tile.designation.type}, do first]` : `[${tile.designation.type}] right-click to do first`);
+            parts.push(task?.doFirst ? `[${tile.designation.type}, do first]` : `[${tile.designation.type}] ${isTouchUI() ? 'long-press' : 'right-click'} to do first`);
         }
         if (tile.zone) parts.push(`Farm: ${tile.zone.crop}`);
         const nameMode = this.game.settings.showColonistNames;
@@ -5248,12 +5539,16 @@ export class UI {
         const duration = this.game.settings.notificationDuration || 100;
         const recent = this.game.notifications.filter(n => this.game.tick - n.tick < duration);
         this.game.notifications = recent;
-        const shown = recent.slice(-4);
+        // Narrow screens show only the newest toast plus a count, so the stack doesn't
+        // cover the map. Everything still lands in the Log tab.
+        const compact = isCompactLayout();
+        const shown = recent.slice(compact ? -1 : -4);
+        const hiddenCount = recent.length - shown.length;
         // `update()` runs every frame, so rebuild the notification DOM only when the
         // visible set actually changes. Otherwise the CSS enter animation would
         // restart every frame and the whole stack would flicker. Each notif has a
         // stable key (tick + text). A signature of the visible keys detects change.
-        const sig = shown.map(n => `${n.tick}${n.text}`).join('');
+        const sig = shown.map(n => `${n.tick}${n.text}`).join('') + (compact ? `${hiddenCount}` : '');
         if (sig === this._notifSig) return;
         const prevKeys = this._notifKeys || (this._notifKeys = new Set());
         // Reduced motion (item 24): skip the slide-in, render statically.
@@ -5263,7 +5558,7 @@ export class UI {
             // Only notifs that weren't shown last render get the enter animation.
             const enter = (!reduceMotion && !prevKeys.has(key)) ? ' notif-enter' : '';
             return `<div class="notif notif-${escapeAttr(n.type)}${enter}">${escapeHtmlKeepEntities(n.text)}</div>`;
-        }).join('');
+        }).join('') + (compact && hiddenCount > 0 ? `<div class="notif notif-more">+${hiddenCount} more in Log</div>` : '');
         this._notifKeys = new Set(shown.map(n => `${n.tick}${n.text}`));
         this._notifSig = sig;
     }
@@ -5272,6 +5567,7 @@ export class UI {
         const evt = this.game.events.pendingEvent;
         if (!evt) {
             if (this._lastEventId) {
+                document.body.classList.remove('event-open');
                 this.elements.eventPanel.style.display = 'none';
                 this.elements.eventPanel.className = '';
                 this._lastEventId = null;
@@ -5293,6 +5589,8 @@ export class UI {
         if (this._lastEventId === eventId) return;
         this._lastEventId = eventId;
         this.elements.eventPanel.style.display = 'block';
+        // Lets narrow layouts hide the tutorial card while a prompt needs an answer.
+        document.body.classList.add('event-open');
         window.soundManager?.playSFXPitched('open_close_click', 3);
         this.elements.eventPanel.className = evt.type === 'raid' ? 'event-panel-raid' : evt.type === 'void_whisper' ? 'event-panel-void' : '';
         let html = '';

@@ -1,5 +1,5 @@
 import { installTutorialPointer } from './ui-tutorial-pointer.js';
-import { escapeHtml } from './ui-utils.js';
+import { escapeHtml, isTouchUI, isCompactLayout, touchText } from './ui-utils.js';
 
 export function installTutorialPanel(UI) {
     Object.assign(UI.prototype, tutorialMethods);
@@ -35,6 +35,14 @@ const tutorialMethods = {
         this.initTutorialPointer();
     },
 
+    // Narrow screens: the card covers much of the map, so touching the map tucks it down
+    // to its header (tap + to bring it back).
+    onMapTouched() {
+        if (!this._tutorialExpanded || !isCompactLayout() || !this._tutorialEl || this._tutorialEl.style.display === 'none') return;
+        this._tutorialExpanded = false;
+        this.updateTutorialNote(this.game);
+    },
+
     updateTutorialNote(game) {
         const el = this._tutorialEl;
         if (!el) return;
@@ -58,7 +66,7 @@ const tutorialMethods = {
                 html += '<ul class="tutorial-goals">';
                 for (const goal of tutorial.steps) {
                     const isDone = tutorial.completed.has(goal.id);
-                    html += `<li class="${isDone ? 'done' : ''}">${isDone ? '&#10003;' : '&#9744;'} ${withKeycaps(goal.title)}</li>`;
+                    html += `<li class="${isDone ? 'done' : ''}">${isDone ? '&#10003;' : '&#9744;'} ${withKeycaps(touchText(goal.title))}</li>`;
                 }
                 html += '</ul>';
             }
@@ -74,10 +82,10 @@ const tutorialMethods = {
             const pct = Math.round((tutorial.currentStep / total) * 100);
             html = `<div class="tutorial-header"><span class="tutorial-step">${step}/${total}</span>${toggle}</div>`
                 + `<div class="tutorial-progress"><div class="tutorial-progress-fill" style="width:${pct}%"></div></div>`
-                + `<div class="tutorial-title">${escapeHtml(task.title)}</div>`;
+                + `<div class="tutorial-title">${escapeHtml(touchText(task.title))}</div>`;
             if (this._tutorialExpanded) {
-                html += `<div class="tutorial-desc">${withKeycaps(tutorial.getDescription(task))}</div>`;
-                const help = tutorial.getHelpText(game);
+                html += `<div class="tutorial-desc">${withKeycaps(touchText(tutorial.getDescription(task, isTouchUI())))}</div>`;
+                const help = touchText(tutorial.getHelpText(game));
                 if (help) html += `<div class="tutorial-help">${help}</div>`;
                 html += task.manual
                     ? '<button class="tutorial-ack">Got it &rarr;</button>'

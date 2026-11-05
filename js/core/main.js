@@ -41,7 +41,7 @@ import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
 import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, getLastSyncTime, forceSyncNow, PER_SAVE_SETTING_DEFAULTS, applyPerSaveSettings } from './save.js';
 import { getGdriveAPI } from './gdrive-web.js';
-import { escapeHtml, escapeAttr, jsArg } from '../ui/ui-utils.js';
+import { escapeHtml, escapeAttr, jsArg, isTouchUI } from '../ui/ui-utils.js';
 import { initResizeHandles } from '../ui/resize.js';
 import { SpatialHash } from '../world/spatial.js';
 import { MapIndex } from '../world/mapindex.js';
@@ -96,11 +96,31 @@ function _setFullscreen(enabled) {
 }
 
 const _isMobileApp = !!window.Capacitor?.isNativePlatform();
+// Default interface text scale on touch screens, where 12px text is hard to read and hit.
+const TOUCH_UI_FONT_SCALE = 1.15;
+// Leaving the app saves at most this often (ms), so flipping between apps doesn't re-save every time.
+const BACKGROUND_SAVE_MIN_MS = 15000;
 if (_isMobileApp) {
     import('@capacitor/status-bar').then(({ StatusBar }) => {
         StatusBar.setOverlaysWebView({ overlay: true });
         StatusBar.hide();
     }).catch(() => {});
+}
+
+// Android's Back button walks the WebView's history and closes the app once there is none.
+// While a colony is running, keep one history entry in hand so Back acts like Esc (close the
+// open panel, leave build mode, or open the settings menu) instead of quitting mid-game.
+function _trapBackButton() {
+    if (!_isMobileApp || history.state?.riftholdGame) return;
+    history.pushState({ riftholdGame: true }, '');
+}
+if (_isMobileApp) {
+    window.addEventListener('popstate', () => {
+        const game = window.game;
+        if (!game?._rafId || game._gameOver) return; // start screen: let Back close the app
+        game.input?.handleEscape();
+        _trapBackButton();
+    });
 }
 
 // Settings that are not global player preferences. Per-colony ones travel with
@@ -186,6 +206,7 @@ class Game {
             keyBindings: {},
             showCrtScanlines: true,
             showCrtWarp: true,
+            keepScreenAwake: false,
         };
         try {
             const saved = JSON.parse(localStorage.getItem('colony_settings'));
@@ -201,6 +222,11 @@ class Game {
                 this.settings.particleDensity = 50;
                 this.settings.showCrtScanlines = false;
                 this.settings.showCrtWarp = false;
+            }
+            if ((_isMobileApp || isTouchUI()) && !saved) {
+                // Phones: half the frames for battery and heat, and larger interface text.
+                this.settings.fpsCap = 30;
+                this.settings.uiFontScale = TOUCH_UI_FONT_SCALE;
             }
         } catch (e) {}
         this._fpsFrames = 0;
@@ -462,7 +488,13 @@ class Game {
             if (document.hidden && this.settings.pauseOnFocusLoss && !this.paused) {
                 this.togglePause();
             }
+            // Phones often kill a backgrounded app, losing everything since the last autosave.
+            if (document.hidden) this._saveOnBackground();
+            this._syncWakeLock();
         };
+        this._onPageHide = () => this._saveOnBackground();
+        window.addEventListener('pagehide', this._onPageHide);
+        _trapBackButton();
         this._onWindowBlur = () => {
             if (this.settings.pauseOnFocusLoss && !this.paused) {
                 this.togglePause();
@@ -1018,8 +1050,39 @@ class Game {
         return this._occupiedTiles ? this._occupiedTiles.has((y << 16) | x) : false;
     }
 
+    // Autosaves when a phone app goes to the background. Skipped when autosave is off.
+    _saveOnBackground() {
+        if (!(_isMobileApp || isTouchUI()) || this._gameOver || !this.settings.autoSaveInterval) return;
+        const now = Date.now();
+        if (now - (this._lastBackgroundSave || 0) < BACKGROUND_SAVE_MIN_MS) return;
+        this._lastBackgroundSave = now;
+        this._lastAutoSaveTick = this.tick;
+        saveAutoSlot(this).catch(e => console.error('Background save failed:', e));
+    }
+
+    // "Keep screen awake" holds a screen wake lock while the game runs unpaused and visible.
+    // The browser drops the lock when the page is hidden, so this re-requests it on return.
+    _syncWakeLock() {
+        const want = !!this.settings.keepScreenAwake && !this.paused && !document.hidden && !this._gameOver
+            && window.game === this && !!navigator.wakeLock;
+        if (want && !this._wakeLock && !this._wakeLockPending) {
+            this._wakeLockPending = true;
+            navigator.wakeLock.request('screen').then(lock => {
+                this._wakeLockPending = false;
+                this._wakeLock = lock;
+                lock.addEventListener('release', () => { if (this._wakeLock === lock) this._wakeLock = null; });
+                if (!this.settings.keepScreenAwake || this.paused) this._syncWakeLock();
+            }).catch(() => { this._wakeLockPending = false; });
+        } else if (!want && this._wakeLock) {
+            const lock = this._wakeLock;
+            this._wakeLock = null;
+            lock.release().catch(() => {});
+        }
+    }
+
     togglePause(silent = false) {
         this.paused = !this.paused;
+        this._syncWakeLock();
         const recording = this.input?._recordingMode;
         document.getElementById('game').classList.toggle('paused', this.paused && this.settings.darkenOnPause && !recording);
         document.getElementById('pause-overlay').style.display = (this.paused && !recording) ? 'block' : 'none';
@@ -3707,6 +3770,9 @@ class Game {
         this.gameLoop = () => {};
         if (this._onVisibilityChange) document.removeEventListener('visibilitychange', this._onVisibilityChange);
         if (this._onWindowBlur) window.removeEventListener('blur', this._onWindowBlur);
+        if (this._onPageHide) window.removeEventListener('pagehide', this._onPageHide);
+        this._wakeLock?.release().catch(() => {});
+        this._wakeLock = null;
         if (this.input) {
             if (typeof this.input.destroy === 'function') {
                 this.input.destroy();
@@ -3754,15 +3820,20 @@ class Game {
             showEquipmentOverlays: true, showProgressBars: true, showPortalPath: true, showBreathing: true, showWalkSway: true, showAttackSwing: true, showActionAnimations: true, showTreeSway: true, showTerrainDetail: true, showExpeditionExtras: true, reduceMotion: false, layoutMode: 'auto',
             musicVolume: 50, sfxVolume: 50, temperatureUnit: 'F', ditherDistance: 'light',
             ditherQuality: 'medium', showColonistHighlight: false, showTutorial: true, showTutorialArrows: true,
-            enableFullscreen: false,
+            enableFullscreen: false, keepScreenAwake: false,
         });
         this.settings.keyBindings = keep;
         this.settings.craftTargets = craftTargets;
         this.settings.potionAutoUse = potionAutoUse;
+        if (_isMobileApp || isTouchUI()) {
+            this.settings.fpsCap = 30;
+            this.settings.uiFontScale = TOUCH_UI_FONT_SCALE;
+        }
+        this._syncWakeLock();
         this.saveSettingsToStorage();
         // Re-apply live effects that have side effects beyond the settings object.
         _setFullscreen(false);
-        window.setUIFontScale?.(1);
+        window.setUIFontScale?.(this.settings.uiFontScale);
         if (window.soundManager) { window.soundManager.setMusicVolume(50); window.soundManager.setSFXVolume(50); }
         document.getElementById('game')?.classList.toggle('paused', this.paused && this.settings.darkenOnPause);
         document.getElementById('game-container')?.classList.toggle('large-targets', false);
@@ -4448,26 +4519,46 @@ function initFooterTabs() {
     const footerContent = document.getElementById('footer-content');
 
     if (window.innerWidth <= 768) {
+        footer.classList.add('tabbed');
         container.classList.add('tabbed-mode');
         footerContent.insertBefore(infoPanel, footerContent.firstChild);
         infoPanel.classList.add('active');
         footer.querySelector('.footer-tab[data-tab="info"]').classList.add('active');
+        // Narrow screens start with the footer folded down to its tabs, leaving the map the room.
+        footer.classList.add('collapsed');
     }
 
     footer.addEventListener('transitionend', () => fitGameFont());
 
     footer.addEventListener('click', (e) => {
+        const isTabbed = footer.classList.contains('tabbed') || window.innerWidth <= 768;
+        if (e.target.closest('[data-footer-size]')) {
+            if (!isTabbed) return;
+            if (footer.classList.contains('collapsed')) {
+                footer.classList.remove('collapsed');
+            } else {
+                footer.classList.toggle('footer-tall');
+            }
+            updateFooterSizeButton(footer);
+            return;
+        }
         const tab = e.target.closest('.footer-tab[data-tab]');
         if (!tab) return;
 
         const target = tab.dataset.tab;
 
-
-        const isTabbed = footer.classList.contains('tabbed') || window.innerWidth <= 768;
         if (!isTabbed) return;
 
+        // Tapping the open tab again folds the footer away.
+        if (tab.classList.contains('active') && !footer.classList.contains('collapsed')) {
+            footer.classList.add('collapsed');
+            footer.classList.remove('footer-tall');
+            updateFooterSizeButton(footer);
+            return;
+        }
         if (footer.classList.contains('collapsed')) {
             footer.classList.remove('collapsed');
+            updateFooterSizeButton(footer);
         }
 
         const tabs = footer.querySelectorAll('.footer-tab[data-tab]');
@@ -4490,6 +4581,16 @@ function initFooterTabs() {
     });
 }
 
+// The footer's size button: grow while collapsed or normal, shrink back once tall.
+function updateFooterSizeButton(footer) {
+    const btn = footer.querySelector('[data-footer-size]');
+    if (!btn) return;
+    const tall = footer.classList.contains('footer-tall') && !footer.classList.contains('collapsed');
+    btn.innerHTML = tall ? '&#9660;' : '&#9650;';
+    btn.title = tall ? 'Shrink panel' : 'Expand panel';
+}
+window.updateFooterSizeButton = updateFooterSizeButton;
+
 function setFooterMode(tabbed) {
     const footer = document.getElementById('game-footer');
     const container = document.getElementById('game-container');
@@ -4497,6 +4598,7 @@ function setFooterMode(tabbed) {
     const footerContent = document.getElementById('footer-content');
 
     if (tabbed) {
+        if (!footer.classList.contains('tabbed')) footer.classList.add('collapsed');
         footer.classList.add('tabbed');
         container.classList.add('tabbed-mode');
         footerContent.insertBefore(infoPanel, footerContent.firstChild);
@@ -4507,13 +4609,17 @@ function setFooterMode(tabbed) {
         tabs.forEach(t => { if (t.dataset.tab !== 'collapse') t.classList.remove('active'); });
         footer.querySelector('.footer-tab[data-tab="info"]').classList.add('active');
     } else {
-        footer.classList.remove('tabbed');
+        footer.classList.remove('tabbed', 'collapsed', 'footer-tall');
         container.classList.remove('tabbed-mode');
         container.insertBefore(infoPanel, footer);
         infoPanel.classList.remove('active');
+        window.game?.ui?.resetSheetHeights?.();
     }
+    updateFooterSizeButton(footer);
     fitGameFont();
     requestAnimationFrame(() => resetMinimapSize());
+    // The mode bar's layout (one row plus More, or the full list) depends on the footer mode.
+    if (window.game?.ui && window.game.input) window.game.ui.updateModeDisplay(window.game.input);
 }
 
 window.setFooterMode = setFooterMode;
@@ -5991,7 +6097,15 @@ _onDOMReady(() => {
         _loadingSettings = true;
         try {
             const s = JSON.parse(localStorage.getItem('colony_settings'));
-            if (!s) return;
+            if (!s) {
+                // First run on a phone: match the Game defaults for touch screens.
+                if (_isMobileApp || isTouchUI()) {
+                    document.getElementById('start-fps-cap').checked = true;
+                    document.getElementById('start-ui-font-size').value = TOUCH_UI_FONT_SCALE;
+                    document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(TOUCH_UI_FONT_SCALE);
+                }
+                return;
+            }
             if (s.autoPauseHostile != null) document.getElementById('start-autopause-hostile').checked = s.autoPauseHostile;
             if (s.autoPauseEvent != null) document.getElementById('start-autopause-event').checked = s.autoPauseEvent;
             if (s.autoPauseCaravan != null) document.getElementById('start-autopause-caravan').checked = s.autoPauseCaravan;
@@ -6585,6 +6699,18 @@ _onDOMReady(() => {
         }
         importFileInput.value = '';
     });
+
+    // The footer folding, the phone button bar hiding and similar layout changes resize
+    // the map area without resizing the window, so watch the area itself.
+    const gameAreaEl = document.getElementById('game-area');
+    if (gameAreaEl && window.ResizeObserver) {
+        let refitQueued = false;
+        new ResizeObserver(() => {
+            if (refitQueued) return;
+            refitQueued = true;
+            requestAnimationFrame(() => { refitQueued = false; fitGameFont(); });
+        }).observe(gameAreaEl);
+    }
 
     window.addEventListener('resize', () => {
         fitGameFont();

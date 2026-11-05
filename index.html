@@ -477,6 +477,7 @@
                 <button class="footer-tab" data-tab="colonists">Colonists</button>
                 <button class="footer-tab" data-tab="log">Log</button>
                 <button class="footer-tab" data-tab="minimap">Map</button>
+                <button class="footer-tab footer-size-btn" data-footer-size title="Expand panel">&#9650;</button>
             </div>
             <div id="footer-content">
                 <div id="colonist-hud" class="footer-panel"></div>
@@ -491,13 +492,15 @@
             <div id="mode-bar"></div>
         </div>
         <div id="touch-toolbar">
-            <button id="touch-destroy-btn" onclick="window.game?.input.toggleDestroyMode()">Destroy</button>
-            <button id="touch-pan-btn" onclick="window.game?.input.toggleTouchPanMode()">Pan</button>
-            <button id="touch-rally-btn" onclick="window.game?.input.toggleRallyMode()">Rally</button>
+            <!-- ui.updateTouchToolbar shows only the buttons that apply to the current selection and mode. -->
+            <button id="touch-prev-btn" title="Previous colonist" onclick="window.game?.cycleColonist(-1)" hidden>&#9664;</button>
+            <button id="touch-next-btn" title="Next colonist" onclick="window.game?.cycleColonist(1)" hidden>&#9654;</button>
+            <button id="touch-center-btn" onclick="window.game?.input.centerOnSelection()" hidden>Center</button>
+            <button id="touch-draft-btn" onclick="window.game?.input.toggleDraftSelected()" hidden>Draft</button>
+            <button id="touch-rally-btn" onclick="window.game?.input.toggleRallyMode()" hidden>Rally</button>
             <button id="touch-selectall-btn" onclick="window.game?.input.selectAllColonists()">Select All</button>
+            <button id="touch-destroy-btn" onclick="window.game?.input.toggleDestroyMode()">Destroy</button>
             <button id="touch-idle-btn" onclick="window.game?.cycleIdleColonist()">Next Idle</button>
-            <button id="touch-draft-btn" onclick="window.game?.input.toggleDraftSelected()">Draft</button>
-            <button onclick="window.game?.togglePause()">Pause</button>
         </div>
         <div id="panel-overlay" class="panel-overlay"></div>
         <div id="priority-panel"></div>

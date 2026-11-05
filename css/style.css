@@ -6023,3 +6023,234 @@ details.settings-debug > summary::marker {
     min-height: 92px;
 }
 
+
+/* ============================
+   NARROW SCREENS AND TOUCH
+   ============================
+   Narrow rules key off the tabbed layout classes (#game-footer.tabbed and
+   #game-container.tabbed-mode), which phones get automatically and any screen gets
+   with Layout mode: Tabbed. Size rules key off (pointer: coarse), so a narrow desktop
+   window keeps mouse-sized controls and a touch laptop with a trackpad is unaffected. */
+
+/* Status bar clears a camera cutout or notch when the app draws under the status bar. */
+#status-bar {
+    padding-top: max(3px, env(safe-area-inset-top));
+}
+#start-screen {
+    padding-top: max(16px, env(safe-area-inset-top));
+}
+
+/* --- Mode bar: one row of buttons plus a More menu --- */
+.compact-nav {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+}
+.nav-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 1px;
+    font-family: inherit;
+    font-size: calc(var(--ui-font-size) * 0.88);
+    background: #1a1a33;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #bbb;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.nav-btn.active {
+    background: #3a3a6a;
+    border-color: #88f;
+    color: #fff;
+}
+.nav-btn.tutorial-highlight {
+    border-color: #ffcc44;
+    color: #ffcc44;
+}
+#game-container.tabbed-mode #mode-bar {
+    padding: 4px 6px;
+    padding-left: max(6px, env(safe-area-inset-left));
+    padding-right: max(6px, env(safe-area-inset-right));
+}
+.more-menu {
+    position: fixed;
+    right: max(6px, env(safe-area-inset-right));
+    left: max(6px, env(safe-area-inset-left));
+    z-index: 120;
+    background: #12122a;
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.more-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+.more-menu-title {
+    color: #888;
+    font-size: 0.85em;
+    margin-top: 2px;
+}
+
+/* --- Phone button bar --- */
+#touch-toolbar button[hidden] { display: none; }
+#touch-toolbar.toolbar-hidden { display: none !important; }
+#game-container.tabbed-mode #touch-toolbar { flex-wrap: nowrap; }
+#game-container.tabbed-mode #touch-toolbar button { min-width: 0; padding-left: 4px; padding-right: 4px; }
+
+/* --- Build, farm and gather panels --- */
+.build-panel-pan {
+    color: #8f8;
+    font-size: 0.85em;
+    padding: 4px 10px;
+    border: 1px solid #4a4;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.build-panel-pan.active {
+    background: #2a5a2a;
+    border-color: #6f6;
+    color: #cfc;
+}
+
+/* --- Footer: folds to its tabs, opens to a strip, or grows tall --- */
+.footer-size-btn { display: none; }
+#game-footer.tabbed .footer-size-btn {
+    display: inline-block;
+    margin-left: auto;
+}
+#game-footer.tabbed.footer-tall {
+    height: 62vh;
+}
+#game-footer.tabbed.collapsed {
+    height: auto;
+    min-height: 0;
+}
+/* Outranks "#game-footer.tabbed #footer-content", which would otherwise keep showing it. */
+#game-footer.tabbed.collapsed #footer-content {
+    display: none;
+}
+
+/* --- Toasts: only the newest shows on narrow screens --- */
+.notif-more {
+    background: #1a1a2e;
+    color: #999;
+    border: 1px solid #333;
+    font-style: normal;
+}
+
+/* --- Tutorial card docks to the top of the map, full width --- */
+#game-container.tabbed-mode #tutorial-note,
+#game-container.tabbed-mode #tutorial-note.expanded {
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    width: auto;
+    max-height: 45%;
+    overflow-y: auto;
+}
+.event-open #game-container.tabbed-mode #tutorial-note {
+    display: none !important;
+}
+
+/* --- Bottom sheets: a grab strip at the top resizes them (see ui._initTouchHelpers) --- */
+#game-container.tabbed-mode :is(#priority-panel, #craft-panel, #inventory-panel, #taming-panel, #settings-panel, #arcane-panel, #story-panel, #map-panel, #save-slot-ingame-panel)::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: #555;
+    border-radius: 2px;
+    margin: -4px auto 8px;
+}
+#game-container.tabbed-mode .research-tree {
+    max-height: calc(var(--sheet-h, 70vh) - 110px);
+}
+#game-container.tabbed-mode .craft-row {
+    flex-wrap: wrap;
+}
+
+/* Tab rows scroll sideways, and fade at the right edge to say so. */
+#game-container.tabbed-mode :is(.craft-tabs, .arcane-tabs, .story-tabs, .research-tabs, .inv-tabs, .build-panel-tabs) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    padding-right: 20px;
+}
+#game-container.tabbed-mode :is(.craft-tab, .arcane-tab, .story-tab-btn, .research-tab-btn, .inv-tab-btn, .build-tab) {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Work priority grid: the name column stays put while the skills scroll under it. */
+#priority-panel .prio-grid tr > :first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #1a1a2e;
+}
+#priority-panel .prio-grid tr:first-child > :first-child {
+    background: #222;
+}
+
+/* --- Finger-sized targets --- */
+@media (pointer: coarse) {
+    .status-controls { gap: 4px; }
+    .status-controls button {
+        min-width: 40px;
+        min-height: 34px;
+        padding: 4px 8px;
+    }
+    .footer-tab {
+        min-height: 38px;
+        padding: 6px 12px;
+    }
+    .nav-btn { min-height: 40px; }
+    .footer-size-btn { min-width: 44px; }
+    #touch-toolbar button { min-height: 40px; }
+    .mode-opt {
+        display: inline-block;
+        padding: 8px 10px;
+    }
+    .panel-close {
+        min-width: 40px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    :is(.craft-tab, .arcane-tab, .story-tab-btn, .research-tab-btn, .inv-tab-btn, .build-tab) {
+        min-height: 38px;
+    }
+    .build-panel-close, .build-panel-pan {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+    }
+    .build-card-key { display: none; }
+    .prio-cell {
+        min-width: 40px;
+        height: 40px;
+    }
+    .craft-row button, .craft-row input { min-height: 36px; }
+    .craft-row button.craft-multi { min-width: 40px; }
+    .event-choices button { min-height: 44px; }
+    #tile-tooltip {
+        white-space: normal;
+        max-width: 80vw;
+    }
+}
