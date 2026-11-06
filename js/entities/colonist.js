@@ -11,6 +11,9 @@ import { getNextId } from './entity-factory.js';
 import { completeTask } from './task-executor.js';
 import { getCraftSpeedBonus, getSpellCooldownMult, getGatherSpeedBonus, getDefenseBonusMult } from '../systems/complexBuildings.js';
 import { haptic } from '../ui/ui-utils.js';
+import { t as tr, tp, defText, defRef } from '../core/i18n.js';
+import { itemRef } from './item-roll.js';
+import { resourceName } from '../core/names.js';
 
 function hslToHex(h, s, l) {
     s /= 100; l /= 100;
@@ -305,9 +308,9 @@ export function updateColonist(colonist, game) {
         const starvingPulse = colonist.state !== 'eating' &&
             (colonist.state !== 'drafted' || game.tick % 75 === 0);
         if (starvingPulse && colonist.needs.hunger < COLONIST_CONFIG.hungerMoodThreshold) {
-            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Starving!', color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
+            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_starving'), color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
         }
-        if (colonist.thoughts && colonist.thoughts.some(t => t.text === 'Freezing outside')) {
+        if (hasThought(colonist, 'freezing')) {
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.freezingChar, color: COMBAT_VISUALS.freezingColor, ttl: COMBAT_VISUALS.freezingTtl });
         }
         if (colonist.maxHp > 0 && colonist.hp < colonist.maxHp && colonist.hp > 0) {
@@ -499,38 +502,38 @@ function updateThoughts(colonist, game) {
         const nearOthers = game.colonists.some(c => c.id !== colonist.id && c.hp > 0 &&
             manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.socialRange);
         if (nearOthers) {
-            addThought(colonist, 'Enjoying company', TRAITS.socialite.nearOthersMoodBonus, 20, game.tick);
+            addThought(colonist, 'enjoying_company', TRAITS.socialite.nearOthersMoodBonus, 20, game.tick);
         } else {
-            addThought(colonist, 'Feeling lonely', TRAITS.socialite.aloneMoodPenalty, 20, game.tick);
+            addThought(colonist, 'feeling_lonely', TRAITS.socialite.aloneMoodPenalty, 20, game.tick);
         }
     }
     if (colonist.traits.includes('loner')) {
         const nearOthers = game.colonists.some(c => c.id !== colonist.id && c.hp > 0 &&
             manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.socialRange);
         if (!nearOthers) {
-            addThought(colonist, 'Peaceful solitude', TRAITS.loner.aloneMoodBonus, 20, game.tick);
+            addThought(colonist, 'peaceful_solitude', TRAITS.loner.aloneMoodBonus, 20, game.tick);
         } else {
-            addThought(colonist, 'Too crowded', TRAITS.loner.nearOthersMoodPenalty, 20, game.tick);
+            addThought(colonist, 'too_crowded', TRAITS.loner.nearOthersMoodPenalty, 20, game.tick);
         }
     }
     if (colonist.traits.includes('lazy') && colonist.state === 'idle') {
-        addThought(colonist, 'Relaxing', TRAITS.lazy.idleMoodBonus, 30, game.tick);
+        addThought(colonist, 'relaxing', TRAITS.lazy.idleMoodBonus, 30, game.tick);
     }
     if (colonist.traits.includes('workaholic') && colonist.state === 'idle') {
-        addThought(colonist, 'Restless with nothing to do', TRAITS.workaholic.idleMoodPenalty, 30, game.tick);
+        addThought(colonist, 'restless_idle', TRAITS.workaholic.idleMoodPenalty, 30, game.tick);
     }
     if (colonist.traits.includes('menagerist')) {
         const nearTamed = game.entities.some(e => e.category === 'animal' && e.tamed && e.hp > 0 &&
             manhattanDist(colonist.x, colonist.y, e.x, e.y) <= COLONIST_CONFIG.socialRange);
-        if (nearTamed) addThought(colonist, 'Comforted by animals', TRAITS.menagerist.tamedAnimalMoodAura, 20, game.tick);
+        if (nearTamed) addThought(colonist, 'comforted_by_animals', TRAITS.menagerist.tamedAnimalMoodAura, 20, game.tick);
     }
 
     const indoorPenalty = getRaceModifier(colonist, 'indoorMoodPenalty', 0);
     if (indoorPenalty < 0) {
         if (isIndoors(colonist, game.map)) {
-            addThought(colonist, 'Restless indoors', indoorPenalty, 20, game.tick);
+            addThought(colonist, 'restless_indoors', indoorPenalty, 20, game.tick);
         } else {
-            addThought(colonist, 'At home outdoors', 3, 20, game.tick);
+            addThought(colonist, 'at_home_outdoors', 3, 20, game.tick);
         }
     }
 
@@ -538,7 +541,7 @@ function updateThoughts(colonist, game) {
     if (isoPenalty < 0) {
         const nearOthers = game.colonists.some(c => c.id !== colonist.id && c.hp > 0 &&
             manhattanDist(colonist.x, colonist.y, c.x, c.y) <= COLONIST_CONFIG.socialRange);
-        if (!nearOthers) addThought(colonist, 'Rattled alone', isoPenalty, 20, game.tick);
+        if (!nearOthers) addThought(colonist, 'rattled_alone', isoPenalty, 20, game.tick);
     }
 
     if (game.waves) {
@@ -554,7 +557,7 @@ function updateThoughts(colonist, game) {
             }
         }
         if (game._unwantedIds && game._unwantedIds.has(colonist.id)) {
-            addThought(colonist, THOUGHTS.unwanted.text, THOUGHTS.unwanted.moodEffect, 20, game.tick);
+            addThought(colonist, 'unwanted', THOUGHTS.unwanted.moodEffect, 20, game.tick);
         }
     }
 }
@@ -564,7 +567,7 @@ function updateThoughts(colonist, game) {
 // ("3 colonists are overheating!"). Playtests saw ~5 such toasts per game day.
 const ALERT_TOAST_COOLDOWN = CONFIG.TICKS_PER_DAY;
 const ALERT_MERGE_TICKS = 30;
-function pushColonistAlert(game, colonist, kind, singular, plural, type) {
+function pushColonistAlert(game, colonist, kind, msgKey, type) {
     const last = game._alertToastTicks || (game._alertToastTicks = new Map());
     const key = `${kind}:${colonist.id}`;
     if (last.has(key) && game.tick - last.get(key) < ALERT_TOAST_COOLDOWN) return;
@@ -572,10 +575,10 @@ function pushColonistAlert(game, colonist, kind, singular, plural, type) {
     const recent = game.notifications.find(n => n._alertKind === kind && game.tick - n.tick <= ALERT_MERGE_TICKS);
     if (recent) {
         if (!recent._alertNames.includes(colonist.name)) recent._alertNames.push(colonist.name);
-        recent.text = recent._alertNames.length === 1 ? `${recent._alertNames[0]} ${singular}` : `${recent._alertNames.length} colonists ${plural}`;
+        recent.text = tp(msgKey, recent._alertNames.length, { name: recent._alertNames[0] });
         return;
     }
-    game.notifications.push({ text: `${colonist.name} ${singular}`, tick: game.tick, type, _alertKind: kind, _alertNames: [colonist.name] });
+    game.notifications.push({ text: tp(msgKey, 1, { name: colonist.name }), tick: game.tick, type, _alertKind: kind, _alertNames: [colonist.name] });
 }
 
 function checkCriticalAlerts(colonist, game) {
@@ -585,34 +588,34 @@ function checkCriticalAlerts(colonist, game) {
     const hasFood = game.resources.stockpile.food > 0 || game.resources.getFoodstuffTotal() > 0;
     if (colonist.needs.hunger < 30 && !flags.hunger && !hasFood) {
         flags.hunger = true;
-        game.notifications.push({ text: `${colonist.name} is hungry and there's no food!`, tick: game.tick, type: 'warning' });
+        game.notifications.push({ text: tr('msg.colonist.hungry_no_food', { name: colonist.name }), tick: game.tick, type: 'warning' });
     } else if (colonist.needs.hunger >= 40 || hasFood) {
         flags.hunger = false;
     }
 
     if (colonist.mood < 30 && colonist.mood > 20 && !flags.mood) {
         flags.mood = true;
-        pushColonistAlert(game, colonist, 'mood', 'is near breaking!', 'are near breaking!', 'warning');
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Low mood!', color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
+        pushColonistAlert(game, colonist, 'mood', 'msg.colonist.alert_near_breaking', 'warning');
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_low_mood'), color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
     } else if (colonist.mood >= 40) {
         flags.mood = false;
     }
 
-    const freezing = colonist.thoughts.some(t => t.text === 'Freezing outside');
+    const freezing = hasThought(colonist, 'freezing');
     if (freezing && !flags.freezing) {
         flags.freezing = true;
-        pushColonistAlert(game, colonist, 'freezing', 'is freezing!', 'are freezing!', 'danger');
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Freezing!', color: '#88ddff', fontSize: 11, ttl: 12, maxTtl: 12 });
+        pushColonistAlert(game, colonist, 'freezing', 'msg.colonist.alert_freezing', 'danger');
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_freezing'), color: '#88ddff', fontSize: 11, ttl: 12, maxTtl: 12 });
         window.soundManager?.playSFX('freezing');
     } else if (!freezing) {
         flags.freezing = false;
     }
 
-    const overheating = colonist.thoughts.some(t => t.text === 'Overheating outside');
+    const overheating = hasThought(colonist, 'overheating');
     if (overheating && !flags.overheating) {
         flags.overheating = true;
-        pushColonistAlert(game, colonist, 'overheating', 'is overheating!', 'are overheating!', 'warning');
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Overheating!', color: '#ff8844', fontSize: 11, ttl: 12, maxTtl: 12 });
+        pushColonistAlert(game, colonist, 'overheating', 'msg.colonist.alert_overheating', 'warning');
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_overheating'), color: '#ff8844', fontSize: 11, ttl: 12, maxTtl: 12 });
     } else if (!overheating) {
         flags.overheating = false;
     }
@@ -623,15 +626,27 @@ function checkCriticalAlerts(colonist, game) {
         if (game.settings.pauseOnLowHealth && !game.paused) {
             game.togglePause(true);
             game.camera.centerOn(colonist.x, colonist.y);
-            game.notifications.push({ text: `${colonist.name} is critically wounded! (auto-paused)`, tick: game.tick, type: 'warning' });
+            game.notifications.push({ text: tr('msg.colonist.critically_wounded_paused', { name: colonist.name }), tick: game.tick, type: 'warning' });
         }
     } else if (colonist.hp > colonist.maxHp * 0.35) {
         flags.lowHealthPaused = false;
     }
 }
 
-export function addThought(colonist, text, moodEffect, duration, tick) {
-    const existing = colonist.thoughts.find(t => t.text === text);
+/**
+ * Gives a colonist a mood thought, or refreshes it if they already have it.
+ * Thoughts are matched by `id`, never by their text, and their text is looked
+ * up only when shown (thoughtText), so it can be translated.
+ * @param {string|object} thought A THOUGHTS id, or { id, params, loc, text, targetId }
+ *   for a thought whose text needs params, lives under another key (`loc`), or
+ *   comes as plain text from a mod (`text`). A string that isn't a THOUGHTS id is
+ *   treated as plain text, which keeps older mods working.
+ */
+export function addThought(colonist, thought, moodEffect, duration, tick) {
+    let spec = typeof thought === 'string' ? { id: thought } : thought;
+    if (!spec) return;
+    if (!spec.loc && spec.text == null && !THOUGHTS[spec.id]) spec = { id: `text:${spec.id}`, text: String(spec.id) };
+    const existing = colonist.thoughts.find(t => t.id === spec.id);
     if (existing) {
         existing.tickAdded = tick;
         return;
@@ -645,12 +660,37 @@ export function addThought(colonist, text, moodEffect, duration, tick) {
         else if (effect < 0) effect *= TRAITS.volatile.negativeThoughtMult;
     }
 
-    colonist.thoughts.push({ text, moodEffect: effect, duration, tickAdded: tick });
+    const entry = { id: spec.id, moodEffect: effect, duration, tickAdded: tick };
+    if (spec.params) entry.params = spec.params;
+    if (spec.loc) entry.loc = spec.loc;
+    if (spec.text != null) entry.text = spec.text;
+    if (spec.targetId != null) entry.targetId = spec.targetId;
+    colonist.thoughts.push(entry);
 }
 
-function applyThought(colonist, thoughtKey, tick) {
+/** Adds a THOUGHTS entry with its configured mood effect and duration. */
+export function applyThought(colonist, thoughtKey, tick) {
     const t = THOUGHTS[thoughtKey];
-    if (t) addThought(colonist, t.text, t.moodEffect, t.duration, tick);
+    if (t) addThought(colonist, thoughtKey, t.moodEffect, t.duration, tick);
+}
+
+/** True if the colonist currently has the thought with this id. */
+export function hasThought(colonist, id) {
+    return !!colonist.thoughts?.some(t => t.id === id);
+}
+
+// Room, town hall and workshop quality thoughts are named after the tier.
+function qualityTierThought(q) {
+    return { id: `quality:${q.tierLoc || q.tier}`, loc: q.tierLoc ? `${q.tierLoc}.name` : null, text: q.tierName };
+}
+
+/** Display text for a stored thought, in the active language. */
+export function thoughtText(thought) {
+    if (!thought) return '';
+    if (thought.loc) return tr(thought.loc, thought.params, thought.text);
+    const def = THOUGHTS[thought.id];
+    if (def) return defText(def, 'text', thought.params);
+    return thought.text != null ? String(thought.text) : String(thought.id ?? '');
 }
 
 function computeMood(colonist) {
@@ -972,7 +1012,7 @@ function tryUsePotions(colonist, game) {
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellBuffChar, color: '#44aaff', ttl: 3 });
         }
 
-        game.notifications.push({ text: `${colonist.name} used ${potion.name}`, tick: game.tick, type: 'success' });
+        game.notifications.push({ text: tr('msg.colonist.used_potion', { name: colonist.name, potion: potion.name }), tick: game.tick, type: 'success' });
     }
 }
 
@@ -1010,9 +1050,9 @@ export function grantCastXp(colonist, spell, game) {
         colonist.magicXpAccumulator[school] -= magicXpNeeded;
         colonist.magicSkills[school] = Math.min(10, colonist.magicSkills[school] + 1);
         recalcMaxMana(colonist);
-        game.notifications.push({ text: `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}`, tick: game.tick, type: 'success' });
-        game.eventLog.add(game, `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}!`, 'success', { type: 'colonist', id: colonist.id });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${MAGIC_SKILLS[school].name} lvl ${colonist.magicSkills[school]}`, color: '#aa66ff', fontSize: 11, ttl: 20, maxTtl: 20 });
+        game.notifications.push({ text: tr('msg.colonist.magic_skill_up_toast', { name: colonist.name, school: MAGIC_SKILLS[school].name, level: colonist.magicSkills[school] }), tick: game.tick, type: 'success' });
+        game.eventLog.add(game, { key: 'msg.colonist.magic_skill_up_log', params: { name: colonist.name, school: defRef(MAGIC_SKILLS[school]), level: colonist.magicSkills[school] } }, 'success', { type: 'colonist', id: colonist.id });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.magic_skill_up_float', { school: MAGIC_SKILLS[school].name, level: colonist.magicSkills[school] }), color: '#aa66ff', fontSize: 11, ttl: 20, maxTtl: 20 });
         // Level-up starburst particles
         for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * Math.PI * 2;
@@ -1049,7 +1089,7 @@ function tryAutocastSpells(colonist, game) {
         if (colonist._spellRetryAt?.[spellKey] > game.tick) continue;
         const effectiveCost = getEffectiveManaCost(colonist, spell);
         if (colonist.mana < effectiveCost) {
-            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'No mana', color: '#6688cc', fontSize: 10, ttl: 10, maxTtl: 10 });
+            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_no_mana'), color: '#6688cc', fontSize: 10, ttl: 10, maxTtl: 10 });
             continue;
         }
 
@@ -1065,7 +1105,7 @@ function tryAutocastSpells(colonist, game) {
             else colonist._spellCooldowns[spellKey] = prevCastTick;
             if (!colonist._spellRetryAt) colonist._spellRetryAt = {};
             colonist._spellRetryAt[spellKey] = game.tick + SPELL_FIZZLE_RETRY_TICKS;
-            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'No room to summon', color: '#9966ff', fontSize: 10, ttl: 14, maxTtl: 14 });
+            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_no_room_to_summon'), color: '#9966ff', fontSize: 10, ttl: 14, maxTtl: 14 });
             continue;
         }
         // Render latch for the per-school cast animation (js/ui/entity-animation.js).
@@ -1451,7 +1491,7 @@ function applySpellEffect(colonist, spell, game) {
             });
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellDivinationChar, color: COMBAT_VISUALS.spellDivinationColor, ttl: 3 });
             window.soundManager?.playSFXAt('spell_divination', colonist.x, colonist.y);
-            game.notifications.push({ text: `${colonist.name} cast ${spell.name}`, tick: game.tick, type: 'success' });
+            game.notifications.push({ text: tr('msg.colonist.cast_spell', { name: colonist.name, spell: spell.name }), tick: game.tick, type: 'success' });
             break;
         }
         case 'chain_damage': {
@@ -1647,14 +1687,16 @@ function applySpellEffect(colonist, spell, game) {
             const to = spell.toResource;
             const outAmt = spell.outputAmount || 1;
             if (from && (game.resources.stockpile[from] || 0) < inAmt) {
-                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `No ${from.replace(/_/g, ' ')}`, color: '#aa8844', fontSize: 10, ttl: 10, maxTtl: 10 });
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_no_resource', { resource: resourceName(from) }), color: '#aa8844', fontSize: 10, ttl: 10, maxTtl: 10 });
                 break;
             }
             if (from) game.resources.stockpile[from] -= inAmt;
             game.resources.stockpile[to] = (game.resources.stockpile[to] || 0) + outAmt;
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.spellGrowthChar, color: '#ffdd44', ttl: 4 });
-            const fromStr = from ? `${inAmt} ${from.replace(/_/g, ' ')} → ` : '';
-            game.notifications.push({ text: `${colonist.name} transmuted ${fromStr}${outAmt} ${to.replace(/_/g, ' ')}`, tick: game.tick, type: 'success' });
+            const transmuteText = from
+                ? tr('msg.colonist.transmuted_from', { name: colonist.name, inAmt, from: resourceName(from), outAmt, to: resourceName(to) })
+                : tr('msg.colonist.transmuted', { name: colonist.name, outAmt, to: resourceName(to) });
+            game.notifications.push({ text: transmuteText, tick: game.tick, type: 'success' });
             break;
         }
         case 'dot_burn': {
@@ -1780,7 +1822,7 @@ function applySpellEffect(colonist, spell, game) {
             tile.zone._soilEnriched = true;
             tile.zone._soilGrowthBonus = (tile.zone._soilGrowthBonus || 0) + (spell.growthBonus || 0.15);
             game.combatEffects.push({ x: tx, y: ty, char: COMBAT_VISUALS.spellGrowthChar, color: '#88ff44', ttl: 6 });
-            game.notifications.push({ text: `${colonist.name} enriched the soil`, tick: game.tick, type: 'success' });
+            game.notifications.push({ text: tr('msg.colonist.enriched_soil', { name: colonist.name }), tick: game.tick, type: 'success' });
             window.soundManager?.playSFXAt('spell_growth', colonist.x, colonist.y);
             break;
         }
@@ -1973,7 +2015,7 @@ function updateIdle(colonist, game) {
     // Seek warmth when freezing and idle. Walk toward the nearest warmth source
     // within range. Interrupted immediately if work or a threat appears (guard/
     // task checks come right after).
-    if (colonist.thoughts.some(t => t.text === 'Freezing outside') &&
+    if (hasThought(colonist, 'freezing') &&
         !game.power.isTileWarmed(game, colonist.x, colonist.y)) {
         let bestTarget = null;
         let bestDist = WARMTH_SEEK_RADIUS + 1;
@@ -2038,10 +2080,10 @@ function updateIdle(colonist, game) {
                         tile.designation = null;
                         game.combatEffects.push({ x: task.x, y: task.y, char: COMBAT_VISUALS.needCriticalChar, color: COMBAT_VISUALS.needCriticalColor, ttl: COMBAT_VISUALS.needCriticalTtl });
                     }
-                    game.notifications.push({ text: `Cancelled unreachable ${task.type} task`, tick: game.tick, type: 'warning' });
+                    game.notifications.push({ text: tr('msg.task.cancelled_unreachable', { task: tr(`msg.task.type.${task.type}`, null, task.type) }), tick: game.tick, type: 'warning' });
                 } else if (!colonist._lastPathFailNotify || game.tick - colonist._lastPathFailNotify > TASK_CONFIG.unreachableCheckInterval) {
                     colonist._lastPathFailNotify = game.tick;
-                    game.notifications.push({ text: `${colonist.name} can't reach ${task.type} task`, tick: game.tick, type: 'danger' });
+                    game.notifications.push({ text: tr('msg.task.cant_reach', { name: colonist.name, task: tr(`msg.task.type.${task.type}`, null, task.type) }), tick: game.tick, type: 'danger' });
                 }
             }
         }
@@ -2134,16 +2176,17 @@ function wander(colonist, game) {
 
 // Relaxation activity metadata: the mood thought awarded on completion and the
 // floating-text glyph/color shown while relaxing. 'hang_out' uses the Town Hall's
-// quality tier for its thought when available (see finishRelaxing).
+// quality tier for its thought when available (see finishRelaxing). Display
+// labels are msg.colonist.relax.<activity>.
 const RELAX_ACTIVITIES = {
-    hang_out:       { label: 'Hanging out',       thought: 'hung_out',        glyph: '♪', color: '#ffdd66' },
-    warm_by_fire:   { label: 'Warming by the fire', thought: 'warmed_by_fire', glyph: '≈', color: '#ff8844' },
-    people_watch:   { label: 'People watching',   thought: 'people_watched',  glyph: '☺', color: '#88ccff' },
-    stargaze:       { label: 'Stargazing',        thought: 'stargazed',       glyph: '✦', color: '#aaccff' },
-    cloud_watch:    { label: 'Cloud watching',    thought: 'cloud_watched',   glyph: '☁', color: '#cccccc' },
-    skip_stones:    { label: 'Skipping stones',   thought: 'skipped_stones',  glyph: '○', color: '#88bbcc' },
-    smell_flowers:  { label: 'Smelling the flowers', thought: 'smelled_flowers', glyph: '❀', color: '#ff99cc' },
-    stroll:         { label: 'Strolling',         thought: 'strolled',        glyph: '♫', color: '#aaddaa' },
+    hang_out:       { thought: 'hung_out',        glyph: '♪', color: '#ffdd66' },
+    warm_by_fire:   { thought: 'warmed_by_fire', glyph: '≈', color: '#ff8844' },
+    people_watch:   { thought: 'people_watched',  glyph: '☺', color: '#88ccff' },
+    stargaze:       { thought: 'stargazed',       glyph: '✦', color: '#aaccff' },
+    cloud_watch:    { thought: 'cloud_watched',   glyph: '☁', color: '#cccccc' },
+    skip_stones:    { thought: 'skipped_stones',  glyph: '○', color: '#88bbcc' },
+    smell_flowers:  { thought: 'smelled_flowers', glyph: '❀', color: '#ff99cc' },
+    stroll:         { thought: 'strolled',        glyph: '♫', color: '#aaddaa' },
 };
 
 // Friendly label for a colonist's current relaxation activity, or null if not
@@ -2151,7 +2194,7 @@ const RELAX_ACTIVITIES = {
 export function getRelaxActivityLabel(colonist) {
     if (!colonist._relaxActivity) return null;
     const info = RELAX_ACTIVITIES[colonist._relaxActivity];
-    return info ? info.label : 'Relaxing';
+    return info ? tr(`msg.colonist.relax.${colonist._relaxActivity}`) : tr('msg.colonist.relax.relaxing');
 }
 
 const WARMTH_SOURCES = ['campfire', 'ember_heater', 'inferno_ward'];
@@ -2270,10 +2313,10 @@ function finishRelaxing(colonist, game) {
         ? game.map[colonist.y][colonist.x].roomId : null;
     if (activity === 'hang_out' && roomId !== null && game.townHallQualities[roomId]) {
         const q = game.townHallQualities[roomId];
-        addThought(colonist, q.tierName, q.moodEffect, q.duration, game.tick);
+        addThought(colonist, qualityTierThought(q), q.moodEffect, q.duration, game.tick);
     } else if (info) {
         const th = THOUGHTS[info.thought];
-        if (th) addThought(colonist, th.text, th.moodEffect, th.duration, game.tick);
+        if (th) addThought(colonist, info.thought, th.moodEffect, th.duration, game.tick);
     }
     delete colonist._relaxActivity;
     delete colonist._relaxTimer;
@@ -2587,24 +2630,24 @@ function updateEating(colonist, game) {
             if (colonist.traits.includes('comfort_eater')) mealMood += TRAITS.comfort_eater.mealMoodBonus;
             let mealDuration = COLONIST_CONFIG.mealMoodDuration;
             if (colonist.traits.includes('chef')) mealDuration = Math.round(mealDuration * TRAITS.chef.mealMoodDurationMult);
-            addThought(colonist, colonist.traits.includes('gourmand') ? 'Delicious meal' : 'Ate a meal', mealMood, mealDuration, game.tick);
+            addThought(colonist, colonist.traits.includes('gourmand') ? 'delicious_meal' : 'ate_meal', mealMood, mealDuration, game.tick);
             colonist._eatTicksLeft = 15;  // simulation ticks: 3 s of game time at 1x
         } else {
             const eaten = eatRawFoodstuff(game);
             if (eaten) {
                 colonist.needs.hunger = Math.min(100, colonist.needs.hunger + COLONIST_CONFIG.rawFoodRestore);
                 if (colonist.traits.includes('foraging_gut')) {
-                    addThought(colonist, 'Ate raw food', TRAITS.foraging_gut.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+                    addThought(colonist, 'ate_raw_food', TRAITS.foraging_gut.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
                 } else if (colonist.traits.includes('gourmand')) {
-                    addThought(colonist, 'Ate raw food', TRAITS.gourmand.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+                    addThought(colonist, 'ate_raw_food', TRAITS.gourmand.rawFoodMoodPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
                 } else {
                     const rawPenalty = getRaceModifier(colonist, 'rawFoodMoodPenalty', COLONIST_CONFIG.rawFoodMoodPenalty);
-                    addThought(colonist, 'Ate raw food', rawPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
+                    addThought(colonist, 'ate_raw_food', rawPenalty, COLONIST_CONFIG.rawFoodMoodDuration, game.tick);
                 }
                 colonist._eatTicksLeft = 23;  // raw food takes a little longer (~4.6 s)
             } else {
                 colonist.state = 'idle';
-                addThought(colonist, 'Starving', COLONIST_CONFIG.starvingMoodPenalty, COLONIST_CONFIG.starvingMoodDuration, game.tick);
+                addThought(colonist, 'starving', COLONIST_CONFIG.starvingMoodPenalty, COLONIST_CONFIG.starvingMoodDuration, game.tick);
             }
         }
         return;
@@ -2650,7 +2693,7 @@ function updateSleeping(colonist, game) {
     if (colonist.traits.includes('insomniac')) sleepRestMult *= TRAITS.insomniac.sleepRestMult;
     colonist.needs.rest = Math.min(100, colonist.needs.rest + COLONIST_CONFIG.restPerTick * sleepRestMult);
     if (game.tick % 12 === 0) {
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Zzz', color: '#8888ff', fontSize: 14, ttl: 11, maxTtl: 11, initialAlpha: 0.9 });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_sleeping'), color: '#8888ff', fontSize: 14, ttl: 11, maxTtl: 11, initialAlpha: 0.9 });
     }
 
     // If resting to recover from injury, wake immediately when combat starts,
@@ -2681,16 +2724,16 @@ function updateSleeping(colonist, game) {
             const roomId = game.map[colonist.y][colonist.x].roomId;
             if (roomId !== null && game.roomQualities[roomId]) {
                 const rq = game.roomQualities[roomId];
-                addThought(colonist, rq.tierName, rq.moodEffect, rq.duration, game.tick);
+                addThought(colonist, qualityTierThought(rq), rq.moodEffect, rq.duration, game.tick);
             } else if (roomId !== null) {
-                addThought(colonist, 'Slept in a room', COLONIST_CONFIG.sleptInBedMoodBonus, COLONIST_CONFIG.sleptInBedMoodDuration, game.tick);
+                addThought(colonist, 'slept_in_room', COLONIST_CONFIG.sleptInBedMoodBonus, COLONIST_CONFIG.sleptInBedMoodDuration, game.tick);
             } else {
-                addThought(colonist, 'Slept in bed', COLONIST_CONFIG.sleptInBedMoodBonus, COLONIST_CONFIG.sleptInBedMoodDuration, game.tick);
+                addThought(colonist, 'slept_in_bed', COLONIST_CONFIG.sleptInBedMoodBonus, COLONIST_CONFIG.sleptInBedMoodDuration, game.tick);
             }
         } else {
             const noBeds = game.mapIndex.getStructurePositions('bed').size === 0;
             const penalty = noBeds ? COLONIST_CONFIG.sleptOnGroundNoBedsMoodPenalty : COLONIST_CONFIG.sleptOnGroundMoodPenalty;
-            addThought(colonist, 'Slept on the ground', penalty, COLONIST_CONFIG.sleptOnGroundMoodDuration, game.tick);
+            addThought(colonist, 'slept_on_ground', penalty, COLONIST_CONFIG.sleptOnGroundMoodDuration, game.tick);
         }
     }
 }
@@ -2953,7 +2996,7 @@ function updateFighting(colonist, game) {
     if (target.hp <= 0) {
         const hpOnKill = getEquipmentStat(colonist, 'hpOnKill');
         if (hpOnKill > 0) colonist.hp = Math.min(colonist.maxHp, colonist.hp + hpOnKill);
-        addThought(colonist, 'Won a fight', COLONIST_CONFIG.victoryMoodBonus, COLONIST_CONFIG.victoryMoodDuration, game.tick);
+        addThought(colonist, 'won_fight', COLONIST_CONFIG.victoryMoodBonus, COLONIST_CONFIG.victoryMoodDuration, game.tick);
         colonist.state = 'idle';
     }
 }
@@ -3006,7 +3049,7 @@ function updateHunting(colonist, game) {
             delete colonist.huntTargetId;
             const votes = animal._huntUnreachable || (animal._huntUnreachable = { skillRequired: 'animals' });
             if (recordUnreachableFailure(votes, colonist, game)) {
-                game.notifications.push({ text: `Cancelled unreachable hunt task`, tick: game.tick, type: 'warning' });
+                game.notifications.push({ text: tr('msg.task.cancelled_unreachable', { task: tr('msg.task.type.hunt') }), tick: game.tick, type: 'warning' });
             } else {
                 const retry = game.taskQueue.add({
                     type: 'hunt', skillRequired: 'animals', x: animal.x, y: animal.y,
@@ -3220,7 +3263,7 @@ function updateDraftBreak(colonist, game) {
         // No free tile beside the wall can be reached: drop the order rather than stand idle.
         if (colonist._fightPath.length === 0 && colonist._fightPathRetryAt > game.tick) {
             colonist.draftBreakTarget = null;
-            game.notifications.push({ text: `${colonist.name} can't reach that wall`, tick: game.tick, type: 'warning' });
+            game.notifications.push({ text: tr('msg.colonist.cant_reach_wall', { name: colonist.name }), tick: game.tick, type: 'warning' });
         }
         return;
     }
@@ -3276,7 +3319,7 @@ function updateDraftInteract(colonist, game) {
         // No free tile beside the target can be reached: drop the order rather than stand idle.
         if (colonist._fightPath.length === 0 && colonist._fightPathRetryAt > game.tick) {
             colonist.draftInteractTarget = null;
-            game.notifications.push({ text: `${colonist.name} can't reach that ${tile.structure === 'rift_anchor' ? 'rift anchor' : 'chest'}`, tick: game.tick, type: 'warning' });
+            game.notifications.push({ text: tr(tile.structure === 'rift_anchor' ? 'msg.colonist.cant_reach_rift_anchor' : 'msg.colonist.cant_reach_chest', { name: colonist.name }), tick: game.tick, type: 'warning' });
         }
         return;
     }
@@ -3371,7 +3414,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker, isDot = fal
     dodgeChance = Math.min(0.75, dodgeChance);
     if (dodgeChance > 0 && Math.random() < dodgeChance) {
         game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '~', color: '#88ccff', ttl: 4 });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Block!', color: '#4488ff', fontSize: 11, ttl: 12, maxTtl: 12 });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_block'), color: '#4488ff', fontSize: 11, ttl: 12, maxTtl: 12 });
         window.soundManager?.playSFXAt('shield_block', colonist.x, colonist.y);
         return;
     }
@@ -3480,7 +3523,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker, isDot = fal
     }
 
     if (!isDot && colonist.state !== 'fighting' && colonist.state !== 'fleeing' && colonist.hp > 0) {
-        game.eventLog.add(game, `${colonist.name} is under attack!`, 'danger', { type: 'colonist', id: colonist.id });
+        game.eventLog.add(game, { key: 'msg.colonist.under_attack', params: { name: colonist.name } }, 'danger', { type: 'colonist', id: colonist.id });
     }
 
     if (colonist.hp <= 0) {
@@ -3497,7 +3540,7 @@ export function colonistTakeDamage(colonist, damage, game, attacker, isDot = fal
                 colonist[slot] = null;
             }
             invalidateEquipStatCache(colonist);
-            game.eventLog.add(game, `${colonist.name}'s ${item.name} shatters, reviving them!`, 'success', { type: 'colonist', id: colonist.id });
+            game.eventLog.add(game, { key: 'msg.colonist.revive_item_shattered', params: { name: colonist.name, item: itemRef(item) } }, 'success', { type: 'colonist', id: colonist.id });
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: '✦', color: '#ffdd44', ttl: 8 });
             revived = true;
             break;
@@ -3508,30 +3551,30 @@ export function colonistTakeDamage(colonist, damage, game, attacker, isDot = fal
             releaseColonistTasks(colonist, game);
             game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.deathChar, color: COMBAT_VISUALS.deathColor, ttl: COMBAT_VISUALS.deathTtl });
             window.soundManager?.playSFXAt('colonist_death', colonist.x, colonist.y);
-            game.eventLog.add(game, `${colonist.name} has died!`, 'danger', { type: 'colonist', id: colonist.id });
+            game.eventLog.add(game, { key: 'msg.colonist.died', params: { name: colonist.name } }, 'danger', { type: 'colonist', id: colonist.id });
             haptic(200);
             game.story.checkMilestone('first_colonist_death', game);
             if (game.settings.pauseOnDeath && !game.paused) {
                 game.paused = true;
                 game.camera.centerOn(colonist.x, colonist.y);
-                game.notifications.push({ text: `${colonist.name} has died! (auto-paused)`, tick: game.tick, type: 'danger' });
+                game.notifications.push({ text: tr('msg.colonist.died_paused', { name: colonist.name }), tick: game.tick, type: 'danger' });
             }
             for (const other of game.colonists) {
                 if (other.id !== colonist.id && other.hp > 0) {
                     const opinion = other.opinions?.[colonist.id] ?? 0;
                     const tier = getRelationshipTier(opinion).key;
                     if (tier === 'lovers') {
-                        addThought(other, THOUGHTS.lover_died.text, THOUGHTS.lover_died.moodEffect, THOUGHTS.lover_died.duration, game.tick);
+                        addThought(other, { id: 'lover_died', targetId: colonist.id }, THOUGHTS.lover_died.moodEffect, THOUGHTS.lover_died.duration, game.tick);
                     } else if (tier === 'close_friend') {
-                        addThought(other, THOUGHTS.close_friend_died.text, THOUGHTS.close_friend_died.moodEffect, THOUGHTS.close_friend_died.duration, game.tick);
+                        addThought(other, { id: 'close_friend_died', targetId: colonist.id }, THOUGHTS.close_friend_died.moodEffect, THOUGHTS.close_friend_died.duration, game.tick);
                     } else if (tier === 'friend') {
-                        addThought(other, THOUGHTS.friend_died.text, THOUGHTS.friend_died.moodEffect, THOUGHTS.friend_died.duration, game.tick);
+                        addThought(other, { id: 'friend_died', targetId: colonist.id }, THOUGHTS.friend_died.moodEffect, THOUGHTS.friend_died.duration, game.tick);
                     } else if (tier === 'acquaintance') {
-                        addThought(other, THOUGHTS.acquaintance_died.text, THOUGHTS.acquaintance_died.moodEffect, THOUGHTS.acquaintance_died.duration, game.tick);
+                        addThought(other, { id: 'acquaintance_died', targetId: colonist.id }, THOUGHTS.acquaintance_died.moodEffect, THOUGHTS.acquaintance_died.duration, game.tick);
                     } else if (tier === 'rival') {
-                        addThought(other, THOUGHTS.rival_died.text, THOUGHTS.rival_died.moodEffect, THOUGHTS.rival_died.duration, game.tick);
+                        addThought(other, { id: 'rival_died', targetId: colonist.id }, THOUGHTS.rival_died.moodEffect, THOUGHTS.rival_died.duration, game.tick);
                     } else {
-                        addThought(other, `${colonist.name} died`, COLONIST_CONFIG.deathMoodPenalty, COLONIST_CONFIG.deathMoodDuration, game.tick);
+                        addThought(other, { id: `colonist_died:${colonist.id}`, loc: 'thought.colonist_died.text', text: THOUGHTS.colonist_died.text, params: { name: colonist.name }, targetId: colonist.id }, COLONIST_CONFIG.deathMoodPenalty, COLONIST_CONFIG.deathMoodDuration, game.tick);
                     }
                 }
             }

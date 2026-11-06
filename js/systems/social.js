@@ -7,8 +7,9 @@
  */
 import { SOCIAL_INTERACTIONS, SOCIAL_CONFIG, THOUGHTS, TRAITS, GROUP_ACTIVITIES } from '../core/config.js';
 import { getRelationshipTier } from './social-utils.js';
-import { addThought } from '../entities/colonist.js';
+import { applyThought } from '../entities/colonist.js';
 import { manhattanDist } from '../world/pathfinding.js';
+import { t, defText } from '../core/i18n.js';
 
 export { getRelationshipTier };
 
@@ -56,47 +57,47 @@ function checkRelationshipChange(colonist, other, prevTierKey, game) {
 
     // Milestone thoughts and notifications
     if (effectiveTierKey === 'friend' && (storedTier === 'stranger' || storedTier === 'acquaintance')) {
-        addThought(colonist, THOUGHTS.made_friend.text, THOUGHTS.made_friend.moodEffect, THOUGHTS.made_friend.duration, game.tick);
-        game.notifications.push({ text: `${colonist.name} and ${other.name} became friends!`, tick: game.tick, type: 'success' });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
-        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
+        applyThought(colonist, 'made_friend', game.tick);
+        game.notifications.push({ text: t('msg.social.became_friends', { a: colonist.name, b: other.name }), tick: game.tick, type: 'success' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: t('msg.social.float_friends'), color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: t('msg.social.float_friends'), color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
         game.story.checkMilestone('first_friend_made', game);
     } else if (effectiveTierKey === 'close_friend' && storedTier !== 'lovers') {
-        game.notifications.push({ text: `${colonist.name} and ${other.name} are now close friends!`, tick: game.tick, type: 'success' });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Close Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
-        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Close Friends!', color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.notifications.push({ text: t('msg.social.became_close_friends', { a: colonist.name, b: other.name }), tick: game.tick, type: 'success' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: t('msg.social.float_close_friends'), color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: t('msg.social.float_close_friends'), color: '#44ff88', fontSize: 11, ttl: 15, maxTtl: 15 });
     } else if (effectiveTierKey === 'lovers') {
         // Force mutual lovers: set the other side immediately so both always match.
         if (!other.relationships) other.relationships = {};
         const otherHadLovers = Object.values(other.relationships).includes('lovers');
         other.relationships[colonist.id] = 'lovers';
 
-        addThought(colonist, THOUGHTS.fell_in_love.text, THOUGHTS.fell_in_love.moodEffect, THOUGHTS.fell_in_love.duration, game.tick);
-        addThought(other, THOUGHTS.fell_in_love.text, THOUGHTS.fell_in_love.moodEffect, THOUGHTS.fell_in_love.duration, game.tick);
+        applyThought(colonist, 'fell_in_love', game.tick);
+        applyThought(other, 'fell_in_love', game.tick);
         if (!otherHadLovers) {
-            game.notifications.push({ text: `${colonist.name} and ${other.name} have fallen in love!`, tick: game.tick, type: 'success' });
-            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Lovers!', color: '#ff88cc', fontSize: 11, ttl: 15, maxTtl: 15 });
-            game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Lovers!', color: '#ff88cc', fontSize: 11, ttl: 15, maxTtl: 15 });
+            game.notifications.push({ text: t('msg.social.fell_in_love', { a: colonist.name, b: other.name }), tick: game.tick, type: 'success' });
+            game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: t('msg.social.float_lovers'), color: '#ff88cc', fontSize: 11, ttl: 15, maxTtl: 15 });
+            game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: t('msg.social.float_lovers'), color: '#ff88cc', fontSize: 11, ttl: 15, maxTtl: 15 });
             game.story.checkMilestone('first_lover_made', game);
         }
     } else if (effectiveTierKey === 'rival') {
-        addThought(colonist, THOUGHTS.became_rivals.text, THOUGHTS.became_rivals.moodEffect, THOUGHTS.became_rivals.duration, game.tick);
+        applyThought(colonist, 'became_rivals', game.tick);
         if (storedTier === 'friend' || storedTier === 'close_friend' || storedTier === 'lovers') {
-            addThought(colonist, THOUGHTS.friendship_ended.text, THOUGHTS.friendship_ended.moodEffect, THOUGHTS.friendship_ended.duration, game.tick);
+            applyThought(colonist, 'friendship_ended', game.tick);
         }
-        game.notifications.push({ text: `${colonist.name} and ${other.name} have become rivals!`, tick: game.tick, type: 'danger' });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Rivals!', color: '#ff4444', fontSize: 11, ttl: 15, maxTtl: 15 });
-        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Rivals!', color: '#ff4444', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.notifications.push({ text: t('msg.social.became_rivals', { a: colonist.name, b: other.name }), tick: game.tick, type: 'danger' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: t('msg.social.float_rivals'), color: '#ff4444', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: t('msg.social.float_rivals'), color: '#ff4444', fontSize: 11, ttl: 15, maxTtl: 15 });
     } else if (newTierKey === 'adversary') {
-        addThought(colonist, THOUGHTS.became_adversaries.text, THOUGHTS.became_adversaries.moodEffect, THOUGHTS.became_adversaries.duration, game.tick);
+        applyThought(colonist, 'became_adversaries', game.tick);
         if (storedTier === 'friend' || storedTier === 'close_friend' || storedTier === 'lovers') {
-            addThought(colonist, THOUGHTS.friendship_ended.text, THOUGHTS.friendship_ended.moodEffect, THOUGHTS.friendship_ended.duration, game.tick);
+            applyThought(colonist, 'friendship_ended', game.tick);
         }
-        game.notifications.push({ text: `${colonist.name} and ${other.name} have become adversaries!`, tick: game.tick, type: 'danger' });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Adversaries!', color: '#ff9d34', fontSize: 11, ttl: 15, maxTtl: 15 });
-        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: 'Adversaries!', color: '#ff9d34', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.notifications.push({ text: t('msg.social.became_adversaries', { a: colonist.name, b: other.name }), tick: game.tick, type: 'danger' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: t('msg.social.float_adversaries'), color: '#ff9d34', fontSize: 11, ttl: 15, maxTtl: 15 });
+        game.overlays.push({ type: 'floating_text', x: other.x, y: other.y, text: t('msg.social.float_adversaries'), color: '#ff9d34', fontSize: 11, ttl: 15, maxTtl: 15 });
     } else if (newTierKey === 'stranger' && (storedTier === 'friend' || storedTier === 'close_friend' || storedTier === 'lovers')) {
-        addThought(colonist, THOUGHTS.friendship_ended.text, THOUGHTS.friendship_ended.moodEffect, THOUGHTS.friendship_ended.duration, game.tick);
+        applyThought(colonist, 'friendship_ended', game.tick);
     }
 }
 
@@ -124,14 +125,11 @@ function applyInteraction(a, b, interaction, game) {
     setOpinion(b, a.id, getOpinion(b, a.id) + sharedDelta);
 
     if (interaction.thoughtKey && THOUGHTS[interaction.thoughtKey]) {
-        const t = THOUGHTS[interaction.thoughtKey];
-        addThought(a, t.text, t.moodEffect, t.duration, game.tick);
-        addThought(b, t.text, t.moodEffect, t.duration, game.tick);
+        applyThought(a, interaction.thoughtKey, game.tick);
+        applyThought(b, interaction.thoughtKey, game.tick);
     }
 
-    const text = interaction.text
-        .replace('{a}', a.name)
-        .replace('{b}', b.name);
+    const text = defText(interaction, 'text', { a: a.name, b: b.name });
     game.notifications.push({ text, tick: game.tick, type: interaction.type });
 
     // Chat bubbles above both colonists

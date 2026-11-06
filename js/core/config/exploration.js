@@ -1,3 +1,5 @@
+import { stampLoc } from '../i18n.js';
+
 // Named enemy catalog. Each enemy type has base stats, a sprite, and a color.
 // Realms reference these by key with a spawn weight.
 export const EXPEDITION_ENEMIES = {
@@ -6,59 +8,60 @@ export const EXPEDITION_ENEMIES = {
     // 'Stab' (fang/thorn/spear thrust), or 'DrawAndShoot' (fling a projectile).
     // DrawAndShoot enemies carry projectileChar/projectileColor so their shot
     // renders themed (the composer styles it as a mote when the enemy has spells).
-    crystal_bat:      { name: 'Crystal Bat',       hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', attackAnim: 'Swing', lore: 'An impossible creature made of solid crystal. Somehow it flies with ease throughout the caverns.' },
-    crystal_beast:    { name: 'Crystal Beast',     hp: [30, 45],  damage: [4, 7],  sprite: 'crystal_beast', color: '#4368ec', attackAnim: 'Swing', lore: 'A cat-like beast that grows horns made of illuminated crystal.' },
-    crystal_golem:    { name: 'Crystal Golem',     hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', attackAnim: 'Swing', lore: 'The remains of an ancient crystalline mining construct. It can still throw a mean punch.' },
-    shard_spider:     { name: 'Shard Spider',      hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', attackAnim: 'Stab', lore: 'A giant spider covered in scales of crystal. These are often seen skittering on the ceiling of the caverns.' },
-    runite_elemental: { name: 'Runite Elemental',  hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#44ccff', lore: 'An elemental bound to the caverns. They greatly resemble the mining golems, making you wonder if the miners based their designs on these denizens.', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
-    crystal_wurm:     { name: 'Crystal Wurm',      hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa', attackAnim: 'Swing', lore: 'A large wurm that inhabits the deepest parts of the caverns. It tunnels through the crystal walls with ease.' },
+    crystal_bat:      { hp: [20, 35],  damage: [3, 6],  sprite: 'crystal_bat', color: '#6688ff', attackAnim: 'Swing' },
+    crystal_beast:    { hp: [30, 45],  damage: [4, 7],  sprite: 'crystal_beast', color: '#4368ec', attackAnim: 'Swing' },
+    crystal_golem:    { hp: [50, 80],  damage: [6, 10], sprite: 'crystal_golem', color: '#4466cc', attackAnim: 'Swing' },
+    shard_spider:     { hp: [30, 50],  damage: [5, 8],  sprite: 'shard_spider', color: '#88aaff', attackAnim: 'Stab' },
+    runite_elemental: { hp: [80, 130], damage: [9, 14], sprite: 'runite_elemental', color: '#44ccff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#44ccff', spells: [{ spell: 'arcane_bolt', chance: 0.25, damage: [8, 14] }] },
+    crystal_wurm:     { hp: [100, 160],damage: [11, 17],sprite: 'crystal_wurm', color: '#3355aa', attackAnim: 'Swing' },
 
     // Verdant chain
-    vine_creeper:     { name: 'Vine Creeper',      hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44', attackAnim: 'Swing', lore: 'A slow-moving plant creature that creeps along the canopy above.' },
-    thorn_beast:      { name: 'Thorn Beast',       hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab', lore: 'A jungle predator covered in sharp thorns. Its teeth are even sharper.' },
-    spore_walker:     { name: 'Spore Walker',      hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', lore: 'A plant creature infected by blight. It moves much faster than its creeping kin.', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
-    fungal_horror:    { name: 'Fungal Horror',     hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', lore: 'A creature made almost entirely of blight fungus. Far more dangerous than the average blight bloom seen in the Frontier.', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
-    canopy_stalker:   { name: 'Canopy Stalker',    hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing', lore: `A gigantic snake that glides through the treetops. Thankfully it isn't venomous, but its bite is still quite painful.` },
+    vine_creeper:     { hp: [20, 35],  damage: [3, 5],  sprite: 'vine_creeper', color: '#44aa44', attackAnim: 'Swing' },
+    thorn_beast:      { hp: [40, 65],  damage: [5, 9],  sprite: 'thorn_beast', color: '#338833', attackAnim: 'Stab' },
+    spore_walker:     { hp: [35, 55],  damage: [4, 7],  sprite: 'spore_walker', color: '#88aa44', attackAnim: 'Swing', spells: [{ spell: 'poison_cloud', chance: 0.2, damage: [3, 6], dot: { damage: [2, 3], ticks: 3, interval: 10 } }] },
+    fungal_horror:    { hp: [55, 90],  damage: [6, 11], sprite: 'fungal_horror', color: '#669944', attackAnim: 'Swing', spells: [{ spell: 'spore_burst', chance: 0.2, damage: [4, 8], aoe: true }] },
+    canopy_stalker:   { hp: [70, 120], damage: [8, 13], sprite: 'canopy_stalker', color: '#226622', attackAnim: 'Swing' },
 
     // Arcane chain
-    arcane_wisp:      { name: 'Arcane Wisp',       hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', lore: `Small wisps of magical energy that have been allowed to roam freely throughout the university. They seem to enjoy pulling pranks on our explorers.`, spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
-    tome_guardian:    { name: 'Tome Guardian',     hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', attackAnim: 'Swing', lore: `A floating eyeball that diligently guards the quiet library's books. It is unclear just how long these beings have served as protectors.` },
-    spell_wraith:     { name: 'Spell Wraith',      hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#bb88ff', lore: 'A creature made from the remnants of a spell cast a long time ago. It seems to haunt the space it once supported as a magical helper.', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
-    construct:        { name: 'Arcane Construct',  hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', attackAnim: 'Swing', lore: `A golem built to guard the university halls. It has an extremely tough outer shell and has been given a set of magical cannons to fend off attackers, almost like a mobile version of the colony's own Arcane Sentinels.`, spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
-    lab_abomination:  { name: 'Lab Abomination',   hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', attackAnim: 'Swing', lore: `Similar to the spell wraith, this monster is what remains of some long forgotten research project. Something must have gone terribly wrong with it.`, spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
+    arcane_wisp:      { hp: [15, 30],  damage: [4, 7],  sprite: 'arcane_wisp', color: '#aa88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#aa88ff', spells: [{ spell: 'arcane_bolt', chance: 0.3, damage: [5, 10] }] },
+    tome_guardian:    { hp: [50, 80],  damage: [6, 10], sprite: 'tome_guardian', color: '#8866cc', attackAnim: 'Swing' },
+    spell_wraith:     { hp: [40, 70],  damage: [7, 12], sprite: 'spell_wraith', color: '#bb88ff', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#bb88ff', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [6, 12], lifesteal: 0.5 }] },
+    construct:        { hp: [70, 120], damage: [8, 14], sprite: 'construct', color: '#6644aa', attackAnim: 'Swing', spells: [{ spell: 'arcane_blast', chance: 0.2, damage: [10, 16], aoe: true }] },
+    lab_abomination:  { hp: [90, 150], damage: [10, 16],sprite: 'lab_abomination', color: '#994488', attackAnim: 'Swing', spells: [{ spell: 'toxic_spray', chance: 0.2, damage: [5, 10], aoe: true, dot: { damage: [2, 4], ticks: 3, interval: 10 } }] },
 
     // Shadow chain
-    shadow_imp:       { name: 'Shadow Imp',        hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing', lore: `An impish creature that may be mistaken for a Kobaloi at a distance. Up close it becomes far more obvious that this thing is made entirely of some dark substance that completely absorbs the light.` },
-    void_stalker:     { name: 'Abyss Stalker',     hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', lore: `A strange eyeball with a piercing stare. It stands tall on a pitch-black eyestalk, much like that of a crab. Despite all of the oddities, the eyeball itself looks far too human.`, spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
-    shade:            { name: 'Shade',             hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', lore: `A ghostly presence that haunts the explorers of the void. It leeches energy from living things and should be dealt with quickly whenever encountered.`, spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
-    void_horror:      { name: 'Abyss Horror',      hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', lore: `An impossible monster that seems to swim through the air like a deep-water fish. Its teeth are long and sharp and its eyes shine brightly in the dark of the abyss.`, spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
-    oblivion_spawn:   { name: 'Oblivion Spawn',    hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', lore: `A giant bipedal roach that creeps through the deepest parts of the void. They seem to share a close connection to the void and show their cunning through ambush tactics.`, spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
+    shadow_imp:       { hp: [40, 65],  damage: [6, 10], sprite: 'shadow_imp', color: '#885588', attackAnim: 'Swing' },
+    void_stalker:     { hp: [60, 100], damage: [8, 13], sprite: 'void_stalker', color: '#664488', attackAnim: 'Swing', spells: [{ spell: 'void_bolt', chance: 0.2, damage: [8, 14] }] },
+    shade:            { hp: [80, 130], damage: [10, 15],sprite: 'shade', color: '#553377', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9977bb', spells: [{ spell: 'shadow_drain', chance: 0.2, damage: [6, 12], lifesteal: 0.3 }] },
+    void_horror:      { hp: [120, 180],damage: [12, 18],sprite: 'void_horror', color: '#442266', attackAnim: 'Swing', spells: [{ spell: 'void_blast', chance: 0.25, damage: [10, 18], aoe: true }] },
+    oblivion_spawn:   { hp: [150, 230],damage: [14, 21],sprite: 'oblivion_spawn', color: '#331155', attackAnim: 'Swing', spells: [{ spell: 'annihilate', chance: 0.15, damage: [15, 25] }] },
 
     // Void Pact chain
-    shade_wraith:       { name: 'Shade Wraith',      hp: [45, 70],  damage: [8, 13],  sprite: 'shade_wraith', color: '#7733aa', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9955cc', lore: `Similar to the Shades seen in other realms, but a lot more persistent. They too drain life from all living things around them, with their hunger appearing to be insatiable.`, spells: [{ spell: 'soul_drain', chance: 0.25, damage: [5, 10], lifesteal: 0.3 }] },
-    void_penitent:      { name: 'Void Penitent',     hp: [35, 55],  damage: [7, 11],  sprite: 'void_penitent', color: '#553388', attackAnim: 'Stab', lore: `Unrecognizable beings that have been trapped here after taking bad deals. They will likely never be able to pay their dues, remaining servants to the Arbiter for the rest of their days.` },
-    hollow_sentinel:    { name: 'Hollow Sentinel',   hp: [75, 110], damage: [11, 16], sprite: 'hollow_sentinel', color: '#442266', attackAnim: 'Swing', damageReduction: 0.25, lore: `Giant eyeballs that float through the Void. They appear wrong, with large black lenses unseen in any other realm. They aren't incredibly dangerous on their own, but be wary of the guardians they call upon.` },
-    void_broker:        { name: 'Void Broker',       hp: [40, 65],  damage: [8, 12],  sprite: 'void_broker', color: '#8844bb', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#aa66dd', lore: `A low-level deal maker. They use their big mouths to rope the residents of the Void into more and more debt.`, spells: [{ spell: 'soul_drain', chance: 0.3, damage: [3, 6], manaDrain: 0.12 }] },
-    penitent_guardian:  { name: 'Penitent Guardian', hp: [60, 90],  damage: [13, 18], sprite: 'penitent_guardian', color: '#6633aa', attackAnim: 'Swing', lore: `Similar to their penitent kin, these guardians are under strict contract. They act as the enforcers of pacts, ensuring debtors have no escape until their debts are paid in full.` },
-    echo_beast:         { name: 'Echo Beast',        hp: [50, 80],  damage: [10, 15], sprite: 'echo_beast', color: '#773399', attackAnim: 'Swing', lore: `Wolf-like oddities in the Void known for their echoing howls. Their death wails are piercing, sapping the colonists of their strength.`, onDeath: { applyVoidDrained: true, rounds: 2 } },
-    void_herald:        { name: 'Void Herald',       hp: [70, 110], damage: [14, 20], sprite: 'void_herald', color: '#993dcc', attackAnim: 'Swing', lore: `Heralds of the Void Arbiter, blessed with their own pacts with the lowly penitents. These advanced guardians act directly under the command of their Arbiter.`, spells: [{ spell: 'summon_penitent', chance: 0.25, summonKey: 'void_penitent' }] },
+    shade_wraith:       { hp: [45, 70],  damage: [8, 13],  sprite: 'shade_wraith', color: '#7733aa', attackAnim: 'DrawAndShoot', projectileChar: '·', projectileColor: '#9955cc', spells: [{ spell: 'soul_drain', chance: 0.25, damage: [5, 10], lifesteal: 0.3 }] },
+    void_penitent:      { hp: [35, 55],  damage: [7, 11],  sprite: 'void_penitent', color: '#553388', attackAnim: 'Stab' },
+    hollow_sentinel:    { hp: [75, 110], damage: [11, 16], sprite: 'hollow_sentinel', color: '#442266', attackAnim: 'Swing', damageReduction: 0.25 },
+    void_broker:        { hp: [40, 65],  damage: [8, 12],  sprite: 'void_broker', color: '#8844bb', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#aa66dd', spells: [{ spell: 'soul_drain', chance: 0.3, damage: [3, 6], manaDrain: 0.12 }] },
+    penitent_guardian:  { hp: [60, 90],  damage: [13, 18], sprite: 'penitent_guardian', color: '#6633aa', attackAnim: 'Swing' },
+    echo_beast:         { hp: [50, 80],  damage: [10, 15], sprite: 'echo_beast', color: '#773399', attackAnim: 'Swing', onDeath: { applyVoidDrained: true, rounds: 2 } },
+    void_herald:        { hp: [70, 110], damage: [14, 20], sprite: 'void_herald', color: '#993dcc', attackAnim: 'Swing', spells: [{ spell: 'summon_penitent', chance: 0.25, summonKey: 'void_penitent' }] },
 
     // Chaos chain
-    fracture_imp:       { name: 'Fracture Imp',      hp: [25, 40],  damage: [6, 10],  sprite: 'fracture_imp', color: '#ff66cc', attackAnim: 'Swing', lore: `Imps that seem to rapidly fall in and out of existence.`, chaosOnDeath: true },
-    glitch_beast:       { name: 'Glitch Beast',      hp: [40, 65],  damage: [9, 14],  sprite: 'phase_beast', color: '#cc44ff', attackAnim: 'Swing', lore: `Chaotic beasts that appear to be many different animals at once.`, spells: [{ spell: 'phase_dodge', chance: 0.3, dodgeRounds: 1 }] },
-    mirror_shade:       { name: 'Mirror Shade',      hp: [35, 55],  damage: [8, 12],  sprite: 'mirror_shade', color: '#ff88ff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ff88ff', lore: `Shades equipped with silver mirrors, reflecting some magic back at the colonists.` },
-    shifting_horror:    { name: 'Shifting Horror',   hp: [55, 85],  damage: [11, 17], sprite: 'shifting_horror', color: '#ff44aa', attackAnim: 'Swing', lore: `Monsters that take the appearance of many of our colony's enemies throughout the years.` },
-    chaos_hound:        { name: 'Chaos Hound',       hp: [30, 50],  damage: [10, 15], sprite: 'chaos_hound', color: '#ff6633', attackAnim: 'Stab', lore: `Just like our wolves, but they somehow stand on the ceiling.`, spells: [{ spell: 'frenzy_bite', chance: 0.2, extraAttack: true }] },
-    mirror_twin:        { name: 'Mirror Twin',       hp: [30, 50],  damage: [8, 13],  sprite: 'mirror_twin', color: '#ee88ff', attackAnim: 'Swing', lore: `Reflections of our colonists and the allies we've made over the years. They're always found on the ceiling, so don't forget to look up.` },
-    reality_shred:      { name: 'Reality Shred',     hp: [65, 100], damage: [13, 19], sprite: 'reality_shred', color: '#cc33cc', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#cc33cc', lore: `Flying fish that seem to feed on order. They seem to grow in power every time a colonist asks how they breathe out of water.`, spells: [{ spell: 'chaos_bolt', chance: 0.2, damage: [8, 14], appliesChaos: true }] },
+    fracture_imp:       { hp: [25, 40],  damage: [6, 10],  sprite: 'fracture_imp', color: '#ff66cc', attackAnim: 'Swing', chaosOnDeath: true },
+    glitch_beast:       { hp: [40, 65],  damage: [9, 14],  sprite: 'phase_beast', color: '#cc44ff', attackAnim: 'Swing', spells: [{ spell: 'phase_dodge', chance: 0.3, dodgeRounds: 1 }] },
+    mirror_shade:       { hp: [35, 55],  damage: [8, 12],  sprite: 'mirror_shade', color: '#ff88ff', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ff88ff' },
+    shifting_horror:    { hp: [55, 85],  damage: [11, 17], sprite: 'shifting_horror', color: '#ff44aa', attackAnim: 'Swing' },
+    chaos_hound:        { hp: [30, 50],  damage: [10, 15], sprite: 'chaos_hound', color: '#ff6633', attackAnim: 'Stab', spells: [{ spell: 'frenzy_bite', chance: 0.2, extraAttack: true }] },
+    mirror_twin:        { hp: [30, 50],  damage: [8, 13],  sprite: 'mirror_twin', color: '#ee88ff', attackAnim: 'Swing' },
+    reality_shred:      { hp: [65, 100], damage: [13, 19], sprite: 'reality_shred', color: '#cc33cc', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#cc33cc', spells: [{ spell: 'chaos_bolt', chance: 0.2, damage: [8, 14], appliesChaos: true }] },
 
     // Kingdom chain (armored: true enables armoredDamageBonus on Runic Greatsword)
-    kingdom_guard:    { name: 'Kingdom Guard',     hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1, lore: `A common soldier of the kingdom, armed with a simple spear. These soldiers seem undertrained and poorly equipped, as if the kingdom had no foresight that battles would be fought on this side of their borders.` },
-    knight:           { name: 'Knight',            hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15, lore: `A seasoned warrior of the kingdom, clad in heavy armor. Their heavy swords easily cleave through the armor of our explorers.` },
-    crusader:         { name: 'Crusader',          hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2, lore: `A devoted warrior dedicated to the cause of the kingdom. Great care should be taken when fighting these heavily armed fanatics.` },
-    high_priest:      { name: 'High Priest',       hp: [50, 75],  damage: [10, 16],sprite: 'high_priest', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', lore: `A high ranking member of the royal clergy. Their divine magic is the only kind permissible in the kingdom, though they are extremely limited in their use. The Crusaders see them as a necessary evil, barely tolerating their presence.`, spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
-    palace_champion:  { name: 'Palace Champion',   hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25, lore: `A skilled member of the palace guard, loyal only to the king himself. The best of the best in terms of martial prowess.` },
+    kingdom_guard:    { hp: [35, 55],  damage: [5, 8],  sprite: 'kingdom_guard', color: '#ccaa44', attackAnim: 'Stab', armored: true, damageReduction: 0.1 },
+    knight:           { hp: [60, 90],  damage: [7, 12], sprite: 'knight', color: '#bbaa33', attackAnim: 'Swing', armored: true, damageReduction: 0.15 },
+    crusader:         { hp: [80, 120], damage: [9, 14], sprite: 'crusader', color: '#ddcc44', attackAnim: 'Swing', armored: true, damageReduction: 0.2 },
+    high_priest:      { hp: [50, 75],  damage: [10, 16],sprite: 'high_priest', color: '#ffcc66', attackAnim: 'DrawAndShoot', projectileChar: '✦', projectileColor: '#ffcc66', spells: [{ spell: 'holy_smite', chance: 0.3, damage: [8, 14] }, { spell: 'heal', chance: 0.2, healPct: 0.15 }] },
+    palace_champion:  { hp: [100, 150],damage: [12, 18],sprite: 'palace_champion', color: '#ffdd88', attackAnim: 'Swing', armored: true, damageReduction: 0.25 },
 };
+stampLoc(EXPEDITION_ENEMIES, 'exp_enemy');
 
 // Realm chains a demo-mode player may explore. All other chains stay locked
 // while demo mode is on, even if their research / event / prior-realm
@@ -69,7 +72,6 @@ export const DEMO_ALLOWED_REALM_CHAINS = new Set(['crystal', 'verdant']);
 // Exploration / realms. Used by exploration.js.
 export const REALMS = {
     wild_frontiers: {
-        name: 'The Wild Frontiers',
         difficulty: 1,
         chain: 'scouting',
         chainOrder: 1,
@@ -91,32 +93,17 @@ export const REALMS = {
             { key: 'spore_walker', weight: 25 },
         ] },
         events: {
-            ambient: [
-                '{name} pushes through dense undergrowth, scanning the horizon.',
-                'The scouts find a half-overgrown trail leading deeper into the wilds.',
-                '{name} spots fresh animal tracks in the mud.',
-                'A distant howl echoes through the trees.',
-                'The forest here is ancient and still.',
-            ],
-            discoveries: [
-                '{name} uncovers a hidden cache of supplies left by a previous traveller!',
-                '{name} finds a cluster of wild herbs growing near a stream.',
-                'A collapsed lean-to shelters some useful salvage.',
-                '{name} spots a game trail and follows it to a natural clearing.',
-            ],
-            traps: [
-                '{name} stumbles into a hunter\'s snare!',
-                'A concealed pit nearly catches the scouts off guard.',
-                '{name} triggers a tripwire strung across the path.',
-            ],
+            ambient: 5,
+            discoveries: 4,
+            traps: 3,
             rare: [
-                { chance: 0.05, text: '{name} discovers the ruins of an old ritual site. Amid the rubble lies something valuable.', loot: { resource: 'runite', amount: [1, 2] } },
-                { chance: 0.04, text: 'The scouts find the remains of a traveller\'s pack. Old but well-stocked.', loot: { resource: 'leather', amount: [2, 4] } },
+                { chance: 0.05, loot: { resource: 'runite', amount: [1, 2] } },
+                { chance: 0.04, loot: { resource: 'leather', amount: [2, 4] } },
             ],
         },
     },
     crystal_caves: {
-        name: 'Crystal Caves', difficulty: 3,
+        difficulty: 3,
         chain: 'crystal', chainOrder: 1,
         duration: [220, 380], encounters: 5, combatEncounters: [1, 2],
         vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
@@ -133,33 +120,19 @@ export const REALMS = {
             { key: 'crystal_golem', weight: 20 },
         ] },
         events: {
-            ambient: [
-                '{name} marvels at crystalline formations pulsing with light.',
-                'The cave walls hum with resonant energy.',
-                '{name} traces veins of glowing runite through the rock.',
-                'Luminescent fungi illuminate a side passage.',
-                'A crystal chime echoes from deep below.',
-            ],
-            discoveries: [
-                '{name} cracks open a geode with raw runite inside!',
-                '{name} finds a vein of pure crystal ore.',
-                'A collapsed mining cart still holds usable stone.',
-            ],
-            traps: [
-                'A crystal shard explodes near {name}!',
-                '{name} slips on smooth crystal, landing hard!',
-                'Unstable ceiling crystals rain down on {name}!',
-            ],
+            ambient: 5,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.05, text: '{name} discovers a resonating crystal chamber full of runite!', loot: { resource: 'runite', amount: [3, 6] } },
-                { chance: 0.03, text: '{name} finds an ancient dwarven cache!', loot: { resource: 'stone', amount: [8, 15] } },
-                { chance: 0.005, text: '{name} finds a strange compass embedded in crystal and feels compelled to take it!', loot: { item: 'compass_of_greed' } },
-                { chance: 0.005, text: '{name} finds a jeweler\'s loupe half-buried in crystal dust, its lens still flawless!', loot: { item: 'jewelers_loupe' } },
+                { chance: 0.05, loot: { resource: 'runite', amount: [3, 6] } },
+                { chance: 0.03, loot: { resource: 'stone', amount: [8, 15] } },
+                { chance: 0.005, loot: { item: 'compass_of_greed' } },
+                { chance: 0.005, loot: { item: 'jewelers_loupe' } },
             ],
         },
     },
     crystal_mines: {
-        name: 'Crystal Mines', difficulty: 4,
+        difficulty: 4,
         chain: 'crystal', chainOrder: 2,
         duration: [350, 550], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
@@ -177,35 +150,19 @@ export const REALMS = {
             { key: 'runite_elemental', weight: 10 },
         ] },
         events: {
-            ambient: [
-                '{name} hears the echoing clink of ancient pickaxes.',
-                'The mineshaft vibrates with deep seismic rumbling.',
-                '{name} passes collapsed tunnels sealed by crystal growth.',
-                'Rail tracks rusted shut stretch deeper into the dark.',
-                'Luminescent veins pulse in time with an unseen heartbeat.',
-                '{name} finds an old miner\'s graffiti scratched into the wall with soot.',
-            ],
-            discoveries: [
-                '{name} breaks into a sealed chamber full of pristine runite!',
-                'An abandoned mine cart still holds a rich payload.',
-                '{name} digs into a pocket of concentrated crystal ore.',
-            ],
-            traps: [
-                'A ceiling collapse rains rubble on {name}!',
-                '{name} triggers a tripwire, a pickaxe swings from the wall!',
-                'Unstable ground gives way beneath {name}!',
-                'A pressurized gas pocket bursts near {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.04, text: '{name} finds an untouched runite motherlode!', loot: { resource: 'runite', amount: [6, 12] } },
-                { chance: 0.03, text: '{name} discovers a crystallized void pocket deep underground!', loot: { resource: 'void_essence', amount: [4, 8] } },
-                { chance: 0.005, text: '{name} unearths an ancient mining golem battery that still hums with power!', loot: { item: 'ley_battery' } },
-                { chance: 0.005, text: '{name} pries a ward stone from a sealed vault door!', loot: { item: 'ward_of_the_sentinel' } },
+                { chance: 0.04, loot: { resource: 'runite', amount: [6, 12] } },
+                { chance: 0.03, loot: { resource: 'void_essence', amount: [4, 8] } },
+                { chance: 0.005, loot: { item: 'ley_battery' } },
+                { chance: 0.005, loot: { item: 'ward_of_the_sentinel' } },
             ],
         },
     },
     crystal_depths: {
-        name: 'Crystal Depths', difficulty: 5,
+        difficulty: 5,
         chain: 'crystal', chainOrder: 3,
         duration: [500, 750], encounters: 8, combatEncounters: [2, 4],
         vis: { wall: 'crystal_wall', floor: 'crystal_floor' },
@@ -222,11 +179,7 @@ export const REALMS = {
             { key: 'crystal_wurm', weight: 20 },
         ] },
         boss: {
-            name: 'The Crystal Colossus',
-            lore: `The heart of the Crystal Caverns. All crystal formations seem to originate from its core, vibrating in sync with its constant, overwhelming hum. It is unclear how long this entity has ruled these caves, but it seems to have held a grudge against the ancient miners that once ransacked its home. To the colossus, we are just more of those miners.`,
             attackAnim: 'Swing',
-            approachText: 'A massive crystalline figure rises from the depths, blocking the path!',
-            defeatText: 'The Crystal Colossus shatters into a thousand gleaming shards!',
             guaranteedLoot: [
                 { item: 'crystal_aegis', chance: 0.5 },
                 { item: 'crystalline_hammer', chance: 0.5 },
@@ -234,64 +187,41 @@ export const REALMS = {
             bonusResources: { runite: 8, void_essence: 4 },
             phases: [
                 {
-                    name: 'Crystalline Form', hp: 300, damage: 20, damageReduction: 0.35,
+                    hp: 300, damage: 20, damageReduction: 0.35,
                     color: '#4488ff', sprite: 'boss_crystal_colossus',
-                    transitionText: 'The Crystal Colossus cracks and glows red!',
-                    armorText: 'The Crystal Colossus\'s outer shell deflects much of the damage!',
                 },
                 {
-                    name: 'Enraged', hp: 250, damage: 30, damageReduction: 0.20,
+                    hp: 250, damage: 30, damageReduction: 0.20,
                     color: '#ff2222', sprite: 'boss_crystal_colossus_enraged',
-                    abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10], text: 'Orbiting crystal shards slice through the party!' }],
-                    transitionText: 'The Colossus fractures! Shards orbit its now molten core!',
-                    armorText: 'Shards still coat the Colossus, but cracks are showing!',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10] }],
                 },
                 {
-                    name: 'Storm of Shards', hp: 200, damage: 38, damageReduction: 0.10,
+                    hp: 200, damage: 38, damageReduction: 0.10,
                     color: '#ff6644', sprite: 'boss_crystal_colossus_shattered',
-                    abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14], text: 'Crystal shards rain down on the party!' }],
-                    transitionText: 'The Colossus reforms around a pulsing crystal heart!',
-                    armorText: 'The Colossus\'s armor is nearly broken!',
+                    abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14] }],
                 },
                 {
-                    name: 'Crystal Heart', hp: 150, damage: 45,
+                    hp: 150, damage: 45,
                     color: '#ff0000', sprite: 'boss_crystal_colossus_heart',
-                    abilities: [{ type: 'aoe', chance: 0.3, damage: [12, 20], text: 'The crystal heart detonates nearby crystals in a set of blinding explosions!' }],
+                    abilities: [{ type: 'aoe', chance: 0.3, damage: [12, 20] }],
                 },
             ],
         },
         events: {
-            ambient: [
-                '{name} feels immense pressure from the weight of the stone above.',
-                'Crystals here grow at impossible angles, some seemingly defying gravity.',
-                '{name} passes through a chamber lit entirely by runite veins.',
-                'The air is thick with mineral dust that sparkles in torchlight.',
-                '{name} finds the dense air of the depths to be difficult to breathe.',
-                'A low vibration pulses through the stone, something massive shifts below.',
-                '{name} notices the crystals here are warm to the touch.',
-            ],
-            discoveries: [
-                '{name} cracks open a massive geode, revealing a motherlode of runite!',
-                'A sealed dwarven vault still holds its treasures.',
-                '{name} finds a vein of crystal so pure it hums with energy.',
-            ],
-            traps: [
-                'A crystal stalactite shatters and rains razor shards on {name}!',
-                '{name} triggers a pressure plate, detonating long-forgotten explosives!',
-                'Superheated steam vents from a crack, scalding {name}!',
-                'The floor collapses into a crystal-lined sinkhole beneath {name}!',
-            ],
+            ambient: 7,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.04, text: '{name} discovers a massive runite formation in the shape of a heart!', loot: { resource: 'runite', amount: [10, 18] } },
-                { chance: 0.03, text: '{name} finds a sealed primordial chamber full of void-infused crystal!', loot: { resource: 'void_essence', amount: [6, 12] } },
-                { chance: 0.004, text: '{name} pries a crystal-encrusted shield from the cave wall, it shimmers with protective energy!', loot: { item: 'crystal_aegis' } },
-                { chance: 0.004, text: '{name} uncovers an ancient crystalline forge still burning with arcane fire!', loot: { item: 'crystalline_hammer' } },
-                { chance: 0.005, text: '{name} pulls a charged ward stone from a crumbling crystal vault door!', loot: { item: 'ward_of_the_sentinel' } },
+                { chance: 0.04, loot: { resource: 'runite', amount: [10, 18] } },
+                { chance: 0.03, loot: { resource: 'void_essence', amount: [6, 12] } },
+                { chance: 0.004, loot: { item: 'crystal_aegis' } },
+                { chance: 0.004, loot: { item: 'crystalline_hammer' } },
+                { chance: 0.005, loot: { item: 'ward_of_the_sentinel' } },
             ],
         },
     },
     verdant_depths: {
-        name: 'Verdant Depths', difficulty: 1,
+        difficulty: 1,
         chain: 'verdant', chainOrder: 1,
         duration: [150, 280], encounters: 4, combatEncounters: [1, 1],
         vis: { wall: 'verdant_wall', floor: 'verdant_floor' },
@@ -307,32 +237,18 @@ export const REALMS = {
             { key: 'spore_walker', weight: 20 },
         ] },
         events: {
-            ambient: [
-                '{name} pushes through thick vine curtains.',
-                'Bioluminescent flowers line the path.',
-                '{name} hears birdsong from an impossible direction.',
-                'Giant mushrooms tower overhead, releasing spores.',
-                'A stream of crystal-clear water crosses the trail.',
-            ],
-            discoveries: [
-                '{name} finds a grove bursting with ripe fruit.',
-                'Fallen timber lies ready for harvest.',
-                '{name} discovers a hidden garden still bearing crops.',
-            ],
-            traps: [
-                'A thorny vine snaps around {name}\'s leg!',
-                '{name} stumbles into a pitcher plant, acid burns!',
-                'Toxic pollen bursts from a flower near {name}!',
-            ],
+            ambient: 5,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.06, text: '{name} discovers a fertile seed cache, rare crops!', loot: { resource: 'potatoes', amount: [6, 10] } },
-                { chance: 0.04, text: '{name} finds a druid\'s abandoned herb stash!', loot: { resource: 'berries', amount: [8, 12] } },
-                { chance: 0.005, text: '{name} finds a golden charm shaped like a cornucopia!', loot: { item: 'cornucopia_charm' } },
+                { chance: 0.06, loot: { resource: 'potatoes', amount: [6, 10] } },
+                { chance: 0.04, loot: { resource: 'berries', amount: [8, 12] } },
+                { chance: 0.005, loot: { item: 'cornucopia_charm' } },
             ],
         },
     },
     fungal_hollows: {
-        name: 'Fungal Hollows', difficulty: 2,
+        difficulty: 2,
         chain: 'verdant', chainOrder: 2,
         duration: [280, 450], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'verdant_wall', floor: 'verdant_floor' },
@@ -349,36 +265,20 @@ export const REALMS = {
             { key: 'fungal_horror', weight: 25 },
         ] },
         events: {
-            ambient: [
-                '{name} ducks under a canopy of phosphorescent mushroom caps.',
-                'Spore clouds drift lazily through the cavern.',
-                '{name} hears the squelch of something moving in the mycelium.',
-                'Bioluminescent tendrils pulse in waves along the walls.',
-                'The air is warm and humid, thick with the scent of decay and growth.',
-                '{name} notices mushrooms growing visibly before their eyes.',
-            ],
-            discoveries: [
-                '{name} finds a cluster of edible fungi, enormous and ripe.',
-                'A fallen log teems with harvestable growth.',
-                '{name} discovers a fungal garden tended by some long-gone cultivator.',
-            ],
-            traps: [
-                'A puffball mushroom explodes in {name}\'s face, choking spores!',
-                '{name} steps on a cap that snaps shut like a jaw!',
-                'Acidic sap drips from above onto {name}!',
-                'A vine whips out from the fungal mass, striking {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.05, text: '{name} discovers a grove of giant truffles, incredibly valuable!', loot: { resource: 'potatoes', amount: [8, 14] } },
-                { chance: 0.04, text: '{name} finds a cache of preserved seeds in a hollow tree!', loot: { resource: 'wheat', amount: [10, 16] } },
-                { chance: 0.005, text: '{name} finds a living staff of intertwined roots that still grows!', loot: { item: 'staff_of_regrowth' } },
-                { chance: 0.004, text: '{name} discovers a symbiotic fungal crown that enhances the mind!', loot: { item: 'mycelium_crown' } },
-                { chance: 0.005, text: '{name} finds a golden charm shaped like a cornucopia tucked inside a hollow log!', loot: { item: 'cornucopia_charm' } },
+                { chance: 0.05, loot: { resource: 'potatoes', amount: [8, 14] } },
+                { chance: 0.04, loot: { resource: 'wheat', amount: [10, 16] } },
+                { chance: 0.005, loot: { item: 'staff_of_regrowth' } },
+                { chance: 0.004, loot: { item: 'mycelium_crown' } },
+                { chance: 0.005, loot: { item: 'cornucopia_charm' } },
             ],
         },
     },
     primeval_canopy: {
-        name: 'Primeval Canopy', difficulty: 3,
+        difficulty: 3,
         chain: 'verdant', chainOrder: 3,
         duration: [400, 600], encounters: 7, combatEncounters: [2, 3],
         vis: { wall: 'verdant_wall', floor: 'verdant_floor' },
@@ -396,11 +296,7 @@ export const REALMS = {
             { key: 'canopy_stalker', weight: 30 },
         ] },
         boss: {
-            name: 'The Ancient Treant',
-            lore: `A massive, sentient tree that has stood in the canopy for centuries. It is said to be the guardian of the forest, and it will not tolerate intruders in its domain.`,
             attackAnim: 'Swing',
-            approachText: 'The canopy shudders as an enormous living tree rises to block the party!',
-            defeatText: 'The Ancient Treant groans and collapses, returning to the earth!',
             guaranteedLoot: [
                 { item: 'living_bark_armor', chance: 0.5 },
                 { item: 'heartwood_staff', chance: 0.5 },
@@ -408,62 +304,40 @@ export const REALMS = {
             bonusResources: { wood: 15, berries: 10 },
             phases: [
                 {
-                    name: 'Rooted', hp: 270, damage: 18, damageReduction: 0.35,
+                    hp: 270, damage: 18, damageReduction: 0.35,
                     color: '#22aa66', sprite: 'boss_ancient_treant',
-                    transitionText: 'The Ancient Treant roars! Roots erupt from the ground!',
-                    armorText: 'Ancient bark and dense wood deflect many of your strikes!',
                 },
                 {
-                    name: 'Enraged', hp: 220, damage: 28, damageReduction: 0.20,
+                    hp: 220, damage: 28, damageReduction: 0.20,
                     color: '#ff4400', sprite: 'boss_ancient_treant_enraged',
-                    abilities: [{ type: 'aoe', chance: 0.15, damage: [4, 9], text: 'The Treant stomps the ground, roots burst up beneath the party!' }],
-                    transitionText: 'The Treant tears free from the earth, now mobile and furious!',
-                    armorText: 'The Treant\'s bark is splintering!',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [4, 9] }],
                 },
                 {
-                    name: 'Uprooted', hp: 180, damage: 35, damageReduction: 0.10,
+                    hp: 180, damage: 35, damageReduction: 0.10,
                     color: '#cc3300', sprite: 'boss_ancient_treant_uprooted',
-                    abilities: [{ type: 'aoe', chance: 0.2, damage: [6, 12], text: 'Massive roots sweep through the party!' }],
-                    transitionText: 'The Treant splits apart, its heartwood pulses with primal fury!',
-                    armorText: 'Only strips of bark remain clinging to the Treant\'s frame!',
+                    abilities: [{ type: 'aoe', chance: 0.2, damage: [6, 12] }],
                 },
                 {
-                    name: 'Heartwood', hp: 130, damage: 42,
+                    hp: 130, damage: 42,
                     color: '#ff0000', sprite: 'boss_ancient_treant_heartwood',
-                    abilities: [{ type: 'aoe', chance: 0.3, damage: [10, 18], text: 'Thorned vines lash out in all directions!' }],
+                    abilities: [{ type: 'aoe', chance: 0.3, damage: [10, 18] }],
                 },
             ],
         },
         events: {
-            ambient: [
-                '{name} climbs through roots thicker than castle walls.',
-                'The canopy above blocks all sky, only bioluminescence lights the way.',
-                '{name} hears the call of creatures that haven\'t existed for millennia.',
-                'Ancient bark carvings depict a civilization built among these branches.',
-                'A waterfall cascades from somewhere impossibly high above.',
-                '{name} feels the forest watching them with a patient intelligence.',
-            ],
-            discoveries: [
-                '{name} finds a tree house larder still stocked with preserved fruit.',
-                'A massive seed pod cracks open, revealing usable materials.',
-                '{name} discovers a natural spring with restorative waters.',
-            ],
-            traps: [
-                'A carnivorous flower snaps its petals around {name}!',
-                '{name} disturbs a wasp nest the size of a cart!',
-                'The branch beneath {name} snaps, long fall!',
-                'Paralytic pollen fills the air around {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.04, text: '{name} discovers the World-Root, a nexus of primal nature energy!', loot: { resource: 'void_essence', amount: [5, 9] } },
-                { chance: 0.03, text: '{name} harvests from the legendary Ever-Fruit tree!', loot: { resource: 'berries', amount: [12, 20] } },
-                { chance: 0.004, text: '{name} finds a staff of living roots still growing in the ancient canopy!', loot: { item: 'staff_of_regrowth' } },
-                { chance: 0.003, text: '{name} finds a talisman pulsing with ancient growth energy, hanging from the World-Root!', loot: { item: 'verdant_talisman' } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [5, 9] } },
+                { chance: 0.03, loot: { resource: 'berries', amount: [12, 20] } },
+                { chance: 0.004, loot: { item: 'staff_of_regrowth' } },
+                { chance: 0.003, loot: { item: 'verdant_talisman' } },
             ],
         },
     },
     arcane_library: {
-        name: 'Arcane Library', difficulty: 5,
+        difficulty: 5,
         chain: 'arcane', chainOrder: 1,
         duration: [180, 320], encounters: 4, combatEncounters: [1, 1],
         vis: { wall: 'university_wall', floor: 'university_floor' },
@@ -482,34 +356,19 @@ export const REALMS = {
             { key: 'spell_wraith', weight: 15 },
         ] },
         events: {
-            ambient: [
-                '{name} reads a passage from a floating book.',
-                'Spectral librarians drift silently between shelves.',
-                '{name} feels arcane knowledge pressing at the edges of their mind.',
-                'A book flies off its shelf as the party passes.',
-                'The smell of ancient parchment fills the air.',
-                '{name} spots equations writing themselves on a chalkboard.',
-            ],
-            discoveries: [
-                '{name} finds a scroll hidden between two heavy tomes.',
-                'A secret shelf clicks open, revealing stored materials.',
-                '{name} deciphers a map leading to a hidden alcove.',
-            ],
-            traps: [
-                'A warded book shocks {name} upon touch!',
-                '{name} triggers a glyph on the floor, arcane blast!',
-                'An animated tome attacks {name} with paper cuts!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.05, text: '{name} discovers a sealed headmaster\'s vault, rare tome inside!', loot: { resource: 'tome_of_magic_missile', amount: [1, 1] } },
-                { chance: 0.04, text: '{name} finds a cache of enchanting runite!', loot: { resource: 'runite', amount: [3, 5] } },
-                { chance: 0.005, text: '{name} finds a glowing codex that shares its knowledge with all who stand near!', loot: { item: 'tome_of_shared_wisdom' } },
-                { chance: 0.004, text: '{name} discovers a crystalline apparatus in a forgotten research alcove, it amplifies mana storage!', loot: { item: 'crystal_capacitor' } },
+                { chance: 0.05, loot: { resource: 'tome_of_magic_missile', amount: [1, 1] } },
+                { chance: 0.04, loot: { resource: 'runite', amount: [3, 5] } },
+                { chance: 0.005, loot: { item: 'tome_of_shared_wisdom' } },
+                { chance: 0.004, loot: { item: 'crystal_capacitor' } },
             ],
         },
     },
     ancient_university: {
-        name: 'Ancient University', difficulty: 6,
+        difficulty: 6,
         chain: 'arcane', chainOrder: 2,
         duration: [320, 500], encounters: 6, combatEncounters: [1, 3],
         vis: { wall: 'university_wall', floor: 'university_floor' },
@@ -529,35 +388,19 @@ export const REALMS = {
             { key: 'construct', weight: 20 },
         ] },
         events: {
-            ambient: [
-                '{name} passes through a grand lecture hall where spectral students still sit.',
-                'Enchanted chalk writes formulas endlessly across ancient blackboards.',
-                '{name} feels raw magical energy crackling along the corridors.',
-                'A golem proctor patrols the halls, still enforcing long-dead rules.',
-                'Alchemical apparatus bubbles and steams in an abandoned laboratory wing.',
-                '{name} hears a distant bell tolling class changes for no one.',
-            ],
-            discoveries: [
-                '{name} finds a professor\'s private collection hidden behind a false wall.',
-                'A sealed examination vault still contains graded manuscripts of power.',
-                '{name} deciphers a master thesis containing a spell formula.',
-            ],
-            traps: [
-                'A failed experiment reactivates as {name} passes, explosion!',
-                '{name} triggers a student\'s old ward, lightning arcs!',
-                'An animated suit of armor swings at {name}!',
-                'A containment circle breaks, releasing stored energy at {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.04, text: '{name} discovers the Dean\'s private vault, advanced tome inside!', loot: { resource: 'tome_of_haste', amount: [1, 1] } },
-                { chance: 0.03, text: '{name} finds an enchanted runite cache in the alchemy wing!', loot: { resource: 'runite', amount: [5, 9] } },
-                { chance: 0.005, text: '{name} finds a set of spectacles that reveal hidden truths!', loot: { item: 'scholars_spectacles' } },
-                { chance: 0.004, text: '{name} discovers a shared wisdom codex in the Dean\'s private study!', loot: { item: 'tome_of_shared_wisdom' } },
+                { chance: 0.04, loot: { resource: 'tome_of_haste', amount: [1, 1] } },
+                { chance: 0.03, loot: { resource: 'runite', amount: [5, 9] } },
+                { chance: 0.005, loot: { item: 'scholars_spectacles' } },
+                { chance: 0.004, loot: { item: 'tome_of_shared_wisdom' } },
             ],
         },
     },
     abandoned_laboratory: {
-        name: 'Abandoned Laboratory', difficulty: 7,
+        difficulty: 7,
         chain: 'arcane', chainOrder: 3,
         duration: [450, 680], encounters: 8, combatEncounters: [2, 4],
         vis: { wall: 'university_wall', floor: 'university_floor' },
@@ -578,11 +421,7 @@ export const REALMS = {
             { key: 'tome_guardian', weight: 15 },
         ] },
         boss: {
-            name: 'The Arcane Construct',
-            lore: `A sentient construct born through magical experimentation. One of the few surviving research notes make mention of the being's peaceful nature and gentleness. It is of little surprise that all of these years alone would send it into madness.`,
             attackAnim: 'Swing',
-            approachText: 'A half-finished golem whirrs to life, crackling with unstable magic!',
-            defeatText: 'The Arcane Construct overloads and detonates in a shower of sparks!',
             guaranteedLoot: [
                 { item: 'arcane_amplifier', chance: 0.7 },
                 { item: 'staff_of_distortion', chance: 0.5 },
@@ -590,64 +429,41 @@ export const REALMS = {
             bonusResources: { runite: 6, void_essence: 5 },
             phases: [
                 {
-                    name: 'Awakened', hp: 290, damage: 20, damageReduction: 0.35,
+                    hp: 290, damage: 20, damageReduction: 0.35,
                     color: '#ff8844', sprite: 'boss_arcane_construct',
-                    transitionText: 'The Arcane Construct accelerates! Sparks fly wildly!',
-                    armorText: 'Arcane shielding deflects much of your damage!',
                 },
                 {
-                    name: 'Enraged', hp: 240, damage: 30, damageReduction: 0.20,
+                    hp: 240, damage: 30, damageReduction: 0.20,
                     color: '#ff0000', sprite: 'boss_arcane_construct_enraged',
-                    abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10], text: 'Absorbed magic discharges in a shockwave!' }],
-                    transitionText: 'The Construct absorbs ambient magic, warping the air around it!',
-                    armorText: 'The Construct\'s arcane shell is beginning to crack!',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [5, 10] }],
                 },
                 {
-                    name: 'Overcharged', hp: 190, damage: 38, damageReduction: 0.10,
+                    hp: 190, damage: 38, damageReduction: 0.10,
                     color: '#ff4400', sprite: 'boss_arcane_construct_overcharged',
-                    abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14], text: 'Arcane bolts discharge in every direction!' }],
-                    transitionText: 'The Construct begins to destabilize! Raw energy leaks from its core!',
-                    armorText: 'Flickering shields still resist some blows!',
+                    abilities: [{ type: 'aoe', chance: 0.25, damage: [8, 14] }],
                 },
                 {
-                    name: 'Meltdown', hp: 140, damage: 46,
+                    hp: 140, damage: 46,
                     color: '#ff0000', sprite: 'boss_arcane_construct_meltdown',
-                    abilities: [{ type: 'aoe', chance: 0.35, damage: [12, 22], text: 'The Construct erupts in a cascade of unstable magic!' }],
+                    abilities: [{ type: 'aoe', chance: 0.35, damage: [12, 22] }],
                 },
             ],
         },
         events: {
-            ambient: [
-                '{name} passes containment chambers. Most are cracked and empty.',
-                'Unstable magical fields distort the air like heat shimmer.',
-                '{name} reads warning signs in a dozen languages on every door.',
-                'A half-finished construct twitches as the party passes.',
-                'Arcane waste pools glow an unsettling green in side chambers.',
-                '{name} hears the hum of a still-running experiment deep below.',
-            ],
-            discoveries: [
-                '{name} finds an intact experimental prototype in a sealed chamber.',
-                'A researcher\'s emergency stash, hidden for a quick escape that never came.',
-                '{name} recovers usable materials from a decommissioned experiment.',
-            ],
-            traps: [
-                'A containment breach floods the corridor with raw magic, {name} is hit!',
-                '{name} steps on a pressure plate, an experimental weapon fires!',
-                'A mutated specimen breaks free from stasis as {name} passes!',
-                'Unstable reagents combust near {name}!',
-                'A temporal anomaly snaps shut on {name}, disorienting!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 5,
             rare: [
-                { chance: 0.04, text: '{name} accesses the head researcher\'s personal vault, forbidden knowledge!', loot: { resource: 'tome_of_circle_of_growth', amount: [1, 1] } },
-                { chance: 0.03, text: '{name} finds concentrated void essence in a sealed containment jar!', loot: { resource: 'void_essence', amount: [6, 10] } },
-                { chance: 0.004, text: '{name} recovers a pair of spectacles from a researcher\'s cluttered desk, lenses still intact!', loot: { item: 'scholars_spectacles' } },
-                { chance: 0.003, text: '{name} discovers a soulbound scepter in a sealed experiment chamber, its spirit-link still active!', loot: { item: 'soulbond_scepter' } },
-                { chance: 0.002, text: '{name} finds a condensed field spellbook in a researcher\'s emergency kit!', loot: { item: 'expedition_spellbook' } },
+                { chance: 0.04, loot: { resource: 'tome_of_circle_of_growth', amount: [1, 1] } },
+                { chance: 0.03, loot: { resource: 'void_essence', amount: [6, 10] } },
+                { chance: 0.004, loot: { item: 'scholars_spectacles' } },
+                { chance: 0.003, loot: { item: 'soulbond_scepter' } },
+                { chance: 0.002, loot: { item: 'expedition_spellbook' } },
             ],
         },
     },
     shadow_realm: {
-        name: 'Abyss Gate', difficulty: 7,
+        difficulty: 7,
         chain: 'shadow', chainOrder: 1,
         duration: [400, 650], encounters: 7, combatEncounters: [2, 3],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -662,36 +478,20 @@ export const REALMS = {
             { key: 'shade', weight: 35 },
         ] },
         events: {
-            ambient: [
-                'Reality flickers. {name} sees double for a moment.',
-                'Whispers from nowhere fill {name}\'s ears.',
-                'The shadows here seem to breathe. Slowly. Deliberately.',
-                '{name} feels something pulling at their mana from below.',
-                'A rift in space opens briefly, showing another world. The whole other world stands eerily still.',
-                'The ground shifts underfoot. Nothing is solid here. Nothing is trying to be.',
-            ],
-            discoveries: [
-                '{name} finds crystallized void essence on a dead creature.',
-                'A pocket dimension collapses, dropping its contents.',
-                '{name} absorbs residual energy from a fading rift.',
-            ],
-            traps: [
-                'A void tendril lashes out at {name}!',
-                '{name} steps through a spatial fold, disorienting impact!',
-                'Shadow claws rake at {name} from the darkness!',
-                'A gravity inversion slams {name} into the ceiling!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.04, text: '{name} absorbs a collapsing void crystal, pure essence!', loot: { resource: 'void_essence', amount: [4, 8] } },
-                { chance: 0.02, text: '{name} finds a sealed void reliquary!', loot: { resource: 'void_essence', amount: [6, 10] } },
-                { chance: 0.005, text: '{name} pulls a glowing lantern from the void, it never goes dark!', loot: { item: 'voidwalkers_lantern' } },
-                { chance: 0.005, text: '{name} wraps themselves in living shadow, a cloak of concealment!', loot: { item: 'cloak_of_shadows' } },
-                { chance: 0.005, text: '{name} snatches a charm from an abyss stalker\'s fading corpse, carved with the rune of evasion!', loot: { item: 'ghost_step_charm' } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [4, 8] } },
+                { chance: 0.02, loot: { resource: 'void_essence', amount: [6, 10] } },
+                { chance: 0.005, loot: { item: 'voidwalkers_lantern' } },
+                { chance: 0.005, loot: { item: 'cloak_of_shadows' } },
+                { chance: 0.005, loot: { item: 'ghost_step_charm' } },
             ],
         },
     },
     void_abyss: {
-        name: 'Sunken Abyss', difficulty: 8,
+        difficulty: 8,
         chain: 'shadow', chainOrder: 2,
         duration: [550, 800], encounters: 7, combatEncounters: [3, 5],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -707,39 +507,22 @@ export const REALMS = {
             { key: 'oblivion_spawn', weight: 15 },
         ] },
         events: {
-            ambient: [
-                '{name} cannot tell if they are walking on ground or floating.',
-                'The void here is so deep that sound ceases to propagate.',
-                '{name} sees echoes of themselves from other timelines.',
-                'Space folds back on itself. The party passes the same point twice.',
-                'A black sun burns overhead, radiating darkness instead of light.',
-                '{name} feels their thoughts being pulled apart by the emptiness.',
-            ],
-            discoveries: [
-                '{name} collects crystallized void from a collapsed pocket dimension.',
-                'The remains of another expedition float by, their supplies are intact.',
-                '{name} absorbs energy from a dying rift nexus.',
-            ],
-            traps: [
-                'A gravity well inverts, {name} slams into the ceiling then back down!',
-                '{name} is caught in a temporal loop, experiencing the same pain twice!',
-                'A void creature phases through {name}, draining their life force!',
-                'Reality tears open beneath {name}, they barely avoid falling into nothing!',
-                'An anti-magic pulse hits {name}, disrupting their defenses!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 5,
             rare: [
-                { chance: 0.04, text: '{name} finds an abyss crystal radiating pure primordial essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
-                { chance: 0.03, text: '{name} collects runite that has spent aeons in the abyss. It\'s changed.', loot: { resource: 'runite', amount: [6, 12] } },
-                { chance: 0.004, text: '{name} wrests a blade from the deep dark. It seems to cut through reality!', loot: { item: 'void_edge' } },
-                { chance: 0.005, text: '{name} pries a gem-encrusted gauntlet from an abyss creature\'s withered hand. It pulses with stolen life!', loot: { item: 'bloodstone_gauntlet' } },
-                { chance: 0.002, text: '{name} discovers an orb containing a trapped dimension, incredible power!', loot: { item: 'dimensional_orb' } },
-                { chance: 0.003, text: '{name} finds a charm pulsing with abyss energy, its power barely contained!', loot: { item: 'void_charm' } },
-                { chance: 0.004, text: '{name} finds a lantern drifting in the deep dark, its flame burning against the void!', loot: { item: 'voidwalkers_lantern' } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [8, 14] } },
+                { chance: 0.03, loot: { resource: 'runite', amount: [6, 12] } },
+                { chance: 0.004, loot: { item: 'void_edge' } },
+                { chance: 0.005, loot: { item: 'bloodstone_gauntlet' } },
+                { chance: 0.002, loot: { item: 'dimensional_orb' } },
+                { chance: 0.003, loot: { item: 'void_charm' } },
+                { chance: 0.004, loot: { item: 'voidwalkers_lantern' } },
             ],
         },
     },
     oblivion_rift: {
-        name: 'Oblivion Rift', difficulty: 9,
+        difficulty: 9,
         chain: 'shadow', chainOrder: 3,
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
         vis: { wall: 'abyss_wall', floor: 'abyss_floor' },
@@ -754,11 +537,7 @@ export const REALMS = {
             { key: 'oblivion_spawn', weight: 50 },
         ] },
         boss: {
-            name: 'The Oblivion Sovereign',
-            lore: `An insect-like entity that seems to be made entirely of shadow. It appears to be the ruler of the abyss, with all denizens of this place treating it with reverence and fear. The most unsettling aspect of the creature is its complete lack of sound, with even its most devastating attacks being completely silent.`,
             attackAnim: 'Swing',
-            approachText: 'The darkness at the center of the chamber condenses. Something that has been here longer than light gazes upon your party.',
-            defeatText: 'The Sovereign does not scream. It simply becomes less. The abyss is quieter without it. Somewhat.',
             guaranteedLoot: [
                 { item: 'shard_of_oblivion', chance: 0.4 },
                 { item: 'voidheart', chance: 0.3 },
@@ -767,66 +546,42 @@ export const REALMS = {
             bonusResources: { void_essence: 10 },
             phases: [
                 {
-                    name: 'Manifest', hp: 350, damage: 25, damageReduction: 0.35,
+                    hp: 350, damage: 25, damageReduction: 0.35,
                     color: '#7722cc', sprite: 'boss_void_sovereign',
-                    transitionText: 'The Sovereign\'s accumulated mass begins to churn. It is becoming more.',
-                    armorText: 'The Sovereign\'s void energy absorbs much of the impact!',
                 },
                 {
-                    name: 'Surging', hp: 300, damage: 38, damageReduction: 0.20,
+                    hp: 300, damage: 38, damageReduction: 0.20,
                     color: '#ff0000', sprite: 'boss_void_sovereign_enraged',
-                    abilities: [{ type: 'aoe', chance: 0.15, damage: [6, 12], text: 'The Sovereign exhales abyss-dark across the chamber!' }],
-                    transitionText: 'Something ancient and heavy shifts at its core. It stops holding back.',
-                    armorText: 'Void energy still cushions the Sovereign\'s form!',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [6, 12] }],
                 },
                 {
-                    name: 'Unbound', hp: 250, damage: 48, damageReduction: 0.10,
+                    hp: 250, damage: 48, damageReduction: 0.10,
                     color: '#aa00ff', sprite: 'boss_void_sovereign_unbound',
-                    abilities: [{ type: 'aoe', chance: 0.25, damage: [10, 18], text: 'The abyss presses inward from all directions!' }],
-                    transitionText: 'The Sovereign sheds its shape. What remains beneath is older.',
-                    armorText: 'Thin tendrils of void still deflect some blows!',
+                    abilities: [{ type: 'aoe', chance: 0.25, damage: [10, 18] }],
                 },
                 {
-                    name: 'The Deep', hp: 200, damage: 58,
+                    hp: 200, damage: 58,
                     color: '#ff00ff', sprite: 'boss_void_sovereign_true',
-                    abilities: [{ type: 'aoe', chance: 0.35, damage: [15, 25], text: 'Everything the abyss ever swallowed pours out at once!' }],
+                    abilities: [{ type: 'aoe', chance: 0.35, damage: [15, 25] }],
                 },
             ],
         },
         events: {
-            ambient: [
-                '{name} walks on platforms of solidified nothingness.',
-                'The concept of direction has no meaning here, only forward.',
-                '{name} sees the end of all things and looks away quickly.',
-                'Reality is a thin membrane here. The party can see through it.',
-                'Entities vast beyond comprehension move in the distance, unaware of the party.',
-                '{name} feels time flowing backwards, forwards, and sideways simultaneously.',
-            ],
-            discoveries: [
-                '{name} gathers essence that has crystallized into impossible geometries.',
-                'A fragment of a destroyed world drifts by, {name} salvages from it.',
-                '{name} absorbs raw oblivion energy from the space between realities.',
-            ],
-            traps: [
-                'An oblivion wave washes over {name}, they briefly cease to exist!',
-                '{name} is caught between colliding reality fragments, crushed!',
-                'The Sovereign\'s attention turns briefly to {name}. Even partial focus is agony.',
-                'The ground unmakes itself beneath {name}!',
-                'A paradox storm engulfs {name}, existing and not existing hurts!',
-                '{name} is struck by a shard of broken time!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 6,
             rare: [
-                { chance: 0.04, text: '{name} finds a tear in reality leading to a void essence wellspring!', loot: { resource: 'void_essence', amount: [10, 18] } },
-                { chance: 0.003, text: '{name} plucks a charm from the deep dark. It warps the air around it.', loot: { item: 'void_charm' } },
-                { chance: 0.004, text: '{name} tears a cloak of living shadow from the rift wall. It wraps around them instinctively.', loot: { item: 'cloak_of_shadows' } },
-                { chance: 0.003, text: '{name} pulls a helm of abyssal authority from a collapsed vault, its runes still demanding attention!', loot: { item: 'abyss_wardens_helm' } },
-                { chance: 0.003, text: '{name} wrenches a plate of abyssal iron from the rift wall, barbed with crystallized shadow!', loot: { item: 'abyssal_bramble_plate' } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [10, 18] } },
+                { chance: 0.003, loot: { item: 'void_charm' } },
+                { chance: 0.004, loot: { item: 'cloak_of_shadows' } },
+                { chance: 0.003, loot: { item: 'abyss_wardens_helm' } },
+                { chance: 0.003, loot: { item: 'abyssal_bramble_plate' } },
             ],
         },
     },
     // ── Void Pact chain ──────────────────────────────────────────────────────
     void_hollow: {
-        name: 'Void Hollow', difficulty: 9,
+        difficulty: 9,
         chain: 'void_pact', chainOrder: 1,
         duration: [400, 620], encounters: 6, combatEncounters: [2, 3],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
@@ -840,34 +595,19 @@ export const REALMS = {
             { key: 'hollow_sentinel', weight: 30 },
         ] },
         events: {
-            ambient: [
-                'The walls here lean inward, as if the space is slowly collapsing toward a point.',
-                '{name} passes a row of altars, each still wet.',
-                'The floor is etched with names in a language no one recognizes.',
-                'Something watches from the dark. It does not approach. It is patient.',
-                '{name} finds footprints leading toward the center. None lead back.',
-                'The air here has a taste to it. Like metal and old promises.',
-            ],
-            discoveries: [
-                '{name} pries loose a cache of void essence from a cracked altar.',
-                'A ledger of transactions lies open on a stone table. The entries are all prices.',
-                '{name} finds a vial of something thick and dark. It pulses.',
-            ],
-            traps: [
-                'Void energy surges through the floor, scorching {name}!',
-                '{name} brushes against a wall and is briefly drained.',
-                'A dark tendril whips from the shadow and strikes {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.04, text: '{name} discovers an untapped void essence wellspring!', loot: { resource: 'void_essence', amount: [6, 12] } },
-                { chance: 0.004, text: '{name} finds a void contract pinned to a crumbling altar, its terms still binding!', loot: { item: 'void_contract' } },
-                { chance: 0.003, text: '{name} finds a crude effigy stuffed with scraps of void-pact bargains!', loot: { item: 'stitched_poppet' } },
-                { chance: 0.003, text: '{name} discovers a glass eye that has clearly been watching this hollow for a very long time!', loot: { item: 'seers_eye' } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [6, 12] } },
+                { chance: 0.004, loot: { item: 'void_contract' } },
+                { chance: 0.003, loot: { item: 'stitched_poppet' } },
+                { chance: 0.003, loot: { item: 'seers_eye' } },
             ],
         },
     },
     void_sanctum: {
-        name: 'Void Sanctum', difficulty: 10,
+        difficulty: 10,
         chain: 'void_pact', chainOrder: 2,
         duration: [500, 750], encounters: 7, combatEncounters: [2, 4],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
@@ -884,34 +624,19 @@ export const REALMS = {
             { key: 'hollow_sentinel', weight: 10 },
         ] },
         events: {
-            ambient: [
-                'Void entities drift through the chamber, ignoring the party.',
-                '{name} watches two void entities make an exchange. Neither looks pleased.',
-                'Candles float at head height, burning with black flame.',
-                'A queue forms at a door. The things in line do not have faces.',
-                'Every surface here is inscribed with terms and conditions in fine script.',
-                '{name} is offered something by a passing figure. They wisely refuse.',
-            ],
-            discoveries: [
-                'An unclaimed payment sits on a stone counter. {name} takes it.',
-                '{name} finds a chest whose lock is a contract. The terms are reasonable.',
-                'A broker left its ledger unattended. {name} extracts useful materials.',
-            ],
-            traps: [
-                '{name} triggers a binding ward and is briefly paralyzed!',
-                'A mana-hungry rune activates under {name}\'s feet!',
-                'An incomplete transaction animates and strikes at {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.04, text: '{name} steals an unclaimed prize from a void broker\'s table!', loot: { resource: 'void_essence', amount: [8, 14] } },
-                { chance: 0.03, text: '{name} finds a crystallized fragment lodged in the sanctum wall.', loot: { resource: 'abyss_sliver', amount: [1, 2] } },
-                { chance: 0.005, text: '{name} intercepts an undelivered void contract left on a sanctum counter!', loot: { item: 'void_contract' } },
-                { chance: 0.005, text: '{name} finds a ledger detailing a forgotten trade. The rewards are theirs.', loot: { item: 'arbiters_ledger' } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [8, 14] } },
+                { chance: 0.03, loot: { resource: 'abyss_sliver', amount: [1, 2] } },
+                { chance: 0.005, loot: { item: 'void_contract' } },
+                { chance: 0.005, loot: { item: 'arbiters_ledger' } },
             ],
         },
     },
     void_heart: {
-        name: 'Void Heart', difficulty: 11,
+        difficulty: 11,
         chain: 'void_pact', chainOrder: 3,
         duration: [600, 900], encounters: 8, combatEncounters: [3, 5],
         vis: { wall: 'arcane_wall', floor: 'abyss_floor' },
@@ -929,37 +654,18 @@ export const REALMS = {
             { key: 'hollow_sentinel', weight: 10 },
         ] },
         events: {
-            ambient: [
-                'The chamber is perfectly silent except for the sound of a quill scratching somewhere.',
-                'The Arbiter\'s chamber lies ahead. {name} can already feel its attention.',
-                'Old debts hang in the air here like fog.',
-                '{name} reads inscriptions on the walls: terms, conditions, consequences.',
-                'The gravity here pulls slightly sideways. Nothing falls straight.',
-                'The air smells of finality.',
-            ],
-            discoveries: [
-                '{name} finds a sealed container of void essence, unclaimed for ages.',
-                'A cache of runite sits behind a door that has no lock. Strange.',
-                '{name} finds a tribute that was never collected. They collect it.',
-            ],
-            traps: [
-                'A binding agreement activates, draining {name} of energy!',
-                '{name} breaks a deal-seal on the floor, releasing a void burst!',
-                'An echo of an old fight replays suddenly, striking {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.04, text: '{name} discovers a pre-paid reward awaiting collection!', loot: { resource: 'void_essence', amount: [10, 18] } },
-                { chance: 0.04, text: '{name} pries a razor-thin sliver of hardened abyss from the chamber wall.', loot: { resource: 'abyss_sliver', amount: [1, 2] } },
-                { chance: 0.005, text: '{name} finds a signed contract granting extraordinary boons!', loot: { item: 'void_contract' } },
-                { chance: 0.004, text: '{name} finds the Arbiter\'s personal ledger, dropped in haste!', loot: { item: 'arbiters_ledger' } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [10, 18] } },
+                { chance: 0.04, loot: { resource: 'abyss_sliver', amount: [1, 2] } },
+                { chance: 0.005, loot: { item: 'void_contract' } },
+                { chance: 0.004, loot: { item: 'arbiters_ledger' } },
             ],
         },
         boss: {
-            name: 'The Void Arbiter',
-            lore: 'Neither god nor beast. It has mediated the terms of a thousand bargains and held each one to account. It regards your party with the detached interest of an accountant reviewing figures.',
             attackAnim: 'Swing',
-            approachText: 'A tall, featureless figure rises from the center of the chamber. It opens a ledger and begins to write.',
-            defeatText: 'The Arbiter closes its ledger. "Agreement terminated." It does not bleed. It simply... concludes.',
             guaranteedLoot: [
                 { item: 'void_contract', chance: 1.0 },
                 { item: 'arbiters_ledger', chance: 0.7 },
@@ -967,36 +673,24 @@ export const REALMS = {
             bonusResources: { void_essence: 20, runite: 5, abyss_sliver: 3 },
             phases: [
                 {
-                    name: 'Opening Terms', hp: 320, damage: 20, damageReduction: 0.35,
+                    hp: 320, damage: 20, damageReduction: 0.35,
                     color: '#8844bb', sprite: 'boss_void_arbiter',
-                    transitionText: 'The Arbiter pauses. "An adjustment to the terms. Accept, and the cost of Phase Two is halved. Refuse, and we continue at full price."',
-                    armorText: 'The Arbiter\'s contractual wards deflect much of the damage!',
                     voidPactChoice: {
-                        promptText: 'The Arbiter offers adjusted terms: the whole party takes 20 HP damage, but Phase Two deals half damage. Accept or refuse?',
                         acceptEffect: { partyDamage: 20, nextPhaseDmgMult: 0.5 },
-                        logAccept: 'The party accepts the adjusted terms. The Arbiter nods and notes it down.',
-                        logRefuse: 'The party refuses. The Arbiter notes that too.',
                     },
                 },
                 {
-                    name: 'Amended Contract', hp: 260, damage: 26, damageReduction: 0.10,
+                    hp: 260, damage: 26, damageReduction: 0.10,
                     color: '#6622aa', sprite: 'boss_void_arbiter',
-                    transitionText: 'The Arbiter sets down its quill. "Final offer. One of you accepts significant personal cost. The proceedings end more quickly."',
-                    armorText: 'Residual wards still absorb some of your attacks!',
                     voidPactChoice: {
-                        promptText: 'The Arbiter\'s final offer: the weakest party member takes 40 HP damage and becomes Void-Drained, but the Arbiter loses 60 HP and is stunned for 2 rounds. Accept or refuse?',
                         acceptEffect: { weakestMemberDamage: 40, applyVoidDrained: true, bossDamage: 60, bossStun: 2 },
-                        logAccept: 'The terms are accepted. The Arbiter tilts its head, satisfied.',
-                        logRefuse: 'Refused. The Arbiter makes a note in its ledger. The column for "unnecessary expenses" grows.',
                     },
                 },
                 {
-                    name: 'Breach of Contract', hp: 220, damage: 32, damageReduction: 0.20,
+                    hp: 220, damage: 32, damageReduction: 0.20,
                     color: '#440088', sprite: 'boss_void_arbiter_enraged',
-                    transitionText: 'The Arbiter closes its ledger with finality. There are no more offers.',
-                    armorText: 'The Arbiter\'s wards continue to deflect your attacks!',
                     abilities: [
-                        { type: 'aoe', chance: 0.2, damage: [12, 20], text: 'The Arbiter stamps its seal. Void energy erupts outward!' },
+                        { type: 'aoe', chance: 0.2, damage: [12, 20] },
                     ],
                 },
             ],
@@ -1005,7 +699,7 @@ export const REALMS = {
 
     // ── Chaos chain ──────────────────────────────────────────────────────────
     fracture_gate: {
-        name: 'Fracture Gate', difficulty: 13,
+        difficulty: 13,
         chain: 'chaos', chainOrder: 1,
         duration: [420, 650], encounters: 6, combatEncounters: [2, 3],
         vis: { wall: 'crystal_wall', floor: 'shadow_floor' },
@@ -1021,35 +715,20 @@ export const REALMS = {
             { key: 'mirror_shade', weight: 25 },
         ] },
         events: {
-            ambient: [
-                'The floor is stone. Then it is not. Then it is stone again.',
-                '{name} looks left and sees the room they came from. But they came from the right.',
-                'Something laughs. There is no one there to laugh.',
-                'The walls are crystal, then shadow, then crystal. It hurts to watch.',
-                '{name} notes that their footprints lead away from where they are standing.',
-                'A door opens onto a wall. A wall opens onto a door.',
-            ],
-            discoveries: [
-                '{name} reaches through a fracture in space and pulls out loot.',
-                'A chest exists in two places at once. {name} opens the more valuable one.',
-                '{name} finds resources that may or may not be from this realm.',
-            ],
-            traps: [
-                'The floor inverts briefly, slamming {name} against the ceiling!',
-                'A spatial fracture slices across {name}!',
-                '{name} walks through a door and exits through a different one moving fast!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.05, text: '{name} finds a pocket of stable space with unclaimed loot inside!', loot: { resource: 'void_essence', amount: [5, 10] } },
-                { chance: 0.005, text: 'A crack in reality reveals a pristine chaos shard!', loot: { item: 'chaos_shard' } },
-                { chance: 0.003, text: '{name} pulls a blade from a fracture in space. It exists in two states simultaneously.', loot: { item: 'fracture_edge' } },
-                { chance: 0.003, text: '{name} finds a plate of iron forged at the fracture point, chaos still humming through it!', loot: { item: 'chaos_wrought_plate' } },
-                { chance: 0.003, text: '{name} seizes a pair of boots from a collapsing pocket dimension, still vibrating with speed!', loot: { item: 'boots_of_haste' } },
+                { chance: 0.05, loot: { resource: 'void_essence', amount: [5, 10] } },
+                { chance: 0.005, loot: { item: 'chaos_shard' } },
+                { chance: 0.003, loot: { item: 'fracture_edge' } },
+                { chance: 0.003, loot: { item: 'chaos_wrought_plate' } },
+                { chance: 0.003, loot: { item: 'boots_of_haste' } },
             ],
         },
     },
     shifting_labyrinth: {
-        name: 'Shifting Labyrinth', difficulty: 14,
+        difficulty: 14,
         chain: 'chaos', chainOrder: 2,
         duration: [550, 820], encounters: 8, combatEncounters: [3, 5],
         vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
@@ -1067,33 +746,18 @@ export const REALMS = {
             { key: 'glitch_beast', weight: 15 },
         ] },
         events: {
-            ambient: [
-                'Every chamber looks exactly like the last one.',
-                '{name} marks a wall. Two turns later it is unmarked. Two turns after that it is somewhere else.',
-                'The labyrinth is not trying to trap the party. It simply does not remember what it looked like.',
-                '{name} hears their own footsteps coming from the other direction.',
-                'A sign on the wall reads "EXIT." It has been wrong twice already.',
-                'The ceiling is further away than it was. Or nearer. It is difficult to say.',
-            ],
-            discoveries: [
-                '{name} finds a room that wasn\'t here a moment ago. It has loot in it.',
-                'A cache tucked in a corner that the labyrinth has been carrying around.',
-                '{name} backtracks and finds something that was not there on the way out.',
-            ],
-            traps: [
-                'The floor dissolves briefly under {name}\'s feet!',
-                'A wall closes faster than expected, striking {name}!',
-                'A corridor shortens suddenly, hurling {name} against its end!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.04, text: '{name} finds a still point in the chaos, a perfectly calm room with valuable loot.', loot: { resource: 'gold', amount: [10, 18] } },
-                { chance: 0.005, text: 'A seam in the labyrinth wall reveals a chaos shard, perfectly intact despite everything!', loot: { item: 'chaos_shard' } },
-                { chance: 0.004, text: '{name} spots an unraveler\'s eye embedded in a wall, watching nothing in particular.', loot: { item: 'unravelers_eye' } },
+                { chance: 0.04, loot: { resource: 'gold', amount: [10, 18] } },
+                { chance: 0.005, loot: { item: 'chaos_shard' } },
+                { chance: 0.004, loot: { item: 'unravelers_eye' } },
             ],
         },
     },
     unraveling_core: {
-        name: 'Unraveling Core', difficulty: 15,
+        difficulty: 15,
         chain: 'chaos', chainOrder: 3,
         duration: [650, 950], encounters: 9, combatEncounters: [4, 6],
         vis: { wall: 'arcane_wall', floor: 'shadow_floor' },
@@ -1113,37 +777,18 @@ export const REALMS = {
             { key: 'fracture_imp', weight: 15 },
         ] },
         events: {
-            ambient: [
-                'Reality is decorative here.',
-                '{name} exists. Then more than one of them exists. Then just one again.',
-                'The center of the labyrinth is visible in every direction at once.',
-                'Gravity apologizes and returns.',
-                'A thought {name} had yesterday plays out on the wall in front of them.',
-                'Everything is fine. Everything has never been fine.',
-            ],
-            discoveries: [
-                '{name} reaches into an unraveled fold of space and pulls out materials.',
-                'Loot from a different expedition entirely is sitting here. {name} takes it.',
-                '{name} finds resources in a configuration that should not exist.',
-            ],
-            traps: [
-                'A reality tear cuts across the party!',
-                '{name} is briefly inverted and falls upward, hard!',
-                'A paradox catches {name} mid-step. They arrive back before they leave!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 3,
             rare: [
-                { chance: 0.04, text: '{name} locates the one stable point in the entire realm. It has a lot of void essence.', loot: { resource: 'void_essence', amount: [12, 20] } },
-                { chance: 0.005, text: '{name} pulls a chaos shard directly out of unraveling space.', loot: { item: 'chaos_shard' } },
-                { chance: 0.003, text: '{name} pries an Unraveler\'s eye from the core wall. It is still watching.', loot: { item: 'unravelers_eye' } },
-                { chance: 0.04, text: '{name} reaches into an unraveled seam and pulls free a razor-thin fragment of hardened abyss.', loot: { resource: 'abyss_sliver', amount: [2, 4] } },
+                { chance: 0.04, loot: { resource: 'void_essence', amount: [12, 20] } },
+                { chance: 0.005, loot: { item: 'chaos_shard' } },
+                { chance: 0.003, loot: { item: 'unravelers_eye' } },
+                { chance: 0.04, loot: { resource: 'abyss_sliver', amount: [2, 4] } },
             ],
         },
         boss: {
-            name: 'The Unraveler',
-            lore: `A giant floating eyeball that seems to be a master of illusion. Using the chaotic energies of the labyrinth, it is able to mask itself as other powerful entities that it pulls from the minds of the colonists. It makes chaotic use of our previous foes' abilities, though it thankfully cannot hold these forms for long while being attacked.`,
             attackAnim: 'Swing',
-            approachText: 'Something at the center of the core shifts. Parts of it are in different places than other parts. It has too many edges. It turns toward the party, and the turning takes longer than it should.',
-            defeatText: 'The Unraveler disperses. Each thread of it unwinds back into the labyrinth it came from. Somewhere, something subtle changes.',
             guaranteedLoot: [
                 { item: 'chaos_shard', chance: 1.0 },
                 { item: 'unravelers_eye', chance: 0.8 },
@@ -1157,42 +802,36 @@ export const REALMS = {
             dynamicMasks: true,
             phases: [
                 {
-                    name: 'Incoherent', hp: 280, damage: 18, damageReduction: 0.35,
+                    hp: 280, damage: 18, damageReduction: 0.35,
                     color: '#cc33cc', sprite: 'boss_unraveler',
-                    transitionText: 'The Unraveler fractures into shards then snaps back together. It looks a little different.',
-                    armorText: 'Chaos energy refracts your attacks, absorbing your damage!',
                     abilities: [
-                        { type: 'aoe', chance: 0.25, damage: [8, 14], text: 'A chaos pulse detonates outward from the Unraveler!' },
+                        { type: 'aoe', chance: 0.25, damage: [8, 14] },
                     ],
                 },
                 {
-                    name: 'Fracturing', hp: 240, damage: 24, damageReduction: 0.20,
+                    hp: 240, damage: 24, damageReduction: 0.20,
                     color: '#ff33aa', sprite: 'boss_unraveler',
-                    transitionText: 'The Unraveler sheds one version of itself. What remains is faster and angrier.',
-                    armorText: 'The chaos field is thinning but still deflects some blows!',
                     abilities: [
-                        { type: 'aoe', chance: 0.30, damage: [10, 18], text: 'A chaos pulse detonates outward from the Unraveler!' },
-                        { type: 'summon_adds', chance: 0.2, hp: 30, damage: 8, count: 1, text: 'A fragment splits off and takes shape!' },
+                        { type: 'aoe', chance: 0.30, damage: [10, 18] },
+                        { type: 'summon_adds', chance: 0.2, hp: 30, damage: 8, count: 1 },
                     ],
                 },
                 {
-                    name: 'Unbound', hp: 200, damage: 30, damageReduction: 0.10,
+                    hp: 200, damage: 30, damageReduction: 0.10,
                     color: '#ff6600', sprite: 'boss_unraveler',
-                    transitionText: 'The Unraveler stops pretending to have a stable form. Every round from here is different.',
-                    armorText: 'Flickering chaos energy still absorbs a fraction of your damage!',
                     autoChaosTick: true,
                     abilities: [
-                        { type: 'aoe', chance: 0.25, damage: [12, 20], text: 'Chaos erupts from the Unraveler!' },
+                        { type: 'aoe', chance: 0.25, damage: [12, 20] },
                     ],
                 },
                 {
-                    name: 'The Last Thread', hp: 150, damage: 35,
+                    hp: 150, damage: 35,
                     color: '#ff0066', sprite: 'boss_unraveler',
                     transitionText: null,
                     autoChaosTick: true,
                     abilities: [
-                        { type: 'aoe', chance: 0.3, damage: [14, 22], text: 'The Unraveler tears reality apart around the party!' },
-                        { type: 'random_status', chance: 0.15, text: 'An unraveling force seizes the party!' },
+                        { type: 'aoe', chance: 0.3, damage: [14, 22] },
+                        { type: 'random_status', chance: 0.15 },
                     ],
                 },
             ],
@@ -1201,7 +840,7 @@ export const REALMS = {
 
     // ── Kingdom chain ────────────────────────────────────────────────────────
     kingdom_outskirts: {
-        name: 'Kingdom Outskirts', difficulty: 11,
+        difficulty: 11,
         chain: 'kingdom', chainOrder: 1,
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
 
@@ -1219,35 +858,19 @@ export const REALMS = {
             { key: 'high_priest', weight: 15 },
         ] },
         events: {
-            ambient: [
-                '{name} keeps to the treeline as a crusader patrol marches past on the road.',
-                'Banners of the High King snap in the wind above a fortified checkpoint.',
-                'A temporary encampment sprawls across the valley. {name} can hear orders being barked all throughout.',
-                '{name} passes a shrine defaced with anti-magic scripture.',
-                'The distant toll of a war-bell rolls across the farmland.',
-                '{name} finds a refugee trail, cold and long abandoned.',
-            ],
-            discoveries: [
-                '{name} raids an unguarded supply wagon left at the roadside.',
-                'A tax-collector\'s strongbox lies forgotten in a ransacked cottage.',
-                '{name} finds a deserter\'s cache hidden beneath a hay bale.',
-            ],
-            traps: [
-                'A sentry\'s alarm bell clangs, {name} scrambles for cover!',
-                '{name} stumbles into a field of scattered caltrops!',
-                'A crossbow bolt whistles from a hidden murder-hole at {name}!',
-                'A tripwire snare yanks tight around {name}\'s ankle!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.05, text: '{name} intercepts a crusader pay-chest bound for the front!', loot: { resource: 'gold', amount: [10, 20] } },
-                { chance: 0.03, text: '{name} loots a paymaster\'s strongbox from a toppled wagon!', loot: { resource: 'gold', amount: [8, 16] } },
-                { chance: 0.005, text: '{name} lifts a merchant\'s lucky coin from a captured caravan!', loot: { item: 'hagglers_coin' } },
-                { chance: 0.005, text: '{name} pries a runic charm from a fallen officer\'s effects!', loot: { item: 'amulet_of_fortune' } },
+                { chance: 0.05, loot: { resource: 'gold', amount: [10, 20] } },
+                { chance: 0.03, loot: { resource: 'gold', amount: [8, 16] } },
+                { chance: 0.005, loot: { item: 'hagglers_coin' } },
+                { chance: 0.005, loot: { item: 'amulet_of_fortune' } },
             ],
         },
     },
     crusader_barracks: {
-        name: 'Crusader Barracks', difficulty: 12,
+        difficulty: 12,
         chain: 'kingdom', chainOrder: 2,
         duration: [700, 1000], encounters: 9, combatEncounters: [4, 6],
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
@@ -1265,36 +888,20 @@ export const REALMS = {
             { key: 'high_priest', weight: 20 },
         ] },
         events: {
-            ambient: [
-                '{name} slips past a drill yard where recruits rehearse anti-magic formations.',
-                'Racks of polished steel line the armory walls, each blade blessed against magic.',
-                'A war chapel echoes with a chaplain\'s recorded sermon, playing to an empty hall.',
-                '{name} passes rows of empty bunks, footlockers stamped with the royal crest.',
-                'The clang of a distant smithy never seems to stop.',
-                '{name} reads a duty roster pinned to the wall, half the names are crossed out.',
-            ],
-            discoveries: [
-                '{name} strips a weapons rack of its runic-forged steel.',
-                'A quartermaster\'s ledger reveals a hidden supply cache.',
-                '{name} pries open a blessed reliquary and pockets its offerings.',
-            ],
-            traps: [
-                'A rigged training dummy swings a live blade at {name}!',
-                'An oil trough ignites, flames roar toward {name}!',
-                'A portcullis slams down, its spikes grazing {name}\'s gear!',
-                'A stack of pikes topples from the wall onto {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.05, text: '{name} cracks open the garrison paychest, a soldier\'s fortune!', loot: { resource: 'gold', amount: [14, 26] } },
-                { chance: 0.03, text: '{name} clears an armory vault of runic ingots!', loot: { resource: 'runite', amount: [8, 14] } },
-                { chance: 0.005, text: '{name} recovers the drum that once rallied a whole regiment!', loot: { item: 'drum_of_rallying' } },
-                { chance: 0.005, text: '{name} tears a battle standard from the barracks wall, its enchantments still potent!', loot: { item: 'rallying_standard' } },
-                { chance: 0.004, text: '{name} finds a pair of battle-worn wraps belonging to a legendary berserker, still wrapped around a training post!', loot: { item: 'berserkers_wraps' } },
+                { chance: 0.05, loot: { resource: 'gold', amount: [14, 26] } },
+                { chance: 0.03, loot: { resource: 'runite', amount: [8, 14] } },
+                { chance: 0.005, loot: { item: 'drum_of_rallying' } },
+                { chance: 0.005, loot: { item: 'rallying_standard' } },
+                { chance: 0.004, loot: { item: 'berserkers_wraps' } },
             ],
         },
     },
     palace_fortress: {
-        name: 'Palace Fortress', difficulty: 13,
+        difficulty: 13,
         chain: 'kingdom', chainOrder: 3,
         duration: [700, 1000], encounters: 9, combatEncounters: [5, 7],
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
@@ -1312,11 +919,7 @@ export const REALMS = {
             { key: 'palace_champion', weight: 30 },
         ] },
         boss: {
-            name: 'The High King',
-            lore: `The leader of the human kingdoms and commander of the Crusader armies. He is a master swordsman and tactician, using his combat experience to protect his throne himself. He liberally uses his arsenal of legendary weaponry, as well as the lives of his soldiers, to keep his enemies at bay. When pushed to the brink he may even break his own oaths and call upon the power of magic to turn the tide. His defeat will be a major blow to the Crusader forces, leaving our colonists safe to return to their old homes.`,
             attackAnim: 'Swing',
-            approachText: 'The throne room doors burst open. The High King rises, blade drawn, eyes burning with conviction!',
-            defeatText: 'The High King falls to his knees, his crown clattering across the stone floor!',
             guaranteedLoot: [
                 { item: 'sovereign_blade', chance: 0.4 },
                 { item: 'commanders_crown', chance: 0.4 },
@@ -1325,59 +928,41 @@ export const REALMS = {
             bonusResources: { gold: 50, void_essence: 8 },
             phases: [
                 {
-                    name: 'The Duel', hp: 400, damage: 30,
+                    hp: 400, damage: 30,
                     color: '#ddaa22', sprite: 'boss_high_king',
-                    transitionText: 'The High King draws a second blade! His fury is unrelenting!',
                 },
                 {
-                    name: 'Enraged', hp: 350, damage: 44,
+                    hp: 350, damage: 44,
                     color: '#ff2200', sprite: 'boss_high_king_enraged',
-                    abilities: [{ type: 'aoe', chance: 0.15, damage: [8, 14], text: 'The King cleaves with both blades in a wide arc!' }],
-                    transitionText: 'The King calls his royal guard to his side!',
+                    abilities: [{ type: 'aoe', chance: 0.15, damage: [8, 14] }],
                 },
                 {
-                    name: 'Royal Guard', hp: 300, damage: 52,
+                    hp: 300, damage: 52,
                     color: '#ff4400', sprite: 'boss_high_king_guard',
-                    abilities: [{ type: 'summon_adds', chance: 0.2, count: 2, hp: 40, damage: 12, text: 'Royal guards charge into the fray!' }],
-                    transitionText: 'The King shatters his crown! Dark energy surges through him!',
+                    abilities: [{ type: 'summon_adds', chance: 0.2, count: 2, hp: 40, damage: 12 }],
                 },
                 {
-                    name: 'Desperate', hp: 250, damage: 65,
+                    hp: 250, damage: 65,
                     color: '#ff0000', sprite: 'boss_high_king_desperate',
-                    abilities: [{ type: 'aoe', chance: 0.3, damage: [15, 28], text: 'The King unleashes a devastating whirlwind of steel!' }],
+                    abilities: [{ type: 'aoe', chance: 0.3, damage: [15, 28] }],
                 },
             ],
         },
         events: {
-            ambient: [
-                '{name} crosses a gilded hall where portraits of dead kings glare down.',
-                'Marble columns rise into shadow, each carved with the history of the Crusade.',
-                '{name} steps around a mosaic depicting the burning of a magic-user.',
-                'Silk banners and golden filigree drip from every archway.',
-                '{name} hears the faint music of a court that fled long ago.',
-                'The throne-room doors loom ahead, sealed with the royal sigil.',
-            ],
-            discoveries: [
-                '{name} empties a coffer from the royal treasury.',
-                'A vault of confiscated magic yields tomes and void essence.',
-                '{name} prises jewels from an abandoned ceremonial crown.',
-            ],
-            traps: [
-                'A pressure plate springs a wall of gilded spears at {name}!',
-                'The floor drops away over an oubliette, {name} barely catches the edge!',
-                'A royal ward flares to life, lashing arcane fire at {name}!',
-                'A chandelier crashes down toward {name}!',
-            ],
+            ambient: 6,
+            discoveries: 3,
+            traps: 4,
             rare: [
-                { chance: 0.05, text: '{name} breaks into the royal war chest, a king\'s ransom in gold!', loot: { resource: 'gold', amount: [20, 36] } },
-                { chance: 0.03, text: '{name} raids the vault of confiscated magic, raw void essence!', loot: { resource: 'void_essence', amount: [8, 14] } },
-                { chance: 0.005, text: '{name} claims a lodestone the crown used to draw wealth to its coffers!', loot: { item: 'lodestone_of_prosperity' } },
-                { chance: 0.003, text: '{name} recovers the High King\'s personal sword from a display case in the war gallery!', loot: { item: 'sovereign_blade' } },
-                { chance: 0.003, text: '{name} lifts the Commander\'s Crown from a pedestal in the throne antechamber!', loot: { item: 'commanders_crown' } },
+                { chance: 0.05, loot: { resource: 'gold', amount: [20, 36] } },
+                { chance: 0.03, loot: { resource: 'void_essence', amount: [8, 14] } },
+                { chance: 0.005, loot: { item: 'lodestone_of_prosperity' } },
+                { chance: 0.003, loot: { item: 'sovereign_blade' } },
+                { chance: 0.003, loot: { item: 'commanders_crown' } },
             ],
         },
     },
 };
+stampLoc(REALMS, 'realm');
 
 export const EXPLORATION_CONFIG = {
     // Party size the Rifts panel recommends before a chain's boss realm. Playtests
@@ -1432,86 +1017,45 @@ export const EXPLORATION_CONFIG = {
 };
 
 export const EXPEDITION_DIFFICULTY = {
-    1:  { name: 'Normal',       enemyHpMult: 1,    enemyDmgMult: 1,    enemyCountMult: 1,    trapDmgMult: 1,    lootAmountMult: 1.00, rareLootMult: 1.00, extraEncounters: 0,  bossPhases: 3 },
-    2:  { name: 'Dangerous',   enemyHpMult: 1.3,  enemyDmgMult: 1.2,  enemyCountMult: 1.25, trapDmgMult: 1.3,  lootAmountMult: 1.15, rareLootMult: 1.10, extraEncounters: 1,  bossPhases: 3 },
-    3:  { name: 'Perilous',    enemyHpMult: 1.7,  enemyDmgMult: 1.5,  enemyCountMult: 1.5,  trapDmgMult: 1.7,  lootAmountMult: 1.30, rareLootMult: 1.20, extraEncounters: 2,  bossPhases: 4 },
-    4:  { name: 'Deadly',      enemyHpMult: 2.2,  enemyDmgMult: 1.8,  enemyCountMult: 1.75, trapDmgMult: 2.0,  lootAmountMult: 1.45, rareLootMult: 1.30, extraEncounters: 3,  bossPhases: 4 },
-    5:  { name: 'Suicidal',    enemyHpMult: 3.0,  enemyDmgMult: 2.2,  enemyCountMult: 2.0,  trapDmgMult: 2.5,  lootAmountMult: 1.60, rareLootMult: 1.40, extraEncounters: 4,  bossPhases: 4 },
-    6:  { name: 'Lethal',      enemyHpMult: 3.9,  enemyDmgMult: 2.7,  enemyCountMult: 2.25, trapDmgMult: 3.2,  lootAmountMult: 1.75, rareLootMult: 1.50, extraEncounters: 5,  bossPhases: 4 },
-    7:  { name: 'Catastrophic',enemyHpMult: 5.0,  enemyDmgMult: 3.3,  enemyCountMult: 2.5,  trapDmgMult: 4.0,  lootAmountMult: 1.90, rareLootMult: 1.60, extraEncounters: 6,  bossPhases: 4 },
-    8:  { name: 'Nightmarish', enemyHpMult: 6.5,  enemyDmgMult: 4.0,  enemyCountMult: 2.75, trapDmgMult: 5.0,  lootAmountMult: 2.05, rareLootMult: 1.70, extraEncounters: 7,  bossPhases: 4 },
-    9:  { name: 'Harrowing',   enemyHpMult: 8.5,  enemyDmgMult: 4.8,  enemyCountMult: 3.0,  trapDmgMult: 6.0,  lootAmountMult: 2.20, rareLootMult: 1.80, extraEncounters: 8,  bossPhases: 4 },
-    10: { name: 'Dire',        enemyHpMult: 11.0, enemyDmgMult: 5.8,  enemyCountMult: 3.25, trapDmgMult: 7.5,  lootAmountMult: 2.35, rareLootMult: 1.90, extraEncounters: 9,  bossPhases: 4 },
-    11: { name: 'Crushing',    enemyHpMult: 14.0, enemyDmgMult: 7.0,  enemyCountMult: 3.5,  trapDmgMult: 9.0,  lootAmountMult: 2.50, rareLootMult: 2.00, extraEncounters: 10, bossPhases: 4 },
-    12: { name: 'Overwhelming',enemyHpMult: 18.0, enemyDmgMult: 8.5,  enemyCountMult: 3.75, trapDmgMult: 11.0, lootAmountMult: 2.65, rareLootMult: 2.10, extraEncounters: 11, bossPhases: 4 },
-    13: { name: 'Apocalyptic', enemyHpMult: 23.0, enemyDmgMult: 10.0, enemyCountMult: 4.0,  trapDmgMult: 13.0, lootAmountMult: 2.80, rareLootMult: 2.20, extraEncounters: 12, bossPhases: 4 },
-    14: { name: 'Cataclysmic', enemyHpMult: 29.0, enemyDmgMult: 12.0, enemyCountMult: 4.25, trapDmgMult: 16.0, lootAmountMult: 2.95, rareLootMult: 2.30, extraEncounters: 13, bossPhases: 4 },
-    15: { name: 'World-Ending',enemyHpMult: 36.0, enemyDmgMult: 14.5, enemyCountMult: 4.5,  trapDmgMult: 20.0, lootAmountMult: 3.10, rareLootMult: 2.40, extraEncounters: 14, bossPhases: 4 },
+    1:  { enemyHpMult: 1,    enemyDmgMult: 1,    enemyCountMult: 1,    trapDmgMult: 1,    lootAmountMult: 1.00, rareLootMult: 1.00, extraEncounters: 0,  bossPhases: 3 },
+    2:  { enemyHpMult: 1.3,  enemyDmgMult: 1.2,  enemyCountMult: 1.25, trapDmgMult: 1.3,  lootAmountMult: 1.15, rareLootMult: 1.10, extraEncounters: 1,  bossPhases: 3 },
+    3:  { enemyHpMult: 1.7,  enemyDmgMult: 1.5,  enemyCountMult: 1.5,  trapDmgMult: 1.7,  lootAmountMult: 1.30, rareLootMult: 1.20, extraEncounters: 2,  bossPhases: 4 },
+    4:  { enemyHpMult: 2.2,  enemyDmgMult: 1.8,  enemyCountMult: 1.75, trapDmgMult: 2.0,  lootAmountMult: 1.45, rareLootMult: 1.30, extraEncounters: 3,  bossPhases: 4 },
+    5:  { enemyHpMult: 3.0,  enemyDmgMult: 2.2,  enemyCountMult: 2.0,  trapDmgMult: 2.5,  lootAmountMult: 1.60, rareLootMult: 1.40, extraEncounters: 4,  bossPhases: 4 },
+    6:  { enemyHpMult: 3.9,  enemyDmgMult: 2.7,  enemyCountMult: 2.25, trapDmgMult: 3.2,  lootAmountMult: 1.75, rareLootMult: 1.50, extraEncounters: 5,  bossPhases: 4 },
+    7:  { enemyHpMult: 5.0,  enemyDmgMult: 3.3,  enemyCountMult: 2.5,  trapDmgMult: 4.0,  lootAmountMult: 1.90, rareLootMult: 1.60, extraEncounters: 6,  bossPhases: 4 },
+    8:  { enemyHpMult: 6.5,  enemyDmgMult: 4.0,  enemyCountMult: 2.75, trapDmgMult: 5.0,  lootAmountMult: 2.05, rareLootMult: 1.70, extraEncounters: 7,  bossPhases: 4 },
+    9:  { enemyHpMult: 8.5,  enemyDmgMult: 4.8,  enemyCountMult: 3.0,  trapDmgMult: 6.0,  lootAmountMult: 2.20, rareLootMult: 1.80, extraEncounters: 8,  bossPhases: 4 },
+    10: { enemyHpMult: 11.0, enemyDmgMult: 5.8,  enemyCountMult: 3.25, trapDmgMult: 7.5,  lootAmountMult: 2.35, rareLootMult: 1.90, extraEncounters: 9,  bossPhases: 4 },
+    11: { enemyHpMult: 14.0, enemyDmgMult: 7.0,  enemyCountMult: 3.5,  trapDmgMult: 9.0,  lootAmountMult: 2.50, rareLootMult: 2.00, extraEncounters: 10, bossPhases: 4 },
+    12: { enemyHpMult: 18.0, enemyDmgMult: 8.5,  enemyCountMult: 3.75, trapDmgMult: 11.0, lootAmountMult: 2.65, rareLootMult: 2.10, extraEncounters: 11, bossPhases: 4 },
+    13: { enemyHpMult: 23.0, enemyDmgMult: 10.0, enemyCountMult: 4.0,  trapDmgMult: 13.0, lootAmountMult: 2.80, rareLootMult: 2.20, extraEncounters: 12, bossPhases: 4 },
+    14: { enemyHpMult: 29.0, enemyDmgMult: 12.0, enemyCountMult: 4.25, trapDmgMult: 16.0, lootAmountMult: 2.95, rareLootMult: 2.30, extraEncounters: 13, bossPhases: 4 },
+    15: { enemyHpMult: 36.0, enemyDmgMult: 14.5, enemyCountMult: 4.5,  trapDmgMult: 20.0, lootAmountMult: 3.10, rareLootMult: 2.40, extraEncounters: 14, bossPhases: 4 },
 };
+stampLoc(EXPEDITION_DIFFICULTY, 'difficulty');
 
 export const EXPLORATION_EVENTS = {
-    ambient: [
-        '{name} notices strange runes on the walls.',
-        '{name} hears distant echoes ahead.',
-        'The party passes through a narrow passage.',
-        '{name} spots glowing crystals in the ceiling.',
-        'A cold draft blows from deeper in.',
-        '{name} finds old bones scattered on the ground.',
-        'The air grows thick with arcane energy.',
-        '{name} pauses to study an ancient mural.',
-        'Water drips from the ceiling above.',
-        'The path splits. The party chooses the left fork.',
-        '{name} feels a strange presence watching them.',
-        'Faint music drifts from somewhere ahead.',
-    ],
-    traps: [
-        '{name} triggers a hidden spike trap!',
-        'A burst of arcane fire singes {name}!',
-        '{name} steps on a pressure plate, darts fly!',
-        'The floor gives way under {name}!',
-        '{name} walks into a magical ward, shock!',
-        'Poisoned needles spring from the wall at {name}!',
-    ],
-    discoveries: [
-        '{name} finds a small cache behind a loose stone.',
-        'The party discovers an old supply stash.',
-        '{name} pries a gem from a wall socket.',
-        'An abandoned pack contains useful supplies.',
-        '{name} spots something glinting in the rubble.',
-    ],
-    combatStart: [
-        'Hostile creatures emerge from the darkness!',
-        'The party is ambushed!',
-        'Enemies block the path ahead!',
-        'Enemies close in from around the corner!',
-    ],
-    combatHit: [
-        '{attacker} strikes {target} for {dmg} damage.',
-        '{attacker} lands a blow on {target} ({dmg} dmg).',
-        '{attacker} hits {target} hard ({dmg} dmg).',
-    ],
-    combatMiss: [
-        '{attacker} swings at {target} but misses.',
-        '{target} dodges {attacker}\'s attack.',
-    ],
-    combatDefeat: [
-        '{name} collapses from their wounds!',
-        '{name} is knocked unconscious!',
-    ],
+    ambient: 12,
+    traps: 6,
+    discoveries: 5,
+    combatStart: 4,
+    combatHit: 3,
+    combatMiss: 2,
+    combatDefeat: 2,
 };
+stampLoc(EXPLORATION_EVENTS, 'exp_event');
 
 // Formation: front/back row positioning for expedition parties.
 export const FORMATION_CONFIG = {
     rows: {
         front: {
-            name: 'Front Row',
             damageTakenMult: 1.3,
             meleeDamageMult: 1.2,
             spellDamageMult: 1.0,
             targetPriorityMod: 5,
         },
         back: {
-            name: 'Back Row',
             damageTakenMult: 0.7,
             meleeDamageMult: 0.6,
             spellDamageMult: 1.15,
@@ -1521,155 +1065,108 @@ export const FORMATION_CONFIG = {
     maxPerRow: 3,
     defaultAssignment: 'front',
 };
+stampLoc({ formation: FORMATION_CONFIG }, 'config');
 
 // Trap types.
 export const EXPEDITION_TRAPS = {
     rockfall: {
-        name: 'Rockfall',
-        text: 'The ceiling groans, loose rocks begin to shift above!',
         damageType: 'instant',
         initialDamage: [5, 15],
         checks: [
             {
-                label: 'Shore up the ceiling',
-                description: 'Use building skill to brace the rocks',
                 skill: 'building', minLevel: 3,
                 traitBonus: ['tough', 'sturdy'],
-                successText: '{name} braces the ceiling, rocks held!',
-                failText: '{name} tries to brace it but rocks crash down!',
             },
             {
-                label: 'Dodge through quickly',
-                description: 'Sprint past the danger zone',
                 skill: null, traitAny: ['quick', 'lucky'],
-                successText: 'The party dashes through just in time!',
-                failText: 'Too slow, falling rocks strike the party!',
             },
         ],
     },
     poison_trap: {
-        name: 'Poison Trap',
-        text: 'A faint hissing sound, poison darts are primed in the walls!',
         damageType: 'dot',
         initialDamage: [3, 8],
         dotDamage: [2, 4], dotTicks: 5, dotInterval: 10,
         checks: [
             {
-                label: 'Identify and neutralize',
-                description: 'Use research knowledge to disarm the mechanism',
                 skill: 'research', minLevel: 3,
                 traitBonus: ['scholar'],
-                successText: '{name} carefully disarms the dart mechanism!',
-                failText: '{name} fumbles, darts fire from the walls!',
             },
             {
-                label: 'Craft a quick antidote',
-                description: 'Prepare herbal protection with cooking skill',
                 skill: 'cooking', minLevel: 3,
                 traitBonus: ['iron_stomach'],
-                successText: '{name} brews a quick antidote, poison neutralized!',
-                failText: '{name} can\'t prepare it fast enough, the darts strike!',
             },
         ],
     },
     disarm_trap: {
-        name: 'Disarm Trap',
-        text: 'A magnetic mechanism hums, it could rip equipment loose!',
         damageType: 'equipment',
         initialDamage: [2, 5],
         effect: { disableRandomSlot: true, disableDuration: 3 },
         checks: [
             {
-                label: 'Dismantle the mechanism',
-                description: 'Use crafting skill to safely take it apart',
                 skill: 'crafting', minLevel: 3,
                 traitBonus: ['sturdy'],
-                successText: '{name} dismantles the mechanism with expert precision!',
-                failText: '{name} triggers it, equipment ripped loose!',
             },
             {
-                label: 'Shield equipment with padding',
-                description: 'Use animal hides to insulate gear',
                 skill: 'animals', minLevel: 3,
                 traitBonus: ['sturdy'],
-                successText: '{name} wraps the gear safely, the pulse passes harmlessly!',
-                failText: 'The padding isn\'t enough, the magnetic pulse hits!',
             },
         ],
     },
     mana_siphon: {
-        name: 'Mana Siphon',
-        text: 'Glowing runes on the floor pulse hungrily, a mana drain!',
         damageType: 'mana',
         initialDamage: [0, 2],
         manaDrain: [10, 25],
         checks: [
             {
-                label: 'Overload the runes',
-                description: 'Channel research knowledge to short-circuit the trap',
                 skill: 'research', minLevel: 4,
                 traitBonus: ['scholar'],
-                successText: '{name} overloads the runes, they shatter harmlessly!',
-                failText: '{name} can\'t contain it, mana drained!',
             },
             {
-                label: 'Cover the runes with earth',
-                description: 'Use farming knowledge to smother the trap',
                 skill: 'farming', minLevel: 3,
                 traitBonus: ['green_thumb'],
-                successText: '{name} packs earth over the runes, the glow fades!',
-                failText: 'The earth isn\'t enough, the siphon activates!',
             },
         ],
     },
     snare_trap: {
-        name: 'Snare Trap',
-        text: 'A hidden tripline snaps taut, a net of rope and hooks whips up from the ground!',
         damageType: 'instant',
         initialDamage: [4, 12],
         checks: [
             {
-                label: 'Cut the party free',
-                description: 'Use crafting skill to slash through the netting',
                 skill: 'crafting', minLevel: 3,
                 traitBonus: ['quick'],
-                successText: '{name} slices the net apart before it can close!',
-                failText: '{name} is too slow, the hooks bite deep!',
             },
             {
-                label: 'Spot the tripline',
-                description: 'Sharp eyes catch the snare before it triggers',
                 skill: null, traitAny: ['quick', 'lucky'],
-                successText: 'The party freezes at {name}\'s warning and steps clear!',
-                failText: 'No one sees it in time, the snare springs!',
             },
         ],
     },
 };
+stampLoc(EXPEDITION_TRAPS, 'exp_trap');
 
 // Elite enemy modifiers.
 export const ELITE_MODIFIERS = {
     regenerating: {
-        name: 'Regenerating', prefix: 'Regenerating', color: '#44ff44',
+        color: '#44ff44',
         hpMult: 1.2, regenPerRound: 0.05, lootBonusMult: 1.5,
     },
     shielded: {
-        name: 'Shielded', prefix: 'Shielded', color: '#4488ff',
+        color: '#4488ff',
         hpMult: 1.0, damageReduction: 0.3, lootBonusMult: 1.4,
     },
     vampiric: {
-        name: 'Vampiric', prefix: 'Vampiric', color: '#cc0044',
+        color: '#cc0044',
         hpMult: 0.9, lifeSteal: 0.5, lootBonusMult: 1.6,
     },
     explosive: {
-        name: 'Explosive', prefix: 'Explosive', color: '#ff6600',
+        color: '#ff6600',
         hpMult: 0.8, onDeath: { aoe: true, damage: [10, 20] }, lootBonusMult: 1.3,
     },
     swift: {
-        name: 'Swift', prefix: 'Swift', color: '#ffff44',
+        color: '#ffff44',
         hpMult: 0.9, extraAttacks: 1, dodgeChance: 0.2, lootBonusMult: 1.4,
     },
 };
+stampLoc(ELITE_MODIFIERS, 'elite_mod');
 
 export const ELITE_CONFIG = {
     baseChance: 0.08,
@@ -1683,865 +1180,632 @@ export const ELITE_CONFIG = {
 // Mid-expedition decisions.
 export const EXPEDITION_DECISIONS = {
     forked_path: {
-        text: 'The passage splits into two tunnels.',
         triggerChance: 0.35,
         realmFilter: null,
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Left tunnel, narrow and dark',
-                description: 'More enemies, but rare loot chance doubled',
                 effects: { spawnCombat: { countMult: 1.5 }, nextLootRareMult: 2.0 },
-                logText: 'The party squeezes through the narrow left tunnel...',
             },
             {
-                label: 'Right path, wider, well-lit',
-                description: 'Safer passage, partial healing',
                 effects: { healParty: 0.15 },
-                logText: 'The party takes the wider right path...',
             },
         ],
     },
     mysterious_shrine: {
-        text: 'An ancient shrine glows with faint energy.',
         triggerChance: 0.2,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         minDifficulty: 1,
         safeIndex: 2,
         choices: [
             {
-                label: 'Pray at the shrine',
-                description: 'Restore mana, risk a trap',
                 effects: { restoreMana: 0.5, trapRisk: 0.3 },
-                logText: '{name} kneels before the shrine...',
             },
             {
-                label: 'Smash the shrine',
-                description: 'Guaranteed loot, enemies buffed',
                 effects: { grantLoot: { type: 'realm_roll', mult: 1.5 }, buffEnemies: { hpMult: 1.2 } },
-                logText: '{name} shatters the shrine with a heavy blow!',
             },
             {
-                label: 'Ignore it',
-                description: 'Play it safe',
                 effects: {},
-                logText: 'The party cautiously passes the shrine.',
             },
         ],
     },
     trapped_chest: {
-        text: 'A chest sits in the middle of the room, suspiciously obvious.',
         triggerChance: 0.25,
         realmFilter: null,
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Open it carefully',
-                description: 'Decent loot if no trap triggers',
                 effects: { grantLoot: { type: 'realm_roll', mult: 1.0 }, trapRisk: 0.4 },
-                logText: 'The party carefully pries open the chest...',
             },
             {
-                label: 'Leave it alone',
-                description: 'No risk, no reward',
                 effects: {},
-                logText: 'The party leaves the chest untouched.',
             },
         ],
     },
     echoing_cry: {
-        text: 'A distant cry for help echoes through the passage.',
         triggerChance: 0.2,
         realmFilter: null,
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Investigate',
-                description: 'Could be an ally or a trap',
                 effects: { npcChance: 0.6, trapRisk: 0.4 },
-                logText: 'The party follows the voice...',
             },
             {
-                label: 'Press on',
-                description: 'Stay focused on the mission',
                 effects: {},
-                logText: 'The party ignores the cry and continues forward.',
             },
         ],
     },
     prisoners_dilemma: {
-        text: 'A row of cells holds captured magic-users, their guards nowhere in sight.',
         triggerChance: 0.3,
         realmFilter: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
         minDifficulty: 1,
         safeIndex: 2,
         choices: [
             {
-                label: 'Free the prisoners',
-                description: 'A freed mage fights alongside you, and tends your wounds',
                 effects: { healParty: 0.2, npcChance: 1.0 },
-                logText: '{name} breaks the locks, the grateful captives rally to the party!',
             },
             {
-                label: 'Loot the cell block',
-                description: 'Guaranteed loot, but the alarm draws guards',
                 effects: { grantLoot: { type: 'realm_roll', mult: 1.5 }, spawnCombat: { countMult: 1.0 } },
-                logText: '{name} ransacks the confiscated belongings, boots pound down the corridor!',
             },
             {
-                label: 'Move on quietly',
-                description: 'Leave no trace',
                 effects: {},
-                logText: 'The party slips past the cells without a sound.',
             },
         ],
     },
     supply_line: {
-        text: 'A crusader supply cache sits stacked against the wall, barrels and crates marked for the front.',
         triggerChance: 0.3,
         realmFilter: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Torch the cache',
-                description: 'Cripple the Crusade so the next enemies are underequipped',
                 effects: { buffEnemies: { hpMult: 0.8 } },
-                logText: '{name} sets the supplies ablaze, the war effort staggers!',
             },
             {
-                label: 'Raid it quietly',
-                description: 'Take the best of it, and the next find is richer',
                 effects: { grantLoot: { type: 'realm_roll', mult: 1.0 }, nextLootRareMult: 2.0 },
-                logText: 'The party quietly strips the cache of anything valuable...',
             },
         ],
     },
     resonant_vein: {
-        text: 'A wall of humming crystal pulses in time with the party\'s heartbeat.',
         triggerChance: 0.3,
         realmFilter: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
         minDifficulty: 1,
         safeIndex: 2,
         choices: [
             {
-                label: 'Attune to the vein',
-                description: 'Draw out its energy for mana and crystal, but the shards may burst',
                 effects: { restoreMana: 0.4, grantLoot: { type: 'realm_roll', mult: 1.25 }, trapRisk: 0.3 },
-                logText: '{name} presses a palm to the resonating crystal...',
             },
             {
-                label: 'Chip away carefully',
-                description: 'A modest, safe harvest',
                 effects: { grantLoot: { type: 'realm_roll', mult: 0.75 } },
-                logText: 'The party carefully chisels loose a few clean shards.',
             },
             {
-                label: 'Leave it be',
-                description: 'The humming is unsettling',
                 effects: {},
-                logText: 'The party edges past the humming wall.',
             },
         ],
     },
     ancient_grove: {
-        text: 'A grove of ancient trees hangs heavy with fruit, but the air feels watchful.',
         triggerChance: 0.3,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Harvest aggressively',
-                description: 'Strip the grove bare, the roused grove-things grow fiercer',
                 effects: { grantLoot: { type: 'realm_roll', mult: 1.5 }, buffEnemies: { hpMult: 1.2 } },
-                logText: '{name} tears down armfuls of fruit as the branches groan in protest!',
             },
             {
-                label: 'Tend it respectfully',
-                description: 'Take only what is offered, and the grove restores you',
                 effects: { healParty: 0.2 },
-                logText: 'The party gathers gently, and the grove\'s calm settles their wounds.',
             },
         ],
     },
     unstable_experiment: {
-        text: 'An unlabeled vial bubbles on an abandoned workbench, its contents shifting color.',
         triggerChance: 0.25,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Drink it',
-                description: 'A gamble, vigor and mana, or a caustic backlash',
                 effects: { healParty: 0.25, restoreMana: 0.5, trapRisk: 0.5 },
-                logText: '{name} throws back the unknown draught...',
             },
             {
-                label: 'Pour it out',
-                description: 'Too risky to touch',
                 effects: {},
-                logText: 'The party carefully empties the vial onto the floor.',
             },
         ],
     },
     whispering_rift: {
-        text: 'A hairline rift in the air whispers promises of hidden riches.',
         triggerChance: 0.25,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Listen to the whispers',
-                description: 'Follow the voices to treasure, but they claw at your mind',
                 effects: { nextLootRareMult: 2.5, trapRisk: 0.4 },
-                logText: '{name} leans toward the rift, straining to catch the words...',
             },
             {
-                label: 'Steel your mind and resist',
-                description: 'Shut out the voices, and the focus steadies your reserves',
                 effects: { restoreMana: 0.25 },
-                logText: 'The party clamps hands over their ears and pushes on.',
             },
         ],
     },
     abandoned_campsite: {
-        text: 'The cold ashes of an old expedition camp offer a moment\'s respite.',
         triggerChance: 0.25,
         realmFilter: null,
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Rest a while',
-                description: 'Recover health and mana, but the camp may not be empty',
                 effects: { healParty: 0.2, restoreMana: 0.3, spawnCombat: { countMult: 0.5 } },
-                logText: 'The party stokes the embers and catches their breath...',
             },
             {
-                label: 'Scavenge and move on',
-                description: 'Grab what was left behind without lingering',
                 effects: { grantLoot: { type: 'realm_roll', mult: 0.75 } },
-                logText: 'The party picks over the abandoned camp for anything useful.',
             },
         ],
     },
     rival_expedition: {
-        text: 'Another expedition blocks the path ahead, eyeing your party warily.',
         triggerChance: 0.2,
         realmFilter: null,
         minDifficulty: 1,
         safeIndex: 2,
         choices: [
             {
-                label: 'Trade with them',
-                description: 'A peaceful exchange of goods',
                 effects: { grantLoot: { type: 'realm_roll', mult: 1.25 } },
-                logText: 'The two parties barter supplies before parting ways.',
             },
             {
-                label: 'Challenge them for their haul',
-                description: 'Fight for it, and the spoils go to the victor',
                 effects: { spawnCombat: { countMult: 1.0 }, grantLoot: { type: 'realm_roll', mult: 1.5 }, nextLootRareMult: 1.5 },
-                logText: 'Steel is drawn! The party moves to seize the rival\'s haul!',
             },
             {
-                label: 'Give them a wide berth',
-                description: 'Avoid the confrontation entirely',
                 effects: {},
-                logText: 'The party circles around and leaves the rivals behind.',
             },
         ],
     },
     bleeding_altar: {
-        text: 'An altar sits in the center of the chamber, still wet. It expects something.',
         triggerChance: 0.45,
         realmFilter: ['void_hollow', 'void_sanctum', 'void_heart'],
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Bleed on the altar',
-                description: 'One colonist takes 25 HP damage and becomes Void-Drained. Loot doubled.',
                 effects: { voidDrainedSacrifice: 25, nextLootRareMult: 2.0 },
-                logText: '{name} cuts their palm and bleeds onto the altar. It drinks deeply.',
             },
             {
-                label: 'Pass it by',
-                description: 'Leave the altar alone',
                 effects: {},
-                logText: 'The party avoids the altar\'s gaze and moves on.',
             },
             {
-                label: 'Leave an offering instead',
-                description: 'Crafting skill: sacrifice carried loot instead of HP',
                 effects: { sacrificeLootForAltarBless: true },
-                logText: '{name} reads the altar\'s runes carefully and makes a substitution.',
             },
         ],
     },
     brokers_table: {
-        text: 'A void entity leans over a stone table, studying you. It taps the table once.',
         triggerChance: 0.35,
         realmFilter: ['void_sanctum', 'void_heart'],
         minDifficulty: 1,
         safeIndex: 1,
         choices: [
             {
-                label: 'Accept the broker\'s offer',
-                description: 'Whole party takes 15% HP damage. One colonist\'s weapon gains +8 damage for this expedition.',
                 effects: { partyDamagePercent: 0.15, expeditionWeaponBuff: 8 },
-                logText: 'The broker reaches across the table. The exchange is brief and costs everyone something.',
             },
             {
-                label: 'Decline and fight',
-                description: 'Fight the broker as a combat encounter',
                 effects: { spawnCombat: { countMult: 1.0 } },
-                logText: 'The party refuses. The broker sighs and produces a weapon from somewhere.',
             },
         ],
     },
     fractured_portal: {
-        text: 'Three identical portals face the party. One leads forward, one loops back, one holds a cache.',
         triggerChance: 0.40,
         realmFilter: ['fracture_gate', 'shifting_labyrinth', 'unraveling_core'],
         minDifficulty: 1,
         safeIndex: 0,
         choices: [
             {
-                label: 'Read the patterns carefully',
-                description: 'Divination skill: correctly identify the forward portal',
                 effects: { healParty: 0.05, nextLootRareMult: 1.5 },
-                logText: '{name} reads the fracture patterns and leads the party through the right portal.',
             },
             {
-                label: 'Take the middle portal',
-                description: 'Guess — 33% chance of each outcome',
                 effects: { randomPortal: true },
-                logText: 'The party picks the middle portal and hopes for the best.',
             },
         ],
     },
 };
+stampLoc(EXPEDITION_DECISIONS, 'exp_decision');
 
 // Puzzle encounters.
 export const PUZZLE_ENCOUNTERS = {
     ancient_runes: {
-        text: 'Ancient runes cover a sealed door.',
         triggerWeight: 10,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         checks: [
             {
-                label: 'Decipher the runes',
                 requirement: { skill: 'research', minLevel: 7 },
                 traitBonus: ['scholar'],
-                success: { text: '{name} deciphers the runes, the door swings open!', reward: { type: 'bonus_loot', mult: 2.0 } },
-                failure: { text: '{name} triggers a ward, arcane backlash!', penalty: { type: 'damage', amount: [10, 20] } },
+                success: { reward: { type: 'bonus_loot', mult: 2.0 } },
+                failure: { penalty: { type: 'damage', amount: [10, 20] } },
             },
             {
-                label: 'Break through the door',
                 requirement: { skill: 'building', minLevel: 6 },
                 traitBonus: ['tough', 'sturdy'],
-                success: { text: '{name} smashes through, but alerts nearby enemies!', reward: { type: 'bonus_loot', mult: 1.0 }, penalty: { type: 'spawn_combat' } },
-                failure: { text: '{name} injures themselves on the reinforced door.', penalty: { type: 'damage', amount: [5, 15] } },
+                success: { reward: { type: 'bonus_loot', mult: 1.0 }, penalty: { type: 'spawn_combat' } },
+                failure: { penalty: { type: 'damage', amount: [5, 15] } },
             },
         ],
     },
     unstable_bridge: {
-        text: 'A crumbling bridge spans a dark chasm.',
         triggerWeight: 8,
         realmFilter: null,
         checks: [
             {
-                label: 'Carefully cross',
                 requirement: { traitAny: ['quick', 'lucky'] },
-                success: { text: 'The party nimbly crosses the bridge!', reward: { type: 'bonus_loot', mult: 1.5 } },
-                failure: { text: '{name} slips, the bridge collapses!', penalty: { type: 'damage_all', amount: [5, 10] } },
+                success: { reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { penalty: { type: 'damage_all', amount: [5, 10] } },
             },
             {
-                label: 'Find another way around',
                 requirement: null,
-                success: { text: 'The party finds another way around safely.', reward: null },
+                success: { reward: null },
                 failure: null,
             },
         ],
     },
     crystal_lock: {
-        text: 'A crystal-powered lock seals a vault door.',
         triggerWeight: 7,
         realmFilter: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
         checks: [
             {
-                label: 'Attune to the crystals',
                 requirement: { skill: 'research', minLevel: 6 },
                 traitBonus: ['scholar'],
-                success: { text: '{name} resonates with the crystal lock, it opens!', reward: { type: 'bonus_loot', mult: 2.5 } },
-                failure: { text: 'The crystal shatters, {name} is cut by the shards!', penalty: { type: 'damage', amount: [8, 16] } },
+                success: { reward: { type: 'bonus_loot', mult: 2.5 } },
+                failure: { penalty: { type: 'damage', amount: [8, 16] } },
             },
             {
-                label: 'Force the lock',
                 requirement: { skill: 'crafting', minLevel: 6 },
                 traitBonus: ['creative'],
-                success: { text: '{name} pries the lock open with finesse!', reward: { type: 'bonus_loot', mult: 1.5 } },
-                failure: { text: 'The mechanism jams, {name} strains a muscle.', penalty: { type: 'damage', amount: [3, 8] } },
+                success: { reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { penalty: { type: 'damage', amount: [3, 8] } },
             },
         ],
     },
     overgrown_path: {
-        text: 'Dense vegetation blocks the primary route.',
         triggerWeight: 8,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
         checks: [
             {
-                label: 'Clear a path with tools',
                 requirement: { skill: 'farming', minLevel: 6 },
                 traitBonus: ['green_thumb'],
-                success: { text: '{name} expertly clears the growth, uncovering a hidden cache!', reward: { type: 'bonus_loot', mult: 1.5 } },
-                failure: { text: 'Thorny vines lash back at {name}!', penalty: { type: 'damage', amount: [5, 12] } },
+                success: { reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { penalty: { type: 'damage', amount: [5, 12] } },
             },
             {
-                label: 'Push through',
                 requirement: null,
                 traitBonus: ['tough'],
-                success: { text: 'The party forces through, scratched but intact.', reward: null },
-                failure: { text: 'The vegetation fights back, everyone takes scratches.', penalty: { type: 'damage_all', amount: [3, 6] } },
+                success: { reward: null },
+                failure: { penalty: { type: 'damage_all', amount: [3, 6] } },
             },
         ],
     },
     barred_gate: {
-        text: 'A reinforced portcullis blocks the way, its winch mechanism locked tight.',
         triggerWeight: 8,
         realmFilter: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
         checks: [
             {
-                label: 'Force the winch',
                 requirement: { skill: 'building', minLevel: 7 },
                 traitBonus: ['tough', 'sturdy'],
-                success: { text: '{name} cranks the portcullis open by main strength!', reward: { type: 'bonus_loot', mult: 1.5 } },
-                failure: { text: 'The chain snaps back, {name} is struck, and the noise draws guards!', penalty: { type: 'spawn_combat' } },
+                success: { reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { penalty: { type: 'spawn_combat' } },
             },
             {
-                label: 'Pick the gate-lock',
                 requirement: { skill: 'research', minLevel: 8 },
                 traitBonus: ['scholar'],
-                success: { text: '{name} decodes the lock and raises the gate silently, the way beyond is rich!', reward: { type: 'bonus_loot', mult: 2.5 } },
-                failure: { text: 'A hidden ward triggers, arcane fire lashes {name}!', penalty: { type: 'damage', amount: [10, 20] } },
+                success: { reward: { type: 'bonus_loot', mult: 2.5 } },
+                failure: { penalty: { type: 'damage', amount: [10, 20] } },
             },
         ],
     },
     river_crossing: {
-        text: 'A swift underground river cuts across the path, too deep to wade.',
         triggerWeight: 8,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
         checks: [
             {
-                label: 'Fell timber and bridge it',
                 requirement: { skill: 'farming', minLevel: 6 },
                 traitBonus: ['green_thumb', 'tough'],
-                success: { text: '{name} lashes together a sturdy log bridge, and spots a cache on the far bank!', reward: { type: 'bonus_loot', mult: 1.5 } },
-                failure: { text: 'The logs give way, the party is swept against the rocks!', penalty: { type: 'damage_all', amount: [5, 10] } },
+                success: { reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { penalty: { type: 'damage_all', amount: [5, 10] } },
             },
             {
-                label: 'Ford the shallows',
                 requirement: { traitAny: ['quick', 'lucky'] },
-                success: { text: 'The party picks a nimble path across the shallows.', reward: null },
-                failure: { text: '{name} loses their footing in the current!', penalty: { type: 'damage', amount: [5, 12] } },
+                success: { reward: null },
+                failure: { penalty: { type: 'damage', amount: [5, 12] } },
             },
         ],
     },
     void_seal: {
-        text: 'A rift in the floor leaks void energy, its containment seal flickering.',
         triggerWeight: 7,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
         checks: [
             {
-                label: 'Reforge the seal',
                 requirement: { skill: 'research', minLevel: 7 },
                 traitBonus: ['scholar'],
-                success: { text: '{name} reweaves the containment glyphs, the rift sighs shut, disgorging its hoard!', reward: { type: 'bonus_loot', mult: 2.5 } },
-                failure: { text: 'The seal ruptures! Raw void energy scours the party!', penalty: { type: 'damage_all', amount: [8, 15] } },
+                success: { reward: { type: 'bonus_loot', mult: 2.5 } },
+                failure: { penalty: { type: 'damage_all', amount: [8, 15] } },
             },
             {
-                label: 'Wrench the anchor stone free',
                 requirement: { skill: 'building', minLevel: 7 },
                 traitBonus: ['tough', 'sturdy'],
-                success: { text: '{name} pries loose the anchor stone and collapses the rift by force!', reward: { type: 'bonus_loot', mult: 1.5 }, penalty: { type: 'spawn_combat' } },
-                failure: { text: 'The stone cracks and the rift lashes out at {name}!', penalty: { type: 'damage', amount: [10, 18] } },
+                success: { reward: { type: 'bonus_loot', mult: 1.5 }, penalty: { type: 'spawn_combat' } },
+                failure: { penalty: { type: 'damage', amount: [10, 18] } },
             },
         ],
     },
     collapsed_tunnel: {
-        text: 'A collapsed tunnel blocks the direct route forward.',
         triggerWeight: 8,
         realmFilter: null,
         checks: [
             {
-                label: 'Dig through the rubble',
                 requirement: { skill: 'building', minLevel: 6 },
                 traitBonus: ['tough', 'sturdy'],
-                success: { text: '{name} clears a passage, and uncovers something buried in the debris!', reward: { type: 'bonus_loot', mult: 1.5 } },
-                failure: { text: 'The rubble shifts and crashes down on {name}!', penalty: { type: 'damage', amount: [8, 16] } },
+                success: { reward: { type: 'bonus_loot', mult: 1.5 } },
+                failure: { penalty: { type: 'damage', amount: [8, 16] } },
             },
             {
-                label: 'Find a detour',
                 requirement: null,
-                success: { text: 'The party finds a longer way around.', reward: null },
+                success: { reward: null },
                 failure: null,
             },
         ],
     },
     price_ledger: {
-        name: 'The Price Ledger',
-        text: 'A ledger lies open on a stone counter. It lists what was taken from previous expeditions and the prices paid.',
         triggerWeight: 8,
         realmFilter: ['void_sanctum', 'void_heart'],
         checks: [
             {
-                label: 'Study the ledger entries',
-                description: 'Research skill reveals profitable patterns',
                 skill: 'research', minLevel: 5,
                 traitBonus: ['scholar'],
-                successText: '{name} reads the ledger and identifies unclaimed rewards!',
-                failText: '{name} triggers a binding ward in the ledger!',
             },
             {
-                label: 'Copy down the terms',
-                description: 'Crafting skill lets you document the agreements for advantage',
                 skill: 'crafting', minLevel: 4,
                 traitBonus: ['creative'],
-                successText: '{name} carefully copies the terms and extracts useful information!',
-                failText: '{name} misreads the ledger and triggers a void burst!',
             },
         ],
     },
     shifting_map: {
-        name: 'The Shifting Map',
-        text: 'A map on the wall shows the labyrinth, but it keeps changing while you look at it.',
         triggerWeight: 10,
         realmFilter: ['shifting_labyrinth', 'unraveling_core'],
         checks: [
             {
-                label: 'Read the underlying pattern',
-                description: 'Research skill sees past the changes',
                 skill: 'research', minLevel: 6,
                 traitBonus: ['scholar'],
-                successText: '{name} finds the constant beneath the change. The route ahead is clear!',
-                failText: '{name} tries to follow the map and becomes briefly turned around. Enemies ambush!',
             },
             {
-                label: 'Mark the walls physically',
-                description: 'Building skill lets you anchor stable reference points',
                 skill: 'building', minLevel: 5,
                 traitBonus: ['sturdy'],
-                successText: '{name} marks reference points throughout. Navigation improves for the rest of the expedition!',
-                failText: '{name} marks a wall, but the wall moves. The marks are useless.',
             },
         ],
     },
 };
+stampLoc(PUZZLE_ENCOUNTERS, 'puzzle');
 
 // NPC encounters.
 export const NPC_ENCOUNTERS = {
     wounded_traveler: {
-        name: 'Wounded Traveler',
-        lore: `A common traveler found in all parts of the world. They're always willing to chat with our explorers after getting offered a helping hand.`,
         sprite: 'npc_wounded_traveler',
-        text: 'A wounded traveler lies beside the path.',
         triggerWeight: 6,
         realmFilter: null,
         choices: [
             {
-                label: 'Heal them',
                 requirement: { spellAny: ['mend', 'renewal'] },
                 cost: { mana: 10 },
-                result: { text: '{name} heals the traveler, who offers a reward.', reward: { type: 'realm_roll', mult: 2.0 } },
+                result: { reward: { type: 'realm_roll', mult: 2.0 } },
             },
             {
-                label: 'Share supplies',
                 cost: { potionSlots: 1 },
-                result: { text: 'The traveler shares what they know of the realm.', reward: { type: 'reveal_encounters', count: 2 } },
+                result: { reward: { type: 'reveal_encounters', count: 2 } },
             },
             {
-                label: 'Leave them',
-                result: { text: 'The party passes by without stopping.' },
+                result: {  },
             },
         ],
     },
     mercenary: {
-        name: 'Mercenary',
-        lore: `A hardened sellsword found throughout the world. They are willing to fight in even the most dangerous places, for the right price.`,
         sprite: 'npc_mercenary',
-        text: 'A sellsword offers their blade, for a price.',
         triggerWeight: 4,
         realmFilter: null,
         choices: [
             {
-                label: 'Hire them',
                 cost: { loot: { resource: 'runite', amount: 3 } },
                 result: {
-                    text: 'The mercenary joins for the next 2 combats.',
-                    reward: { type: 'temp_ally', ally: { name: 'Mercenary', hp: 80, damage: 12, char: 'M', color: '#ccaa44', duration: 2, sprite: 'npc_mercenary' } },
+                    reward: { type: 'temp_ally', ally: { hp: 80, damage: 12, char: 'M', color: '#ccaa44', duration: 2, sprite: 'npc_mercenary' } },
                 },
             },
             {
-                label: 'Decline',
-                result: { text: 'The sellsword shrugs and disappears into the shadows.' },
+                result: {  },
             },
         ],
     },
     lost_scholar: {
-        name: 'Lost Scholar',
-        lore: `A scholar seemingly trapped in a haze within the university. His research is highly valuable for our community, but he never seems to remember our explorers when encountered and always insists on staying at the university despite its dangers.`,
         sprite: 'npc_lost_scholar',
-        text: 'A disoriented scholar clutches a bundle of notes.',
         triggerWeight: 5,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         choices: [
             {
-                label: 'Escort them to safety',
                 result: {
-                    text: 'The grateful scholar shares their research notes.',
                     reward: { type: 'bonus_loot', mult: 1.5 },
                 },
             },
             {
-                label: 'Trade supplies for notes',
                 cost: { potionSlots: 1 },
-                result: { text: 'You exchange a potion for valuable notes.', reward: { type: 'bonus_loot', mult: 2.0 } },
+                result: { reward: { type: 'bonus_loot', mult: 2.0 } },
             },
             {
-                label: 'Wish them luck',
-                result: { text: 'The scholar nods nervously and hurries away.' },
+                result: {  },
             },
         ],
     },
     shadow_merchant: {
-        name: 'Shadow Merchant',
-        lore: `A mysterious figure that appears in the shadows, offering deals that seem too good to be true.`,
         sprite: 'npc_shadow_merchant',
-        text: 'A cloaked figure materializes from the darkness, wares floating around them.',
         triggerWeight: 3,
         realmFilter: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
         choices: [
             {
-                label: 'Trade void essence for healing',
                 cost: { loot: { resource: 'void_essence', amount: 2 } },
-                result: { text: 'The merchant weaves void energy into restorative magic.', reward: { type: 'heal_party', amount: 0.3 } },
+                result: { reward: { type: 'heal_party', amount: 0.3 } },
             },
             {
-                label: 'Trade void essence for power',
                 cost: { loot: { resource: 'void_essence', amount: 3 } },
-                result: { text: 'The merchant imbues the party with dark strength.', reward: { type: 'buff_party', damageMult: 1.3, duration: 2 } },
+                result: { reward: { type: 'buff_party', damageMult: 1.3, duration: 2 } },
             },
             {
-                label: 'Decline',
-                result: { text: 'The figure fades back into the void.' },
+                result: {  },
             },
         ],
     },
     defecting_soldier: {
-        name: 'Defecting Soldier',
-        lore: `A young soldier who has grown disillusioned with the war and seeks refuge with the party. They're never able to find the courage to leave their home and truly join the colony, though no one can blame them for it.`,
         sprite: 'npc_defecting_soldier',
-        text: 'A young crusader lowers their blade. "I never wanted this war," they whisper.',
         triggerWeight: 5,
         realmFilter: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
         choices: [
             {
-                label: 'Take them in',
-                description: 'They know these halls, and fight at your side',
                 cost: { potionSlots: 1 },
                 result: {
-                    text: 'The soldier sheds their tabard and joins the party for the next 2 combats.',
-                    reward: { type: 'temp_ally', ally: { name: 'Defector', hp: 90, damage: 13, char: 'D', color: '#ccaa44', duration: 2, sprite: 'npc_defecting_soldier' } },
+                    reward: { type: 'temp_ally', ally: { hp: 90, damage: 13, char: 'D', color: '#ccaa44', duration: 2, sprite: 'npc_defecting_soldier' } },
                 },
             },
             {
-                label: 'Buy their intel',
-                description: 'They mark the safe routes ahead',
                 cost: { loot: { resource: 'gold', amount: 3 } },
-                result: { text: 'The soldier sketches the patrol routes before slipping away.', reward: { type: 'reveal_encounters', count: 3 } },
+                result: { reward: { type: 'reveal_encounters', count: 3 } },
             },
             {
-                label: 'Turn them away',
-                result: { text: 'The soldier nods grimly and melts back into the ranks.' },
+                result: {  },
             },
         ],
     },
     trapped_miner: {
-        name: 'Trapped Miner',
-        lore: `A miner who had been trapped in a cave-in within the crystal mines. They seem to be unrelated to the ancient miners that built the tunnels, but they have a good knowledge of the veins and passages in the mines. They are grateful for any help, sharing their knowledge or battling alongside our colonists for a time. They seem to always disappear after being rescued, often muttering about a shortcut home that they know. The colonists suspect that the miner must live somewhere inside the caverns and has no interest in leaving any time soon.`,
         sprite: 'npc_trapped_miner',
-        text: 'A muffled voice calls from behind a cave-in. A miner, pinned but alive.',
         triggerWeight: 5,
         realmFilter: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
         choices: [
             {
-                label: 'Dig them out',
-                description: 'The grateful miner takes up a pick at your side',
                 cost: { potionSlots: 1 },
                 result: {
-                    text: 'The freed miner hefts a pickaxe and joins the party for the next 2 combats.',
-                    reward: { type: 'temp_ally', ally: { name: 'Miner', hp: 85, damage: 11, char: 'M', color: '#88bbcc', duration: 2, sprite: 'npc_trapped_miner' } },
+                    reward: { type: 'temp_ally', ally: { hp: 85, damage: 11, char: 'M', color: '#88bbcc', duration: 2, sprite: 'npc_trapped_miner' } },
                 },
             },
             {
-                label: 'Ask about the tunnels',
-                description: 'They know where the veins run',
-                result: { text: 'The miner describes the passages ahead before crawling free.', reward: { type: 'reveal_encounters', count: 2 } },
+                result: { reward: { type: 'reveal_encounters', count: 2 } },
             },
             {
-                label: 'Leave them',
-                result: { text: 'The party moves on, the calls fading behind them.' },
+                result: {  },
             },
         ],
     },
     wandering_druid: {
-        name: 'Wandering Druid',
-        lore: `A druid found meditating in the depths of the verdant forests. This kind soul is always willing to share the gifts of the forest with those who show respect for the natural world. Our colonists find that our home-grown berries are often a welcome trade for the druid's blessing, seeing their healthy state as a sign of our stewardship.`,
         sprite: 'npc_wandering_druid',
-        text: 'A druid sits cross-legged among the roots, offering to share the forest\'s gifts.',
         triggerWeight: 5,
         realmFilter: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
         choices: [
             {
-                label: 'Trade berries for healing',
                 cost: { loot: { resource: 'berries', amount: 5 } },
-                result: { text: 'The druid weaves the berries into a restorative charm.', reward: { type: 'heal_party', amount: 0.3 } },
+                result: { reward: { type: 'heal_party', amount: 0.3 } },
             },
             {
-                label: 'Trade berries for a blessing',
                 cost: { loot: { resource: 'berries', amount: 8 } },
-                result: { text: 'The druid marks the party with a thorned sigil of strength.', reward: { type: 'buff_party', damageMult: 1.3, duration: 2 } },
+                result: { reward: { type: 'buff_party', damageMult: 1.3, duration: 2 } },
             },
             {
-                label: 'Wave them off',
-                result: { text: 'The druid smiles and returns to their meditation.' },
+                result: {  },
             },
         ],
     },
     spectral_professor: {
-        name: 'Spectral Professor',
-        lore: `A ghostly scholar who roams the halls of the ancient university. He adores a good riddle and will always stop our colonists to test their wits. Winners are rewarded with rare texts, while losers are left to ponder the riddle for their next visit.`,
         sprite: 'npc_spectral_professor',
-        text: 'A translucent scholar hovers by a lectern. "A riddle for a reward, if you please."',
         triggerWeight: 4,
         realmFilter: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         choices: [
             {
-                label: 'Answer the riddle',
-                description: 'Wager wits for a rich prize',
                 cost: { potionSlots: 1 },
-                result: { text: 'The professor beams, "Correct!", and gifts a bundle of rare texts.', reward: { type: 'bonus_loot', mult: 2.0 } },
+                result: { reward: { type: 'bonus_loot', mult: 2.0 } },
             },
             {
-                label: 'Ask for a hint about the halls',
-                result: { text: 'The professor gestures, and the layout of the rooms ahead swims into focus.', reward: { type: 'reveal_encounters', count: 3 } },
+                result: { reward: { type: 'reveal_encounters', count: 3 } },
             },
             {
-                label: 'Excuse yourselves',
-                result: { text: 'The professor sighs and drifts back to the lectern.' },
+                result: {  },
             },
         ],
     },
     strange_totem: {
-        name: 'Strange Totem',
-        lore: `A weathered totem found at a crossroads. It is said that those who leave offerings at its base are granted strength for the trials ahead, while those who take from it risk angering protective spirits.`,
         sprite: 'npc_strange_totem',
-        text: 'A weathered totem stands at a crossroads, a hollow at its base worn smooth by offerings.',
         triggerWeight: 4,
         realmFilter: null,
         choices: [
             {
-                label: 'Leave an offering',
-                description: 'Give up supplies for the totem\'s blessing of strength',
                 cost: { potionSlots: 1 },
-                result: { text: 'The totem\'s eyes glow, the party feels emboldened for the trials ahead.', reward: { type: 'buff_party', damageMult: 1.3, duration: 3 } },
+                result: { reward: { type: 'buff_party', damageMult: 1.3, duration: 3 } },
             },
             {
-                label: 'Pry loose its trinkets',
-                description: 'Take the offerings others left, a small, safe haul',
-                result: { text: 'The party pockets the trinkets wedged in the totem\'s hollow.', reward: { type: 'realm_roll', mult: 1.0 } },
+                result: { reward: { type: 'realm_roll', mult: 1.0 } },
             },
             {
-                label: 'Leave it undisturbed',
-                result: { text: 'The party bows their heads and passes the totem by.' },
+                result: {  },
             },
         ],
     },
 };
+stampLoc(NPC_ENCOUNTERS, 'npc');
 
 // Expedition potions.
 export const EXPEDITION_POTIONS = {
     health_potion: {
-        name: 'Health Potion', resource: 'health_potion',
+        resource: 'health_potion',
         maxCarry: 5, useCondition: 'combat',
         effect: { healTarget: 0.5 },
         autoUse: { hpThreshold: 0.3 },
-        logText: '{name} drinks a health potion!',
     },
     mana_potion: {
-        name: 'Mana Potion', resource: 'mana_potion',
+        resource: 'mana_potion',
         maxCarry: 5, useCondition: 'combat',
         effect: { restoreMana: 0.5 },
         autoUse: { manaThreshold: 0.2 },
-        logText: '{name} drinks a mana potion!',
     },
     antidote: {
-        name: 'Antidote', resource: 'antidote',
+        resource: 'antidote',
         maxCarry: 5, useCondition: 'any',
         effect: { clearDot: true },
         autoUse: { hasDot: true },
-        logText: '{name} drinks an antidote!',
     },
     battle_tonic: {
-        name: 'Battle Tonic', resource: 'battle_tonic',
+        resource: 'battle_tonic',
         maxCarry: 3, useCondition: 'combat',
         effect: { buffCombat: { attackSpeed: 0.3, critChance: 0.15, duration: 5 } },
         autoUse: { hpAbove: 0.7, onBoss: true },
-        logText: '{name} downs a battle tonic!',
     },
     smoke_draught: {
-        name: 'Smoke Draught', resource: 'smoke_draught',
+        resource: 'smoke_draught',
         maxCarry: 3, useCondition: 'combat',
         effect: { buffDefense: { dodgeChance: 0.35, duration: 5 } },
         autoUse: { hpThreshold: 0.7 },
-        logText: '{name} quaffs a smoke draught!',
     },
     lifesteal_elixir: {
-        name: 'Lifesteal Elixir', resource: 'lifesteal_elixir',
+        resource: 'lifesteal_elixir',
         maxCarry: 3, useCondition: 'combat',
         effect: { buffCombat: { hpOnKill: 25, duration: 5 } },
         autoUse: { anyMemberAtOrBelow: 0.4 },
-        logText: '{name} drinks a lifesteal elixir!',
     },
     loot_elixir: {
-        name: 'Loot Elixir', resource: 'loot_elixir',
+        resource: 'loot_elixir',
         maxCarry: 2, useCondition: 'entry',
         effect: { buffLoot: { lootMult: 1.5, rareEncounterMult: 1.4 } },
         autoUse: { onEntry: true },
-        logText: 'The party uncorks a loot elixir before diving in.',
     },
     rally_brew: {
-        name: 'Rally Brew', resource: 'rally_brew',
+        resource: 'rally_brew',
         maxCarry: 3, useCondition: 'combat',
         effect: { rallyParty: { healPercent: 0.2, clearSlow: true } },
         autoUse: { anyMemberSlowed: true },
-        logText: '{name} rallies the party with a brew!',
     },
     mana_surge: {
-        name: 'Mana Surge', resource: 'mana_surge',
+        resource: 'mana_surge',
         maxCarry: 4, useCondition: 'combat',
         effect: { restoreMana: 0.3, buffCombat: { spellCostReduction: 0.25, duration: 5 } },
         autoUse: { manaThreshold: 0.4, requiresMana: true },
-        logText: '{name} surges with arcane power!',
     },
 };
+stampLoc(EXPEDITION_POTIONS, 'exp_potion');
 
 export const POTION_CARRY_CONFIG = {
     packAnimalBonus: 2,
@@ -2550,42 +1814,31 @@ export const POTION_CARRY_CONFIG = {
 // Expedition mutators.
 export const EXPEDITION_MUTATORS = {
     dense_fog: {
-        name: 'Dense Fog',
-        description: '-20% accuracy for both sides, +30% loot',
         effects: { missChanceMod: 0.2, lootAmountMult: 1.3 },
         incompatible: [],
     },
     blood_moon: {
-        name: 'Blood Moon',
-        description: '+50% enemy damage, +50% rare loot',
         effects: { enemyDmgMult: 1.5, rareLootMult: 1.5 },
         incompatible: [],
     },
     veterans_march: {
-        name: "Veteran's March",
-        description: '-30% duration, +25% enemy HP',
         effects: { durationMult: 0.7, enemyHpMult: 1.25 },
         incompatible: [],
     },
     arcane_surge: {
-        name: 'Arcane Surge',
-        description: '+50% spell damage, enemies resist 20% physical',
         effects: { spellDamageMult: 1.5, enemyPhysicalResist: 0.2 },
         incompatible: [],
     },
     thorns_aura: {
-        name: 'Thorns Aura',
-        description: 'Enemies take 5 damage when they attack, +20% enemy HP',
         effects: { globalThorns: 5, enemyHpMult: 1.2 },
         incompatible: [],
     },
     packmasters_bounty: {
-        name: "Packmaster's Bounty",
-        description: '+2 loot per drop, -20% party damage',
         effects: { lootBonusFlat: 2, partyDamageMult: 0.8 },
         incompatible: [],
     },
 };
+stampLoc(EXPEDITION_MUTATORS, 'mutator');
 
 // Fatigue cooldowns.
 export const FATIGUE_CONFIG = {
@@ -2600,12 +1853,12 @@ export const STREAK_CONFIG = {
     historyLength: 10,
     sameRealmDiminishing: { 2: 0.9, 3: 0.75, 4: 0.6, 5: 0.5 },
     varietyBonus: {
-        name: 'Cartographer',
         uniqueRealmsForBonus: 3,
         lootMult: 1.25,
         rareLootMult: 1.5,
     },
 };
+stampLoc({ streak: STREAK_CONFIG }, 'config');
 
 // Expedition XP.
 export const EXPEDITION_XP_CONFIG = {
@@ -2663,54 +1916,43 @@ export const ANIMAL_XP_CONFIG = {
 // Realm events.
 export const REALM_EVENTS = {
     crystal_surge: {
-        name: 'Crystal Surge',
-        description: 'Double runite drops, +50% enemy HP',
         realms: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
         effects: { resourceMult: { runite: 2.0 }, enemyHpMult: 1.5 },
         duration: [2000, 4000],
         weight: 10,
     },
     void_tide: {
-        name: 'Void Tide',
-        description: 'Void essence +75%, enemies deal splash damage',
         realms: ['shadow_realm', 'void_abyss', 'oblivion_rift'],
         effects: { resourceMult: { void_essence: 1.75 }, enemyAoEChance: 0.15, enemyAoEDamage: [3, 6] },
         duration: [2500, 5000],
         weight: 8,
     },
     arcane_residue: {
-        name: 'Arcane Residue',
-        description: 'Mana regen doubled, +30% tome drops',
         realms: ['arcane_library', 'ancient_university', 'abandoned_laboratory'],
         effects: { manaRegenMult: 2.0, lootAmountMult: 1.3 },
         duration: [1500, 3000],
         weight: 8,
     },
     verdant_bloom: {
-        name: 'Verdant Bloom',
-        description: '+50% food drops, enemies regenerate',
         realms: ['verdant_depths', 'fungal_hollows', 'primeval_canopy'],
         effects: { resourceMult: { berries: 1.5, potatoes: 1.5, wheat: 1.5 }, enemyRegenPerRound: 0.03 },
         duration: [2000, 3500],
         weight: 8,
     },
     crusade_muster: {
-        name: 'Crusade Muster',
-        description: '+50% gold, +30% loot, but +40% enemy damage',
         realms: ['kingdom_outskirts', 'crusader_barracks', 'palace_fortress'],
         effects: { resourceMult: { gold: 1.5 }, lootAmountMult: 1.3, enemyDmgMult: 1.4 },
         duration: [2000, 4000],
         weight: 8,
     },
     seismic_tremor: {
-        name: 'Seismic Tremor',
-        description: '+75% stone and runite drops, but the unstable ground rocks the party',
         realms: ['crystal_caves', 'crystal_mines', 'crystal_depths'],
         effects: { resourceMult: { stone: 1.75, runite: 1.75 }, enemyAoEChance: 0.12, enemyAoEDamage: [2, 5] },
         duration: [1500, 3000],
         weight: 8,
     },
 };
+stampLoc(REALM_EVENTS, 'realm_event');
 
 export const REALM_EVENT_CONFIG = {
     checkInterval: 500,
@@ -2721,28 +1963,31 @@ export const REALM_EVENT_CONFIG = {
 // Bestiary.
 export const BESTIARY_CONFIG = {
     categories: {
-        regular: { name: 'Enemies', color: '#ff4444' },
-        elite: { name: 'Elites', color: '#ff8844' },
-        boss: { name: 'Bosses', color: '#ffcc44' },
-        npc: { name: 'Encounters', color: '#44ccff' },
+        regular: { color: '#ff4444' },
+        elite: { color: '#ff8844' },
+        boss: { color: '#ffcc44' },
+        npc: { color: '#44ccff' },
     },
     completionRewards: {
-        25: { type: 'loot_bonus', value: 1.05, description: '+5% expedition loot' },
-        50: { type: 'loot_bonus', value: 1.1, description: '+10% expedition loot' },
-        75: { type: 'rare_bonus', value: 1.15, description: '+15% rare finds' },
-        100: { type: 'title', value: 'Master Explorer', description: 'Bestiary complete!' },
+        25: { type: 'loot_bonus', value: 1.05 },
+        50: { type: 'loot_bonus', value: 1.1 },
+        75: { type: 'rare_bonus', value: 1.15 },
+        100: { type: 'title' },
     },
 };
+// `fields` is TEXT_FIELDS plus `value` (the title reward), spelled out because
+// extract-config.mjs reads stampLoc options as literals.
+stampLoc({ bestiary: BESTIARY_CONFIG }, 'config', { fields: ['name', 'description', 'desc', 'text', 'label', 'lore', 'title', 'summary', 'prefix', 'suffix', 'notification', 'message', 'detail', 'logMessage', 'logText', 'transitionText', 'armorText', 'successText', 'failText', 'approachText', 'defeatText', 'arrivalText', 'promptText', 'logAccept', 'logRefuse', 'flavor', 'flavour', 'tooltip', 'hint', 'displayName', 'subtitle', 'value'] });
 
 // Node map.
 export const NODE_MAP_CONFIG = {
     nodeTypes: {
-        combat:   { icon: '⚔', color: '#ff4444', label: 'Combat' },
-        loot:     { icon: '◆', color: '#ffcc44', label: 'Treasure' },
-        decision: { icon: '?', color: '#44ccff', label: 'Choice' },
-        puzzle:   { icon: '⊕', color: '#aa88ff', label: 'Puzzle' },
-        npc:      { icon: '☺', color: '#88ff88', label: 'NPC' },
-        boss:     { icon: '☠', color: '#ff8844', label: 'Boss' },
+        combat:   { icon: '⚔', color: '#ff4444' },
+        loot:     { icon: '◆', color: '#ffcc44' },
+        decision: { icon: '?', color: '#44ccff' },
+        puzzle:   { icon: '⊕', color: '#aa88ff' },
+        npc:      { icon: '☺', color: '#88ff88' },
+        boss:     { icon: '☠', color: '#ff8844' },
     },
     canvasHeight: 60,
     nodeRadius: 10,
@@ -2752,6 +1997,7 @@ export const NODE_MAP_CONFIG = {
     currentColor: '#ffffff',
     futureColor: '#444',
 };
+stampLoc({ node_map: NODE_MAP_CONFIG }, 'config');
 
 // Wave defense (void nexus) tuning. Used by waves.js.
 export const WAVE_CONFIG = {
@@ -2784,16 +2030,17 @@ export const WORLD_SIZE_COLONY = {
 // type 'realm_order': fires when any realm with chainOrder === order has been completed
 // type 'chains_completed': fires when countCompletedChains() >= count
 export const COLONY_MILESTONES = [
-    { key: 'wave_1',        label: 'Survive Wave 1',                  type: 'wave',            threshold: 1 },
-    { key: 'realm_order_1', label: 'Venture into a new realm',        type: 'realm_order',     order: 1 },
-    { key: 'wave_3',        label: 'Survive Wave 3',                  type: 'wave',            threshold: 3 },
-    { key: 'realm_order_2', label: 'Delve deeper into a realm chain', type: 'realm_order',     order: 2 },
-    { key: 'chain_1',       label: 'Conquer a full realm chain',     type: 'chains_completed', count: 1 },
-    { key: 'wave_6',        label: 'Survive Wave 6',                  type: 'wave',            threshold: 6 },
-    { key: 'chain_2',       label: 'Conquer two realm chains',       type: 'chains_completed', count: 2 },
-    { key: 'wave_9',        label: 'Survive Wave 9',                  type: 'wave',            threshold: 9 },
-    { key: 'chain_3',       label: 'Conquer three realm chains',     type: 'chains_completed', count: 3 },
+    { key: 'wave_1',        type: 'wave',            threshold: 1 },
+    { key: 'realm_order_1', type: 'realm_order',     order: 1 },
+    { key: 'wave_3',        type: 'wave',            threshold: 3 },
+    { key: 'realm_order_2', type: 'realm_order',     order: 2 },
+    { key: 'chain_1',       type: 'chains_completed', count: 1 },
+    { key: 'wave_6',        type: 'wave',            threshold: 6 },
+    { key: 'chain_2',       type: 'chains_completed', count: 2 },
+    { key: 'wave_9',        type: 'wave',            threshold: 9 },
+    { key: 'chain_3',       type: 'chains_completed', count: 3 },
 ];
+stampLoc(COLONY_MILESTONES, 'colony_milestone');
 
 // Returns how many full realm chains (all 3 chainOrder tiers present in completedRealms) have been completed.
 // The 'scouting' chain has only 1 realm and no boss, so it is excluded from the count.
@@ -2824,379 +2071,142 @@ export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
     first_building: {
         tab: 'colony',
-        title: 'First Foundation',
         trigger: 'first_building_placed',
-        text: `<img class="pixel-art" src="portraits/first_building.png" alt="A drawing depicting a brand new colony">
-        Your group has staked their claim in the wild frontier. Few others live in 
-        these parts, but you'll keep your doors open for traders and wanderers who 
-        stumble past.
-        <br><br>
-        With this seclusion you hope to build a thriving community while you wait out
-        the growing crusade in your homelands. Here we will be able to practice magic
-        freely and attempt to reclaim knowledge that's been lost to time.`,
     },
     colony_5: {
         tab: 'colony',
-        title: 'A Settlement Forms',
         trigger: 'colonist_count_5',
-        text: `<img class="pixel-art" src="portraits/colony_5.png" alt="A drawing depicting a small frontier settlement">
-        Your community is still small, but growth is steady. You anticipate more will
-        join as you advance your ability to harness magic. Until then, you do what you
-        can for those who've already made this colony their home.
-        <br><br>
-        Despite the progress, you still find yourself thinking back to The Crusade each 
-        night. One day you hope to bring your new friends back to the homes that were 
-        taken from them.`,
     },
     colony_10: {
         tab: 'colony',
-        title: 'A Thriving Community',
         trigger: 'colonist_count_10',
-        text: `<img class="pixel-art" src="portraits/colony_10.png" alt="A drawing depicting a thriving frontier community">
-        You think back to how this community began. We were small and scared, nearly
-        starving through our first winter. You've all grown much stronger, in body,
-        mind, and spirit. Your efforts to lead this community are paying off in spades.
-        <br><br>
-        You still have to keep pushing. The Crusade is looming on the horizon and your
-        community needs to be ready to face them when the time comes.`,
     },
     first_raid_survived: {
         tab: 'colony',
-        title: 'Into the Fire',
         trigger: 'first_raid_survived',
-        text: `<img class="pixel-art" src="portraits/first_raid_survived.png" alt="A drawing depicting raiders attacking a settlement">
-        Not all people are friendly out in the frontier. For every group of traders is 
-        a gang of raiders ready to take what they need by force.
-        <br><br>
-        Your small group has held off their attackers today, but you know there will be more
-        in the future. Though no one wants to fight their fellow man, many colonists 
-        admit that better weapons and armor would go a long way to make them feel safer.`,
     },
     first_crusader_raid_survived: {
         tab: 'colony',
-        title: 'Fie on Goodness',
         trigger: 'first_crusader_raid_survived',
-        text: `<img class="pixel-art" src="portraits/first_crusader_raid_survived.png" alt="A drawing depicting crusaders attacking the frontier">
-        You hadn't anticipated crusaders making it this deep into the frontier.
-        Thankfully you were prepared, pushing back the invaders for the time being.
-        <br><br>
-        Their presence shakes the whole colony. Rumors spread that greater forces will
-        be sent our way in the near future. We'll need to be prepared for anything.
-        <br><br>
-        It may even be time to use our progress to slow down the crusade. Perhaps we
-        could open a rift right into the heart of the kingdom and cut off their supplies
-        from there? The dangers will be colossal, but we'll do what we must to keep our
-        frontier safe.`,
     },
     first_mental_break: {
         tab: 'colony',
-        title: 'The Breaking Point',
         trigger: 'first_mental_break',
-        text: `
-        Today a colonist has lost control of themselves. We all knew that life on the
-        frontier would be difficult, but the constant toil is often too much to bear.
-        <br><br>
-        Perhaps we can find ways to keep everyone happy? Better sleeping quarters
-        and consistent access to cooked food is a good starting point.`,
     },
     first_death: {
         tab: 'colony',
-        title: 'The First Marker',
         trigger: 'first_colonist_death',
-        text: `<img class="pixel-art" src="portraits/first_death.png" alt="A drawing depicting a grave marker on the frontier">
-        Today a colonist has died. This will take a major toll on the friends they've
-        made over their time here. Another may one day take their place in the colony,
-        but this loss will be felt for a very long time.
-        <br><br>
-        We'll do what we can to keep the remaining colonists safe. Fight in groups, always
-        wear armor, try out ranged weapons, and keep an abundant supply of healing potions.`,
     },
     first_tame: {
         tab: 'colony',
-        title: 'Kindred Spirits',
         trigger: 'first_animal_tamed',
-        text: `
-        The Binding Circle was a huge success! Your colony's first animal companion
-        has joined the flock and now lives among us. This animal will provide a lot
-        to our community as long as we care for it properly.`,
     },
     first_trade: {
         tab: 'colony',
-        title: 'Wandering Traders',
         trigger: 'first_trade_completed',
-        text: `
-        The trader was one of the first friendly faces your colonists had seen in some
-        time. They were excited by all of the trader's goods, but such luxuries would
-        remain out of reach for some time.`,
     },
     first_spell: {
         tab: 'colony',
-        title: 'The Spark of Magic',
         trigger: 'first_spell_cast',
-        text: `
-        One of your colonists cast their first spell. Whether innate or learned, you 
-        are excited by the results. You plan to write more tomes and help everyone 
-        get to the point where they can cast their very own spells for the first time.`,
     },
     first_friend: {
         tab: 'colony',
-        title: 'Friendly Neighbors',
         trigger: 'first_friend_made',
-        text: `
-        Some of your colonists have become fast friends. You see these two chatting 
-        often, keeping each other sane during these unstable times.`,
     },
     first_love: {
         tab: 'colony',
-        title: 'Love on the Frontier',
         trigger: 'first_lover_made',
-        text: `<img class="pixel-art" src="portraits/first_love.png" alt="A drawing depicting two colonists in love">
-        You overheard some talks of romance among the colonists. It's beautiful to 
-        think that they're able to find love so far from home. You can only hope that 
-        this relationship helps these two weather the tribulations of The Frontier.`,
     },
     first_winter_feast: {
         tab: 'colony',
-        title: 'Winter Celebration',
         trigger: 'first_winter_feast',
-        text: `<img class="pixel-art" src="portraits/first_winter_feast.png" alt="A drawing depicting colonists gathered for a winter feast">
-        Winter has arrived and the colony is feeling optimistic. By the first frost
-        we were able to secure plenty of food to last through the season. In their
-        excitement, the colonists proposed a feast to celebrate their hard work.
-        <br><br>
-        The Winter Feast is a common tradition throughout the world, though everyone 
-        celebrates it differently. What all could agree on was coming together in the 
-        warmth of the town hall, fires stoked high.
-        <br><br>
-        For one night the harsh winter chill was felt by no one. In lieu of traditional 
-        foods, the colonists shared a meal of roasted vegetables, fresh bread, and a 
-        hearty stew. The meal was simple and made with care.
-        <br><br>
-        The whole feast was over in a matter of hours, but the memories will last a 
-        lifetime. This group of strangers will continue to weather the cold together.`,
     },
     first_wave_complete: {
         tab: 'colony',
-        title: 'Horrors from the Void',
         trigger: 'first_wave_completed',
-        text: `<img class="pixel-art" src="portraits/first_wave_complete.png" alt="A drawing depicting void creatures pouring from a rift">
-        It was horrifying, but opening these rifts may just be a worthwhile endeavour. 
-        Your colonists held fast against the horde of fleshy monsters that poured from 
-        the portals, finding time to harvest a shadowy material from beyond the rift.
-        <br><br>
-        Some of the colonists have turned to calling this material <i>Void Essence</i> 
-        which was only fitting for something taken from such unnatural creatures. Your 
-        initial tests show that this essence will be of great use to the colony, but it 
-        seems that the only way to get it is to re-open the rifts to this terrifying place.
-        <br><br>
-        You ponder the dangers, afraid that the only way forward is to once again invite 
-        these monsters into your home. Perhaps with enough study the essence will give 
-        your colonists what they need to face these beasts with confidence.`,
     },
     // -----------------------------------------------------------------------
     // Research tab: knowledge and technology discoveries
     // -----------------------------------------------------------------------
     research_runecraft: {
         tab: 'research',
-        title: 'Runecraft',
         trigger: 'research_runecraft',
-        text: `
-        Runes are the main way to channel magical energies into equipment. Though 
-        a metal sword may be stronger than a stone, a stone with the right rune engraved 
-        into it might just turn the tide.
-        <br><br>
-        You're certain that runes will be used in all sorts of equipment and workstations 
-        going forward, so giving your colonists a good understanding of the fundamentals 
-        is a must.`,
     },
     research_beast_binding: {
         tab: 'research',
-        title: 'Beast Binding',
         trigger: 'research_beast_binding',
-        text: `
-        The ancient Ferini were known for their perfection of beast binding, but those
-        arts are largely lost to you. Using the Binding Circle you are able to salvage  
-        a portion of that art and work alongside the wildlife of the frontier.
-        <br><br>
-        As you practice this art you wonder what else the Ferini knew that you'll have 
-        to rediscover.`,
     },
     research_ley_channeling: {
         tab: 'research',
-        title: 'Ley Channeling',
         trigger: 'research_ley_channeling',
-        text: `
-        These lands are rich in untapped leylines full of magical energies. 
-        Tapping into that energy is a top priority. Using your knowledge of runes, you 
-        develop engraved crystals that will help spread magical energies throughout 
-        your colony.`,
     },
     research_arcane_studies: {
         tab: 'research',
-        title: 'Arcane Studies',
         trigger: 'research_arcane_studies',
-        text: `
-        You find that your colonists are quickly outgrowing the simple tomes
-        they create in the workshop. Perhaps this knowledge will satisfy their desire
-        to learn.`,
     },
     research_void_summoning: {
         tab: 'research',
-        title: 'Unstable Rifts',
         trigger: 'research_void_summoning',
-        text: `
-        Progress in your colony has rapidly slowed. Perhaps it's time to seek 
-        something new to continue your growth. Using your knowledge of rifts, you think 
-        you may have found a way to tap into the void itself without ever having to 
-        leave your realm. The solution: summon it directly to you.`,
     },
     research_planar_rift: {
         tab: 'research',
-        title: 'Planar Rifts',
         trigger: 'research_planar_rift',
-        text: `
-        While you find great success opening rifts to your colony, you wonder
-        what may lie beyond these portals. You quickly find a way to maintain a rift
-        to other realms for your colonists to explore, though it'll take a toll on your
-        mana reserves.`,
     },
     research_deep_delving: {
         tab: 'research',
-        title: 'Deep Delving',
         trigger: 'anchor_shadow',
-        text: `
-        In spite of the dangers you find yourself sending colonists deeper into
-        these hostile realms. The deeper they go the greater the rewards become, but
-        how will we keep up with the dangers ahead?`,
     },
     research_golem_craft: {
         tab: 'research',
-        title: 'Golem Craft',
         trigger: 'research_golem_craft',
-        text: `
-        Soon your first golem will be up and running, but what do you want them to
-        do? Maybe it can act as a beast of burden, taking on the menial labor your
-        colonists have been putting in for all these years. It's really too bad a
-        single golem can't do everything.`,
     },
     research_herbalism: {
         tab: 'research',
-        title: 'Herbalism',
         trigger: 'research_herbalism',
-        text: `
-        You're quickly feeling more in-tune with the plants of the Frontier. With
-        the right care you think your crops will be able to handle much harsher
-        conditions going forward.`,
     },
     research_void_architecture: {
         tab: 'research',
-        title: 'Void Architecture',
         trigger: 'research_void_architecture',
-        text: `
-        Your colony has found even more uses for the void essence you collect. By
-        hardening our walls and doors with the stuff we'll be able to hold off large
-        groups of enemies with ease.`,
     },
     research_mana_reservoir: {
         tab: 'research',
-        title: 'Mana Reservoir',
         trigger: 'research_mana_reservoir',
-        text: `
-        Your mana reserves have been stretched thin, so it's time to innovate.
-        With some runic tinkering you're able to get more juice out of each mana
-        crystal. Your colonists will be pleased to know that the energy problem
-        is solved for now.`,
     },
     research_alchemy: {
         tab: 'research',
-        title: 'Alchemy',
         trigger: 'research_alchemy',
-        text: `
-        Who would've guessed that your crops would have more uses than just
-        cooking? You excitedly write up recipes for potions based on each plant's
-        properties.`,
     },
     research_trade_routes: {
         tab: 'research',
-        title: 'Trade Routes',
         trigger: 'research_trade_routes',
-        text: `
-        You've learned from your encounters with traders in the past. You know 
-        what they like, what they don't, and how to push them towards better deals. 
-        Beyond that your community has become better known and has been included 
-        as an important stop on the major trade routes in the frontier.`,
     },
     research_arcane_infusion: {
         tab: 'research',
-        title: 'Arcane Infusion',
         trigger: 'research_arcane_infusion',
-        text: `
-        Your colony can now create their first Enchanting Table. You're excited
-        about the possibilities this brings, letting you start enchanting your
-        existing equipment to further boost your colonists.`,
     },
     research_warding: {
         tab: 'research',
-        title: 'Warding',
         trigger: 'research_warding',
-        text: `
-        Your first ward: The Arcane Sentinel.
-        <br><br>
-        For only a small amount of mana you can properly protect your colony 
-        from attacks. You feel that this will come in handy if your colony 
-        ever decides to open their gates to dangerous enemies.`,
     },
     research_void_forging: {
         tab: 'research',
-        title: 'Void Forging',
         trigger: 'research_void_forging',
-        text: `
-        Harnessing void essence to its full potential, you can now create equipment 
-        to rival the weaponry of the far off crusaders. It'll be difficult to find 
-        enough of this material to supply your entire colony, but it's not impossible.`,
     },
     research_masterwork: {
         tab: 'research',
-        title: 'Masterwork',
         trigger: 'research_masterwork',
-        text: `
-        Your colonists have become masters at their craft. Your equipment is of pristine 
-        quality and even distant traders struggle to offer you anything you couldn't 
-        simply make for yourself.`,
     },
     research_advanced_arcana: {
         tab: 'research',
-        title: 'Advanced Arcana',
         trigger: 'research_advanced_arcana',
-        text: `
-        Your community is learning quickly with the help of your tomes. You discover more 
-        magical spells and put them to paper for your colonists to grow even further.`,
     },
     research_mana_weaving: {
         tab: 'research',
-        title: 'Mana Weaving',
         trigger: 'research_mana_weaving',
-        text: `
-        Many of your colonists complain about the weight of their metal armors and the 
-        toll they take on their ability to control their mana flow. You've come up with 
-        a clever solution by infusing lighter fabric with pure mana, increasing their 
-        protective capabilities tenfold.
-        <br><br>
-        While not quite as protective as runite plates, these robes get the job done. 
-        As a bonus they even help the wearer with their own mana control, boosting their 
-        magical abilities.`,
     },
     research_void_sorcery: {
         tab: 'research',
-        title: 'Void Sorcery',
         trigger: 'research_void_sorcery',
-        text: `
-        While some focus on the brute strength of swords and clubs, 
-        you find yourself pondering more delicate options. By manipulating void essence 
-        in just the right way, you can use it to enhance a colonist's magical abilities.
-        <br><br>
-        Whether using a wand, stave, or dagger, you know these powerful casters will 
-        accomplish great things for their colony going forward.`,
     },
 
     // -----------------------------------------------------------------------
@@ -3204,164 +2214,23 @@ export const STORY_MILESTONES = {
     // -----------------------------------------------------------------------
     first_bufos_colonist: {
         tab: 'races',
-        title: 'The Bufoi',
         trigger: 'first_bufos_colonist_arrived',
-        text: `<img class="pixel-art" src="portraits/bufoi.png" alt="A drawing depicting the Bufoi">
-        A foreign presence in the world. The Bufoi are a group of people that resemble 
-        frogs, salamanders, or even occasionally fish, but with a more human-like body plan.
-        They are by far the furthest removed group of people from the other races, with humans 
-        having little understanding of how the bufoi live their lives. Some even go as far 
-        as assuming the bufoi are not truly intelligent beings, though anyone who's lived among 
-        them knows that this is preposterous.
-        <br><br>
-        Despite not being inherently magical beings themselves, the bufoi still found their 
-        communities targeted by the spreading Crusade. Flushed from their homes and forced to 
-        move downstream, into the far reaches of The Frontier. While the newly formed communities 
-        there are willing to take in these bufoi, their strange behaviors are quickly seen in full.
-        <br><br>
-        It is unclear if the bufoi are amphibious, like the animals they resemble. Regardless, 
-        it is well known that they tend to live near fresh water sources like rivers and 
-        lakes. Their society is often viewed as the most foreign part about them, even moreso 
-        than their physical appearance. For example, their courtship traditions are known to 
-        confuse and often frighten humans who find themselves in the wrong place at the wrong 
-        time. Despite these differences, the bufoi have had little trouble fitting in among 
-        communities in The Frontier. Some may find it odd when they spend their leisure time 
-        soaking in nearby rivers or fall asleep at odd hours of the day, but their friendly 
-        nature tends to make them seem normal among their community of outcasts. So friendly 
-        in fact that rumors have begun to spread of a bufos finding his true love among the 
-        ferini people.
-        <br><br>
-        It can often be difficult to guess how a bufos is feeling, but overall, much like
-        the ferini, they always seem content living in the far off parts of The Frontier. They 
-        almost always enjoy life among their newly found community and seem to take great joy 
-        in teaching their interested neighbors about their people.`,
     },
     first_kobalos_colonist: {
         tab: 'races',
-        title: 'The Kobaloi',
         trigger: 'first_kobalos_colonist_arrived',
-        text: `<img class="pixel-art" src="portraits/kobaloi.png" alt="A drawing depicting the Kobaloi">
-        A roguish people known for their bright chromatic skin tones and ears as wide as 
-        their own heads. For most humans, the kobaloi are best known for their depictions 
-        in myths and stories. For them, a kobalos is a mischievous figure that's as likely 
-        to pull a prank on you as they are to eat you whole, especially if you're a child 
-        exploring the woods all alone.
-        <br><br>
-        In spite of these stories, the kobaloi are a rather peaceful people. Embodying the idea 
-        that it takes a village to raise a child, they take any opportunity to help their community.
-        It is clear that they take great pride in their large families and friendly neighbors.
-        <br><br>
-        The human kingdoms refused to see this reality and it was only a matter of time before The 
-        Crusade made its way to the kobaloi's doors. They defended their communities fiercely, with
-        several groups of kobaloi continuing to fight back against the Crusaders today. While lacking 
-        in numbers compared to their attackers, they make great use of their knack for tricks by leading
-        groups of Crusaders into traps and winning battles through ambush tactics.
-        <br><br>
-        The many kobaloi who were unable to continue fighting found themselves pushed deep into The 
-        Frontier. Their once thriving communities were shattered and each individual is left to pick 
-        up the pieces. It wasn't long before many new communities were established, often consisting 
-        of complete strangers. These kobaloi continue to be protective of their community, regardless 
-        of how different their new neighbors might be.`,
     },
     first_ferin_colonist: {
         tab: 'races',
-        title: 'The Ferini',
         trigger: 'first_ferin_colonist_arrived',
-        text: `<img class="pixel-art" src="portraits/ferini.png" alt="A drawing depicting the Ferini">
-        A people with a strong connection to the wilderness. The ferini have always found 
-        themselves on the outskirts of society, living among themselves and the animals they 
-        befriend in far off lands. The Frontier is comfortable for the ferini, acting as many 
-        communities' home for years already.
-        <br><br>
-        The ferini largely live their lives unseen by other groups of people, content to 
-        live among their own and let the land provide for them all that they need. Ferini 
-        communities tend to differ a lot between one another, with some making their homes 
-        in steep mountains among the goats, others with deer in the woods, all sharing 
-        a reverence for nature.
-        <br><br>
-        This deep understanding of nature has manifested in the ferini through gifts from 
-        the world. They find themselves gifted with traits much like the animals they live 
-        among and the ability to communicate directly with the wild things around them. The 
-        few humans who are aware of the ferini outside of myths treat these gifts as curses, 
-        shunning the ferini from human society completely.
-        <br><br>
-        As The Crusade spreads, the ferini find their homes encroached upon by fearful humans. 
-        To keep themselves safe they've moved deeper into The Frontier, further from the 
-        homes they've grown alongside. They hope to one day return to these homes regardless 
-        of the damage the Crusaders continue to inflict upon the land. For the time 
-        being they find themselves joining new settlements, helping their small communities 
-        of strangers work alongside the unfamiliar nature that surrounds them.`,
     },
     first_nymph_colonist: {
         tab: 'races',
-        title: 'The Nympha',
         trigger: 'first_nymph_colonist_arrived',
-        text: `<img class="pixel-art" src="portraits/nympha.png" alt="A drawing depicting the Nympha">
-        A secretive presence throughout recorded history. The nympha are a group of very 
-        few, with their hidden communities making them appear even smaller to those unfamiliar 
-        with their communities. Living among forest canopies, the nympha are truly one with 
-        the magic of the world they live in. Just as the world has become less magical, the 
-        nympha have dropped in number, being only a small fraction of what they used to be.
-        <br><br>
-        Among modern humans the visage of the nympha brings to mind long standing fears 
-        of the unknown, seeing them as symbols of the wicked magic that they've been raised to 
-        distrust. One reason often cited for their fears is the nympha's uncanny appearance, 
-        with many sightings by humans describing their beauty being otherworldly. Some even 
-        fear that nympha may be able to live silently among their communities, acting as a 
-        curse upon their friends and family.
-        <br><br>
-        In the far past it was not uncommon to see a nymph working alongside humans. While not 
-        quite as physically capable as the average human farmhand, the nympha used their magic 
-        creatively to bridge the gap. Nympha were sought after by many among humanity's most 
-        powerful at that time, making use of the nympha's many talents. It was not uncommon to 
-        see a nympha employed as bookkeepers, court magicians, or even concubines. 
-        Some especially long-lived nympha have fond memories of their time among humans. 
-        These nympha still hold out hope for humanity, taking in the exiles that wander 
-        into The Frontier.
-        <br><br>
-        The many humans that continue to fear the nympha continue to drive them further from 
-        their homes in the woods outside of the human kingdoms. The Frontier remains one of the 
-        only safe havens for these people, letting them rebuild their communities that were 
-        shaken by The Crusade.`,
     },
     first_human_colonist: {
         tab: 'races',
-        title: 'Humanity',
         trigger: 'first_human_colonist_arrived',
-        text: `<img class="pixel-art" src="portraits/humanity.png" alt="A drawing depicting Humanity">
-        A dominating presence in the world. Humanity makes up the largest portion of the 
-        known world, living in kingdoms that span huge swaths of land. Known for their 
-        strict rules and social boundaries, humans tend to have a skewed perception of 
-        the world outside of their borders that fails to conform to their requirements.
-        <br><br>
-        With these codes of conduct came an air of superiority over the other. This arrogance 
-        has led the kingdoms to outlaw magic completely, along with those who are born 
-        with it. Their passion to enforce their rules has culminated in The Crusade, an 
-        attempt by humanity to rid their world of magic completely.
-        <br><br>
-        Nearly all of the kingdoms throughout the realm have pushed aside their grudges 
-        to work together on this common goal. It has been rather easy to convince the 
-        people under these rulers to contribute to the cause, with many being taught from 
-        a young age to be fearful of the other. With the ever expanding Crusade on their 
-        heels, most magical races have gone into hiding deep within The Frontier, where 
-        no kingdom has claimed as its own.
-        <br><br>
-        While all Crusaders are human, not all humans are supportive of their actions. 
-        Some remember happier times where they had toiled alongside magical beings. Some 
-        simply remain unconvinced that further eradication is necessary now that these 
-        beings have fled into hiding. Speaking out against The Crusade is forbidden, with 
-        those accused of such actions often finding themselves among those they tried to 
-        defend in The Frontier. Thankfully these humans are welcomed into their new 
-        communities with open arms.
-        <br><br>
-        Humans tend to be very unique from one another, often being some of the first 
-        people to pick up a new skill if they have enough interest in it. With enough 
-        effort any human can become a valuable asset to their community. Interestingly 
-        humans have no issues learning how to control magic and cast spells despite 
-        their lack of innate magical gifts. Truly humans are capable of anything as long 
-        as they have the right support from those around them.
-        <br><br>
-        We can only hope that these kinder humans are able to prosper.`,
     },
     // -----------------------------------------------------------------------
     // Realms tab: exploration journals from other worlds
@@ -3369,350 +2238,142 @@ export const STORY_MILESTONES = {
     realm_wild_frontiers: {
         tab: 'realms',
         realmGroup: 'The Wild Frontiers',
-        title: 'The Wild Frontiers',
         trigger: 'realm_wild_frontiers',
-        text: `<img class="pixel-art" src="portraits/realm_wild_frontiers.png" alt="A drawing depicting the Wild Frontiers">
-        The Wild Frontiers are a vast expanse of untamed wilderness that lie just beyond the 
-        borders of your colony. This made it an enticing place to explore, especially as colony 
-        resources ran low.
-        <br><br>
-        You anticipated that the wilds would be dangerous and prepared accordingly. You and a small team 
-        of colonists began your trek into the woods, bags packed with essential supplies and weaponry. 
-        It was only a short walk before you found yourself almost lost in the dense forest, trees towering 
-        high above you and nearly blocking out the sun. These woods were loud with wildlife, overwhelming 
-        your senses with the sounds of birds singing and critters scurrying at your approach.
-        <br><br>
-        Just as you began to feel comfortable with all of the noise, the woods suddenly went completely silent. 
-        Your team stopped in their tracks, unsure of what may have happened to scare all of these animals. Just 
-        as quickly your team found themselves surrounded on all sides by a gang of bandits armed with spears and 
-        bows. It was an ambush!
-        <br><br>
-        It was a close fight, but your team was able to fend off the attackers, though a handful of the 
-        bandits managed to escape into the woods. You collect what you can from the fallen bandits and 
-        return to the colony to treat your wounds. You now know that the Wild Frontiers are not a place 
-        to be taken lightly. Your expedition team will be more cautious from here on out.`,
     },
     realm_verdant_depths: {
         tab: 'realms',
         realmGroup: 'Verdant Wilds',
-        title: 'Verdant Depths',
         trigger: 'realm_verdant_depths',
-        text: `<img class="pixel-art" src="portraits/realm_verdant_depths.png" alt="A drawing depicting the Verdant Depths">TODO: Write lore text for exploring the Verdant Depths.`,
     },
     realm_fungal_hollows: {
         tab: 'realms',
         realmGroup: 'Verdant Wilds',
-        title: 'Fungal Hollows',
         trigger: 'realm_fungal_hollows',
-        text: `<img class="pixel-art" src="portraits/realm_fungal_hollows.png" alt="A drawing depicting the Fungal Hollows">TODO: Write lore text for exploring the Fungal Hollows.`,
     },
     realm_primeval_canopy: {
         tab: 'realms',
         realmGroup: 'Verdant Wilds',
-        title: 'Primeval Canopy',
         trigger: 'realm_primeval_canopy',
-        text: `<img class="pixel-art" src="portraits/realm_primeval_canopy.png" alt="A drawing depicting the Primeval Canopy">TODO: Write lore text for exploring the Primeval Canopy.`,
     },
     realm_crystal_caves: {
         tab: 'realms',
         realmGroup: 'Crystal Caverns',
-        title: 'Crystal Caves',
         trigger: 'realm_crystal_caves',
-        text: `<img class="pixel-art" src="portraits/realm_crystal_caves.png" alt="A drawing depicting the Crystal Caves">
-        You tore open a rift between your colony and a distant land. Without practice you 
-        had little control over just where this hole in space would open. Thankfully you 
-        were greeted by a large cavern lined with beautiful translucent crystals.
-        <br><br>
-        After making sure the rift would stay open long enough to allow for exploration, 
-        you and a small team of colonists ventured into this unknown cave. The crystals 
-        provided ample light for navigation, their faint glow giving you a sense of safety 
-        in this unfamiliar place.
-        <br><br>
-        Despite this feeling you still found the quietness of the cavern off-putting. You 
-        had hoped to hear a bat fly by or some insects scuttle to their hiding places, but
-        instead you were met with only the sound of your own footsteps echoing through the
-        dimly lit cave.
-        <br><br>
-        In the silence you collected stray rocks and crystal samples to bring back to 
-        the colony. Sadly it seemed that this cave didn't have a lot to offer you, but
-        you continued on your march regardless.
-        <br><br>
-        As you continued to walk you noticed the cave walls slowly closing in to a tight 
-        opening. It was easy enough to crawl through the opening as you entered into a deep 
-        hallway-like passage. Suddenly you heard something different coming from the end of
-        the hallway. The sounds of quick footsteps making their way toward you, four feet 
-        moving efficiently through the tight corridor.
-        <br><br>
-        You stood ready to face the creature, not knowing what you expected to see. Your 
-        curiosity was answered when the monster stepped into your line of sight, glowing 
-        with the same dim light as the crystals throughout the cave system. The dim light 
-        made it hard to parse the being's exact features, looking almost like a wolf or a
-        wild cat. As it moved closer it became clear that its glow came from crystals of its 
-        own that seemed to be embedded into its body.
-        <br><br>
-        With some quick thinking you were able to drive the creature away by throwing loose 
-        stones and scraping your weapon against the cave walls. You pursued the creature in 
-        hopes of driving it further from the safe portion of the cavern you've already explored. 
-        While you ran as fast as you could, it was still able to out pace you, disappearing into 
-        the darkness of the cave tunnels.
-        <br><br>
-        As you caught your breath you took a moment to look around your new surroundings. A 
-        wooden plank held up against the tunnel wall caught your attention. Clearly someone 
-        was here before you. You noted down this finding as you walked back towards the open 
-        rift. Maybe there will be something useful to find deep within these caves after all?
-        `,
     },
     realm_crystal_mines: {
         tab: 'realms',
         realmGroup: 'Crystal Caverns',
-        title: 'Crystal Mines',
         trigger: 'realm_crystal_mines',
-        text: `<img class="pixel-art" src="portraits/realm_crystal_mines.png" alt="A drawing depicting the Crystal Mines">TODO: Write lore text for exploring the Crystal Mines.`,
     },
     realm_crystal_depths: {
         tab: 'realms',
         realmGroup: 'Crystal Caverns',
-        title: 'Crystal Depths',
         trigger: 'realm_crystal_depths',
-        text: `<img class="pixel-art" src="portraits/realm_crystal_depths.png" alt="A drawing depicting the Crystal Depths">TODO: Write lore text for exploring the Crystal Depths.`,
     },
     realm_arcane_library: {
         tab: 'realms',
         realmGroup: 'University Ruins',
-        title: 'Arcane Library',
         trigger: 'realm_arcane_library',
-        text: `<img class="pixel-art" src="portraits/realm_arcane_library.png" alt="A drawing depicting the Arcane Library">
-        The Arcane Library was once home to hundreds of prospective mages. 
-        With bans on magic the bustling halls quickly became silent. It's
-        disappointing to see such a beautiful building slowly rot without
-        its inhabitants.
-        <br><br>
-        Despite the lack of librarians, the shelves continue to be organized 
-        and re-stocked with books of all kinds. The deeper sections of the library 
-        carry fading magic energies that might be contributing to these remaining 
-        traces of order. We'll try to use this space while we can and keep it clear 
-        of those who'd like to see its knowledge stay forever trapped within these 
-        decaying walls.
-        <br><br>
-        Some sections of the library remain locked off with magical wards. You'd 
-        guess that these sections hide long lost magical lore that would greatly 
-        benefit your colony. Perhaps we can find a way in through the larger university 
-        grounds that the library sits on?`,
     },
     realm_ancient_university: {
         tab: 'realms',
         realmGroup: 'University Ruins',
-        title: 'Ancient University',
         trigger: 'realm_ancient_university',
-        text: `<img class="pixel-art" src="portraits/realm_ancient_university.png" alt="A drawing depicting the Ancient University">
-        Just as you anticipated, the university grounds contained the answer to 
-        the locked off library sections you hoped to explore.
-        <br><br>
-        Finding the key to these wards was not easy. The university has stood for 
-        hundreds of years, becoming a labyrinth of buildings and squares. The streets 
-        were also less empty than expected, with patrols of crusaders keeping wanderers
-        from getting close to the library. You were glad you decided to open the initial
-        rift directly into the library as they seemed to be unwilling to enter.
-        <br><br>
-        By moving carefully right under their noses you were able to take your time with
-        the cache of once-locked-away tomes.
-        <br><br>
-        You found among these hidden works a collection of notes. While it was difficult to
-        understand what exactly they meant, you gleaned that there was a fundamental aspect
-        of magic that the university was researching. The notes led you to a building
-        at the far end of the university grounds. This laboratory was clearly long
-        abandoned, much like the rest of the buildings, but magical energy seemed
-        to still linger in the air from their experiments. Their findings may be just
-        what we needed to uncover some lost art or a powerful spell!`,
     },
     realm_abandoned_laboratory: {
         tab: 'realms',
         realmGroup: 'University Ruins',
-        title: 'Abandoned Laboratory',
         trigger: 'realm_abandoned_laboratory',
-        text: `<img class="pixel-art" src="portraits/realm_abandoned_laboratory.png" alt="A drawing depicting the Abandoned Laboratory">
-        As you entered the laboratory the lingering magic grew rapidly in strength. 
-        After just a dozen steps into the main hallway the energy started to become 
-        overwhelming. You pushed through, walking quickly towards the source of this 
-        thick haze of magic.
-        <br><br>
-        As the haze grew in density the hallways became less and less cohesive. It was 
-        as if a fundamental chaos had intruded on this space, twisting the halls into 
-        impossible shapes. Stairs ran on for far too long and you found yourself questioning 
-        your ability to make your way back out of this maze.
-        <br><br>
-        Just as you started to grow frightened, you came to a proper antechamber free 
-        from the entropy affecting the rest of the building. Just past this lay a large
-        room that appeared more pristine than even the untouched sections of the library. 
-        It was clear in an instant that this is where the experiments must have taken place.
-        <br><br>
-        The room wasn't all that impressive at a glance. The walls were lined with bookshelves
-        and alchemical equipment dotted the many worktables. Along with these beakers and vials
-        sat piles and piles of parchment, all beautifully hand written and precisely sorted.
-        Within these pages you found the secrets to the control of magic. If you understood it
-        correctly, you believed that order and chaos were the underlying aspects of magic. With
-        the right balance you could easily master a spell of enormous strength.
-        <br><br>
-        Frantically you began to write notes of your own. These notes easily turned to full 
-        spell tomes within the room, like the order had seeped into your own writings. As you 
-        step out of the room back into the chaos you found the knowledge you'd learned slipping.
-        However your tomes remained untouched, surviving the trek back to the rift.
-        <br><br>
-        You feel compelled to return to this place and continue your research, even if you can't 
-        bring it all home with you. You'll at least try to write up something useful for the 
-        colony whenever you visit.`,
     },
     realm_shadow_realm: {
         tab: 'realms',
         realmGroup: 'The Abyss',
-        title: 'Abyss Gate',
         trigger: 'realm_shadow_realm',
-        text: `<img class="pixel-art" src="portraits/realm_shadow_realm.png" alt="A drawing depicting the Abyss Gate">TODO`,
     },
     realm_void_abyss: {
         tab: 'realms',
         realmGroup: 'The Abyss',
-        title: 'Sunken Abyss',
         trigger: 'realm_void_abyss',
-        text: `<img class="pixel-art" src="portraits/realm_void_abyss.png" alt="A drawing depicting the Sunken Abyss">TODO`,
     },
     realm_oblivion_rift: {
         tab: 'realms',
         realmGroup: 'The Abyss',
-        title: 'Oblivion Rift',
         trigger: 'realm_oblivion_rift',
-        text: `<img class="pixel-art" src="portraits/realm_oblivion_rift.png" alt="A drawing depicting the Oblivion Rift">TODO`,
     },
     // ── Void Nexus / Void Whispers ───────────────────────────────────────────
     void_nexus_built: {
         tab: 'colony',
-        title: 'The Nexus Stirs',
         trigger: 'void_nexus_placed',
-        text: `
-        The Nexus is a magical device built to connect your colony to the Void. As soon as it was supplied with mana 
-        it began to hum with energy, emitting a small amount of black fog that rolls from the Nexus to the ground. 
-        The fog seems to be harmless, but the thinning of the veil between your realm and the Void is clearly noticeable 
-        throughout the colony. You feel a need to exercise caution when using this device as the consequences of opening 
-        a line of communication, let alone a doorway, to the Void are unknown.`,
     },
     void_whisper_first_accepted: {
         tab: 'colony',
-        title: 'The First Exchange',
         trigger: 'void_whisper_first_accepted',
-        text: `
-        Something powerful from the Void has taken notice of your colony and the thin veil between your realms. It seems 
-        to be an entity of extreme lawfulness, offering pacts and bargains to your colony for completing very specific requests. 
-        <br><br>
-        Thankfully it does not appear to be able to cross over into our realm, but its pacts are not without consequence. What it 
-        asks for is what it will get, threatening exteme punishment if your colony fails to deliver. You must be careful in your 
-        dealings with this entity, though some of its deals may be too good to pass up.`,
     },
     void_whisper_refused_3: {
         tab: 'colony',
-        title: 'Displeasure',
         trigger: 'void_whisper_refused_3',
-        text: `
-        The entity from the Void seems displeased with your colony's refusal to work with it. It seems understanding of your hesitation, 
-        but it is clear that it will not be so forgiving if you continue to refuse its requests. You must be careful in your dealings 
-        to keep this entity occupied.`,
     },
     void_whisper_accepted_5: {
         tab: 'colony',
-        title: 'The Fluent Colony',
         trigger: 'void_whisper_accepted_5',
-        text: `
-        The entity from the Void seems to now see your colony as a reliable business partner. Communication channels are open and the entity 
-        has no issues reaching out whenever it needs something from us, offering fair payment in return. You feel a lot more confident in 
-        your dealings, but it still occasionally asks for something far too outlandish to accept. You must continue to be cautious of this thing.`,
     },
     void_whisper_veil_parted: {
         tab: 'colony',
-        title: 'A Glimpse',
         trigger: 'void_whisper_veil_parted',
-        text: `
-        The entity from the Void has offered to show the colony a glimpse of what we've been working with all this time. Upon receiving payment, 
-        it seemed to beam images directly into the minds of your colonists. Everyone was shocked by the sights, with many describing the Void and 
-        this entity as horrific, something that may have been better left unseen.
-        <br><br>
-        Its clear that this entity holds your colony in high regard, but making deals with something so alien and unknowable is difficult to justify. 
-        As your colonists recover from the invasion of their minds, you must decide if working with with entity is worth the risk of further exposure.`,
     },
     waves_10_complete: {
         tab: 'colony',
-        title: 'The Entity Watches',
         trigger: 'waves_10_complete',
-        text: `
-        Your colony has become proficient in battling the monsterous creatures from the Void, holding back all of their attacks whenever the 
-        realms were connected. Perhaps your colonists are ready to venture into the Void themselves instead of always letting it come to them. 
-        You only hope that the entity from the Void will not keep too close of an eye on your colony as you venture into its realm.`,
     },
     // ── Void Pact realms ────────────────────────────────────────────────────
     realm_void_hollow: {
         tab: 'realms',
         realmGroup: 'The Void Pact',
-        title: 'Void Hollow',
         trigger: 'realm_void_hollow',
-        text: `<img class="pixel-art" src="portraits/realm_void_hollow.png" alt="A drawing depicting the Void Hollow">TODO`,
     },
     realm_void_sanctum: {
         tab: 'realms',
         realmGroup: 'The Void Pact',
-        title: 'Void Sanctum',
         trigger: 'realm_void_sanctum',
-        text: `<img class="pixel-art" src="portraits/realm_void_sanctum.png" alt="A drawing depicting the Void Sanctum">TODO`,
     },
     realm_void_heart: {
         tab: 'realms',
         realmGroup: 'The Void Pact',
-        title: 'Void Heart',
         trigger: 'realm_void_heart',
-        text: `<img class="pixel-art" src="portraits/realm_void_heart.png" alt="A drawing depicting the Void Heart">TODO`,
     },
     // ── Chaos realms ────────────────────────────────────────────────────────
     realm_fracture_gate: {
         tab: 'realms',
         realmGroup: 'The Unraveling',
-        title: 'Fracture Gate',
         trigger: 'realm_fracture_gate',
-        text: `<img class="pixel-art" src="portraits/realm_fracture_gate.png" alt="A drawing depicting the Fracture Gate">TODO`,
     },
     realm_shifting_labyrinth: {
         tab: 'realms',
         realmGroup: 'The Unraveling',
-        title: 'Shifting Labyrinth',
         trigger: 'realm_shifting_labyrinth',
-        text: `<img class="pixel-art" src="portraits/realm_shifting_labyrinth.png" alt="A drawing depicting the Shifting Labyrinth">TODO`,
     },
     realm_unraveling_core: {
         tab: 'realms',
         realmGroup: 'The Unraveling',
-        title: 'Unraveling Core',
         trigger: 'realm_unraveling_core',
-        text: `<img class="pixel-art" src="portraits/realm_unraveling_core.png" alt="A drawing depicting the Unraveling Core">TODO`,
     },
     realm_kingdom_outskirts: {
         tab: 'realms',
         realmGroup: 'The Kingdom',
-        title: 'Kingdom Outskirts',
         trigger: 'realm_kingdom_outskirts',
-        text: `<img class="pixel-art" src="portraits/realm_kingdom_outskirts.png" alt="A drawing depicting the Kingdom Outskirts">TODO: Write lore text for exploring the Kingdom.`,
     },
     realm_crusader_barracks: {
         tab: 'realms',
         realmGroup: 'The Kingdom',
-        title: 'Crusader Barracks',
         trigger: 'realm_crusader_barracks',
-        text: `<img class="pixel-art" src="portraits/realm_crusader_barracks.png" alt="A drawing depicting the Crusader Barracks">TODO: Write lore text for exploring the Kingdom.`,
     },
     realm_palace_fortress: {
         tab: 'realms',
         realmGroup: 'The Kingdom',
-        title: 'Palace Fortress',
         trigger: 'realm_palace_fortress',
         // The story panel renders the "Return Home (Epilogue)" button for this
         // entry. It can't live in `text`: sanitizeHtml strips buttons and handlers.
         epilogueButton: true,
-        text: `<img class="pixel-art" src="portraits/realm_palace_fortress.png" alt="A drawing depicting the Palace Fortress">
-        TODO: Write lore text for exploring the Kingdom.`,
     },
 };
+stampLoc(STORY_MILESTONES, 'story_milestone');

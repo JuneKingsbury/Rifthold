@@ -1,6 +1,7 @@
 import { CONFIG } from '../core/config.js';
 import { Minimap, MAP_LAYERS, MAP_TERRAIN_KEY, CRYPT_STATE_KEY, defaultMapLayers } from './minimap.js';
 import { escapeHtml } from './ui-utils.js';
+import { t as tr } from '../core/i18n.js';
 
 const LAYER_STORAGE_KEY = 'rifthold_fullmap_layers';
 
@@ -120,24 +121,24 @@ const mapPanelMethods = {
 
     _mapPanelHtml() {
         const layerRows = MAP_LAYERS.map(l =>
-            `<label class="map-layer-row" title="${escapeHtml(l.desc)}">` +
+            `<label class="map-layer-row" title="${escapeHtml(tr(l.descKey))}">` +
             `<input type="checkbox" data-map-layer="${escapeHtml(l.key)}"${this._mapLayers[l.key] ? ' checked' : ''}>` +
-            `${swatch(l.color)}<span class="map-layer-text"><b>${escapeHtml(l.label)}</b><small>${escapeHtml(l.desc)}</small></span></label>`
+            `${swatch(l.color)}<span class="map-layer-text"><b>${escapeHtml(tr(l.labelKey))}</b><small>${escapeHtml(tr(l.descKey))}</small></span></label>`
         ).join('');
-        const terrainRows = MAP_TERRAIN_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${escapeHtml(t.label)}</span>`).join('');
-        const cryptRows = CRYPT_STATE_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${escapeHtml(t.label)}</span>`).join('');
-        const doneRow = '<span class="map-key-item" title="All chests opened and, if it has one, its rift anchor attuned"><span class="map-check">&#10003;</span>Complete</span>';
+        const terrainRows = MAP_TERRAIN_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${escapeHtml(tr(t.labelKey))}</span>`).join('');
+        const cryptRows = CRYPT_STATE_KEY.map(t => `<span class="map-key-item">${swatch(t.color)}${escapeHtml(tr(t.labelKey))}</span>`).join('');
+        const doneRow = `<span class="map-key-item" title="${escapeHtml(tr('ui.map.complete_tip'))}"><span class="map-check">&#10003;</span>${escapeHtml(tr('ui.map.complete'))}</span>`;
         return '<div class="panel-close" data-panel-close="map">&times;</div>' +
-            '<h3>World Map</h3>' +
+            `<h3>${escapeHtml(tr('ui.map.title'))}</h3>` +
             '<div class="map-body">' +
             '<div class="map-canvas-wrap"><canvas id="fullmap-canvas"></canvas>' +
-            '<div class="map-hint">Click anywhere on the map to jump the camera there.</div></div>' +
+            `<div class="map-hint">${escapeHtml(tr('ui.map.hint'))}</div></div>` +
             '<div class="map-side">' +
-            '<div class="map-side-head">Show on map' +
-            '<span><button data-map-action="all">All</button><button data-map-action="none">None</button></span></div>' +
+            `<div class="map-side-head">${escapeHtml(tr('ui.map.show_on_map'))}` +
+            `<span><button data-map-action="all">${escapeHtml(tr('ui.map.all'))}</button><button data-map-action="none">${escapeHtml(tr('ui.map.none'))}</button></span></div>` +
             layerRows +
-            '<div class="map-side-head">Terrain</div><div class="map-key-grid">' + terrainRows + '</div>' +
-            '<div class="map-side-head">Crypt states</div><div class="map-key-grid">' + cryptRows + doneRow + '</div>' +
+            `<div class="map-side-head">${escapeHtml(tr('ui.map.terrain'))}</div><div class="map-key-grid">` + terrainRows + '</div>' +
+            `<div class="map-side-head">${escapeHtml(tr('ui.map.crypt_states'))}</div><div class="map-key-grid">` + cryptRows + doneRow + '</div>' +
             '</div></div>';
     },
 

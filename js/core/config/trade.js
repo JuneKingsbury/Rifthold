@@ -6,6 +6,8 @@
  * '../core/config.js'.
  */
 
+import { stampLoc } from '../i18n.js';
+
 export const CARAVAN_TRADES = [
     { give: { wood: 5 }, receive: { food: 4 } },
     { give: { stone: 3 }, receive: { wood: 4 } },
@@ -36,7 +38,8 @@ export const CARAVAN_TRADES = [
 //   Rare Goods Broker ~7%.
 export const MERCHANTS = [
     {
-        name: 'Traveling Merchant',        // generalist: cheap everyday gear, common charms
+        key: 'traveling_merchant',
+        // generalist: cheap everyday gear, common charms
         weight: 10,
         resourcePool: null,
         lowTierItems: ['cotton_shirt', 'wool_cap', 'leather_boots', 'stone_pickaxe', 'stone_axe', 'wooden_club', 'short_bow', 'iron_clad_effigy'],
@@ -50,7 +53,8 @@ export const MERCHANTS = [
         buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'tome', 'consumable', 'potion'],
     },
     {
-        name: 'Arms Dealer',               // weapons/armor specialist: better quality odds
+        key: 'arms_dealer',
+        // weapons/armor specialist: better quality odds
         weight: 7,
         resourcePool: ['iron', 'planks', 'leather', 'iron_ore', 'runite_ore', 'runite'],
         lowTierItems: ['iron_sword', 'stone_spear', 'etched_axe', 'etched_mace', 'iron_helmet', 'iron_chainmail', 'iron_greaves', 'hunting_bow'],
@@ -62,7 +66,8 @@ export const MERCHANTS = [
         buyCategories: ['trinket', 'tome', 'consumable'],
     },
     {
-        name: 'Tome Peddler',              // magic focus: wands, circlets, spell tomes
+        key: 'tome_peddler',
+        // magic focus: wands, circlets, spell tomes
         weight: 7,
         resourcePool: ['planks', 'runite', 'wood'],
         lowTierItems: ['wooden_wand', 'crystal_staff', 'mages_circlet', 'lantern'],
@@ -74,7 +79,8 @@ export const MERCHANTS = [
         buyCategories: ['weapon', 'armor', 'helmet', 'trinket', 'consumable'],
     },
     {
-        name: 'Wandering Alchemist',       // nature/utility: farm tools, warm clothing, relics
+        key: 'wandering_alchemist',
+        // nature/utility: farm tools, warm clothing, relics
         weight: 7,
         resourcePool: ['berries', 'wheat', 'moonbloom', 'corn', 'potatoes', 'food'],
         lowTierItems: ['stone_sickle', 'stone_mattock', 'leather_cloak', 'leather_vest', 'wool_tunic'],
@@ -88,7 +94,8 @@ export const MERCHANTS = [
         buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'tome', 'potion'],
     },
     {
-        name: 'Rare Goods Broker',         // late-game specialist: runic and void-tier gear
+        key: 'rare_goods_broker',
+        // late-game specialist: runic and void-tier gear
         weight: 3,
         resourcePool: ['runite', 'void_essence', 'planks'],
         lowTierItems: ['runic_blade', 'runic_crossbow', 'runic_plate', 'runic_helm', 'runic_wand', 'runic_striders', 'runic_buckler'],
@@ -100,7 +107,8 @@ export const MERCHANTS = [
         buyCategories: ['material', 'tome', 'consumable', 'trinket'],
     },
     {
-        name: 'Expedition Outfitter',      // exploration focus: expedition trinkets and field consumables
+        key: 'expedition_outfitter',
+        // exploration focus: expedition trinkets and field consumables
         weight: 4,
         resourcePool: null,
         lowTierItems: ['compass_of_greed', 'venom_vial', 'rallying_standard', 'jewelers_loupe', 'ghost_step_charm', 'strikers_band'],
@@ -114,7 +122,8 @@ export const MERCHANTS = [
         buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'potion'],
     },
     {
-        name: 'Clothier',                  // clothing and boots: comfort, warmth, and utility wear
+        key: 'clothier',
+        // clothing and boots: comfort, warmth, and utility wear
         weight: 5,
         resourcePool: ['wool', 'cotton', 'cloth', 'hides', 'leather', 'food'],
         lowTierItems: ['cotton_shirt', 'wool_tunic', 'leather_jerkin', 'leather_boots', 'enchanted_sandals', 'wool_cap'],
@@ -127,6 +136,7 @@ export const MERCHANTS = [
         buyCategories: ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'trinket'],
     },
 ];
+stampLoc(MERCHANTS, 'merchant');
 
 // Base gold value per unit. Used by both buy and sell calculations.
 // Effective buy price = value × TRADER_MARKUP, effective sell price = value × TRADER_DISCOUNT.

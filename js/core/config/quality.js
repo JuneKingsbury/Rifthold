@@ -6,6 +6,8 @@
  * config hub (index.js) so consumers import from '../core/config.js'.
  */
 
+import { stampLoc } from '../i18n.js';
+
 export const ENCHANT_COST_BY_TIER = {
     1: { resource: 'runite',       amount: 2  },
     2: { resource: 'runite',       amount: 5  },
@@ -32,35 +34,35 @@ export const ENCHANTMENT_TIERS = [
 //     digit-percent event. It is craft-only (the trade/merchant tables in
 //     trade.js have their own quality lists and never include it).
 export const QUALITY_TIERS = [
-    { key: 'poor', prefix: 'Crude', multiplier: 0.85, color: '#888888', baseChance: 0.20, perSkill: -0.03 },
-    { key: 'normal', prefix: '', multiplier: 1.00, color: '#cccccc', baseChance: 0.60, perSkill: 0 },
-    { key: 'fine', prefix: 'Fine', multiplier: 1.10, color: '#44cc44', baseChance: 0.15, perSkill: 0.02 },
-    { key: 'superior', prefix: 'Superior', multiplier: 1.20, color: '#4488ff', baseChance: 0.05, perSkill: 0.01 },
-    { key: 'masterwork', prefix: 'Masterwork', multiplier: 1.40, color: '#ffcc44', baseChance: 0, perSkill: 0.005, requiresResearch: 'masterwork' },
+    { key: 'poor', multiplier: 0.85, color: '#888888', baseChance: 0.20, perSkill: -0.03 },
+    { key: 'normal', multiplier: 1.00, color: '#cccccc', baseChance: 0.60, perSkill: 0 },
+    { key: 'fine', multiplier: 1.10, color: '#44cc44', baseChance: 0.15, perSkill: 0.02 },
+    { key: 'superior', multiplier: 1.20, color: '#4488ff', baseChance: 0.05, perSkill: 0.01 },
+    { key: 'masterwork', multiplier: 1.40, color: '#ffcc44', baseChance: 0, perSkill: 0.005, requiresResearch: 'masterwork' },
 ];
 
 export const ROOM_QUALITY_TIERS = [
-    { key: 'bare', name: 'Bare room', minScore: 0, moodEffect: 10, duration: 300 },
-    { key: 'modest', name: 'Modest bedroom', minScore: 20, moodEffect: 13, duration: 325 },
-    { key: 'cozy', name: 'Cozy bedroom', minScore: 40, moodEffect: 16, duration: 375 },
-    { key: 'comfortable', name: 'Comfortable bedroom', minScore: 60, moodEffect: 20, duration: 420 },
-    { key: 'fine', name: 'Fine bedroom', minScore: 75, moodEffect: 23, duration: 460 },
-    { key: 'luxurious', name: 'Luxurious bedroom', minScore: 90, moodEffect: 26, duration: 500 },
+    { key: 'bare', minScore: 0, moodEffect: 10, duration: 300 },
+    { key: 'modest', minScore: 20, moodEffect: 13, duration: 325 },
+    { key: 'cozy', minScore: 40, moodEffect: 16, duration: 375 },
+    { key: 'comfortable', minScore: 60, moodEffect: 20, duration: 420 },
+    { key: 'fine', minScore: 75, moodEffect: 23, duration: 460 },
+    { key: 'luxurious', minScore: 90, moodEffect: 26, duration: 500 },
 ];
 
 export const TOWN_HALL_QUALITY_TIERS = [
-    { key: 'plain',     name: 'Plain hall',     minScore: 0,  moodEffect: 8,  duration: 250 },
-    { key: 'welcoming', name: 'Welcoming hall', minScore: 25, moodEffect: 11, duration: 300 },
-    { key: 'grand',     name: 'Grand hall',     minScore: 50, moodEffect: 15, duration: 350 },
-    { key: 'majestic',  name: 'Majestic hall',  minScore: 75, moodEffect: 19, duration: 400 },
+    { key: 'plain',     minScore: 0,  moodEffect: 8,  duration: 250 },
+    { key: 'welcoming', minScore: 25, moodEffect: 11, duration: 300 },
+    { key: 'grand',     minScore: 50, moodEffect: 15, duration: 350 },
+    { key: 'majestic',  minScore: 75, moodEffect: 19, duration: 400 },
 ];
 
 export const WORKSHOP_QUALITY_TIERS = [
-    { key: 'makeshift', name: 'Makeshift', minScore: 0, speedMult: 1.0, qualityBonus: 0 },
-    { key: 'functional', name: 'Functional', minScore: 25, speedMult: 1.1, qualityBonus: 0 },
-    { key: 'professional', name: 'Professional', minScore: 50, speedMult: 1.15, qualityBonus: 1 },
-    { key: 'master', name: 'Master', minScore: 70, speedMult: 1.2, qualityBonus: 2 },
-    { key: 'legendary', name: 'Legendary', minScore: 90, speedMult: 1.25, qualityBonus: 3 },
+    { key: 'makeshift', minScore: 0, speedMult: 1.0, qualityBonus: 0 },
+    { key: 'functional', minScore: 25, speedMult: 1.1, qualityBonus: 0 },
+    { key: 'professional', minScore: 50, speedMult: 1.15, qualityBonus: 1 },
+    { key: 'master', minScore: 70, speedMult: 1.2, qualityBonus: 2 },
+    { key: 'legendary', minScore: 90, speedMult: 1.25, qualityBonus: 3 },
 ];
 
 export const STATION_GROUPS = {
@@ -78,13 +80,8 @@ export const STATION_GROUPS = {
 // it counts as, so several pieces (shelf, bookcase, wardrobe) can satisfy the
 // same room requirement. `misc` pieces add decor only and never meet one.
 export const FURNITURE_TYPES = {
-    seating: 'Seating',
-    surface: 'Table / Desk',
-    storage: 'Storage',
-    tools: 'Tools',
-    centerpiece: 'Centerpiece',
-    misc: 'Misc',
 };
+stampLoc({ furniture_types: FURNITURE_TYPES }, 'config', { fields: ['seating', 'surface', 'storage', 'tools', 'centerpiece', 'misc'] });
 
 // Furniture each room type needs to reach its top quality tiers. A room
 // missing any requirement has its total capped at `ceiling` (just below the
@@ -102,3 +99,8 @@ export const FLOOR_QUALITY_VALUES = {
 };
 
 export const SALVAGE_RATE = 0.5;
+
+stampLoc(QUALITY_TIERS, 'quality_tier');
+stampLoc(ROOM_QUALITY_TIERS, 'room_tier');
+stampLoc(TOWN_HALL_QUALITY_TIERS, 'hall_tier');
+stampLoc(WORKSHOP_QUALITY_TIERS, 'workshop_tier');

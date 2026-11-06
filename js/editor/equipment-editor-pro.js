@@ -3,7 +3,7 @@ import { RESEARCH } from '../core/config/magic.js';
 import { STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines } from '../core/config/effects.js';
 import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
 import { getLoadedManifests } from '../core/mod-registry.js';
-import { importPristineConfig, fetchConfigSource, spliceExportObject, toJsLiteral } from './config-source.js';
+import { importPristineConfig, fetchConfigSource, spliceExportObject, toJsLiteral, splitText, buildLocaleFile, downloadText } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_equip_pro';
 
@@ -679,7 +679,7 @@ class EquipmentEditorPro {
     }
 
     _serializeItem(key, item) {
-        return `${key}: ${toJsLiteral(this._toDef(item))},`;
+        return `${key}: ${toJsLiteral(splitText(this._toDef(item), `item.${key}`, {}))},`;
     }
 
     async _showExportModal() {
@@ -702,6 +702,7 @@ class EquipmentEditorPro {
                 <textarea readonly style="min-height:400px;">${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="eqp-modal-download">Download File</button>
+                    <button id="eqp-modal-locale" title="Item names and descriptions live in locale/en.json">Download en.json</button>
                     <button id="eqp-modal-copy">Copy to Clipboard</button>
                     <button id="eqp-modal-close">Close</button>
                 </div>
@@ -720,6 +721,10 @@ class EquipmentEditorPro {
             a.href = url; a.download = 'equipment.js'; a.click();
             URL.revokeObjectURL(url);
         });
+        document.getElementById('eqp-modal-locale').addEventListener('click', async () => {
+            try { downloadText('en.json', await buildLocaleFile(this._exportStrings), 'application/json'); }
+            catch (err) { alert(`Export failed: ${err.message}`); }
+        });
         document.getElementById('eqp-modal-close').addEventListener('click', () => modal.remove());
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     }
@@ -729,6 +734,8 @@ class EquipmentEditorPro {
     // RECIPES code stay exactly as shipped.
     async _generateFullFile() {
         let out = await fetchConfigSource('equipment.js');
+        // Text of changed items goes to locale/en.json, offered as a second download.
+        this._exportStrings = {};
         for (const [cat, { exportName, config }] of Object.entries(CATEGORIES)) {
             const changed = new Map(), removed = new Set(), added = new Map();
             for (const key of Object.keys(config)) {
@@ -739,7 +746,7 @@ class EquipmentEditorPro {
             for (const [key, item] of this.items) {
                 if (item.category === cat && !Object.hasOwn(config, key)) added.set(key, this._toDef(item));
             }
-            out = spliceExportObject(out, exportName, { changed, removed, added });
+            out = spliceExportObject(out, exportName, { changed, removed, added, loc: 'item', strings: this._exportStrings });
         }
         return out;
     }

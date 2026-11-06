@@ -5,14 +5,15 @@
  * colony's best Divination skill level: a novice sees vague hunches, a master
  * reads exact timings. Purely a read of live game state, no side effects.
  */
-import { CONFIG, RAID_CONFIG } from '../core/config.js';
+import { CONFIG, RAID_CONFIG, WEATHER_TYPES } from '../core/config.js';
+import { t, tp, ref, defRef } from '../core/i18n.js';
 
 // Divination clarity tiers keyed off the best diviner's school level. Higher
 // tiers reveal finer timing detail and unlock more omen categories.
 const CLARITY = [
-    { minLevel: 1, key: 'faint',    label: 'Faint',    raidWindow: true,  weather: false, seasonHint: true,  events: false },
-    { minLevel: 3, key: 'clear',    label: 'Clear',    raidWindow: true,  weather: true,  seasonHint: true,  events: true },
-    { minLevel: 6, key: 'profound', label: 'Profound', raidWindow: false, weather: true,  seasonHint: true,  events: true },
+    { minLevel: 1, key: 'faint',    label: t('msg.omens.clarity_faint'),    raidWindow: true,  weather: false, seasonHint: true,  events: false },
+    { minLevel: 3, key: 'clear',    label: t('msg.omens.clarity_clear'),    raidWindow: true,  weather: true,  seasonHint: true,  events: true },
+    { minLevel: 6, key: 'profound', label: t('msg.omens.clarity_profound'), raidWindow: false, weather: true,  seasonHint: true,  events: true },
 ];
 
 /**
@@ -40,18 +41,18 @@ function clarityFor(level) {
     return tier;
 }
 
-// Convert a tick count into a coarse "soon / a while / far off" phrase or, at high
+// The raid omen's sentence: a coarse "soon / a while / far off" phrase or, at high
 // clarity, an approximate day count. days = ticks / TICKS_PER_DAY.
-function describeDelay(ticks, exact) {
-    if (ticks <= 0) return 'imminent';
+function describeRaid(ticks, exact) {
+    if (ticks <= 0) return t('msg.omens.raid_imminent');
     const days = ticks / CONFIG.TICKS_PER_DAY;
     if (exact) {
-        if (days < 1) return 'within a day';
-        return `in about ${Math.round(days)} day${Math.round(days) === 1 ? '' : 's'}`;
+        if (days < 1) return t('msg.omens.raid_within_day');
+        return tp('msg.omens.raid_in_days', Math.round(days));
     }
-    if (days < 2) return 'very soon';
-    if (days < 5) return 'before long';
-    return 'in the distance';
+    if (days < 2) return t('msg.omens.raid_very_soon');
+    if (days < 5) return t('msg.omens.raid_before_long');
+    return t('msg.omens.raid_distant');
 }
 
 /**
@@ -75,8 +76,8 @@ export function getOmens(game) {
         if (ticksUntil > 0) {
             omens.push({
                 icon: '⚔',
-                title: 'A Gathering Threat',
-                text: `Raiders will descend upon the colony ${describeDelay(ticksUntil, exact)}.`,
+                title: t('msg.omens.raid_title'),
+                text: describeRaid(ticksUntil, exact),
                 tone: 'bad',
             });
         }
@@ -86,8 +87,8 @@ export function getOmens(game) {
         !game.combat.crusaderRaidDefeated && !game.combat.crusaderRaidTriggered) {
         omens.push({
             icon: '✝',
-            title: 'The Crusade Comes',
-            text: 'A crusader warband has been sighted. They will descend upon your settlement before the next season ends.',
+            title: t('msg.omens.crusade_title'),
+            text: t('msg.omens.crusade_text'),
             tone: 'bad',
         });
     }
@@ -98,8 +99,8 @@ export function getOmens(game) {
     if (delayMod) {
         omens.push({
             icon: '✦',
-            title: 'Fate Forestalled',
-            text: 'Mystic influence holds the tide of violence at bay, delaying the next assault.',
+            title: t('msg.omens.forestalled_title'),
+            text: t('msg.omens.forestalled_text'),
             tone: 'good',
         });
     }
@@ -111,8 +112,8 @@ export function getOmens(game) {
         if (biasMod) {
             omens.push({
                 icon: '☀',
-                title: 'Skies Cleared',
-                text: `Arcane winds coax the skies toward ${biasMod.weatherBias} weather.`,
+                title: t('msg.omens.skies_title'),
+                text: t('msg.omens.skies_text', { weather: weatherWord(biasMod.weatherBias) }),
                 tone: 'good',
             });
         }
@@ -123,12 +124,12 @@ export function getOmens(game) {
         const mods = game.divinationModifiers || [];
         for (const m of mods) {
             if (m.eventBoost === 'caravan') {
-                omens.push({ icon: '☼', title: 'Merchants on the Wind', text: 'Traders are drawn toward the colony. Expect a caravan soon.', tone: 'good' });
+                omens.push({ icon: '☼', title: t('msg.omens.merchants_title'), text: t('msg.omens.merchants_text'), tone: 'good' });
             } else if (m.eventBoost === 'meteorite') {
-                omens.push({ icon: '★', title: 'A Falling Fortune', text: 'The heavens will soon shed a gift upon the land.', tone: 'good' });
+                omens.push({ icon: '★', title: t('msg.omens.fortune_title'), text: t('msg.omens.fortune_text'), tone: 'good' });
             }
             if (m.suppressEvents && m.suppressEvents.length > 0) {
-                omens.push({ icon: '⛨', title: 'Calamity Warded', text: 'Ill fortunes are held at bay by an active ward.', tone: 'good' });
+                omens.push({ icon: '⛨', title: t('msg.omens.warded_title'), text: t('msg.omens.warded_text'), tone: 'good' });
             }
         }
 
@@ -140,8 +141,8 @@ export function getOmens(game) {
         if (auguryActive) {
             omens.push({
                 icon: '♦',
-                title: 'Blessed Spirits',
-                text: 'Arcane insight flows through the settlement, lifting the spirits of those nearby.',
+                title: t('msg.omens.blessed_title'),
+                text: t('msg.omens.blessed_text'),
                 tone: 'good',
             });
         }
@@ -154,14 +155,46 @@ function cap(s) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// Human-readable resource names for scry hints (falls back to the raw key).
-const RESOURCE_LABELS = {
-    stone: 'stone', runite: 'runite', void_essence: 'void essence',
-    wood: 'timber', herbs: 'herbs', crystal: 'crystal',
-};
+// The weather a Fair Winds bias leans toward, lowercase as it sits mid-sentence.
+// Falls back to the weather type's own name, then the raw key.
+function weatherWord(key) {
+    return t(`msg.omens.weather.${key}`, null, WEATHER_TYPES[key]?.name ?? key);
+}
 
-function resourceLabel(key) {
-    return RESOURCE_LABELS[key] || key.replace(/_/g, ' ');
+// Scry hint wording for a resource, as a log/save param (lowercase, mid-sentence;
+// "timber" rather than "wood"). Falls back to the key with spaces.
+function resourceLabelRef(key) {
+    return ref(`msg.omens.resource.${key}`, key.replace(/_/g, ' '));
+}
+
+/**
+ * Display title of a scry hint. Hints are saved (exploration.realmScries), so new
+ * ones keep keys and params; older saves have finished `title`/`text` strings.
+ *
+ * @param {object} hint A hint from generateRealmScry.
+ * @return {string}
+ */
+export function scryTitle(hint) {
+    if (hint?.titleKey) return t(hint.titleKey);
+    return hint?.title ?? '';
+}
+
+/** Display text of a scry hint (see scryTitle). */
+export function scryText(hint) {
+    if (hint?.textKey) return t(hint.textKey, hint.params);
+    return hint?.text ?? '';
+}
+
+// A saved hint: keys and params, plus the text in the current language for
+// readers that still show `title`/`text` directly.
+function scryHint(icon, tone, name, params) {
+    const titleKey = `msg.omens.scry_${name}_title`;
+    const textKey = `msg.omens.scry_${name}_text`;
+    const hint = { icon, tone, titleKey, textKey };
+    if (params) hint.params = params;
+    hint.title = scryTitle(hint);
+    hint.text = scryText(hint);
+    return hint;
 }
 
 /**
@@ -186,10 +219,7 @@ export function generateRealmScry(dim, level) {
         const richest = resourceLoot.reduce((a, b) => (b.amount[1] || 0) > (a.amount[1] || 0) ? b : a);
         candidates.push({
             weight: 3,
-            hint: {
-                icon: '⛏', title: 'A Rich Vein', tone: 'good',
-                text: `The scrying pool shows veins of ${resourceLabel(richest.resource)} running rich through this rift.`,
-            },
+            hint: () => scryHint('⛏', 'good', 'rich_vein', { resource: resourceLabelRef(richest.resource) }),
         });
     }
 
@@ -198,24 +228,19 @@ export function generateRealmScry(dim, level) {
     if (rareItems.length > 0) {
         candidates.push({
             weight: 2,
-            hint: {
-                icon: '✦', title: 'A Hidden Cache', tone: 'good',
-                text: 'A rare treasure lies hidden here, waiting to be found.',
-            },
+            hint: () => scryHint('✦', 'good', 'hidden_cache'),
         });
     }
 
     // Lurking guardian: the realm has a boss. Higher clarity reveals its phases.
     if (dim.boss) {
-        const phaseNote = level >= 3 && dim.boss.phases
-            ? ` It will shift through ${dim.boss.phases.length} forms before it falls.`
-            : '';
+        const boss = dim.boss.name ? defRef(dim.boss) : ref('msg.omens.scry_guardian_fallback');
+        const phases = level >= 3 && dim.boss.phases;
         candidates.push({
             weight: 2,
-            hint: {
-                icon: '☠', title: 'A Lurking Guardian', tone: 'bad',
-                text: `A great ${dim.boss.name || 'guardian'} slumbers in the depths of this rift.${phaseNote}`,
-            },
+            hint: () => (phases
+                ? scryHint('☠', 'bad', 'guardian_phases', { boss, n: dim.boss.phases.length })
+                : scryHint('☠', 'bad', 'guardian', { boss })),
         });
     }
 
@@ -223,10 +248,7 @@ export function generateRealmScry(dim, level) {
     if ((dim.difficulty || 1) >= 2) {
         candidates.push({
             weight: 2,
-            hint: {
-                icon: '★', title: 'Elite Presence', tone: 'bad',
-                text: 'The vision flickers with dread. Elite creatures prowl this rift.',
-            },
+            hint: () => scryHint('★', 'bad', 'elite'),
         });
     }
 
@@ -235,10 +257,7 @@ export function generateRealmScry(dim, level) {
     if (maxCount >= 4) {
         candidates.push({
             weight: 2,
-            hint: {
-                icon: '⚔', title: 'A Teeming Horde', tone: 'bad',
-                text: 'You glimpse the rift swarming. Expect foes in great number.',
-            },
+            hint: () => scryHint('⚔', 'bad', 'horde'),
         });
     }
 
@@ -248,7 +267,7 @@ export function generateRealmScry(dim, level) {
     let r = Math.random() * total;
     for (const c of candidates) {
         r -= c.weight;
-        if (r <= 0) return c.hint;
+        if (r <= 0) return c.hint();
     }
-    return candidates[candidates.length - 1].hint;
+    return candidates[candidates.length - 1].hint();
 }

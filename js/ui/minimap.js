@@ -1,4 +1,5 @@
-import { CONFIG, TILE_COLORS, BUILDINGS, ENTITIES, CRYPT_CONFIG } from '../core/config.js';
+import { CONFIG, TILE_COLORS, BUILDINGS, ENTITIES, CRYPT_CONFIG, LANDMARK_BLUEPRINTS } from '../core/config.js';
+import { t } from '../core/i18n.js';
 
 // Canvas pixels per tile for the footer minimap. The full-map panel picks its own.
 const DEFAULT_SCALE = 2;
@@ -41,44 +42,44 @@ const AUTUMN_LEAF_COLOR = [190, 115, 30];
 
 /**
  * Toggleable detail layers of the full map. Each entry doubles as a key row: `color`
- * is the swatch, `desc` the meaning. The footer minimap ignores this list and shows
+ * is the swatch, `descKey` the meaning (`labelKey`/`descKey` are locale keys). The footer minimap ignores this list and shows
  * everything (with its white camera rectangle in place of the screen-center arrow).
  */
 export const MAP_LAYERS = [
-    { key: 'colonists', label: 'Colonists',        color: [255, 255, 0],   desc: 'Your living colonists' },
-    { key: 'tamed',     label: 'Tamed animals',    color: [100, 200, 100], desc: 'Animals tamed by your colony' },
-    { key: 'wildlife',  label: 'Wildlife',         color: [150, 120, 80],  desc: 'Wild animals that are not hostile' },
-    { key: 'hostiles',  label: 'Hostiles',         color: [255, 50, 50],   desc: 'Raiders, wave enemies and predators (dark red)' },
-    { key: 'trees',     label: 'Trees',            color: [24, 92, 30],    desc: 'Forests (orange in autumn)' },
-    { key: 'ore',       label: 'Ore',              color: [196, 124, 78],  desc: 'Stone (grey), iron (copper) and runite (teal)' },
-    { key: 'buildings', label: 'Buildings',        color: [180, 180, 180], desc: 'Walls (light grey), doors (brown), floors and furniture' },
-    { key: 'farms',     label: 'Farm zones',       color: [60, 150, 30],   desc: 'Farm plots: brown when empty, green growing, gold ready' },
-    { key: 'crypts',    label: 'Crypts',           color: [190, 160, 230], desc: 'Discovered crypts, tinted by state. Attuned means its rift anchor is active' },
-    { key: 'landmarks', label: 'Landmarks',        color: [214, 178, 96],  desc: 'Ancient ruins scattered across the map' },
-    { key: 'camera',    label: 'Screen center',    color: [235, 40, 40],   desc: 'Red arrow pointing at the center of the main view' },
+    { key: 'colonists', labelKey: 'ui.minimap.layer_colonists', color: [255, 255, 0], descKey: 'ui.minimap.layer_colonists_desc' },
+    { key: 'tamed',     labelKey: 'ui.minimap.layer_tamed', color: [100, 200, 100], descKey: 'ui.minimap.layer_tamed_desc' },
+    { key: 'wildlife',  labelKey: 'ui.minimap.layer_wildlife', color: [150, 120, 80], descKey: 'ui.minimap.layer_wildlife_desc' },
+    { key: 'hostiles',  labelKey: 'ui.minimap.layer_hostiles', color: [255, 50, 50], descKey: 'ui.minimap.layer_hostiles_desc' },
+    { key: 'trees',     labelKey: 'ui.minimap.layer_trees', color: [24, 92, 30], descKey: 'ui.minimap.layer_trees_desc' },
+    { key: 'ore',       labelKey: 'ui.minimap.layer_ore', color: [196, 124, 78], descKey: 'ui.minimap.layer_ore_desc' },
+    { key: 'buildings', labelKey: 'ui.minimap.layer_buildings', color: [180, 180, 180], descKey: 'ui.minimap.layer_buildings_desc' },
+    { key: 'farms',     labelKey: 'ui.minimap.layer_farms', color: [60, 150, 30], descKey: 'ui.minimap.layer_farms_desc' },
+    { key: 'crypts',    labelKey: 'ui.minimap.layer_crypts', color: [190, 160, 230], descKey: 'ui.minimap.layer_crypts_desc' },
+    { key: 'landmarks', labelKey: 'ui.minimap.layer_landmarks', color: [214, 178, 96], descKey: 'ui.minimap.layer_landmarks_desc' },
+    { key: 'camera',    labelKey: 'ui.minimap.layer_camera', color: [235, 40, 40], descKey: 'ui.minimap.layer_camera_desc' },
 ];
 
 /** Terrain swatches for the key. Not toggleable: terrain is the map itself. */
 export const MAP_TERRAIN_KEY = [
-    { label: 'Grassland', color: TERRAIN_COLORS.grass },
-    { label: 'Forest',    color: TERRAIN_COLORS.forest_grass },
-    { label: 'Swamp',     color: TERRAIN_COLORS.swamp_grass },
-    { label: 'Dirt',      color: TERRAIN_COLORS.dirt },
-    { label: 'Desert',    color: TERRAIN_COLORS.sand },
-    { label: 'Red rock',  color: TERRAIN_COLORS.red_rock },
-    { label: 'Mountain',  color: TERRAIN_COLORS.rock },
-    { label: 'Tundra',    color: TERRAIN_COLORS.snow_ground },
-    { label: 'Water',     color: TERRAIN_COLORS.water },
-    { label: 'Shallows',  color: TERRAIN_COLORS.shallow_water },
+    { labelKey: 'ui.minimap.terrain_grassland', color: TERRAIN_COLORS.grass },
+    { labelKey: 'ui.minimap.terrain_forest', color: TERRAIN_COLORS.forest_grass },
+    { labelKey: 'ui.minimap.terrain_swamp', color: TERRAIN_COLORS.swamp_grass },
+    { labelKey: 'ui.minimap.terrain_dirt', color: TERRAIN_COLORS.dirt },
+    { labelKey: 'ui.minimap.terrain_desert', color: TERRAIN_COLORS.sand },
+    { labelKey: 'ui.minimap.terrain_red_rock', color: TERRAIN_COLORS.red_rock },
+    { labelKey: 'ui.minimap.terrain_mountain', color: TERRAIN_COLORS.rock },
+    { labelKey: 'ui.minimap.terrain_tundra', color: TERRAIN_COLORS.snow_ground },
+    { labelKey: 'ui.minimap.terrain_water', color: TERRAIN_COLORS.water },
+    { labelKey: 'ui.minimap.terrain_shallows', color: TERRAIN_COLORS.shallow_water },
 ];
 
 /** Crypt disc colours by state, shared by the map and its key. */
 export const CRYPT_STATE_KEY = [
-    { label: 'Sealed',    color: [190, 160, 230] },
-    { label: 'Warded',    color: [110, 130, 200] },
-    { label: 'Breached',  color: [230, 90, 90] },
-    { label: 'Plundered', color: [90, 170, 90] },
-    { label: 'Attuned',   color: ATTUNED_COLOR },
+    { labelKey: 'ui.minimap.crypt_sealed', color: [190, 160, 230] },
+    { labelKey: 'ui.minimap.crypt_warded', color: [110, 130, 200] },
+    { labelKey: 'ui.minimap.crypt_breached', color: [230, 90, 90] },
+    { labelKey: 'ui.minimap.crypt_plundered', color: [90, 170, 90] },
+    { labelKey: 'ui.minimap.crypt_attuned', color: ATTUNED_COLOR },
 ];
 
 export const defaultMapLayers = () => Object.fromEntries(MAP_LAYERS.map(l => [l.key, true]));
@@ -104,6 +105,13 @@ const CRYPT_ICON_SIZE = 12;
 // 'barrow_crypt' -> 'Barrow Crypt'; names that are already display text pass through.
 // Only the start of each space-separated word is capitalised, so "witch's hut" doesn't become "Witch'S Hut".
 const prettyName = (id) => String(id).replace(/_/g, ' ').replace(/(^|\s)[a-z]/g, m => m.toUpperCase());
+
+// Ruins save the landmark's name as it was when the map was made; show the current
+// language's name when it still matches a blueprint (by id or by name).
+const landmarkName = (saved) => {
+    const bp = LANDMARK_BLUEPRINTS[saved] || Object.values(LANDMARK_BLUEPRINTS).find(b => b.name === saved);
+    return bp?.name || prettyName(saved);
+};
 
 // Attuned (its rift anchor is active) outranks every other state.
 const cryptColor = (ruin) => ruin.anchor?.attuned ? ATTUNED_COLOR : ruin.ward ? [110, 130, 200] : ruin.state === 'sealed' ? [190, 160, 230] : ruin.state === 'cleared' ? [90, 170, 90] : [230, 90, 90];
@@ -319,15 +327,17 @@ export class Minimap {
             for (const ruin of ruins) {
                 if (ruin.kind !== 'crypt' || !ruin.discovered) continue;
                 if (!near(ruin.x + Math.floor(ruin.w / 2) + 0.5, ruin.y + Math.floor(ruin.h / 2) + 0.5, iconR)) continue;
-                const chain = ruin.chain ? `${CRYPT_CONFIG.chainNames[ruin.chain] || ruin.chain} ` : '';
-                const state = ruin.anchor?.attuned ? 'attuned' : ruin.ward ? 'warded' : ruin.state === 'sealed' ? 'sealed' : ruin.state === 'cleared' ? 'plundered' : 'breached';
-                return `${chain}Crypt (${state}${isCryptComplete(ruin) ? ', complete' : ''})`;
+                const state = t(ruin.anchor?.attuned ? 'ui.minimap.state_attuned' : ruin.ward ? 'ui.minimap.state_warded' : ruin.state === 'sealed' ? 'ui.minimap.state_sealed' : ruin.state === 'cleared' ? 'ui.minimap.state_plundered' : 'ui.minimap.state_breached');
+                const status = isCryptComplete(ruin) ? t('ui.minimap.state_complete', { state }) : state;
+                return ruin.chain
+                    ? t('ui.minimap.crypt_chain_tip', { chain: CRYPT_CONFIG.chainNames[ruin.chain] || ruin.chain, status })
+                    : t('ui.minimap.crypt_tip', { status });
             }
         }
         if (this.detailed && this.layerOn('landmarks')) {
             for (const ruin of ruins) {
                 if (ruin.kind !== 'landmark') continue;
-                if (near(ruin.x + Math.floor(ruin.w / 2) + 0.5, ruin.y + Math.floor(ruin.h / 2) + 0.5, landR)) return prettyName(ruin.blueprint);
+                if (near(ruin.x + Math.floor(ruin.w / 2) + 0.5, ruin.y + Math.floor(ruin.h / 2) + 0.5, landR)) return landmarkName(ruin.blueprint);
             }
         }
 
@@ -341,17 +351,17 @@ export class Minimap {
             if (d <= bestDist) { bestDist = d; best = label; }
         };
         const unitName = (u, fallback) => ENTITIES[u.type]?.name || (u.type ? prettyName(u.type) : fallback);
-        if (this.layerOn('colonists')) for (const c of this.game.colonists) consider(c, c.name || 'Colonist');
+        if (this.layerOn('colonists')) for (const c of this.game.colonists) consider(c, c.name || t('ui.minimap.colonist'));
         for (const e of this.game.entities) {
             if (e.tamed) {
-                if (this.layerOn('tamed')) consider(e, `${e.name || unitName(e, 'Animal')} (tamed)`);
+                if (this.layerOn('tamed')) consider(e, t('ui.minimap.tamed_tip', { name: e.name || unitName(e, t('ui.minimap.animal')) }));
             } else if (e.category === 'animal' && this.layerOn(e.hostile ? 'hostiles' : 'wildlife')) {
-                consider(e, unitName(e, 'Animal'));
+                consider(e, unitName(e, t('ui.minimap.animal')));
             }
         }
         if (this.layerOn('hostiles')) {
-            for (const r of this.game.raiders) consider(r, ENTITIES[r.type]?.name || (r.char === 'E' ? 'Void Enemy' : 'Raider'));
-            if (this.detailed && this.game.waves) for (const en of this.game.waves.enemies) consider(en, unitName(en, 'Enemy'));
+            for (const r of this.game.raiders) consider(r, ENTITIES[r.type]?.name || t(r.char === 'E' ? 'ui.minimap.void_enemy' : 'ui.minimap.raider'));
+            if (this.detailed && this.game.waves) for (const en of this.game.waves.enemies) consider(en, unitName(en, t('ui.minimap.enemy')));
         }
         return best;
     }

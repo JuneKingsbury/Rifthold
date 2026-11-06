@@ -5,6 +5,8 @@ import { ensureEntityRoles } from '../entities/roles.js';
 import { recalcMaxMana, invalidateEquipStatCache, TRANSIENT_COLONIST_FIELDS, TRANSIENT_COLONIST_DEFAULTS } from '../entities/colonist.js';
 import * as gdriveWeb from './gdrive-web.js';
 import { getLoadedManifests } from './mod-registry.js';
+import { LEGACY_THOUGHT_IDS, LEGACY_QUALITY_TIER_LOCS } from './legacy-text.js';
+import { t } from './i18n.js';
 
 const SAVE_KEY = 'colony_save';
 const GDRIVE_LAST_SYNC_KEY = 'gdrive_last_sync_ts';
@@ -12,7 +14,7 @@ const GDRIVE_LAST_SYNC_KEY = 'gdrive_last_sync_ts';
 // versions below 11 predate the ladder and are discarded one final time on load
 // (see _applyLoadData). From v11 onward, schema changes add a MIGRATIONS step and
 // bump SAVE_VERSION instead of invalidating saves.
-const SAVE_VERSION = 13;
+const SAVE_VERSION = 14;
 const SLOT_META_KEY = 'colony_slot_meta';
 const SLOT_AUTO_NEXT_KEY = 'colony_slot_auto_next';
 
@@ -81,8 +83,8 @@ function _storageWrite(key, value) {
     } catch (e) {
         const quota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
         const err = new Error(quota
-            ? 'Not enough browser storage to save. Delete old save slots or export a backup.'
-            : `Could not write save: ${e?.message || e}`);
+            ? t('msg.save.storage_full')
+            : t('msg.save.write_failed', { error: e?.message || e }));
         err.cause = e;
         err.storageFull = !!quota;
         throw err;
@@ -567,6 +569,21 @@ function _writeSlot(slotKey, stored, meta) {
     }
 }
 
+/**
+ * Display label of a save slot. Labels the game wrote carry a locale key
+ * (labelKey) so they follow the language; the English `label` is kept for
+ * older builds and for slots saved before keys existed.
+ */
+export function slotLabel(meta, fallback) {
+    if (!meta) return fallback;
+    if (meta.labelKey) return t(meta.labelKey, meta.labelParams, meta.label);
+    const auto = /^Auto-save (\d+)$/.exec(meta.label || '');
+    if (auto) return t('save.slot.autosave', { n: Number(auto[1]) }, meta.label);
+    if (meta.label === 'Migrated Save') return t('save.slot.migrated', null, meta.label);
+    if (meta.label === 'Imported Save') return t('save.slot.imported', null, meta.label);
+    return meta.label || fallback;
+}
+
 // Throws (see _storageWrite) when storage is full, so callers can tell the
 // player the save did not happen.
 export async function saveToSlot(game, slotKey, opts = {}) {
@@ -576,6 +593,7 @@ export async function saveToSlot(game, slotKey, opts = {}) {
     const meta = extractMeta(data);
     meta.timestamp = Date.now();
     if (opts.label) meta.label = opts.label;
+    if (opts.labelKey) { meta.labelKey = opts.labelKey; meta.labelParams = opts.labelParams; }
     meta.thumbnail = captureThumbnail(game);
     _writeSlot(slotKey, stored, meta);
     syncSlotToCloud(slotKey).catch(e => console.warn('Cloud sync failed:', e));
@@ -607,7 +625,7 @@ export async function loadFromSlot(game, slotKey) {
 export async function saveAutoSlot(game) {
     const next = parseInt(localStorage.getItem(SLOT_AUTO_NEXT_KEY) || '0') % 3;
     const slotKey = `colony_slot_auto_${next}`;
-    const result = await saveToSlot(game, slotKey, { label: `Auto-save ${next + 1}` });
+    const result = await saveToSlot(game, slotKey, { label: `Auto-save ${next + 1}`, labelKey: 'save.slot.autosave', labelParams: { n: next + 1 } });
     localStorage.setItem(SLOT_AUTO_NEXT_KEY, String((next + 1) % 3));
     return result;
 }
@@ -630,6 +648,7 @@ export function migrateColonySave() {
         const data = JSON.parse(existing);
         const meta = extractMeta(data);
         meta.label = 'Migrated Save';
+        meta.labelKey = 'save.slot.migrated';
         const all = {};
         all['colony_slot_manual_0'] = meta;
         localStorage.setItem(SLOT_META_KEY, JSON.stringify(all));
@@ -679,7 +698,38 @@ const MIGRATIONS = {
             for (const [res, qty] of Object.entries(HEARTH_SHRINE_REFUND)) stock[res] = (stock[res] || 0) + qty * removed;
         }
     },
+    // v14 identifies thoughts by id instead of their English text, so their
+    // text can be translated.
+    14: (d) => {
+        const colonists = d.colonists || [];
+        for (const c of colonists) {
+            if (Array.isArray(c.thoughts)) c.thoughts = c.thoughts.map(th => _migrateThought(th, colonists));
+        }
+    },
 };
+
+// Maps a v13 thought ({ text, ... }) to its id. Unknown text (mods) stays as
+// plain text under a `text:` id, which is what addThought gives it today.
+function _migrateThought(th, colonists) {
+    if (!th || th.id || typeof th.text !== 'string') return th;
+    const { text, ...rest } = th;
+    const id = LEGACY_THOUGHT_IDS[text];
+    if (id) return { ...rest, id };
+    const tierLoc = LEGACY_QUALITY_TIER_LOCS[text];
+    if (tierLoc) return { ...rest, id: `quality:${tierLoc}`, loc: `${tierLoc}.name`, text };
+    const soothed = /^Soothed by a (\w+)$/.exec(text);
+    if (soothed) {
+        return { ...rest, id: `soothed_by:${soothed[1]}`, loc: 'thought.soothed_by_animal.text', text: 'Soothed by a {animal}', params: { animal: { $t: `entity.${soothed[1]}.name`, fb: soothed[1] } } };
+    }
+    const died = /^(.+) died$/.exec(text);
+    if (died) {
+        const who = colonists.find(c => c.name === died[1]);
+        const out = { ...rest, id: `colonist_died:${who ? who.id : died[1]}`, loc: 'thought.colonist_died.text', text: '{name} died', params: { name: died[1] } };
+        if (who) out.targetId = who.id;
+        return out;
+    }
+    return { ...rest, id: `text:${text}`, text };
+}
 
 // Build cost of the removed Hearth Shrine, refunded per shrine by the v13 migration.
 const HEARTH_SHRINE_REFUND = { stone: 6, planks: 4, runite: 2 };
@@ -726,9 +776,7 @@ function _applyLoadData(game, data) {
         // forward.
         if (!(data.version >= 11)) {
             console.warn(`Incompatible save version ${data.version}.`);
-            const wantExport = window.confirm(
-                `Your save was made with an older game version (v${data.version}) and cannot be loaded.\n\nWould you like to export a backup of your save file?`
-            );
+            const wantExport = window.confirm(t('msg.save.incompatible_version', { version: data.version }));
             if (wantExport) {
                 const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -828,7 +876,7 @@ function _applyValidatedData(game, data) {
                 .sort((a, b) => b.level - a.level || b.i - a.i);
             const kept = ranked.slice(0, cap).sort((a, b) => a.i - b.i).map(r => r.school);
             c.attunedSchools = kept;
-            trimmedAttunements.push(`${c.name} (${kept.map(k => MAGIC_SKILLS[k]?.name || k).join(', ')})`);
+            trimmedAttunements.push(t('msg.save.attunement_kept', { name: c.name, schools: kept.map(k => MAGIC_SKILLS[k]?.name || k).join(', ') }));
         }
         // The pyromaniac trait was removed along with map fires.
         if (Array.isArray(c.traits)) c.traits = c.traits.filter(t => t !== 'pyromaniac');
@@ -847,7 +895,7 @@ function _applyValidatedData(game, data) {
         // Queued, not pushed: the load path resets transient state (including
         // notifications) right after this runs; _resetTransientState posts these.
         (game._loadNotices ||= []).push({
-            text: `Colonists can now attune to one magic school at a time. Kept: ${trimmedAttunements.join('; ')}. Change it in Priority [P] > Attunement.`,
+            text: t('msg.save.attunement_trimmed', { list: trimmedAttunements.join('; ') }),
             tick: game.tick, type: 'warning',
         });
     }
@@ -927,6 +975,8 @@ function _applyValidatedData(game, data) {
         game.exploration.completedExpeditions = data.exploration.completedExpeditions || [];
         game.exploration.completedRealms = new Set(data.exploration.completedRealms || []);
         game.exploration.bestiary = new Map(Object.entries(data.exploration.bestiary || {}));
+        // Boss entries used to be keyed by the boss's (now translated) name; key them by realm.
+        game.exploration.migrateBestiaryKeys(game.exploration.bestiary);
         game.exploration.wildlifeKills = new Map(Object.entries(data.exploration.wildlifeKills || {}));
         game.exploration.raiderKills = new Map(Object.entries(data.exploration.raiderKills || {}));
         game.exploration.summonsSeen = new Map(Object.entries(data.exploration.summonsSeen || {}));
@@ -1122,7 +1172,7 @@ async function _mobileExport(json, filename) {
         data: btoa(unescape(encodeURIComponent(json))),
         directory: Directory.Cache,
     });
-    await Share.share({ title: 'Rifthold Save', url: result.uri });
+    await Share.share({ title: t('msg.save.share_title'), url: result.uri });
 }
 
 function _downloadJson(json, filename) {
@@ -1180,8 +1230,8 @@ function _pickImportSlot() {
         const ts = meta[key]?.timestamp || 0;
         if (ts < oldestTs) { oldestTs = ts; oldestKey = key; }
     }
-    const label = meta[oldestKey]?.label || `Manual slot ${Number(oldestKey.split('_').pop()) + 1}`;
-    if (!window.confirm(`All manual save slots are full.\n\nOverwrite the oldest one ("${label}") with the imported save?`)) return null;
+    const label = slotLabel(meta[oldestKey], t('msg.save.manual_slot', { n: Number(oldestKey.split('_').pop()) + 1 }));
+    if (!window.confirm(t('msg.save.import_overwrite', { label }))) return null;
     return oldestKey;
 }
 
@@ -1208,6 +1258,7 @@ export function importSave(file) {
                 }
                 const meta = extractMeta(data);
                 meta.label = 'Imported Save';
+                meta.labelKey = 'save.slot.imported';
                 try {
                     _writeSlot(slotKey, await _encodeSave(json), meta);
                 } catch (err) {

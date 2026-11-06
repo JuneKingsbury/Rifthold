@@ -13,6 +13,7 @@ import {
     WALL_STRUCTURES, FURNITURE_STRUCTURES, PLANT_STRUCTURES, DOOR_STRUCTURES, TILE_CHARS, TILE_COLORS,
 } from './config.js';
 import { SOUND_MANIFEST } from './sound-manifest.js';
+import { getLanguage, mergeLocale, restampConfig, t } from './i18n.js';
 import {
     isModEnabled, recordDiscoveredManifests, recordLoadedManifests, recordWarning,
     registerModPortrait, getModsBaseUrl, getModLoadOrder,
@@ -90,11 +91,11 @@ function _snapshotBaseline() {
 
 function _safeSet(target, key, value, modId, context) {
     if (_baselineKeys.has(key)) {
-        recordWarning(`Mod "${modId}": key "${key}" in ${context} exists in base game. Skipping.`);
+        recordWarning(t('msg.mods.key_in_base_game', { mod: modId, key, context }));
         return false;
     }
     if (key in target) {
-        recordWarning(`Mod "${modId}": key "${key}" in ${context} already defined by another mod. Overwriting.`);
+        recordWarning(t('msg.mods.key_overwritten', { mod: modId, key, context }));
     }
     target[key] = value;
     return true;
@@ -135,7 +136,7 @@ function _translateEffects(def) {
                 out[eff.stat] = (out[eff.stat] || 0) + eff.value;
                 break;
             default:
-                recordWarning(`Unknown effect type "${eff.type}" in mod effects, skipped.`);
+                recordWarning(t('msg.mods.unknown_effect_type', { type: eff.type }));
         }
     }
     return out;
@@ -157,7 +158,7 @@ function _mergeItems(modId, data) {
     for (const [catKey, items] of Object.entries(data)) {
         const catInfo = _ITEM_CATEGORY_MAP[catKey];
         if (!catInfo) {
-            recordWarning(`Mod "${modId}": unknown item category "${catKey}". Skipping.`);
+            recordWarning(t('msg.mods.unknown_item_category', { mod: modId, category: catKey }));
             continue;
         }
         for (const [key, rawDef] of Object.entries(items)) {
@@ -197,7 +198,7 @@ function _mergeResearchTabs(modId, data) {
     const existingKeys = new Set(RESEARCH_TABS.map(t => t.key));
     for (const [key, def] of Object.entries(data)) {
         if (existingKeys.has(key)) {
-            recordWarning(`Mod "${modId}": research tab "${key}" already exists. Skipping.`);
+            recordWarning(t('msg.mods.research_tab_exists', { mod: modId, key }));
             continue;
         }
         RESEARCH_TABS.push({ key, name: def.name || key });
@@ -298,7 +299,7 @@ function _mergeEvents(modId, data) {
     for (const [key, def] of Object.entries(data)) {
         if (!_safeSet(EVENTS, key, def, modId, 'events')) continue;
         if (def.effect && !KNOWN_EFFECTS.has(def.effect)) {
-            recordWarning(`Mod "${modId}": event "${key}" uses unknown effect type "${def.effect}". It will be ignored by the events system.`);
+            recordWarning(t('msg.mods.event_unknown_effect', { mod: modId, key, effect: def.effect }));
         }
     }
 }
@@ -331,7 +332,7 @@ function _mergeRituals(modId, data) {
     for (const [key, def] of Object.entries(data)) {
         if (!_safeSet(RITUALS, key, def, modId, 'rituals')) continue;
         if (def.effect && !KNOWN_EFFECTS.has(def.effect)) {
-            recordWarning(`Mod "${modId}": ritual "${key}" uses unknown effect type "${def.effect}". It will be ignored by the ritual system.`);
+            recordWarning(t('msg.mods.ritual_unknown_effect', { mod: modId, key, effect: def.effect }));
         }
     }
 }
@@ -485,7 +486,7 @@ function _resolveLoadOrder(manifests) {
                 graph.get(depId).push(m.id);
                 inDegree.set(m.id, inDegree.get(m.id) + 1);
             } else {
-                recordWarning(`Mod "${m.id}": dependency "${depId}" not found or not enabled.`);
+                recordWarning(t('msg.mods.missing_dependency', { mod: m.id, dep: depId }));
             }
         }
     }
@@ -507,7 +508,7 @@ function _resolveLoadOrder(manifests) {
     }
 
     if (sorted.length < manifests.length) {
-        recordWarning('Circular dependency detected in mods. Some mods may load in an unexpected order.');
+        recordWarning(t('msg.mods.circular_dependency'));
         for (const m of manifests) {
             if (!sorted.includes(m)) sorted.push(m);
         }
@@ -562,7 +563,7 @@ export async function runModLoader() {
         try { perm = await activeHandle.queryPermission({ mode: 'read' }); }
         catch { /* API unavailable */ }
         if (perm !== 'granted') {
-            recordWarning('Local mods folder needs permission again. Open Mods and click "Grant access", then restart. Falling back to URL-based path.');
+            recordWarning(t('msg.mods.folder_permission'));
             activeHandle = null;
         }
     }
@@ -596,7 +597,7 @@ export async function runModLoader() {
         for (const conflictId of m.conflicts || []) {
             if (!enabledIds.has(conflictId)) continue;
             const loser = rank.get(conflictId) > rank.get(m.id) ? conflictId : m.id;
-            recordWarning(`Mod "${m.id}" conflicts with "${conflictId}". Disabling "${loser}".`);
+            recordWarning(t('msg.mods.conflict', { mod: m.id, other: conflictId, loser }));
             enabledIds.delete(loser);
             if (loser === m.id) break;
         }
@@ -629,17 +630,31 @@ export async function runModLoader() {
             if (data) dataFiles[type] = data;
         }
 
+        // A mod may ship locale/<lang>.json with text for its own content, keyed
+        // like the base game's (`spell.<id>.name`). Base game text always wins.
+        // English is merged first so it backs up a partial translation.
+        const langs = [...new Set(['en', getLanguage()])];
+        for (const lang of langs) {
+            const rel = `locale/${lang}.json`;
+            const strings = await (modDirHandle ? _readJsonFromHandle(modDirHandle, rel) : _fetchJson(`${modBaseUrl}/${rel}`));
+            if (strings && typeof strings === 'object') mergeLocale(lang, strings);
+        }
+
         for (const [type, data] of Object.entries(dataFiles)) {
             const merger = _DATA_MERGERS[type];
             if (merger) {
                 try { merger(manifest.id, data); }
-                catch (err) { recordWarning(`Mod "${manifest.id}": error merging "${type}": ${err.message}`); }
+                catch (err) { recordWarning(t('msg.mods.merge_error', { mod: manifest.id, type, error: err.message })); }
             } else {
-                recordWarning(`Mod "${manifest.id}": unknown data type "${type}". Skipping.`);
+                recordWarning(t('msg.mods.unknown_data_type', { mod: manifest.id, type }));
             }
         }
 
         _registerAssets(manifest.id, modBaseUrl, manifest.assets, modDirHandle);
         _registerPortraits(manifest.id, dataFiles, modDirHandle);
     }
+
+    // Mod entries were merged after the base config was stamped; stamp them so
+    // their text can come from the mods' locale files (inline text otherwise).
+    restampConfig();
 }

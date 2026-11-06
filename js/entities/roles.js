@@ -1,10 +1,22 @@
-import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG, TAMED_ANIMALS } from '../core/config.js';
+import { CONFIG, BUILDINGS, COMBAT_VISUALS, COLONIST_CONFIG, WORK_CONFIG, TAMED_ANIMALS, SKILLS } from '../core/config.js';
 import { manhattanDist, findPathForEnemies, findPathUniform, wasLastSearchExhausted } from '../world/pathfinding.js';
 import { isPassable, isPassableForEnemies, isBreakableByEnemies, hasLineOfSight, findLineOfSightTile } from '../world/map.js';
 import { moveEntity, computeMoveDuration, computeMoveCooldown } from '../systems/movement-lerp.js';
 import { colonistTakeDamage, getMoveSpeedBonus, addThought } from './colonist.js';
+import { t as tr, ref } from '../core/i18n.js';
+import { resourceName } from '../core/names.js';
 import { spawnDamageText, spawnImpactSpray, spawnStructureCrumble } from '../ui/overlay-renderer.js';
 import { escapeHtml as esc } from '../ui/ui-utils.js';
+
+// Escapes a translated info line, then puts already-escaped markup params (a
+// colored status word) in place of their placeholders.
+function escWithHtml(key, params, htmlParams) {
+    const marks = {};
+    for (const k of Object.keys(htmlParams)) marks[k] = `\u0001${k}\u0001`;
+    let out = esc(tr(key, { ...params, ...marks }));
+    for (const [k, html] of Object.entries(htmlParams)) out = out.replace(marks[k], html);
+    return out;
+}
 
 function canAttack(entity, game) {
     const cooldown = entity.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
@@ -22,7 +34,7 @@ export const ROLE_HANDLERS = {
             const rs = entity.roleState.guard || {};
             const state = String(rs.state || 'patrolling');
             const stateColor = state === 'engaging' ? '#ff4444' : state === 'retreating' ? '#ffaa00' : '#44cc44';
-            return `<div class="info-row" style="color:${stateColor}">Guard: ${esc(state.charAt(0).toUpperCase() + state.slice(1))} (radius ${esc(role.guardRadius || 8)}, ${esc(role.guardDamage || 8)} dmg)</div>`;
+            return `<div class="info-row" style="color:${stateColor}">${esc(tr('msg.roles.guard_info', { state: tr(`msg.roles.guard_state.${state}`, null, state), radius: role.guardRadius || 8, damage: role.guardDamage || 8 }))}</div>`;
         },
         update(entity, role, game) {
             const rs = entity.roleState.guard;
@@ -109,8 +121,8 @@ export const ROLE_HANDLERS = {
             const next = rs.cooldown || 0;
             const tamedDef = TAMED_ANIMALS[entity.type];
             const threshold = tamedDef?.hungerThreshold || 3;
-            const hungerStr = (entity.hunger || 0) >= threshold ? ' <span style="color:#ff6644">Hungry!</span>' : '';
-            return `<div class="info-row" style="color:#88cc88">Produces: ${esc(role.produces)} (every ${esc(role.produceRate || 80)} ticks, next in ${esc(next)})${hungerStr}</div>`;
+            const hungerStr = (entity.hunger || 0) >= threshold ? ` <span style="color:#ff6644">${esc(tr('msg.roles.hungry'))}</span>` : '';
+            return `<div class="info-row" style="color:#88cc88">${esc(tr('msg.roles.production_info', { resource: resourceName(role.produces), rate: role.produceRate || 80, next }))}${hungerStr}</div>`;
         },
         update(entity, role, game) {
             if (entity.onExpedition) return;
@@ -150,7 +162,7 @@ export const ROLE_HANDLERS = {
             entity.roleState.ranged_attacker = { state: 'approaching', cooldown: 0 };
         },
         info(entity, role) {
-            return `<div class="info-row" style="color:#ffaa33">Ranged Attacker (range ${esc(role.range || 6)}, prefers distance ${esc(role.preferDistance || 4)})</div>`;
+            return `<div class="info-row" style="color:#ffaa33">${esc(tr('msg.roles.ranged_info', { range: role.range || 6, distance: role.preferDistance || 4 }))}</div>`;
         },
         update(entity, role, game, combatSystem) {
             const rs = entity.roleState.ranged_attacker;
@@ -231,8 +243,8 @@ export const ROLE_HANDLERS = {
         },
         info(entity, role) {
             const rs = entity.roleState.melee_charger || {};
-            const status = rs.charged ? 'Engaged' : 'Charging';
-            return `<div class="info-row" style="color:#ff6644">Melee Charger: ${status} (+${esc(role.chargeBonus || 5)} first hit bonus)</div>`;
+            const status = tr(rs.charged ? 'msg.roles.charger_engaged' : 'msg.roles.charger_charging');
+            return `<div class="info-row" style="color:#ff6644">${esc(tr('msg.roles.charger_info', { status, bonus: role.chargeBonus || 5 }))}</div>`;
         },
         update(entity, role, game, combatSystem) {
             const rs = entity.roleState.melee_charger;
@@ -292,7 +304,7 @@ export const ROLE_HANDLERS = {
             entity.roleState.nexus_target = { state: 'moving' };
         },
         info(entity, role) {
-            return `<div class="info-row" style="color:#aa33ff">Nexus Target: Attacking the Void Nexus</div>`;
+            return `<div class="info-row" style="color:#aa33ff">${esc(tr('msg.roles.nexus_target_info'))}</div>`;
         },
         update(entity, role, game) {
             if (!game.waves || !game.waves.active || !game.waves.nexusPosition) return;
@@ -332,7 +344,7 @@ export const ROLE_HANDLERS = {
             entity.roleState.structure_breaker = {};
         },
         info(entity, role) {
-            return `<div class="info-row" style="color:#ffaa00">Structure Breaker (${esc(role.breakSpeed || 1)}x break speed)</div>`;
+            return `<div class="info-row" style="color:#ffaa00">${esc(tr('msg.roles.structure_breaker_info', { speed: role.breakSpeed || 1 }))}</div>`;
         },
         update(entity, role, game) {
             if (!entity.path || entity.path.length === 0) return;
@@ -352,8 +364,8 @@ export const ROLE_HANDLERS = {
         },
         info(entity, role) {
             const rs = entity.roleState.boss || {};
-            const status = rs.enraged ? '<span style="color:#ff0000">ENRAGED</span>' : 'Normal';
-            return `<div class="info-row" style="color:#ff8800">Boss: ${status} (enrage at ${Math.round((role.enrageThreshold || 0.3) * 100)}% HP, ${esc(role.enrageDamageMult || 1.5)}x damage)</div>`;
+            const status = rs.enraged ? `<span style="color:#ff0000">${esc(tr('msg.roles.boss_enraged'))}</span>` : esc(tr('msg.roles.status_normal'));
+            return `<div class="info-row" style="color:#ff8800">${escWithHtml('msg.roles.boss_info', { pct: Math.round((role.enrageThreshold || 0.3) * 100), mult: role.enrageDamageMult || 1.5 }, { status })}</div>`;
         },
         update(entity, role, game) {
             const rs = entity.roleState.boss;
@@ -372,7 +384,7 @@ export const ROLE_HANDLERS = {
     wander: {
         init() {},
         info(entity, role) {
-            return `<div class="info-row" style="color:#aabb88">Wanders near pen</div>`;
+            return `<div class="info-row" style="color:#aabb88">${esc(tr('msg.roles.wander_info'))}</div>`;
         },
         update(entity, role, game) {
             if (entity.onExpedition) return;
@@ -399,8 +411,8 @@ export const ROLE_HANDLERS = {
         info(entity) {
             const rs = entity.roleState.pet || {};
             const stateColor = rs.state === 'sheltering' ? '#ffaa00' : rs.state === 'fighting' ? '#ff4444' : '#aaddff';
-            const stateLabel = rs.state === 'sheltering' ? 'Sheltering' : rs.state === 'fighting' ? 'Fighting!' : 'Following';
-            return `<div class="info-row" style="color:${stateColor}">Pet: ${esc(stateLabel)}</div>`;
+            const stateLabel = tr(rs.state === 'sheltering' ? 'msg.roles.pet_sheltering' : rs.state === 'fighting' ? 'msg.roles.pet_fighting' : 'msg.roles.pet_following');
+            return `<div class="info-row" style="color:${stateColor}">${esc(tr('msg.roles.pet_info', { state: stateLabel }))}</div>`;
         },
         update(entity, role, game) {
             if (entity.onExpedition) return;
@@ -497,8 +509,8 @@ export const ROLE_HANDLERS = {
             // Mood goes through a short, refreshed thought: computeMood rebuilds mood from
             // thoughts every tick, so a direct write to owner.mood would be discarded.
             switch (entity.type) {
-                case 'rabbit': addThought(owner, 'Pet rabbit at my side', 4, 20, game.tick); break;
-                case 'tapir':  addThought(owner, 'Pet tapir at my side', 6, 20, game.tick); break;
+                case 'rabbit': addThought(owner, 'pet_rabbit_near', 4, 20, game.tick); break;
+                case 'tapir':  addThought(owner, 'pet_tapir_near', 6, 20, game.tick); break;
                 case 'deer':   owner.activePetSpeedBonus = (owner.activePetSpeedBonus || 0) + 0.10; break;
                 case 'okapi':  owner.activePetSpeedBonus = (owner.activePetSpeedBonus || 0) + 0.15; break;
                 case 'boar':   owner.activePetDmgBonus   = (owner.activePetDmgBonus   || 0) + 1;    break;
@@ -509,7 +521,8 @@ export const ROLE_HANDLERS = {
     worker: {
         init() {},
         info(entity, role) {
-            return `<div class="info-row" style="color:#88aaff">Worker: ${esc(String(role.specialty || 'general').charAt(0).toUpperCase() + String(role.specialty || 'general').slice(1))} (skill ${esc(role.skillLevel || 6)})</div>`;
+            const specialty = role.specialty ? (SKILLS[role.specialty]?.name ?? role.specialty) : tr('msg.roles.worker_general');
+            return `<div class="info-row" style="color:#88aaff">${esc(tr('msg.roles.worker_info', { specialty, skill: role.skillLevel || 6 }))}</div>`;
         },
         update() {},
     },
@@ -520,8 +533,8 @@ export const ROLE_HANDLERS = {
         },
         info(entity, role) {
             const rs = entity.roleState.flee_on_damage || {};
-            const status = rs.fleeing ? '<span style="color:#ffaa00">Fleeing!</span>' : 'Normal';
-            return `<div class="info-row" style="color:#cccc44">Flee on Damage: ${status} (threshold ${Math.round((role.fleeThreshold || 0.3) * 100)}% HP)</div>`;
+            const status = rs.fleeing ? `<span style="color:#ffaa00">${esc(tr('msg.roles.fleeing'))}</span>` : esc(tr('msg.roles.status_normal'));
+            return `<div class="info-row" style="color:#cccc44">${escWithHtml('msg.roles.flee_info', { pct: Math.round((role.fleeThreshold || 0.3) * 100) }, { status })}</div>`;
         },
         update(entity, role, game) {
             const rs = entity.roleState.flee_on_damage;
@@ -541,7 +554,7 @@ export const ROLE_HANDLERS = {
         init() {},
         info(entity, role) {
             const remaining = entity.expiresAt ? Math.max(0, entity.expiresAt - (window.game?.tick || 0)) : '?';
-            return `<div class="info-row" style="color:#9966ff">Summoned (${esc(remaining)} ticks remaining)</div>`;
+            return `<div class="info-row" style="color:#9966ff">${esc(tr('msg.roles.summoned_info', { remaining }))}</div>`;
         },
         update(entity, role, game) {
             if (entity.expiresAt && game.tick >= entity.expiresAt) {
@@ -648,9 +661,9 @@ const EFFECT_HANDLERS = {
         info(entity, effect) {
             const bonus = effect.moodBonus || 5;
             const scope = effect.scope || 'aura';
-            if (scope === 'self') return `<div class="info-row" style="color:#ffaacc">Mood: +${esc(bonus)} (self)</div>`;
-            if (scope === 'global') return `<div class="info-row" style="color:#ffaacc">Mood: +${esc(bonus)} (all colonists)</div>`;
-            return `<div class="info-row" style="color:#ffaacc">Mood Aura: +${esc(bonus)} (${esc(effect.radius || 4)} tile radius)</div>`;
+            if (scope === 'self') return `<div class="info-row" style="color:#ffaacc">${esc(tr('msg.roles.mood_self', { bonus }))}</div>`;
+            if (scope === 'global') return `<div class="info-row" style="color:#ffaacc">${esc(tr('msg.roles.mood_global', { bonus }))}</div>`;
+            return `<div class="info-row" style="color:#ffaacc">${esc(tr('msg.roles.mood_aura', { bonus, radius: effect.radius || 4 }))}</div>`;
         },
         update(entity, effect, game) {
             if (entity.onExpedition) return;
@@ -664,12 +677,12 @@ const EFFECT_HANDLERS = {
             // Colonist mood is rebuilt from thoughts every tick (computeMood), so the
             // aura grants a short thought that is refreshed while the colonist stays in
             // range. One thought per animal type: several rabbits don't stack.
-            const text = `Soothed by a ${entity.type}`;
+            const thought = { id: `soothed_by:${entity.type}`, loc: 'thought.soothed_by_animal.text', text: 'Soothed by a {animal}', params: { animal: ref(`entity.${entity.type}.name`, entity.type) } };
             const radius = scope === 'global' ? Infinity : (effect.radius || 4);
             for (const c of game.colonists) {
                 if (c.hp <= 0 || c.onExpedition || c.golem) continue;
                 if (manhattanDist(c.x, c.y, entity.x, entity.y) <= radius) {
-                    addThought(c, text, bonus, 20, game.tick);
+                    addThought(c, thought, bonus, 20, game.tick);
                 }
             }
         },

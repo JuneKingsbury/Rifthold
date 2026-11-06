@@ -4,9 +4,14 @@
     "minTick": 960,
     "cooldown": 2400,
     "effect": "mood",
-    "mood": -5,
+    "thought": "Heard whispers from the void",
+    "moodChange": -5,
+    "moodDuration": 300,
     "description": "Strange whispers from the void unsettle your colonists.",
     "message": "Void Whispers",
-    "detail": "Your colonists report hearing strange whispers from beneath the earth."
+    "detail": "Your colonists report hearing strange whispers from beneath the earth.",
+    "notification": "{name} hears strange whispers from beneath the earth.",
+    "logMessage": "{name} heard whispers from the void",
+    "logType": "event"
   }
 }

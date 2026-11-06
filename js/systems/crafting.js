@@ -6,6 +6,8 @@
  */
 import { RECIPES, WORK_CONFIG, ENCHANT_COST_BY_TIER } from '../core/config.js';
 import { getEquippedItems } from '../entities/colonist.js';
+import { t } from '../core/i18n.js';
+import { resourceName } from '../core/names.js';
 
 // Cached recipe availability. Availability depends only on research, the stock of
 // recipe inputs, which station types exist and grid power, so the cache is keyed
@@ -73,10 +75,10 @@ export function queueCraftingOrder(game, recipeKey) {
 
 export function queueEnchantingOrder(game, itemKey, itemQuality, itemType, itemTier) {
     const station = findAvailableStation(game, 'enchanting_table');
-    if (!station) return 'No enchanting table has been built.';
-    if (!station.powered) return 'The enchanting table needs power.';
+    if (!station) return t('msg.crafting.no_enchanting_table');
+    if (!station.powered) return t('msg.crafting.enchanting_table_unpowered');
     const cost = ENCHANT_COST_BY_TIER[itemTier] ?? { resource: 'runite', amount: 5 };
-    if (!game.resources.has({ [cost.resource]: cost.amount })) return `Not enough ${cost.resource.replace(/_/g, ' ')} (need ${cost.amount}).`;
+    if (!game.resources.has({ [cost.resource]: cost.amount })) return t('msg.crafting.enchant_not_enough', { resource: resourceName(cost.resource), n: cost.amount });
     game.resources.deduct({ [cost.resource]: cost.amount });
 
     let workAmount = 100; // Base work amount for enchanting.

@@ -1,56 +1,58 @@
+import { stampLoc } from '../i18n.js';
+
 export const ENTITIES = {
     // === Animals ===
-    deer:    { char: 'd', color: '#bb8855', hp: 40, speed: 0.22, category: 'animal', hostile: false, meatYield: 3, hideYield: 2, fleeRange: 5, spawnWeight: 15, lore: 'An offshoot of the common mule deer. These skittish creatures are found all throughout the Frontier.', tameable: true, tamed: { foodToTame: 4, courage: 0.3, petDamage: 2, roles: [{ type: 'pack', expeditionSpeedBonus: 0.05 }, { type: 'wander' }], effects: [] } },
-    rabbit:  { char: 'r', color: '#ccaa88', hp: 10, speed: 0.3, category: 'animal', hostile: false, meatYield: 1, fleeRange: 4, spawnWeight: 12, lore: 'A long eared rodent found in the forests of the Frontier.', tameable: true, tamed: { foodToTame: 1, courage: 0.05, petDamage: 1, roles: [{ type: 'wander' }], effects: [{ type: 'mood_aura', scope: 'aura', radius: 3, moodBonus: 2 }] } },
-    wolf:    { char: 'w', color: '#555555', hp: 60, speed: 0.26, category: 'animal', hostile: true, meatYield: 2, hideYield: 1, damage: 8, aggroRange: 6, spawnWeight: 0, spawnCondition: 'hostileNight', lore: 'The apex predator of the Frontier. During the winter it is not uncommon to see wandering packs of hungry wolves.', tameable: true, tamed: { foodToTame: 6, dangerousTame: true, baseTameChance: 0.40, retaliationDamage: 12, roles: [{ type: 'guard', guardRadius: 8, guardDamage: 8 }, { type: 'war', beastHp: 35, beastDamage: 12 }], effects: [] } },
-    chicken: { char: 'c', color: '#ddaa44', hp: 15, speed: 0.15, category: 'animal', hostile: false, meatYield: 1, fleeRange: 3, spawnWeight: 13, lore: 'A bit more wild that their kingdom counterparts. Regardless, they are easy to tame and seem to enjoy the company of people.', tameable: true, tamed: { foodToTame: 2, hungerRate: 200, hungerThreshold: 3, roles: [{ type: 'production', produces: 'eggs', produceRate: 80, produceAmount: 1 }, { type: 'wander' }], effects: [] } },
-    cow:     { char: 'C', color: '#aa7744', hp: 80, speed: 0.11, category: 'animal', hostile: false, meatYield: 4, hideYield: 3, fleeRange: 4, spawnWeight: 13, lore: 'A common bovine found in the fields of the Frontier.', tameable: true, tamed: { foodToTame: 4, hungerRate: 200, hungerThreshold: 3, roles: [{ type: 'production', produces: 'milk', produceRate: 100, produceAmount: 2 }, { type: 'wander' }], effects: [] } },
-    sheep:   { char: 's', color: '#cccccc', hp: 40, speed: 0.14, category: 'animal', hostile: false, meatYield: 2, woolYield: 1, fleeRange: 4, spawnWeight: 13, lore: 'A docile herbivore commonly found in the meadows of the Frontier.', tameable: true, tamed: { foodToTame: 3, hungerRate: 200, hungerThreshold: 3, roles: [{ type: 'production', produces: 'wool', produceRate: 120, produceAmount: 1 }, { type: 'wander' }], effects: [] } },
-    okapi:   { char: 'O', color: '#b3562e', hp: 100, speed: 0.34, category: 'animal', hostile: false, meatYield: 1, fleeRange: 4, spawnWeight: 11, lore: 'A rare and elusive creature found in the dense forests of the Frontier.', tameable: true, tamed: { foodToTame: 5, courage: 0.4, petDamage: 3, roles: [{ type: 'pack', expeditionSpeedBonus: 0.13 }, { type: 'wander' }], effects: [] } },
-    tapir:   { char: 't', color: '#f2e6e6', hp: 60, speed: 0.11, category: 'animal', hostile: false, meatYield: 1, fleeRange: 4, spawnWeight: 11, lore: 'A large herbivore with a distinctive snout found in the swamps of the Frontier.', tameable: true, tamed: { foodToTame: 3, courage: 0.2, petDamage: 1, roles: [{ type: 'wander' }], effects: [{ type: 'mood_aura', scope: 'aura', radius: 4, moodBonus: 5 }] } },
-    goose:   { char: 'n', color: '#e0e0cc', hp: 20, speed: 0.18, category: 'animal', hostile: false, meatYield: 1, fleeRange: 6, spawnWeight: 11, lore: 'A large, ill-tempered waterfowl common near the rivers of the Frontier. Their honking carries far and wide, warning of any who approach.', tameable: true, tamed: { foodToTame: 2, roles: [{ type: 'guard', guardRadius: 12, guardDamage: 3 }, { type: 'wander' }], effects: [] } },
-    boar:    { char: 'b', color: '#7a5c44', hp: 70, speed: 0.18, category: 'animal', hostile: false, meatYield: 3, hideYield: 1, fleeRange: 5, spawnWeight: 10, lore: 'A stocky and ill-tempered wild pig found throughout the Frontier. Though it flees at first, it does not forget an intrusion.', tameable: true, tamed: { foodToTame: 5, dangerousTame: true, baseTameChance: 0.55, retaliationDamage: 10, courage: 0.8, petDamage: 6, roles: [{ type: 'war', beastHp: 45, beastDamage: 10 }], effects: [] } },
+    deer:    { char: 'd', color: '#bb8855', hp: 40, speed: 0.22, category: 'animal', hostile: false, meatYield: 3, hideYield: 2, fleeRange: 5, spawnWeight: 15, tameable: true, tamed: { foodToTame: 4, courage: 0.3, petDamage: 2, roles: [{ type: 'pack', expeditionSpeedBonus: 0.05 }, { type: 'wander' }], effects: [] } },
+    rabbit:  { char: 'r', color: '#ccaa88', hp: 10, speed: 0.3, category: 'animal', hostile: false, meatYield: 1, fleeRange: 4, spawnWeight: 12, tameable: true, tamed: { foodToTame: 1, courage: 0.05, petDamage: 1, roles: [{ type: 'wander' }], effects: [{ type: 'mood_aura', scope: 'aura', radius: 3, moodBonus: 2 }] } },
+    wolf:    { char: 'w', color: '#555555', hp: 60, speed: 0.26, category: 'animal', hostile: true, meatYield: 2, hideYield: 1, damage: 8, aggroRange: 6, spawnWeight: 0, spawnCondition: 'hostileNight', tameable: true, tamed: { foodToTame: 6, dangerousTame: true, baseTameChance: 0.40, retaliationDamage: 12, roles: [{ type: 'guard', guardRadius: 8, guardDamage: 8 }, { type: 'war', beastHp: 35, beastDamage: 12 }], effects: [] } },
+    chicken: { char: 'c', color: '#ddaa44', hp: 15, speed: 0.15, category: 'animal', hostile: false, meatYield: 1, fleeRange: 3, spawnWeight: 13, tameable: true, tamed: { foodToTame: 2, hungerRate: 200, hungerThreshold: 3, roles: [{ type: 'production', produces: 'eggs', produceRate: 80, produceAmount: 1 }, { type: 'wander' }], effects: [] } },
+    cow:     { char: 'C', color: '#aa7744', hp: 80, speed: 0.11, category: 'animal', hostile: false, meatYield: 4, hideYield: 3, fleeRange: 4, spawnWeight: 13, tameable: true, tamed: { foodToTame: 4, hungerRate: 200, hungerThreshold: 3, roles: [{ type: 'production', produces: 'milk', produceRate: 100, produceAmount: 2 }, { type: 'wander' }], effects: [] } },
+    sheep:   { char: 's', color: '#cccccc', hp: 40, speed: 0.14, category: 'animal', hostile: false, meatYield: 2, woolYield: 1, fleeRange: 4, spawnWeight: 13, tameable: true, tamed: { foodToTame: 3, hungerRate: 200, hungerThreshold: 3, roles: [{ type: 'production', produces: 'wool', produceRate: 120, produceAmount: 1 }, { type: 'wander' }], effects: [] } },
+    okapi:   { char: 'O', color: '#b3562e', hp: 100, speed: 0.34, category: 'animal', hostile: false, meatYield: 1, fleeRange: 4, spawnWeight: 11, tameable: true, tamed: { foodToTame: 5, courage: 0.4, petDamage: 3, roles: [{ type: 'pack', expeditionSpeedBonus: 0.13 }, { type: 'wander' }], effects: [] } },
+    tapir:   { char: 't', color: '#f2e6e6', hp: 60, speed: 0.11, category: 'animal', hostile: false, meatYield: 1, fleeRange: 4, spawnWeight: 11, tameable: true, tamed: { foodToTame: 3, courage: 0.2, petDamage: 1, roles: [{ type: 'wander' }], effects: [{ type: 'mood_aura', scope: 'aura', radius: 4, moodBonus: 5 }] } },
+    goose:   { char: 'n', color: '#e0e0cc', hp: 20, speed: 0.18, category: 'animal', hostile: false, meatYield: 1, fleeRange: 6, spawnWeight: 11, tameable: true, tamed: { foodToTame: 2, roles: [{ type: 'guard', guardRadius: 12, guardDamage: 3 }, { type: 'wander' }], effects: [] } },
+    boar:    { char: 'b', color: '#7a5c44', hp: 70, speed: 0.18, category: 'animal', hostile: false, meatYield: 3, hideYield: 1, fleeRange: 5, spawnWeight: 10, tameable: true, tamed: { foodToTame: 5, dangerousTame: true, baseTameChance: 0.55, retaliationDamage: 10, courage: 0.8, petDamage: 6, roles: [{ type: 'war', beastHp: 45, beastDamage: 10 }], effects: [] } },
 
     // === Crypt guardians ===
     // Hostile "animals" so the wildlife AI drives them (chase colonists inside aggroRange).
     // spawnWeight 0 keeps them out of the wild spawn table: only a breached crypt makes them.
-    crypt_warden:    { name: 'Crypt Warden', char: 'W', color: '#9988aa', hp: 45, speed: 0.2, category: 'animal', hostile: true, guardian: true, meatYield: 0, damage: 6, aggroRange: 5, spawnWeight: 0, lore: 'A shambling watcher bound to a tomb long after its charge was forgotten.' },
-    bone_sentinel:   { name: 'Bone Sentinel', char: 'S', color: '#ddd8c4', hp: 85, speed: 0.22, category: 'animal', hostile: true, guardian: true, meatYield: 0, damage: 11, aggroRange: 6, spawnWeight: 0, lore: 'Old bones wired with ritual script. It does not tire and does not bargain.' },
+    crypt_warden:    { char: 'W', color: '#9988aa', hp: 45, speed: 0.2, category: 'animal', hostile: true, guardian: true, meatYield: 0, damage: 6, aggroRange: 5, spawnWeight: 0 },
+    bone_sentinel:   { char: 'S', color: '#ddd8c4', hp: 85, speed: 0.22, category: 'animal', hostile: true, guardian: true, meatYield: 0, damage: 11, aggroRange: 6, spawnWeight: 0 },
 
     // === Summons ===
-    familiar: { name: 'Familiar', char: 'f', color: '#9966ff', hp: 40, speed: 0.5, category: 'summon', damage: 8, summonDuration: 60, lore: 'A creature bound by novice conjurers. It lives to serve its new master.', roles: [{ type: 'guard', guardRadius: 6, patrolRadius: 3 }, { type: 'summoned' }] },
-    ghost:    { name: 'Ghost',    char: 'g', color: '#88ccff', hp: 25, speed: 0.7, category: 'summon', damage: 14, summonDuration: 80, lore: 'Ancestral spirits called upon to protect their kin.', roles: [{ type: 'guard', guardRadius: 8, patrolRadius: 4 }, { type: 'summoned' }] },
-    monster:  { name: 'Monster',  char: 'M', color: '#ff4466', hp: 60, speed: 0.4, category: 'summon', damage: 20, summonDuration: 100, lore: 'A monster bound by experienced conjurers. It lets no harm come to its master.', roles: [{ type: 'guard', guardRadius: 10, patrolRadius: 5 }, { type: 'summoned' }] },
-    spectral_wisp: { name: 'Spectral Wisp', char: 'w', color: '#aaccff', hp: 12, speed: 0.6, category: 'summon', damage: 5, summonDuration: 45, lore: 'Short-lived spectral skirmishers conjured in packs of three.', roles: [{ type: 'guard', guardRadius: 7, patrolRadius: 4 }, { type: 'summoned' }] },
-    decoy:         { name: 'Decoy',         char: '◈', color: '#aaaaaa', hp: 14, speed: 0.0, category: 'summon', damage: 0, summonDuration: 60, threatMult: 5, lore: 'An illusory construct conjured to draw enemy fire. It cannot attack, but enemies instinctively target it.', roles: [{ type: 'guard', guardRadius: 0, patrolRadius: 0 }, { type: 'summoned' }] },
+    familiar: { char: 'f', color: '#9966ff', hp: 40, speed: 0.5, category: 'summon', damage: 8, summonDuration: 60, roles: [{ type: 'guard', guardRadius: 6, patrolRadius: 3 }, { type: 'summoned' }] },
+    ghost:    { char: 'g', color: '#88ccff', hp: 25, speed: 0.7, category: 'summon', damage: 14, summonDuration: 80, roles: [{ type: 'guard', guardRadius: 8, patrolRadius: 4 }, { type: 'summoned' }] },
+    monster:  { char: 'M', color: '#ff4466', hp: 60, speed: 0.4, category: 'summon', damage: 20, summonDuration: 100, roles: [{ type: 'guard', guardRadius: 10, patrolRadius: 5 }, { type: 'summoned' }] },
+    spectral_wisp: { char: 'w', color: '#aaccff', hp: 12, speed: 0.6, category: 'summon', damage: 5, summonDuration: 45, roles: [{ type: 'guard', guardRadius: 7, patrolRadius: 4 }, { type: 'summoned' }] },
+    decoy:         { char: '◈', color: '#aaaaaa', hp: 14, speed: 0.0, category: 'summon', damage: 0, summonDuration: 60, threatMult: 5, roles: [{ type: 'guard', guardRadius: 0, patrolRadius: 0 }, { type: 'summoned' }] },
 
     // === Golems ===
-    farmer_golem:    { name: 'Farmer Golem', char: 'G', color: '#55aa33', hp: 150, speed: 0.3, category: 'golem', traits: ['pacifist', 'green_thumb'], roles: [{ type: 'worker', specialty: 'farming', skillLevel: 6 }], cost: { stone: 10, runite: 3, void_essence: 2 }, craftTicks: 80 },
-    builder_golem:   { name: 'Builder Golem', char: 'G', color: '#888888', hp: 180, speed: 0.25, category: 'golem', traits: ['pacifist'], roles: [{ type: 'worker', specialty: 'building', skillLevel: 6 }], cost: { stone: 12, runite: 4, void_essence: 2 }, craftTicks: 90 },
-    cook_golem:      { name: 'Cook Golem', char: 'G', color: '#cc7722', hp: 140, speed: 0.32, category: 'golem', traits: ['pacifist'], roles: [{ type: 'worker', specialty: 'cooking', skillLevel: 6 }], cost: { stone: 9, runite: 2, void_essence: 1 }, craftTicks: 75 },
-    herder_golem:    { name: 'Herder Golem', char: 'G', color: '#88aa33', hp: 170, speed: 0.29, category: 'golem', traits: ['pacifist'], roles: [{ type: 'worker', specialty: 'animals', skillLevel: 6 }], cost: { stone: 11, runite: 3, void_essence: 2 }, craftTicks: 85 },
+    farmer_golem:    { char: 'G', color: '#55aa33', hp: 150, speed: 0.3, category: 'golem', traits: ['pacifist', 'green_thumb'], roles: [{ type: 'worker', specialty: 'farming', skillLevel: 6 }], cost: { stone: 10, runite: 3, void_essence: 2 }, craftTicks: 80 },
+    builder_golem:   { char: 'G', color: '#888888', hp: 180, speed: 0.25, category: 'golem', traits: ['pacifist'], roles: [{ type: 'worker', specialty: 'building', skillLevel: 6 }], cost: { stone: 12, runite: 4, void_essence: 2 }, craftTicks: 90 },
+    cook_golem:      { char: 'G', color: '#cc7722', hp: 140, speed: 0.32, category: 'golem', traits: ['pacifist'], roles: [{ type: 'worker', specialty: 'cooking', skillLevel: 6 }], cost: { stone: 9, runite: 2, void_essence: 1 }, craftTicks: 75 },
+    herder_golem:    { char: 'G', color: '#88aa33', hp: 170, speed: 0.29, category: 'golem', traits: ['pacifist'], roles: [{ type: 'worker', specialty: 'animals', skillLevel: 6 }], cost: { stone: 11, runite: 3, void_essence: 2 }, craftTicks: 85 },
 
     // === Enemies ===
-    raider_brute:    { name: 'Raider', char: 'R', color: '#ff3333', hp: 50, speed: 0.28, category: 'enemy', hostile: true, damage: 5, aggroRange: 30, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', loot: [], lore: 'Exiles from the human kingdom. Their strength would greatly benefit any community, but they found more success using that power to simply take what they want.' },
-    raider_archer:   { name: 'Raider Archer', char: 'R', color: '#ff6633', hp: 35, speed: 0.18, category: 'enemy', hostile: true, damage:2, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 5, preferDistance: 4 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', attackAnim: 'DrawAndShoot', loot: [], lore: 'Exiles from the human kingdom. Much like their brutish siblings, these skilled archers forgo the simple life of hunters for the exciting life of bandits.' },
-    crusader:        { name: 'Crusader', char: 'C', color: '#d6d216', hp: 80, speed: 0.32, category: 'enemy', hostile: true, damage: 10, aggroRange: 40, noFlee: true, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', damageReduction: 0.2, loot: [], lore: 'A crusader sent from the human kingdom to snuff out the remains of magic. They are extremely skilled with their halberds and specialize in fighting magicians.' },
-    crusader_archer: { name: 'Crusader Archer', char: 'C', color: '#d6a816', hp: 50, speed: 0.24, category: 'enemy', hostile: true, damage: 4, aggroRange: 40, noFlee: true, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#d6d216', attackAnim: 'DrawAndShoot', damageReduction: 0.1, loot: [], lore: 'A crusader sent from the human kingdom to snuff out the remains of magic. They are armed with mechanically enhanced bows, striking with unmatched precision.' },
-    raider_hexer:    { name: 'Raider Hexer', char: 'R', color: '#cc44ff', hp: 30, speed: 0.22, category: 'enemy', hostile: true, damage: 1, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 6, preferDistance: 5 }], ranged: true, projectileChar: '*', projectileColor: '#cc44ff', attackAnim: 'DrawAndShoot', onHit: { effect: 'slow', duration: 50, moveSpeedMalus: -0.5 }, loot: [], lore: 'Raiders with vast experience in the Frontier. They have mastered the basics of curses and use them to their advantage in battle, slowing their enemies to a crawl.' },
-    raider_poisoner: { name: 'Raider Poisoner', char: 'R', color: '#44cc44', hp: 40, speed: 0.20, category: 'enemy', hostile: true, damage: 2, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 5, preferDistance: 4 }], ranged: true, projectileChar: '-', projectileColor: '#44cc44', attackAnim: 'DrawAndShoot', onHit: { effect: 'dot', tickDamage: 1, tickInterval: 5, duration: 60 }, loot: [], lore: 'Raiders with vast experience in the Frontier. They have mastered the basics of poisons and use them to their advantage in battle, slowly killing their enemies from a distance.' },
-    void_walker:     { name: 'Void Walker', char: 'V', color: '#aa33ff', hp: 30, speed: 0.21, category: 'enemy', hostile: true, damage: 4, roles: [{ type: 'nexus_target' }], attackAnim: 'Swing', loot: [], lore: 'Beasts from the void solely focused on severing the connection between our realms.' },
-    void_brute:      { name: 'Void Brute', char: 'V', color: '#7722cc', hp: 80, speed: 0.14, category: 'enemy', hostile: true, damage: 10, roles: [{ type: 'nexus_target' }, { type: 'structure_breaker', breakSpeed: 2 }], attackAnim: 'Swing', loot: [], lore: 'Powerful beasts from the void, seemingly built to destroy the walls we raise around the Nexus.' },
+    raider_brute:    { char: 'R', color: '#ff3333', hp: 50, speed: 0.28, category: 'enemy', hostile: true, damage: 5, aggroRange: 30, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', loot: [] },
+    raider_archer:   { char: 'R', color: '#ff6633', hp: 35, speed: 0.18, category: 'enemy', hostile: true, damage:2, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 5, preferDistance: 4 }], ranged: true, projectileChar: '-', projectileColor: '#ffaa33', attackAnim: 'DrawAndShoot', loot: [] },
+    crusader:        { char: 'C', color: '#d6d216', hp: 80, speed: 0.32, category: 'enemy', hostile: true, damage: 10, aggroRange: 40, noFlee: true, roles: [{ type: 'melee_charger' }], attackAnim: 'Swing', damageReduction: 0.2, loot: [] },
+    crusader_archer: { char: 'C', color: '#d6a816', hp: 50, speed: 0.24, category: 'enemy', hostile: true, damage: 4, aggroRange: 40, noFlee: true, roles: [{ type: 'ranged_attacker', range: 7, preferDistance: 5 }], ranged: true, projectileChar: '-', projectileColor: '#d6d216', attackAnim: 'DrawAndShoot', damageReduction: 0.1, loot: [] },
+    raider_hexer:    { char: 'R', color: '#cc44ff', hp: 30, speed: 0.22, category: 'enemy', hostile: true, damage: 1, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 6, preferDistance: 5 }], ranged: true, projectileChar: '*', projectileColor: '#cc44ff', attackAnim: 'DrawAndShoot', onHit: { effect: 'slow', duration: 50, moveSpeedMalus: -0.5 }, loot: [] },
+    raider_poisoner: { char: 'R', color: '#44cc44', hp: 40, speed: 0.20, category: 'enemy', hostile: true, damage: 2, aggroRange: 30, roles: [{ type: 'ranged_attacker', range: 5, preferDistance: 4 }], ranged: true, projectileChar: '-', projectileColor: '#44cc44', attackAnim: 'DrawAndShoot', onHit: { effect: 'dot', tickDamage: 1, tickInterval: 5, duration: 60 }, loot: [] },
+    void_walker:     { char: 'V', color: '#aa33ff', hp: 30, speed: 0.21, category: 'enemy', hostile: true, damage: 4, roles: [{ type: 'nexus_target' }], attackAnim: 'Swing', loot: [] },
+    void_brute:      { char: 'V', color: '#7722cc', hp: 80, speed: 0.14, category: 'enemy', hostile: true, damage: 10, roles: [{ type: 'nexus_target' }, { type: 'structure_breaker', breakSpeed: 2 }], attackAnim: 'Swing', loot: [] },
 
     // === Expedition Bosses ===
-    boss_crystal_colossus:          { name: 'Crystal Colossus',          char: '▲', color: '#4488ff', category: 'boss' },
-    boss_crystal_colossus_enraged:  { name: 'Crystal Colossus (Enraged)',char: '▲', color: '#ff2222', category: 'boss' },
-    boss_ancient_treant:            { name: 'Ancient Treant',            char: '▲', color: '#22aa66', category: 'boss' },
-    boss_ancient_treant_enraged:    { name: 'Ancient Treant (Enraged)',  char: '▲', color: '#ff4400', category: 'boss' },
-    boss_arcane_construct:          { name: 'Arcane Construct',          char: '▲', color: '#ff8844', category: 'boss' },
-    boss_arcane_construct_enraged:  { name: 'Arcane Construct (Enraged)',char: '▲', color: '#ff0000', category: 'boss' },
-    boss_void_sovereign:            { name: 'Void Sovereign',            char: '▲', color: '#7722cc', category: 'boss' },
-    boss_void_sovereign_enraged:    { name: 'Void Sovereign (Enraged)',  char: '▲', color: '#ff0000', category: 'boss' },
-    boss_high_king:                 { name: 'The High King',             char: '▲', color: '#ddaa22', category: 'boss' },
-    boss_high_king_enraged:         { name: 'The High King (Enraged)',   char: '▲', color: '#ff2200', category: 'boss' },
+    boss_crystal_colossus:          { char: '▲', color: '#4488ff', category: 'boss' },
+    boss_crystal_colossus_enraged:  { char: '▲', color: '#ff2222', category: 'boss' },
+    boss_ancient_treant:            { char: '▲', color: '#22aa66', category: 'boss' },
+    boss_ancient_treant_enraged:    { char: '▲', color: '#ff4400', category: 'boss' },
+    boss_arcane_construct:          { char: '▲', color: '#ff8844', category: 'boss' },
+    boss_arcane_construct_enraged:  { char: '▲', color: '#ff0000', category: 'boss' },
+    boss_void_sovereign:            { char: '▲', color: '#7722cc', category: 'boss' },
+    boss_void_sovereign_enraged:    { char: '▲', color: '#ff0000', category: 'boss' },
+    boss_high_king:                 { char: '▲', color: '#ddaa22', category: 'boss' },
+    boss_high_king_enraged:         { char: '▲', color: '#ff2200', category: 'boss' },
 };
 
 // Themed crypt guardians, two per realm chain (see CRYPT_CONFIG.themes). Same stats
@@ -61,24 +63,26 @@ const GUARDIAN_STATS = {
     heavy: { hp: 85, speed: 0.22, damage: 11, aggroRange: 6 },
 };
 const CHAIN_GUARDIANS = {
-    thorn_warden:     ['light', 'Thorn Warden',     'T', '#6fbf5a', 'A tangle of living briar that guards the roots of a forgotten grove.'],
-    briar_sentinel:   ['heavy', 'Briar Sentinel',   'B', '#3f8f3a', 'Old heartwood grown into a hulking guardian.'],
-    crystal_warden:   ['light', 'Crystal Warden',   'c', '#8fd8ff', 'TODO.'],
-    crystal_sentinel: ['heavy', 'Crystal Sentinel', 'C', '#58b8ee', 'TODO.'],
-    rune_automaton:   ['light', 'Rune Automaton',   'r', '#ffaa66', 'A scholar-built construct still following its last instructions.'],
-    arcane_sentinel:  ['heavy', 'Arcane Sentinel',  'A', '#ff8844', 'An engine wound tight with old spells.'],
-    shade_warden:     ['light', 'Shade Warden',     's', '#8877bb', 'TODO.'],
-    gloom_sentinel:   ['heavy', 'Gloom Sentinel',   'G', '#5d4f99', 'TODO.'],
-    void_acolyte:     ['light', 'Void Acolyte',     'v', '#aa66ee', 'A hollowed servant of the pact, still murmuring its vows.'],
-    void_sentinel:    ['heavy', 'Void Sentinel',    'V', '#7722cc', 'A bound horror kept awake by the pact it signed an eon ago.'],
-    fracture_wraith:  ['light', 'Fracture Wraith',  'f', '#ff7766', 'A flickering thing constantly jumping in and out of our world.'],
-    fracture_horror:  ['heavy', 'Fracture Horror',  'F', '#ee3355', 'A body torn and stitched back together by the rift.'],
-    palace_husk:      ['light', 'Palace Husk',      'p', '#ddc060', 'The remains of a palace guard, rusted armor continuing its final watch.'],
-    revenant_knight:  ['heavy', 'Revenant Knight',  'K', '#c9a227', 'A long dead knight brought back to serve its kingdom once more.'],
+    thorn_warden:     ['light', 'T', '#6fbf5a'],
+    briar_sentinel:   ['heavy', 'B', '#3f8f3a'],
+    crystal_warden:   ['light', 'c', '#8fd8ff'],
+    crystal_sentinel: ['heavy', 'C', '#58b8ee'],
+    rune_automaton:   ['light', 'r', '#ffaa66'],
+    arcane_sentinel:  ['heavy', 'A', '#ff8844'],
+    shade_warden:     ['light', 's', '#8877bb'],
+    gloom_sentinel:   ['heavy', 'G', '#5d4f99'],
+    void_acolyte:     ['light', 'v', '#aa66ee'],
+    void_sentinel:    ['heavy', 'V', '#7722cc'],
+    fracture_wraith:  ['light', 'f', '#ff7766'],
+    fracture_horror:  ['heavy', 'F', '#ee3355'],
+    palace_husk:      ['light', 'p', '#ddc060'],
+    revenant_knight:  ['heavy', 'K', '#c9a227'],
 };
-for (const [key, [weight, name, char, color, lore]] of Object.entries(CHAIN_GUARDIANS)) {
-    ENTITIES[key] = { name, char, color, ...GUARDIAN_STATS[weight], category: 'animal', hostile: true, guardian: true, meatYield: 0, spawnWeight: 0, lore };
+// Added before stampLoc(ENTITIES) so their name and lore come from the table.
+for (const [key, [weight, char, color]] of Object.entries(CHAIN_GUARDIANS)) {
+    ENTITIES[key] = { char, color, ...GUARDIAN_STATS[weight], category: 'animal', hostile: true, guardian: true, meatYield: 0, spawnWeight: 0 };
 }
+stampLoc(ENTITIES, 'entity');
 
 export const ANIMALS = Object.fromEntries(
     Object.entries(ENTITIES).filter(([, e]) => e.category === 'animal')
@@ -128,7 +132,6 @@ export const SUMMON_TYPES = Object.fromEntries(
 
 export const RAID_TYPES = {
     bandit_raid: {
-        name: 'Bandit Raid',
         composition: [
             { entity: 'raider_brute', count: [2, 4] },
             { entity: 'raider_archer', count: [0, 2], minRaidLevel: 4 },
@@ -136,7 +139,6 @@ export const RAID_TYPES = {
         scaling: { hpMult: 0.1, damageMult: 0.05 },
     },
     crusader_raid: {
-        name: 'Crusader Raid',
         scripted: true,
         composition: [
             { entity: 'crusader',        count: [5, 5] },
@@ -146,7 +148,6 @@ export const RAID_TYPES = {
     },
     // Fired once by the tutorial to teach drafting. Scripted, so it never joins the random raid pool.
     training_raid: {
-        name: 'Bandit Scouts',
         scripted: true,
         composition: [
             { entity: 'raider_brute', count: [2, 2] },
@@ -154,7 +155,6 @@ export const RAID_TYPES = {
         scaling: { hpMult: 0.1, damageMult: 0.05 },
     },
     warband_raid: {
-        name: 'Warband Raid',
         composition: [
             { entity: 'raider_brute',    count: [2, 3] },
             { entity: 'raider_hexer',    count: [1, 2], minRaidLevel: 6 },
@@ -163,16 +163,17 @@ export const RAID_TYPES = {
         scaling: { hpMult: 0.1, damageMult: 0.05 },
     },
 };
+stampLoc(RAID_TYPES, 'raid_type');
 
 export const WAVE_TYPES = {
     void_wave: {
-        name: 'Void Wave',
         composition: [
             { entity: 'void_walker', weight: 3 },
             { entity: 'void_brute', weight: 0.5, minWave: 3 },
         ],
     },
 };
+stampLoc(WAVE_TYPES, 'wave_type');
 
 export const WILDLIFE_CONFIG = {
     maxCount: 30,

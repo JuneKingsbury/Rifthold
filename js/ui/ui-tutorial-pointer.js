@@ -4,6 +4,7 @@
 // `game.tutorialMapHint`, because tiles have no DOM element to anchor to.
 
 import { touchText, isCompactLayout } from './ui-utils.js';
+import { t } from '../core/i18n.js';
 
 const POLL_MS = 150;
 const NOTE_REFRESH_EVERY = 7; // polls (~1s), so affordability/stuck hints stay current
@@ -108,9 +109,9 @@ const pointerMethods = {
     // buttons are in the More menu. Point at what reveals the target instead.
     _compactPointerFallback(desc) {
         const sel = desc.selector || '';
-        if (sel.includes('#colonist-hud')) return { selector: '#footer-tabs .footer-tab[data-tab="colonists"]', label: 'Open Colonists' };
-        if (sel.includes('.info-actions') || sel.includes('data-tut-slot')) return { selector: '#footer-tabs .footer-tab[data-tab="info"]', label: 'Open Info' };
-        if (sel.startsWith('#mode-bar')) return { selector: '#mode-bar [data-mode-action="more"]', label: 'Open More' };
+        if (sel.includes('#colonist-hud')) return { selector: '#footer-tabs .footer-tab[data-tab="colonists"]', label: t('ui.pointer.open_colonists') };
+        if (sel.includes('.info-actions') || sel.includes('data-tut-slot')) return { selector: '#footer-tabs .footer-tab[data-tab="info"]', label: t('ui.pointer.open_info') };
+        if (sel.startsWith('#mode-bar')) return { selector: '#mode-bar [data-mode-action="more"]', label: t('ui.pointer.open_more') };
         return null;
     },
 

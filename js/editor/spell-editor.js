@@ -1,6 +1,6 @@
 import { SPELLS, SPELL_TOMES, RESEARCH, CONFIG, SUMMON_TYPES, RECIPES } from '../core/config.js';
 import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
-import { toJsLiteral } from './config-source.js';
+import { toJsLiteral, splitText, localeBlock } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_spell_drafts';
 
@@ -526,13 +526,15 @@ class SpellEditor {
     _formatOutput(data) {
         if (!data) return '';
         const e = this._buildEntries(data);
+        // Names and descriptions go to locale/en.json (spell.<key>.*, item.<tomeKey>.*).
+        const strings = {};
         let out = '// === Add to SPELLS in js/core/config/magic.js ===\n';
-        out += this._entryLine(data.key, e.spell) + '\n';
+        out += this._entryLine(data.key, splitText(e.spell, `spell.${data.key}`, strings)) + '\n';
         out += '// === Add to SPELL_TOMES in js/core/config/magic.js ===\n';
-        out += this._entryLine(e.tomeKey, e.tome) + '\n';
+        out += this._entryLine(e.tomeKey, splitText(e.tome, `item.${e.tomeKey}`, strings)) + '\n';
         out += '// === Add to BASE_RECIPES in js/core/config/equipment.js ===\n';
         out += this._entryLine(e.recipeKey, e.recipe);
-        return out;
+        return out + localeBlock(strings);
     }
 
     _addToBatch() {

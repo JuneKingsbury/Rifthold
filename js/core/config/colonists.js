@@ -1,38 +1,42 @@
+import { stampLoc } from '../i18n.js';
+
 export const SKILLS = {
-    building: { name: 'Building', baseLevel: [0, 2], biasBonus: 3, description: 'Construction, mining, chopping, and repairs' },
-    farming:  { name: 'Farming', baseLevel: [0, 2], biasBonus: 3, description: 'Planting and harvesting crops' },
-    crafting: { name: 'Crafting', baseLevel: [0, 2], biasBonus: 3, description: 'Crafting items at workbenches' },
-    cooking:  { name: 'Cooking', baseLevel: [0, 2], biasBonus: 3, description: 'Cooking meals at cooking pots' },
-    animals:  { name: 'Animals', baseLevel: [0, 2], biasBonus: 3, description: 'Taming and handling animals' },
-    research: { name: 'Research', baseLevel: [0, 2], biasBonus: 3, description: 'Studying and discovering new knowledge' },
+    building: { baseLevel: [0, 2], biasBonus: 3 },
+    farming:  { baseLevel: [0, 2], biasBonus: 3 },
+    crafting: { baseLevel: [0, 2], biasBonus: 3 },
+    cooking:  { baseLevel: [0, 2], biasBonus: 3 },
+    animals:  { baseLevel: [0, 2], biasBonus: 3 },
+    research: { baseLevel: [0, 2], biasBonus: 3 },
 };
+stampLoc(SKILLS, 'skill');
 
 export const SKILL_MILESTONES = {
     building: {
-        5:  { description: '15% faster deconstruct', type: 'deconstructSpeed', value: 0.15 },
-        10: { description: '15% chance to recover materials on deconstruct', type: 'deconstructRefund', value: 0.15 },
+        5:  { type: 'deconstructSpeed', value: 0.15 },
+        10: { type: 'deconstructRefund', value: 0.15 },
     },
     farming: {
-        5:  { description: '+1 yield every 5th harvest', type: 'harvestBonus', value: 5 },
-        10: { description: 'Chance to double full plot yield on harvest', type: 'harvestDouble', value: 0.20 },
+        5:  { type: 'harvestBonus', value: 5 },
+        10: { type: 'harvestDouble', value: 0.20 },
     },
     crafting: {
-        5:  { description: '10% chance to not consume materials on craft', type: 'craftFreeChance', value: 0.10 },
-        10: { description: 'Always produce at least fine quality', type: 'craftMinQuality', value: 'fine' },
+        5:  { type: 'craftFreeChance', value: 0.10 },
+        10: { type: 'craftMinQuality', value: 'fine' },
     },
     cooking: {
-        5:  { description: 'Cooked meals grant a brief work speed boost to the colonist who eats them', type: 'mealWorkBuff', value: 0.15, duration: 30 },
-        10: { description: 'Cooked meals grant a work speed boost colony-wide', type: 'mealWorkBuffColony', value: 0.10, duration: 30 },
+        5:  { type: 'mealWorkBuff', value: 0.15, duration: 30 },
+        10: { type: 'mealWorkBuffColony', value: 0.10, duration: 30 },
     },
     animals: {
-        5:  { description: 'Taming tasks take 20% less work', type: 'tameWorkReduction', value: 0.20 },
-        10: { description: 'Bonded animals gain +1 to their combat damage', type: 'bondedAnimalDamage', value: 1 },
+        5:  { type: 'tameWorkReduction', value: 0.20 },
+        10: { type: 'bondedAnimalDamage', value: 1 },
     },
     research: {
-        5:  { description: '+10% research speed contribution', type: 'researchSpeedBonus', value: 0.10 },
-        10: { description: 'Contributes at 75% efficiency while studying tomes (default 50%)', type: 'tomeResearchEfficiency', value: 0.75 },
+        5:  { type: 'researchSpeedBonus', value: 0.10 },
+        10: { type: 'tomeResearchEfficiency', value: 0.75 },
     },
 };
+stampLoc(SKILL_MILESTONES, 'skill_milestone');
 
 // THOUGHTS moved to ./social.js (still re-exported via index.js).
 
@@ -76,85 +80,86 @@ export const TRAIT_EXCLUSIONS = [
 
 export const TRAITS = {
     // ── Common ──────────────────────────────────────────────────────────────
-    hard_worker:   { name: 'Hard Worker',   weight: 10, value:  3, workSpeedBonus: 0.2,   description: '+20% work speed', expedition: { fatigueMult: 0.9 } },
-    lazy:          { name: 'Lazy',          weight: 10, value: -2, workSpeedBonus: -0.15, idleMoodBonus: 5, description: '-15% work speed, happy when idle', expedition: { fatigueMult: 1.3 } },
-    night_owl:     { name: 'Night Owl',     weight: 10, value:  1, nightSpeedMult: 1.2, daySpeedMult: 0.9, description: '+20% at night, -10% during day', expedition: { realmBonus: { shadow_realm: { damageMult: 1.2 }, void_abyss: { damageMult: 1.15 }, oblivion_rift: { damageMult: 1.1 } } } },
-    early_bird:    { name: 'Early Bird',    weight: 10, value:  1, daySpeedMult: 1.2,   nightSpeedMult: 0.9, description: '+20% during day, -10% at night' },
-    socialite:     { name: 'Socialite',     weight: 10, value:  1, nearOthersMoodBonus: 8, aloneMoodPenalty: -5, description: 'Happy near others, sad alone' },
-    loner:         { name: 'Loner',         weight: 10, value:  0, aloneMoodBonus: 8,   nearOthersMoodPenalty: -5, description: 'Happy alone, stressed near others' },
-    optimist:      { name: 'Optimist',      weight: 10, value:  2, positiveThoughtMult: 1.5, description: 'Positive thoughts 50% stronger' },
-    pessimist:     { name: 'Pessimist',     weight: 10, value: -2, negativeThoughtMult: 1.5, description: 'Negative thoughts 50% stronger' },
-    gourmand:      { name: 'Gourmand',      weight: 10, value: -1, cookedFoodMoodBonus: 8, rawFoodMoodPenalty: -12, description: '+8 mood from cooked meals, -12 mood from raw food' },
+    hard_worker:   { weight: 10, value:  3, workSpeedBonus: 0.2,   expedition: { fatigueMult: 0.9 } },
+    lazy:          { weight: 10, value: -2, workSpeedBonus: -0.15, idleMoodBonus: 5, expedition: { fatigueMult: 1.3 } },
+    night_owl:     { weight: 10, value:  1, nightSpeedMult: 1.2, daySpeedMult: 0.9, expedition: { realmBonus: { shadow_realm: { damageMult: 1.2 }, void_abyss: { damageMult: 1.15 }, oblivion_rift: { damageMult: 1.1 } } } },
+    early_bird:    { weight: 10, value:  1, daySpeedMult: 1.2,   nightSpeedMult: 0.9 },
+    socialite:     { weight: 10, value:  1, nearOthersMoodBonus: 8, aloneMoodPenalty: -5 },
+    loner:         { weight: 10, value:  0, aloneMoodBonus: 8,   nearOthersMoodPenalty: -5 },
+    optimist:      { weight: 10, value:  2, positiveThoughtMult: 1.5 },
+    pessimist:     { weight: 10, value: -2, negativeThoughtMult: 1.5 },
+    gourmand:      { weight: 10, value: -1, cookedFoodMoodBonus: 8, rawFoodMoodPenalty: -12 },
     // ── Uncommon ────────────────────────────────────────────────────────────
-    green_thumb:   { name: 'Green Thumb',   weight: 7,  value:  2, farmingSpeedMult: 1.3, description: '+30% farming speed', expedition: { realmBonus: { verdant_depths: { lootMult: 1.2 }, fungal_hollows: { lootMult: 1.15 }, primeval_canopy: { lootMult: 1.1 } } } },
-    iron_stomach:  { name: 'Iron Stomach',  weight: 7,  value:  2, hungerDecayMult: 0.5,  description: 'Gets hungry half as fast' },
-    tough:         { name: 'Tough',         weight: 7,  value:  3, damageReduction: 0.3,  description: 'Takes 30% less damage', expedition: { trapDamageMult: 0.7, fatigueMult: 0.8 } },
-    brave:         { name: 'Brave',         weight: 6,  value:  2, fleeHpMult: 0.10,      description: 'Only flees at very low HP', expedition: { rallyChance: 0.1, rallyHeal: 0.05 } },
-    quick:         { name: 'Quick',         weight: 7,  value:  2, moveSpeedBonus: 0.25,  description: 'Moves 25% faster', expedition: { durationMult: 0.95, dodgeChanceMod: 0.05 } },
-    sturdy:        { name: 'Sturdy',        weight: 6,  value:  1, damageReduction: 0.15, workSpeedBonus: -0.1, description: 'Takes 15% less damage, -10% work speed' },
-    light_sleeper: { name: 'Light Sleeper', weight: 7,  value:  0, restDecayMult: 1.4, sleepRestMult: 1.5, description: 'Gets tired faster, but recovers faster while sleeping' },
-    deep_sleeper:  { name: 'Deep Sleeper',  weight: 7,  value:  0, restDecayMult: 0.7, sleepRestMult: 0.7, description: 'Gets tired slower, but recovers slower while sleeping' },
-    creative:      { name: 'Creative',      weight: 6,  value:  3, craftingSpeedMult: 1.2, qualityBonus: 1, description: '+20% crafting speed, +1 quality tier chance' },
-    scholar:       { name: 'Scholar',       weight: 6,  value:  3, researchSpeedMult: 1.2, magicXpMult: 1.2, description: '+20% research speed, +20% magic XP gain', expedition: { puzzleSuccessBonus: 0.2 } },
-    gluttonous:    { name: 'Gluttonous',    weight: 6,  value: -2, hungerDecayMult: 1.6,  description: 'Gets hungry 60% faster' },
+    green_thumb:   { weight: 7,  value:  2, farmingSpeedMult: 1.3, expedition: { realmBonus: { verdant_depths: { lootMult: 1.2 }, fungal_hollows: { lootMult: 1.15 }, primeval_canopy: { lootMult: 1.1 } } } },
+    iron_stomach:  { weight: 7,  value:  2, hungerDecayMult: 0.5 },
+    tough:         { weight: 7,  value:  3, damageReduction: 0.3,  expedition: { trapDamageMult: 0.7, fatigueMult: 0.8 } },
+    brave:         { weight: 6,  value:  2, fleeHpMult: 0.10,      expedition: { rallyChance: 0.1, rallyHeal: 0.05 } },
+    quick:         { weight: 7,  value:  2, moveSpeedBonus: 0.25,  expedition: { durationMult: 0.95, dodgeChanceMod: 0.05 } },
+    sturdy:        { weight: 6,  value:  1, damageReduction: 0.15, workSpeedBonus: -0.1 },
+    light_sleeper: { weight: 7,  value:  0, restDecayMult: 1.4, sleepRestMult: 1.5 },
+    deep_sleeper:  { weight: 7,  value:  0, restDecayMult: 0.7, sleepRestMult: 0.7 },
+    creative:      { weight: 6,  value:  3, craftingSpeedMult: 1.2, qualityBonus: 1 },
+    scholar:       { weight: 6,  value:  3, researchSpeedMult: 1.2, magicXpMult: 1.2, expedition: { puzzleSuccessBonus: 0.2 } },
+    gluttonous:    { weight: 6,  value: -2, hungerDecayMult: 1.6 },
     // ── Rare ────────────────────────────────────────────────────────────────
-    lucky:         { name: 'Lucky',         weight: 3,  value:  4, qualityBonus: 2, description: '+2 quality tier chance on all crafted items', expedition: { rareEncounterMult: 1.3 } },
+    lucky:         { weight: 3,  value:  4, qualityBonus: 2, expedition: { rareEncounterMult: 1.3 } },
     // ── Very Rare ───────────────────────────────────────────────────────────
-    pacifist:         { name: 'Pacifist',         weight: 1, value: -2, description: 'Refuses to attack enemies, only flees' },
-    prodigy:          { name: 'Prodigy',          weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, description: 'Gains all XP 20% faster', expedition: { xpMult: 1.3 } },
-    magically_gifted: { name: 'Magically Gifted', weight: 2, value:  3, description: 'Starts with 2 levels in a random magic school and knows its starter spell' },
+    pacifist:         { weight: 1, value: -2 },
+    prodigy:          { weight: 1, value:  5, allSkillXpMult: 1.2, magicXpMult: 1.2, expedition: { xpMult: 1.3 } },
+    magically_gifted: { weight: 2, value:  3 },
 
     // ── New: Direct combat (Gap A) ────────────────────────────────────────────
-    duelist:       { name: 'Duelist',       weight: 6, value:  2, dodgeChance: 0.12, description: '+12% chance to dodge attacks in combat' },
-    deadeye:       { name: 'Deadeye',        weight: 6, value:  2, critChance: 0.12, description: '+12% critical hit chance in combat' },
-    berserker:     { name: 'Berserker',      weight: 3, value:  2, lowHpDamageMult: 1.25, lowHpThreshold: 0.4, damageReduction: -0.1, description: '+25% damage dealt below 40% HP, but takes +10% damage' },
-    coward:        { name: 'Coward',         weight: 10, value: -2, fleeHpMult: 0.4, description: 'Flees from combat at much higher HP' },
+    duelist:       { weight: 6, value:  2, dodgeChance: 0.12 },
+    deadeye:       { weight: 6, value:  2, critChance: 0.12 },
+    berserker:     { weight: 3, value:  2, lowHpDamageMult: 1.25, lowHpThreshold: 0.4, damageReduction: -0.1 },
+    coward:        { weight: 10, value: -2, fleeHpMult: 0.4 },
 
     // ── New: Taming & animals (Gap B) ─────────────────────────────────────────
-    beast_whisperer: { name: 'Beast Whisperer', weight: 6, value:  2, tameChanceBonus: 0.3, animalWorkMult: 1.2, description: '+30% taming success, +20% animal handling speed' },
-    menagerist:      { name: 'Menagerist',      weight: 5, value:  2, tamedAnimalMoodAura: 4, description: 'Cheered by nearby tamed animals' },
-    skittish:        { name: 'Skittish',        weight: 10, value: -1, tameChancePenalty: 0.25, description: '-25% taming success, unnerved by wild beasts' },
+    beast_whisperer: { weight: 6, value:  2, tameChanceBonus: 0.3, animalWorkMult: 1.2 },
+    menagerist:      { weight: 5, value:  2, tamedAnimalMoodAura: 4 },
+    skittish:        { weight: 10, value: -1, tameChancePenalty: 0.25 },
 
     // ── New: Trade / gold (Gap C) ─────────────────────────────────────────────
-    silver_tongue:  { name: 'Silver Tongue',  weight: 6, value:  2, tradeMarkupMult: 0.9, description: 'Better trade prices while in the colony' },
-    merchants_eye:  { name: "Merchant's Eye", weight: 3, value:  3, tradeRewardQualityBonus: 1, description: 'Trade Rift rewards arrive at higher quality' },
-    scavenger:      { name: 'Scavenger',      weight: 6, value:  2, scavengeChance: 0.12, description: 'Chance to find bonus materials while gathering' },
+    silver_tongue:  { weight: 6, value:  2, tradeMarkupMult: 0.9 },
+    merchants_eye:  { weight: 3, value:  3, tradeRewardQualityBonus: 1 },
+    scavenger:      { weight: 6, value:  2, scavengeChance: 0.12 },
 
     // ── New: Cooking / food (Gap D) ───────────────────────────────────────────
-    chef:          { name: 'Chef',           weight: 6, value:  2, cookingBonusFood: 1, mealMoodDurationMult: 1.5, description: '+1 food per cook, meals lift mood longer' },
-    comfort_eater: { name: 'Comfort Eater',  weight: 10, value:  0, mealMoodBonus: 6, hungerDecayMult: 1.15, description: 'Eating restores extra mood, but gets hungry 15% faster' },
-    foraging_gut:  { name: 'Foraging Gut',   weight: 6, value:  2, rawFoodMoodPenalty: 0, description: 'No mood penalty from eating raw food' },
+    chef:          { weight: 6, value:  2, cookingBonusFood: 1, mealMoodDurationMult: 1.5 },
+    comfort_eater: { weight: 10, value:  0, mealMoodBonus: 6, hungerDecayMult: 1.15 },
+    foraging_gut:  { weight: 6, value:  2, rawFoodMoodPenalty: 0 },
 
     // ── New: Magic / mana (Gap E) ─────────────────────────────────────────────
-    attuned:        { name: 'Attuned',        weight: 6, value:  2, manaRegenBonus: 0.2, maxManaMult: 1.1, description: '+20% mana regen, +10% max mana' },
-    spellsword:     { name: 'Spellsword',     weight: 3, value:  3, spellDamageBonus: 0.15, description: '+15% spell damage', expedition: { spellDamageMult: 1.15 } },
-    magically_inept:{ name: 'Magically Inept', weight: 10, value: -2, magicXpMult: 0.7, mundaneXpMult: 1.1, description: '-30% magic XP, but +10% mundane skill XP' },
+    attuned:        { weight: 6, value:  2, manaRegenBonus: 0.2, maxManaMult: 1.1 },
+    spellsword:     { weight: 3, value:  3, spellDamageBonus: 0.15, expedition: { spellDamageMult: 1.15 } },
+    magically_inept:{ weight: 10, value: -2, magicXpMult: 0.7, mundaneXpMult: 1.1 },
 
     // ── New: Expedition layer (Gap F) ─────────────────────────────────────────
-    trailblazer:    { name: 'Trailblazer',    weight: 6, value:  2, description: 'Faster, more evasive on expeditions', expedition: { durationMult: 0.9, dodgeChanceMod: 0.05 } },
-    treasure_hunter:{ name: 'Treasure Hunter', weight: 3, value:  3, description: 'Finds more loot and rarer encounters on expeditions', expedition: { lootMult: 1.2, rareEncounterMult: 1.15 } },
-    trapsmith:      { name: 'Trapsmith',      weight: 6, value:  2, description: 'Takes far less trap damage; can disarm traps', expedition: { trapDamageMult: 0.6 } },
-    inspiring:      { name: 'Inspiring',      weight: 3, value:  3, description: 'Rallies the party more often and heals more', expedition: { rallyChance: 0.15, rallyHeal: 0.08 } },
-    void_touched:   { name: 'Void-Touched',   weight: 3, value:  2, description: 'Empowered within the shadowed realms', expedition: { realmBonus: { shadow_realm: { partyDamageMult: 1.2 }, void_abyss: { partyDamageMult: 1.15 }, oblivion_rift: { partyDamageMult: 1.1 } } } },
+    trailblazer:    { weight: 6, value:  2, expedition: { durationMult: 0.9, dodgeChanceMod: 0.05 } },
+    treasure_hunter:{ weight: 3, value:  3, expedition: { lootMult: 1.2, rareEncounterMult: 1.15 } },
+    trapsmith:      { weight: 6, value:  2, expedition: { trapDamageMult: 0.6 } },
+    inspiring:      { weight: 3, value:  3, expedition: { rallyChance: 0.15, rallyHeal: 0.08 } },
+    void_touched:   { weight: 3, value:  2, expedition: { realmBonus: { shadow_realm: { partyDamageMult: 1.2 }, void_abyss: { partyDamageMult: 1.15 }, oblivion_rift: { partyDamageMult: 1.1 } } } },
 
     // ── New: Social / relationships (Gap G) ───────────────────────────────────
-    charismatic:    { name: 'Charismatic',    weight: 6, value:  2, positiveInteractionMult: 1.5, description: 'Builds friendships faster' },
-    abrasive:       { name: 'Abrasive',       weight: 10, value: -2, negativeInteractionMult: 1.5, description: 'Sours relationships faster' },
-    loyal:          { name: 'Loyal',          weight: 6, value:  2, loyalWorkMult: 1.1, description: 'Works harder near a friend or lover' },
+    charismatic:    { weight: 6, value:  2, positiveInteractionMult: 1.5 },
+    abrasive:       { weight: 10, value: -2, negativeInteractionMult: 1.5 },
+    loyal:          { weight: 6, value:  2, loyalWorkMult: 1.1 },
 
     // ── New: Mental resilience & flavor (Gap H) ───────────────────────────────
-    steadfast:      { name: 'Steadfast',      weight: 6, value:  2, breakThresholdMult: 0.6, description: 'Far more resistant to mental breaks' },
-    volatile:       { name: 'Volatile',       weight: 10, value: -1, positiveThoughtMult: 1.4, negativeThoughtMult: 1.4, description: 'Mood swings harder in both directions' },
-    workaholic:     { name: 'Workaholic',     weight: 6, value:  2, workSpeedBonus: 0.15, idleMoodPenalty: -5, description: '+15% work speed, but restless when idle' },
-    insomniac:      { name: 'Insomniac',      weight: 10, value: -1, sleepRestMult: 0.7, workSpeedBonus: 0.05, description: 'Recovers slowly from sleep, but always a bit more productive' },
+    steadfast:      { weight: 6, value:  2, breakThresholdMult: 0.6 },
+    volatile:       { weight: 10, value: -1, positiveThoughtMult: 1.4, negativeThoughtMult: 1.4 },
+    workaholic:     { weight: 6, value:  2, workSpeedBonus: 0.15, idleMoodPenalty: -5 },
+    insomniac:      { weight: 10, value: -1, sleepRestMult: 0.7, workSpeedBonus: 0.05 },
 
     // ── Race-specific ────────────────────────────────────────────────────────
-    human:   { name: 'Human',   weight: 0, value:  10, allSkillXpMult: 1.15, magicXpMult: 1.15, description: 'A versatile member of Humanity (learns all skills, magic and mundane, 15% faster)' },
-    nymph:   { name: 'Nymph',   weight: 0, value:  10, magicXpMult: 1.3, workSpeedBonus: -0.15, description: 'A mystical member of the Nympha (+30% magic skill XP, but physically frail: -15% work speed)' },
-    ferin:   { name: 'Ferin',   weight: 0, value:  10, farmingSpeedMult: 1.2, animalXpMult: 1.5, animalWorkMult: 1.3, indoorMoodPenalty: -6, description: 'A wild member of the Ferini (+20% farming, gifted with animals, restless indoors)' },
-    kobalos: { name: 'Kobalos', weight: 0, value:  10, moveSpeedBonus: 0.10, allyDamageReduction: 0.05, allyDamageReductionCap: 0.20, isolatedMoodPenalty: -6, rawFoodMoodPenalty: 0, description: 'A pack-minded member of the Kobaloi (+10% move speed, tougher near allies, no raw-food penalty, but rattled alone)' },
-    bufos:   { name: 'Bufos',   weight: 0, value:  10, daySpeedMult: 1.15, nightSpeedMult: 0.85, restDecayMult: 0.85, description: 'A cold-blooded member of the Bufoi (+15% work by day, -15% by night, but rests efficiently)' },
+    human:   { weight: 0, value:  10, allSkillXpMult: 1.15, magicXpMult: 1.15 },
+    nymph:   { weight: 0, value:  10, magicXpMult: 1.3, workSpeedBonus: -0.15 },
+    ferin:   { weight: 0, value:  10, farmingSpeedMult: 1.2, animalXpMult: 1.5, animalWorkMult: 1.3, indoorMoodPenalty: -6 },
+    kobalos: { weight: 0, value:  10, moveSpeedBonus: 0.10, allyDamageReduction: 0.05, allyDamageReductionCap: 0.20, isolatedMoodPenalty: -6, rawFoodMoodPenalty: 0 },
+    bufos:   { weight: 0, value:  10, daySpeedMult: 1.15, nightSpeedMult: 0.85, restDecayMult: 0.85 },
 };
+stampLoc(TRAITS, 'trait');
 
 export const RACES = {
     human: {},
@@ -163,6 +168,7 @@ export const RACES = {
     kobalos: {},
     bufos: {},
 }
+stampLoc(RACES, 'race');
 
 export const COLONIST_CONFIG = {
     initialHunger: [80, 100],

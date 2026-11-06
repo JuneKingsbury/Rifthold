@@ -11,6 +11,28 @@
 import { CONFIG, CRYPT_CONFIG, REALMS, BUILDINGS, getCryptTiles } from '../core/config.js';
 import { createWildAnimal } from '../entities/entity-factory.js';
 import { colonistTakeDamage } from '../entities/colonist.js';
+import { t, ref, defRef, registerParamType } from '../core/i18n.js';
+import { resourceName } from '../core/names.js';
+
+// A chest's contents ({ resource: amount }) as a log param, listed in the
+// language that is active when the log is read.
+const formatAmounts = (contents) => Object.entries(contents || {})
+    .map(([res, n]) => t('msg.main.resource_amount', { n, resource: resourceName(res) }))
+    .join(t('msg.main.list_separator'));
+registerParamType('resource_amounts', formatAmounts);
+
+/**
+ * @param {string} chain Realm chain key, e.g. 'verdant'.
+ * @return {string} The chain's display name ("Verdant").
+ */
+export function chainName(chain) {
+    return CRYPT_CONFIG.chainNames[chain] || chain;
+}
+
+/** A log param naming a realm chain, translated when the log is read. */
+export function chainNameRef(chain) {
+    return ref(`config.crypt_chains.${chain}`, CRYPT_CONFIG.chainNames[chain] || chain);
+}
 
 let nextRuinId = 1;
 
@@ -162,7 +184,7 @@ export class RuinSystem {
                     if (breach === 'dead' && !ruin.deadGapNoted) {
                         // Say so once, so the player isn't left waiting for a breach that won't come.
                         ruin.deadGapNoted = true;
-                        game.eventLog.add(game, 'That gap in the crypt wall leads nowhere. Break a wall that faces the inside directly.', 'warning', { type: 'position', x: ruin.x, y: ruin.y });
+                        game.eventLog.add(game, { key: 'msg.ruins.dead_gap' }, 'warning', { type: 'position', x: ruin.x, y: ruin.y });
                     }
                     this._checkDiscovery(game, ruin);
                 }
@@ -177,9 +199,10 @@ export class RuinSystem {
      * @return {string} Sentence naming the chain a ward is bound to and what lifts it.
      */
     wardText(ruin) {
-        const chainName = CRYPT_CONFIG.chainNames[ruin.ward.chain] || ruin.ward.chain;
-        const bossName = REALMS[bossRealmOf(ruin.ward.chain)]?.name;
-        return `Its seal is bound to the ${chainName} rift${bossName ? ` and will fade once ${bossName} is cleared` : ''}.`;
+        const boss = REALMS[bossRealmOf(ruin.ward.chain)];
+        return boss?.name
+            ? t('msg.ruins.ward_bound_boss', { chain: chainName(ruin.ward.chain), boss: boss.name })
+            : t('msg.ruins.ward_bound', { chain: chainName(ruin.ward.chain) });
     }
 
     _liftWard(game, ruin) {
@@ -198,7 +221,7 @@ export class RuinSystem {
         game.markRoomsDirty();
         game.renderer?.markTerrainDirty();
         game.minimap?.markTerrainDirty();
-        game.eventLog.add(game, 'A ward on an ancient crypt has faded. Its walls can be broken now.', 'event', { type: 'position', x: ruin.x, y: ruin.y });
+        game.eventLog.add(game, { key: 'msg.ruins.ward_faded' }, 'event', { type: 'position', x: ruin.x, y: ruin.y });
     }
 
     _checkDiscovery(game, ruin) {
@@ -210,11 +233,14 @@ export class RuinSystem {
             if (Math.abs(c.x - cx) <= reach && Math.abs(c.y - cy) <= reach) {
                 ruin.discovered = true;
                 game.minimap?.markTerrainDirty();
-                let text = ruin.anchor
-                    ? 'A sealed crypt hums with rift energy.'
-                    : 'A sealed crypt stands here, its seal unbroken.';
-                if (ruin.ward) text = `A warded crypt. ${this.wardText(ruin)}`;
-                game.eventLog.add(game, text, 'event', { type: 'position', x: ruin.x, y: ruin.y });
+                let message = { key: ruin.anchor ? 'msg.ruins.found_anchor_crypt' : 'msg.ruins.found_sealed_crypt' };
+                if (ruin.ward) {
+                    const boss = REALMS[bossRealmOf(ruin.ward.chain)];
+                    message = boss?.name
+                        ? { key: 'msg.ruins.found_warded_crypt_boss', params: { chain: chainNameRef(ruin.ward.chain), boss: defRef(boss) } }
+                        : { key: 'msg.ruins.found_warded_crypt', params: { chain: chainNameRef(ruin.ward.chain) } };
+                }
+                game.eventLog.add(game, message, 'event', { type: 'position', x: ruin.x, y: ruin.y });
                 return;
             }
         }
@@ -249,7 +275,7 @@ export class RuinSystem {
         game.markRoomsDirty();
         game.renderer?.markTerrainDirty();
         game.minimap?.markTerrainDirty();
-        game.eventLog.add(game, 'A crypt has been breached! Something stirs inside.', 'warning', { type: 'position', x: ruin.x, y: ruin.y });
+        game.eventLog.add(game, { key: 'msg.ruins.crypt_breached' }, 'warning', { type: 'position', x: ruin.x, y: ruin.y });
         window.soundManager?.playSFXAt('chop_hit', ruin.x, ruin.y);
     }
 
@@ -261,7 +287,7 @@ export class RuinSystem {
             trap.armed = false;
             colonistTakeDamage(victim, CRYPT_CONFIG.trapDamage[ruin.tier] || 8, game, null);
             game.combatEffects.push({ x: trap.x, y: trap.y, char: '^', color: '#cc3333', ttl: 8 });
-            game.overlays.push({ type: 'floating_text', x: trap.x, y: trap.y, text: 'Trap!', color: '#ff5555', fontSize: 11, ttl: 14, maxTtl: 14 });
+            game.overlays.push({ type: 'floating_text', x: trap.x, y: trap.y, text: t('msg.ruins.float_trap'), color: '#ff5555', fontSize: 11, ttl: 14, maxTtl: 14 });
         }
     }
 
@@ -289,13 +315,14 @@ export class RuinSystem {
         }
         tile.structure = 'ancient_chest_open';
 
-        const summary = Object.entries(chest.contents).map(([res, amt]) => `${amt} ${res.replace(/_/g, ' ')}`).join(', ');
-        game.eventLog.add(game, `Looted a crypt chest: ${summary}`, 'success', { type: 'position', x, y });
+        const summary = formatAmounts(chest.contents);
+        const loot = { $f: 'resource_amounts', v: { ...chest.contents }, fb: summary };
+        game.eventLog.add(game, { key: 'msg.ruins.looted_chest', params: { loot } }, 'success', { type: 'position', x, y });
         game.overlays.push({ type: 'floating_text', x, y, text: summary, color: '#ffd24a', fontSize: 11, ttl: 20, maxTtl: 20 });
 
         if (ruin.loot.every(c => c.taken)) {
             ruin.state = 'cleared';
-            game.eventLog.add(game, 'The crypt has been plundered.', 'event', { type: 'position', x: ruin.x, y: ruin.y });
+            game.eventLog.add(game, { key: 'msg.ruins.crypt_plundered' }, 'event', { type: 'position', x: ruin.x, y: ruin.y });
         }
         return true;
     }
@@ -348,9 +375,8 @@ export class RuinSystem {
         }
         tile.structure = 'rift_anchor_active';
 
-        const name = CRYPT_CONFIG.chainNames[anchor.chain] || anchor.chain;
-        game.eventLog.add(game, `The ${name} rift anchor is attuned. Expeditions to the ${name} realms can now gather here.`, 'success', { type: 'position', x, y });
-        game.overlays.push({ type: 'floating_text', x, y, text: `${name} rift open`, color: '#aaf0ff', fontSize: 11, ttl: 24, maxTtl: 24 });
+        game.eventLog.add(game, { key: 'msg.ruins.anchor_attuned', params: { chain: chainNameRef(anchor.chain) } }, 'success', { type: 'position', x, y });
+        game.overlays.push({ type: 'floating_text', x, y, text: t('msg.ruins.float_rift_open', { chain: chainName(anchor.chain) }), color: '#aaf0ff', fontSize: 11, ttl: 24, maxTtl: 24 });
         window.soundManager?.playSFXAt('chop_hit', x, y);
         game.story.checkMilestone(`anchor_${anchor.chain}`, game);
         return true;

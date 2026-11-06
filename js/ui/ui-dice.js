@@ -3,6 +3,9 @@
 // Exposed as window.VoidDiceRenderer so the arcane panel can instantiate it
 // without needing an ES module import (the panel is injected as innerHTML).
 
+import { t } from '../core/i18n.js';
+import { escapeHtml } from './ui-utils.js';
+
 const FACE_ROTATIONS = [
     null,                                      // index 0 unused
     'rotateY(0deg)',                            // face 1: front
@@ -441,7 +444,7 @@ function _buildFaceHtml(value) {
 
 function _buildDieHtml(index, half) {
     let html = `<div class="vd-die-wrap" data-die="${index}" onclick="window._voidDiceRenderer?.toggleLock(${index})" onmouseenter="window._voidDiceRenderer?.showDieTooltip(${index}, event)" onmouseleave="window._voidDiceRenderer?.hideDieTooltip()">`;
-    html += `<span class="vd-lock-badge">LOCKED</span>`;
+    html += `<span class="vd-lock-badge">${escapeHtml(t('ui.dice.lock_badge'))}</span>`;
     html += `<div class="vd-die" id="vd-die-${index}">`;
     for (let f = 1; f <= 6; f++) {
         const faceTransform = _faceTransform(f, half);
@@ -482,8 +485,8 @@ function _faceToAngles(face) {
     return { rx: 0, ry: 0 };
 }
 
-function _easeOut(t) {
-    return 1 - Math.pow(1 - t, 3);
+function _easeOut(prog) {
+    return 1 - Math.pow(1 - prog, 3);
 }
 
 class VoidDiceRenderer {
@@ -591,7 +594,7 @@ class VoidDiceRenderer {
             const isForced = i === this._forcedLockIndex;
             wrap.classList.toggle('vd-forced-lock', isForced);
             const badge = wrap.querySelector('.vd-lock-badge');
-            if (badge) badge.textContent = isForced ? '☠ BOSS-LOCKED' : 'LOCKED';
+            if (badge) badge.textContent = isForced ? t('ui.dice.lock_badge_boss') : t('ui.dice.lock_badge');
         }
     }
 
@@ -632,7 +635,7 @@ class VoidDiceRenderer {
         });
         for (const k of keys) {
             const pct = Math.round(counts[k] / 6 * 100);
-            html += `<div><span>${k === 'W' ? 'Wild' : k}</span><span>${pct}%</span></div>`;
+            html += `<div><span>${k === 'W' ? escapeHtml(t('ui.dice.face_wild')) : k}</span><span>${escapeHtml(t('ui.dice.face_odds_pct', { pct }))}</span></div>`;
         }
         html += '</div>';
         el.innerHTML = html;
@@ -659,7 +662,7 @@ class VoidDiceRenderer {
         for (let i = 0; i < this._numDice; i++) {
             html += _buildDieHtml(i, half);
         }
-        html += '<span class="vd-mat-label">Void Shards</span>';
+        html += `<span class="vd-mat-label">${escapeHtml(t('ui.dice.mat_label'))}</span>`;
         html += '</div>';
         containerEl.innerHTML = html;
         containerEl.setAttribute('data-renderer-attached', '1');
@@ -859,15 +862,15 @@ class VoidDiceRenderer {
             if (!anim) continue;
             if (anim.startTime === null) anim.startTime = ts;
             const elapsed = ts - anim.startTime;
-            const t = Math.min(elapsed / anim.duration, 1);
-            const eased = _easeOut(t);
+            const prog = Math.min(elapsed / anim.duration, 1);
+            const eased = _easeOut(prog);
             const rx = anim.startRx + (anim.endRx - anim.startRx) * eased;
             const ry = anim.startRy + (anim.endRy - anim.startRy) * eased;
             const dieEl = this._container && this._container.querySelector(`#vd-die-${anim.i}`);
             if (dieEl) {
                 dieEl.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
             }
-            if (t < 1) allDone = false;
+            if (prog < 1) allDone = false;
         }
 
         if (!allDone) {
@@ -999,13 +1002,13 @@ function _spawnPoofDot(x0, y0, x1, y1, color) {
     const duration = 350;
     const start = performance.now();
     function step(now) {
-        const t = Math.min((now - start) / duration, 1);
-        const ease = 1 - Math.pow(1 - t, 2);
+        const prog = Math.min((now - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - prog, 2);
         el.style.left = (x0 + dx * ease) + 'px';
         el.style.top = (y0 + dy * ease) + 'px';
-        el.style.opacity = String(1 - t);
-        el.style.transform = `scale(${1 - t * 0.6})`;
-        if (t < 1) requestAnimationFrame(step);
+        el.style.opacity = String(1 - prog);
+        el.style.transform = `scale(${1 - prog * 0.6})`;
+        if (prog < 1) requestAnimationFrame(step);
         else el.remove();
     }
     requestAnimationFrame(step);
@@ -1025,13 +1028,13 @@ function _spawnConfettiShard(x0, y, color, delayMs) {
         const spin = (Math.random() - 0.5) * 720;
         const start = performance.now();
         function step(now) {
-            const t = Math.min((now - start) / duration, 1);
-            const ease = t * t;
+            const prog = Math.min((now - start) / duration, 1);
+            const ease = prog * prog;
             el.style.top = (y + fallDist * ease) + 'px';
             el.style.left = (x0 + drift * ease) + 'px';
-            el.style.transform = `rotate(${spin * t}deg)`;
-            el.style.opacity = t < 0.7 ? '1' : String(1 - (t - 0.7) / 0.3);
-            if (t < 1) requestAnimationFrame(step);
+            el.style.transform = `rotate(${spin * prog}deg)`;
+            el.style.opacity = prog < 0.7 ? '1' : String(1 - (prog - 0.7) / 0.3);
+            if (prog < 1) requestAnimationFrame(step);
             else el.remove();
         }
         requestAnimationFrame(step);
@@ -1083,7 +1086,7 @@ window.voidShardsSyncFdDisplay = function(val) {
     const activeEl = document.getElementById('vs-run-fd-active');
     if (activeEl) { activeEl.textContent = String(val); _bump(activeEl); }
     const shopEl = document.getElementById('vs-run-fd-shop');
-    if (shopEl) { shopEl.textContent = val + ' Fd'; _bump(shopEl); }
+    if (shopEl) { shopEl.textContent = t('ui.dice.fd_amount', { n: val }); _bump(shopEl); }
 };
 
 // Run-end flourish: shard confetti on a win, a brief dark pulse on a loss.
@@ -1116,9 +1119,9 @@ const _COMBO_FLASH_COLOR = {
     shard_cluster: '#77ee99',
 };
 const _COMBO_BANNER_LABEL = {
-    void_convergence: 'VOID CONVERGENCE!',
-    shard_straight: 'SHARD STRAIGHT!',
-    void_bloom: 'VOID BLOOM!',
+    void_convergence: () => t('ui.dice.banner.void_convergence'),
+    shard_straight: () => t('ui.dice.banner.shard_straight'),
+    void_bloom: () => t('ui.dice.banner.void_bloom'),
 };
 
 // Particle + counter animation fired when the player scores.
@@ -1146,7 +1149,7 @@ window.voidShardsScoreAnim = function(chips, mult, fd, category, clearRatio) {
         document.body.appendChild(flashEl);
         setTimeout(() => flashEl.remove(), 450);
     }
-    const bannerLabel = _COMBO_BANNER_LABEL[category];
+    const bannerLabel = _COMBO_BANNER_LABEL[category]?.();
     if (bannerLabel) {
         const bannerEl = document.createElement('div');
         bannerEl.className = 'vd-combo-banner';
@@ -1196,7 +1199,7 @@ window.voidShardsScoreAnim = function(chips, mult, fd, category, clearRatio) {
                 matRect.top + Math.random() * matRect.height,
                 knightScreenX,
                 knightScreenY,
-                '#dd88ff', 'x' + mult,
+                '#dd88ff', t('ui.dice.mult_particle', { n: mult }),
                 chipCount * 40 + i * 50
             );
         }
@@ -1230,12 +1233,12 @@ function _spawnParticle(x0, y0, x1, y1, color, label, delayMs) {
         const start = performance.now();
 
         function step(now) {
-            const t = Math.min((now - start) / duration, 1);
-            const ease = 1 - Math.pow(1 - t, 2);
+            const prog = Math.min((now - start) / duration, 1);
+            const ease = 1 - Math.pow(1 - prog, 2);
             el.style.left = (x0 + dx * ease) + 'px';
             el.style.top  = (y0 + dy * ease) + 'px';
-            el.style.opacity = t < 0.8 ? '1' : String(1 - (t - 0.8) / 0.2);
-            if (t < 1) {
+            el.style.opacity = prog < 0.8 ? '1' : String(1 - (prog - 0.8) / 0.2);
+            if (prog < 1) {
                 requestAnimationFrame(step);
             } else {
                 el.remove();
@@ -1248,11 +1251,11 @@ function _spawnParticle(x0, y0, x1, y1, color, label, delayMs) {
 function _countUp(el, from, to, duration) {
     const start = performance.now();
     function step(now) {
-        const t = Math.min((now - start) / duration, 1);
-        const ease = 1 - Math.pow(1 - t, 3);
+        const prog = Math.min((now - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - prog, 3);
         const val = Math.round(from + (to - from) * ease);
-        el.textContent = val + ' Fd';
-        if (t < 1) requestAnimationFrame(step);
+        el.textContent = t('ui.dice.fd_amount', { n: val });
+        if (prog < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
 }

@@ -9,6 +9,7 @@ import {
     WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS,
     CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS, BOOTS_ENCHANTMENT_EFFECTS,
 } from '../core/config.js';
+import { t, defText, defName, registerParamType } from '../core/i18n.js';
 
 const CRAFT_MARKUP = 1.25;                     // crafting premium over raw materials
 const TIER_PREMIUM = [0, 2, 5, 10, 18];        // additive floor per tier (0-4), keeps tiers monotonic
@@ -211,8 +212,49 @@ export function applyEnchantmentEffect(item, type, enchantTier) {
 
     item.enchantment = effect;
     item.enchantTier = enchantTier.multiplier;   // retained so resale value can price the enchant (getItemTradeValue)
+    item.enchantTierKey = enchantTier.key;       // the numeral in the name; see itemName()
+    // English name and description kept for older code and saves; display goes
+    // through itemName()/itemDescription(), which rebuild them per language.
     item.description = `${item.description} ${effect.description}`;
     item.name = `${item.name} ${effect.suffix} ${enchantTier.key}`;
+}
+
+// ---------------------------------------------------------------------------
+// Display text. An item instance is a copy of its config entry with quality,
+// enchantment and crafter applied, so its name and description are rebuilt
+// from those parts rather than read from the instance's English fields.
+// Enchanted items saved before enchantments carried a locale key keep the
+// English name they were saved with.
+// ---------------------------------------------------------------------------
+
+function _isLegacyEnchant(item) {
+    return item.enchantment && (!item.enchantment._loc || !item.enchantTierKey);
+}
+
+/** Display name of an item instance or config entry, in the active language. */
+export function itemName(item) {
+    if (!item) return '';
+    const def = ALL_ITEMS[item.key];
+    if (!def || _isLegacyEnchant(item)) return item.name ?? (def ? defName(def) : '');
+    let name = defName(def);
+    const tier = item.quality && item.quality !== 'normal' ? QUALITY_TIERS.find(q => q.key === item.quality) : null;
+    const prefix = tier ? defText(tier, 'prefix') : '';
+    if (prefix) name = t('item.name.with_quality', { quality: prefix, base: name });
+    if (item.enchantment) {
+        name = t('item.name.enchanted', { base: name, suffix: defText(item.enchantment, 'suffix'), tier: item.enchantTierKey });
+    }
+    return name;
+}
+
+/** Description of an item instance or config entry, in the active language. */
+export function itemDescription(item) {
+    if (!item) return '';
+    const def = ALL_ITEMS[item.key];
+    if (!def || _isLegacyEnchant(item)) return item.description ?? (def ? defText(def, 'description') : '');
+    const parts = [defText(def, 'description')];
+    if (item.quality === 'masterwork' && item.craftedBy) parts.push(t('item.masterwork_flavour', { name: item.craftedBy }));
+    if (item.enchantment) parts.push(defText(item.enchantment, 'description'));
+    return parts.filter(Boolean).join(' ');
 }
 
 /**
@@ -267,3 +309,20 @@ export function pickArtifactKey(game) {
     const pool = fresh.length ? fresh : artifactKeys;
     return pool[Math.floor(Math.random() * pool.length)];
 }
+
+/**
+ * A log/notification param naming an item: t('log.x', { item: itemRef(item) }).
+ * Stores just the parts itemName() needs, so a saved log entry re-renders its
+ * item name in the active language.
+ */
+export function itemRef(item) {
+    if (!item) return '';
+    const v = { key: item.key, name: item.name };
+    if (item.quality) v.quality = item.quality;
+    if (item.enchantment) {
+        v.enchantment = { _loc: item.enchantment._loc, suffix: item.enchantment.suffix, description: item.enchantment.description };
+        v.enchantTierKey = item.enchantTierKey;
+    }
+    return { $f: 'item', v, fb: item.name };
+}
+registerParamType('item', itemName);

@@ -11,9 +11,9 @@ export const ROOM_SCORE_CAPS = {
 // first whose `max` fits the value wins. Shared with the room info panel so the
 // ideal range it shows always matches the scoring.
 export const ROOM_SIZE_BANDS = {
-    bedroom:  { metric: 'perBed',     unit: 'tiles per bed',     bands: [{ max: 3.99, score: 0 }, { max: 5, score: 10 }, { max: 12, score: 20 }, { max: 16, score: 15 }, { max: 20, score: 10 }, { max: Infinity, score: 5 }] },
-    townhall: { metric: 'total',      unit: 'tiles',             bands: [{ max: 5.99, score: 0 }, { max: 12, score: 8 }, { max: 30, score: 20 }, { max: 60, score: 15 }, { max: Infinity, score: 10 }] },
-    workshop: { metric: 'perStation', unit: 'tiles per station', bands: [{ max: 4.99, score: 0 }, { max: 7, score: 8 }, { max: 15, score: 15 }, { max: 20, score: 10 }, { max: Infinity, score: 5 }] },
+    bedroom:  { metric: 'perBed',     bands: [{ max: 3.99, score: 0 }, { max: 5, score: 10 }, { max: 12, score: 20 }, { max: 16, score: 15 }, { max: 20, score: 10 }, { max: Infinity, score: 5 }] },
+    townhall: { metric: 'total',      bands: [{ max: 5.99, score: 0 }, { max: 12, score: 8 }, { max: 30, score: 20 }, { max: 60, score: 15 }, { max: Infinity, score: 10 }] },
+    workshop: { metric: 'perStation', bands: [{ max: 4.99, score: 0 }, { max: 7, score: 8 }, { max: 15, score: 15 }, { max: 20, score: 10 }, { max: Infinity, score: 5 }] },
 };
 
 // Score a room's size against its bands. Also reports the ideal (top-scoring)
@@ -409,7 +409,7 @@ function computeBedroomQuality(a) {
     }
 
     return {
-        total, tier: tier.key, tierName: tier.name,
+        total, tier: tier.key, tierName: tier.name, tierLoc: tier._loc,
         moodEffect: tier.moodEffect, duration: tier.duration,
         breakdown: { size: sizeScore, floor: floorScore, light: lightScore, decor: decorScore, coherence: coherenceScore },
         decorList: Object.keys(a.decorations),
@@ -471,7 +471,7 @@ function computeTownHallQuality(a) {
     }
 
     return {
-        total, tier: tier.key, tierName: tier.name,
+        total, tier: tier.key, tierName: tier.name, tierLoc: tier._loc,
         moodEffect: tier.moodEffect, duration: tier.duration,
         breakdown: { size: sizeScore, floor: floorScore, light: lightScore, decor: decorScore, coherence: coherenceScore },
         decorList: Object.keys(a.decorations),
@@ -537,7 +537,7 @@ function computeWorkshopQuality(a) {
     }
 
     return {
-        total, tier: tier.key, tierName: tier.name,
+        total, tier: tier.key, tierName: tier.name, tierLoc: tier._loc,
         speedMult: tier.speedMult, qualityBonus: tier.qualityBonus,
         breakdown: { size: sizeScore, floor: floorScore, light: lightScore, focus: focusScore, support: supportScore },
         focusGroup, supportList,

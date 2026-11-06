@@ -1,27 +1,18 @@
+import { stampLoc } from '../i18n.js';
+
 import { BUILDINGS } from './buildings.js';
 import { RECIPES } from './equipment.js';
 import { CROPS } from './world.js';
 
 export const MAGIC_SKILLS = {
-    evocation:     { name: 'Evocation', baseLevel: [0, 0], biasBonus: 2, color: '#ff6644', description: 'Combat magic',
-        // Fuller role summary: attunement grid tooltip and the glossary entry.
-        summary: 'Damage spells: bolts, fireballs and chain lightning that strike enemies at range, in raids and on expeditions. They hit harder as the caster\'s Evocation level rises.' },
-    enchantment:   { name: 'Enchantment', baseLevel: [0, 0], biasBonus: 2, color: '#88ffff', description: 'Supportive magic',
-        // Fuller role summary: attunement grid tooltip and the glossary entry.
-        summary: 'Buffs and crowd control. At home it speeds up work, improves crafting quality and wards off tiredness. On expeditions it gives the whole party dodges, attack speed and extra damage, and stuns the most dangerous foes. Also sets equipment enchantment tiers.' },
-    abjuration:    { name: 'Abjuration', baseLevel: [0, 0], biasBonus: 2, color: '#44ff44', description: 'Healing and protective magic',
-        // Fuller role summary: attunement grid tooltip and the glossary entry.
-        summary: 'Healing, cleansing and shields. Mends wounded allies at home and in combat. On expeditions, Shield guards whoever enemies target most, and Guardian Ward covers the whole party.' },
-    conjuration:   { name: 'Conjuration', baseLevel: [0, 0], biasBonus: 2, color: '#9966ff', description: 'Summoning and teleportation magic',
-        // Fuller role summary: attunement grid tooltip and the glossary entry.
-        summary: 'Summons that fight beside your colonists (familiars, ghosts, wisps and monsters), decoys that draw enemy attacks, and short-range teleports. An expedition party can have up to 3 summons at once, and summons grow stronger with Conjuration level.' },
-    transmutation: { name: 'Transmutation', baseLevel: [0, 0], biasBonus: 2, color: '#88ff88', description: 'Environmental and growth magic',
-        // Fuller role summary: attunement grid tooltip and the glossary entry.
-        summary: 'Colony magic that speeds crop growth, enriches soil, shapes stone and terrain, and transmutes materials. Little use on expeditions.' },
-    divination:    { name: 'Divination', baseLevel: [0, 0], biasBonus: 2, color: '#ccaaff', description: 'Influencing fate with magic',
-        // Fuller role summary: attunement grid tooltip and the glossary entry.
-        summary: 'Colony magic that bends fate to delay raids, draw in traders, ward off disasters, shift the weather, and reveal Omens of what\'s coming. Little use on expeditions.' },
+    evocation:     { baseLevel: [0, 0], biasBonus: 2, color: '#ff6644' },
+    enchantment:   { baseLevel: [0, 0], biasBonus: 2, color: '#88ffff' },
+    abjuration:    { baseLevel: [0, 0], biasBonus: 2, color: '#44ff44' },
+    conjuration:   { baseLevel: [0, 0], biasBonus: 2, color: '#9966ff' },
+    transmutation: { baseLevel: [0, 0], biasBonus: 2, color: '#88ff88' },
+    divination:    { baseLevel: [0, 0], biasBonus: 2, color: '#ccaaff' },
 };
+stampLoc(MAGIC_SKILLS, 'magic_skill');
 
 export const MANA_CONFIG = {
     baseMana: 20,
@@ -59,117 +50,119 @@ export const POWER_PRIORITY = {
 // stop at maxGlobalLevel so global effects don't snowball.
 export const PEDESTAL_CHARGE = {
     levels: [
-        { name: 'Normal',    color: '#ccaa44', costMult: 1, strength: 1,   flatBonus: 0, radiusBonus: 0 },
-        { name: 'Empowered', color: '#ffcc55', costMult: 2, strength: 1.5, flatBonus: 1, radiusBonus: 2 },
-        { name: 'Radiant',   color: '#ffee99', costMult: 3, strength: 2,   flatBonus: 2, radiusBonus: 4 },
+        { color: '#ccaa44', costMult: 1, strength: 1,   flatBonus: 0, radiusBonus: 0 },
+        { color: '#ffcc55', costMult: 2, strength: 1.5, flatBonus: 1, radiusBonus: 2 },
+        { color: '#ffee99', costMult: 3, strength: 2,   flatBonus: 2, radiusBonus: 4 },
     ],
     maxGlobalLevel: 1,
     flatKeys: ['harvestYieldBonus', 'craftOutputBonus', 'cookingBonusFood'],
     radiusKeys: ['lightRadius'],
     caps: { blightDamageReduction: 0.9 },
 };
+stampLoc({ pedestal: PEDESTAL_CHARGE }, 'config');
 
 export const SPELLS = {
     // Evocation
-    spark: { name: 'Spark', school: 'evocation', minLevel: 0, manaCost: 4, cooldown: 25, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 6, range: 4, projectileColor: '#ffaa33', projectileChar: '.' },
-    singe: { name: 'Singe', school: 'evocation', minLevel: 1, manaCost: 5, cooldown: 35, castType: 'auto', trigger: 'inCombat', effect: 'dot_burn', damage: 4, burnDuration: 45, burnRounds: 3, range: 5, projectileColor: '#ff6600', projectileChar: '~' },
-    magic_missile: { name: 'Magic Missile', school: 'evocation', minLevel: 2, manaCost: 8, cooldown: 30, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 15, range: 6, projectileColor: '#ff44ff', projectileChar: '*' },
-    hex_bolt: { name: 'Hex Bolt', school: 'evocation', minLevel: 2, manaCost: 9, cooldown: 40, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_hex', damage: 10, hexDamageMult: 1.2, hexDuration: 60, hexRounds: 3, range: 5, projectileColor: '#cc44ff', projectileChar: '⁕' },
-    smite: { name: 'Smite', school: 'evocation', minLevel: 1, manaCost: 6, cooldown: 20, castType: 'auto', trigger: 'inCombat', effect: 'melee_damage', damage: 12, range: 1, projectileColor: '#ffffaa', projectileChar: '✝' },
-    fireball: { name: 'Fireball', school: 'evocation', minLevel: 5, manaCost: 18, cooldown: 60, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_aoe', damage: 12, range: 7, radius: 3, projectileColor: '#ff6600', projectileChar: '●' },
+    spark: { school: 'evocation', minLevel: 0, manaCost: 4, cooldown: 25, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 6, range: 4, projectileColor: '#ffaa33', projectileChar: '.' },
+    singe: { school: 'evocation', minLevel: 1, manaCost: 5, cooldown: 35, castType: 'auto', trigger: 'inCombat', effect: 'dot_burn', damage: 4, burnDuration: 45, burnRounds: 3, range: 5, projectileColor: '#ff6600', projectileChar: '~' },
+    magic_missile: { school: 'evocation', minLevel: 2, manaCost: 8, cooldown: 30, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage', damage: 15, range: 6, projectileColor: '#ff44ff', projectileChar: '*' },
+    hex_bolt: { school: 'evocation', minLevel: 2, manaCost: 9, cooldown: 40, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_hex', damage: 10, hexDamageMult: 1.2, hexDuration: 60, hexRounds: 3, range: 5, projectileColor: '#cc44ff', projectileChar: '⁕' },
+    smite: { school: 'evocation', minLevel: 1, manaCost: 6, cooldown: 20, castType: 'auto', trigger: 'inCombat', effect: 'melee_damage', damage: 12, range: 1, projectileColor: '#ffffaa', projectileChar: '✝' },
+    fireball: { school: 'evocation', minLevel: 5, manaCost: 18, cooldown: 60, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_aoe', damage: 12, range: 7, radius: 3, projectileColor: '#ff6600', projectileChar: '●' },
     // Chain Lightning arcs from the primary target to nearby foes, each arc dealing
     // chainFalloff× the previous hit's damage. chainTargets counts the primary hit.
-    chain_lightning: { name: 'Chain Lightning', school: 'evocation', minLevel: 4, manaCost: 14, cooldown: 45, castType: 'auto', trigger: 'inCombat', effect: 'chain_damage', damage: 11, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 4, projectileColor: '#88ddff', projectileChar: '⚡' },
-    arcane_blast: { name: 'Arcane Blast', school: 'evocation', minLevel: 3, manaCost: 10, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'knockback', damage: 8, knockbackDist: 2, stunDuration: 20, stunRounds: 1, range: 2, projectileColor: '#aaaaff', projectileChar: '◎' },
+    chain_lightning: { school: 'evocation', minLevel: 4, manaCost: 14, cooldown: 45, castType: 'auto', trigger: 'inCombat', effect: 'chain_damage', damage: 11, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 4, projectileColor: '#88ddff', projectileChar: '⚡' },
+    arcane_blast: { school: 'evocation', minLevel: 3, manaCost: 10, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'knockback', damage: 8, knockbackDist: 2, stunDuration: 20, stunRounds: 1, range: 2, projectileColor: '#aaaaff', projectileChar: '◎' },
     // Frost Lance deals damage and slows the target (movement + attack cadence). Slow is
     // soft CC: slowMult scales speed in the colony, slowRounds skips no turn but adds a
     // "slowed" status in expeditions that reduces the enemy's attacks that round.
-    frost_lance: { name: 'Frost Lance', school: 'evocation', minLevel: 3, manaCost: 12, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_slow', damage: 12, range: 6, slowMult: 0.5, slowDuration: 60, slowRounds: 2, projectileColor: '#aaddff', projectileChar: '❄' },
+    frost_lance: { school: 'evocation', minLevel: 3, manaCost: 12, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'ranged_damage_slow', damage: 12, range: 6, slowMult: 0.5, slowDuration: 60, slowRounds: 2, projectileColor: '#aaddff', projectileChar: '❄' },
 
     // Abjuration
-    mend: { name: 'Mend', school: 'abjuration', minLevel: 0, manaCost: 4, cooldown: 60, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.5, effect: 'heal', healAmount: 8, range: 4 },
-    renewal: { name: 'Renewal', school: 'abjuration', minLevel: 3, manaCost: 10, cooldown: 90, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.6, effect: 'heal', healAmount: 28, range: 6 },
-    shield: { name: 'Shield', school: 'abjuration', minLevel: 4, manaCost: 15, cooldown: 150, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense', expeditionTarget: 'tank', damageReduction: 0.3, duration: 60, radius: 4 },
+    mend: { school: 'abjuration', minLevel: 0, manaCost: 4, cooldown: 60, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.5, effect: 'heal', healAmount: 8, range: 4 },
+    renewal: { school: 'abjuration', minLevel: 3, manaCost: 10, cooldown: 90, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.6, effect: 'heal', healAmount: 28, range: 6 },
+    shield: { school: 'abjuration', minLevel: 4, manaCost: 15, cooldown: 150, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense', expeditionTarget: 'tank', damageReduction: 0.3, duration: 60, radius: 4 },
     // Chain Heal is the abjuration counterpart to Chain Lightning: it mends the most
     // wounded ally, then bounces to further wounded allies, each bounce healing
     // chainFalloff× the previous. chainTargets counts the primary heal.
-    chain_heal: { name: 'Chain Heal', school: 'abjuration', minLevel: 5, manaCost: 13, cooldown: 100, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.7, effect: 'chain_heal', healAmount: 16, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 5 },
-    fortify: { name: 'Fortify', school: 'abjuration', minLevel: 2, manaCost: 8, cooldown: 100, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense_self', damageReduction: 0.25, duration: 80 },
+    chain_heal: { school: 'abjuration', minLevel: 5, manaCost: 13, cooldown: 100, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.7, effect: 'chain_heal', healAmount: 16, range: 6, chainTargets: 3, chainFalloff: 0.6, chainRange: 5 },
+    fortify: { school: 'abjuration', minLevel: 2, manaCost: 8, cooldown: 100, castType: 'auto', trigger: 'inCombat', effect: 'buff_defense_self', damageReduction: 0.25, duration: 80 },
     // Mending Aura pulses a small heal-over-time to nearby wounded allies each cast.
-    mending_aura: { name: 'Mending Aura', school: 'abjuration', minLevel: 2, manaCost: 8, cooldown: 120, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.8, effect: 'heal_aura', healPerRound: 4, auraRounds: 3, healPerTick: 0.12, range: 5, duration: 90 },
+    mending_aura: { school: 'abjuration', minLevel: 2, manaCost: 8, cooldown: 120, castType: 'auto', trigger: 'woundedNearby', hpThreshold: 0.8, effect: 'heal_aura', healPerRound: 4, auraRounds: 3, healPerTick: 0.12, range: 5, duration: 90 },
     // Cleanse strips harmful statuses (bleed/poison/burn/slow/debuff DoTs) from the most
     // afflicted ally in range. Fires whenever an ally nearby is suffering a debuff.
-    cleanse: { name: 'Cleanse', school: 'abjuration', minLevel: 1, manaCost: 8, cooldown: 50, castType: 'auto', trigger: 'debuffNearby', effect: 'cleanse', range: 6 },
+    cleanse: { school: 'abjuration', minLevel: 1, manaCost: 8, cooldown: 50, castType: 'auto', trigger: 'debuffNearby', effect: 'cleanse', range: 6 },
     // Guardian Ward grants a flat HP absorb-shield bubble that soaks damage before HP.
     // Scales with school mastery. Distinct from Shield's percentage damage reduction.
-    guardian_ward: { name: 'Guardian Ward', school: 'abjuration', minLevel: 3, manaCost: 16, cooldown: 140, castType: 'auto', trigger: 'inCombat', effect: 'absorb_shield', absorbAmount: 30, duration: 120, radius: 4 },
+    guardian_ward: { school: 'abjuration', minLevel: 3, manaCost: 16, cooldown: 140, castType: 'auto', trigger: 'inCombat', effect: 'absorb_shield', absorbAmount: 30, duration: 120, radius: 4 },
 
     // Enchantment
-    quicken: { name: 'Quicken', school: 'enchantment', minLevel: 0, manaCost: 6, cooldown: 80, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', moveSpeedBonus: 0, workSpeedBonus: 0.2, duration: 40, radius: 3 },
-    haste: { name: 'Haste', school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 200, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', expeditionAttackSpeed: 0.2, expeditionRounds: 4, moveSpeedBonus: 0.4, workSpeedBonus: 0.2, duration: 80, idleExclude: true, radius: 5 },
+    quicken: { school: 'enchantment', minLevel: 0, manaCost: 6, cooldown: 80, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', moveSpeedBonus: 0, workSpeedBonus: 0.2, duration: 40, radius: 3 },
+    haste: { school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 200, castType: 'auto', trigger: 'hasTask', effect: 'buff_speed', expeditionAttackSpeed: 0.2, expeditionRounds: 4, moveSpeedBonus: 0.4, workSpeedBonus: 0.2, duration: 80, idleExclude: true, radius: 5 },
     // Diligence: aura that improves craft/build quality odds for working allies (read in
     // task-executor applyQuality via a 'quality' activeEffect). Fires while working.
-    diligence: { name: 'Diligence', school: 'enchantment', minLevel: 1, manaCost: 8, cooldown: 120, castType: 'auto', trigger: 'hasTask', effect: 'buff_quality', qualityBonus: 3, duration: 150, radius: 4 },
+    diligence: { school: 'enchantment', minLevel: 1, manaCost: 8, cooldown: 120, castType: 'auto', trigger: 'hasTask', effect: 'buff_quality', qualityBonus: 3, duration: 150, radius: 4 },
     // Tireless: slows rest-need decay for allies (read in updateNeeds via a 'rest' effect).
-    tireless: { name: 'Tireless', school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'buff_rest', restDecayMult: 0.4, duration: 300, idleExclude: true, radius: 5 },
+    tireless: { school: 'enchantment', minLevel: 2, manaCost: 12, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'buff_rest', restDecayMult: 0.4, duration: 300, idleExclude: true, radius: 5 },
     // Mind Shroud clouds nearby enemies' senses, granting the caster a chance to evade
     // incoming attacks (dodge charges in expedition; evasion aura in colony).
-    mind_shroud: { name: 'Mind Shroud', school: 'enchantment', minLevel: 3, manaCost: 11, cooldown: 120, castType: 'auto', trigger: 'inCombat', effect: 'buff_miss_chance', expeditionTarget: 'tank', dodgeBonus: 0.25, dodgeRounds: 2, duration: 80 },
+    mind_shroud: { school: 'enchantment', minLevel: 3, manaCost: 11, cooldown: 120, castType: 'auto', trigger: 'inCombat', effect: 'buff_miss_chance', expeditionTarget: 'tank', dodgeBonus: 0.25, dodgeRounds: 2, duration: 80 },
     // Mesmerize: brief stun/pacify on a foe (skips its turn / freezes it). Light CC.
-    mesmerize: { name: 'Mesmerize', school: 'enchantment', minLevel: 3, manaCost: 12, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'stun', range: 6, stunDuration: 45, stunRounds: 1, projectileColor: '#ffccff', projectileChar: '✦' },
+    mesmerize: { school: 'enchantment', minLevel: 3, manaCost: 12, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'stun', range: 6, stunDuration: 45, stunRounds: 1, projectileColor: '#ffccff', projectileChar: '✦' },
 
-    inspire: { name: 'Inspire', school: 'enchantment', minLevel: 4, manaCost: 14, cooldown: 250, castType: 'auto', trigger: 'hasTask', effect: 'buff_inspire', workSpeedBonus: 0.3, qualityBonus: 4, duration: 120, radius: 5, inspireRounds: 3 },
+    inspire: { school: 'enchantment', minLevel: 4, manaCost: 14, cooldown: 250, castType: 'auto', trigger: 'hasTask', effect: 'buff_inspire', workSpeedBonus: 0.3, qualityBonus: 4, duration: 120, radius: 5, inspireRounds: 3 },
     // Spellbind enthralls an enemy mind, compelling it to stand down. In expeditions
     // this is resolved as a powerful stun (full mind-control is out of scope there).
-    spellbind: { name: 'Spellbind', school: 'enchantment', minLevel: 5, manaCost: 18, cooldown: 300, castType: 'auto', trigger: 'inCombat', effect: 'convert_enemy', bindRounds: 2, charmDuration: 120, range: 6, projectileColor: '#ffccff', projectileChar: '◈' },
+    spellbind: { school: 'enchantment', minLevel: 5, manaCost: 18, cooldown: 300, castType: 'auto', trigger: 'inCombat', effect: 'convert_enemy', bindRounds: 2, charmDuration: 120, range: 6, projectileColor: '#ffccff', projectileChar: '◈' },
 
     // Conjuration
-    phase_step: { name: 'Phase Step', school: 'conjuration', minLevel: 0, manaCost: 6, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'teleport', range: 5 },
+    phase_step: { school: 'conjuration', minLevel: 0, manaCost: 6, cooldown: 50, castType: 'auto', trigger: 'inCombat', effect: 'teleport', range: 5 },
     // Conjure Decoy spawns a short-lived illusory construct that draws enemy attacks.
     // In expeditions enemies strongly prefer targeting it over party members.
-    conjure_decoy: { name: 'Conjure Decoy', school: 'conjuration', minLevel: 1, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'inCombat', effect: 'summon_decoy', summonType: 'decoy' },
-    summon_familiar: { name: 'Summon Familiar', school: 'conjuration', minLevel: 1, manaCost: 10, cooldown: 250, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
-    warp: { name: 'Warp', school: 'conjuration', minLevel: 2, manaCost: 15, cooldown: 100, castType: 'targeted', effect: 'teleport', range: 15 },
-    summon_ghost: { name: 'Summon Ghost', school: 'conjuration', minLevel: 3, manaCost: 15, cooldown: 200, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
-    gate: { name: 'Gate', school: 'conjuration', minLevel: 4, manaCost: 25, cooldown: 200, castType: 'targeted', effect: 'teleport', range: 30 },
-    summon_monster: { name: 'Summon Monster', school: 'conjuration', minLevel: 5, manaCost: 25, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
+    conjure_decoy: { school: 'conjuration', minLevel: 1, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'inCombat', effect: 'summon_decoy', summonType: 'decoy' },
+    summon_familiar: { school: 'conjuration', minLevel: 1, manaCost: 10, cooldown: 250, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'familiar' },
+    warp: { school: 'conjuration', minLevel: 2, manaCost: 15, cooldown: 100, castType: 'targeted', effect: 'teleport', range: 15 },
+    summon_ghost: { school: 'conjuration', minLevel: 3, manaCost: 15, cooldown: 200, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'ghost' },
+    gate: { school: 'conjuration', minLevel: 4, manaCost: 25, cooldown: 200, castType: 'targeted', effect: 'teleport', range: 30 },
+    summon_monster: { school: 'conjuration', minLevel: 5, manaCost: 25, cooldown: 400, castType: 'auto', trigger: 'inCombat', effect: 'summon', summonType: 'monster' },
     // Spectral Swarm conjures several weak, short-lived skirmishers at once (vs. the single
     // summon of the other conjuration spells). swarmCount uses the spectral_wisp entity.
-    spectral_swarm: { name: 'Spectral Swarm', school: 'conjuration', minLevel: 3, manaCost: 22, cooldown: 350, castType: 'auto', trigger: 'inCombat', effect: 'summon_swarm', summonType: 'spectral_wisp', swarmCount: 3 },
+    spectral_swarm: { school: 'conjuration', minLevel: 3, manaCost: 22, cooldown: 350, castType: 'auto', trigger: 'inCombat', effect: 'summon_swarm', summonType: 'spectral_wisp', swarmCount: 3 },
 
     // Transmutation
-    nurture: { name: 'Nurture', school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 600, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },
+    nurture: { school: 'transmutation', minLevel: 0, manaCost: 8, cooldown: 600, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 5, radius: 1, growthMult: 1.5, duration: 100 },
     // Enrich Soil applies a permanent per-tile growth bonus to a farm tile. Unlike
     // Nurture's temporary boost, this modifier persists across seasons.
-    enrich_soil: { name: 'Enrich Soil', school: 'transmutation', minLevel: 1, manaCost: 12, cooldown: 1200, castType: 'targeted', effect: 'enrich_soil', range: 8, growthBonus: 0.15 },
-    circle_of_growth: { name: 'Circle of Growth', school: 'transmutation', minLevel: 2, manaCost: 20, cooldown: 1200, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 10, radius: 3, growthMult: 2.0, duration: 200 },
-    level_field: { name: 'Level Field', school: 'transmutation', minLevel: 4, manaCost: 30, cooldown: 600, castType: 'targeted', effect: 'terraform', range: 8, radius: 3, targetTerrain: 'grass' },
+    enrich_soil: { school: 'transmutation', minLevel: 1, manaCost: 12, cooldown: 1200, castType: 'targeted', effect: 'enrich_soil', range: 8, growthBonus: 0.15 },
+    circle_of_growth: { school: 'transmutation', minLevel: 2, manaCost: 20, cooldown: 1200, castType: 'auto', trigger: 'cropsNearby', effect: 'boost_crops', range: 10, radius: 3, growthMult: 2.0, duration: 200 },
+    level_field: { school: 'transmutation', minLevel: 4, manaCost: 30, cooldown: 600, castType: 'targeted', effect: 'terraform', range: 8, radius: 3, targetTerrain: 'grass' },
     // Stone Shape instantly completes a targeted construction (build task) or repairs a
     // damaged structure, matter shaped to will. Targeted so the player picks the tile.
-    stone_shape: { name: 'Stone Shape', school: 'transmutation', minLevel: 2, manaCost: 18, cooldown: 200, castType: 'targeted', effect: 'finish_construction', range: 12 },
+    stone_shape: { school: 'transmutation', minLevel: 2, manaCost: 18, cooldown: 200, castType: 'targeted', effect: 'finish_construction', range: 12 },
     // Transmutation alchemy of the colony's stores, split into three tiers that each
     // auto-cast (trigger 'canTransmute') only when the conversion is actually possible,
     // i.e. enough of the input material is stockpiled. A missing `fromResource` means the
     // output is conjured from nothing (Transmute Stone). Cheaper/faster at the low tier,
     // costlier/slower and stingier at the high tier so runite stays scarce.
-    transmute_stone: { name: 'Transmute Stone', school: 'transmutation', minLevel: 1, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', toResource: 'stone', outputAmount: 8 },
-    transmute_iron: { name: 'Transmute Iron', school: 'transmutation', minLevel: 3, manaCost: 18, cooldown: 300, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'stone', inputAmount: 10, toResource: 'iron_ore', outputAmount: 6 },
-    transmute_runite: { name: 'Transmute Runite', school: 'transmutation', minLevel: 5, manaCost: 28, cooldown: 500, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'iron', inputAmount: 8, toResource: 'runite', outputAmount: 2 },
+    transmute_stone: { school: 'transmutation', minLevel: 1, manaCost: 10, cooldown: 200, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', toResource: 'stone', outputAmount: 8 },
+    transmute_iron: { school: 'transmutation', minLevel: 3, manaCost: 18, cooldown: 300, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'stone', inputAmount: 10, toResource: 'iron_ore', outputAmount: 6 },
+    transmute_runite: { school: 'transmutation', minLevel: 5, manaCost: 28, cooldown: 500, castType: 'auto', trigger: 'canTransmute', effect: 'transmute', fromResource: 'iron', inputAmount: 8, toResource: 'runite', outputAmount: 2 },
     // Verdant Bloom instantly ripens all mature growing crops in radius (sets them ready to
     // harvest). Targeted burst of growth, the payoff transmutation capstone for farms.
-    verdant_bloom: { name: 'Verdant Bloom', school: 'transmutation', minLevel: 4, manaCost: 28, cooldown: 500, castType: 'targeted', effect: 'ripen_crops', range: 10, radius: 3, ripenThreshold: 0.5 },
+    verdant_bloom: { school: 'transmutation', minLevel: 4, manaCost: 28, cooldown: 500, castType: 'targeted', effect: 'ripen_crops', range: 10, radius: 3, ripenThreshold: 0.5 },
 
     // Divination
-    foresight: { name: 'Foresight', school: 'divination', minLevel: 0, manaCost: 6, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { raidDelay: 200 }, duration: 300 },
-    augury: { name: 'Augury', school: 'divination', minLevel: 1, manaCost: 7, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'buff_morale', happinessBonus: 6, duration: 400, radius: 6 },
+    foresight: { school: 'divination', minLevel: 0, manaCost: 6, cooldown: 300, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { raidDelay: 200 }, duration: 300 },
+    augury: { school: 'divination', minLevel: 1, manaCost: 7, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'buff_morale', happinessBonus: 6, duration: 400, radius: 6 },
     // Ill Omen hexes a nearby enemy with bad fortune, reducing its outgoing damage.
     // Uses the existing weaken status in expedition combat.
-    ill_omen: { name: 'Ill Omen', school: 'divination', minLevel: 2, manaCost: 8, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'debuff_accuracy', weakenMult: 0.7, weakenDuration: 90, weakenRounds: 3, range: 6, projectileColor: '#884488', projectileChar: '☽' },
-    fair_winds: { name: 'Fair Winds', school: 'divination', minLevel: 2, manaCost: 10, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { weatherBias: 'clear' }, duration: 200 },
-    merchants_omen: { name: "Merchant's Omen", school: 'divination', minLevel: 3, manaCost: 15, cooldown: 600, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'caravan', eventMult: 3.0 }, duration: 400 },
-    ward_of_calamity: { name: 'Ward of Calamity', school: 'divination', minLevel: 4, manaCost: 20, cooldown: 800, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { suppressEvents: ['blight_bloom', 'cold_snap'], blightSpreadSuppressed: true }, duration: 500 },
-    fortunate_discovery: { name: 'Fortunate Discovery', school: 'divination', minLevel: 5, manaCost: 25, cooldown: 1000, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'meteorite', eventMult: 5.0 }, duration: 600 },
+    ill_omen: { school: 'divination', minLevel: 2, manaCost: 8, cooldown: 90, castType: 'auto', trigger: 'inCombat', effect: 'debuff_accuracy', weakenMult: 0.7, weakenDuration: 90, weakenRounds: 3, range: 6, projectileColor: '#884488', projectileChar: '☽' },
+    fair_winds: { school: 'divination', minLevel: 2, manaCost: 10, cooldown: 400, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { weatherBias: 'clear' }, duration: 200 },
+    merchants_omen: { school: 'divination', minLevel: 3, manaCost: 15, cooldown: 600, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'caravan', eventMult: 3.0 }, duration: 400 },
+    ward_of_calamity: { school: 'divination', minLevel: 4, manaCost: 20, cooldown: 800, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { suppressEvents: ['blight_bloom', 'cold_snap'], blightSpreadSuppressed: true }, duration: 500 },
+    fortunate_discovery: { school: 'divination', minLevel: 5, manaCost: 25, cooldown: 1000, castType: 'auto', trigger: 'always', effect: 'divination_modifier', modifiers: { eventBoost: 'meteorite', eventMult: 5.0 }, duration: 600 },
 };
+stampLoc(SPELLS, 'spell');
 
 // Player-triggered rituals: on-demand invocations performed at a Grand Ritual
 // altar (a complex structure). Unlike passive complex structures and auto-cast
@@ -184,165 +177,165 @@ export const SPELLS = {
 // Consumed by complexBuildings.js (altar detection) and main.js (triggerRitual).
 export const RITUALS = {
     rite_of_mending: {
-        name: 'Rite of Mending', icon: '✚', color: '#66dd88',
-        description: 'Channel energy to rejuvenate every colonist currently in the colony.',
+        icon: '✚', color: '#66dd88',
         cost: { void_essence: 3, moonbloom: 4 },
         cooldown: 3000,
         effect: 'mass_heal',
     },
     rite_of_calm_skies: {
-        name: 'Rite of Calm Skies', icon: '☀', color: '#ffdd66',
-        description: 'Bend the heavens toward clear weather.',
+        icon: '☀', color: '#ffdd66',
         cost: { void_essence: 2, runite: 2 },
         cooldown: 2400,
         effect: 'weather_bias', weatherBias: 'clear', duration: 600,
     },
     rite_of_warding: {
-        name: 'Rite of Warding', icon: '⛨', color: '#88bbff',
-        description: 'Raise a great ward that delays gathering raids.',
+        icon: '⛨', color: '#88bbff',
         cost: { void_essence: 4, runite: 3 },
         cooldown: 3600,
         effect: 'raid_ward', raidDelay: 1200,
     },
     rite_of_abundance: {
-        name: 'Rite of Abundance', icon: '❀', color: '#88ff88',
-        description: 'Surge the growth of every planted crop across the colony.',
+        icon: '❀', color: '#88ff88',
         cost: { void_essence: 3, moonbloom: 3 },
         cooldown: 3000,
         effect: 'ripen_crops', growthGain: 0.5,
     },
 };
+stampLoc(RITUALS, 'ritual');
 
 export const SPELL_TOMES = {
     // Evocation
-    tome_of_spark: { name: 'Tome of Spark', tradeValue: 12, spell: 'spark', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a basic bolt of fire at nearby foes.' },
-    tome_of_singe: { name: 'Tome of Singe', tradeValue: 18, spell: 'singe', learningWork: 90, minSchoolLevel: 1, description: 'Teaches a flame that scorches enemies with a burning DoT.' },
-    tome_of_smite: { name: 'Tome of Smite', tradeValue: 22, spell: 'smite', learningWork: 120, minSchoolLevel: 1, description: 'Teaches a powerful melee strike of holy energy.' },
-    tome_of_magic_missile: { name: 'Tome of Magic Missile', tradeValue: 28, spell: 'magic_missile', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a potent ranged arcane bolt.' },
-    tome_of_hex_bolt: { name: 'Tome of Hex Bolt', tradeValue: 28, spell: 'hex_bolt', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a hexing bolt that leaves enemies vulnerable to further damage.' },
-    tome_of_arcane_blast: { name: 'Tome of Arcane Blast', tradeValue: 38, spell: 'arcane_blast', learningWork: 200, minSchoolLevel: 3, description: 'Teaches a short-range shockwave that pushes enemies away.' },
-    tome_of_frost_lance: { name: 'Tome of Frost Lance', tradeValue: 40, spell: 'frost_lance', learningWork: 240, minSchoolLevel: 3, description: 'Teaches a frozen lance that wounds and slows its target.' },
-    tome_of_chain_lightning: { name: 'Tome of Chain Lightning', tradeValue: 44, spell: 'chain_lightning', learningWork: 260, minSchoolLevel: 4, description: 'Teaches lightning that arcs between multiple nearby foes.' },
-    tome_of_fireball: { name: 'Tome of Fireball', tradeValue: 58, spell: 'fireball', learningWork: 350, minSchoolLevel: 5, description: 'Teaches an explosive fireball that damages an area.' },
+    tome_of_spark: { tradeValue: 12, spell: 'spark', learningWork: 60, minSchoolLevel: 0 },
+    tome_of_singe: { tradeValue: 18, spell: 'singe', learningWork: 90, minSchoolLevel: 1 },
+    tome_of_smite: { tradeValue: 22, spell: 'smite', learningWork: 120, minSchoolLevel: 1 },
+    tome_of_magic_missile: { tradeValue: 28, spell: 'magic_missile', learningWork: 150, minSchoolLevel: 2 },
+    tome_of_hex_bolt: { tradeValue: 28, spell: 'hex_bolt', learningWork: 150, minSchoolLevel: 2 },
+    tome_of_arcane_blast: { tradeValue: 38, spell: 'arcane_blast', learningWork: 200, minSchoolLevel: 3 },
+    tome_of_frost_lance: { tradeValue: 40, spell: 'frost_lance', learningWork: 240, minSchoolLevel: 3 },
+    tome_of_chain_lightning: { tradeValue: 44, spell: 'chain_lightning', learningWork: 260, minSchoolLevel: 4 },
+    tome_of_fireball: { tradeValue: 58, spell: 'fireball', learningWork: 350, minSchoolLevel: 5 },
 
     // Abjuration
-    tome_of_mend: { name: 'Tome of Mend', tradeValue: 12, spell: 'mend', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a healing incantation that mends the most wounded nearby (self or ally).' },
-    tome_of_cleanse: { name: 'Tome of Cleanse', tradeValue: 20, spell: 'cleanse', learningWork: 110, minSchoolLevel: 1, description: 'Teaches a purifying spell that removes poison, bleed and other afflictions.' },
-    tome_of_fortify: { name: 'Tome of Fortify', tradeValue: 28, spell: 'fortify', learningWork: 140, minSchoolLevel: 2, description: 'Teaches a self-only barrier that reduces incoming damage.' },
-    tome_of_mending_aura: { name: 'Tome of Mending Aura', tradeValue: 30, spell: 'mending_aura', learningWork: 160, minSchoolLevel: 2, description: 'Teaches a healing aura that slowly mends nearby wounded allies.' },
-    tome_of_renewal: { name: 'Tome of Renewal', tradeValue: 40, spell: 'renewal', learningWork: 230, minSchoolLevel: 3, description: 'Teaches potent healing magic that mends the most wounded nearby (self or ally).' },
-    tome_of_guardian_ward: { name: 'Tome of Guardian Ward', tradeValue: 46, spell: 'guardian_ward', learningWork: 280, minSchoolLevel: 3, description: 'Teaches an absorbing barrier that soaks a burst of damage.' },
-    tome_of_shield: { name: 'Tome of Shield', tradeValue: 52, spell: 'shield', learningWork: 320, minSchoolLevel: 4, description: 'Teaches a protective barrier that reduces damage.' },
-    tome_of_chain_heal: { name: 'Tome of Chain Heal', tradeValue: 54, spell: 'chain_heal', learningWork: 330, minSchoolLevel: 5, description: 'Teaches healing that leaps between wounded allies.' },
+    tome_of_mend: { tradeValue: 12, spell: 'mend', learningWork: 60, minSchoolLevel: 0 },
+    tome_of_cleanse: { tradeValue: 20, spell: 'cleanse', learningWork: 110, minSchoolLevel: 1 },
+    tome_of_fortify: { tradeValue: 28, spell: 'fortify', learningWork: 140, minSchoolLevel: 2 },
+    tome_of_mending_aura: { tradeValue: 30, spell: 'mending_aura', learningWork: 160, minSchoolLevel: 2 },
+    tome_of_renewal: { tradeValue: 40, spell: 'renewal', learningWork: 230, minSchoolLevel: 3 },
+    tome_of_guardian_ward: { tradeValue: 46, spell: 'guardian_ward', learningWork: 280, minSchoolLevel: 3 },
+    tome_of_shield: { tradeValue: 52, spell: 'shield', learningWork: 320, minSchoolLevel: 4 },
+    tome_of_chain_heal: { tradeValue: 54, spell: 'chain_heal', learningWork: 330, minSchoolLevel: 5 },
 
     // Enchantment
-    tome_of_quicken: { name: 'Tome of Quicken', tradeValue: 12, spell: 'quicken', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a spell to hasten work speed.' },
-    tome_of_diligence: { name: 'Tome of Diligence', tradeValue: 22, spell: 'diligence', learningWork: 120, minSchoolLevel: 1, description: 'Teaches an aura that sharpens the craft of nearby workers.' },
-    tome_of_haste: { name: 'Tome of Haste', tradeValue: 45, spell: 'haste', learningWork: 280, minSchoolLevel: 2, description: 'Teaches a powerful speed enhancement spell.' },
-    tome_of_tireless: { name: 'Tome of Tireless', tradeValue: 38, spell: 'tireless', learningWork: 220, minSchoolLevel: 2, description: 'Teaches a spell that staves off fatigue in allies.' },
-    tome_of_mind_shroud: { name: 'Tome of Mind Shroud', tradeValue: 38, spell: 'mind_shroud', learningWork: 210, minSchoolLevel: 3, description: 'Teaches an enchantment that clouds enemies\' senses, granting evasion.' },
-    tome_of_mesmerize: { name: 'Tome of Mesmerize', tradeValue: 40, spell: 'mesmerize', learningWork: 240, minSchoolLevel: 3, description: 'Teaches an enchantment that briefly stuns a foe.' },
-    tome_of_inspire: { name: 'Tome of Inspire', tradeValue: 52, spell: 'inspire', learningWork: 300, minSchoolLevel: 4, description: 'Teaches an inspirational aura that boosts work speed and quality.' },
-    tome_of_spellbind: { name: 'Tome of Spellbind', tradeValue: 70, spell: 'spellbind', learningWork: 460, minSchoolLevel: 5, description: 'Teaches an enchantment that enthralls an enemy mind.' },
+    tome_of_quicken: { tradeValue: 12, spell: 'quicken', learningWork: 60, minSchoolLevel: 0 },
+    tome_of_diligence: { tradeValue: 22, spell: 'diligence', learningWork: 120, minSchoolLevel: 1 },
+    tome_of_haste: { tradeValue: 45, spell: 'haste', learningWork: 280, minSchoolLevel: 2 },
+    tome_of_tireless: { tradeValue: 38, spell: 'tireless', learningWork: 220, minSchoolLevel: 2 },
+    tome_of_mind_shroud: { tradeValue: 38, spell: 'mind_shroud', learningWork: 210, minSchoolLevel: 3 },
+    tome_of_mesmerize: { tradeValue: 40, spell: 'mesmerize', learningWork: 240, minSchoolLevel: 3 },
+    tome_of_inspire: { tradeValue: 52, spell: 'inspire', learningWork: 300, minSchoolLevel: 4 },
+    tome_of_spellbind: { tradeValue: 70, spell: 'spellbind', learningWork: 460, minSchoolLevel: 5 },
 
     // Conjuration
-    tome_of_phase_step: { name: 'Tome of Phase Step', tradeValue: 12, spell: 'phase_step', learningWork: 60, minSchoolLevel: 0, description: 'Teaches instant teleportation a short distance away.' },
-    tome_of_conjure_decoy: { name: 'Tome of Conjure Decoy', tradeValue: 20, spell: 'conjure_decoy', learningWork: 100, minSchoolLevel: 1, description: 'Teaches conjuring an illusory construct that draws enemy attacks.' },
-    tome_of_summon_familiar: { name: 'Tome of Summon Familiar', tradeValue: 24, spell: 'summon_familiar', learningWork: 120, minSchoolLevel: 1, description: 'Teaches summoning a familiar to fight alongside.' },
-    tome_of_warp: { name: 'Tome of Warp', tradeValue: 38, spell: 'warp', learningWork: 230, minSchoolLevel: 2, description: 'Teaches instant teleportation to a target location.' },
-    tome_of_summon_ghost: { name: 'Tome of Summon Ghost', tradeValue: 70, spell: 'summon_ghost', learningWork: 440, minSchoolLevel: 3, description: 'Teaches summoning a spectral warrior.' },
-    tome_of_spectral_swarm: { name: 'Tome of Spectral Swarm', tradeValue: 56, spell: 'spectral_swarm', learningWork: 340, minSchoolLevel: 3, description: 'Teaches summoning a swarm of fleeting spectral skirmishers.' },
-    tome_of_gate: { name: 'Tome of Gate', tradeValue: 38, spell: 'gate', learningWork: 440, minSchoolLevel: 4, description: 'Teaches instant teleportation to a distant location.' },
-    tome_of_summon_monster: { name: 'Tome of Summon Monster', tradeValue: 70, spell: 'summon_monster', learningWork: 650, minSchoolLevel: 5, description: 'Teaches summoning a monster under your control.' },
+    tome_of_phase_step: { tradeValue: 12, spell: 'phase_step', learningWork: 60, minSchoolLevel: 0 },
+    tome_of_conjure_decoy: { tradeValue: 20, spell: 'conjure_decoy', learningWork: 100, minSchoolLevel: 1 },
+    tome_of_summon_familiar: { tradeValue: 24, spell: 'summon_familiar', learningWork: 120, minSchoolLevel: 1 },
+    tome_of_warp: { tradeValue: 38, spell: 'warp', learningWork: 230, minSchoolLevel: 2 },
+    tome_of_summon_ghost: { tradeValue: 70, spell: 'summon_ghost', learningWork: 440, minSchoolLevel: 3 },
+    tome_of_spectral_swarm: { tradeValue: 56, spell: 'spectral_swarm', learningWork: 340, minSchoolLevel: 3 },
+    tome_of_gate: { tradeValue: 38, spell: 'gate', learningWork: 440, minSchoolLevel: 4 },
+    tome_of_summon_monster: { tradeValue: 70, spell: 'summon_monster', learningWork: 650, minSchoolLevel: 5 },
 
     // Transmutation
-    tome_of_nurture: { name: 'Tome of Nurture', tradeValue: 12, spell: 'nurture', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a spell to accelerate crop growth.' },
-    tome_of_enrich_soil: { name: 'Tome of Enrich Soil', tradeValue: 20, spell: 'enrich_soil', learningWork: 100, minSchoolLevel: 1, description: 'Teaches a permanent soil enrichment that boosts farm tile growth.' },
-    tome_of_transmute_stone: { name: 'Tome of Transmute Stone', tradeValue: 30, spell: 'transmute_stone', learningWork: 180, minSchoolLevel: 1, description: 'Teaches conjuring usable stone from raw earth.' },
-    tome_of_stone_shape: { name: 'Tome of Stone Shape', tradeValue: 44, spell: 'stone_shape', learningWork: 260, minSchoolLevel: 2, description: 'Teaches shaping matter to finish or mend a structure instantly.' },
-    tome_of_circle_of_growth: { name: 'Tome of Circle of Growth', tradeValue: 40, spell: 'circle_of_growth', learningWork: 240, minSchoolLevel: 2, description: 'Teaches a wide-area crop growth enhancement.' },
-    tome_of_transmute_iron: { name: 'Tome of Transmute Iron', tradeValue: 50, spell: 'transmute_iron', learningWork: 300, minSchoolLevel: 3, description: 'Teaches transmuting stone into raw iron chunks.' },
-    tome_of_level_field: { name: 'Tome of Level Field', tradeValue: 70, spell: 'level_field', learningWork: 440, minSchoolLevel: 4, description: 'Teaches terrain-shaping transmutation magic.' },
-    tome_of_verdant_bloom: { name: 'Tome of Verdant Bloom', tradeValue: 66, spell: 'verdant_bloom', learningWork: 420, minSchoolLevel: 4, description: 'Teaches a surge of growth that ripens crops at once.' },
-    tome_of_transmute_runite: { name: 'Tome of Transmute Runite', tradeValue: 68, spell: 'transmute_runite', learningWork: 420, minSchoolLevel: 5, description: 'Teaches transmuting iron bars into precious runite.' },
+    tome_of_nurture: { tradeValue: 12, spell: 'nurture', learningWork: 60, minSchoolLevel: 0 },
+    tome_of_enrich_soil: { tradeValue: 20, spell: 'enrich_soil', learningWork: 100, minSchoolLevel: 1 },
+    tome_of_transmute_stone: { tradeValue: 30, spell: 'transmute_stone', learningWork: 180, minSchoolLevel: 1 },
+    tome_of_stone_shape: { tradeValue: 44, spell: 'stone_shape', learningWork: 260, minSchoolLevel: 2 },
+    tome_of_circle_of_growth: { tradeValue: 40, spell: 'circle_of_growth', learningWork: 240, minSchoolLevel: 2 },
+    tome_of_transmute_iron: { tradeValue: 50, spell: 'transmute_iron', learningWork: 300, minSchoolLevel: 3 },
+    tome_of_level_field: { tradeValue: 70, spell: 'level_field', learningWork: 440, minSchoolLevel: 4 },
+    tome_of_verdant_bloom: { tradeValue: 66, spell: 'verdant_bloom', learningWork: 420, minSchoolLevel: 4 },
+    tome_of_transmute_runite: { tradeValue: 68, spell: 'transmute_runite', learningWork: 420, minSchoolLevel: 5 },
 
     // Divination
-    tome_of_foresight: { name: 'Tome of Foresight', tradeValue: 12, spell: 'foresight', learningWork: 60, minSchoolLevel: 0, description: 'Teaches a divination that delays enemy raids.' },
-    tome_of_augury: { name: 'Tome of Augury', tradeValue: 18, spell: 'augury', learningWork: 90, minSchoolLevel: 1, description: 'Teaches a divination aura that lifts the spirits of nearby colonists.' },
-    tome_of_fair_winds: { name: 'Tome of Fair Winds', tradeValue: 28, spell: 'fair_winds', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a spell that biases weather toward clear skies.' },
-    tome_of_ill_omen: { name: 'Tome of Ill Omen', tradeValue: 28, spell: 'ill_omen', learningWork: 150, minSchoolLevel: 2, description: 'Teaches a hex that diminishes an enemy\'s fighting power.' },
-    tome_of_merchants_omen: { name: "Tome of Merchant's Omen", tradeValue: 40, spell: 'merchants_omen', learningWork: 240, minSchoolLevel: 3, description: 'Teaches a divination that attracts caravans.' },
-    tome_of_ward_of_calamity: { name: 'Tome of Ward of Calamity', tradeValue: 58, spell: 'ward_of_calamity', learningWork: 350, minSchoolLevel: 4, description: 'Teaches a ward that suppresses natural disasters.' },
-    tome_of_fortunate_discovery: { name: 'Tome of Fortunate Discovery', tradeValue: 70, spell: 'fortunate_discovery', learningWork: 440, minSchoolLevel: 5, description: 'Teaches a divination that attracts meteorites.' },
+    tome_of_foresight: { tradeValue: 12, spell: 'foresight', learningWork: 60, minSchoolLevel: 0 },
+    tome_of_augury: { tradeValue: 18, spell: 'augury', learningWork: 90, minSchoolLevel: 1 },
+    tome_of_fair_winds: { tradeValue: 28, spell: 'fair_winds', learningWork: 150, minSchoolLevel: 2 },
+    tome_of_ill_omen: { tradeValue: 28, spell: 'ill_omen', learningWork: 150, minSchoolLevel: 2 },
+    tome_of_merchants_omen: { tradeValue: 40, spell: 'merchants_omen', learningWork: 240, minSchoolLevel: 3 },
+    tome_of_ward_of_calamity: { tradeValue: 58, spell: 'ward_of_calamity', learningWork: 350, minSchoolLevel: 4 },
+    tome_of_fortunate_discovery: { tradeValue: 70, spell: 'fortunate_discovery', learningWork: 440, minSchoolLevel: 5 },
 };
+stampLoc(SPELL_TOMES, 'item');
 
 export const RESEARCH_TABS = [
-    { key: 'foundations', name: 'Foundations' },
-    { key: 'nature', name: 'Nature' },
-    { key: 'mana', name: 'Mana' },
-    { key: 'crafting', name: 'Crafting' },
-    { key: 'magic', name: 'Magic' },
-    { key: 'rifts', name: 'Rifts' },
+    { key: 'foundations' },
+    { key: 'nature' },
+    { key: 'mana' },
+    { key: 'crafting' },
+    { key: 'magic' },
+    { key: 'rifts' },
 ];
+stampLoc(RESEARCH_TABS, 'research_tab');
 
 export const RESEARCH = {
     // Foundations
-    runecraft: { name: 'Runecraft', cost: 80, requires: [], tab: 'foundations', description: 'Etch runes into stone weapons and picks (+25% mining speed)'},
-    metalworking: { name: 'Metalworking', cost: 100, requires: [], tab: 'foundations', description: 'Smelting metal and crafting gear at anvils' },
-    ley_channeling: { name: 'Ley Channeling', cost: 175, requires: ['runecraft', 'metalworking'], tab: 'mana', description: 'Tap leylines for mana', requiresBuildings: { anvil: 1 } },
-    alchemy: { name: 'Alchemy', cost: 150, requires: ['runecraft'], tab: 'foundations', description: 'Learn how to brew potions and unlock corn and potatoes' },
-    trade_routes: { name: 'Trade Routes', cost: 300, requires: ['alchemy'], tab: 'foundations', description: 'Caravans arrive more often and offer better prices. Unlocks the Trade Rift barter board.' },
-    domestic_alchemy: { name: 'Domestic Alchemy', cost: 280, requires: ['alchemy'], tab: 'foundations', description: 'Brew tonics for use around the colony' },
-    battle_brewing: { name: 'Battle Brewing', cost: 500, requires: ['domestic_alchemy', 'herbalism'], tab: 'foundations', description: 'Brew potions for expeditions, making it easier for your colonists to go further' },
+    runecraft: { cost: 80, requires: [], tab: 'foundations'},
+    metalworking: { cost: 100, requires: [], tab: 'foundations' },
+    ley_channeling: { cost: 175, requires: ['runecraft', 'metalworking'], tab: 'mana', requiresBuildings: { anvil: 1 } },
+    alchemy: { cost: 150, requires: ['runecraft'], tab: 'foundations' },
+    trade_routes: { cost: 300, requires: ['alchemy'], tab: 'foundations' },
+    domestic_alchemy: { cost: 280, requires: ['alchemy'], tab: 'foundations' },
+    battle_brewing: { cost: 500, requires: ['domestic_alchemy', 'herbalism'], tab: 'foundations' },
 
     // Wildlife
-    beast_binding: { name: 'Beast Binding', cost: 280, requires: [], tab: 'nature', description: 'Bind and pen creatures' },
-    pack_binding: { name: 'Pack Binding', cost: 350, requires: ['husbandry'], tab: 'nature', description: 'Each colonist can bond with up to two pets.' },
-    husbandry: { name: 'Husbandry', cost: 350, requires: ['beast_binding'], tab: 'nature', description: 'Tamed animals produce 50% more resources' },
-    wolf_mastery: { name: 'Wolf Mastery', cost: 350, requires: ['pack_binding'], tab: 'nature', description: 'Wolf tame chance +20%, tamed wolves deal +4 damage' },
-    textiles: { name: 'Textiles', cost: 150, requires: [], tab: 'nature', description: 'Grow cotton and weave cloth into clothing at the loom' },
-    irrigation: { name: 'Irrigation', cost: 250, requires: ['textiles'], tab: 'nature', description: 'Crops grow in winter at half speed; water-adjacent farms grow 20% faster' },
-    herbalism: { name: 'Herbalism', cost: 350, requires: ['alchemy', 'irrigation'], tab: 'nature', description: 'Grow moonbloom and brew mana/resistance potions' },
-    verdant_growth: { name: 'Verdant Growth', cost: 500, requires: ['herbalism'], tab: 'nature', description: 'All crops gain +1 harvest yield; moonbloom grows 30% faster' },
+    beast_binding: { cost: 280, requires: [], tab: 'nature' },
+    pack_binding: { cost: 350, requires: ['husbandry'], tab: 'nature' },
+    husbandry: { cost: 350, requires: ['beast_binding'], tab: 'nature' },
+    wolf_mastery: { cost: 350, requires: ['pack_binding'], tab: 'nature' },
+    textiles: { cost: 150, requires: [], tab: 'nature' },
+    irrigation: { cost: 250, requires: ['textiles'], tab: 'nature' },
+    herbalism: { cost: 350, requires: ['alchemy', 'irrigation'], tab: 'nature' },
+    verdant_growth: { cost: 500, requires: ['herbalism'], tab: 'nature' },
 
     // Crafting
-    marksmanship: { name: 'Marksmanship', cost: 250, requires: ['runecraft', 'metalworking'], tab: 'crafting', description: 'Crossbow crafting and +1 range to all ranged weapons' },
-    arcane_implements: { name: 'Arcane Implements', cost: 250, requires: ['runecraft'], tab: 'crafting', description: 'Craft wands and staves for spellcasters' },
-    artisans_touch: { name: "Artisan's Touch", cost: 450, requires: ['marksmanship'], tab: 'crafting', description: 'Better crafting quality odds; salvage returns 75%' },
-    runeforging: { name: 'Runic Forging', cost: 350, requires: ['arcane_infusion', 'arcane_implements', 'warrior_training'], tab: 'crafting', description: 'Forge weapons using runite at an enchanting table' },
-    masterwork: { name: 'Masterwork', cost: 800, requires: ['runeforging', 'arcane_infusion', 'artisans_touch'], tab: 'crafting', description: 'Forge legendary enchanted weapons, and let master crafters rarely produce Masterwork-quality gear', requiresBuildings: { enchanting_table: 1 }, requiresMilestone: { stat: 'superiorItemsCrafted', min: 1 }, requiresTabCount: 3 },
-    golem_craft: { name: 'Golem Craft', cost: 1000, requires: ['arcane_infusion', 'void_forging', 'mana_reservoir'], tab: 'crafting', description: 'Animate stone golems to serve as tireless workers', requiresBuildings: { enchanting_table: 1 }, requiresTabCount: 3 },
+    marksmanship: { cost: 250, requires: ['runecraft', 'metalworking'], tab: 'crafting' },
+    arcane_implements: { cost: 250, requires: ['runecraft'], tab: 'crafting' },
+    artisans_touch: { cost: 450, requires: ['marksmanship'], tab: 'crafting' },
+    runeforging: { cost: 350, requires: ['arcane_infusion', 'arcane_implements', 'warrior_training'], tab: 'crafting' },
+    masterwork: { cost: 800, requires: ['runeforging', 'arcane_infusion', 'artisans_touch'], tab: 'crafting', requiresBuildings: { enchanting_table: 1 }, requiresMilestone: { stat: 'superiorItemsCrafted', min: 1 }, requiresTabCount: 3 },
+    golem_craft: { cost: 1000, requires: ['arcane_infusion', 'void_forging', 'mana_reservoir'], tab: 'crafting', requiresBuildings: { enchanting_table: 1 }, requiresTabCount: 3 },
 
     // Spells
-    arcane_studies: { name: 'Arcane Studies', cost: 100, requires: ['runecraft'], tab: 'magic', description: 'Study and craft basic spell tomes' },
-    arcane_infusion: { name: 'Arcane Infusion', cost: 300, requires: ['arcane_studies', 'ley_channeling', 'alchemy'], tab: 'magic', description: 'Enchant equipment and craft faster by infusing magic into the process', requiresBuildings: { mana_crystal: 2 } },
-    advanced_arcana: { name: 'Advanced Arcana', cost: 550, requires: ['arcane_infusion'], tab: 'magic', description: 'Craft advanced spell tomes', requiresBuildings: { scriptorium: 1 } },
-    ritual_magic: { name: 'Ritual Magic', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Unlock complex arcane rituals patterns for powerful colony-wide effects' },
-    void_sorcery: { name: 'Void Sorcery', cost: 600, requires: ['advanced_arcana'], tab: 'magic', description: 'Craft runic wands and void staves', requiresTabCount: 2 },
-    mana_weaving: { name: 'Mana Weaving', cost: 650, requires: ['arcane_infusion', 'textiles'], tab: 'magic', description: 'Weave mana into protective garb', requiresTabCount: 3 },
-    void_weaving: { name: 'Void Weaving', cost: 700, requires: ['mana_weaving', 'void_forging'], tab: 'magic', description: 'Weave void essence into enchanted garb' },
+    arcane_studies: { cost: 100, requires: ['runecraft'], tab: 'magic' },
+    arcane_infusion: { cost: 300, requires: ['arcane_studies', 'ley_channeling', 'alchemy'], tab: 'magic', requiresBuildings: { mana_crystal: 2 } },
+    advanced_arcana: { cost: 550, requires: ['arcane_infusion'], tab: 'magic', requiresBuildings: { scriptorium: 1 } },
+    ritual_magic: { cost: 600, requires: ['advanced_arcana'], tab: 'magic' },
+    void_sorcery: { cost: 600, requires: ['advanced_arcana'], tab: 'magic', requiresTabCount: 2 },
+    mana_weaving: { cost: 650, requires: ['arcane_infusion', 'textiles'], tab: 'magic', requiresTabCount: 3 },
+    void_weaving: { cost: 700, requires: ['mana_weaving', 'void_forging'], tab: 'magic' },
 
     // Mana
-    luminance: { name: 'Luminance', cost: 200, requires: ['ley_channeling'], tab: 'mana', description: 'Mana-powered light' },
-    brilliance: { name: 'Brilliance', cost: 500, requires: ['ember_magic'], tab: 'mana', description: 'Radiant beacon lights large areas', requiresTabCount: 3 },
-    arcane_conduits: { name: 'Arcane Conduits', cost: 400, requires: ['ley_channeling'], tab: 'mana', description: 'Mana relays reduce nearby building consumption' },
-    ember_magic: { name: 'Ember Magic', cost: 250, requires: ['luminance'], tab: 'mana', description: 'Ember Beacons: smart warmth that only draws mana in winter' },
-    mana_reservoir: { name: 'Mana Reservoir', cost: 600, requires: ['arcane_conduits'], tab: 'mana', description: 'Mana crystal cap +3 and each generates +1 mana', requiresTabCount: 3 },
-    pyroclasm: { name: 'Pyroclasm', cost: 750, requires: ['ember_magic'], tab: 'mana', description: 'Fire ward incinerates nearby foes', requiresTabCount: 3 },
+    luminance: { cost: 200, requires: ['ley_channeling'], tab: 'mana' },
+    brilliance: { cost: 500, requires: ['ember_magic'], tab: 'mana', requiresTabCount: 3 },
+    arcane_conduits: { cost: 400, requires: ['ley_channeling'], tab: 'mana' },
+    ember_magic: { cost: 250, requires: ['luminance'], tab: 'mana' },
+    mana_reservoir: { cost: 600, requires: ['arcane_conduits'], tab: 'mana', requiresTabCount: 3 },
+    pyroclasm: { cost: 750, requires: ['ember_magic'], tab: 'mana', requiresTabCount: 3 },
 
     // Rifts
-    warrior_training: { name: 'Heavy Arms', cost: 150, requires: ['metalworking'], tab: 'crafting', description: 'Forge heavy war axes for frontline fighters' },
-    warding: { name: 'Warding', cost: 250, requires: ['runecraft'], tab: 'rifts', description: 'Conjure defensive wards and build tougher structures using bricks' },
-    fortification: { name: 'Fortification', cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts', description: 'Reinforced doors and faster wall auto-repair' },
-    void_summoning: { name: 'Unstable Rifts', cost: 550, requires: ['ley_channeling'], tab: 'rifts', description: 'Open unstable rifts to summon waves of enemies', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
-    void_architecture: { name: 'Void Architecture', cost: 400, requires: ['fortification'], tab: 'rifts', description: 'Build void-reinforced walls and doors' },
-    void_forging: { name: 'Void Shaping', cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', description: 'Forge void essence into powerful gear', requiresTabCount: 3 },
-    planar_rift: { name: 'Planar Rifts', cost: 300, requires: ['arcane_infusion'], tab: 'rifts', description: 'Stabilize rifts so expeditions can launch from attuned rift anchors, which are found inside ancient crypts' },
-    auto_expedition: { name: 'Auto Expeditions', cost: 600, requires: ['planar_rift'], tab: 'rifts', description: 'Send one expedition to run automatically, skipping decisions. Extra loot awaits those who choose manually', requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, },
-    auto_expedition_ii: { name: 'Auto Expeditions II', cost: 1000, requires: ['auto_expedition'], tab: 'rifts', description: 'Send up to two simultaneous auto expeditions' },
-    auto_expedition_iii: { name: 'Auto Expeditions III', cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts', description: 'Send up to three simultaneous auto expeditions' },
-    abyss_smithing: { name: 'Abyss Forging', cost: 900, requires: ['void_forging'], tab: 'crafting', description: 'Shape abyss slivers into weapons of immense power. Only those who have ventured deep into the void can master this craft.', requiresMilestone: { stat: 'expeditionsCompleted', min: 5 } },
+    warrior_training: { cost: 150, requires: ['metalworking'], tab: 'crafting' },
+    warding: { cost: 250, requires: ['runecraft'], tab: 'rifts' },
+    fortification: { cost: 350, requires: ['warding', 'metalworking'], tab: 'rifts' },
+    void_summoning: { cost: 550, requires: ['ley_channeling'], tab: 'rifts', requiresMilestone: { stat: 'raidsDefeated', min: 1 } },
+    void_architecture: { cost: 400, requires: ['fortification'], tab: 'rifts' },
+    void_forging: { cost: 750, requires: ['void_summoning', 'runeforging'], tab: 'crafting', requiresTabCount: 3 },
+    planar_rift: { cost: 300, requires: ['arcane_infusion'], tab: 'rifts' },
+    auto_expedition: { cost: 600, requires: ['planar_rift'], tab: 'rifts', requiresMilestone: { stat: 'expeditionsCompleted', min: 1 }, },
+    auto_expedition_ii: { cost: 1000, requires: ['auto_expedition'], tab: 'rifts' },
+    auto_expedition_iii: { cost: 1600, requires: ['auto_expedition_ii'], tab: 'rifts' },
+    abyss_smithing: { cost: 900, requires: ['void_forging'], tab: 'crafting', requiresMilestone: { stat: 'expeditionsCompleted', min: 5 } },
 };
+stampLoc(RESEARCH, 'research');
 
 export const DEMO_LOCKED_RESEARCH = new Set([
     'advanced_arcana', 'void_sorcery', 'masterwork', 'golem_craft', 'mana_weaving',

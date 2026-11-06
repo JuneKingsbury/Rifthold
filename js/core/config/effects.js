@@ -1,87 +1,90 @@
+import { stampLoc, t } from '../i18n.js';
+
 export const STAT_META = {
     // ── Combat ──
-    damage:               { label: 'Damage',             format: 'flat' },
-    damageReduction:      { label: 'Damage Reduction',   format: 'percent', aggregation: 'multiplicative' },
-    critChance:           { label: 'Crit Chance',        format: 'percent' },
-    dodgeChance:          { label: 'Dodge',              format: 'percent' },
-    hpOnKill:             { label: 'HP on Kill',         format: 'plus_flat' },
-    lifeSteal:            { label: 'Life Steal',         format: 'plus_percent' },
-    thornsDamage:         { label: 'Thorns',             format: 'flat' },
-    armoredDamageBonus:   { label: 'vs Armored',         format: 'plus_percent' },
-    postMoveAttackBonus:  { label: 'First Strike',       format: 'plus_percent' },
-    lowHpDamageBonus:     { label: 'Low HP Dmg',         format: 'plus_percent' },
-    poisonImmunity:       { label: 'Poison Immune',      format: 'boolean', text: 'Poison Immune' },
-    targetPriority:       { label: 'Target Priority',   format: 'threat' },
-    autoReviveHp:         { label: 'Auto-Revive',        format: 'at_percent_hp' },
-    attackSpeed:          { label: 'Attack Speed',       format: 'plus_percent' },
+    damage:               { format: 'flat' },
+    damageReduction:      { format: 'percent', aggregation: 'multiplicative' },
+    critChance:           { format: 'percent' },
+    dodgeChance:          { format: 'percent' },
+    hpOnKill:             { format: 'plus_flat' },
+    lifeSteal:            { format: 'plus_percent' },
+    thornsDamage:         { format: 'flat' },
+    armoredDamageBonus:   { format: 'plus_percent' },
+    postMoveAttackBonus:  { format: 'plus_percent' },
+    lowHpDamageBonus:     { format: 'plus_percent' },
+    poisonImmunity:       { format: 'boolean' },
+    targetPriority:       { format: 'threat' },
+    autoReviveHp:         { format: 'at_percent_hp' },
+    attackSpeed:          { format: 'plus_percent' },
     // ── Magic ──
-    spellDamageBonus:     { label: 'Spell Dmg',          format: 'plus_percent' },
-    spellCostReduction:   { label: 'Spell Cost',         format: 'minus_percent' },
-    spellCooldownReduction: { label: 'Spell Cooldown',   format: 'minus_percent' },
-    spellDurationBonus:   { label: 'Spell Duration',     format: 'plus_percent' },
-    spellHealBonus:       { label: 'Spell Heal',         format: 'plus_percent' },
-    summonHpBonus:        { label: 'Summon HP',          format: 'plus_percent' },
-    summonDamageBonus:    { label: 'Summon Dmg',         format: 'plus_percent' },
-    summonDurationBonus:  { label: 'Summon Duration',    format: 'plus_percent' },
-    evocationBonus:       { label: 'Evocation',          format: 'plus_percent' },
-    transmutationBonus:   { label: 'Transmutation',      format: 'plus_percent' },
-    abjurationBonus:      { label: 'Abjuration',         format: 'plus_percent' },
-    enchantmentBonus:     { label: 'Enchantment',        format: 'plus_percent' },
-    conjurationBonus:     { label: 'Conjuration',        format: 'plus_percent' },
-    divinationBonus:      { label: 'Divination',         format: 'plus_percent' },
-    manaRegen:            { label: 'Mana Regen',         format: 'plus_per_tick' },
-    manaRegenBonus:       { label: 'Mana Regen',         format: 'plus_percent' },
-    maxManaBonus:         { label: 'Max Mana',           format: 'plus_flat' },
+    spellDamageBonus:     { format: 'plus_percent' },
+    spellCostReduction:   { format: 'minus_percent' },
+    spellCooldownReduction: { format: 'minus_percent' },
+    spellDurationBonus:   { format: 'plus_percent' },
+    spellHealBonus:       { format: 'plus_percent' },
+    summonHpBonus:        { format: 'plus_percent' },
+    summonDamageBonus:    { format: 'plus_percent' },
+    summonDurationBonus:  { format: 'plus_percent' },
+    evocationBonus:       { format: 'plus_percent' },
+    transmutationBonus:   { format: 'plus_percent' },
+    abjurationBonus:      { format: 'plus_percent' },
+    enchantmentBonus:     { format: 'plus_percent' },
+    conjurationBonus:     { format: 'plus_percent' },
+    divinationBonus:      { format: 'plus_percent' },
+    manaRegen:            { format: 'plus_per_tick' },
+    manaRegenBonus:       { format: 'plus_percent' },
+    maxManaBonus:         { format: 'plus_flat' },
     // ── Sustain ──
-    healthRegen:          { label: 'Health Regen',       format: 'plus_per_tick' },
-    healthRegenBonus:     { label: 'Health Regen',       format: 'plus_percent' },
-    maxHpBonus:           { label: 'Max HP',             format: 'plus_flat' },
+    healthRegen:          { format: 'plus_per_tick' },
+    healthRegenBonus:     { format: 'plus_percent' },
+    maxHpBonus:           { format: 'plus_flat' },
     // ── Movement & work ──
-    moveSpeedBonus:       { label: 'Move Speed',         format: 'plus_percent' },
-    workSpeedBonus:       { label: 'Work Speed',         format: 'plus_percent' },
-    miningSpeed:          { label: 'Mining',             format: 'mult_as_percent' },
-    choppingSpeed:        { label: 'Chopping',           format: 'mult_as_percent' },
-    farmingSpeed:         { label: 'Farming',            format: 'mult_as_percent' },
-    craftingSpeed:        { label: 'Crafting',           format: 'mult_as_percent' },
-    cookingSpeed:         { label: 'Cooking',            format: 'mult_as_percent' },
-    buildSpeed:           { label: 'Building',           format: 'mult_as_percent' },
-    tomeStudySpeed:       { label: 'Tome Speed',         format: 'multiplier' },
-    researchSpeed:        { label: 'Research',           format: 'multiplier' },
-    skillGrowthBonus:     { label: 'Skill Growth',       format: 'plus_percent' },
+    moveSpeedBonus:       { format: 'plus_percent' },
+    workSpeedBonus:       { format: 'plus_percent' },
+    miningSpeed:          { format: 'mult_as_percent' },
+    choppingSpeed:        { format: 'mult_as_percent' },
+    farmingSpeed:         { format: 'mult_as_percent' },
+    craftingSpeed:        { format: 'mult_as_percent' },
+    cookingSpeed:         { format: 'mult_as_percent' },
+    buildSpeed:           { format: 'mult_as_percent' },
+    tomeStudySpeed:       { format: 'multiplier' },
+    researchSpeed:        { format: 'multiplier' },
+    skillGrowthBonus:     { format: 'plus_percent' },
     // ── Colonist comfort ──
-    moodBonus:            { label: 'Mood',               format: 'plus_flat' },
-    hungerReduction:      { label: 'Hunger',             format: 'minus_percent' },
-    hungerDecayMult:      { label: 'Hunger Rate',        format: 'inverse_percent' },
-    coldResistance:       { label: 'Cold Res',           format: 'percent' },
-    heatResistance:       { label: 'Heat Res',           format: 'percent' },
-    lightRadius:          { label: 'Light Radius',       format: 'flat' },
+    moodBonus:            { format: 'plus_flat' },
+    hungerReduction:      { format: 'minus_percent' },
+    hungerDecayMult:      { format: 'inverse_percent' },
+    coldResistance:       { format: 'percent' },
+    heatResistance:       { format: 'percent' },
+    lightRadius:          { format: 'flat' },
     // ── Colony economy ──
-    damageBonusMult:      { label: 'Damage Bonus',       format: 'mult_as_percent' },
-    wandererChanceMult:   { label: 'Wanderer Chance',    format: 'mult_as_percent' },
-    traderChanceMult:     { label: 'Trader Chance',      format: 'mult_as_percent' },
-    cookingBonusFood:     { label: 'Bonus Food',         format: 'plus_flat', suffix: '/cook' },
-    harvestYieldBonus:    { label: 'Harvest Yield',      format: 'plus_flat', suffix: '/harvest' },
-    craftOutputBonus:     { label: 'Craft Output',       format: 'plus_flat', suffix: '/craft' },
-    tradeMarkupMult:      { label: 'Trade Discount',     format: 'inverse_percent' },
-    voidEssenceGainMult:  { label: 'Void Essence',       format: 'mult_as_percent' },
+    damageBonusMult:      { format: 'mult_as_percent' },
+    wandererChanceMult:   { format: 'mult_as_percent' },
+    traderChanceMult:     { format: 'mult_as_percent' },
+    cookingBonusFood:     { format: 'plus_flat' },
+    harvestYieldBonus:    { format: 'plus_flat' },
+    craftOutputBonus:     { format: 'plus_flat' },
+    tradeMarkupMult:      { format: 'inverse_percent' },
+    voidEssenceGainMult:  { format: 'mult_as_percent' },
     // ── Blight ──
-    blightImmunity:       { label: 'Blight Immunity',    format: 'boolean', text: 'Crops immune to miasma' },
-    blightDamageReduction: { label: 'Bloom Resistance',  format: 'plus_percent', text: 'Crops resist bloom kills' },
-    blightBloomDamage:    { label: 'Bloom Damage',       format: 'flat', suffix: '/tick', text: 'Passively damages blight blooms' },
+    blightImmunity:       { format: 'boolean' },
+    blightDamageReduction: { format: 'plus_percent' },
+    blightBloomDamage:    { format: 'flat' },
     // ── Expedition ──
-    lootMult:             { label: 'Loot',               format: 'mult_as_percent' },
-    trapDamageMult:       { label: 'Trap Damage',        format: 'trap_mult' },
-    rareEncounterMult:    { label: 'Rare Encounters',    format: 'multiplier' },
-    partyDamageMult:      { label: 'Party Damage',       format: 'mult_as_percent' },
-    spellDamageMult:      { label: 'Spell Dmg',          format: 'mult_as_percent' },
-    fatigueMult:          { label: 'Fatigue',            format: 'inverse_percent' },
-    durationMult:         { label: 'Duration',           format: 'inverse_percent' },
-    rallyChance:          { label: 'Rally Chance',       format: 'percent' },
-    rallyHeal:            { label: 'Rally Heal',         format: 'plus_percent' },
-    xpMult:               { label: 'XP',                 format: 'mult_as_percent' },
-    puzzleSuccessBonus:   { label: 'Puzzle Success',     format: 'plus_percent' },
-    chaosResistance:      { label: 'Chaos Resist',       format: 'plus_percent' },
+    lootMult:             { format: 'mult_as_percent' },
+    trapDamageMult:       { format: 'trap_mult' },
+    rareEncounterMult:    { format: 'multiplier' },
+    partyDamageMult:      { format: 'mult_as_percent' },
+    spellDamageMult:      { format: 'mult_as_percent' },
+    fatigueMult:          { format: 'inverse_percent' },
+    durationMult:         { format: 'inverse_percent' },
+    rallyChance:          { format: 'percent' },
+    rallyHeal:            { format: 'plus_percent' },
+    xpMult:               { format: 'mult_as_percent' },
+    puzzleSuccessBonus:   { format: 'plus_percent' },
+    chaosResistance:      { format: 'plus_percent' },
 };
+stampLoc(STAT_META, 'stat');
 
 const ITEM_META_KEYS = new Set([
     'name', 'key', 'description', 'tier', 'ranged', 'range',
@@ -103,14 +106,16 @@ export function formatStatValue(statKey, value) {
         case 'percent':            return `${Math.round(value * 100)}%`;
         case 'plus_percent':       return `+${Math.round(value * 100)}%`;
         case 'minus_percent':      return `-${Math.round(value * 100)}%`;
-        case 'multiplier':         return `${value}x`;
+        case 'multiplier':         return t('ui.stats.format.multiplier', { value });
         case 'mult_as_percent':    return `+${Math.round((value - 1) * 100)}%`;
         case 'inverse_percent':    return `-${Math.round((1 - value) * 100)}%`;
-        case 'plus_per_tick':      return `+${value}/tick`;
+        case 'plus_per_tick':      return t('ui.stats.format.per_tick', { value });
         case 'boolean':            return meta.text || meta.label;
-        case 'threat':             return value > 0 ? 'draws enemy fire' : 'enemies avoid you';
-        case 'at_percent_hp':      return `at ${Math.round(value * 100)}% HP`;
-        case 'trap_mult':          return value < 1 ? `-${Math.round((1 - value) * 100)}% trap dmg` : `+${Math.round((value - 1) * 100)}% trap dmg`;
+        case 'threat':             return t(value > 0 ? 'ui.stats.format.threat_draw' : 'ui.stats.format.threat_avoid');
+        case 'at_percent_hp':      return t('ui.stats.format.at_percent_hp', { pct: Math.round(value * 100) });
+        case 'trap_mult':          return value < 1
+            ? t('ui.stats.format.trap_less', { pct: Math.round((1 - value) * 100) })
+            : t('ui.stats.format.trap_more', { pct: Math.round((value - 1) * 100) });
         default:                   return `${value}`;
     }
 }
@@ -124,7 +129,7 @@ export function getItemStatLines(item) {
         const meta = STAT_META[key];
         if (!meta) continue;
         if (meta.format === 'boolean') { lines.push(meta.text || meta.label); }
-        else { lines.push(`${meta.label}: ${formatStatValue(key, value)}`); }
+        else { lines.push(t('ui.stats.line', { label: meta.label, value: formatStatValue(key, value) })); }
     }
     return lines;
 }
@@ -134,24 +139,24 @@ export function getOnHitLines(item) {
     if (item.onHit?.effect === 'slow') {
         const speedPct = Math.round(Math.abs(item.onHit.moveSpeedMalus) * 100);
         const atkPct   = item.onHit.attackSlowMult != null ? Math.round((1 - item.onHit.attackSlowMult) * 100) : null;
-        let s = `Slows on hit: -${speedPct}% move`;
-        if (atkPct) s += `, -${atkPct}% atk spd`;
-        lines.push(s);
+        lines.push(atkPct
+            ? t('ui.stats.on_hit.slow_attack', { move: speedPct, attack: atkPct })
+            : t('ui.stats.on_hit.slow', { move: speedPct }));
     }
     if (item.poisonOnHit) {
         const p = item.poisonOnHit;
-        lines.push(`Poisons on hit: ${p.damage} dmg × ${p.ticks} ticks`);
+        lines.push(t('ui.stats.on_hit.poison', { damage: p.damage, ticks: p.ticks }));
     }
     if (item.bleedOnHit) {
         const b = item.bleedOnHit;
-        lines.push(`Bleeds on hit: ${b.damage} dmg × ${b.ticks} ticks`);
+        lines.push(t('ui.stats.on_hit.bleed', { damage: b.damage, ticks: b.ticks }));
     }
     if (item.burnOnHit) {
         const b = item.burnOnHit;
-        lines.push(`Burns on hit: ${b.damage} dmg × ${b.ticks} ticks`);
+        lines.push(t('ui.stats.on_hit.burn', { damage: b.damage, ticks: b.ticks }));
     }
     if (item.cleave) {
-        lines.push('Cleave: hits all adjacent foes');
+        lines.push(t('ui.stats.on_hit.cleave'));
     }
     return lines;
 }
@@ -165,7 +170,7 @@ export function getNestedEffectLines(obj) {
         const meta = STAT_META[key];
         if (!meta) continue;
         if (meta.format === 'boolean') { lines.push(meta.text || meta.label); }
-        else { lines.push(`${meta.label}: ${formatStatValue(key, value)}`); }
+        else { lines.push(t('ui.stats.line', { label: meta.label, value: formatStatValue(key, value) })); }
     }
     return lines;
 }

@@ -36,12 +36,15 @@ import { ExplorationSystem } from '../systems/exploration.js';
 import { EXPEDITION_ENEMIES, NPC_ENCOUNTERS, REALMS, WORLD_SIZE_COLONY } from './config/exploration.js';
 import { ENTITIES } from './config/entities.js';
 import { TradeRiftSystem } from '../systems/traderift.js';
-import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey } from '../entities/item-roll.js';
+import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey, itemName } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
-import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, getLastSyncTime, forceSyncNow, PER_SAVE_SETTING_DEFAULTS, applyPerSaveSettings } from './save.js';
+import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, getLastSyncTime, forceSyncNow, PER_SAVE_SETTING_DEFAULTS, applyPerSaveSettings, slotLabel } from './save.js';
 import { getGdriveAPI } from './gdrive-web.js';
 import { escapeHtml, escapeAttr, jsArg, isTouchUI } from '../ui/ui-utils.js';
+import { getLanguage, getAvailableLanguages, t, tp, ref, defRef } from './i18n.js';
+import { resourceName, entityName, raceName, idLabel } from './names.js';
+import { applyDomI18n } from '../ui/i18n-dom.js';
 import { initResizeHandles } from '../ui/resize.js';
 import { SpatialHash } from '../world/spatial.js';
 import { MapIndex } from '../world/mapindex.js';
@@ -169,6 +172,12 @@ if (_isMobileApp) {
 // New Game choice (written by beginNewGame) so the start screen can preselect it.
 const _NON_GLOBAL_SETTING_KEYS = [...Object.keys(PER_SAVE_SETTING_DEFAULTS), 'primarySaveSlot'];
 
+// Display name of a recipe: the name of what it makes (recipe keys are ids like craft_planks).
+function _recipeName(recipeKey) {
+    const out = Object.keys(RECIPES[recipeKey]?.output || {})[0];
+    return out ? resourceName(out) : recipeKey;
+}
+
 function _roomTierRank(key) {
     return ROOM_QUALITY_TIERS.findIndex(t => t.key === key);
 }
@@ -247,6 +256,8 @@ class Game {
             showCrtWarp: true,
             keepScreenAwake: false,
             haptics: true,
+            // Read by boot.js before the game loads, so a change applies on restart.
+            language: 'en',
         };
         try {
             const saved = JSON.parse(localStorage.getItem('colony_settings'));
@@ -468,7 +479,7 @@ class Game {
             }
             c.priorities[biases[i]] = 1;
             refreshCustomColonist(c);
-            addThought(c, 'A fresh start', COLONIST_CONFIG.freshStartMoodBonus, COLONIST_CONFIG.freshStartMoodDuration, this.tick);
+            addThought(c, 'fresh_start', COLONIST_CONFIG.freshStartMoodBonus, COLONIST_CONFIG.freshStartMoodDuration, this.tick);
             this.addColonist(c);
         }
     }
@@ -609,7 +620,7 @@ class Game {
                     // loop must not block on it. Notify/report stats when it resolves.
                     saveAutoSlot(this).then(ok => {
                         if (!ok) return;
-                        this.notifications.push({ text: 'Auto-saved', tick: this.tick, type: 'success' });
+                        this.notifications.push({ text: t('msg.main.auto_saved'), tick: this.tick, type: 'success' });
                         if (window.electronAPI?.steam) {
                             const steam = window.electronAPI.steam;
                             for (const [key, value] of Object.entries(this.stats)) {
@@ -619,7 +630,7 @@ class Game {
                         }
                     }).catch(e => {
                         console.error('Auto-save failed:', e);
-                        this.notifications.push({ text: `Auto-save failed: ${e?.message || e}`, tick: this.tick, type: 'danger' });
+                        this.notifications.push({ text: t('msg.main.auto_save_failed', { error: e?.message || e }), tick: this.tick, type: 'danger' });
                     });
                 }
             }
@@ -641,7 +652,7 @@ class Game {
                 vs._pulseAccum = 0;
                 vs._nextPulseMs = _SIPHON_CONFIG.pulseCooldownTicks * CONFIG.TICK_RATE + Math.random() * _SIPHON_CONFIG.pulseCooldownTicks * CONFIG.TICK_RATE;
                 vs.voidPulseActive = true;
-                this.notifications.push({ text: '&#10022; A Void Pulse surges through the Fracture Bloom!', tick: this.tick, type: 'event' });
+                this.notifications.push({ text: `&#10022; ${t('msg.main.void_pulse')}`, tick: this.tick, type: 'event' });
             }
             // Auto-Burst: fire whenever charge is full if unlocked and toggled on
             if (vs.autoBurst && vs.charge >= vs.maxCharge) {
@@ -796,14 +807,14 @@ class Game {
             if (sfx) window.soundManager.playSFX(sfx);
         }
         if (this.weather.season !== prevSeason) {
-            this.eventLog.add(this, `Season changed to ${this.weather.season} (Year ${this.weather.year})`, 'event', null);
+            this.eventLog.add(this, { key: 'msg.main.season_changed', params: { season: ref(`season.${this.weather.season}.name`, this.weather.season), year: this.weather.year } }, 'event', null);
             this._markTilesDirty(this.weather.applySnow(this.map));
             if (this.mapIndex.findFirst('trade_rift')) {
                 this.tradeRift.regenerate(this, 'season');
-                let msg = 'The Trade Rift shimmers! New seasonal requests have arrived.';
+                let msg = t('msg.main.trade_rift_seasonal');
                 if (this.weather.seasonIndex === 0) {   // wrapped to spring = new year
                     this.tradeRift.regenerate(this, 'year');
-                    msg = 'The Trade Rift blazes! Rare yearly commissions have arrived.';
+                    msg = t('msg.main.trade_rift_yearly');
                 }
                 this.notifications.push({ text: msg, tick: this.tick, type: 'success' });
             }
@@ -831,8 +842,8 @@ class Game {
             this._spoiledToday = 0;
             if (lost >= 5) {
                 const chests = this.mapIndex.getStructurePositions('food_chest').size;
-                const hint = chests < 2 ? ' Food Chests slow spoilage.' : '';
-                this.eventLog.add(this, `${lost} food spoiled today.${hint}`, 'warning', null);
+                const key = chests < 2 ? 'msg.main.food_spoiled_hint' : 'msg.main.food_spoiled';
+                this.eventLog.add(this, { key, params: { n: lost } }, 'warning', null);
             }
         }
 
@@ -851,16 +862,16 @@ class Game {
                 for (const s of this.activeComplexStructures) {
                     if (!prevIds.has(makeId(s))) {
                         const def = COMPLEX_STRUCTURES[s.key];
-                        this.notifications.push({ text: `${def.name} activated!`, tick: this.tick, type: 'success' });
-                        this.overlays.push({ type: 'floating_text', x: s.x, y: s.y, text: `${def.name} Active!`, color: '#44ffaa', fontSize: 12, ttl: 40, maxTtl: 40 });
+                        this.notifications.push({ text: t('msg.main.structure_activated', { name: def.name }), tick: this.tick, type: 'success' });
+                        this.overlays.push({ type: 'floating_text', x: s.x, y: s.y, text: t('msg.main.structure_active_float', { name: def.name }), color: '#44ffaa', fontSize: 12, ttl: 40, maxTtl: 40 });
                         window.soundManager?.playSFXAt('spell_cast', s.x, s.y);
                     }
                 }
                 for (const s of prevComplex) {
                     if (!newIds.has(makeId(s))) {
                         const def = COMPLEX_STRUCTURES[s.key];
-                        this.notifications.push({ text: `${def.name} deactivated`, tick: this.tick, type: 'danger' });
-                        this.overlays.push({ type: 'floating_text', x: s.x, y: s.y, text: `${def.name} Lost`, color: '#ff6644', fontSize: 12, ttl: 40, maxTtl: 40 });
+                        this.notifications.push({ text: t('msg.main.structure_deactivated', { name: def.name }), tick: this.tick, type: 'danger' });
+                        this.overlays.push({ type: 'floating_text', x: s.x, y: s.y, text: t('msg.main.structure_lost_float', { name: def.name }), color: '#ff6644', fontSize: 12, ttl: 40, maxTtl: 40 });
                     }
                 }
             }
@@ -909,14 +920,14 @@ class Game {
                 const centerY = Math.floor(roomSumY[roomId] / roomTileCount[roomId]);
                 const m = overlap[roomId];
                 if (!m) {
-                    this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: 'Room complete', color: '#ffcc00', fontSize: 11, ttl: 25, maxTtl: 25 });
+                    this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: t('msg.main.room_complete'), color: '#ffcc00', fontSize: 11, ttl: 25, maxTtl: 25 });
                     continue;
                 }
                 let bestPid = -1, bestCount = 0;
                 for (const [pid, n] of m) { if (n > bestCount) { bestCount = n; bestPid = pid; } }
                 const prevQuality = prevQualities[bestPid];
                 if (_roomTierRank(newQuality.tier) > _roomTierRank(prevQuality.tier)) {
-                    this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: `Room: ${newQuality.tierName || newQuality.tier}`, color: '#44ff44', fontSize: 11, ttl: 25, maxTtl: 25 });
+                    this.overlays.push({ type: 'floating_text', x: centerX, y: centerY, text: t('msg.main.room_tier', { tier: newQuality.tierName || newQuality.tier }), color: '#44ff44', fontSize: 11, ttl: 25, maxTtl: 25 });
                 }
             }
             this._prevRoomGrid = grid;
@@ -1055,8 +1066,8 @@ class Game {
         if (!this._gameOver && this.colonists.length > 0 && this.colonists.every(c => c.hp <= 0)) {
             this._gameOver = true;
             this.paused = true;
-            this.notifications.push({ text: 'All colonists have died.', tick: this.tick, type: 'danger' });
-            this.eventLog.add(this, 'All colonists have died. You can load a previous save or wait for a new colonist to wander in.', 'danger', null);
+            this.notifications.push({ text: t('msg.main.all_died'), tick: this.tick, type: 'danger' });
+            this.eventLog.add(this, { key: 'msg.main.all_died_log' }, 'danger', null);
         }
 
         if (prof && this.tick % this._profilerReportEvery === 0) prof.report();
@@ -1122,7 +1133,7 @@ class Game {
     }
 
     startOutro() {
-        if (!confirm('This will end the current game and play the credits.\nYou can continue playing by re-loading your save.\n\nAre you sure?')) return;
+        if (!confirm(t('ui.dialog.end_game_confirm'))) return;
         this.paused = true;
         this._gameOver = true;
         const overlay = document.getElementById('outro-overlay');
@@ -1162,7 +1173,7 @@ class Game {
         for (let i = 4; i <= n; i++) {
             const btn = document.createElement('button');
             btn.id = `btn-speed-${i}`;
-            btn.title = `${i}x Speed`;
+            btn.title = t('msg.main.speed_title', { n: i });
             btn.textContent = `${i}x`;
             btn.addEventListener('click', () => this.setSpeed(i));
             insertAfter.after(btn);
@@ -1288,14 +1299,14 @@ class Game {
         if (!c || c.hp <= 0) return;
         if (c.guardMode) {
             c.guardPost = { x: pos.x, y: pos.y };
-            this.notifications.push({ text: `${c.name}'s guard point set to (${pos.x}, ${pos.y})`, tick: this.tick, type: 'event' });
+            this.notifications.push({ text: t('msg.main.guard_point_set', { name: c.name, x: pos.x, y: pos.y }), tick: this.tick, type: 'event' });
             if (this.selectedColonists.length > 1) {
                 this.ui.showMultiColonistInfo(this.selectedColonists);
             } else {
                 this.ui.showColonistInfo(c);
             }
         } else {
-            this.notifications.push({ text: `${c.name} must be in Guard Mode first`, tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.guard_mode_required', { name: c.name }), tick: this.tick, type: 'danger' });
         }
     }
 
@@ -1321,7 +1332,7 @@ class Game {
         const c = this.getColonist(colonistId);
         if (!c) return;
         c.assignedBed = { x, y };
-        this.notifications.push({ text: `${c.name} assigned to bed at (${x},${y})`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.bed_assigned', { name: c.name, x, y }), tick: this.tick, type: 'success' });
         const tile = this.map[y][x];
         this.ui.showTileInfo(tile, x, y);
     }
@@ -1332,7 +1343,7 @@ class Game {
         );
         if (c) {
             c.assignedBed = null;
-            this.notifications.push({ text: `${c.name} unassigned from bed`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.bed_unassigned', { name: c.name }), tick: this.tick, type: 'success' });
             const tile = this.map[y][x];
             this.ui.showTileInfo(tile, x, y);
         }
@@ -1346,7 +1357,7 @@ class Game {
         tile.pedestalArtifact = itemKey;
         tile.pedestalCharge = 0;
         this.power.update(this);
-        this.notifications.push({ text: `Placed ${ALL_ITEMS[itemKey].name} on pedestal`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.pedestal_placed', { item: ALL_ITEMS[itemKey].name }), tick: this.tick, type: 'success' });
         this.ui.showTileInfo(tile, x, y);
     }
 
@@ -1379,7 +1390,7 @@ class Game {
         tile.pedestalInactive = false;
         tile.pedestalCharge = 0;
         this.resources.addItem({ ...ALL_ITEMS[key], key });
-        this.notifications.push({ text: `Retrieved ${ALL_ITEMS[key]?.name || key} from pedestal`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.pedestal_retrieved', { item: ALL_ITEMS[key]?.name || key }), tick: this.tick, type: 'success' });
         this.ui.showTileInfo(tile, x, y);
     }
 
@@ -1387,31 +1398,31 @@ class Game {
         const tile = this.map[y][x];
         if (tile.structure !== 'trade_rift') return;
         if (!this.power.isPowered(x, y)) {
-            this.notifications.push({ text: 'The Trade Rift is unpowered and has no mana to open the rift.', tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.trade_rift_unpowered'), tick: this.tick, type: 'warning' });
             this.ui.updateArcanePanel();
             return;
         }
         const req = this.tradeRift.requests.find(r => r.id === requestId);
         if (!req || req.fulfilled) return;
         if (!this.resources.has(req.cost)) {
-            this.notifications.push({ text: 'Not enough materials for this trade.', tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.trade_not_enough'), tick: this.tick, type: 'warning' });
             return;
         }
         // Roll the concrete reward only now, so the exact item stays hidden until fulfilled.
         const jackpot = Math.random() < TRADE_RIFT_CONFIG.jackpotChance;
         const item = this._rollTradeRiftReward(req.reward, jackpot);
         if (!item) {
-            this.notifications.push({ text: 'The rift flickers as the trader fails to deliver. Trade cancelled.', tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.trade_failed'), tick: this.tick, type: 'warning' });
             return;
         }
         this.resources.deduct(req.cost);
         this.resources.addItem(item);
         req.fulfilled = true;
         if (jackpot) {
-            this.notifications.push({ text: `The rift overflows! Received ${item.name}!`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.trade_jackpot', { item: itemName(item) }), tick: this.tick, type: 'success' });
             window.soundManager?.playSFX('magic_levelup');
         } else {
-            this.notifications.push({ text: `Trade complete! Received ${item.name}.`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.trade_complete', { item: itemName(item) }), tick: this.tick, type: 'success' });
             window.soundManager?.playSFX('craft_complete');
         }
         this.ui.updateArcanePanel();
@@ -1573,12 +1584,12 @@ class Game {
     toggleFollow(colonistId) {
         if (this.followingColonist === colonistId) {
             this.followingColonist = null;
-            this.notifications.push({ text: 'Camera unfollowed', tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.camera_unfollowed'), tick: this.tick, type: 'success' });
         } else {
             this.followingColonist = colonistId;
             const c = this.getColonist(colonistId);
             if (c) {
-                this.notifications.push({ text: `Following ${c.name}`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: t('msg.main.following', { name: c.name }), tick: this.tick, type: 'success' });
             }
         }
         if (this.selectedColonist) this.ui.showColonistInfo(this.selectedColonist);
@@ -1595,7 +1606,7 @@ class Game {
         c[slot] = item;
         this._recalcEquipmentStats(c);
         if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool' || slot === 'boots') this.renderer?.skinManager?.invalidateComposite(colonistId);
-        this.notifications.push({ text: `${c.name} equipped ${item.name}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.equipped', { name: c.name, item: itemName(item) }), tick: this.tick, type: 'success' });
         if (slot === 'trinket') this._updateColonistRadiusHighlight(c);
         this.ui.showColonistInfo(c);
     }
@@ -1608,7 +1619,7 @@ class Game {
         c[slot] = null;
         this._recalcEquipmentStats(c);
         if (slot === 'armor' || slot === 'helmet' || slot === 'clothes' || slot === 'weapon' || slot === 'tool' || slot === 'boots') this.renderer?.skinManager?.invalidateComposite(colonistId);
-        this.notifications.push({ text: `${c.name} unequipped ${label}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.unequipped', { name: c.name, slot: idLabel('msg.main.slot', label) }), tick: this.tick, type: 'success' });
         if (slot === 'trinket') this._updateColonistRadiusHighlight(c);
         this.ui.showColonistInfo(c);
     }
@@ -1648,7 +1659,7 @@ class Game {
         if (c.trinket) this._updateColonistRadiusHighlight(c);
         // Reset UI viewing tab to follow the new active set.
         if (this.ui._colonistViewingSet) this.ui._colonistViewingSet[colonistId] = targetSetName;
-        if (changed) this.notifications.push({ text: `${c.name} switched to ${targetSetName} gear`, tick: this.tick, type: 'success' });
+        if (changed) this.notifications.push({ text: t('msg.main.gear_switched', { name: c.name, set: idLabel('msg.main.equip_set', targetSetName) }), tick: this.tick, type: 'success' });
         this.ui.showColonistInfo(c);
     }
 
@@ -1683,7 +1694,7 @@ class Game {
         }
         this._recalcEquipmentStats(c);
         if (slot === 'trinket') this._updateColonistRadiusHighlight(c);
-        this.notifications.push({ text: `${c.name}: ${newItem.name} saved to ${setName} set`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.item_saved_to_set', { name: c.name, item: itemName(newItem), set: idLabel('msg.main.equip_set', setName) }), tick: this.tick, type: 'success' });
         this.ui.showColonistInfo(c);
     }
 
@@ -1746,15 +1757,15 @@ class Game {
             recovered.planks = 1;
         }
         this.resources.add(recovered);
-        const recoveredStr = Object.entries(recovered).map(([k, v]) => `${v} ${k}`).join(', ');
-        this.notifications.push({ text: `Salvaged ${item.name} (${recoveredStr})`, tick: this.tick, type: 'event' });
+        const recoveredStr = Object.entries(recovered).map(([k, v]) => t('msg.main.resource_amount', { n: v, resource: resourceName(k) })).join(t('msg.main.list_separator'));
+        this.notifications.push({ text: t('msg.main.salvaged', { item: itemName(item), recovered: recoveredStr }), tick: this.tick, type: 'event' });
         this.ui.updateInventoryPanel();
     }
 
     _enchantItem(itemIndex, itemType) {
         const item = this.resources[itemType]?.[itemIndex];
         if (!item) {
-            this.notifications.push({ text: 'Item no longer available', tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.item_unavailable'), tick: this.tick, type: 'warning' });
             this.ui.updateInventoryPanel();
             return;
         }
@@ -1762,13 +1773,13 @@ class Game {
         const itemTier = item.tier;
         const result = queueEnchantingOrder(this, itemKey, item.quality, itemType, itemTier);
         if (result === true) {
-            this.notifications.push({ text: `Queued Enchantment on ${itemKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.enchant_queued_on', { item: itemName(item) }), tick: this.tick, type: 'success' });
             // Discard original item if successfully queued for enchanting.
             const list = this.resources[itemType];
             const item = list.splice(itemIndex, 1)[0];
             this.ui.updateInventoryPanel();
         } else {
-            this.notifications.push({ text: `Enchantment failed: ${result}`, tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.enchant_failed', { reason: result }), tick: this.tick, type: 'warning' });
         }
     }
 
@@ -1790,7 +1801,7 @@ class Game {
 
     craft(recipeKey) {
         if (queueCraftingOrder(this, recipeKey)) {
-            this.notifications.push({ text: `Queued: ${recipeKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.craft_queued', { name: _recipeName(recipeKey) }), tick: this.tick, type: 'success' });
         }
     }
 
@@ -1801,13 +1812,13 @@ class Game {
             else break;
         }
         if (queued > 0) {
-            this.notifications.push({ text: `Queued ${queued}x: ${recipeKey.replace(/_/g, ' ')}`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.craft_queued_n', { n: queued, name: _recipeName(recipeKey) }), tick: this.tick, type: 'success' });
         }
     }
 
     enchant(item) {
         if (queueEnchantingOrder(this, item) === true) {
-            this.notifications.push({ text: `Queued Enchantment: ${item.name}`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.enchant_queued', { item: itemName(item) }), tick: this.tick, type: 'success' });
         }
     }
 
@@ -1816,8 +1827,8 @@ class Game {
             this.settings.craftTargets[recipeKey] = { repeat: false, target: 0 };
         }
         this.settings.craftTargets[recipeKey].repeat = !this.settings.craftTargets[recipeKey].repeat;
-        const state = this.settings.craftTargets[recipeKey].repeat ? 'ON' : 'OFF';
-        this.notifications.push({ text: `Auto-repeat ${recipeKey.replace(/_/g, ' ')}: ${state}`, tick: this.tick, type: 'info' });
+        const key = this.settings.craftTargets[recipeKey].repeat ? 'msg.main.auto_repeat_on' : 'msg.main.auto_repeat_off';
+        this.notifications.push({ text: t(key, { name: _recipeName(recipeKey) }), tick: this.tick, type: 'info' });
     }
 
     setCraftTarget(recipeKey, value) {
@@ -2070,8 +2081,8 @@ class Game {
 
     selectResearch(techKey) {
         if (this.research.selectResearch(techKey)) {
-            const name = techKey.replace(/_/g, ' ');
-            this.notifications.push({ text: `Now researching: ${name}`, tick: this.tick, type: 'info' });
+            const name = RESEARCH[techKey]?.name || techKey;
+            this.notifications.push({ text: t('msg.main.researching', { name }), tick: this.tick, type: 'info' });
             window.soundManager?.playSFXPitched('button_click', 0);
         }
     }
@@ -2079,7 +2090,7 @@ class Game {
     cancelResearch() {
         if (this.research.activeResearch) {
             this.research.deselectResearch();
-            this.notifications.push({ text: 'Research paused', tick: this.tick, type: 'info' });
+            this.notifications.push({ text: t('msg.main.research_paused'), tick: this.tick, type: 'info' });
             window.soundManager?.playSFXPitched('button_click', -3);
         }
     }
@@ -2089,9 +2100,9 @@ class Game {
             this.camera.centerOn(this.waves.nexusPosition.x, this.waves.nexusPosition.y);
             if (this.ui.arcanePanelVisible) this.ui.toggleArcanePanel();
         } else if (this.waves.active) {
-            this.notifications.push({ text: 'A wave is already in progress!', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.wave_in_progress'), tick: this.tick, type: 'danger' });
         } else {
-            this.notifications.push({ text: 'Build a Void Nexus first!', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.need_void_nexus'), tick: this.tick, type: 'danger' });
         }
     }
 
@@ -2107,7 +2118,7 @@ class Game {
         vs.charge = Math.min(vs.maxCharge, vs.charge + power);
         vs.totalClicks++;
         if (isCrit && this.ui) {
-            this.notifications.push({ text: `&#9670; Resonant Strike! +${power} charge`, tick: this.tick, type: 'event' });
+            this.notifications.push({ text: `&#9670; ${t('msg.main.resonant_strike', { n: power })}`, tick: this.tick, type: 'event' });
         }
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
@@ -2130,8 +2141,10 @@ class Game {
         vs.lastBurstTick = this.tick;
         vs.lastBurstMs = performance.now();
         if (vs.voidPulseActive) vs.voidPulseActive = false;
-        const goldStr = goldReward > 0 ? ` + ${goldReward} gold` : '';
-        this.notifications.push({ text: `&#10070; Fracture Bloom burst! +${essenceReward} fracture dust${goldStr}`, tick: this.tick, type: 'success' });
+        const burstText = goldReward > 0
+            ? t('msg.main.bloom_burst_gold', { n: essenceReward, gold: goldReward })
+            : t('msg.main.bloom_burst', { n: essenceReward });
+        this.notifications.push({ text: `&#10070; ${burstText}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2145,14 +2158,14 @@ class Game {
         if (currentLevel >= costs.length) return;
         const cost = costs[currentLevel];
         if (!this.resources.has({ fracture_dust: cost })) {
-            this.notifications.push({ text: `Not enough fracture dust (need ${cost})`, tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.not_enough_dust', { n: cost }), tick: this.tick, type: 'danger' });
             return;
         }
         this.resources.deduct({ fracture_dust: cost });
         vs.upgrades[key]++;
         if (key === 'voidHeart') vs.maxCharge = cfg.voidHeartMaxCharge;
-        const labels = { resonance: 'Resonance', seepage: 'Seepage', crystallization: 'Crystallization', convergence: 'Convergence', voidHeart: 'Void Heart' };
-        this.notifications.push({ text: `&#10022; Void Siphon upgraded: ${labels[key] || key} Lv${vs.upgrades[key]}`, tick: this.tick, type: 'success' });
+        const label = idLabel('msg.main.siphon_upgrade', key);
+        this.notifications.push({ text: `&#10022; ${t('msg.main.siphon_upgraded', { name: label, level: vs.upgrades[key] })}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2616,8 +2629,9 @@ class Game {
             vs.earnedFd += clearBonus;
             if (vs.modifiers.includes('chain_reaction') && category === 'shard_straight') vs.bonusRolls++;
             if (sm) sm.playSFXPitched(isBossRound ? 'research_complete' : 'craft_complete', 0);
-            const label = isBossRound ? `Boss defeated! ${this._voidShardsLabel(category)}` : this._voidShardsLabel(category);
-            this.notifications.push({ text: `&#10022; Void Shards: ${label} (${fd} Fd)! Round cleared! (+${clearBonus} bonus)`, tick: this.tick, type: 'success' });
+            const params = { hand: this._voidShardsLabel(category), fd, bonus: clearBonus };
+            const text = t(isBossRound ? 'msg.main.shards_boss_cleared' : 'msg.main.shards_round_cleared', params);
+            this.notifications.push({ text: `&#10022; ${text}`, tick: this.tick, type: 'success' });
         } else {
             vs.failStreak++;
             if (vs.modifiers.includes('fracture_insurance')) {
@@ -2625,12 +2639,12 @@ class Game {
                 vs.earnedFd += insurance;
             }
             if (sm) sm.playSFXPitched('shield_block', 0);
-            this.notifications.push({ text: `&#9670; Void Shards: ${this._voidShardsLabel(category)} (${fd} Fd, needed ${threshold})`, tick: this.tick, type: 'event' });
+            this.notifications.push({ text: `&#9670; ${t('msg.main.shards_round_failed', { hand: this._voidShardsLabel(category), fd, needed: threshold })}`, tick: this.tick, type: 'event' });
             if (vs.failStreak === 2) {
                 // One more fail ends the run, a failed round is otherwise
                 // silent/low-stakes, so this needs to stand out on its own.
                 if (sm) sm.playSFXPitched('wave_alert', 2);
-                this.notifications.push({ text: '&#9888; One more failed round ends this run!', tick: this.tick, type: 'danger' });
+                this.notifications.push({ text: `&#9888; ${t('msg.main.shards_last_chance')}`, tick: this.tick, type: 'danger' });
             }
         }
 
@@ -2643,7 +2657,7 @@ class Game {
             if (vs.relics.includes('second_chance') && !vs.secondChanceUsed) {
                 vs.secondChanceUsed = true;
                 vs.failStreak = 2;
-                this.notifications.push({ text: '&#10022; Second Chance: fail streak reset!', tick: this.tick, type: 'success' });
+                this.notifications.push({ text: `&#10022; ${t('msg.main.shards_second_chance')}`, tick: this.tick, type: 'success' });
             } else {
                 this._voidShardsEndRun(false);
                 return;
@@ -2717,11 +2731,11 @@ class Game {
         const mod = DICE_CONFIG.modifiers.find(m => m.key === modifierKey);
         if (!mod) return;
         if (vs.earnedFd < mod.cost) {
-            this.notifications.push({ text: `Need ${mod.cost} Fd for ${mod.label}`, tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_need_fd', { n: mod.cost, name: mod.label }), tick: this.tick, type: 'danger' });
             return;
         }
         if (vs.modifiers.length >= this._voidShardsMaxModifiers()) {
-            this.notifications.push({ text: 'Modifier slots full', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_modifier_slots_full'), tick: this.tick, type: 'danger' });
             return;
         }
         vs.earnedFd -= mod.cost;
@@ -2732,7 +2746,7 @@ class Game {
         vs.reforgeOffers = [];
         vs.relicOffer = null;
         if (window.voidShardsPurchasePoof) window.voidShardsPurchasePoof('#bb88ff');
-        this.notifications.push({ text: `&#10022; Equipped: ${mod.label}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: `&#10022; ${t('msg.main.shards_modifier_equipped', { name: mod.label })}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2742,12 +2756,12 @@ class Game {
         const preset = DICE_FACE_SETS[presetKey];
         if (!preset || presetKey === 'standard') return;
         if (vs.earnedFd < preset.cost) {
-            this.notifications.push({ text: `Need ${preset.cost} Fd for ${preset.label}`, tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_need_fd', { n: preset.cost, name: preset.label }), tick: this.tick, type: 'danger' });
             return;
         }
         const idx = vs.diceFacePresetKeys.findIndex(k => k === 'standard');
         if (idx === -1) {
-            this.notifications.push({ text: 'All dice already reforged', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_all_reforged'), tick: this.tick, type: 'danger' });
             return;
         }
         let faces = preset.faces;
@@ -2777,7 +2791,7 @@ class Game {
         if (window.voidShardsColorFlash) window.voidShardsColorFlash(reforgeColor);
         // No dice mat is mounted during the shop phase this is called from;
         // the next render mounts a fresh renderer and reads vs.diceFaces then.
-        this.notifications.push({ text: `&#10022; Die ${idx + 1} reforged: ${preset.label}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: `&#10022; ${t('msg.main.shards_die_reforged', { n: idx + 1, name: preset.label })}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2787,19 +2801,19 @@ class Game {
         const relic = RELICS[key];
         if (!relic) return;
         if (vs.earnedFd < relic.cost) {
-            this.notifications.push({ text: `Need ${relic.cost} Fd for ${relic.label}`, tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_need_fd', { n: relic.cost, name: relic.label }), tick: this.tick, type: 'danger' });
             return;
         }
         if (vs.relics.length >= DICE_CONFIG.maxRelics) {
-            this.notifications.push({ text: 'Relic slots full', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_relic_slots_full'), tick: this.tick, type: 'danger' });
             return;
         }
         if (key === 'overflow_core' && vs.dice.length >= DICE_CONFIG.maxDice) {
-            this.notifications.push({ text: 'Already at max dice', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_max_dice'), tick: this.tick, type: 'danger' });
             return;
         }
         if (key === 'fracture_weight' && vs.dice.length <= DICE_CONFIG.minDice) {
-            this.notifications.push({ text: 'Already at min dice', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_min_dice'), tick: this.tick, type: 'danger' });
             return;
         }
         vs.earnedFd -= relic.cost;
@@ -2813,7 +2827,7 @@ class Game {
         vs.relicOffer = null;
         if (window.soundManager) window.soundManager.playSFXPitched('summon_arrival', 0);
         if (window.voidShardsPurchasePoof) window.voidShardsPurchasePoof('#ffcc66');
-        this.notifications.push({ text: `&#10022; Relic acquired: ${relic.label}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: `&#10022; ${t('msg.main.shards_relic_acquired', { name: relic.label })}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2840,10 +2854,10 @@ class Game {
         const sm = window.soundManager;
         if (won) {
             if (sm) sm.playSFXPitched('research_complete', 0);
-            this.notifications.push({ text: `&#10022; Void Shards run complete! +${reward} Fd`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: `&#10022; ${t('msg.main.shards_run_won', { n: reward })}`, tick: this.tick, type: 'success' });
         } else {
             if (sm) sm.playSFXPitched('colonist_death', 0);
-            this.notifications.push({ text: `&#9670; Void Shards run ended. Recovered ${reward} Fd`, tick: this.tick, type: 'event' });
+            this.notifications.push({ text: `&#9670; ${t('msg.main.shards_run_lost', { n: reward })}`, tick: this.tick, type: 'event' });
         }
         if (window.voidShardsRunEndEffect) window.voidShardsRunEndEffect(won);
         if (this.ui) this.ui._lastArcaneHtml = '';
@@ -2858,14 +2872,14 @@ class Game {
         if (level >= upg.maxLevel) return;
         const cost = upg.costs[level];
         if (!this.resources.has({ fracture_dust: cost })) {
-            this.notifications.push({ text: `Need ${cost} Fd for ${upg.label}`, tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.shards_need_fd', { n: cost, name: upg.label }), tick: this.tick, type: 'danger' });
             return;
         }
         this.resources.deduct({ fracture_dust: cost });
         vs.permanentUpgrades[key]++;
         if (window.soundManager) window.soundManager.playSFXPitched('build_complete', 0);
         if (window.voidShardsPurchasePoof) window.voidShardsPurchasePoof('#cc99ff');
-        this.notifications.push({ text: `&#10022; Void Shards: ${upg.label} Lv${vs.permanentUpgrades[key]}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: `&#10022; ${t('msg.main.shards_perm_upgraded', { name: upg.label, level: vs.permanentUpgrades[key] })}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
@@ -2876,22 +2890,22 @@ class Game {
         this.voidShardsMeta.startingReforgeDie = idx;
         this.voidShardsMeta.startingReforgePreset = presetKey || null;
         this.voidShardsMeta.startingReforgeValue = value || null;
-        const label = presetKey ? DICE_FACE_SETS[presetKey].label : 'Standard';
-        this.notifications.push({ text: `&#10022; Starting reforge set: Die ${idx + 1} -> ${label}`, tick: this.tick, type: 'success' });
+        const label = (presetKey ? DICE_FACE_SETS[presetKey] : DICE_FACE_SETS.standard)?.label || presetKey;
+        this.notifications.push({ text: `&#10022; ${t('msg.main.shards_starting_reforge', { n: idx + 1, name: label })}`, tick: this.tick, type: 'success' });
         if (this.ui) this.ui._lastArcaneHtml = '';
     }
 
     communeWithVoid() {
         if (this.waves.active) {
-            this.notifications.push({ text: 'Cannot commune during a wave!', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.commune_during_wave'), tick: this.tick, type: 'danger' });
             return;
         }
         if (this._voidCommunionAvailable === false) {
-            this.notifications.push({ text: 'The Nexus is silent until the next wave concludes.', tick: this.tick, type: 'event' });
+            this.notifications.push({ text: t('msg.main.commune_silent'), tick: this.tick, type: 'event' });
             return;
         }
         if (!this.waves.findNexus(this)) {
-            this.notifications.push({ text: 'Build a Void Nexus first!', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.need_void_nexus'), tick: this.tick, type: 'danger' });
             return;
         }
         this.events.eventVoidCommunion(this);
@@ -2901,35 +2915,36 @@ class Game {
     showExpeditionSetup(realmKey) {
         const available = this.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.drafted);
         if (available.length === 0) {
-            this.notifications.push({ text: 'No colonists available for expedition', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.no_expedition_colonists'), tick: this.tick, type: 'danger' });
             return;
         }
-        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">Select Party</div>`;
-        html += `<div class="info-row" style="color:#888;">Choose colonists to send:</div>`;
+        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">${escapeHtml(t('ui.dialog.exp_select_party'))}</div>`;
+        html += `<div class="info-row" style="color:#888;">${escapeHtml(t('ui.dialog.exp_choose_colonists'))}</div>`;
         for (const c of available) {
-            const weaponInfo = c.weapon ? ` (${c.weapon.name})` : ' (unarmed)';
-            html += `<div class="info-row"><label><input type="checkbox" class="exp-check" value="${escapeAttr(c.id)}"> ${escapeHtml(c.name)}${escapeHtml(weaponInfo)} HP:${c.hp}/${c.maxHp}</label></div>`;
+            const weapon = c.weapon ? itemName(c.weapon) : t('ui.dialog.exp_unarmed');
+            const row = t('ui.dialog.exp_colonist_row', { name: c.name, weapon, hp: c.hp, max: c.maxHp });
+            html += `<div class="info-row"><label><input type="checkbox" class="exp-check" value="${escapeAttr(c.id)}"> ${escapeHtml(row)}</label></div>`;
         }
         const packAnimals = this.entities.filter(a => {
             return a.tamed && a.hp > 0 && !a.onExpedition &&
                 a.roles && a.roles.some(r => r.type === 'pack');
         });
         if (packAnimals.length > 0) {
-            html += `<div class="info-row" style="color:#bbaa44;margin-top:6px;"><b>Pack Animals:</b></div>`;
+            html += `<div class="info-row" style="color:#bbaa44;margin-top:6px;"><b>${escapeHtml(t('ui.dialog.exp_pack_animals'))}</b></div>`;
             for (const a of packAnimals) {
                 const packRole = a.roles.find(r => r.type === 'pack');
                 const speedBonus = packRole ? packRole.expeditionSpeedBonus || 0.25 : 0.25;
-                html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${escapeAttr(a.id)}"> ${escapeHtml(a.type)} (+${Math.round(speedBonus * 100)}% speed)</label></div>`;
+                html += `<div class="info-row"><label><input type="checkbox" class="exp-pack-check" value="${escapeAttr(a.id)}"> ${escapeHtml(t('ui.dialog.exp_pack_row', { name: entityName(a.type), pct: Math.round(speedBonus * 100) }))}</label></div>`;
             }
         }
-        html += `<div class="info-actions"><button onclick="window.game.launchExpedition(${jsArg(realmKey)})" style="background:#1a4466;color:#88ddff;">Launch</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.launchExpedition(${jsArg(realmKey)})" style="background:#1a4466;color:#88ddff;">${escapeHtml(t('ui.dialog.exp_launch'))}</button></div>`;
         this.ui.elements.infoPanel.innerHTML = html;
     }
 
     showExpeditionSetupInPanel(realmKey, autoMode = false) {
         const available = this.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.drafted);
         if (available.length === 0) {
-            this.notifications.push({ text: 'No colonists available for expedition', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.no_expedition_colonists'), tick: this.tick, type: 'danger' });
             return;
         }
         this.ui._arcaneExpSetup = realmKey;
@@ -2941,10 +2956,10 @@ class Game {
     scryRealmFromPanel(realmKey) {
         const hint = this.exploration.scryRealm(this, realmKey);
         if (!hint) {
-            this.notifications.push({ text: 'No diviner is able to scry that rift', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.no_diviner'), tick: this.tick, type: 'danger' });
             return;
         }
-        this.notifications.push({ text: `Scried the rift: ${hint.title}`, tick: this.tick, type: 'info' });
+        this.notifications.push({ text: t('msg.main.scried', { title: hint.title }), tick: this.tick, type: 'info' });
         this.ui._lastArcaneHtml = '';
         this.ui.updateArcanePanel();
     }
@@ -2953,44 +2968,44 @@ class Game {
         const ritual = RITUALS[ritualKey];
         if (!ritual) return;
         if (!hasRitualAltar(this)) {
-            this.notifications.push({ text: 'You need an active Grand Altar to perform rituals', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.ritual_need_altar'), tick: this.tick, type: 'danger' });
             return;
         }
         const readyAt = this.ritualCooldowns[ritualKey] || 0;
         if (this.tick < readyAt) {
             const ticksPerSec = (1000 / CONFIG.TICK_RATE) * this.speed;
             const remaining = Math.ceil((readyAt - this.tick) / ticksPerSec);
-            this.notifications.push({ text: `${ritual.name} is still recovering (${remaining}s)`, tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.ritual_cooldown', { name: ritual.name, n: remaining }), tick: this.tick, type: 'warning' });
             return;
         }
         if (!this.resources.has(ritual.cost)) {
-            this.notifications.push({ text: `Not enough reagents for ${ritual.name}`, tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.ritual_no_reagents', { name: ritual.name }), tick: this.tick, type: 'danger' });
             return;
         }
 
         this.resources.deduct(ritual.cost);
         this.ritualCooldowns[ritualKey] = this.tick + ritual.cooldown;
 
-        let resultText = '';
+        let result;
         switch (ritual.effect) {
             case 'mass_heal': {
                 let healed = 0;
                 for (const c of this.colonists) {
                     if (c.hp > 0 && c.hp < c.maxHp) { c.hp = c.maxHp; healed++; }
                 }
-                resultText = `Restorative energy sweeps the colony. ${healed} colonist${healed === 1 ? '' : 's'} healed.`;
+                result = ref('msg.main.ritual.mass_heal', null, { n: healed });
                 break;
             }
             case 'weather_bias': {
                 this.divinationModifiers.push({ weatherBias: ritual.weatherBias, expiresAt: this.tick + ritual.duration, casterName: 'Grand Altar' });
-                resultText = 'The skies bend toward calm.';
+                result = ref('msg.main.ritual.weather_bias');
                 break;
             }
             case 'raid_ward': {
                 if (this.combat) {
                     this.combat.nextRaidTick = Math.max(this.combat.nextRaidTick || this.tick, this.tick) + ritual.raidDelay;
                 }
-                resultText = 'A great ward turns back the gathering raid.';
+                result = ref('msg.main.ritual.raid_ward');
                 break;
             }
             case 'ripen_crops': {
@@ -3007,15 +3022,15 @@ class Game {
                         }
                     }
                 }
-                resultText = `Verdant growth surges through ${ripened} crop${ripened === 1 ? '' : 's'}.`;
+                result = ref('msg.main.ritual.ripen_crops', null, { n: ripened });
                 break;
             }
             default:
-                resultText = 'The ritual is performed.';
+                result = ref('msg.main.ritual.default');
         }
 
-        this.eventLog.add(this, `${ritual.icon} ${ritual.name}: ${resultText}`, 'event', null);
-        this.notifications.push({ text: `${ritual.name} performed`, tick: this.tick, type: 'success' });
+        this.eventLog.add(this, { key: 'msg.main.ritual_log', params: { icon: ritual.icon, name: defRef(ritual), result } }, 'event', null);
+        this.notifications.push({ text: t('msg.main.ritual_performed', { name: ritual.name }), tick: this.tick, type: 'success' });
         window.soundManager?.playSFXPitched('button_click', 4);
         this.ui.refreshInfoPanel?.();
     }
@@ -3034,10 +3049,10 @@ class Game {
         this.resources.deductFoodstuffs(cfg.foodConsumed);
         let fed = 0;
         for (const c of this.colonists) {
-            if (c.hp > 0) { addThought(c, cfg.thoughtText, cfg.moodBonus, cfg.moodDuration, this.tick); fed++; }
+            if (c.hp > 0) { addThought(c, cfg.thought, cfg.moodBonus, cfg.moodDuration, this.tick); fed++; }
         }
-        this.eventLog.add(this, `The colony gathers for a winter feast. ${fed} colonist${fed === 1 ? '' : 's'} share a warm meal.`, 'event', null);
-        this.notifications.push({ text: 'A winter feast lifts everyone\'s spirits!', tick: this.tick, type: 'success' });
+        this.eventLog.add(this, { key: 'msg.main.winter_feast_log', params: { n: fed } }, 'event', null);
+        this.notifications.push({ text: t('msg.main.winter_feast'), tick: this.tick, type: 'success' });
         this.story.checkMilestone('first_winter_feast', this);
     }
 
@@ -3046,7 +3061,7 @@ class Game {
         const checks = panel.querySelectorAll('.exp-check:checked');
         const ids = Array.from(checks).map(cb => parseInt(cb.value));
         if (ids.length === 0) {
-            this.notifications.push({ text: 'Select at least one colonist', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.select_one_colonist'), tick: this.tick, type: 'danger' });
             return;
         }
         const packChecks = panel.querySelectorAll('.exp-pack-check:checked');
@@ -3073,8 +3088,8 @@ class Game {
         const options = { mutators, potions, formation, warBeastIds, autoMode: this.ui._arcaneExpIsAuto || false };
         const result = this.exploration.sendExpedition(this, realmKey, ids, packIds, difficulty, options);
         if (result) {
-            const autoLabel = result.autoMode ? ' (auto)' : '';
-            this.notifications.push({ text: `Expedition launched to ${result.realmName}${autoLabel}!`, tick: this.tick, type: 'success' });
+            const key = result.autoMode ? 'msg.main.expedition_launched_auto' : 'msg.main.expedition_launched';
+            this.notifications.push({ text: t(key, { realm: result.realmName }), tick: this.tick, type: 'success' });
             this.ui._arcaneExpSetup = null;
             this.ui._arcaneExpIsAuto = false;
             this.ui._lastArcaneHtml = '';
@@ -3082,7 +3097,7 @@ class Game {
             this.ui._expVisState = { lastLogLen: 0, effects: [], partyX: 0, ambientParticles: [], shakeFrames: 0, flashFrames: 0, summonLastPos: {} };
             this.ui.updateArcanePanel();
         } else {
-            this.notifications.push({ text: 'Cannot launch expedition', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.expedition_cannot_launch'), tick: this.tick, type: 'danger' });
         }
     }
 
@@ -3091,7 +3106,7 @@ class Game {
         const wasGathering = this.exploration.expeditions.find(e => e.id === expId)?.status === 'gathering';
         const result = this.exploration.retreatExpedition(this, expId);
         if (result) {
-            const text = wasGathering ? 'Expedition called off. The party stands down.' : 'Retreat ordered!';
+            const text = t(wasGathering ? 'msg.main.expedition_called_off' : 'msg.main.expedition_retreat');
             this.notifications.push({ text, tick: this.tick, type: 'info' });
             this.ui._lastArcaneHtml = '';
             this.ui.updateArcanePanel();
@@ -3134,12 +3149,12 @@ class Game {
         const panel = this.ui.elements.arcanePanel;
         const ids = Array.from(panel.querySelectorAll('.exp-check:checked')).map(cb => parseInt(cb.value));
         if (ids.length === 0) {
-            this.notifications.push({ text: 'Select colonists first', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.select_colonists_first'), tick: this.tick, type: 'danger' });
             return;
         }
         const nameInput = panel.querySelector('#exp-preset-name');
         const customName = nameInput?.value?.trim();
-        const name = customName || `Preset ${this.exploration.partyPresets.length + 1}`;
+        const name = customName || t('msg.main.default_preset_name', { n: this.exploration.partyPresets.length + 1 });
         const backRowSet = this.ui._expBackRowIds || new Set();
         const backRowIds = ids.filter(id => backRowSet.has(id));
         const frontRowIds = ids.filter(id => !backRowSet.has(id));
@@ -3154,7 +3169,7 @@ class Game {
         const warBeastIds = [...panel.querySelectorAll('.exp-war-check:checked')].map(cb => parseInt(cb.value));
 
         this.exploration.savePartyPreset(name, ids, { front: frontRowIds, back: backRowIds }, potions, mutators, packAnimalIds, warBeastIds);
-        this.notifications.push({ text: `Saved preset "${name}"`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.preset_saved', { name }), tick: this.tick, type: 'success' });
         this.ui._lastArcaneHtml = '';
         this.ui.updateArcanePanel();
     }
@@ -3190,18 +3205,18 @@ class Game {
         const checks = this.ui.elements.infoPanel.querySelectorAll('.exp-check:checked');
         const ids = Array.from(checks).map(cb => parseInt(cb.value));
         if (ids.length === 0) {
-            this.notifications.push({ text: 'Select at least one colonist', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.select_one_colonist'), tick: this.tick, type: 'danger' });
             return;
         }
         const packChecks = this.ui.elements.infoPanel.querySelectorAll('.exp-pack-check:checked');
         const packIds = Array.from(packChecks).map(cb => parseInt(cb.value));
         const result = this.exploration.sendExpedition(this, realmKey, ids, packIds);
         if (result) {
-            this.notifications.push({ text: `Expedition launched to ${result.realmName}!`, tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.expedition_launched', { realm: result.realmName }), tick: this.tick, type: 'success' });
             this.ui._viewingRiftGate = true;
             this.ui._viewingColonistId = null;
         } else {
-            this.notifications.push({ text: 'Cannot launch expedition', tick: this.tick, type: 'danger' });
+            this.notifications.push({ text: t('msg.main.expedition_cannot_launch'), tick: this.tick, type: 'danger' });
         }
     }
 
@@ -3261,7 +3276,7 @@ class Game {
                 return true;
             }
         }
-        this.notifications.push({ text: 'No gear to equip (all slots filled or inventory empty)', tick: this.tick, type: 'info' });
+        this.notifications.push({ text: t('msg.main.no_gear_to_equip'), tick: this.tick, type: 'info' });
         return false;
     }
 
@@ -3272,7 +3287,7 @@ class Game {
         if (!tome) return;
         if (c.equippedTome) this.resources.addTome({ ...SPELL_TOMES[c.equippedTome], key: c.equippedTome });
         c.equippedTome = tome.key;
-        this.notifications.push({ text: `${c.name} began studying ${tome.name}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.tome_studying', { name: c.name, tome: itemName(tome) }), tick: this.tick, type: 'success' });
         this.ui.showColonistInfo(c);
     }
 
@@ -3281,7 +3296,7 @@ class Game {
         if (!c || !c.equippedTome) return;
         this.resources.addTome({ ...SPELL_TOMES[c.equippedTome], key: c.equippedTome });
         c.equippedTome = null;
-        this.notifications.push({ text: `${c.name} stopped studying`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.tome_stopped', { name: c.name }), tick: this.tick, type: 'success' });
         this.ui.showColonistInfo(c);
     }
 
@@ -3296,8 +3311,8 @@ class Game {
             this.manaCrystalBonus = (this.manaCrystalBonus || 0) + 1;
             const reservoirBonus = this.research.isResearched('mana_reservoir') ? 3 : 0;
             const newLimit = 4 + this.manaCrystalBonus + reservoirBonus;
-            this.notifications.push({ text: `Crystal Capacitor used! Mana crystal limit: ${newLimit}`, tick: this.tick, type: 'success' });
-            this.eventLog.add(this, `Used Crystal Capacitor. Mana crystal limit increased to ${newLimit}`, 'event', null);
+            this.notifications.push({ text: t('msg.main.capacitor_used', { n: newLimit }), tick: this.tick, type: 'success' });
+            this.eventLog.add(this, { key: 'msg.main.capacitor_used_log', params: { n: newLimit } }, 'event', null);
         }
     }
 
@@ -3325,7 +3340,7 @@ class Game {
                 colonist.path = [];
                 this.combatEffects.push({ x: pos.x, y: pos.y, char: COMBAT_VISUALS.spellTeleportChar, color: COMBAT_VISUALS.spellTeleportColor, ttl: 3 });
                 window.soundManager?.playSFXAt('spell_teleport', pos.x, pos.y);
-                this.notifications.push({ text: `${colonist.name} warped!`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: t('msg.main.spell_warped', { name: colonist.name }), tick: this.tick, type: 'success' });
                 break;
             }
             case 'boost_crops': {
@@ -3359,7 +3374,7 @@ class Game {
                     }
                 }
                 window.soundManager?.playSFXAt('spell_growth', pos.x, pos.y);
-                this.notifications.push({ text: `${colonist.name} cast ${spell.name}, boosting ${boosted} crops!`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: tp('msg.main.spell_boosted_crops', boosted, { name: colonist.name, spell: spell.name }), tick: this.tick, type: 'success' });
                 break;
             }
             case 'terraform': {
@@ -3389,7 +3404,7 @@ class Game {
                     if (this.renderer) this.renderer.markTerrainDirty();
                 }
                 window.soundManager?.playSFXAt('spell_terraform', pos.x, pos.y);
-                this.notifications.push({ text: `${colonist.name} cast ${spell.name}, transforming ${changed} tiles!`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: tp('msg.main.spell_transformed_tiles', changed, { name: colonist.name, spell: spell.name }), tick: this.tick, type: 'success' });
                 break;
             }
             case 'finish_construction': {
@@ -3412,9 +3427,9 @@ class Game {
                     colonist.currentTaskId = savedTaskId;
                     colonist.state = savedState;
                     colonist.workProgress = savedProgress;
-                    this.notifications.push({ text: `${colonist.name} shaped stone. Construction complete!`, tick: this.tick, type: 'success' });
+                    this.notifications.push({ text: t('msg.main.stone_shaped', { name: colonist.name }), tick: this.tick, type: 'success' });
                 } else {
-                    this.notifications.push({ text: `No construction in range for ${spell.name}`, tick: this.tick, type: 'warning' });
+                    this.notifications.push({ text: t('msg.main.no_construction_in_range', { spell: spell.name }), tick: this.tick, type: 'warning' });
                 }
                 break;
             }
@@ -3457,7 +3472,7 @@ class Game {
                     }
                 }
                 window.soundManager?.playSFXAt('spell_growth', pos.x, pos.y);
-                this.notifications.push({ text: `${colonist.name} cast ${spell.name}, ripening ${ripened} crops!`, tick: this.tick, type: 'success' });
+                this.notifications.push({ text: tp('msg.main.spell_ripened_crops', ripened, { name: colonist.name, spell: spell.name }), tick: this.tick, type: 'success' });
                 break;
             }
         }
@@ -3481,7 +3496,7 @@ class Game {
             radius: 1.2, alpha: 0.35, ttl: 3,
         });
         grantCastXp(colonist, spell, this);
-        addThought(colonist, 'Cast a spell', 3, 80, this.tick);
+        addThought(colonist, 'cast_spell', 3, 80, this.tick);
         this.story.checkMilestone('first_spell_cast', this);
     }
 
@@ -3504,7 +3519,7 @@ class Game {
         const isIdle = (c) => !c.drafted && !c.currentTaskId && c.state !== 'working';
         const idle = alive.filter(isIdle);
         if (idle.length === 0) {
-            this.notifications.push({ text: 'No idle colonists', tick: this.tick, type: 'event' });
+            this.notifications.push({ text: t('msg.main.no_idle_colonists'), tick: this.tick, type: 'event' });
             return;
         }
         const startIdx = this.selectedColonist ? alive.indexOf(this.selectedColonist) : -1;
@@ -3532,7 +3547,7 @@ class Game {
         const from = this.getColonist(fromId);
         if (!to || !from) return;
         to.priorities = { ...from.priorities };
-        this.notifications.push({ text: `${to.name} copied priorities from ${from.name}`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.priorities_copied', { name: to.name, from: from.name }), tick: this.tick, type: 'success' });
         this.ui.showColonistInfo(to);
     }
 
@@ -3544,7 +3559,7 @@ class Game {
                 c.draftInteractTarget = null;
             }
         }
-        this.notifications.push({ text: `Rally point set at (${x},${y})`, tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.rally_point_set', { x, y }), tick: this.tick, type: 'success' });
     }
 
     autoEquipBest(colonistId) {
@@ -3614,8 +3629,8 @@ class Game {
         animal.bondedColonistId = colonistId;
         if (animal._path) animal._path = null;
         if (animal._pathTarget) animal._pathTarget = null;
-        const animalLabel = animal.name || animal.type;
-        this.notifications.push({ text: `${animalLabel} now defends ${colonist.name}`, tick: this.tick, type: 'success' });
+        const animalLabel = animal.name || entityName(animal.type);
+        this.notifications.push({ text: t('msg.main.animal_defends', { animal: animalLabel, name: colonist.name }), tick: this.tick, type: 'success' });
     }
 
     rebondPet(animalId, colonistId) {
@@ -3629,16 +3644,16 @@ class Game {
         const maxPets = this.research.isResearched('pack_binding') ? 2 : 1;
         if (existing >= maxPets) {
             const msg = existing >= 2
-                ? `${colonist.name} already has the maximum of 2 pets`
-                : 'Requires Pack Binding research to assign a second pet';
+                ? t('msg.main.pet_limit', { name: colonist.name, n: 2 })
+                : t('msg.main.pet_needs_research');
             this.notifications.push({ text: msg, tick: this.tick, type: 'warning' });
             return;
         }
         animal.bondedColonistId = colonistId;
         if (animal._path) animal._path = null;
         if (animal._pathTarget) animal._pathTarget = null;
-        const label = animal.name || animal.type;
-        this.notifications.push({ text: `${label} is now bonded with ${colonist.name}`, tick: this.tick, type: 'success' });
+        const label = animal.name || entityName(animal.type);
+        this.notifications.push({ text: t('msg.main.pet_bonded', { animal: label, name: colonist.name }), tick: this.tick, type: 'success' });
     }
 
     directAssignAnimalPen(animalId, x, y) {
@@ -3655,8 +3670,8 @@ class Game {
         }
         if (animal._feedTaskQueued !== undefined) animal._feedTaskQueued = false;
         animal._relocateTaskQueued = false;
-        const animalLabel = animal.name || animal.type;
-        this.notifications.push({ text: `${animalLabel} pen reassigned, colonist dispatched`, tick: this.tick, type: 'success' });
+        const animalLabel = animal.name || entityName(animal.type);
+        this.notifications.push({ text: t('msg.main.pen_reassigned', { animal: animalLabel }), tick: this.tick, type: 'success' });
         this.taskQueue.add({
             type: 'relocate_animal',
             skillRequired: 'animals',
@@ -3700,7 +3715,7 @@ class Game {
         const def = GOLEM_TYPES[golemType];
         if (!def) return;
         if (!this.resources.has(def.cost)) {
-            this.notifications.push({ text: 'Not enough resources for golem', tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.golem_no_resources'), tick: this.tick, type: 'warning' });
             return;
         }
         this.resources.deduct(def.cost);
@@ -3709,8 +3724,8 @@ class Game {
         const y = forge ? forge.y : this.colonists[0]?.y || 128;
         const golem = createGolem(golemType, x, y);
         this.addColonist(golem);
-        this.notifications.push({ text: `${def.name} animated!`, tick: this.tick, type: 'success' });
-        this.eventLog.add(this, `Crafted a ${def.name}`, 'success', { type: 'position', x, y });
+        this.notifications.push({ text: t('msg.main.golem_animated', { name: def.name }), tick: this.tick, type: 'success' });
+        this.eventLog.add(this, { key: 'msg.main.golem_crafted_log', params: { name: defRef(def) } }, 'success', { type: 'position', x, y });
         this.combatEffects.push({ x, y, char: COMBAT_VISUALS.golemActivateChar, color: COMBAT_VISUALS.golemActivateColor, ttl: COMBAT_VISUALS.golemActivateTtl });
         window.soundManager?.playSFXAt('golem_activate', x, y);
     }
@@ -3893,13 +3908,13 @@ class Game {
 
     _notifySaveFailed(e) {
         console.error('Save failed:', e);
-        this.notifications.push({ text: `Save failed: ${e?.message || e}`, tick: this.tick, type: 'danger' });
+        this.notifications.push({ text: t('msg.main.save_failed', { error: e?.message || e }), tick: this.tick, type: 'danger' });
     }
 
     async save() {
         const slot = this.settings.primarySaveSlot;
         if (!slot) {
-            this.notifications.push({ text: 'No save slot selected. Use Settings → Save to Slot…', tick: this.tick, type: 'warning' });
+            this.notifications.push({ text: t('msg.main.no_save_slot'), tick: this.tick, type: 'warning' });
             return false;
         }
         try {
@@ -3908,7 +3923,7 @@ class Game {
             this._notifySaveFailed(e);
             return false;
         }
-        this.notifications.push({ text: 'Game saved!', tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.game_saved'), tick: this.tick, type: 'success' });
         this.saveSettingsToStorage();
         return true;
     }
@@ -3922,7 +3937,7 @@ class Game {
         }
         this.settings.primarySaveSlot = slotKey;
         this.saveSettingsToStorage();
-        this.notifications.push({ text: 'Saved!', tick: this.tick, type: 'success' });
+        this.notifications.push({ text: t('msg.main.saved'), tick: this.tick, type: 'success' });
         return true;
     }
 
@@ -3932,7 +3947,7 @@ class Game {
             this.settings.primarySaveSlot = slotKey;
             this.saveSettingsToStorage();
             if (this.renderer) this.renderer.markTerrainDirty();
-            this.notifications.push({ text: 'Game loaded!', tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.game_loaded'), tick: this.tick, type: 'success' });
             this.ui.updateModeDisplay(this.input);
             if (this.settings.layoutMode && this.settings.layoutMode !== 'auto') {
                 this.setLayoutMode(this.settings.layoutMode);
@@ -3941,7 +3956,7 @@ class Game {
             else if (this.settings.uiFontSize != null) window.setUIFontScale?.(this.settings.uiFontSize / 12);
             return true;
         }
-        this.notifications.push({ text: 'Could not load that save. Your current game is unchanged.', tick: this.tick, type: 'danger' });
+        this.notifications.push({ text: t('msg.main.load_failed'), tick: this.tick, type: 'danger' });
         return false;
     }
 
@@ -3956,7 +3971,7 @@ class Game {
             // now stale (built from the pre-load map). Force a rebuild on the next
             // frame. The minimap already gets the same treatment inside loadGame.
             if (this.renderer) this.renderer.markTerrainDirty();
-            this.notifications.push({ text: 'Game loaded!', tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.game_loaded'), tick: this.tick, type: 'success' });
             this.ui.updateModeDisplay(this.input);
             if (this.settings.layoutMode && this.settings.layoutMode !== 'auto') {
                 this.setLayoutMode(this.settings.layoutMode);
@@ -3969,7 +3984,7 @@ class Game {
     async exportSave() {
         if (!(await this.save())) return;
         if (await exportSlot(this.settings.primarySaveSlot)) {
-            this.notifications.push({ text: 'Save exported!', tick: this.tick, type: 'success' });
+            this.notifications.push({ text: t('msg.main.save_exported'), tick: this.tick, type: 'success' });
         }
     }
 
@@ -4129,7 +4144,7 @@ class Game {
 
         for (const [realmKey, realm] of Object.entries(REALMS)) {
             if (!realm.boss?.name) continue;
-            const fullKey = `boss:${realm.boss.name}`;
+            const fullKey = `boss:${realmKey}`;
             if (!exp.bestiary.has(fullKey)) {
                 const lastPhase = realm.boss.phases?.[realm.boss.phases.length - 1] || {};
                 const bossPhases = (realm.boss.phases || []).map(p => ({
@@ -4166,13 +4181,14 @@ class Game {
             if (def.category !== 'animal') continue;
             if (!exp.wildlifeKills.has(key)) {
                 const drops = [];
-                if (def.meatYield) drops.push(`${def.meatYield} meat`);
-                if (def.hideYield) drops.push(`${def.hideYield} hides`);
-                if (def.woolYield) drops.push(`${def.woolYield} wool`);
+                const dropList = [];
+                if (def.meatYield) { drops.push(`${def.meatYield} meat`); dropList.push({ item: 'meat', amount: def.meatYield }); }
+                if (def.hideYield) { drops.push(`${def.hideYield} hides`); dropList.push({ item: 'hides', amount: def.hideYield }); }
+                if (def.woolYield) { drops.push(`${def.woolYield} wool`); dropList.push({ item: 'wool', amount: def.woolYield }); }
                 exp.wildlifeKills.set(key, {
                     name: def.name || key.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase()),
                     char: def.char || '?', color: def.color || '#888888',
-                    sprite: key, drops: drops.length ? drops.join(', ') : 'Nothing',
+                    sprite: key, drops: drops.length ? drops.join(', ') : 'Nothing', dropList,
                     count: 1,
                 });
             }
@@ -4184,7 +4200,7 @@ class Game {
                 exp.raiderKills.set(key, {
                     name: def.name || key, char: def.char || 'R',
                     color: def.color || '#ff3333', sprite: key,
-                    drops: 'Nothing', count: 1,
+                    drops: 'Nothing', dropList: [], count: 1,
                 });
             }
         }
@@ -4334,15 +4350,17 @@ function updateBlightBlooms(game) {
         if (bloom.hp <= 0) {
             game.combatEffects.push({ x: bloom.x, y: bloom.y, char: '*', color: '#88ff44', ttl: 5 });
             for (const c of game.colonists) {
-                if (c.hp > 0) addThought(c, 'Destroyed a blight bloom', 5, 100, game.tick);
+                if (c.hp > 0) addThought(c, 'destroyed_bloom', 5, 100, game.tick);
             }
             const kills = game.exploration.wildlifeKills;
             if (kills.has('blight_bloom')) {
-                kills.get('blight_bloom').count++;
+                const rec = kills.get('blight_bloom');
+                rec.count++;
+                if (!rec.dropList) rec.dropList = [];
             } else {
                 kills.set('blight_bloom', {
                     name: 'Blight Bloom', char: '☘', color: '#88aa22',
-                    sprite: 'blight_bloom', drops: 'Nothing', lore: '', count: 1,
+                    sprite: 'blight_bloom', drops: 'Nothing', dropList: [], lore: '', count: 1,
                 });
             }
             const idx = game.entities.indexOf(bloom);
@@ -4534,12 +4552,14 @@ function setUIFontScale(scale) {
 
 function _fontScaleLabel(scale) {
     scale = parseFloat(scale);
-    if (scale <= 0.8) return 'Small';
-    if (scale >= 1.2) return 'Large';
-    return 'Medium';
+    if (scale <= 0.8) return t('ui.start.font_small');
+    if (scale >= 1.2) return t('ui.start.font_large');
+    return t('ui.start.font_medium');
 }
 
 window.setUIFontScale = setUIFontScale;
+// index.html's font size slider labels itself with this.
+window._fontScaleLabel = _fontScaleLabel;
 window.setUIFontSize = scale => setUIFontScale(scale);
 
 function initFooterTabs() {
@@ -4617,7 +4637,7 @@ function updateFooterSizeButton(footer) {
     if (!btn) return;
     const tall = footer.classList.contains('footer-tall') && !footer.classList.contains('collapsed');
     btn.innerHTML = tall ? '&#9660;' : '&#9650;';
-    btn.title = tall ? 'Shrink panel' : 'Expand panel';
+    btn.title = tall ? t('ui.start.footer_shrink') : t('ui.start.footer_expand');
 }
 window.updateFooterSizeButton = updateFooterSizeButton;
 
@@ -4678,7 +4698,31 @@ function _onDOMReady(fn) {
         fn();
     }
 }
+function _storedLanguage() {
+    try { return JSON.parse(localStorage.getItem('colony_settings') || '{}')?.language || getLanguage(); }
+    catch (e) { return getLanguage(); }
+}
+
+// <option> list for a language <select>, from locale/index.json.
+function _languageOptionsHtml(selected) {
+    return getAvailableLanguages()
+        .map(l => `<option value="${escapeAttr(l.code)}"${l.code === selected ? ' selected' : ''}>${escapeHtml(l.label)}</option>`)
+        .join('');
+}
+
+// Stores the language for the next launch (boot.js reads it before main.js loads).
+function setStoredLanguage(code) {
+    try {
+        const s = JSON.parse(localStorage.getItem('colony_settings') || '{}') || {};
+        s.language = code;
+        localStorage.setItem('colony_settings', JSON.stringify(s));
+    } catch (e) {}
+    if (window.game?.settings) window.game.settings.language = code;
+}
+window.setGameLanguage = setStoredLanguage;
+
 _onDOMReady(() => {
+    applyDomI18n(document);
     migrateColonySave();
     // Cloud pull runs in the background. syncAllFromCloud re-checks local
     // timestamps before each write, so a slot saved meanwhile is never clobbered.
@@ -4846,13 +4890,13 @@ _onDOMReady(() => {
         const isEmpty = !meta;
         if (meta && !Array.isArray(meta.mods)) meta = { ...meta, mods: undefined };
         const slotIndex = parseInt(slotKey.slice(-1));
-        const defaultLabel = isAuto ? `Auto ${slotIndex + 1}` : `Slot ${slotIndex + 1}`;
+        const defaultLabel = isAuto ? t('ui.slots.auto', { n: slotIndex + 1 }) : t('ui.slots.slot', { n: slotIndex + 1 });
         // Slot metadata can come from imported or cloud-synced saves, so every
         // value is escaped and the thumbnail must be an inline image.
-        const displayName = escapeHtml(meta?.label || defaultLabel);
+        const displayName = escapeHtml(slotLabel(meta, defaultLabel));
         const seasonRaw = String(meta?.season || '');
-        const season = escapeHtml(seasonRaw.charAt(0).toUpperCase() + seasonRaw.slice(1));
-        const gameStr = meta ? `${season} Y${escapeHtml(meta.year)} · Day ${escapeHtml(meta.dayOfSeason)} · ${escapeHtml(meta.colonistCount)} colonist${meta.colonistCount !== 1 ? 's' : ''}` : '';
+        const season = seasonRaw ? t(`season.${seasonRaw}.name`, null, seasonRaw.charAt(0).toUpperCase() + seasonRaw.slice(1)) : '';
+        const gameStr = meta ? escapeHtml(tp('ui.slots.game_info', meta.colonistCount, { season, year: meta.year, day: meta.dayOfSeason })) : '';
         const dateStr = meta ? escapeHtml(new Date(meta.timestamp).toLocaleString()) : '';
         const thumbHtml = typeof meta?.thumbnail === 'string' && meta.thumbnail.startsWith('data:image/')
             ? `<img class="slot-thumbnail" src="${escapeAttr(meta.thumbnail)}" alt="">`
@@ -4861,17 +4905,17 @@ _onDOMReady(() => {
         const modsHtml = !isEmpty && meta.mods !== undefined
             ? (() => {
                 if (!meta.mods.length && !getLoadedManifests().length) return '';
-                if (mismatch) return `<span style="color:#ffaa33;font-size:10px;">&#9888; Mod mismatch</span>`;
-                if (meta.mods.length) return `<span style="color:#666;font-size:10px;">Mods: ${escapeHtml(meta.mods.join(', '))}</span>`;
-                return `<span style="color:#666;font-size:10px;">No mods</span>`;
+                if (mismatch) return `<span style="color:#ffaa33;font-size:10px;">&#9888; ${escapeHtml(t('ui.slots.mod_mismatch'))}</span>`;
+                if (meta.mods.length) return `<span style="color:#666;font-size:10px;">${escapeHtml(t('ui.slots.mods_list', { mods: meta.mods.join(', ') }))}</span>`;
+                return `<span style="color:#666;font-size:10px;">${escapeHtml(t('ui.slots.no_mods'))}</span>`;
             })()
             : '';
         return `<div class="slot-card${isEmpty ? ' slot-empty' : ''}">
             ${thumbHtml}
-            <div class="slot-label">${defaultLabel}</div>
-            <div class="slot-meta">${isEmpty ? '<span style="color:#555">Empty</span>' : `<span class="slot-name">${displayName}</span><br>${gameStr}<br><span class="slot-timestamp">${dateStr}</span>${modsHtml ? '<br>' + modsHtml : ''}`}</div>
-            <button class="slot-export-btn" ${isEmpty ? 'disabled' : ''} data-slot-export-key="${slotKey}">Export</button>
-            <button class="slot-load-btn" ${isEmpty ? 'disabled' : ''} data-slot-key="${slotKey}">Load</button>
+            <div class="slot-label">${escapeHtml(defaultLabel)}</div>
+            <div class="slot-meta">${isEmpty ? `<span style="color:#555">${escapeHtml(t('ui.slots.empty'))}</span>` : `<span class="slot-name">${displayName}</span><br>${gameStr}<br><span class="slot-timestamp">${dateStr}</span>${modsHtml ? '<br>' + modsHtml : ''}`}</div>
+            <button class="slot-export-btn" ${isEmpty ? 'disabled' : ''} data-slot-export-key="${slotKey}">${escapeHtml(t('ui.slots.export'))}</button>
+            <button class="slot-load-btn" ${isEmpty ? 'disabled' : ''} data-slot-key="${slotKey}">${escapeHtml(t('ui.slots.load'))}</button>
         </div>`;
     }
 
@@ -4902,37 +4946,37 @@ _onDOMReady(() => {
         let detailHtml = '';
         if (mismatch.missing.length) {
             detailHtml += `<div style="margin-bottom:8px;">
-                <div style="color:#ffaa33;font-size:11px;margin-bottom:3px;">Needs to be enabled:</div>
+                <div style="color:#ffaa33;font-size:11px;margin-bottom:3px;">${_esc(t('ui.dialog.mod_mismatch_missing'))}</div>
                 ${mismatch.missing.map(id => {
                     const avail = discoveredIds.has(id);
                     return `<div style="color:${avail ? '#ffcc00' : '#ff6666'};font-size:11px;padding:1px 0;">
-                        ${avail ? '&#9744;' : '&#9888;'} ${_esc(id)}${avail ? '' : ' <span style="color:#888;">(not in mods folder)</span>'}
+                        ${avail ? '&#9744;' : '&#9888;'} ${_esc(id)}${avail ? '' : ` <span style="color:#888;">${_esc(t('ui.dialog.mod_mismatch_not_found'))}</span>`}
                     </div>`;
                 }).join('')}
             </div>`;
         }
         if (mismatch.added.length) {
             detailHtml += `<div style="margin-bottom:8px;">
-                <div style="color:#88aaff;font-size:11px;margin-bottom:3px;">Currently enabled but not in save:</div>
+                <div style="color:#88aaff;font-size:11px;margin-bottom:3px;">${_esc(t('ui.dialog.mod_mismatch_added'))}</div>
                 ${mismatch.added.map(id => `<div style="color:#aaa;font-size:11px;padding:1px 0;">&#9745; ${_esc(id)}</div>`).join('')}
             </div>`;
         }
 
         const restoreBtnHtml = canRestore
-            ? `<button id="mod-mismatch-restore" style="padding:4px 14px;background:#2a2a4e;color:#ffcc00;border:1px solid #664400;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">Restore mods &amp; restart</button>`
+            ? `<button id="mod-mismatch-restore" style="padding:4px 14px;background:#2a2a4e;color:#ffcc00;border:1px solid #664400;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">${_esc(t('ui.dialog.mod_mismatch_restore'))}</button>`
             : '';
 
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;';
         overlay.innerHTML = `
             <div style="background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:20px 24px;max-width:420px;width:90%;font-family:inherit;box-shadow:0 4px 24px #000;">
-                <div style="color:#ffaa33;font-weight:bold;margin-bottom:10px;">&#9888; Mod Mismatch</div>
-                <div style="color:#aaa;font-size:12px;margin-bottom:14px;">This save was created with a different set of mods. Loading may cause missing content or errors.</div>
+                <div style="color:#ffaa33;font-weight:bold;margin-bottom:10px;">&#9888; ${_esc(t('ui.dialog.mod_mismatch_title'))}</div>
+                <div style="color:#aaa;font-size:12px;margin-bottom:14px;">${_esc(t('ui.dialog.mod_mismatch_body'))}</div>
                 ${detailHtml}
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:flex-end;">
                     ${restoreBtnHtml}
-                    <button id="mod-mismatch-load" style="padding:4px 14px;background:#2a3a2a;color:#88cc88;border:1px solid #446644;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">Load anyway</button>
-                    <button id="mod-mismatch-cancel" style="padding:4px 14px;background:#2a2a2a;color:#aaa;border:1px solid #444;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">Cancel</button>
+                    <button id="mod-mismatch-load" style="padding:4px 14px;background:#2a3a2a;color:#88cc88;border:1px solid #446644;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">${_esc(t('ui.dialog.mod_mismatch_load'))}</button>
+                    <button id="mod-mismatch-cancel" style="padding:4px 14px;background:#2a2a2a;color:#aaa;border:1px solid #444;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;">${_esc(t('common.cancel'))}</button>
                 </div>
             </div>`;
 
@@ -5250,12 +5294,12 @@ _onDOMReady(() => {
         const connected = await getGdriveAPI().enabled().catch(() => false);
         if (connected) {
             const ts = getLastSyncTime();
-            const syncLabel = ts ? new Date(ts).toLocaleString() : 'never';
-            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;">Saves sync automatically</span><span id="start-gdrive-last-sync" style="color:#aaa;font-size:10px;flex:1;">Last synced: ${syncLabel}</span><button id="start-gdrive-sync-now" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Sync Now</button><button id="start-gdrive-disconnect" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
+            const syncLabel = ts ? new Date(ts).toLocaleString() : t('ui.start.gdrive_never');
+            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; ${escapeHtml(t('ui.start.gdrive_connected'))}</span><span style="color:#888;font-size:10px;">${escapeHtml(t('ui.start.gdrive_auto_sync'))}</span><span id="start-gdrive-last-sync" style="color:#aaa;font-size:10px;flex:1;">${escapeHtml(t('ui.start.gdrive_last_synced', { time: syncLabel }))}</span><button id="start-gdrive-sync-now" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.start.gdrive_sync_now'))}</button><button id="start-gdrive-disconnect" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.start.gdrive_disconnect'))}</button>`;
             document.getElementById('start-gdrive-sync-now').addEventListener('click', async () => {
                 const lbl = document.getElementById('start-gdrive-last-sync');
                 const btn = document.getElementById('start-gdrive-sync-now');
-                if (lbl) lbl.textContent = 'Syncing...';
+                if (lbl) lbl.textContent = t('ui.start.gdrive_syncing');
                 if (btn) btn.disabled = true;
                 try {
                     await forceSyncNow();
@@ -5265,19 +5309,19 @@ _onDOMReady(() => {
                 await updateStartGdriveStatus();
             });
             document.getElementById('start-gdrive-disconnect').addEventListener('click', async () => {
-                if (!confirm('Disconnect Google Drive? Your saves will remain local and will no longer sync.')) return;
+                if (!confirm(t('ui.dialog.gdrive_disconnect_confirm'))) return;
                 await getGdriveAPI().revoke().catch(() => {});
                 updateStartGdriveStatus();
             });
         } else {
-            row.innerHTML = `<span style="color:#aaa;font-size:11px;flex:1;">Not connected &mdash; saves stay local only</span><button id="start-gdrive-connect" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Connect Google Drive</button>`;
+            row.innerHTML = `<span style="color:#aaa;font-size:11px;flex:1;">${escapeHtml(t('ui.start.gdrive_not_connected'))}</span><button id="start-gdrive-connect" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.start.gdrive_connect'))}</button>`;
             document.getElementById('start-gdrive-connect').addEventListener('click', async () => {
-                row.innerHTML = `<span style="color:#ffcc00;font-size:11px;">Opening browser&#x2026; complete sign-in then return here.</span>`;
+                row.innerHTML = `<span style="color:#ffcc00;font-size:11px;">${escapeHtml(t('ui.start.gdrive_opening'))}</span>`;
                 try {
                     await getGdriveAPI().beginAuth();
                     updateStartGdriveStatus();
                 } catch {
-                    row.innerHTML = `<span style="color:#ff6666;font-size:11px;">Connection failed. Try again.</span><button id="start-gdrive-retry" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Retry</button>`;
+                    row.innerHTML = `<span style="color:#ff6666;font-size:11px;">${escapeHtml(t('ui.start.gdrive_failed'))}</span><button id="start-gdrive-retry" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.start.gdrive_retry'))}</button>`;
                     document.getElementById('start-gdrive-retry').addEventListener('click', () => updateStartGdriveStatus().then(() => document.getElementById('start-gdrive-connect')?.click()));
                 }
             });
@@ -5377,7 +5421,7 @@ _onDOMReady(() => {
         state.skills = skills;
         state.traits = [];
         if (!state.name) {
-            state.name = COLONIST_NAMES[idx % COLONIST_NAMES.length] || `Colonist ${idx + 1}`;
+            state.name = COLONIST_NAMES[idx % COLONIST_NAMES.length] || t('ui.start.colonist_default_name', { n: idx + 1 });
         }
     }
 
@@ -5416,7 +5460,7 @@ _onDOMReady(() => {
 
     function renderSlotName(el, state, slotIdx) {
         const color = (state && state.nameColor) || COLONIST_COLORS[slotIdx % COLONIST_COLORS.length];
-        const name = (state && state.name) || `Colonist ${slotIdx + 1}`;
+        const name = (state && state.name) || t('ui.start.colonist_default_name', { n: slotIdx + 1 });
         el.textContent = name;
         el.style.color = color;
         el.style.textShadow = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000';
@@ -5439,7 +5483,7 @@ _onDOMReady(() => {
 
         const label = document.createElement('label');
         label.htmlFor = `slot-custom-${idx}`;
-        label.textContent = `Colonist ${idx + 1}`;
+        label.textContent = t('ui.start.colonist_slot', { n: idx + 1 });
         label.style.cssText = 'color:#ffcc00; font-weight:bold; cursor:pointer; flex:1;';
 
         header.appendChild(checkbox);
@@ -5456,7 +5500,7 @@ _onDOMReady(() => {
         randomCanvas.style.cssText = 'display:block; margin:0 auto; image-rendering:pixelated;';
         const randomHint = document.createElement('div');
         randomHint.style.cssText = 'font-size:11px; color:#666; margin-top:6px;';
-        randomHint.textContent = 'Random';
+        randomHint.textContent = t('ui.start.random');
         randomView.appendChild(randomCanvas);
         randomView.appendChild(randomHint);
         // Draw the ? fallback immediately. Sprite may not exist.
@@ -5482,13 +5526,13 @@ _onDOMReady(() => {
         arrowRow.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:4px;';
         const leftArrow = document.createElement('button');
         leftArrow.textContent = '◀';
-        leftArrow.title = 'Shift left';
+        leftArrow.title = t('ui.start.shift_left');
         leftArrow.style.cssText = 'flex:1; padding:3px 0; background:#2a2a40; border:1px solid #444; color:#ccc; border-radius:3px; cursor:pointer; font-size:11px;';
         leftArrow.disabled = idx === 0;
         leftArrow.style.opacity = idx === 0 ? '0.3' : '1';
         const rightArrow = document.createElement('button');
         rightArrow.textContent = '▶';
-        rightArrow.title = 'Shift right';
+        rightArrow.title = t('ui.start.shift_right');
         rightArrow.style.cssText = 'flex:1; padding:3px 0; background:#2a2a40; border:1px solid #444; color:#ccc; border-radius:3px; cursor:pointer; font-size:11px;';
         rightArrow.disabled = idx === colonistSlotStates.length - 1;
         rightArrow.style.opacity = idx === colonistSlotStates.length - 1 ? '0.3' : '1';
@@ -5520,7 +5564,7 @@ _onDOMReady(() => {
             grid.innerHTML = '';
 
             const randomTile = mkTile(state[field] == null);
-            randomTile.title = 'Random';
+            randomTile.title = t('ui.start.random');
             randomTile.style.cssText += ' background:#1a1a2e; color:#888; font-size:14px;';
             randomTile.textContent = '?';
             randomTile.addEventListener('click', () => {
@@ -5567,7 +5611,7 @@ _onDOMReady(() => {
             colorRow.style.cssText = 'margin-bottom:6px;';
             const colorLabel = document.createElement('div');
             colorLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
-            colorLabel.textContent = 'Name & Clothing Color';
+            colorLabel.textContent = t('ui.start.color_label');
             colorRow.appendChild(colorLabel);
             const colorInputRow = document.createElement('div');
             colorInputRow.style.cssText = 'display:flex; align-items:center; gap:6px;';
@@ -5575,7 +5619,7 @@ _onDOMReady(() => {
             colorInput.type = 'color';
             colorInput.value = color;
             colorInput.style.cssText = 'width:44px; height:28px; padding:0; border:1px solid #555; border-radius:3px; background:none; cursor:pointer;';
-            colorInput.title = 'Choose name & clothing color';
+            colorInput.title = t('ui.start.color_title');
             // 'input' fires on every drag. Only update the live preview, no DOM rebuild.
             colorInput.addEventListener('input', () => {
                 state.nameColor = colorInput.value;
@@ -5592,7 +5636,7 @@ _onDOMReady(() => {
             });
             const colorHint = document.createElement('div');
             colorHint.style.cssText = 'font-size:10px; color:#666; line-height:1.3;';
-            colorHint.textContent = 'Sets both the name color\nand shirt color in game';
+            colorHint.textContent = t('ui.start.color_hint');
             colorHint.style.whiteSpace = 'pre-line';
             colorInputRow.appendChild(colorInput);
             colorInputRow.appendChild(colorHint);
@@ -5606,14 +5650,14 @@ _onDOMReady(() => {
             raceRow.style.cssText = 'margin-bottom:6px;';
             const raceLabel = document.createElement('div');
             raceLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
-            raceLabel.textContent = 'Race';
+            raceLabel.textContent = t('ui.start.race');
             raceRow.appendChild(raceLabel);
-            const races = ['Human', 'Nymph', 'Ferin', 'Kobalos', 'Bufos'];
+            const races = ['human', 'nymph', 'ferin', 'kobalos', 'bufos'];
             const raceDropdown = document.createElement('select');
-            races.forEach(raceName => {
+            races.forEach(race => {
                 const option = document.createElement('option');
-                option.text = raceName;
-                option.value = raceName.toLowerCase();
+                option.text = raceName(race);
+                option.value = race;
                 raceDropdown.add(option);
             });
 
@@ -5638,7 +5682,7 @@ _onDOMReady(() => {
             bodyRow.style.cssText = 'margin-bottom:6px;';
             const bodyLabel = document.createElement('div');
             bodyLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
-            bodyLabel.textContent = 'Body';
+            bodyLabel.textContent = t('ui.start.body');
             bodyRow.appendChild(bodyLabel);
             const bodyGrid = document.createElement('div');
             bodyGrid.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px;';
@@ -5668,7 +5712,7 @@ _onDOMReady(() => {
             hairRow.style.cssText = 'margin-bottom:6px;';
             const hairLabel = document.createElement('div');
             hairLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
-            hairLabel.textContent = 'Hair';
+            hairLabel.textContent = t('ui.start.hair');
             hairRow.appendChild(hairLabel);
             const hairGrid = document.createElement('div');
             hairGrid.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px;';
@@ -5682,7 +5726,7 @@ _onDOMReady(() => {
             shirtRow.style.cssText = 'margin-bottom:6px;';
             const shirtLabel = document.createElement('div');
             shirtLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
-            shirtLabel.textContent = 'Shirt';
+            shirtLabel.textContent = t('ui.start.shirt');
             shirtRow.appendChild(shirtLabel);
             const shirtGrid = document.createElement('div');
             shirtGrid.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px;';
@@ -5744,7 +5788,7 @@ _onDOMReady(() => {
             const nameRow = document.createElement('div');
             nameRow.style.cssText = 'margin-bottom:8px;';
             const nameLabel = document.createElement('div');
-            nameLabel.textContent = 'Name';
+            nameLabel.textContent = t('ui.start.name');
             nameLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:2px;';
             const nameInput = document.createElement('input');
             nameInput.type = 'text';
@@ -5752,7 +5796,7 @@ _onDOMReady(() => {
             nameInput.maxLength = 20;
             nameInput.style.cssText = 'width:100%; box-sizing:border-box; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:3px; padding:3px 5px; font-family:inherit; font-size:11px;';
             nameInput.addEventListener('input', () => {
-                state.name = nameInput.value.trim() || `Colonist ${idx + 1}`;
+                state.name = nameInput.value.trim() || t('ui.start.colonist_default_name', { n: idx + 1 });
                 if (EASTER_EGG_COLONISTS[state.name]) {
                     const egg = EASTER_EGG_COLONISTS[state.name];
                     state.nameColor = egg.nameColor;
@@ -5776,7 +5820,7 @@ _onDOMReady(() => {
             appearanceSection.style.cssText = 'margin-bottom:8px;';
             const appearanceLabel = document.createElement('div');
             appearanceLabel.style.cssText = 'font-size:10px; color:#888; margin-bottom:3px;';
-            appearanceLabel.textContent = 'Appearance';
+            appearanceLabel.textContent = t('ui.start.appearance');
             appearanceSection.appendChild(appearanceLabel);
             const appearanceContainer = document.createElement('div');
             appearanceContainer.dataset.slotAppearance = idx;
@@ -5790,7 +5834,7 @@ _onDOMReady(() => {
             const skillsHeader = document.createElement('div');
             skillsHeader.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;';
             const skillsLabel = document.createElement('div');
-            skillsLabel.textContent = 'Skills';
+            skillsLabel.textContent = t('ui.start.skills');
             skillsLabel.style.cssText = 'font-size:10px; color:#888;';
             const skillsCount = document.createElement('div');
             skillsCount.id = `slot-skill-count-${idx}`;
@@ -5854,14 +5898,14 @@ _onDOMReady(() => {
             const traitsHeader = document.createElement('div');
             traitsHeader.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;';
             const traitsLabel = document.createElement('div');
-            traitsLabel.textContent = 'Traits';
+            traitsLabel.textContent = t('ui.start.traits');
             traitsLabel.style.cssText = 'font-size:10px; color:#888;';
             const traitsBudget = document.createElement('div');
             traitsBudget.id = `slot-trait-budget-${idx}`;
             traitsBudget.style.cssText = 'font-size:10px; color:#aaa;';
             function updateTraitBudgetDisplay() {
                 const used = getSlotTraitValueSum(state);
-                traitsBudget.textContent = `${used} / ${TRAIT_VALUE_BUDGET} pts`;
+                traitsBudget.textContent = t('ui.start.trait_budget', { used, max: TRAIT_VALUE_BUDGET });
                 traitsBudget.style.color = used > TRAIT_VALUE_BUDGET ? '#ff6666' : '#aaa';
             }
             updateTraitBudgetDisplay();
@@ -5896,7 +5940,7 @@ _onDOMReady(() => {
                 if (state.traits.length === 0) {
                     const none = document.createElement('span');
                     none.style.cssText = 'font-size:10px; color:#555; font-style:italic;';
-                    none.textContent = 'No traits';
+                    none.textContent = t('ui.start.no_traits');
                     selectedTraitsEl.appendChild(none);
                 }
             }
@@ -5906,7 +5950,7 @@ _onDOMReady(() => {
             // Trait picker dropdown
             const pickerLabel = document.createElement('div');
             pickerLabel.style.cssText = 'font-size:10px; color:#666; margin-bottom:2px;';
-            pickerLabel.textContent = 'Add trait:';
+            pickerLabel.textContent = t('ui.start.add_trait');
             traitsSection.appendChild(pickerLabel);
 
             const pickerSelect = document.createElement('select');
@@ -5916,7 +5960,7 @@ _onDOMReady(() => {
                 pickerSelect.innerHTML = '';
                 const placeholder = document.createElement('option');
                 placeholder.value = '';
-                placeholder.textContent = '— select —';
+                placeholder.textContent = t('ui.start.select_placeholder');
                 pickerSelect.appendChild(placeholder);
 
                 const usedBudget = getSlotTraitValueSum(state);
@@ -6199,6 +6243,19 @@ _onDOMReady(() => {
     document.getElementById('start-settings-panel').addEventListener('change', saveStartSettings);
     document.getElementById('start-settings-panel').addEventListener('input', saveStartSettings);
 
+    // Language: the table is loaded once in boot.js, so a change is stored and
+    // applies on restart. Nothing is in progress on the start screen, so it
+    // offers to restart right away.
+    const languageSelect = document.getElementById('start-language');
+    const languageNote = document.getElementById('start-language-note');
+    languageSelect.innerHTML = _languageOptionsHtml(_storedLanguage());
+    languageNote.style.display = _storedLanguage() === getLanguage() ? 'none' : '';
+    languageSelect.addEventListener('change', () => {
+        setStoredLanguage(languageSelect.value);
+        languageNote.style.display = languageSelect.value === getLanguage() ? 'none' : '';
+    });
+    document.getElementById('start-language-restart').addEventListener('click', () => location.reload());
+
     function _syncFullscreenState(isFs) {
         const startCb = document.getElementById('start-fullscreen');
         if (startCb) startCb.checked = isFs;
@@ -6257,7 +6314,7 @@ _onDOMReady(() => {
         beginRebindCapture(
             action, btn,
             () => renderStartKeybindings(),
-            (key) => { btn.title = `"${formatKeyLabel(key)}" is reserved and cannot be rebound`; }
+            (key) => { btn.title = t('ui.start.key_reserved', { key: formatKeyLabel(key) }); }
         );
     };
     window.startResetKey = (action) => {
@@ -6274,7 +6331,7 @@ _onDOMReady(() => {
         document.getElementById('start-skin').value = 'ascii';
         document.getElementById('start-names').value = 'selected';
         document.getElementById('start-ui-font-size').value = 1;
-        document.getElementById('start-ui-font-val').textContent = 'Medium';
+        document.getElementById('start-ui-font-val').textContent = t('ui.start.font_medium');
         document.getElementById('start-autopause-hostile').checked = true;
         document.getElementById('start-autopause-event').checked = true;
         document.getElementById('start-autopause-caravan').checked = false;
@@ -6378,7 +6435,7 @@ _onDOMReady(() => {
             if (ok === false) {
                 game.destroy();
                 returnToStartScreen();
-                alert('That save could not be loaded. It was left untouched.');
+                alert(t('ui.dialog.save_load_failed'));
                 return;
             }
             game._resetTransientState();
@@ -6518,12 +6575,12 @@ _onDOMReady(() => {
             const colony = WORLD_SIZE_COLONY[p.mapWidth];
 
             const lines = [
-                `Max wildlife: ${p.maxAnimals}`,
-                `Sealed crypts: ${crypts}`,
-                `Ritual core ruins: ${cores}`,
-                `Other ruins: ~${ruins}`,
-                `Major rivers: ${rivers}`,
-                `Max colonists: ${colony.capMax} (+${colony.capPerMilestone} per milestone)`,
+                t('ui.start.world_max_wildlife', { n: p.maxAnimals }),
+                t('ui.start.world_crypts', { n: crypts }),
+                t('ui.start.world_core_ruins', { n: cores }),
+                t('ui.start.world_other_ruins', { n: ruins }),
+                t('ui.start.world_rivers', { n: rivers }),
+                t('ui.start.world_max_colonists', { n: colony.capMax, per: colony.capPerMilestone }),
             ];
             el.replaceChildren(...lines.map(text => {
                 const row = document.createElement('div');
@@ -6687,7 +6744,7 @@ _onDOMReady(() => {
     const openEditor = (path, launch) => {
         import(path).then(launch).catch(err => {
             console.error(err);
-            alert(`Could not open editor: ${err.message}`);
+            alert(t('ui.dialog.editor_failed', { error: err.message }));
             startScreen.style.display = '';
         });
     };
@@ -6726,9 +6783,9 @@ _onDOMReady(() => {
             exportBtn.disabled = false;
             openSaveSlotScreen();
         } else if (result?.error) {
-            alert(`Could not import save: ${result.error}`);
+            alert(t('ui.dialog.import_failed', { error: result.error }));
         } else if (result === false) {
-            alert('Invalid save file.');
+            alert(t('ui.dialog.import_invalid'));
         }
         importFileInput.value = '';
     });

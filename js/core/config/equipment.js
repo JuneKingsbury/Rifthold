@@ -1,32 +1,35 @@
+import { stampLoc } from '../i18n.js';
+
 export const RECIPE_CATEGORIES = ['Materials', 'Weapons', 'Armor', 'Clothing', 'Tools', 'Trinkets', 'Food & Potions', 'Tomes'];
 
 export const MATERIALS = {
-    wood: { name: 'Wood'},
-    stone: { name: 'Stone'},
-    food: { name: 'Food'},
-    meat: { name: 'Meat'},
-    wheat: { name: 'Wheat'},
-    berries: { name: 'Berries'},
-    corn: { name: 'Corn'},
-    potatoes: { name: 'Potatoes'},
-    moonbloom: { name: 'Moonbloom'},
-    hides: { name: 'Hides'},
-    iron_ore: { name: 'Iron Ore'},
-    runite_ore: { name: 'Runite Ore' },
-    eggs: { name: 'Eggs'},
-    milk: { name: 'Milk'},
-    wool: { name: 'Wool'},
-    cotton: { name: 'Cotton'},
-    void_essence: { name: 'Void Essence'},
-    abyss_sliver: { name: 'Abyss Sliver'},
-    gold: { name: 'Gold' },
-    planks: { name: 'Planks', recipe: { input: { wood: 2 }, output: 3, ticks: 10, prefix: 'craft_' } },
-    bricks: { name: 'Bricks', recipe: { input: { stone: 2 }, output: 3, ticks: 12, prefix: 'craft_' } },
-    leather: { name: 'Leather', recipe: { input: { hides: 2 }, output: 2, ticks: 10, prefix: 'tan_' } },
-    cloth: { name: 'Cloth', recipe: { input: { cotton: 2 }, output: 3, ticks: 10, prefix: 'weave_', research: 'textiles', station: 'loom' } },
-    iron: { name: 'Iron', recipe: { input: { iron_ore: 2 }, output: 2, ticks: 12, prefix: 'smelt_', research: 'metalworking', station: 'anvil' } },
-    runite: { name: 'Runite Bar', recipe: { input: { runite_ore: 2 }, output: 2, ticks: 14, prefix: 'smelt_', research: 'runeforging', station: 'anvil' } },
+    wood: { },
+    stone: { },
+    food: { },
+    meat: { },
+    wheat: { },
+    berries: { },
+    corn: { },
+    potatoes: { },
+    moonbloom: { },
+    hides: { },
+    iron_ore: { },
+    runite_ore: {  },
+    eggs: { },
+    milk: { },
+    wool: { },
+    cotton: { },
+    void_essence: { },
+    abyss_sliver: { },
+    gold: {  },
+    planks: { recipe: { input: { wood: 2 }, output: 3, ticks: 10 } },
+    bricks: { recipe: { input: { stone: 2 }, output: 3, ticks: 12 } },
+    leather: { recipe: { input: { hides: 2 }, output: 2, ticks: 10 } },
+    cloth: { recipe: { input: { cotton: 2 }, output: 3, ticks: 10, research: 'textiles', station: 'loom' } },
+    iron: { recipe: { input: { iron_ore: 2 }, output: 2, ticks: 12, research: 'metalworking', station: 'anvil' } },
+    runite: { recipe: { input: { runite_ore: 2 }, output: 2, ticks: 14, research: 'runeforging', station: 'anvil' } },
 };
+stampLoc(MATERIALS, 'item');
 
 const BASE_RECIPES = {
     repair_trinket: { input: { runite: 1 }, output: {}, skill: 'crafting', ticks: 40, station: 'anvil', category: 'Materials', special: 'repair' },
@@ -96,48 +99,49 @@ const BASE_RECIPES = {
 
 export const WEAPONS = {
     // ── Tier 0 ──
-    fists: { name: 'Fists', damage: 5, tier: 0, order: 1, attackAnim: 'Swing', description: 'Bare fists.' },
+    fists: { damage: 5, tier: 0, order: 1, attackAnim: 'Swing' },
     // ── Tier 1: melee → ranged → magic ──
-    stone_spear: { name: 'Stone Spear', damage: 8, tier: 1, order: 2, attackCooldown: 2, critChance: 0.15, attackAnim: 'Stab', description: 'A sharpened stone lashed to a stick. Attacks quickly and precisely, with a chance to land a critical hit.', recipe: { input: { stone: 2, wood: 1 }, ticks: 12 } },
-    wooden_club: { name: 'Wooden Club', damage: 20, tier: 1, order: 3, attackCooldown: 5, attackAnim: 'Swing', onHit: { effect: 'slow', moveSpeedMalus: -0.2, attackSlowMult: 0.8, duration: 15, rounds: 1 }, description: 'A heavy wooden bludgeon. Swings slowly but hits hard, staggering enemies on impact.', recipe: { input: { wood: 2, planks: 1 }, ticks: 15 } },
-    short_bow: { name: 'Short Bow', damage: 7, tier: 1, order: 4, ranged: true, range: 5, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', attackAnim: 'DrawAndShoot', description: 'A simple short-range bow.', recipe: { input: { wood: 3, leather: 1 }, ticks: 14 } },
-    wooden_wand: { name: 'Wooden Wand', damage: 3, tier: 1, order: 5, attackCooldown: 2, spellDamageBonus: 0.2, manaRegen: 0.02, ranged: true, range: 5, projectileChar: '·', projectileColor: '#aaccff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', description: 'A basic wand for aspiring mages. Attacks quickly.', recipe: { input: { wood: 3, planks: 1 }, ticks: 12, research: 'arcane_studies' } },
+    stone_spear: { damage: 8, tier: 1, order: 2, attackCooldown: 2, critChance: 0.15, attackAnim: 'Stab', recipe: { input: { stone: 2, wood: 1 }, ticks: 12 } },
+    wooden_club: { damage: 20, tier: 1, order: 3, attackCooldown: 5, attackAnim: 'Swing', onHit: { effect: 'slow', moveSpeedMalus: -0.2, attackSlowMult: 0.8, duration: 15, rounds: 1 }, recipe: { input: { wood: 2, planks: 1 }, ticks: 15 } },
+    short_bow: { damage: 7, tier: 1, order: 4, ranged: true, range: 5, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', attackAnim: 'DrawAndShoot', recipe: { input: { wood: 3, leather: 1 }, ticks: 14 } },
+    wooden_wand: { damage: 3, tier: 1, order: 5, attackCooldown: 2, spellDamageBonus: 0.2, manaRegen: 0.02, ranged: true, range: 5, projectileChar: '·', projectileColor: '#aaccff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', recipe: { input: { wood: 3, planks: 1 }, ticks: 12, research: 'arcane_studies' } },
     // ── Tier 2: melee → ranged → magic ──
-    iron_sword: { name: 'Iron Sword', tradeValue: 28, damage: 15, tier: 2, order: 6, attackAnim: 'Swing', description: 'A reliable iron blade.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    etched_axe: { name: 'Etched Axe', damage: 21, tier: 2, order: 7, attackCooldown: 4, critChance: 0.10, attackAnim: 'Swing', description: 'An axe inscribed with runes of sharpness. Swings with deliberate weight and occasionally lands a precise critical strike.', recipe: { input: { iron: 2, planks: 1, stone: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
-    etched_mace: { name: 'Etched Mace', damage: 24, tier: 2, order: 8, attackCooldown: 5, attackAnim: 'Swing', onHit: { effect: 'slow', moveSpeedMalus: -0.35, attackSlowMult: 0.7, duration: 20, rounds: 1 }, description: 'A brutal iron mace. Crushingly slow but staggers anything it hits.', recipe: { input: { iron: 3, planks: 1 }, ticks: 24, research: 'metalworking', station: 'anvil' } },
-    tempered_blade: { name: 'Tempered Blade', damage: 18, tier: 2, order: 8.5, attackAnim: 'Swing', description: 'A wide iron blade heat-treated for extra sharpness. Hits harder than a standard sword.', recipe: { input: { iron: 3, planks: 2 }, ticks: 26, research: ['metalworking', 'warrior_training'], station: 'anvil' } },
-    poison_tipped_spear: { name: 'Poison-tipped Spear', damage: 9, tier: 2, order: 9, attackCooldown: 2, attackAnim: 'Stab', poisonOnHit: { damage: 1, ticks: 6, interval: 10 }, description: 'A spear coated in toxin. Applies poison on hit.', recipe: { input: { stone: 2, wood: 1, moonbloom: 2 }, ticks: 20, research: 'herbalism' } },
-    hunting_bow: { name: 'Hunting Bow', damage: 10, tier: 2, order: 10, ranged: true, range: 6, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', attackAnim: 'DrawAndShoot', description: 'A sturdy bow made for hunting.', recipe: { input: { planks: 2, leather: 2, iron: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
-    iron_crossbow: { name: 'Iron Crossbow', tradeValue: 38, damage: 22, tier: 2, order: 11, attackCooldown: 5, ranged: true, range: 7, projectileChar: '→', projectileColor: '#aaddff', skinKey: 'projectile_bolt', attackAnim: 'DrawAndShoot', description: 'A mechanical crossbow with iron bolts. Slow but powerful.', recipe: { input: { iron: 3, planks: 2, leather: 1 }, ticks: 30, research: 'marksmanship', station: 'anvil' } },
-    crystal_staff: { name: 'Crystal Staff', damage: 13, tier: 2, order: 12, attackCooldown: 4, spellDamageBonus: 0.35, maxManaBonus: 10, spellCooldownReduction: 0.05, ranged: true, range: 6, projectileChar: '✦', projectileColor: '#88ddff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', description: 'A staff topped with a focusing crystal. Channels power slowly but amplifies spells significantly.', recipe: { input: { iron: 2, planks: 2, runite: 1 }, ticks: 28, research: 'arcane_implements', station: 'anvil' } },
-    war_axe: { name: 'War Axe', damage: 26, tier: 2, order: 12.5, attackCooldown: 4, attackAnim: 'Swing', description: 'A brutal axe. Slower than a sword but hits far harder.', recipe: { input: { iron: 4, planks: 2 }, ticks: 32, research: 'warrior_training', station: 'anvil' } },
+    iron_sword: { tradeValue: 28, damage: 15, tier: 2, order: 6, attackAnim: 'Swing', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    etched_axe: { damage: 21, tier: 2, order: 7, attackCooldown: 4, critChance: 0.10, attackAnim: 'Swing', recipe: { input: { iron: 2, planks: 1, stone: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
+    etched_mace: { damage: 24, tier: 2, order: 8, attackCooldown: 5, attackAnim: 'Swing', onHit: { effect: 'slow', moveSpeedMalus: -0.35, attackSlowMult: 0.7, duration: 20, rounds: 1 }, recipe: { input: { iron: 3, planks: 1 }, ticks: 24, research: 'metalworking', station: 'anvil' } },
+    tempered_blade: { damage: 18, tier: 2, order: 8.5, attackAnim: 'Swing', recipe: { input: { iron: 3, planks: 2 }, ticks: 26, research: ['metalworking', 'warrior_training'], station: 'anvil' } },
+    poison_tipped_spear: { damage: 9, tier: 2, order: 9, attackCooldown: 2, attackAnim: 'Stab', poisonOnHit: { damage: 1, ticks: 6, interval: 10 }, recipe: { input: { stone: 2, wood: 1, moonbloom: 2 }, ticks: 20, research: 'herbalism' } },
+    hunting_bow: { damage: 10, tier: 2, order: 10, ranged: true, range: 6, projectileChar: '-', projectileColor: '#ffaa33', skinKey: 'projectile_arrow', attackAnim: 'DrawAndShoot', recipe: { input: { planks: 2, leather: 2, iron: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
+    iron_crossbow: { tradeValue: 38, damage: 22, tier: 2, order: 11, attackCooldown: 5, ranged: true, range: 7, projectileChar: '→', projectileColor: '#aaddff', skinKey: 'projectile_bolt', attackAnim: 'DrawAndShoot', recipe: { input: { iron: 3, planks: 2, leather: 1 }, ticks: 30, research: 'marksmanship', station: 'anvil' } },
+    crystal_staff: { damage: 13, tier: 2, order: 12, attackCooldown: 4, spellDamageBonus: 0.35, maxManaBonus: 10, spellCooldownReduction: 0.05, ranged: true, range: 6, projectileChar: '✦', projectileColor: '#88ddff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', recipe: { input: { iron: 2, planks: 2, runite: 1 }, ticks: 28, research: 'arcane_implements', station: 'anvil' } },
+    war_axe: { damage: 26, tier: 2, order: 12.5, attackCooldown: 4, attackAnim: 'Swing', recipe: { input: { iron: 4, planks: 2 }, ticks: 32, research: 'warrior_training', station: 'anvil' } },
     // ── Tier 3: melee → ranged → magic → drop-only ──
-    enchanted_glaive: { name: 'Enchanted Glaive', damage: 26, tier: 3, order: 13, attackCooldown: 4, spellDamageBonus: 0.25, attackAnim: 'Swing', description: 'A long blade humming with arcane energy. Sweeps with deliberate power.', recipe: { input: { iron: 2, runite: 1, planks: 2 }, ticks: 38, research: 'mana_weaving', station: 'enchanting_table' } },
-    runic_blade: { name: 'Runic Blade', tradeValue: 45, damage: 28, tier: 3, order: 14, attackAnim: 'Swing', description: 'A blade etched with powerful runes.', recipe: { input: { runite: 2, planks: 1 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
-    barbed_blade: { name: 'Barbed Blade', damage: 22, tier: 3, order: 15, attackAnim: 'Swing', bleedOnHit: { damage: 2, ticks: 5, interval: 8 }, description: 'A serrated blade with deep barbs. Causes bleeding wounds.', recipe: { input: { runite: 2, iron: 1, planks: 1 }, ticks: 38, research: 'runeforging', station: 'enchanting_table' } },
-    sweeping_glaive: { name: 'Sweeping Glaive', damage: 30, tier: 3, order: 16, attackCooldown: 4, attackAnim: 'Swing', cleave: true, description: 'A long-bladed glaive. Strikes in a wide arc, hitting all adjacent foes.', recipe: { input: { runite: 2, iron: 2, planks: 2 }, ticks: 42, research: 'runeforging', station: 'enchanting_table' } },
-    runic_crossbow: { name: 'Runic Crossbow', damage: 30, tier: 3, order: 17, attackCooldown: 5, ranged: true, range: 8, projectileChar: '→', projectileColor: '#bb99ff', skinKey: 'projectile_bolt', attackAnim: 'DrawAndShoot', description: 'A crossbow enhanced with runic power. Slow but devastating.', recipe: { input: { runite: 3, iron: 2, planks: 2 }, ticks: 42, research: ['marksmanship', 'runeforging'], station: 'enchanting_table' } },
-    runic_wand: { name: 'Runic Wand', damage: 7, tier: 3, order: 18, attackCooldown: 2, spellDamageBonus: 0.5, manaRegen: 0.04, ranged: true, range: 7, projectileChar: '·', projectileColor: '#dd88ff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', description: 'A wand inscribed with potent spell-amplifying runes. Attacks quickly.', recipe: { input: { runite: 2, planks: 2 }, ticks: 35, research: 'void_sorcery', station: 'enchanting_table' } },
-    frostfang_wand: { name: 'Frostfang Wand', damage: 6, tier: 3, order: 19, attackCooldown: 2, spellDamageBonus: 0.4, manaRegen: 0.03, evocationBonus: 0.25, ranged: true, range: 6, projectileChar: '❄', projectileColor: '#88eeff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', onHit: { effect: 'slow', moveSpeedMalus: -0.3, attackSlowMult: 0.6, duration: 40, rounds: 1 }, description: 'A wand that crackles with frost. Amplifies Evocation spells and slows targets on hit.', recipe: { input: { runite: 2, void_essence: 1, planks: 2 }, ticks: 40, research: 'void_sorcery', station: 'enchanting_table' } },
-    ashen_staff: { name: 'Ashen Staff', damage: 15, tier: 3, order: 20, attackCooldown: 4, spellDamageBonus: 0.3, maxManaBonus: 15, spellCooldownReduction: 0.1, evocationBonus: 0.15, ranged: true, range: 6, projectileChar: '🔥', projectileColor: '#ff6622', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', burnOnHit: { damage: 2, ticks: 4, interval: 10 }, description: 'A staff smouldering with inner fire. Burns targets on hit.', tradeValue: 50, textColor: '#4488ff' },
-    soulbond_scepter: { name: 'Soulbond Scepter', damage: 11, tier: 3, order: 21, attackCooldown: 4, spellDamageBonus: 0.2, maxManaBonus: 10, spellCooldownReduction: 0.2, conjurationBonus: 0.3, summonHpBonus: 0.25, ranged: true, range: 5, projectileChar: '✦', projectileColor: '#9966ff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', description: 'A scepter bound to the spirit realm. Strengthens summoned allies.', tradeValue: 55, textColor: '#4488ff' },
+    enchanted_glaive: { damage: 26, tier: 3, order: 13, attackCooldown: 4, spellDamageBonus: 0.25, attackAnim: 'Swing', recipe: { input: { iron: 2, runite: 1, planks: 2 }, ticks: 38, research: 'mana_weaving', station: 'enchanting_table' } },
+    runic_blade: { tradeValue: 45, damage: 28, tier: 3, order: 14, attackAnim: 'Swing', recipe: { input: { runite: 2, planks: 1 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
+    barbed_blade: { damage: 22, tier: 3, order: 15, attackAnim: 'Swing', bleedOnHit: { damage: 2, ticks: 5, interval: 8 }, recipe: { input: { runite: 2, iron: 1, planks: 1 }, ticks: 38, research: 'runeforging', station: 'enchanting_table' } },
+    sweeping_glaive: { damage: 30, tier: 3, order: 16, attackCooldown: 4, attackAnim: 'Swing', cleave: true, recipe: { input: { runite: 2, iron: 2, planks: 2 }, ticks: 42, research: 'runeforging', station: 'enchanting_table' } },
+    runic_crossbow: { damage: 30, tier: 3, order: 17, attackCooldown: 5, ranged: true, range: 8, projectileChar: '→', projectileColor: '#bb99ff', skinKey: 'projectile_bolt', attackAnim: 'DrawAndShoot', recipe: { input: { runite: 3, iron: 2, planks: 2 }, ticks: 42, research: ['marksmanship', 'runeforging'], station: 'enchanting_table' } },
+    runic_wand: { damage: 7, tier: 3, order: 18, attackCooldown: 2, spellDamageBonus: 0.5, manaRegen: 0.04, ranged: true, range: 7, projectileChar: '·', projectileColor: '#dd88ff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', recipe: { input: { runite: 2, planks: 2 }, ticks: 35, research: 'void_sorcery', station: 'enchanting_table' } },
+    frostfang_wand: { damage: 6, tier: 3, order: 19, attackCooldown: 2, spellDamageBonus: 0.4, manaRegen: 0.03, evocationBonus: 0.25, ranged: true, range: 6, projectileChar: '❄', projectileColor: '#88eeff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', onHit: { effect: 'slow', moveSpeedMalus: -0.3, attackSlowMult: 0.6, duration: 40, rounds: 1 }, recipe: { input: { runite: 2, void_essence: 1, planks: 2 }, ticks: 40, research: 'void_sorcery', station: 'enchanting_table' } },
+    ashen_staff: { damage: 15, tier: 3, order: 20, attackCooldown: 4, spellDamageBonus: 0.3, maxManaBonus: 15, spellCooldownReduction: 0.1, evocationBonus: 0.15, ranged: true, range: 6, projectileChar: '🔥', projectileColor: '#ff6622', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', burnOnHit: { damage: 2, ticks: 4, interval: 10 }, tradeValue: 50, textColor: '#4488ff' },
+    soulbond_scepter: { damage: 11, tier: 3, order: 21, attackCooldown: 4, spellDamageBonus: 0.2, maxManaBonus: 10, spellCooldownReduction: 0.2, conjurationBonus: 0.3, summonHpBonus: 0.25, ranged: true, range: 5, projectileChar: '✦', projectileColor: '#9966ff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', tradeValue: 55, textColor: '#4488ff' },
     // ── Tier 4: melee → ranged → magic ──
     // ── Tier 4: void_essence weapons ──
-    void_edge: { name: 'Void Edge', damage: 36, tier: 4, order: 22, attackAnim: 'Swing', description: 'A blade folded from raw void essence. Balanced and reliable.', recipe: { input: { void_essence: 3, runite: 3, planks: 1 }, ticks: 45, research: 'void_forging', station: 'enchanting_table' } },
-    void_glaive: { name: 'Void Glaive', damage: 40, tier: 4, order: 23, attackCooldown: 4, cleave: true, attackAnim: 'Swing', description: 'A glaive infused with void energy. Sweeps wide, striking all adjacent foes.', recipe: { input: { void_essence: 4, runite: 2, planks: 2 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
-    void_recurve: { name: 'Void Recurve', damage: 36, tier: 4, order: 24, ranged: true, range: 9, projectileChar: '⟶', projectileColor: '#cc00ff', skinKey: 'projectile_void', attackAnim: 'DrawAndShoot', description: 'A compact bow of compressed void. Hits harder than any iron-forged crossbow.', recipe: { input: { void_essence: 3, runite: 2, planks: 3 }, ticks: 48, research: 'void_forging', station: 'enchanting_table' } },
-    void_wand: { name: 'Void Wand', damage: 16, tier: 4, order: 25, attackCooldown: 2, spellDamageBonus: 0.55, manaRegen: 0.06, ranged: true, range: 7, projectileChar: '·', projectileColor: '#cc00ff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', description: 'A wand infused with raw void energy. Casts quickly and amplifies spells powerfully.', recipe: { input: { void_essence: 3, runite: 2, planks: 2 }, ticks: 45, research: 'void_sorcery', station: 'enchanting_table' } },
-    sovereign_blade: { name: 'Sovereign Blade', textColor: '#f944ff', tradeValue: 80, damage: 44, tier: 4, order: 25.5, attackAnim: 'Swing', armoredDamageBonus: 0.20, critChance: 0.12, description: "The fallen king's personal sword. Precise and armor-piercing, it strikes true against the most heavily defended foes." },
+    void_edge: { damage: 36, tier: 4, order: 22, attackAnim: 'Swing', recipe: { input: { void_essence: 3, runite: 3, planks: 1 }, ticks: 45, research: 'void_forging', station: 'enchanting_table' } },
+    void_glaive: { damage: 40, tier: 4, order: 23, attackCooldown: 4, cleave: true, attackAnim: 'Swing', recipe: { input: { void_essence: 4, runite: 2, planks: 2 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
+    void_recurve: { damage: 36, tier: 4, order: 24, ranged: true, range: 9, projectileChar: '⟶', projectileColor: '#cc00ff', skinKey: 'projectile_void', attackAnim: 'DrawAndShoot', recipe: { input: { void_essence: 3, runite: 2, planks: 3 }, ticks: 48, research: 'void_forging', station: 'enchanting_table' } },
+    void_wand: { damage: 16, tier: 4, order: 25, attackCooldown: 2, spellDamageBonus: 0.55, manaRegen: 0.06, ranged: true, range: 7, projectileChar: '·', projectileColor: '#cc00ff', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', recipe: { input: { void_essence: 3, runite: 2, planks: 2 }, ticks: 45, research: 'void_sorcery', station: 'enchanting_table' } },
+    sovereign_blade: { textColor: '#f944ff', tradeValue: 80, damage: 44, tier: 4, order: 25.5, attackAnim: 'Swing', armoredDamageBonus: 0.20, critChance: 0.12 },
     // ── Tier 5: abyss_sliver weapons ──
-    fracture_edge: { name: 'Fracture Edge', textColor: '#ff4444', tradeValue: 90, damage: 50, tier: 5, order: 26.5, attackCooldown: 3, attackAnim: 'Swing', bleedOnHit: { damage: 3, ticks: 5, interval: 8 }, onHit: { effect: 'slow', moveSpeedMalus: -0.25, attackSlowMult: 0.75, duration: 20, rounds: 1 }, description: 'A blade fractured between dimensions. Wounds from it refuse to close, and the chaos trapped inside the edge slows and bleeds every enemy it touches.' },
-    abyssal_blade: { name: 'Abyssal Blade', damage: 55, tier: 5, order: 26, attackCooldown: 5, attackAnim: 'Swing', description: 'A greatsword forged from abyss slivers. It feels heavier than it looks.', recipe: { input: { abyss_sliver: 3, void_essence: 3, planks: 1 }, ticks: 60, research: 'abyss_smithing', station: 'enchanting_table' } },
-    abyssal_greatsword: { name: 'Abyssal Greatsword', damage: 62, tier: 5, order: 27, attackCooldown: 5, armoredDamageBonus: 0.10, attackAnim: 'Swing', description: 'A massive two-handed sword of abyssal iron. Slow but devastating, with runes tuned to pierce armored foes (+10% damage vs armored enemies).', recipe: { input: { abyss_sliver: 4, runite: 2, planks: 2 }, ticks: 65, research: 'abyss_smithing', station: 'enchanting_table' } },
-    abyssal_piercer: { name: 'Abyssal Piercer', damage: 38, tier: 5, order: 28, attackCooldown: 2, attackAnim: 'Stab', armoredDamageBonus: 0.35, description: 'A spear of pure abyssal crystal. Strikes fast and punches through armored foes.', recipe: { input: { abyss_sliver: 3, runite: 3, iron: 1 }, ticks: 55, research: 'abyss_smithing', station: 'enchanting_table' } },
-    abyssal_longbow: { name: 'Abyssal Longbow', damage: 44, tier: 5, order: 29, ranged: true, range: 10, projectileChar: '⟶', projectileColor: '#9900cc', skinKey: 'projectile_void', attackAnim: 'DrawAndShoot', description: 'A longbow that fires arrows of pure abyss. Unmatched range and power.', recipe: { input: { abyss_sliver: 3, void_essence: 2, planks: 3 }, ticks: 58, research: 'abyss_smithing', station: 'enchanting_table' } },
-    abyssal_dagger: { name: 'Abyssal Dagger', damage: 16, tier: 5, order: 30, attackCooldown: 2, spellDamageBonus: 0.58, attackAnim: 'Stab', description: 'A dagger carved from an abyss sliver. Strikes fast and amplifies spells.', recipe: { input: { abyss_sliver: 2, void_essence: 2, planks: 1 }, ticks: 50, research: 'abyss_smithing', station: 'enchanting_table' } },
-    abyssal_staff: { name: 'Abyssal Staff', damage: 40, tier: 5, order: 31, attackCooldown: 4, spellDamageBonus: 0.65, maxManaBonus: 25, spellCooldownReduction: 0.15, ranged: true, range: 8, projectileChar: '✦', projectileColor: '#9900cc', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', description: 'A staff channeling the power of the deep abyss. Slow to channel, but devastatingly powerful.', recipe: { input: { abyss_sliver: 4, void_essence: 2, planks: 2 }, ticks: 65, research: 'abyss_smithing', station: 'enchanting_table' } },
+    fracture_edge: { textColor: '#ff4444', tradeValue: 90, damage: 50, tier: 5, order: 26.5, attackCooldown: 3, attackAnim: 'Swing', bleedOnHit: { damage: 3, ticks: 5, interval: 8 }, onHit: { effect: 'slow', moveSpeedMalus: -0.25, attackSlowMult: 0.75, duration: 20, rounds: 1 } },
+    abyssal_blade: { damage: 55, tier: 5, order: 26, attackCooldown: 5, attackAnim: 'Swing', recipe: { input: { abyss_sliver: 3, void_essence: 3, planks: 1 }, ticks: 60, research: 'abyss_smithing', station: 'enchanting_table' } },
+    abyssal_greatsword: { damage: 62, tier: 5, order: 27, attackCooldown: 5, armoredDamageBonus: 0.10, attackAnim: 'Swing', recipe: { input: { abyss_sliver: 4, runite: 2, planks: 2 }, ticks: 65, research: 'abyss_smithing', station: 'enchanting_table' } },
+    abyssal_piercer: { damage: 38, tier: 5, order: 28, attackCooldown: 2, attackAnim: 'Stab', armoredDamageBonus: 0.35, recipe: { input: { abyss_sliver: 3, runite: 3, iron: 1 }, ticks: 55, research: 'abyss_smithing', station: 'enchanting_table' } },
+    abyssal_longbow: { damage: 44, tier: 5, order: 29, ranged: true, range: 10, projectileChar: '⟶', projectileColor: '#9900cc', skinKey: 'projectile_void', attackAnim: 'DrawAndShoot', recipe: { input: { abyss_sliver: 3, void_essence: 2, planks: 3 }, ticks: 58, research: 'abyss_smithing', station: 'enchanting_table' } },
+    abyssal_dagger: { damage: 16, tier: 5, order: 30, attackCooldown: 2, spellDamageBonus: 0.58, attackAnim: 'Stab', recipe: { input: { abyss_sliver: 2, void_essence: 2, planks: 1 }, ticks: 50, research: 'abyss_smithing', station: 'enchanting_table' } },
+    abyssal_staff: { damage: 40, tier: 5, order: 31, attackCooldown: 4, spellDamageBonus: 0.65, maxManaBonus: 25, spellCooldownReduction: 0.15, ranged: true, range: 8, projectileChar: '✦', projectileColor: '#9900cc', skinKey: 'projectile_spell', attackAnim: 'DrawAndShoot', recipe: { input: { abyss_sliver: 4, void_essence: 2, planks: 2 }, ticks: 65, research: 'abyss_smithing', station: 'enchanting_table' } },
 };
+stampLoc(WEAPONS, 'item');
 
 // `order` groups a set's pieces together within a tier in the crafting menu
 // (the helmet/boots sharing the same number sit next to the matching body).
@@ -146,95 +150,99 @@ export const WEAPONS = {
 // order values interleave to keep matching sets adjacent.
 export const ARMORS = {
     // ── Tier 1 ──
-    leather_vest: { name: 'Leather Vest', damageReduction: 0.10, tier: 1, order: 4, description: 'A sturdy leather vest.', recipe: { input: { leather: 3 }, ticks: 18 } },
-    padded_scout_vest: { name: 'Padded Scout Vest', damageReduction: 0.07, tier: 1, order: 5, dodgeChance: 0.05, description: 'A padded vest cut for movement. Easier to slip aside in.', recipe: { input: { leather: 2, cloth: 1 }, ticks: 16 } },
-    iron_brigandine: { name: 'Iron Brigandine', damageReduction: 0.12, tier: 1, order: 6, description: 'Light iron armor offering basic protection.', recipe: { input: { iron: 2 }, ticks: 14, research: 'metalworking', station: 'anvil' } },
+    leather_vest: { damageReduction: 0.10, tier: 1, order: 4, recipe: { input: { leather: 3 }, ticks: 18 } },
+    padded_scout_vest: { damageReduction: 0.07, tier: 1, order: 5, dodgeChance: 0.05, recipe: { input: { leather: 2, cloth: 1 }, ticks: 16 } },
+    iron_brigandine: { damageReduction: 0.12, tier: 1, order: 6, recipe: { input: { iron: 2 }, ticks: 14, research: 'metalworking', station: 'anvil' } },
     // ── Tier 2 ──
-    iron_chainmail: { name: 'Iron Chainmail', damageReduction: 0.16, tier: 2, order: 8, description: 'Interlocking iron rings for solid protection.', recipe: { input: { iron: 4, leather: 2 }, ticks: 30, research: 'metalworking', station: 'anvil' } },
-    huntsmans_leathers: { name: "Huntsman's Leathers", damageReduction: 0.11, tier: 2, order: 12, critChance: 0.08, dodgeChance: 0.06, description: 'Supple leathers worn by hunters. Light enough to move in, tough enough to matter.', recipe: { input: { leather: 3, iron: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
-    barbed_chaincoat: { name: 'Barbed Chaincoat', damageReduction: 0.14, tier: 2, order: 14, thornsDamage: 3, description: 'Iron chainmail with outward-facing barbs. Attackers regret it.', recipe: { input: { iron: 4, leather: 1 }, ticks: 28, research: 'metalworking', station: 'anvil' } },
-    enchanted_tunic: { name: 'Enchanted Tunic', damageReduction: 0.12, tier: 2, order: 11, spellDamageBonus: 0.10, description: 'A leather tunic woven with mana threads. Light protection with arcane attunement.', recipe: { input: { leather: 2, planks: 2, iron: 1 }, ticks: 24, research: 'arcane_infusion', station: 'enchanting_table' } },
-    thornweave_vest: { name: 'Thornweave Vest', damageReduction: 0.12, thornsDamage: 2, tier: 2, order: 13, description: 'A vest woven with barbed wire. Punishes attackers.', recipe: { input: { cloth: 3, iron: 1, leather: 1 }, ticks: 22, research: 'textiles', station: 'loom' } },
+    iron_chainmail: { damageReduction: 0.16, tier: 2, order: 8, recipe: { input: { iron: 4, leather: 2 }, ticks: 30, research: 'metalworking', station: 'anvil' } },
+    huntsmans_leathers: { damageReduction: 0.11, tier: 2, order: 12, critChance: 0.08, dodgeChance: 0.06, recipe: { input: { leather: 3, iron: 1 }, ticks: 22, research: 'metalworking', station: 'anvil' } },
+    barbed_chaincoat: { damageReduction: 0.14, tier: 2, order: 14, thornsDamage: 3, recipe: { input: { iron: 4, leather: 1 }, ticks: 28, research: 'metalworking', station: 'anvil' } },
+    enchanted_tunic: { damageReduction: 0.12, tier: 2, order: 11, spellDamageBonus: 0.10, recipe: { input: { leather: 2, planks: 2, iron: 1 }, ticks: 24, research: 'arcane_infusion', station: 'enchanting_table' } },
+    thornweave_vest: { damageReduction: 0.12, thornsDamage: 2, tier: 2, order: 13, recipe: { input: { cloth: 3, iron: 1, leather: 1 }, ticks: 22, research: 'textiles', station: 'loom' } },
     // ── Tier 3 ──
-    runic_plate: { name: 'Runic Plate', tradeValue: 48, damageReduction: 0.24, tier: 3, order: 15, description: 'Heavy plate armor inscribed with protective runes.', recipe: { input: { runite: 3, iron: 2, leather: 1 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
-    channelers_wraps: { name: "Channeler's Wraps", damageReduction: 0.16, tier: 3, order: 19, spellDamageBonus: 0.10, manaRegen: 0.06, description: 'Wraps threaded with mana conduits. Sustains the caster through a long fight.', recipe: { input: { runite: 2, leather: 2, iron: 1 }, ticks: 40, research: 'mana_weaving', station: 'enchanting_table' } },
-    mana_weave_robe: { name: 'Mana-Weave Robe', damageReduction: 0.18, tier: 3, order: 18, spellDamageBonus: 0.15, manaRegen: 0.05, description: 'A robe woven with mana threads. Boosts spell damage and steadily restores mana.', recipe: { input: { runite: 2, leather: 2, iron: 1 }, ticks: 40, research: 'mana_weaving', station: 'enchanting_table' } },
-    frostplate: { name: 'Frostplate', damageReduction: 0.20, coldResistance: 0.8, heatResistance: -0.3, tier: 3, order: 20, description: 'Heavy armour of ice-forged runite. Supreme cold protection, but you feel the heat worse.', recipe: { input: { runite: 3, iron: 2, wool: 2 }, ticks: 44, research: 'runeforging', station: 'enchanting_table' } },
-    duelists_silks: { name: "Duelist's Silks", tier: 3, order: 21, dodgeChance: 0.15, moveSpeedBonus: 0.1, description: 'Featherlight enchanted silks that let the wearer slip aside from incoming blows.', recipe: { input: { cloth: 3, runite: 1, void_essence: 1 }, ticks: 34, research: 'mana_weaving', station: 'enchanting_table' } },
-    shadowstrike_vest: { name: 'Shadowstrike Vest', damageReduction: 0.14, tier: 3, order: 22, critChance: 0.12, dodgeChance: 0.10, description: 'A vest woven for quick, precise strikes and fluid evasion.', recipe: { input: { runite: 2, leather: 2, cloth: 1 }, ticks: 38, research: 'mana_weaving', station: 'enchanting_table' } },
-    foreman_apron: { name: "Foreman's Apron", damageReduction: 0.10, tier: 3, order: 24, workSpeedBonus: 0.15, craftingSpeed: 1.10, description: 'A sturdy apron worn by master craftspeople. Keeps hands free and work moving.', recipe: { input: { cloth: 3, runite: 1, leather: 1 }, ticks: 32, research: 'textiles', station: 'loom' } },
-    living_bark_armor: { name: 'Living Bark Armor', textColor: '#4488ff', tradeValue: 55, damageReduction: 0.30, tier: 3, order: 23, description: 'Armor grown from a living tree. Regenerates the wearer.', healthRegen: 0.07 },
+    runic_plate: { tradeValue: 48, damageReduction: 0.24, tier: 3, order: 15, recipe: { input: { runite: 3, iron: 2, leather: 1 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
+    channelers_wraps: { damageReduction: 0.16, tier: 3, order: 19, spellDamageBonus: 0.10, manaRegen: 0.06, recipe: { input: { runite: 2, leather: 2, iron: 1 }, ticks: 40, research: 'mana_weaving', station: 'enchanting_table' } },
+    mana_weave_robe: { damageReduction: 0.18, tier: 3, order: 18, spellDamageBonus: 0.15, manaRegen: 0.05, recipe: { input: { runite: 2, leather: 2, iron: 1 }, ticks: 40, research: 'mana_weaving', station: 'enchanting_table' } },
+    frostplate: { damageReduction: 0.20, coldResistance: 0.8, heatResistance: -0.3, tier: 3, order: 20, recipe: { input: { runite: 3, iron: 2, wool: 2 }, ticks: 44, research: 'runeforging', station: 'enchanting_table' } },
+    duelists_silks: { tier: 3, order: 21, dodgeChance: 0.15, moveSpeedBonus: 0.1, recipe: { input: { cloth: 3, runite: 1, void_essence: 1 }, ticks: 34, research: 'mana_weaving', station: 'enchanting_table' } },
+    shadowstrike_vest: { damageReduction: 0.14, tier: 3, order: 22, critChance: 0.12, dodgeChance: 0.10, recipe: { input: { runite: 2, leather: 2, cloth: 1 }, ticks: 38, research: 'mana_weaving', station: 'enchanting_table' } },
+    foreman_apron: { damageReduction: 0.10, tier: 3, order: 24, workSpeedBonus: 0.15, craftingSpeed: 1.10, recipe: { input: { cloth: 3, runite: 1, leather: 1 }, ticks: 32, research: 'textiles', station: 'loom' } },
+    living_bark_armor: { textColor: '#4488ff', tradeValue: 55, damageReduction: 0.30, tier: 3, order: 23, healthRegen: 0.07 },
     // ── Tier 4 ──
-    void_armor: { name: 'Void Armor', damageReduction: 0.38, tier: 4, order: 27, description: 'Armor forged from void essence. Maximum protection.', recipe: { input: { void_essence: 5, runite: 2, iron: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
-    voidweave_robes: { name: 'Voidweave Robes', damageReduction: 0.25, tier: 4, order: 28, spellDamageBonus: 0.25, description: 'Robes woven from void-saturated thread. Maximum spell output.', recipe: { input: { void_essence: 4, runite: 2, cloth: 1 }, ticks: 55, research: 'void_weaving', station: 'enchanting_table' } },
-    aether_mantle: { name: 'Aether Mantle', damageReduction: 0.20, tier: 4, order: 29, spellDamageBonus: 0.15, manaRegen: 0.08, description: 'A mantle woven with aetheric channels. Sustains a caster through extended battles.', recipe: { input: { void_essence: 4, runite: 2, leather: 1 }, ticks: 55, research: 'void_weaving', station: 'enchanting_table' } },
-    shadow_wraps: { name: 'Shadow Wraps', damageReduction: 0.06, tier: 4, order: 32, critChance: 0.18, dodgeChance: 0.20, description: 'Void-threaded wraps that blur the wearer. Hit hard and never get hit.', recipe: { input: { void_essence: 3, runite: 1, cloth: 2 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
-    abyssal_bramble_plate: { name: 'Abyssal Bramble Plate', damageReduction: 0.30, tier: 4, order: 34, thornsDamage: 5, description: 'Plate embedded with abyssal barbs. Every hit against the wearer draws blood.', recipe: { input: { void_essence: 4, runite: 3, iron: 1 }, ticks: 58, research: 'void_forging', station: 'enchanting_table' } },
-    armor_of_the_abyss: { name: 'Armor of the Abyss', textColor: '#ff4444', tradeValue: 70, damageReduction: 0.45, tier: 4, order: 31, description: 'Abyssal armor that draws fire and shrugs off blows.', targetPriority: 10 },
-    chaos_wrought_plate: { name: 'Chaos-Wrought Plate', textColor: '#ff4444', tradeValue: 85, damageReduction: 0.35, tier: 4, order: 36, thornsDamage: 4, chaosResistance: 0.25, expedition: { partyDamageMult: 1.1, trapDamageMult: 1.15 }, description: 'Forged at the fracture point of reality. The chaos is not absorbed but channeled: the wearer takes slightly more from traps but hits harder for it.' },
+    void_armor: { damageReduction: 0.38, tier: 4, order: 27, recipe: { input: { void_essence: 5, runite: 2, iron: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    voidweave_robes: { damageReduction: 0.25, tier: 4, order: 28, spellDamageBonus: 0.25, recipe: { input: { void_essence: 4, runite: 2, cloth: 1 }, ticks: 55, research: 'void_weaving', station: 'enchanting_table' } },
+    aether_mantle: { damageReduction: 0.20, tier: 4, order: 29, spellDamageBonus: 0.15, manaRegen: 0.08, recipe: { input: { void_essence: 4, runite: 2, leather: 1 }, ticks: 55, research: 'void_weaving', station: 'enchanting_table' } },
+    shadow_wraps: { damageReduction: 0.06, tier: 4, order: 32, critChance: 0.18, dodgeChance: 0.20, recipe: { input: { void_essence: 3, runite: 1, cloth: 2 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
+    abyssal_bramble_plate: { damageReduction: 0.30, tier: 4, order: 34, thornsDamage: 5, recipe: { input: { void_essence: 4, runite: 3, iron: 1 }, ticks: 58, research: 'void_forging', station: 'enchanting_table' } },
+    armor_of_the_abyss: { textColor: '#ff4444', tradeValue: 70, damageReduction: 0.45, tier: 4, order: 31, targetPriority: 10 },
+    chaos_wrought_plate: { textColor: '#ff4444', tradeValue: 85, damageReduction: 0.35, tier: 4, order: 36, thornsDamage: 4, chaosResistance: 0.25, expedition: { partyDamageMult: 1.1, trapDamageMult: 1.15 } },
 };
+stampLoc(ARMORS, 'item');
 
 // `order` mirrors the matching body armor's value so a helmet renders next to
 // its set's chest piece within the tier (see ARMORS above).
 export const HELMETS = {
     // ── Tier 1 ──
-    wool_cap: { name: 'Wool Cap', damageReduction: 0.02, tier: 1, order: 1, coldResistance: 0.4, moodBonus: 3, description: 'A cozy wool cap. Keeps spirits and warmth up.', recipe: { input: { wool: 3 }, ticks: 10 } },
-    cotton_cap: { name: 'Cotton Cap', damageReduction: 0.02, tier: 1, order: 2, coldResistance: 0.2, moodBonus: 2, description: 'A light cotton cap. Less warm than wool, but better than nothing.', recipe: { input: { cotton: 3 }, ticks: 10, research: 'textiles', station: 'loom' } },
-    leather_cap: { name: 'Leather Cap', damageReduction: 0.05, tier: 1, order: 3, description: 'A simple leather skullcap.', recipe: { input: { leather: 2 }, ticks: 12 } },
-    scouts_hood: { name: "Scout's Hood", damageReduction: 0.03, tier: 1, order: 4, dodgeChance: 0.05, description: 'A simple hood worn by scouts. Keeps the head down and the feet quick.', recipe: { input: { leather: 2 }, ticks: 12 } },
+    wool_cap: { damageReduction: 0.02, tier: 1, order: 1, coldResistance: 0.4, moodBonus: 3, recipe: { input: { wool: 3 }, ticks: 10 } },
+    cotton_cap: { damageReduction: 0.02, tier: 1, order: 2, coldResistance: 0.2, moodBonus: 2, recipe: { input: { cotton: 3 }, ticks: 10, research: 'textiles', station: 'loom' } },
+    leather_cap: { damageReduction: 0.05, tier: 1, order: 3, recipe: { input: { leather: 2 }, ticks: 12 } },
+    scouts_hood: { damageReduction: 0.03, tier: 1, order: 4, dodgeChance: 0.05, recipe: { input: { leather: 2 }, ticks: 12 } },
     // ── Tier 2 ──
-    iron_helmet: { name: 'Iron Helmet', damageReduction: 0.08, tier: 2, order: 7, description: 'A solid iron helmet.', recipe: { input: { iron: 3 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
-    mages_circlet: { name: "Mage's Circlet", damageReduction: 0.06, tier: 2, order: 10, spellDamageBonus: 0.08, description: 'A circlet of woven iron and crystal. Focuses magical energy.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'arcane_implements', station: 'anvil' } },
-    spiritweave_hat: { name: 'Spiritweave Hat', damageReduction: 0.05, tier: 2, order: 11, spellDamageBonus: 0.05, manaRegen: 0.04, description: 'A cowl threaded with mana filaments. Steadily feeds the wearer\'s reserves.', recipe: { input: { cloth: 2, iron: 1, planks: 1 }, ticks: 20, research: 'arcane_implements', station: 'anvil' } },
-    shadowweave_cowl: { name: 'Shadowweave Cowl', damageReduction: 0.05, tier: 2, order: 13, dodgeChance: 0.08, critChance: 0.05, description: 'A dark cowl that keeps the wearer hard to pin down.', recipe: { input: { cloth: 2, leather: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
-    scholars_spectacles: { name: "Scholar's Spectacles", textColor: '#4488ff', tradeValue: 45, damageReduction: 0.04, tier: 2, order: 25, description: 'Enchanted lenses that sharpen the mind.', workSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 2, skillGrowthBonus: 0.1 } },
+    iron_helmet: { damageReduction: 0.08, tier: 2, order: 7, recipe: { input: { iron: 3 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
+    mages_circlet: { damageReduction: 0.06, tier: 2, order: 10, spellDamageBonus: 0.08, recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'arcane_implements', station: 'anvil' } },
+    spiritweave_hat: { damageReduction: 0.05, tier: 2, order: 11, spellDamageBonus: 0.05, manaRegen: 0.04, recipe: { input: { cloth: 2, iron: 1, planks: 1 }, ticks: 20, research: 'arcane_implements', station: 'anvil' } },
+    shadowweave_cowl: { damageReduction: 0.05, tier: 2, order: 13, dodgeChance: 0.08, critChance: 0.05, recipe: { input: { cloth: 2, leather: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
+    scholars_spectacles: { textColor: '#4488ff', tradeValue: 45, damageReduction: 0.04, tier: 2, order: 25, workSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 2, skillGrowthBonus: 0.1 } },
     // ── Tier 3 ──
-    runic_helm: { name: 'Runic Helm', tradeValue: 38, damageReduction: 0.14, tier: 3, order: 14, description: 'A helm etched with protective runes.', recipe: { input: { runite: 2, iron: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
-    spiked_iron_coif: { name: 'Spiked Iron Coif', damageReduction: 0.08, tier: 3, order: 16, thornsDamage: 2, description: 'An iron coif with outward spikes. Headbutts are ill-advised.', recipe: { input: { runite: 1, iron: 2, leather: 1 }, ticks: 30, research: 'runeforging', station: 'enchanting_table' } },
-    runic_hood: { name: 'Runic Hood', damageReduction: 0.10, tier: 3, order: 17, spellDamageBonus: 0.10, manaRegen: 0.03, description: 'A hood inscribed with runes of clarity. Amplifies spellcraft and feeds the wearer\'s mana.', recipe: { input: { runite: 2, leather: 1 }, ticks: 32, research: 'mana_weaving', station: 'enchanting_table' } },
-    sharpshooters_visor: { name: "Sharpshooter's Visor", damageReduction: 0.10, tier: 3, order: 19, critChance: 0.15, description: 'A visor with an enchanted lens that guides every shot to its mark.', recipe: { input: { runite: 2, iron: 1, leather: 1 }, ticks: 34, research: 'marksmanship', station: 'enchanting_table' } },
-    ironbark_hat: { name: 'Ironbark Hat', damageReduction: 0.12, tier: 3, order: 24, healthRegen: 0.04, description: 'A circlet carved from ironwood. Slowly mends the wearer\'s wounds.', recipe: { input: { runite: 2, planks: 2 }, ticks: 34, research: 'runeforging', station: 'enchanting_table' } },
-    runic_furskin_hood: { name: 'Runic Furskin Hood', damageReduction: 0.10, tier: 3, order: 25, coldResistance: 0.60, moodBonus: 2, description: 'A thick fur hood inscribed with warmth runes. Shrugs off even deep winter.', recipe: { input: { runite: 2, wool: 2 }, ticks: 32, research: 'runeforging', station: 'enchanting_table' } },
-    mycelium_crown: { name: 'Mycelium Crown', textColor: '#4488ff', tradeValue: 50, damageReduction: 0.08, tier: 3, order: 24, description: 'A crown woven from fungal threads. Enhances growth.', workSpeedBonus: 0.15, pedestal: { radius: 5, manaCost: 2, skillGrowthBonus: 0.15 }, expedition: { trapDamageMult: 0.6 } },
+    runic_helm: { tradeValue: 38, damageReduction: 0.14, tier: 3, order: 14, recipe: { input: { runite: 2, iron: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
+    spiked_iron_coif: { damageReduction: 0.08, tier: 3, order: 16, thornsDamage: 2, recipe: { input: { runite: 1, iron: 2, leather: 1 }, ticks: 30, research: 'runeforging', station: 'enchanting_table' } },
+    runic_hood: { damageReduction: 0.10, tier: 3, order: 17, spellDamageBonus: 0.10, manaRegen: 0.03, recipe: { input: { runite: 2, leather: 1 }, ticks: 32, research: 'mana_weaving', station: 'enchanting_table' } },
+    sharpshooters_visor: { damageReduction: 0.10, tier: 3, order: 19, critChance: 0.15, recipe: { input: { runite: 2, iron: 1, leather: 1 }, ticks: 34, research: 'marksmanship', station: 'enchanting_table' } },
+    ironbark_hat: { damageReduction: 0.12, tier: 3, order: 24, healthRegen: 0.04, recipe: { input: { runite: 2, planks: 2 }, ticks: 34, research: 'runeforging', station: 'enchanting_table' } },
+    runic_furskin_hood: { damageReduction: 0.10, tier: 3, order: 25, coldResistance: 0.60, moodBonus: 2, recipe: { input: { runite: 2, wool: 2 }, ticks: 32, research: 'runeforging', station: 'enchanting_table' } },
+    mycelium_crown: { textColor: '#4488ff', tradeValue: 50, damageReduction: 0.08, tier: 3, order: 24, workSpeedBonus: 0.15, pedestal: { radius: 5, manaCost: 2, skillGrowthBonus: 0.15 }, expedition: { trapDamageMult: 0.6 } },
     // ── Tier 4 ──
-    void_crown: { name: 'Void Crown', damageReduction: 0.18, tier: 4, order: 26, spellDamageBonus: 0.15, description: 'A crown of void energy. Boosts spells and protection.', recipe: { input: { void_essence: 4, runite: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
-    voidpulse_circlet: { name: 'Voidpulse Circlet', damageReduction: 0.15, tier: 4, order: 27, spellDamageBonus: 0.10, manaRegen: 0.10, description: 'A circlet that pulses with void energy, feeding the wearer\'s mana continuously.', recipe: { input: { void_essence: 3, runite: 2, cloth: 1 }, ticks: 50, research: 'void_weaving', station: 'enchanting_table' } },
-    void_hunters_cowl: { name: "Void Hunter's Cowl", damageReduction: 0.12, critChance: 0.18, tier: 4, order: 29, description: 'A void-stitched cowl that locks in on targets, massively boosting critical strike chance.', recipe: { input: { void_essence: 3, runite: 2, leather: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
-    void_dancers_mask: { name: "Void Dancer's Mask", damageReduction: 0.09, tier: 4, order: 33, dodgeChance: 0.18, critChance: 0.12, description: 'A mask that blurs the wearer\'s movements. Hard to hit, harder to predict.', recipe: { input: { void_essence: 3, runite: 1, cloth: 1, leather: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
-    abyss_wardens_helm: { name: "Abyss Warden's Helm", damageReduction: 0.22, tier: 4, order: 35, targetPriority: 5, description: 'A helm that radiates menace. Enemies cannot help but focus on the wearer.', recipe: { input: { void_essence: 3, runite: 2, iron: 2 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
-    void_sages_tiara: { name: "Void Sage's Tiara", damageReduction: 0.12, tier: 4, order: 36, workSpeedBonus: 0.20, skillGrowthBonus: 0.15, description: 'A tiara humming with void clarity. Sharpens the mind and hastens all work.', recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
-    unravelers_eye: { name: "Unraveler's Eye", textColor: '#ff4444', damageReduction: 0.15, critChance: 0.12, tier: 4, order: 30, tradeValue: 90, description: "A helm shaped from the shattered mind of the Unraveler. The wearer perceives all chaos clearly.", expedition: { partyDamageMult: 1.15, trapDamageMult: 0.8 } },
-    commanders_crown: { name: "Commander's Crown", textColor: '#f944ff', tradeValue: 85, damageReduction: 0.25, tier: 4, order: 37, targetPriority: 8, expedition: { partyDamageMult: 1.15 }, description: "The palace commander's crown. Its bearer draws enemy fire while inspiring allies to strike harder." },
+    void_crown: { damageReduction: 0.18, tier: 4, order: 26, spellDamageBonus: 0.15, recipe: { input: { void_essence: 4, runite: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
+    voidpulse_circlet: { damageReduction: 0.15, tier: 4, order: 27, spellDamageBonus: 0.10, manaRegen: 0.10, recipe: { input: { void_essence: 3, runite: 2, cloth: 1 }, ticks: 50, research: 'void_weaving', station: 'enchanting_table' } },
+    void_hunters_cowl: { damageReduction: 0.12, critChance: 0.18, tier: 4, order: 29, recipe: { input: { void_essence: 3, runite: 2, leather: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
+    void_dancers_mask: { damageReduction: 0.09, tier: 4, order: 33, dodgeChance: 0.18, critChance: 0.12, recipe: { input: { void_essence: 3, runite: 1, cloth: 1, leather: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
+    abyss_wardens_helm: { damageReduction: 0.22, tier: 4, order: 35, targetPriority: 5, recipe: { input: { void_essence: 3, runite: 2, iron: 2 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    void_sages_tiara: { damageReduction: 0.12, tier: 4, order: 36, workSpeedBonus: 0.20, skillGrowthBonus: 0.15, recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
+    unravelers_eye: { textColor: '#ff4444', damageReduction: 0.15, critChance: 0.12, tier: 4, order: 30, tradeValue: 90, expedition: { partyDamageMult: 1.15, trapDamageMult: 0.8 } },
+    commanders_crown: { textColor: '#f944ff', tradeValue: 85, damageReduction: 0.25, tier: 4, order: 37, targetPriority: 8, expedition: { partyDamageMult: 1.15 } },
 };
+stampLoc(HELMETS, 'item');
 
 export const CLOTHES = {
     // ── Tier 1 ──
-    leather_cloak: { name: 'Leather Cloak', tier: 1, order: 0, coldResistance: 0.25, description: 'A rough cloak stitched from cured hides. Not elegant, but keeps out the cold.', recipe: { input: { leather: 3 }, ticks: 14, station: 'workbench' } },
-    cotton_shirt: { name: 'Cotton Shirt', tier: 1, order: 1, coldResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.05, description: 'A light cotton shirt. Comfortable for work.', recipe: { input: { cloth: 3 }, ticks: 14, research: 'textiles', station: 'loom' } },
-    wool_tunic: { name: 'Wool Tunic', tier: 1, order: 2, coldResistance: 0.5, moodBonus: 3, description: 'A warm wool tunic. Good protection from the cold.', recipe: { input: { wool: 4, cloth: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
-    cotton_tunic: { name: 'Cotton Tunic', tier: 1, order: 3, coldResistance: 0.3, moodBonus: 2, description: 'A tunic woven from thick cotton. Warmer than a shirt, lighter than wool.', recipe: { input: { cotton: 4 }, ticks: 18, research: 'textiles', station: 'loom' } },
+    leather_cloak: { tier: 1, order: 0, coldResistance: 0.25, recipe: { input: { leather: 3 }, ticks: 14, station: 'workbench' } },
+    cotton_shirt: { tier: 1, order: 1, coldResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.05, recipe: { input: { cloth: 3 }, ticks: 14, research: 'textiles', station: 'loom' } },
+    wool_tunic: { tier: 1, order: 2, coldResistance: 0.5, moodBonus: 3, recipe: { input: { wool: 4, cloth: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
+    cotton_tunic: { tier: 1, order: 3, coldResistance: 0.3, moodBonus: 2, recipe: { input: { cotton: 4 }, ticks: 18, research: 'textiles', station: 'loom' } },
     // ── Tier 2 ──
-    leather_jerkin: { name: 'Leather Jerkin', tier: 2, order: 4, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, description: 'A rugged leather jerkin. Versatile in all seasons.', recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, research: 'textiles', station: 'loom' } },
+    leather_jerkin: { tier: 2, order: 4, coldResistance: 0.3, heatResistance: 0.2, moodBonus: 2, workSpeedBonus: 0.1, recipe: { input: { leather: 3, cloth: 2 }, ticks: 24, research: 'textiles', station: 'loom' } },
     // ── Tier 3 ──
-    ashwalkers_cloak: { name: "Ashwalker's Cloak", tier: 3, order: 5, heatResistance: 0.7, coldResistance: -0.2, moodBonus: 2, description: 'A fire-treated cloak woven for desert scouts. Shrugs off heat but offers no warmth.', recipe: { input: { leather: 3, cloth: 2, void_essence: 1 }, ticks: 26, research: 'mana_weaving', station: 'loom' } },
-    mana_silk_vestments: { name: 'Mana-Silk Vestments', tier: 3, order: 6, coldResistance: 0.4, heatResistance: 0.3, moodBonus: 4, workSpeedBonus: 0.15, description: 'Robes woven from mana-infused silk. Comfortable in any climate and invigorating to work in.', recipe: { input: { cloth: 3, runite: 1, moonbloom: 1 }, ticks: 32, research: 'mana_weaving', station: 'loom' } },
-    cloak_of_shadows: { name: 'Cloak of Shadows', tier: 3, order: 7, textColor: '#4488ff', tradeValue: 45, description: 'A cloak that makes the wearer harder to target.', targetPriority: -10 },
-    berserkers_wraps: { name: "Berserker's Wraps", tier: 3, order: 8, textColor: '#4488ff', tradeValue: 45, lowHpDamageBonus: 0.3, description: 'Savage wraps that awaken something primal. Deal 30% more damage below 40% HP.' },
+    ashwalkers_cloak: { tier: 3, order: 5, heatResistance: 0.7, coldResistance: -0.2, moodBonus: 2, recipe: { input: { leather: 3, cloth: 2, void_essence: 1 }, ticks: 26, research: 'mana_weaving', station: 'loom' } },
+    mana_silk_vestments: { tier: 3, order: 6, coldResistance: 0.4, heatResistance: 0.3, moodBonus: 4, workSpeedBonus: 0.15, recipe: { input: { cloth: 3, runite: 1, moonbloom: 1 }, ticks: 32, research: 'mana_weaving', station: 'loom' } },
+    cloak_of_shadows: { tier: 3, order: 7, textColor: '#4488ff', tradeValue: 45, targetPriority: -10 },
+    berserkers_wraps: { tier: 3, order: 8, textColor: '#4488ff', tradeValue: 45, lowHpDamageBonus: 0.3 },
 };
+stampLoc(CLOTHES, 'item');
 
 export const BOOTS = {
     // ── Tier 1 ──
-    leather_boots: { name: 'Leather Boots', moveSpeedBonus: 0.1, tier: 1, order: 5, description: 'Sturdy leather boots for travel.', recipe: { input: { leather: 2, planks: 1 }, ticks: 14 } },
+    leather_boots: { moveSpeedBonus: 0.1, tier: 1, order: 5, recipe: { input: { leather: 2, planks: 1 }, ticks: 14 } },
     // ── Tier 2 ──
-    iron_greaves: { name: 'Iron Greaves', moveSpeedBonus: 0.08, damageReduction: 0.05, tier: 2, order: 9, description: 'Heavy iron greaves. Solid protection for the legs.', recipe: { input: { iron: 2, leather: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    enchanted_sandals: { name: 'Enchanted Sandals', moveSpeedBonus: 0.15, tier: 2, order: 12, description: 'Sandals woven with minor enchantments that quicken the step.', recipe: { input: { cloth: 2, leather: 1, iron: 1 }, ticks: 22, research: 'mana_weaving', station: 'loom' } },
+    iron_greaves: { moveSpeedBonus: 0.08, damageReduction: 0.05, tier: 2, order: 9, recipe: { input: { iron: 2, leather: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    enchanted_sandals: { moveSpeedBonus: 0.15, tier: 2, order: 12, recipe: { input: { cloth: 2, leather: 1, iron: 1 }, ticks: 22, research: 'mana_weaving', station: 'loom' } },
     // ── Tier 3 ──
-    runic_striders: { name: 'Runic Striders', moveSpeedBonus: 0.2, tier: 3, order: 16, description: 'Boots inscribed with runes of swiftness.', recipe: { input: { runite: 2, leather: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
-    striders_greaves: { name: "Strider's Greaves", moveSpeedBonus: 0.12, dodgeChance: 0.06, tier: 3, order: 22, description: 'Magically-enhanced greaves that keep the wearer on the move and harder to pin down.', recipe: { input: { runite: 1, iron: 2, leather: 1 }, ticks: 22, research: 'runeforging', station: 'enchanting_table' } },
+    runic_striders: { moveSpeedBonus: 0.2, tier: 3, order: 16, recipe: { input: { runite: 2, leather: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
+    striders_greaves: { moveSpeedBonus: 0.12, dodgeChance: 0.06, tier: 3, order: 22, recipe: { input: { runite: 1, iron: 2, leather: 1 }, ticks: 22, research: 'runeforging', station: 'enchanting_table' } },
     // ── Tier 4 ──
-    void_treads: { name: 'Void Treads', moveSpeedBonus: 0.35, damageReduction: 0.06, tier: 4, order: 28, description: 'Boots forged from void essence. Swift and protective.', recipe: { input: { void_essence: 3, runite: 1, leather: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
-    boots_of_haste: { name: 'Boots of Haste', textColor: '#4488ff', tradeValue: 55, moveSpeedBonus: 0.4, tier: 4, order: 30, description: 'Enchanted boots that quicken the wearer.', expedition: { durationMult: 0.85 }, recipe: { input: { void_essence: 3, planks: 2, runite: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    void_treads: { moveSpeedBonus: 0.35, damageReduction: 0.06, tier: 4, order: 28, recipe: { input: { void_essence: 3, runite: 1, leather: 1 }, ticks: 50, research: 'void_forging', station: 'enchanting_table' } },
+    boots_of_haste: { textColor: '#4488ff', tradeValue: 55, moveSpeedBonus: 0.4, tier: 4, order: 30, expedition: { durationMult: 0.85 }, recipe: { input: { void_essence: 3, planks: 2, runite: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
 };
+stampLoc(BOOTS, 'item');
 
 export const EQUIPMENT_OVERLAY_OFFSETS = {
     helmet: { offsetX: 0, offsetY: 0 },
@@ -248,46 +256,47 @@ export const EQUIPMENT_OVERLAY_OFFSETS = {
 // Tool items can also include Offhand items that appear in the colonist's hand on their sprite.
 export const TOOLS = {
     // ── Pickaxes (mining) ──
-    stone_pickaxe: { name: 'Stone Pickaxe', miningSpeed: 1.25, tier: 1, order: 1, description: 'The simplest pickaxe capable of breaking rocks.', recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
-    iron_pickaxe: { name: 'Iron Pickaxe', miningSpeed: 1.45, tier: 2, order: 2, description: 'A competent pickaxe that easily breaks stone.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    runic_pickaxe: { name: 'Runic Pickaxe', miningSpeed: 1.7, tier: 3, order: 3, description: 'A magically-enhanced pickaxe that helps pulverize boulders.', recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
-    void_pickaxe: { name: 'Void Pickaxe', miningSpeed: 2.0, tier: 4, order: 4, description: 'A pickaxe infused with void energy. Tears through rock and sometimes yields double ore.', recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    stone_pickaxe: { miningSpeed: 1.25, tier: 1, order: 1, recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
+    iron_pickaxe: { miningSpeed: 1.45, tier: 2, order: 2, recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    runic_pickaxe: { miningSpeed: 1.7, tier: 3, order: 3, recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
+    void_pickaxe: { miningSpeed: 2.0, tier: 4, order: 4, recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
     // ── Axes (chopping) ──
-    stone_axe: { name: 'Stone Axe', choppingSpeed: 1.25, tier: 1, order: 5, description: 'The simplest axe capable of chopping wood.', recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
-    iron_axe: { name: 'Iron Axe', choppingSpeed: 1.45, tier: 2, order: 6, description: 'A competent axe that easily fells trees.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    runic_axe: { name: 'Runic Axe', choppingSpeed: 1.7, tier: 3, order: 7, description: 'A magically-enhanced axe that helps level forests.', recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
-    void_axe: { name: 'Void Axe', choppingSpeed: 2.0, tier: 4, order: 8, description: 'An axe that phases through wood grain. Occasionally fells a tree in a single blow.', recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    stone_axe: { choppingSpeed: 1.25, tier: 1, order: 5, recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
+    iron_axe: { choppingSpeed: 1.45, tier: 2, order: 6, recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    runic_axe: { choppingSpeed: 1.7, tier: 3, order: 7, recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
+    void_axe: { choppingSpeed: 2.0, tier: 4, order: 8, recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
     // ── Sickles (farming) ──
-    stone_sickle: { name: 'Stone Sickle', farmingSpeed: 1.25, tier: 1, order: 9, description: 'The simplest sickle capable of harvesting crops.', recipe: { input: { stone: 1, planks: 1 }, ticks: 12 } },
-    iron_sickle: { name: 'Iron Sickle', farmingSpeed: 1.45, tier: 2, order: 10, description: 'A competent sickle that easily harvests crops.', recipe: { input: { iron: 1, planks: 1 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
-    runic_sickle: { name: 'Runic Sickle', farmingSpeed: 1.7, tier: 3, order: 11, description: 'A magically-enhanced sickle that helps reap entire fields.', recipe: { input: { runite: 1, planks: 1 }, ticks: 30, research: 'runeforging', station: 'enchanting_table' } },
-    void_sickle: { name: 'Void Sickle', farmingSpeed: 2.0, tier: 4, order: 12, description: 'A sickle attuned to growth energy. Harvests entire rows at once.', recipe: { input: { void_essence: 3, runite: 1, planks: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
+    stone_sickle: { farmingSpeed: 1.25, tier: 1, order: 9, recipe: { input: { stone: 1, planks: 1 }, ticks: 12 } },
+    iron_sickle: { farmingSpeed: 1.45, tier: 2, order: 10, recipe: { input: { iron: 1, planks: 1 }, ticks: 18, research: 'metalworking', station: 'anvil' } },
+    runic_sickle: { farmingSpeed: 1.7, tier: 3, order: 11, recipe: { input: { runite: 1, planks: 1 }, ticks: 30, research: 'runeforging', station: 'enchanting_table' } },
+    void_sickle: { farmingSpeed: 2.0, tier: 4, order: 12, recipe: { input: { void_essence: 3, runite: 1, planks: 1 }, ticks: 52, research: 'void_forging', station: 'enchanting_table' } },
     // ── Hammers (crafting) ──
-    stone_hammer: { name: 'Stone Hammer', craftingSpeed: 1.25, tier: 1, order: 13, description: 'The simplest hammer capable of carpentry.', recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
-    iron_hammer: { name: 'Iron Hammer', craftingSpeed: 1.45, tier: 2, order: 14, description: 'A competent hammer that easily drives nails through boards.', recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    runic_hammer: { name: 'Runic Hammer', craftingSpeed: 1.7, tier: 3, order: 15, description: 'A magically-enhanced hammer prized by any blacksmith.', recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
-    void_hammer: { name: 'Void Hammer', craftingSpeed: 2.0, tier: 4, order: 16, description: 'A hammer that shapes materials at the atomic level. Drastically speeds all crafting.', recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    stone_hammer: { craftingSpeed: 1.25, tier: 1, order: 13, recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
+    iron_hammer: { craftingSpeed: 1.45, tier: 2, order: 14, recipe: { input: { iron: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    runic_hammer: { craftingSpeed: 1.7, tier: 3, order: 15, recipe: { input: { runite: 2, planks: 1 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
+    void_hammer: { craftingSpeed: 2.0, tier: 4, order: 16, recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
     // ── Mattocks (multi-purpose) ──
-    stone_mattock: { name: 'Stone Mattock', miningSpeed: 1.15, choppingSpeed: 1.15, tier: 1, order: 17, description: 'A versatile tool for mining and chopping.', recipe: { input: { stone: 3, planks: 2 }, ticks: 18 } },
-    iron_mattock: { name: 'Iron Mattock', miningSpeed: 1.3, choppingSpeed: 1.3, tier: 2, order: 18, description: 'An iron mattock. Good at both mining and chopping.', recipe: { input: { iron: 3, planks: 2 }, ticks: 26, research: 'metalworking', station: 'anvil' } },
-    runic_mattock: { name: 'Runic Mattock', miningSpeed: 1.5, choppingSpeed: 1.5, tier: 3, order: 19, description: 'A runic mattock. Excellent at mining and chopping.', recipe: { input: { runite: 3, planks: 2 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
-    void_mattock: { name: 'Void Mattock', miningSpeed: 1.7, choppingSpeed: 1.7, tier: 4, order: 20, description: 'The perfect combination of axes and picks.', recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
+    stone_mattock: { miningSpeed: 1.15, choppingSpeed: 1.15, tier: 1, order: 17, recipe: { input: { stone: 3, planks: 2 }, ticks: 18 } },
+    iron_mattock: { miningSpeed: 1.3, choppingSpeed: 1.3, tier: 2, order: 18, recipe: { input: { iron: 3, planks: 2 }, ticks: 26, research: 'metalworking', station: 'anvil' } },
+    runic_mattock: { miningSpeed: 1.5, choppingSpeed: 1.5, tier: 3, order: 19, recipe: { input: { runite: 3, planks: 2 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
+    void_mattock: { miningSpeed: 1.7, choppingSpeed: 1.7, tier: 4, order: 20, recipe: { input: { void_essence: 3, runite: 2, planks: 1 }, ticks: 55, research: 'void_forging', station: 'enchanting_table' } },
     // ── Utility & offhand ──
-    lantern: { name: 'Lantern', lightRadius: 4, tier: 1, order: 21, description: 'A handheld lantern. Illuminates the area around the carrier.', recipe: { input: { iron: 1, planks: 2 }, ticks: 12, research: 'metalworking', station: 'anvil' } },
-    iron_shield: { name: 'Iron Shield', tradeValue: 15, tier: 1, order: 22, description: 'A simple shield that blocks attacks.', targetPriority: 5, damageReduction: 0.1, recipe: { input: { iron: 2, planks: 2 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    parrying_dagger: { name: "Parrying Dagger", tradeValue: 15, tier: 1, order: 23, dodgeChance: 0.08, moveSpeedBonus: 0.1, description: 'A light off-hand blade for deflecting blows.', recipe: { input: { iron: 1, leather: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    hunters_quiver: { name: "Hunter's Quiver", tradeValue: 15, tier: 1, order: 24, critChance: 0.05, attackSpeed: 0.05, description: 'A simple quiver carried by hunters.', recipe: { input: { iron: 1, leather: 1, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
-    bottomless_quiver: { name: 'Bottomless Quiver', textColor:'#44cc44', tradeValue: 50, tier: 2, order: 25, critChance: 0.1, attackSpeed: 0.1, description: 'An enchanted quiver whose arrows never run short.', recipe: { input: { runite: 1, leather: 2, planks: 1 }, ticks: 30, research: 'marksmanship', station: 'enchanting_table' } },
-    runic_buckler: { name: 'Runic Buckler', tier: 3, order: 26, targetPriority: 5, damageReduction: 0.18, description: 'A compact shield reinforced with protective runes.', recipe: { input: { runite: 2, iron: 2, planks: 1 }, ticks: 38, research: 'runeforging', station: 'enchanting_table' } },
-    drum_of_rallying: { name: 'Drum of Rallying', textColor: '#4488ff', tradeValue: 50, tier: 3, order: 27, description: 'War drums that inspire nearby fighters.', attackSpeed: 0.15, pedestal: { radius: 8, manaCost: 3, damageBonusMult: 1.15 }, expedition: { partyDamageMult: 1.15 }, recipe: { input: { wood: 6, runite: 2, planks: 3 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
+    lantern: { lightRadius: 4, tier: 1, order: 21, recipe: { input: { iron: 1, planks: 2 }, ticks: 12, research: 'metalworking', station: 'anvil' } },
+    iron_shield: { tradeValue: 15, tier: 1, order: 22, targetPriority: 5, damageReduction: 0.1, recipe: { input: { iron: 2, planks: 2 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    parrying_dagger: { tradeValue: 15, tier: 1, order: 23, dodgeChance: 0.08, moveSpeedBonus: 0.1, recipe: { input: { iron: 1, leather: 2, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    hunters_quiver: { tradeValue: 15, tier: 1, order: 24, critChance: 0.05, attackSpeed: 0.05, recipe: { input: { iron: 1, leather: 1, planks: 1 }, ticks: 20, research: 'metalworking', station: 'anvil' } },
+    bottomless_quiver: { textColor:'#44cc44', tradeValue: 50, tier: 2, order: 25, critChance: 0.1, attackSpeed: 0.1, recipe: { input: { runite: 1, leather: 2, planks: 1 }, ticks: 30, research: 'marksmanship', station: 'enchanting_table' } },
+    runic_buckler: { tier: 3, order: 26, targetPriority: 5, damageReduction: 0.18, recipe: { input: { runite: 2, iron: 2, planks: 1 }, ticks: 38, research: 'runeforging', station: 'enchanting_table' } },
+    drum_of_rallying: { textColor: '#4488ff', tradeValue: 50, tier: 3, order: 27, attackSpeed: 0.15, pedestal: { radius: 8, manaCost: 3, damageBonusMult: 1.15 }, expedition: { partyDamageMult: 1.15 }, recipe: { input: { wood: 6, runite: 2, planks: 3 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
     // ── Drop-only pedestal/offhand items ──
-    crystalline_hammer: { name: 'Crystalline Hammer', textColor: '#4488ff', tradeValue: 50, order: 28, description: 'A hammer pulsing with crystalline energy. Greatly speeds work.', workSpeedBonus: 0.35, pedestal: { radius: 5, manaCost: 2, workSpeedBonus: 0.2 } },
-    heartwood_staff: { name: 'Heartwood Staff', textColor: '#4488ff', tradeValue: 55, order: 29, description: 'A staff carved from ancient heartwood. Strong magic focus.', spellDamageBonus: 0.3, pedestal: { radius: 7, manaCost: 3, skillGrowthBonus: 0.1 } },
-    staff_of_regrowth: { name: 'Staff of Regrowth', textColor: '#4488ff', tradeValue: 45, order: 30, description: 'A living staff that protects crops and amplifies spells.', spellDamageBonus: 0.2, pedestal: { radius: 6, manaCost: 2, blightImmunity: true, blightDamageReduction: 0.5 } },
-    staff_of_distortion: { name: 'Staff of Distortion', textColor: '#f944ff', tradeValue: 60, order: 31, description: 'A staff that warps space, confusing enemies.', spellDamageBonus: 0.4, targetPriority: -5, expedition: { partyDamageMult: 1.2, trapDamageMult: 1.3 } },
-    aegis_of_the_vanguard: { name: 'Aegis of the Vanguard', textColor: '#f944ff', tradeValue: 60, order: 32, description: 'A heavy shield that draws attacks and absorbs blows.', targetPriority: 10, damageReduction: 0.3 },
-    crystal_aegis: { name: 'Crystal Aegis', textColor: '#f944ff', tradeValue: 60, order: 33, description: 'A crystalline shield that reflects damage.', damageReduction: 0.28, thornsDamage: 2 },
+    crystalline_hammer: { textColor: '#4488ff', tradeValue: 50, order: 28, workSpeedBonus: 0.35, pedestal: { radius: 5, manaCost: 2, workSpeedBonus: 0.2 } },
+    heartwood_staff: { textColor: '#4488ff', tradeValue: 55, order: 29, spellDamageBonus: 0.3, pedestal: { radius: 7, manaCost: 3, skillGrowthBonus: 0.1 } },
+    staff_of_regrowth: { textColor: '#4488ff', tradeValue: 45, order: 30, spellDamageBonus: 0.2, pedestal: { radius: 6, manaCost: 2, blightImmunity: true, blightDamageReduction: 0.5 } },
+    staff_of_distortion: { textColor: '#f944ff', tradeValue: 60, order: 31, spellDamageBonus: 0.4, targetPriority: -5, expedition: { partyDamageMult: 1.2, trapDamageMult: 1.3 } },
+    aegis_of_the_vanguard: { textColor: '#f944ff', tradeValue: 60, order: 32, targetPriority: 10, damageReduction: 0.3 },
+    crystal_aegis: { textColor: '#f944ff', tradeValue: 60, order: 33, damageReduction: 0.28, thornsDamage: 2 },
 };
+stampLoc(TOOLS, 'item');
 
 /*
 textColor denotes an item's RARITY BAND (not derived from tradeValue). Bands,
@@ -306,92 +315,95 @@ their original 45–60 values; only the TRINKETS block below follows it.)
 */
 export const TRINKETS = {
     // ── Tier 1 ──
-    wanderers_rations_pouch: { name: "Wanderer's Rations Pouch", textColor:'#cccccc', tradeValue: 25, tier: 1, order: 1, description: 'A pouch of preserved rations that stave off hunger and fatigue on long journeys.', hungerDecayMult: 0.8, expedition: { fatigueMult: 0.70 }, recipe: { input: { leather: 2, planks: 1 }, ticks: 14 } },
-    hearthstone_pendant: { name: 'Hearthstone Pendant', textColor:'#cccccc', tradeValue: 25, tier: 1, order: 2, moodBonus: 4, coldResistance: 0.25, description: 'A smooth river stone, warm to the touch. Comforts the wearer.', recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
-    sharpened_fang_necklace: { name: 'Sharpened Fang Necklace', textColor:'#cccccc', tradeValue: 25, tier: 1, order: 3, thornsDamage: 3, bleedOnHit: { damage: 1, ticks: 4, interval: 10 }, description: 'A necklace of sharpened fangs that punishes anyone who strikes the wearer.', recipe: { input: { stone: 1, leather: 2 }, ticks: 12 } },
-    rabbits_paw: { name: "Rabbit's Paw", textColor:'#cccccc', tradeValue: 18, tier: 1, order: 4, description: 'A dried rabbit\'s paw worn for luck. Fortune seems to follow those who carry it.', skillGrowthBonus: 0.04, expedition: { lootMult: 1.15 } },
-    iron_clad_effigy: { name: 'Iron-Clad Effigy', textColor:'#cccccc', tradeValue: 28, tier: 1, order: 5, description: 'A crude iron figurine worn as a ward against harm. Enemies are drawn to the bearer.', targetPriority: 2, damageReduction: 0.05, thornsDamage: 2 },
+    wanderers_rations_pouch: { textColor:'#cccccc', tradeValue: 25, tier: 1, order: 1, hungerDecayMult: 0.8, expedition: { fatigueMult: 0.70 }, recipe: { input: { leather: 2, planks: 1 }, ticks: 14 } },
+    hearthstone_pendant: { textColor:'#cccccc', tradeValue: 25, tier: 1, order: 2, moodBonus: 4, coldResistance: 0.25, recipe: { input: { stone: 2, planks: 1 }, ticks: 14 } },
+    sharpened_fang_necklace: { textColor:'#cccccc', tradeValue: 25, tier: 1, order: 3, thornsDamage: 3, bleedOnHit: { damage: 1, ticks: 4, interval: 10 }, recipe: { input: { stone: 1, leather: 2 }, ticks: 12 } },
+    rabbits_paw: { textColor:'#cccccc', tradeValue: 18, tier: 1, order: 4, skillGrowthBonus: 0.04, expedition: { lootMult: 1.15 } },
+    iron_clad_effigy: { textColor:'#cccccc', tradeValue: 28, tier: 1, order: 5, targetPriority: 2, damageReduction: 0.05, thornsDamage: 2 },
     // ── Tier 2: expedition → combat → utility/economy ──
-    map_fragment: { name: 'Map Fragment', textColor:'#cccccc', tradeValue: 25, tier: 2, order: 11, description: 'A torn piece of an ancient map. Whoever carries it seems to know exactly where to go.', consumable: true, expedition: { durationMult: 0.7, lootMult: 1.4 } },
-    compass_of_greed: { name: 'Compass of Greed', textColor:'#44cc44', tradeValue: 40, tier: 2, order: 12, description: 'Points toward treasure, but attracts danger.', expedition: { lootMult: 1.5, trapDamageMult: 1.2 }, recipe: { input: { iron: 2, runite: 1, hides: 1 }, ticks: 28, research: 'runeforging', station: 'enchanting_table' } },
-    jewelers_loupe: { name: "Jeweler's Loupe", textColor:'#44cc44', tradeValue: 44, tier: 2, order: 13, description: 'A fine magnifying lens for appraising gems. Its keen focus improves puzzle outcomes and sharpens learning on expeditions.', expedition: { puzzleSuccessBonus: 0.4, xpMult: 1.2 } },
-    venom_vial: { name: 'Venom Vial', textColor:'#44cc44', tradeValue: 42, tier: 2, order: 14, description: 'A vial of concentrated toxin. Applies an additional layer of poison on each attack.', poisonOnHit: { damage: 1, ticks: 5, interval: 10 }, expedition: { trapDamageMult: 0.9, partyDamageMult: 1.05 }, recipe: { input: { moonbloom: 3, leather: 1, planks: 1 }, ticks: 25, research: 'herbalism', station: 'alchemy_table' } },
-    burnished_relic: { name: 'Burnished Relic', textColor:'#44cc44', tradeValue: 44, tier: 2, order: 15, description: 'An ancient idol that blesses the harvest. It seems to have been lovingly cared for over the years.', farmingSpeed: 1.1, pedestal: { radius: 6, manaCost: 2, harvestYieldBonus: 1 }, recipe: { input: { iron: 2, runite: 1, planks: 2 }, ticks: 30, research: 'runeforging', station: 'enchanting_table' } },
-    emberstep_anklet: { name: 'Emberstep Anklet', textColor:'#44cc44', tradeValue: 42, tier: 2, order: 16, description: 'Warm iron rings that keep the blood moving and the cold at bay.', coldResistance: 0.4, moveSpeedBonus: 0.12, moodBonus: 2 },
-    jesters_bauble: { name: "Jester's Bauble", textColor:'#44cc44', tradeValue: 40, tier: 2, order: 17, description: 'A shiny, ridiculous trinket that somehow lifts the spirits of everyone nearby.', moodBonus: 8, pedestal: { radius: 5, manaCost: 1, moodBonus: 4 }, recipe: { input: { planks: 2, cloth: 1, iron: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
-    hagglers_coin: { name: "Haggler's Coin", textColor:'#44cc44', tradeValue: 48, tier: 2, order: 18, description: 'A lucky coin worn smooth by a thousand transactions. The bearer feels a little richer just holding it.', moodBonus: 3, pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.85 } },
-    merchants_ring: { name: "Merchant's Ring", textColor:'#44cc44', tradeValue: 40, tier: 2, order: 19, description: 'A ring favored by traders. Something about wearing it keeps the mind focused and the hands busy.', moodBonus: 2, workSpeedBonus: 0.06, pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.88 } },
-    cornucopia_charm: { name: 'Cornucopia Charm', textColor:'#44cc44', tradeValue: 48, tier: 2, order: 20, description: 'A charm carved in the shape of a horn of plenty. The bearer is rarely hungry, and its presence seems to stretch every meal a little further.', hungerDecayMult: 0.85, pedestal: { radius: 'global', manaCost: 1, cookingBonusFood: 1 }, recipe: { input: { wheat: 3, berries: 2, planks: 2 }, ticks: 28, research: 'alchemy', station: 'cooking_pot' } },
-    amulet_of_fortune: { name: 'Amulet of Fortune', textColor:'#44cc44', tradeValue: 50, tier: 2, order: 21, description: 'A lucky amulet. Those who wear it seem to pick things up faster, and its influence spreads further when left in a place of power.', skillGrowthBonus: 0.10, pedestal: { radius: 'global', manaCost: 1, skillGrowthBonus: 0.2 } },
+    map_fragment: { textColor:'#cccccc', tradeValue: 25, tier: 2, order: 11, consumable: true, expedition: { durationMult: 0.7, lootMult: 1.4 } },
+    compass_of_greed: { textColor:'#44cc44', tradeValue: 40, tier: 2, order: 12, expedition: { lootMult: 1.5, trapDamageMult: 1.2 }, recipe: { input: { iron: 2, runite: 1, hides: 1 }, ticks: 28, research: 'runeforging', station: 'enchanting_table' } },
+    jewelers_loupe: { textColor:'#44cc44', tradeValue: 44, tier: 2, order: 13, expedition: { puzzleSuccessBonus: 0.4, xpMult: 1.2 } },
+    venom_vial: { textColor:'#44cc44', tradeValue: 42, tier: 2, order: 14, poisonOnHit: { damage: 1, ticks: 5, interval: 10 }, expedition: { trapDamageMult: 0.9, partyDamageMult: 1.05 }, recipe: { input: { moonbloom: 3, leather: 1, planks: 1 }, ticks: 25, research: 'herbalism', station: 'alchemy_table' } },
+    burnished_relic: { textColor:'#44cc44', tradeValue: 44, tier: 2, order: 15, farmingSpeed: 1.1, pedestal: { radius: 6, manaCost: 2, harvestYieldBonus: 1 }, recipe: { input: { iron: 2, runite: 1, planks: 2 }, ticks: 30, research: 'runeforging', station: 'enchanting_table' } },
+    emberstep_anklet: { textColor:'#44cc44', tradeValue: 42, tier: 2, order: 16, coldResistance: 0.4, moveSpeedBonus: 0.12, moodBonus: 2 },
+    jesters_bauble: { textColor:'#44cc44', tradeValue: 40, tier: 2, order: 17, moodBonus: 8, pedestal: { radius: 5, manaCost: 1, moodBonus: 4 }, recipe: { input: { planks: 2, cloth: 1, iron: 1 }, ticks: 18, research: 'textiles', station: 'loom' } },
+    hagglers_coin: { textColor:'#44cc44', tradeValue: 48, tier: 2, order: 18, moodBonus: 3, pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.85 } },
+    merchants_ring: { textColor:'#44cc44', tradeValue: 40, tier: 2, order: 19, moodBonus: 2, workSpeedBonus: 0.06, pedestal: { radius: 'global', manaCost: 1, tradeMarkupMult: 0.88 } },
+    cornucopia_charm: { textColor:'#44cc44', tradeValue: 48, tier: 2, order: 20, hungerDecayMult: 0.85, pedestal: { radius: 'global', manaCost: 1, cookingBonusFood: 1 }, recipe: { input: { wheat: 3, berries: 2, planks: 2 }, ticks: 28, research: 'alchemy', station: 'cooking_pot' } },
+    amulet_of_fortune: { textColor:'#44cc44', tradeValue: 50, tier: 2, order: 21, skillGrowthBonus: 0.10, pedestal: { radius: 'global', manaCost: 1, skillGrowthBonus: 0.2 } },
     // ── Tier 3: combat ──
-    ghost_step_charm: { name: 'Ghost-Step Charm', textColor:'#4488ff', tradeValue: 65, tier: 3, order: 31, description: 'A charm carved with the rune of evasion. The bearer seems to flicker out of the way at the last moment.', dodgeChance: 0.20, recipe: { input: { cloth: 2, runite: 1, void_essence: 1 }, ticks: 38, research: 'mana_weaving', station: 'enchanting_table' } },
-    bloodstone_gauntlet: { name: 'Bloodstone Gauntlet', textColor:'#4488ff', tradeValue: 68, tier: 3, order: 32, description: 'A deep-red gem embedded within a gauntlet, siphoning life back to the bearer.', lifeSteal: 0.12, expedition: { partyDamageMult: 1.05 }, recipe: { input: { runite: 2, iron: 1, hides: 1 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
-    sanguine_fang: { name: 'Sanguine Fang', textColor:'#4488ff', tradeValue: 66, tier: 3, order: 33, description: 'A serrated fang soaked in cursed blood. Causes bleeding and drains life.', lifeSteal: 0.10, bleedOnHit: { damage: 2, ticks: 4, interval: 10 } },
-    strikers_band: { name: "Striker's Band", textColor:'#4488ff', tradeValue: 62, tier: 3, order: 34, description: 'A band that sharpens reflexes mid-sprint. The first blow after moving hits hardest.', moveSpeedBonus: 0.1, postMoveAttackBonus: 0.20, critChance: 0.05, dodgeChance: 0.10, recipe: { input: { runite: 2, leather: 2, planks: 1 }, ticks: 36, research: 'runeforging', station: 'enchanting_table' } },
-    blight_seedpod: { name: 'Blight Seedpod', textColor:'#4488ff', tradeValue: 60, tier: 3, order: 35, description: 'A volatile seedpod from a blight bloom. Poison has no hold on the bearer, and the pod bristles at the touch of an attacker.', poisonImmunity: true, thornsDamage: 4 },
-    rune_of_splitting: { name: 'Rune of Splitting', textColor:'#4488ff', tradeValue: 64, tier: 3, order: 36, description: 'A rune that cuts through enemy defenses. Boosts damage against armored foes.', armoredDamageBonus: 0.20, pedestal: { radius: 6, manaCost: 2, armoredDamageBonus: 0.10 }, recipe: { input: { runite: 2, iron: 2, planks: 1 }, ticks: 36, research: 'runeforging', station: 'enchanting_table' } },
-    ward_of_the_sentinel: { name: 'Ward of the Sentinel', textColor:'#f944ff', tradeValue: 85, tier: 4, order: 75, description: 'A one-use ward that revives the bearer from death.', autoReviveHp: 0.5, durability: { max: 1, breakOnUse: true }, recipe: { input: { void_essence: 4, runite: 3, stone: 2 }, ticks: 65, research: 'void_forging', station: 'enchanting_table' } },
+    ghost_step_charm: { textColor:'#4488ff', tradeValue: 65, tier: 3, order: 31, dodgeChance: 0.20, recipe: { input: { cloth: 2, runite: 1, void_essence: 1 }, ticks: 38, research: 'mana_weaving', station: 'enchanting_table' } },
+    bloodstone_gauntlet: { textColor:'#4488ff', tradeValue: 68, tier: 3, order: 32, lifeSteal: 0.12, expedition: { partyDamageMult: 1.05 }, recipe: { input: { runite: 2, iron: 1, hides: 1 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
+    sanguine_fang: { textColor:'#4488ff', tradeValue: 66, tier: 3, order: 33, lifeSteal: 0.10, bleedOnHit: { damage: 2, ticks: 4, interval: 10 } },
+    strikers_band: { textColor:'#4488ff', tradeValue: 62, tier: 3, order: 34, moveSpeedBonus: 0.1, postMoveAttackBonus: 0.20, critChance: 0.05, dodgeChance: 0.10, recipe: { input: { runite: 2, leather: 2, planks: 1 }, ticks: 36, research: 'runeforging', station: 'enchanting_table' } },
+    blight_seedpod: { textColor:'#4488ff', tradeValue: 60, tier: 3, order: 35, poisonImmunity: true, thornsDamage: 4 },
+    rune_of_splitting: { textColor:'#4488ff', tradeValue: 64, tier: 3, order: 36, armoredDamageBonus: 0.20, pedestal: { radius: 6, manaCost: 2, armoredDamageBonus: 0.10 }, recipe: { input: { runite: 2, iron: 2, planks: 1 }, ticks: 36, research: 'runeforging', station: 'enchanting_table' } },
+    ward_of_the_sentinel: { textColor:'#f944ff', tradeValue: 85, tier: 4, order: 75, autoReviveHp: 0.5, durability: { max: 1, breakOnUse: true }, recipe: { input: { void_essence: 4, runite: 3, stone: 2 }, ticks: 65, research: 'void_forging', station: 'enchanting_table' } },
     // ── Tier 3: expedition ──
-    rallying_standard: { name: 'Rallying Standard', textColor:'#4488ff', tradeValue: 62, tier: 3, order: 41, description: 'A tiny battle standard. Its presence lifts spirits nearby, and veterans rally faster under its colors.', pedestal: { radius: 6, manaCost: 1, moodBonus: 4 }, expedition: { rallyChance: 0.25, rallyHeal: 0.12 } },
-    warlords_banner: { name: "Warlord's Banner", textColor:'#4488ff', tradeValue: 72, tier: 3, order: 42, description: 'A tiny battle standard that unites the party. Boosts all damage and rally.', expedition: { partyDamageMult: 1.2, rallyChance: 0.15, rallyHeal: 0.08 } },
-    expedition_spellbook: { name: 'Expedition Spellbook', textColor:'#4488ff', tradeValue: 66, tier: 3, order: 43, description: 'A condensed field tome that sharpens spellcraft under pressure.', skillGrowthBonus: 0.05, expedition: { spellDamageMult: 1.3 }, recipe: { input: { runite: 2, planks: 3, moonbloom: 1 }, ticks: 40, research: 'arcane_studies', station: 'scriptorium' } },
-    arcane_amplifier: { name: 'Arcane Amplifier', textColor:'#4488ff', tradeValue: 65, tier: 3, order: 44, description: 'A crystal that amplifies magical output.', spellDamageBonus: 0.25, expedition: { partyDamageMult: 1.1 } },
-    voidwalkers_lantern: { name: "Voidwalker's Lantern", textColor:'#4488ff', tradeValue: 60, tier: 3, order: 45, description: 'A lantern fueled by void energy. It lights the way to things others miss, and something in its glow sustains those attuned to magic.', expedition: { rareEncounterMult: 2.0 }, pedestal: { radius: 6, manaCost: 2, lightRadius: 4, manaRegen: 0.05 } },
+    rallying_standard: { textColor:'#4488ff', tradeValue: 62, tier: 3, order: 41, pedestal: { radius: 6, manaCost: 1, moodBonus: 4 }, expedition: { rallyChance: 0.25, rallyHeal: 0.12 } },
+    warlords_banner: { textColor:'#4488ff', tradeValue: 72, tier: 3, order: 42, expedition: { partyDamageMult: 1.2, rallyChance: 0.15, rallyHeal: 0.08 } },
+    expedition_spellbook: { textColor:'#4488ff', tradeValue: 66, tier: 3, order: 43, skillGrowthBonus: 0.05, expedition: { spellDamageMult: 1.3 }, recipe: { input: { runite: 2, planks: 3, moonbloom: 1 }, ticks: 40, research: 'arcane_studies', station: 'scriptorium' } },
+    arcane_amplifier: { textColor:'#4488ff', tradeValue: 65, tier: 3, order: 44, spellDamageBonus: 0.25, expedition: { partyDamageMult: 1.1 } },
+    voidwalkers_lantern: { textColor:'#4488ff', tradeValue: 60, tier: 3, order: 45, expedition: { rareEncounterMult: 2.0 }, pedestal: { radius: 6, manaCost: 2, lightRadius: 4, manaRegen: 0.05 } },
     // ── Tier 3: economy/utility ──
-    hourglass_of_diligence: { name: 'Hourglass of Diligence', textColor:'#4488ff', tradeValue: 65, tier: 3, order: 51, description: 'Time bends around this hourglass, hastening all labor.', workSpeedBonus: 0.25, pedestal: { radius: 5, manaCost: 2, workSpeedBonus: 0.15 }, recipe: { input: { iron: 2, runite: 2, planks: 2 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
-    tome_of_shared_wisdom: { name: 'Tome of Shared Wisdom', textColor:'#4488ff', tradeValue: 65, tier: 3, order: 52, description: 'A tome that accelerates skill growth for those nearby.', skillGrowthBonus: 0.12, pedestal: { radius: 5, manaCost: 2, skillGrowthBonus: 0.1 }, recipe: { input: { planks: 4, runite: 2, moonbloom: 1 }, ticks: 42, research: 'arcane_studies', station: 'scriptorium' } },
-    abundance_charm: { name: 'Abundance Charm', textColor:'#4488ff', tradeValue: 65, tier: 3, order: 53, description: 'A charm that coaxes extra output from craftspeople at their benches.', workSpeedBonus: 0.15, pedestal: { radius: 5, manaCost: 2, craftOutputBonus: 1 } },
-    lodestone_of_prosperity: { name: 'Lodestone of Prosperity', textColor:'#44cc44', tradeValue: 50, tier: 3, order: 54, description: 'A magnetic stone that hums faintly with purpose. Wanderers and traders find their way to a colony that keeps one.', moodBonus: 3, pedestal: { radius: 'global', manaCost: 2, wandererChanceMult: 1.15, traderChanceMult: 1.15 }, recipe: { input: { iron: 2, runite: 1, planks: 2 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
-    seedkeepers_locket: { name: "Seedkeeper's Locket", textColor:'#4488ff', tradeValue: 72, tier: 3, order: 55, description: 'A locket blessed by druids. Crops thrive near it, and the bearer seems to sense trouble before it springs.', pedestal: { radius: 8, manaCost: 1, blightImmunity: true, blightBloomDamage: 2 }, expedition: { trapDamageMult: 0.7 } },
-    warden_censer: { name: "Warden's Censer", textColor:'#4488ff', tradeValue: 68, tier: 3, order: 56, description: 'A censer of blessed smoke that knits the wounds of the bearer and nearby allies.', healthRegen: 0.08, pedestal: { radius: 6, manaCost: 2, healthRegen: 0.06 }, recipe: { input: { runite: 2, moonbloom: 3, planks: 2 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
-    ley_battery: { name: 'Ley Battery', textColor:'#4488ff', tradeValue: 70, tier: 3, order: 57, description: 'A crystal that siphons ambient ley energy, sustaining a caster mid-battle.', manaRegen: 0.08, spellCostReduction: 0.12, recipe: { input: { runite: 2, moonbloom: 2, void_essence: 1 }, ticks: 42, research: 'void_sorcery', station: 'enchanting_table' } },
+    hourglass_of_diligence: { textColor:'#4488ff', tradeValue: 65, tier: 3, order: 51, workSpeedBonus: 0.25, pedestal: { radius: 5, manaCost: 2, workSpeedBonus: 0.15 }, recipe: { input: { iron: 2, runite: 2, planks: 2 }, ticks: 40, research: 'runeforging', station: 'enchanting_table' } },
+    tome_of_shared_wisdom: { textColor:'#4488ff', tradeValue: 65, tier: 3, order: 52, skillGrowthBonus: 0.12, pedestal: { radius: 5, manaCost: 2, skillGrowthBonus: 0.1 }, recipe: { input: { planks: 4, runite: 2, moonbloom: 1 }, ticks: 42, research: 'arcane_studies', station: 'scriptorium' } },
+    abundance_charm: { textColor:'#4488ff', tradeValue: 65, tier: 3, order: 53, workSpeedBonus: 0.15, pedestal: { radius: 5, manaCost: 2, craftOutputBonus: 1 } },
+    lodestone_of_prosperity: { textColor:'#44cc44', tradeValue: 50, tier: 3, order: 54, moodBonus: 3, pedestal: { radius: 'global', manaCost: 2, wandererChanceMult: 1.15, traderChanceMult: 1.15 }, recipe: { input: { iron: 2, runite: 1, planks: 2 }, ticks: 35, research: 'runeforging', station: 'enchanting_table' } },
+    seedkeepers_locket: { textColor:'#4488ff', tradeValue: 72, tier: 3, order: 55, pedestal: { radius: 8, manaCost: 1, blightImmunity: true, blightBloomDamage: 2 }, expedition: { trapDamageMult: 0.7 } },
+    warden_censer: { textColor:'#4488ff', tradeValue: 68, tier: 3, order: 56, healthRegen: 0.08, pedestal: { radius: 6, manaCost: 2, healthRegen: 0.06 }, recipe: { input: { runite: 2, moonbloom: 3, planks: 2 }, ticks: 45, research: 'runeforging', station: 'enchanting_table' } },
+    ley_battery: { textColor:'#4488ff', tradeValue: 70, tier: 3, order: 57, manaRegen: 0.08, spellCostReduction: 0.12, recipe: { input: { runite: 2, moonbloom: 2, void_essence: 1 }, ticks: 42, research: 'void_sorcery', station: 'enchanting_table' } },
     // ── Tier 3: school-focused trinkets ──
     // Each pushes ONE school hard via a `<school>Bonus` stat (read alongside the
     // generic spellDamageBonus by getEquipmentSchoolBonus), rewarding a colonist
     // who commits to that school. A couple also carry non-damage spell stats
     // (spellHealBonus, spellDurationBonus, spellCooldownReduction) so gear can
     // amplify heals/buffs/recast rate, not just damage.
-    ember_sigil: { name: 'Ember Sigil', textColor:'#ff6644', tradeValue: 68, tier: 3, order: 61, description: 'A searing rune that concentrates destructive fire. Amplifies Evocation spells.', evocationBonus: 0.4, recipe: { input: { runite: 2, void_essence: 1, planks: 2 }, ticks: 40, research: 'void_sorcery', station: 'enchanting_table' } },
-    verdant_talisman: { name: 'Verdant Talisman', textColor:'#88ff88', tradeValue: 62, tier: 3, order: 62, description: 'A talisman pulsing with growth. Strengthens and prolongs Transmutation magic.', transmutationBonus: 0.35, spellDurationBonus: 0.25, recipe: { input: { moonbloom: 3, runite: 1, planks: 2 }, ticks: 40, research: 'advanced_arcana', station: 'enchanting_table' } },
-    healers_pendant: { name: "Healer's Pendant", textColor:'#44ff44', tradeValue: 66, tier: 3, order: 63, description: 'A blessed pendant that magnifies restorative magic. Boosts Abjuration and healing.', abjurationBonus: 0.3, spellHealBonus: 0.3, recipe: { input: { moonbloom: 3, runite: 2, planks: 1 }, ticks: 42, research: 'advanced_arcana', station: 'enchanting_table' } },
-    charmweave_band: { name: 'Charmweave Band', textColor:'#88ffff', tradeValue: 60, tier: 3, order: 64, description: 'A woven band that extends the reach of supportive magic. Boosts Enchantment.', enchantmentBonus: 0.3, spellDurationBonus: 0.3, recipe: { input: { runite: 2, leather: 2, moonbloom: 1 }, ticks: 38, research: 'advanced_arcana', station: 'enchanting_table' } },
-    summoners_focus: { name: "Summoner's Focus", textColor:'#9966ff', tradeValue: 74, tier: 3, order: 65, description: 'A focus stone that quickens the summoner\'s art. Boosts Conjuration and recast speed.', conjurationBonus: 0.35, spellCooldownReduction: 0.2, recipe: { input: { void_essence: 2, runite: 2, planks: 1 }, ticks: 44, research: 'void_sorcery', station: 'enchanting_table' } },
-    seers_eye: { name: "Seer's Eye", textColor:'#ccaaff', tradeValue: 70, tier: 3, order: 66, description: 'An unblinking eye carved from pale stone. Fate-magic woven through it lingers longer and comes back sooner.', spellDurationBonus: 0.25, spellCooldownReduction: 0.25, recipe: { input: { moonbloom: 2, void_essence: 2, planks: 1 }, ticks: 44, research: 'advanced_arcana', station: 'enchanting_table' } },
-    stitched_poppet: { name: 'Stitched Poppet', textColor:'#4488ff', tradeValue: 68, tier: 3, order: 67, description: 'A crudely stitched doll bound to a summoner and their creations.', summonHpBonus: 0.45, summonDamageBonus: 0.2, summonDurationBonus: 0.3, recipe: { input: { cloth: 3, runite: 1, moonbloom: 1 }, ticks: 38, research: 'advanced_arcana', station: 'enchanting_table' } },
+    ember_sigil: { textColor:'#ff6644', tradeValue: 68, tier: 3, order: 61, evocationBonus: 0.4, recipe: { input: { runite: 2, void_essence: 1, planks: 2 }, ticks: 40, research: 'void_sorcery', station: 'enchanting_table' } },
+    verdant_talisman: { textColor:'#88ff88', tradeValue: 62, tier: 3, order: 62, transmutationBonus: 0.35, spellDurationBonus: 0.25, recipe: { input: { moonbloom: 3, runite: 1, planks: 2 }, ticks: 40, research: 'advanced_arcana', station: 'enchanting_table' } },
+    healers_pendant: { textColor:'#44ff44', tradeValue: 66, tier: 3, order: 63, abjurationBonus: 0.3, spellHealBonus: 0.3, recipe: { input: { moonbloom: 3, runite: 2, planks: 1 }, ticks: 42, research: 'advanced_arcana', station: 'enchanting_table' } },
+    charmweave_band: { textColor:'#88ffff', tradeValue: 60, tier: 3, order: 64, enchantmentBonus: 0.3, spellDurationBonus: 0.3, recipe: { input: { runite: 2, leather: 2, moonbloom: 1 }, ticks: 38, research: 'advanced_arcana', station: 'enchanting_table' } },
+    summoners_focus: { textColor:'#9966ff', tradeValue: 74, tier: 3, order: 65, conjurationBonus: 0.35, spellCooldownReduction: 0.2, recipe: { input: { void_essence: 2, runite: 2, planks: 1 }, ticks: 44, research: 'void_sorcery', station: 'enchanting_table' } },
+    seers_eye: { textColor:'#ccaaff', tradeValue: 70, tier: 3, order: 66, spellDurationBonus: 0.25, spellCooldownReduction: 0.25, recipe: { input: { moonbloom: 2, void_essence: 2, planks: 1 }, ticks: 44, research: 'advanced_arcana', station: 'enchanting_table' } },
+    stitched_poppet: { textColor:'#4488ff', tradeValue: 68, tier: 3, order: 67, summonHpBonus: 0.45, summonDamageBonus: 0.2, summonDurationBonus: 0.3, recipe: { input: { cloth: 3, runite: 1, moonbloom: 1 }, ticks: 38, research: 'advanced_arcana', station: 'enchanting_table' } },
     // ── Tier 4 ──
-    void_charm: { name: 'Void Charm', textColor:'#ff4444', tradeValue: 95, tier: 4, order: 71, description: 'A charm that seems to make your weapons cut through dimensions.', targetPriority: 5, damageReduction: 0.1, expedition: { partyDamageMult: 1.25 } },
-    shard_of_oblivion: { name: 'Shard of Oblivion', textColor:'#ff4444', tradeValue: 95, tier: 4, order: 72, description: 'A shard of pure destruction. Devastating but dangerous.', targetPriority: 5, expedition: { partyDamageMult: 1.4, trapDamageMult: 1.3 } },
-    dimensional_orb: { name: 'Dimensional Orb', textColor:'#ff4444', tradeValue: 105, tier: 4, order: 73, description: 'An orb that bends space. Journeys feel shorter to those who carry it.', expedition: { durationMult: 0.6, rareEncounterMult: 2.5 }, pedestal: { radius: 'global', manaCost: 3, skillGrowthBonus: 0.25 } },
-    voidheart: { name: 'Voidheart', textColor:'#ff4444', tradeValue: 120, tier: 4, order: 74, description: 'The heart of the void itself. Ultimate arcane power.', spellDamageBonus: 0.5, moveSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 4, damageBonusMult: 1.2 } },
-    void_contract: { name: 'Void Contract', textColor:'#ff4444', tradeValue: 100, tier: 4, order: 77, description: 'A signed agreement with an entity that does not forget. The terms are unclear, but void essence flows more freely to the bearer, and so does power.', voidEssenceGainMult: 1.35, spellDamageBonus: 0.2, expedition: { partyDamageMult: 1.05 } },
-    arbiters_ledger: { name: "Arbiter's Ledger", textColor:'#f944ff', tradeValue: 85, tier: 4, order: 78, description: 'A ledger of every transaction ever made in the void. Sharpens judgment on expeditions.', expedition: { puzzleSuccessBonus: 0.4, lootMult: 1.3 } },
-    chaos_shard: { name: 'Chaos Shard', textColor:'#ff4444', tradeValue: 95, tier: 4, order: 79, description: 'A crystallized fragment of unraveled reality. The bearer draws power from the disorder around them rather than being consumed by it.', chaosResistance: 0.3, spellDamageBonus: 0.15, expedition: { partyDamageMult: 1.25 } },
+    void_charm: { textColor:'#ff4444', tradeValue: 95, tier: 4, order: 71, targetPriority: 5, damageReduction: 0.1, expedition: { partyDamageMult: 1.25 } },
+    shard_of_oblivion: { textColor:'#ff4444', tradeValue: 95, tier: 4, order: 72, targetPriority: 5, expedition: { partyDamageMult: 1.4, trapDamageMult: 1.3 } },
+    dimensional_orb: { textColor:'#ff4444', tradeValue: 105, tier: 4, order: 73, expedition: { durationMult: 0.6, rareEncounterMult: 2.5 }, pedestal: { radius: 'global', manaCost: 3, skillGrowthBonus: 0.25 } },
+    voidheart: { textColor:'#ff4444', tradeValue: 120, tier: 4, order: 74, spellDamageBonus: 0.5, moveSpeedBonus: 0.2, pedestal: { radius: 'global', manaCost: 4, damageBonusMult: 1.2 } },
+    void_contract: { textColor:'#ff4444', tradeValue: 100, tier: 4, order: 77, voidEssenceGainMult: 1.35, spellDamageBonus: 0.2, expedition: { partyDamageMult: 1.05 } },
+    arbiters_ledger: { textColor:'#f944ff', tradeValue: 85, tier: 4, order: 78, expedition: { puzzleSuccessBonus: 0.4, lootMult: 1.3 } },
+    chaos_shard: { textColor:'#ff4444', tradeValue: 95, tier: 4, order: 79, chaosResistance: 0.3, spellDamageBonus: 0.15, expedition: { partyDamageMult: 1.25 } },
 };
+stampLoc(TRINKETS, 'item');
 
 export const POTIONS = {
-    health_potion: { name: 'Health Potion', trigger: 'lowHealth', hpThreshold: 0.4, effect: 'heal', healAmount: 50, cooldown: 30, description: 'A restorative brew that mends wounds.', recipe: { input: { berries: 3, wheat: 1 }, skill: 'cooking', ticks: 16, station: 'alchemy_table', research: 'alchemy' } },
-    speed_potion: { name: 'Speed Potion', trigger: 'hasTask', effect: 'speed', moveSpeedBonus: 0.5, workSpeedBonus: 0.3, duration: 100, cooldown: 400, description: 'An invigorating tonic that quickens body and mind.', recipe: { input: { corn: 2, potatoes: 2, berries: 1 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'alchemy' } },
-    mana_potion: { name: 'Mana Potion', trigger: 'lowMana', manaThreshold: 0.3, effect: 'restoreMana', manaAmount: 30, cooldown: 300, description: 'A shimmering elixir that restores magical energy.', recipe: { input: { moonbloom: 3, runite: 1 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'herbalism' } },
-    resistance_potion: { name: 'Resistance Potion', trigger: 'inCombat', effect: 'resistance', damageReduction: 0.25, duration: 80, cooldown: 500, description: 'A thick draught that hardens the body against blows.', recipe: { input: { moonbloom: 2, stone: 2, iron: 1 }, skill: 'cooking', ticks: 25, station: 'alchemy_table', research: 'herbalism' } },
-    vitality_brew: { name: 'Vitality Brew', trigger: 'inCombat', effect: 'healthRegen', regenPerTick: 2, duration: 120, cooldown: 450, description: 'A slow-burning brew that regenerates health over time during battle.', recipe: { input: { berries: 2, wheat: 2, iron: 1 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'alchemy' } },
-    morale_tonic: { name: 'Morale Tonic', trigger: 'lowMood', moodThreshold: 35, effect: 'mood', moodBonus: 20, duration: 200, cooldown: 600, description: 'A cheerful tonic that lifts the spirits of a downcast colonist.', recipe: { input: { berries: 3, corn: 2 }, skill: 'cooking', ticks: 18, station: 'alchemy_table', research: 'alchemy' } },
-    warmth_elixir: { name: 'Warmth Elixir', trigger: 'coldSeason', effect: 'warmth', coldResistanceBonus: 0.4, duration: 200, cooldown: 500, description: 'A fiery elixir that wards off winter cold.', recipe: { input: { berries: 2, iron: 1, wheat: 2 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'domestic_alchemy' } },
-    blight_ward: { name: 'Blight Ward', trigger: 'farming', effect: 'blightWard', duration: 150, cooldown: 600, description: 'A murky brew that temporarily shields crops from blight.', recipe: { input: { moonbloom: 2, stone: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'domestic_alchemy' } },
-    scholars_draught: { name: "Scholar's Draught", trigger: 'isStudying', effect: 'scholarship', skillGrowthBonus: 0.4, researchSpeedBonus: 0.25, duration: 100, cooldown: 500, description: 'A potent tonic that sharpens the mind and speeds learning.', recipe: { input: { moonbloom: 2, wheat: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'domestic_alchemy' } },
-    focus_brew: { name: 'Focus Brew', trigger: 'isCrafting', effect: 'focus', craftSpeedBonus: 0.3, duration: 120, cooldown: 400, description: 'A brew that channels concentration into craft, speeding all production work.', recipe: { input: { corn: 2, moonbloom: 1 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'domestic_alchemy' } },
+    health_potion: { trigger: 'lowHealth', hpThreshold: 0.4, effect: 'heal', healAmount: 50, cooldown: 30, recipe: { input: { berries: 3, wheat: 1 }, skill: 'cooking', ticks: 16, station: 'alchemy_table', research: 'alchemy' } },
+    speed_potion: { trigger: 'hasTask', effect: 'speed', moveSpeedBonus: 0.5, workSpeedBonus: 0.3, duration: 100, cooldown: 400, recipe: { input: { corn: 2, potatoes: 2, berries: 1 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'alchemy' } },
+    mana_potion: { trigger: 'lowMana', manaThreshold: 0.3, effect: 'restoreMana', manaAmount: 30, cooldown: 300, recipe: { input: { moonbloom: 3, runite: 1 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'herbalism' } },
+    resistance_potion: { trigger: 'inCombat', effect: 'resistance', damageReduction: 0.25, duration: 80, cooldown: 500, recipe: { input: { moonbloom: 2, stone: 2, iron: 1 }, skill: 'cooking', ticks: 25, station: 'alchemy_table', research: 'herbalism' } },
+    vitality_brew: { trigger: 'inCombat', effect: 'healthRegen', regenPerTick: 2, duration: 120, cooldown: 450, recipe: { input: { berries: 2, wheat: 2, iron: 1 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'alchemy' } },
+    morale_tonic: { trigger: 'lowMood', moodThreshold: 35, effect: 'mood', moodBonus: 20, duration: 200, cooldown: 600, recipe: { input: { berries: 3, corn: 2 }, skill: 'cooking', ticks: 18, station: 'alchemy_table', research: 'alchemy' } },
+    warmth_elixir: { trigger: 'coldSeason', effect: 'warmth', coldResistanceBonus: 0.4, duration: 200, cooldown: 500, recipe: { input: { berries: 2, iron: 1, wheat: 2 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'domestic_alchemy' } },
+    blight_ward: { trigger: 'farming', effect: 'blightWard', duration: 150, cooldown: 600, recipe: { input: { moonbloom: 2, stone: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'domestic_alchemy' } },
+    scholars_draught: { trigger: 'isStudying', effect: 'scholarship', skillGrowthBonus: 0.4, researchSpeedBonus: 0.25, duration: 100, cooldown: 500, recipe: { input: { moonbloom: 2, wheat: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'domestic_alchemy' } },
+    focus_brew: { trigger: 'isCrafting', effect: 'focus', craftSpeedBonus: 0.3, duration: 120, cooldown: 400, recipe: { input: { corn: 2, moonbloom: 1 }, skill: 'cooking', ticks: 20, station: 'alchemy_table', research: 'domestic_alchemy' } },
     // Expedition-only potions (no trigger here, never auto-used in the main game).
-    antidote: { name: 'Antidote', expeditionOnly: true, description: 'Clears all damage-over-time effects on an expedition member.', recipe: { input: { moonbloom: 2, berries: 2 }, skill: 'cooking', ticks: 18, station: 'alchemy_table', research: 'herbalism' } },
-    battle_tonic: { name: 'Battle Tonic', expeditionOnly: true, description: 'Boosts attack speed and critical strike chance for several combat rounds.', recipe: { input: { iron: 1, corn: 2, potatoes: 2 }, skill: 'cooking', ticks: 24, station: 'alchemy_table', research: 'battle_brewing' } },
-    smoke_draught: { name: 'Smoke Draught', expeditionOnly: true, description: 'Greatly increases dodge chance for several combat rounds.', recipe: { input: { moonbloom: 2, stone: 1, berries: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'battle_brewing' } },
-    lifesteal_elixir: { name: 'Lifesteal Elixir', expeditionOnly: true, description: 'Grants a large HP-on-kill bonus for several combat rounds.', recipe: { input: { moonbloom: 2, iron: 1, runite: 1 }, skill: 'cooking', ticks: 26, station: 'alchemy_table', research: 'battle_brewing' } },
-    loot_elixir: { name: 'Loot Elixir', expeditionOnly: true, description: 'Consumed at expedition entry, greatly boosting loot and rare encounter rates.', recipe: { input: { moonbloom: 3, runite: 2, berries: 2 }, skill: 'cooking', ticks: 30, station: 'alchemy_table', research: 'battle_brewing' } },
-    rally_brew: { name: 'Rally Brew', expeditionOnly: true, description: 'Clears slows and restores 20% HP for all party members.', recipe: { input: { moonbloom: 2, wheat: 2, berries: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'battle_brewing' } },
-    mana_surge: { name: 'Mana Surge', expeditionOnly: true, description: 'Restores 30% mana and reduces spell costs for several combat rounds.', recipe: { input: { moonbloom: 3, runite: 1 }, skill: 'cooking', ticks: 24, station: 'alchemy_table', research: 'battle_brewing' } },
+    antidote: { expeditionOnly: true, recipe: { input: { moonbloom: 2, berries: 2 }, skill: 'cooking', ticks: 18, station: 'alchemy_table', research: 'herbalism' } },
+    battle_tonic: { expeditionOnly: true, recipe: { input: { iron: 1, corn: 2, potatoes: 2 }, skill: 'cooking', ticks: 24, station: 'alchemy_table', research: 'battle_brewing' } },
+    smoke_draught: { expeditionOnly: true, recipe: { input: { moonbloom: 2, stone: 1, berries: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'battle_brewing' } },
+    lifesteal_elixir: { expeditionOnly: true, recipe: { input: { moonbloom: 2, iron: 1, runite: 1 }, skill: 'cooking', ticks: 26, station: 'alchemy_table', research: 'battle_brewing' } },
+    loot_elixir: { expeditionOnly: true, recipe: { input: { moonbloom: 3, runite: 2, berries: 2 }, skill: 'cooking', ticks: 30, station: 'alchemy_table', research: 'battle_brewing' } },
+    rally_brew: { expeditionOnly: true, recipe: { input: { moonbloom: 2, wheat: 2, berries: 2 }, skill: 'cooking', ticks: 22, station: 'alchemy_table', research: 'battle_brewing' } },
+    mana_surge: { expeditionOnly: true, recipe: { input: { moonbloom: 3, runite: 1 }, skill: 'cooking', ticks: 24, station: 'alchemy_table', research: 'battle_brewing' } },
 };
+stampLoc(POTIONS, 'item');
 
 export const CONSUMABLES = {
-    crystal_capacitor: { name: 'Crystal Capacitor', char: '◆', charColor: '#aa44ff', description: 'Use to permanently increase your mana crystal limit by 1.', tradeValue: 65 },
+    crystal_capacitor: { char: '◆', charColor: '#aa44ff', tradeValue: 65 },
 };
+stampLoc(CONSUMABLES, 'item');
 
 export const ITEM_CHARS = {
     weapon: { char: '/', color: '#cccccc' },
@@ -407,40 +419,46 @@ export const ITEM_CHARS = {
 };
 
 export const WEAPON_ENCHANTMENT_EFFECTS = {
-    sharpness: { suffix: 'of Sharpness', description: 'Enchanted with sharpness, increasing attack damage by 15% per enchantment tier.', damageMultiplier: 1.15 },
-    witchery: { suffix: 'of Witchery', description: 'Enchanted with witchery, increasing spell damage by 15% per enchantment tier.', spellDamageBonus: 0.15 },
-    piercing: { suffix: 'of Piercing', description: 'Enchanted with piercing, increasing the chance of critical strikes by 15% per enchantment tier.', critChance: 0.15 },
-    vampirism: { suffix: 'of Vampirism', description: 'Enchanted with vampirism, healing for 15% of damage dealt per enchantment tier.', lifeSteal: 0.15 },
+    sharpness: { damageMultiplier: 1.15 },
+    witchery: { spellDamageBonus: 0.15 },
+    piercing: { critChance: 0.15 },
+    vampirism: { lifeSteal: 0.15 },
     // distance: { suffix: 'of Distance', description: 'Enchanted with distance, increasing attack range by 15% per enchantment tier, even for melee weapons.', attackRangeMultiplier: 1.15 },
     // velocity { suffix: 'of Velocity', description: 'Enchanted with velocity, increasing attack speed by 15% per enchantment tier.', attackSpeed: 0.15 },
     // greed { suffix: 'of Greed', description: 'Enchanted with greed, increasing exploration loot rarity by 15% per enchantment tier.', lootRarityMultiplier: 1.15 },
 };
 
 export const ARMOR_ENCHANTMENT_EFFECTS = {
-    protection: { suffix: 'of Protection', description: 'Enchanted with protection, increasing defense by 15% per enchantment tier.', defenseMultiplier: 1.15 },
-    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenBonus: 0.15 },
-    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamage: 0.15 },
+    protection: { defenseMultiplier: 1.15 },
+    wisdom: { manaRegenBonus: 0.15 },
+    barbs: { thornsDamage: 0.15 },
     // free_movement { suffix: 'of Free Movement', description: 'Enchanted with free movement, increasing movement and exploration speed by 10% per enchantment tier.', moveSpeedBonus: 0.10 },
     // dodgeChance { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing dodge chance by 10% per enchantment tier.', dodgeChance: 0.10 },
 };
 
 export const CLOTHES_ENCHANTMENT_EFFECTS = {
-    wisdom: { suffix: 'of Wisdom', description: 'Enchanted with wisdom, increasing mana regeneration by 15% per enchantment tier.', manaRegenBonus: 0.15 },
-    barbs: { suffix: 'of Barbs', description: 'Enchanted with barbs, increasing thorns damage on enemy attacks by 15% per enchantment tier.', thornsDamage: 0.15 },
-    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedBonus: 0.15 },
-    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenBonus: 0.15 },
+    wisdom: { manaRegenBonus: 0.15 },
+    barbs: { thornsDamage: 0.15 },
+    productivity: { workSpeedBonus: 0.15 },
+    renewal: { healthRegenBonus: 0.15 },
 };
 
 export const TOOL_ENCHANTMENT_EFFECTS = {
-    productivity: { suffix: 'of Productivity', description: 'Enchanted with productivity, increasing work speed by 15% per enchantment tier.', workSpeedBonus: 0.15 },
-    renewal: { suffix: 'of Renewal', description: 'Enchanted with renewal, increasing health regeneration 15% per enchantment tier.', healthRegenBonus: 0.15 },
+    productivity: { workSpeedBonus: 0.15 },
+    renewal: { healthRegenBonus: 0.15 },
     // windfall: { suffix: 'of Windfall', description: 'Enchanted with windfall, increasing materials gained while gathering by 20% per enchantment tier.', gatheringMatMultiplier: 1.20 },
     // spellCostReduction
 };
 
 export const BOOTS_ENCHANTMENT_EFFECTS = {
-    swiftness: { suffix: 'of Swiftness', description: 'Enchanted with swiftness, increasing movement speed by 10% per enchantment tier.', moveSpeedBonus: 0.10 },
+    swiftness: { moveSpeedBonus: 0.10 },
 };
+
+stampLoc(WEAPON_ENCHANTMENT_EFFECTS, 'enchant.weapon');
+stampLoc(ARMOR_ENCHANTMENT_EFFECTS, 'enchant.armor');
+stampLoc(CLOTHES_ENCHANTMENT_EFFECTS, 'enchant.clothes');
+stampLoc(TOOL_ENCHANTMENT_EFFECTS, 'enchant.tool');
+stampLoc(BOOTS_ENCHANTMENT_EFFECTS, 'enchant.boots');
 
 // Unified item registry. Every non-stackable item with its type and optional tradeValue.
 // Built by merging all item dicts. SPELL_TOMES are merged in config/index.js after import.

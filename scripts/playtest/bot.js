@@ -10,6 +10,8 @@
 import { CONFIG, MOOD_THRESHOLDS, RESEARCH, REALMS } from '../../js/core/config.js';
 import { createStrategy, PROFILES } from './strategies.js';
 import { findPathAdjacent } from '../../js/world/pathfinding.js';
+import { thoughtText } from '../../js/entities/colonist.js';
+import { logEntryText } from '../../js/ui/eventlog.js';
 
 const SAMPLE_EVERY = 120;   // ticks between metric samples (a quarter day)
 const STRATEGY_EVERY = 10;  // ticks between strategy steps
@@ -108,7 +110,7 @@ async function play(opts, out, log, setShotResolve) {
 
     const origAdd = g.eventLog.add.bind(g.eventLog);
     g.eventLog.add = (game, text, type, linked) => {
-        out.events.push({ tick: g.tick, day: day(), kind: 'log', type, text: String(text).replace(/<[^>]+>/g, '') });
+        out.events.push({ tick: g.tick, day: day(), kind: 'log', type, text: logEntryText(typeof text === 'object' ? text : { text }).replace(/<[^>]+>/g, '') });
         return origAdd(game, text, type, linked);
     };
 
@@ -208,7 +210,7 @@ async function play(opts, out, log, setShotResolve) {
                     if (b) { b.reentries = (b.reentries || 0) + 1; b.lastTick = g.tick; }
                 } else {
                     p.lastBreak = g.tick;
-                    const thoughts = (c.thoughts || []).map(t => `${t.text} (${Math.round(t.moodEffect)})`);
+                    const thoughts = (c.thoughts || []).map(t => `${thoughtText(t)} (${Math.round(t.moodEffect)})`);
                     summary.breaks.push({ name: c.name, tick: g.tick, day: day(), mood: Math.round(c.mood), traits: c.traits, thoughts });
                     event('mental_break', { name: c.name, mood: Math.round(c.mood), thoughts });
                     if (milestone('first_mental_break')) requestShot('first_mental_break');

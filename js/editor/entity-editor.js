@@ -2,7 +2,7 @@ import { ENTITIES, ANIMALS, SPELLS, RESEARCH, CONFIG, SUMMON_TYPES, GOLEM_TYPES,
 import { EffectPicker, formatEffectsCode } from './effect-picker.js';
 import { RolePicker, formatRolesCode } from './role-picker.js';
 import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
-import { toJsLiteral } from './config-source.js';
+import { toJsLiteral, splitText, localeBlock } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_entity_drafts';
 
@@ -696,7 +696,9 @@ class EntityEditor {
         const def = { ...data };
         delete def.key;
         const key = /^[A-Za-z_$][\w$]*$/.test(data.key) ? data.key : JSON.stringify(data.key);
-        return `${key}: ${toJsLiteral(def)},`;
+        const strings = {};
+        const code = toJsLiteral(splitText(def, `entity.${data.key}`, strings));
+        return `${key}: ${code},${localeBlock(strings)}`;
     }
 
     _copyPreview() {

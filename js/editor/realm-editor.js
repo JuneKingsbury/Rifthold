@@ -1,6 +1,6 @@
 import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, ALL_ITEMS, REALMS, RESEARCH, CONFIG, EXPEDITION_ENEMIES } from '../core/config.js';
 import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
-import { toJsLiteral } from './config-source.js';
+import { toJsLiteral, splitText, localeBlock } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_realm_drafts';
 
@@ -706,7 +706,9 @@ class RealmEditor {
         for (const k of ['research', 'requiresRealm']) if (!fields[k]) delete def[k];
         for (const k of Object.keys(def)) if (k.startsWith('_')) delete def[k];
         const jsKey = /^[A-Za-z_$][\w$]*$/.test(key) ? key : toJsLiteral(key);
-        return `${jsKey}: ${toJsLiteral(def)},`;
+        const strings = {};
+        const code = toJsLiteral(splitText(def, `realm.${key}`, strings));
+        return `${jsKey}: ${code},${localeBlock(strings)}`;
     }
 
     _copyPreview() {

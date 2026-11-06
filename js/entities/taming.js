@@ -2,6 +2,8 @@ import { ANIMALS, TAMED_ANIMALS, WORK_CONFIG, THOUGHTS, TRAITS } from '../core/c
 import { colonistTakeDamage, addThought } from './colonist.js';
 import { createTamedEntity } from './entity-factory.js';
 import { updateEntityRoles, updateEntityEffects } from './roles.js';
+import { t as tr } from '../core/i18n.js';
+import { entityName, entityRef } from '../core/names.js';
 
 export function updateTamedAnimals(game) {
     if (!game.research.isResearched('beast_binding')) return;
@@ -44,15 +46,14 @@ export function updateFollowingAnimalRoles(game) {
 }
 
 function _handleTamedDeath(animal, game) {
-    const typeName = animal.type.charAt(0).toUpperCase() + animal.type.slice(1);
-    game.notifications.push({ text: `${typeName} has died!`, tick: game.tick, type: 'danger' });
-    game.eventLog.add(game, `Tamed ${animal.type} died`, 'danger', { type: 'position', x: animal.x, y: animal.y });
+    game.notifications.push({ text: tr('msg.taming.animal_died_toast', { animal: entityName(animal.type) }), tick: game.tick, type: 'danger' });
+    game.eventLog.add(game, { key: 'msg.taming.animal_died_log', params: { animal: entityRef(animal.type) } }, 'danger', { type: 'position', x: animal.x, y: animal.y });
     if (animal.bondedColonistId) {
         const bonded = game.colonists.find(c => c.id === animal.bondedColonistId);
         if (bonded) {
             const thoughtKey = animal.isPet ? 'pet_died' : 'animal_died';
             const t = THOUGHTS[thoughtKey];
-            if (t) addThought(bonded, t.text, t.moodEffect, t.duration, game.tick);
+            if (t) addThought(bonded, thoughtKey, t.moodEffect, t.duration, game.tick);
         }
     }
 }
@@ -86,29 +87,26 @@ function _updateHunger(animal, game) {
 }
 
 export function releaseAnimal(animal, game) {
-    const typeName = animal.type.charAt(0).toUpperCase() + animal.type.slice(1);
-    const label = animal.name || typeName;
-    game.notifications.push({ text: `${label} released into the wild`, tick: game.tick, type: 'info' });
-    game.eventLog.add(game, `${label} released by the colony`, 'info', { type: 'position', x: animal.x, y: animal.y });
+    game.notifications.push({ text: tr('msg.taming.released_toast', { animal: animal.name || entityName(animal.type) }), tick: game.tick, type: 'info' });
+    game.eventLog.add(game, { key: 'msg.taming.released_log', params: { animal: animal.name || entityRef(animal.type) } }, 'info', { type: 'position', x: animal.x, y: animal.y });
     if (animal.bondedColonistId) {
         const bonded = game.colonists.find(c => c.id === animal.bondedColonistId);
         if (bonded) {
             const t = THOUGHTS.animal_escaped;
-            if (t) addThought(bonded, t.text, t.moodEffect, t.duration, game.tick);
+            if (t) addThought(bonded, 'animal_escaped', t.moodEffect, t.duration, game.tick);
         }
     }
     _returnToWild(animal, game);
 }
 
 function _escapeAnimal(animal, game) {
-    const typeName = animal.type.charAt(0).toUpperCase() + animal.type.slice(1);
-    game.notifications.push({ text: `${typeName} escaped! (starved)`, tick: game.tick, type: 'danger' });
-    game.eventLog.add(game, `${animal.type} escaped the colony`, 'danger', { type: 'position', x: animal.x, y: animal.y });
+    game.notifications.push({ text: tr('msg.taming.escaped_starved_toast', { animal: entityName(animal.type) }), tick: game.tick, type: 'danger' });
+    game.eventLog.add(game, { key: 'msg.taming.escaped_log', params: { animal: entityRef(animal.type) } }, 'danger', { type: 'position', x: animal.x, y: animal.y });
     if (animal.bondedColonistId) {
         const bonded = game.colonists.find(c => c.id === animal.bondedColonistId);
         if (bonded) {
             const t = THOUGHTS.animal_escaped;
-            if (t) addThought(bonded, t.text, t.moodEffect, t.duration, game.tick);
+            if (t) addThought(bonded, 'animal_escaped', t.moodEffect, t.duration, game.tick);
         }
     }
     _returnToWild(animal, game);
@@ -162,7 +160,7 @@ export function designateTame(game, wildAnimalId) {
         targetAnimalId: wildAnimalId,
     });
 
-    game.notifications.push({ text: `Taming ${wildAnimal.type}...`, tick: game.tick, type: 'success' });
+    game.notifications.push({ text: tr('msg.taming.taming_started', { animal: entityName(wildAnimal.type) }), tick: game.tick, type: 'success' });
     return true;
 }
 
@@ -213,8 +211,8 @@ function _finalizeTame(game, wildIdx, wildAnimal, spawnX, spawnY, colonistId) {
     const tamed = createTamedEntity(wildAnimal.type, spawnX, spawnY);
     if (colonistId) tamed.bondedColonistId = colonistId;
     game.entities.push(tamed);
-    game.notifications.push({ text: `Tamed a ${wildAnimal.type}!`, tick: game.tick, type: 'success' });
-    game.eventLog.add(game, `Tamed a ${wildAnimal.type}`, 'success', { type: 'position', x: spawnX, y: spawnY });
+    game.notifications.push({ text: tr('msg.taming.tamed_toast', { animal: entityName(wildAnimal.type) }), tick: game.tick, type: 'success' });
+    game.eventLog.add(game, { key: 'msg.taming.tamed_log', params: { animal: entityRef(wildAnimal.type) } }, 'success', { type: 'position', x: spawnX, y: spawnY });
     game.story.checkMilestone('first_animal_tamed', game);
 
     if (game.exploration) {
@@ -227,12 +225,17 @@ function _finalizeTame(game, wildIdx, wildAnimal, spawnX, spawnY, colonistId) {
             if (d?.meatYield) drops.push(`${d.meatYield} meat`);
             if (d?.hideYield) drops.push(`${d.hideYield} hides`);
             if (d?.woolYield) drops.push(`${d.woolYield} wool`);
+            const dropList = [];
+            if (d?.meatYield) dropList.push({ item: 'meat', amount: d.meatYield });
+            if (d?.hideYield) dropList.push({ item: 'hides', amount: d.hideYield });
+            if (d?.woolYield) dropList.push({ item: 'wool', amount: d.woolYield });
             game.exploration.wildlifeKills.set(wildAnimal.type, {
                 name: wildAnimal.type.charAt(0).toUpperCase() + wildAnimal.type.slice(1),
                 char: d?.char || '?',
                 color: d?.color || '#888888',
                 sprite: wildAnimal.type,
                 drops: drops.length ? drops.join(', ') : 'Nothing',
+                dropList,
                 count: 0,
                 tameCount: 1
             });
@@ -269,9 +272,9 @@ export function attemptDangerousTame(game, colonist, wildAnimalId) {
     const retDmg = tamedDef.retaliationDamage || ANIMALS[wildAnimal.type].damage;
     colonistTakeDamage(colonist, retDmg, game);
     const t = THOUGHTS.wolf_retaliated;
-    addThought(colonist, t.text, t.moodEffect, t.duration, game.tick);
-    game.notifications.push({ text: `Wolf attacked ${colonist.name}!`, tick: game.tick, type: 'danger' });
-    game.eventLog.add(game, `Wolf retaliated against ${colonist.name} during taming`, 'danger', { type: 'colonist', id: colonist.id });
+    addThought(colonist, 'wolf_retaliated', t.moodEffect, t.duration, game.tick);
+    game.notifications.push({ text: tr('msg.taming.wolf_attacked', { name: colonist.name }), tick: game.tick, type: 'danger' });
+    game.eventLog.add(game, { key: 'msg.taming.wolf_retaliated', params: { name: colonist.name } }, 'danger', { type: 'colonist', id: colonist.id });
     return 'fail';
 }
 

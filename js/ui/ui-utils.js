@@ -1,18 +1,19 @@
 // Small presentation helpers shared across the UI modules (ui.js, ui-arcane.js)
 // and the exploration system. Kept dependency-free so any layer can import them.
 import { EXPEDITION_XP_CONFIG, ANIMAL_XP_CONFIG } from '../core/config.js';
+import { t, getLanguage } from '../core/i18n.js';
 
 const ADVENTURER_ABILITY_DESCS = {
-    scout:   'Scout: Reveals extra info about the next encounter before it starts.',
-    rally:   'Rally: Chance to heal the party when a member falls in battle.',
-    ambush:  'Ambush: First strike in combat, party attacks before enemies in round 1.',
-    veteran: 'Veteran: Fatigue after expeditions is halved, so you can adventure again sooner.',
+    scout:   'ui.utils.ability_scout',
+    rally:   'ui.utils.ability_rally',
+    ambush:  'ui.utils.ability_ambush',
+    veteran: 'ui.utils.ability_veteran',
 };
 
 // Returns a multi-line tooltip string describing all active Adventurer level bonuses.
 export function adventurerLevelTooltip(level) {
-    if (!level || level <= 0) return 'No Adventurer levels yet.';
-    const lines = [`Adventurer Level ${level} Active Bonuses:`];
+    if (!level || level <= 0) return t('ui.utils.adventurer_none');
+    const lines = [t('ui.utils.adventurer_header', { level })];
     let damageMult = 1;
     let trapMult = 1;
     for (let lv = 1; lv <= level; lv++) {
@@ -20,14 +21,14 @@ export function adventurerLevelTooltip(level) {
         if (!b) continue;
         if (b.expeditionDamageMult) damageMult *= b.expeditionDamageMult;
         if (b.trapDamageMult) trapMult *= b.trapDamageMult;
-        if (b.rareEncounterMult) lines.push(`Lv${lv}: +${Math.round((b.rareEncounterMult - 1) * 100)}% rare encounter chance`);
-        if (b.ability) lines.push(`Lv${lv}: ${ADVENTURER_ABILITY_DESCS[b.ability] || b.ability}`);
+        if (b.rareEncounterMult) lines.push(t('ui.utils.adventurer_rare', { lv, pct: Math.round((b.rareEncounterMult - 1) * 100) }));
+        if (b.ability) lines.push(t('ui.utils.adventurer_ability', { lv, desc: ADVENTURER_ABILITY_DESCS[b.ability] ? t(ADVENTURER_ABILITY_DESCS[b.ability]) : b.ability }));
     }
-    if (damageMult > 1) lines.splice(1, 0, `Expedition damage: +${Math.round((damageMult - 1) * 100)}%`);
-    if (trapMult < 1) lines.splice(damageMult > 1 ? 2 : 1, 0, `Trap damage taken: -${Math.round((1 - trapMult) * 100)}%`);
+    if (damageMult > 1) lines.splice(1, 0, t('ui.utils.adventurer_damage', { pct: Math.round((damageMult - 1) * 100) }));
+    if (trapMult < 1) lines.splice(damageMult > 1 ? 2 : 1, 0, t('ui.utils.adventurer_trap', { pct: Math.round((1 - trapMult) * 100) }));
     const needed = EXPEDITION_XP_CONFIG.xpToLevel + level * EXPEDITION_XP_CONFIG.xpScalePerLevel;
-    if (level < EXPEDITION_XP_CONFIG.maxLevel) lines.push(`Next level at ${needed} XP.`);
-    else lines.push('Maximum level reached.');
+    if (level < EXPEDITION_XP_CONFIG.maxLevel) lines.push(t('ui.utils.next_level', { xp: needed }));
+    else lines.push(t('ui.utils.max_level'));
     return lines.join('\n');
 }
 
@@ -37,16 +38,16 @@ export function animalLevelBadge(level) {
     if (!level || level <= 0) return '';
     const maxed = level >= ANIMAL_XP_CONFIG.maxLevel;
     const color = maxed ? '#ffaa22' : '#ffcc44';
-    return ` <span style="color:${color};font-size:0.8em;font-weight:bold;">Lv${level}</span>`;
+    return ` <span style="color:${color};font-size:0.8em;font-weight:bold;">${escapeHtml(t('ui.utils.level_badge', { level }))}</span>`;
 }
 
 // Returns a tooltip string listing the cumulative bonuses an animal has earned.
 export function animalLevelTooltip(level, animalType) {
-    if (!level || level <= 0) return 'No Animal levels yet.';
+    if (!level || level <= 0) return t('ui.utils.animal_none');
     const isWarBeast = animalType === 'wolf' || animalType === 'boar';
     const bonusKey = isWarBeast ? 'warBeast' : 'packAnimal';
     const bonuses = ANIMAL_XP_CONFIG.levelBonuses[bonusKey];
-    const lines = [`Animal Level ${level}:`];
+    const lines = [t('ui.utils.animal_header', { level })];
     let totalHp = 0, totalDmg = 0, totalSpeed = 0;
     for (let lv = 1; lv <= level; lv++) {
         const b = bonuses[lv];
@@ -55,12 +56,12 @@ export function animalLevelTooltip(level, animalType) {
         if (b.damageBonus)    totalDmg   += b.damageBonus;
         if (b.speedBonusAdd)  totalSpeed += b.speedBonusAdd;
     }
-    if (totalHp)    lines.push(`+${totalHp} expedition HP`);
-    if (totalDmg)   lines.push(`+${totalDmg} expedition damage`);
-    if (totalSpeed) lines.push(`+${Math.round(totalSpeed * 100)}% expedition speed`);
+    if (totalHp)    lines.push(t('ui.utils.animal_hp', { hp: totalHp }));
+    if (totalDmg)   lines.push(t('ui.utils.animal_damage', { dmg: totalDmg }));
+    if (totalSpeed) lines.push(t('ui.utils.animal_speed', { pct: Math.round(totalSpeed * 100) }));
     const needed = ANIMAL_XP_CONFIG.xpToLevel + level * ANIMAL_XP_CONFIG.xpScalePerLevel;
-    if (level < ANIMAL_XP_CONFIG.maxLevel) lines.push(`Next level at ${needed} XP.`);
-    else lines.push('Maximum level reached.');
+    if (level < ANIMAL_XP_CONFIG.maxLevel) lines.push(t('ui.utils.next_level', { xp: needed }));
+    else lines.push(t('ui.utils.max_level'));
     return lines.join('\n');
 }
 
@@ -88,8 +89,8 @@ export function countByKey(items, keyFn) {
 export function getThreatDisplayHtml(priority) {
     if (priority === 0) return '';
     const color = priority > 0 ? '#ff6644' : '#66aaff';
-    const arrow = priority > 0 ? '▲' : '▼';
-    return ` <span style="color:${color};font-size:0.85em;">[${arrow}Threat]</span>`;
+    const label = priority > 0 ? t('ui.utils.threat_up') : t('ui.utils.threat_down');
+    return ` <span style="color:${color};font-size:0.85em;">${escapeHtml(label)}</span>`;
 }
 
 // Escape a string for safe interpolation into HTML text content. Use on any
@@ -182,9 +183,11 @@ const MORE_MENU_PANELS = 'Priority|Rifts|Story|Inventory';
 
 // Rewrites mouse-and-keyboard wording for touch screens: drops key hints, and turns
 // clicks into taps and right-clicks into long presses. Steps that need more than a
-// word swap have their own descriptionTouch.
+// word swap have their own descriptionTouch. The rewrites match English wording,
+// so other languages only lose the key hints.
 export function touchText(text) {
     if (!text || !isTouchUI()) return text;
+    if (getLanguage() !== 'en') return text.replace(/\s?\[(?:[A-Z]|Space|Esc|Tab)\]/g, '');
     let t = text
         .replace(/Press \[[^\]]+\] or click ([^,.]+?) in the mode bar/g, 'Tap $1 at the bottom of the screen')
         .replace(/Press \[Space\] or click the 1x button/g, 'Tap the 1x button')

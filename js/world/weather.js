@@ -1,4 +1,5 @@
 import { CONFIG, GRASS_TERRAIN, PLANT_STRUCTURES, SEASONS, SEASON_EFFECTS, WEATHER_TYPES, SEASON_WEATHER } from '../core/config.js';
+import { t as tr } from '../core/i18n.js';
 
 export class Weather {
     constructor() {
@@ -99,8 +100,8 @@ export class Weather {
     }
 
     getSeasonDisplay() {
-        const seasonName = this.season.charAt(0).toUpperCase() + this.season.slice(1);
-        return `${seasonName} Y${this.year}`;
+        const seasonName = tr(`season.${this.season}.name`, null, this.season.charAt(0).toUpperCase() + this.season.slice(1));
+        return tr('msg.weather.season_display', { season: seasonName, year: this.year });
     }
 
     // Current day within the season (1-based) and the season's total day count,
@@ -108,7 +109,7 @@ export class Weather {
     getDayDisplay() {
         const daysPerSeason = Math.max(1, Math.round(CONFIG.TICKS_PER_SEASON / CONFIG.TICKS_PER_DAY));
         const dayOfSeason = Math.min(daysPerSeason, Math.floor(this.seasonTick / CONFIG.TICKS_PER_DAY) + 1);
-        return `Day ${dayOfSeason}/${daysPerSeason}`;
+        return tr('msg.weather.day_display', { day: dayOfSeason, days: daysPerSeason });
     }
 
     getWeatherDisplay() {

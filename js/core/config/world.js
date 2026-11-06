@@ -1,11 +1,10 @@
+import { stampLoc } from '../i18n.js';
+
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 
 export const SEASON_ADVANCE_NOTICE = {
-    spring: 'Spring arrives tomorrow. Crops can be planted again and food decay will return to normal.',
-    summer: 'Summer arrives tomorrow. Crops will grow faster but food spoils more quickly in the heat.',
-    autumn: 'Autumn arrives tomorrow. Crop growth will slow. Harvest before winter.',
-    winter: 'Winter arrives tomorrow. Crop growth halts. Ensure colonists have warm clothing and food is stocked.',
 };
+stampLoc({ season_notice: SEASON_ADVANCE_NOTICE }, 'config', { fields: ['spring', 'summer', 'autumn', 'winter'] });
 
 export const SEASON_EFFECTS = {
     spring: { cropGrowthMult: 1.0, animalSpawnRate: 0.04, tempRange: [10, 20], bgColor: '#000000', grassColor: '#85a643', grassBg: '#85a643' },
@@ -23,7 +22,7 @@ export const WINTER_FEAST_CONFIG = {
     foodConsumed: 40,    // foodstuffs eaten by the feast
     moodBonus: 12,       // mood effect of the "Winter feast" thought
     moodDuration: 960,   // how long the thought lasts, in ticks
-    thoughtText: 'Warmed by the winter feast',
+    thought: 'winter_feast',   // THOUGHTS id
 };
 
 export const TERRAIN = {
@@ -41,6 +40,7 @@ export const TERRAIN = {
     forest_grass:{ char: '.', color: '#4f9a3a', bg: '#16260f', moveCost: 8,        passable: { colonist: true, animal: true,  enemy: true  } },
     swamp_grass: { char: '"', color: '#5a8a3a', bg: '#141f10', moveCost: 10,       passable: { colonist: true, animal: true,  enemy: true  } },
 };
+stampLoc(TERRAIN, 'terrain');
 
 // Terrain nothing can be built on: deep and shallow water, and impassable cliffs.
 // Every other terrain (rock included) is buildable.
@@ -59,15 +59,17 @@ export const RESOURCES = {
     iron_ore:   { char: 'o', color: '#cc8844', designation: 'mine', work: 20, yield: { iron_ore: 1 }, perAmount: true },
     runite_ore: { char: 'o', color: '#44cccc', designation: 'mine', work: 22, yield: { runite_ore: 1 }, perAmount: true },
 };
+stampLoc(RESOURCES, 'resource');
 
 export const WEATHER_TYPES = {
-    clear:        { display: 'Clear', growthMult: 1.0 },
-    rain:         { display: 'Rain', growthMult: 1.3 },
-    thunderstorm: { display: 'Storm', growthMult: 1.0 },
-    snow:         { display: 'Snow', growthMult: 0.5 },
-    blizzard:     { display: 'Blizzard', growthMult: 0 },
-    heatwave:     { display: 'Heat Wave', growthMult: 0.7 },
+    clear:        { growthMult: 1.0 },
+    rain:         { growthMult: 1.3 },
+    thunderstorm: { growthMult: 1.0 },
+    snow:         { growthMult: 0.5 },
+    blizzard:     { growthMult: 0 },
+    heatwave:     { growthMult: 0.7 },
 };
+stampLoc(WEATHER_TYPES, 'weather', { fields: ['display', 'name', 'description'] });
 
 export const SEASON_WEATHER = {
     spring: [
@@ -305,7 +307,6 @@ export const LANDMARK_BLUEPRINTS = {
     waystone_shrine: {
         structure: 'scholars_ring',
         biome: 'grassland',
-        name: 'Waystone Shrine',
         width: 5, height: 5,
         floorTerrain: 'dirt',
         layout: (() => {
@@ -322,7 +323,6 @@ export const LANDMARK_BLUEPRINTS = {
     woodcutters_lodge: {
         structure: 'harvest_sigil',
         biome: 'forest',
-        name: "Woodcutter's Lodge",
         width: 7, height: 5,
         floorTerrain: 'dirt',
         layout: (() => {
@@ -339,7 +339,6 @@ export const LANDMARK_BLUEPRINTS = {
     dwarven_vault: {
         structure: 'anvil_shrine',
         biome: 'mountain',
-        name: 'Dwarven Vault',
         width: 11, height: 9,
         floorTerrain: 'gravel',
         layout: (() => {
@@ -359,7 +358,6 @@ export const LANDMARK_BLUEPRINTS = {
     witchs_hut: {
         structure: 'ritual_circle',
         biome: 'swamp',
-        name: "Witch's Hut",
         width: 7, height: 7,
         floorTerrain: 'mud',
         layout: (() => {
@@ -378,7 +376,6 @@ export const LANDMARK_BLUEPRINTS = {
     desert_obelisk: {
         structure: 'great_forge',
         biome: 'desert',
-        name: 'Desert Obelisk',
         width: 5, height: 9,
         floorTerrain: 'sand',
         layout: (() => {
@@ -395,7 +392,6 @@ export const LANDMARK_BLUEPRINTS = {
     frozen_cairn: {
         structure: 'watchers_eye',
         biome: 'tundra',
-        name: 'Frozen Cairn',
         width: 7, height: 5,
         floorTerrain: 'gravel',
         layout: (() => {
@@ -414,7 +410,6 @@ export const LANDMARK_BLUEPRINTS = {
     sentinel_ring: {
         structure: 'star_ward',
         biome: 'mountain',
-        name: 'Sentinel Ring',
         width: 7, height: 7,
         floorTerrain: 'gravel',
         layout: (() => {
@@ -429,7 +424,6 @@ export const LANDMARK_BLUEPRINTS = {
     sun_altar: {
         structure: 'grand_ritual',
         biome: 'desert',
-        name: 'Sun Altar',
         width: 9, height: 9,
         floorTerrain: 'sand',
         layout: (() => {
@@ -443,6 +437,7 @@ export const LANDMARK_BLUEPRINTS = {
         })(),
     },
 };
+stampLoc(LANDMARK_BLUEPRINTS, 'landmark');
 
 // Sealed crypts: walled blocks with no door. The interior stays dark (tile.sealed)
 // until a wall ring tile is opened, which wakes the guardians and exposes the
@@ -471,10 +466,9 @@ export const CRYPT_CONFIG = {
         256: [1, 1],
         384: [1, 1, 1, 2, 2],
     },
-    chainNames: {
-        crystal: 'Crystal', verdant: 'Verdant', arcane: 'Arcane', shadow: 'Shadow',
-        void_pact: 'Void Pact', chaos: 'Chaos', kingdom: 'Kingdom',
-    },
+    // Display names, filled from the table (config.crypt_chains.*) by the
+    // stampLoc call after CRYPT_CONFIG.
+    chainNames: {},
     // Per-chain look and contents of an anchor crypt. `biome` is where it is placed
     // (falling back to anywhere on the map if the biome has no room). `wall` and
     // `floor` replace the blueprint's stone ones. `guardians` fill the blueprint's
@@ -506,6 +500,7 @@ export const CRYPT_CONFIG = {
     guardianHpMult: { 1: 1, 2: 1.4, 3: 1.9 },
     trapDamage: { 1: 8, 2: 12, 3: 16 },
 };
+stampLoc({ crypt_chains: CRYPT_CONFIG.chainNames }, 'config', { fields: ['crystal', 'verdant', 'arcane', 'shadow', 'void_pact', 'chaos', 'kingdom'] });
 
 // Weighted chest contents per tier, rolled once at generation and stored on the
 // ruin (a reload must not reroll). `amount` is [min, max].
@@ -705,3 +700,4 @@ export const CROPS = {
     potatoes: { growthTicks: 180, harvestYield: 3, seasons: ['spring', 'autumn', 'winter'], char: '~', readyChar: '◘', color: '#aa7744', research: 'alchemy' },
     moonbloom: { growthTicks: 220, harvestYield: 2, seasons: ['spring', 'summer', 'autumn', 'winter'], char: '✿', readyChar: '❀', color: '#cc88ff', research: 'herbalism' },
 };
+stampLoc(CROPS, 'crop');

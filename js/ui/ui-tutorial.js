@@ -1,5 +1,6 @@
 import { installTutorialPointer } from './ui-tutorial-pointer.js';
 import { escapeHtml, isTouchUI, isCompactLayout, touchText } from './ui-utils.js';
+import { t } from '../core/i18n.js';
 
 export function installTutorialPanel(UI) {
     Object.assign(UI.prototype, tutorialMethods);
@@ -61,7 +62,7 @@ const tutorialMethods = {
 
         if (tutorial.isChecklist) {
             const done = tutorial.completedCount;
-            html = `<div class="tutorial-header"><span class="tutorial-step">Goals ${done}/${tutorial.totalSteps}</span>${toggle}</div>`;
+            html = `<div class="tutorial-header"><span class="tutorial-step">${escapeHtml(t('ui.tutorial_ui.goals', { done, total: tutorial.totalSteps }))}</span>${toggle}</div>`;
             if (this._tutorialExpanded) {
                 html += '<ul class="tutorial-goals">';
                 for (const goal of tutorial.steps) {
@@ -80,7 +81,7 @@ const tutorialMethods = {
             const step = tutorial.currentStep + 1;
             const total = tutorial.totalSteps;
             const pct = Math.round((tutorial.currentStep / total) * 100);
-            html = `<div class="tutorial-header"><span class="tutorial-step">${step}/${total}</span>${toggle}</div>`
+            html = `<div class="tutorial-header"><span class="tutorial-step">${escapeHtml(t('ui.tutorial_ui.step', { step, total }))}</span>${toggle}</div>`
                 + `<div class="tutorial-progress"><div class="tutorial-progress-fill" style="width:${pct}%"></div></div>`
                 + `<div class="tutorial-title">${escapeHtml(touchText(task.title))}</div>`;
             if (this._tutorialExpanded) {
@@ -88,9 +89,9 @@ const tutorialMethods = {
                 const help = touchText(tutorial.getHelpText(game));
                 if (help) html += `<div class="tutorial-help">${help}</div>`;
                 html += task.manual
-                    ? '<button class="tutorial-ack">Got it &rarr;</button>'
-                    : '<button class="tutorial-goto">Go to &rarr;</button>';
-                if (!task.manual) html += '<div class="tutorial-skip">Skip this step</div>';
+                    ? `<button class="tutorial-ack">${escapeHtml(t('ui.tutorial_ui.got_it'))}</button>`
+                    : `<button class="tutorial-goto">${escapeHtml(t('ui.tutorial_ui.go_to'))}</button>`;
+                if (!task.manual) html += `<div class="tutorial-skip">${escapeHtml(t('ui.tutorial_ui.skip'))}</div>`;
             }
         }
 

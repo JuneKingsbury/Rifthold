@@ -1,3 +1,5 @@
+import { stampLoc } from '../i18n.js';
+
 // Keyboard bindings for the main game input handler.
 //
 // DEFAULT_KEYMAP maps a stable *action name* to the list of lowercased key
@@ -52,47 +54,48 @@ export const DEFAULT_KEYMAP = {
 // Ordered, grouped metadata for the rebinding settings UI. `action` matches a
 // key in DEFAULT_KEYMAP; `label` is the human-facing description.
 export const KEYBIND_ACTIONS = [
-    { group: 'Movement', items: [
-        { action: 'panUp', label: 'Pan up' },
-        { action: 'panDown', label: 'Pan down' },
-        { action: 'panLeft', label: 'Pan left' },
-        { action: 'panRight', label: 'Pan right' },
+    { items: [
+        { action: 'panUp' },
+        { action: 'panDown' },
+        { action: 'panLeft' },
+        { action: 'panRight' },
     ] },
-    { group: 'Modes', items: [
-        { action: 'toggleBuild', label: 'Build mode' },
-        { action: 'toggleZone', label: 'Farm zone mode' },
-        { action: 'toggleDesignate', label: 'Gather/designate mode' },
-        { action: 'deconstruct', label: 'Deconstruct (in build mode)' },
+    { items: [
+        { action: 'toggleBuild' },
+        { action: 'toggleZone' },
+        { action: 'toggleDesignate' },
+        { action: 'deconstruct' },
     ] },
-    { group: 'Panels', items: [
-        { action: 'togglePriority', label: 'Priorities panel' },
-        { action: 'toggleCraft', label: 'Craft panel' },
-        { action: 'toggleResearch', label: 'Research panel' },
-        { action: 'toggleInventory', label: 'Inventory panel' },
-        { action: 'toggleArcane', label: 'Arcane panel' },
-        { action: 'toggleStory', label: 'Story panel' },
-        { action: 'toggleMap', label: 'World map panel' },
-        { action: 'toggleWarmthOverlay', label: 'Toggle warmth overlay' },
-        { action: 'toggleDefenseOverlay', label: 'Toggle defense range overlay' },
-        { action: 'toggleRoomOverlay', label: 'Toggle room quality overlay' },
-        { action: 'toggleAuraOverlay', label: 'Toggle aura/range overlay' },
+    { items: [
+        { action: 'togglePriority' },
+        { action: 'toggleCraft' },
+        { action: 'toggleResearch' },
+        { action: 'toggleInventory' },
+        { action: 'toggleArcane' },
+        { action: 'toggleStory' },
+        { action: 'toggleMap' },
+        { action: 'toggleWarmthOverlay' },
+        { action: 'toggleDefenseOverlay' },
+        { action: 'toggleRoomOverlay' },
+        { action: 'toggleAuraOverlay' },
     ] },
-    { group: 'Time & View', items: [
-        { action: 'pause', label: 'Pause / unpause' },
-        { action: 'speedUp', label: 'Speed up' },
-        { action: 'speedDown', label: 'Speed down' },
-        { action: 'zoomIn', label: 'Zoom in' },
-        { action: 'zoomOut', label: 'Zoom out' },
-        { action: 'resetMinimap', label: 'Reset minimap size' },
-        { action: 'toggleRecordingMode', label: 'Toggle recording mode (hide UI / 1080p)' },
-        { action: 'timelapseToggle', label: 'Timelapse toggle (recording mode: 1x / 15x speed)' },
+    { items: [
+        { action: 'pause' },
+        { action: 'speedUp' },
+        { action: 'speedDown' },
+        { action: 'zoomIn' },
+        { action: 'zoomOut' },
+        { action: 'resetMinimap' },
+        { action: 'toggleRecordingMode' },
+        { action: 'timelapseToggle' },
     ] },
-    { group: 'Colonists', items: [
-        { action: 'cyclePrev', label: 'Select previous colonist' },
-        { action: 'cycleNext', label: 'Select next colonist' },
-        { action: 'draftToggle', label: 'Draft / undraft selected' },
-        { action: 'selectAll', label: 'Select all colonists' },
-        { action: 'nextIdle', label: 'Jump to next idle colonist' },
-        { action: 'centerSelection', label: 'Center camera on selection' },
+    { items: [
+        { action: 'cyclePrev' },
+        { action: 'cycleNext' },
+        { action: 'draftToggle' },
+        { action: 'selectAll' },
+        { action: 'nextIdle' },
+        { action: 'centerSelection' },
     ] },
 ];
+stampLoc({ keybinds: KEYBIND_ACTIONS }, 'config', { fields: ['label', 'group'] });

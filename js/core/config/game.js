@@ -1,3 +1,5 @@
+import { stampLoc } from '../i18n.js';
+
 export const GAME_VERSION = '0.2.0';
 
 export const CONFIG = {
@@ -26,33 +28,29 @@ export const EVENTS = {
         weight: 7, minTick: 400, cooldown: 1200, seasons: ['spring', 'summer'],
         effect: 'creeping_miasma',
         initialTiles: [1, 3],
-        thought: 'Blight in the fields', moodChange: -8, moodDuration: 300,
-        notification: 'Dark spores settle on your crops! {count} tiles infected.',
-        logMessage: 'Creeping miasma infected {count} crop tiles', logType: 'danger',
+        thought: 'blight_fields', moodChange: -8, moodDuration: 300,
+        logType: 'danger',
     },
     blight_bloom: {
         weight: 5, minTick: 600, cooldown: 1600, seasons: ['summer', 'autumn'],
         effect: 'spawn_blight_bloom',
         spawnCount: [1, 2],
-        thought: 'Blight has taken root', moodChange: -10, moodDuration: 200,
-        notification: 'Blight blooms have erupted in your fields!',
-        logMessage: 'Blight blooms spawned in the fields', logType: 'danger',
+        thought: 'blight_rooted', moodChange: -10, moodDuration: 200,
+        logType: 'danger',
     },
     cold_snap: {
         weight: 7, minTick: 160, cooldown: 960, seasons: ['winter'],
         effect: 'crop_damage',
         chance: 1.0,
-        thought: 'Freezing cold snap', moodChange: -12, moodDuration: 480,
-        notification: 'Cold snap! All outdoor crops frozen.',
-        logMessage: 'Cold snap froze all outdoor crops', logType: 'danger',
+        thought: 'cold_snap', moodChange: -12, moodDuration: 480,
+        logType: 'danger',
     },
     windfall: {
         weight: 5, minTick: 800, cooldown: 1920,
         effect: 'deposit',
         location: 'anywhere', radius: 1, terrain: ['grass', 'forest_grass'], fillChance: 0.6,
         deposits: [{ type: 'stone', amount: [3, 5] }],
-        notification: 'Mineral vein discovered! {count} new stone deposits.',
-        logMessage: 'Mineral windfall: {count} new stone deposits', logType: 'event',
+        logType: 'event',
     },
     meteorite: {
         weight: 5, minTick: 960, cooldown: 2400,
@@ -62,58 +60,52 @@ export const EVENTS = {
             { type: 'runite_ore', weight: 3, amount: [2, 3] },
             { type: 'stone', weight: 7, amount: [4, 7] },
         ],
-        notification: 'Meteorite impact! {count} deposits found.',
-        logMessage: 'Meteorite: {count} deposits at map edge', logType: 'event',
+        logType: 'event',
     },
     forest_growth: {
         weight: 7, minTick: 640, cooldown: 1600,
         effect: 'deposit',
         location: 'edge', radius: 3, terrain: ['grass', 'forest_grass'], fillChance: 0.55,
         deposits: [{ type: 'tree', amount: [3, 5] }],
-        notification: 'Forest growth! {count} new trees appeared.',
-        logMessage: 'Forest growth: {count} new trees near map edge', logType: 'event',
+        logType: 'event',
     },
     migration: {
         weight: 8, minTick: 480, cooldown: 1280, seasons: ['autumn', 'spring'],
         effect: 'spawn_animals',
         animals: [{ type: 'deer', count: [4, 7] }],
-        notification: 'Animal migration! {count} deer passing through.',
-        logMessage: 'Animal migration: {count} deer passing through', logType: 'event',
+        logType: 'event',
     },
     inspiration: {
         weight: 12, minTick: 160, cooldown: 480,
         effect: 'mood',
-        thought: 'Feeling inspired!', moodChange: 25, moodDuration: 480,
-        notification: '{name} is feeling inspired!',
-        logMessage: '{name} is feeling inspired!', logType: 'success',
+        thought: 'inspired', moodChange: 25, moodDuration: 480,
+        logType: 'success',
     },
     pleasant_weather: {
         weight: 9, minTick: 320, cooldown: 640, seasons: ['spring', 'summer'],
         effect: 'mood',
-        thought: 'Enjoyed the weather', moodChange: 6, moodDuration: 400,
-        notification: '{name} is enjoying the weather.',
-        logMessage: '{name} enjoyed the pleasant weather', logType: 'success',
+        thought: 'enjoyed_weather', moodChange: 6, moodDuration: 400,
+        logType: 'success',
     },
     shooting_star: {
         weight: 5, minTick: 480, cooldown: 1280,
         effect: 'mood',
-        thought: 'Saw a shooting star', moodChange: 8, moodDuration: 400,
-        notification: '{name} saw a shooting star!',
-        logMessage: '{name} saw a shooting star', logType: 'success',
+        thought: 'saw_shooting_star', moodChange: 8, moodDuration: 400,
+        logType: 'success',
     },
     found_trinket: {
         weight: 1, minTick: 1600, cooldown: 4800,
         effect: 'trinket_find',
         trinketKey: 'rabbits_paw',
-        thought: 'Found a lucky trinket', moodChange: 5, moodDuration: 350,
-        notification: "{name} found a Rabbit's Paw!",
-        logMessage: "{name} found a Rabbit's Paw", logType: 'success',
+        thought: 'found_trinket', moodChange: 5, moodDuration: 350,
+        logType: 'success',
     },
     void_whisper: {
         weight: 4, minTick: 2400, cooldown: 2400,
         effect: 'custom',
     },
 };
+stampLoc(EVENTS, 'event');
 
 export const BLIGHT_CONFIG = {
     decayPerTick: 2,

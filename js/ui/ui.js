@@ -1,18 +1,21 @@
 import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG, WAVE_TYPES, WORLD_SIZE_COLONY } from '../core/config.js';
 import { ROOM_SCORE_CAPS, ROOM_SIZE_BANDS, furnitureCountsFor } from '../world/rooms.js';
-import { FURNITURE_TYPES, POWER_PRIORITY, PEDESTAL_CHARGE } from '../core/config.js';
+import { FURNITURE_TYPES, POWER_PRIORITY, PEDESTAL_CHARGE, RESEARCH } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
-import { getItemTradeValue } from '../entities/item-roll.js';
+import { getItemTradeValue, itemName, itemDescription } from '../entities/item-roll.js';
 import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../systems/complexBuildings.js';
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
 import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml, isTouchUI, isCompactLayout, keyHint, haptic } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
+import { t, tp, tHtml, defName, getLanguage, getAvailableLanguages } from '../core/i18n.js';
+import { resourceName, buildingName, entityName, terrainName, buildCategoryName, recipeCategoryName, realmGroupName, priorityProfileName, stationGroupName } from '../core/names.js';
+import { logEntryText, logEntryTime } from './eventlog.js';
 import { getPedestalEffect, getPedestalCharge, getMaxPedestalCharge, getTilePedestalStats } from '../systems/artifacts.js';
 import { getPowerTier } from '../systems/power.js';
-import { getEquippedItems, getEquipmentStat } from '../entities/colonist.js';
+import { getEquippedItems, getEquipmentStat, thoughtText } from '../entities/colonist.js';
 import { getRoleInfoHtml, getEffectInfoHtml } from '../entities/roles.js';
 import { waveScaling } from '../entities/entity-factory.js';
 import { keybindingRowsHtml, beginRebindCapture, cancelRebindCapture, formatKeyLabel } from './keybindings-ui.js';
@@ -45,14 +48,14 @@ function skillXpTip(def, skillKey, level, xp) {
     const milestones = SKILL_MILESTONES[skillKey] || {};
     const lines = [];
     if (level >= COLONIST_CONFIG.skillMaxLevel) {
-        lines.push(`${def.description} (MAX)`);
+        lines.push(t('ui.colonist.skill_tip_max', { desc: def.description }));
     } else {
-        lines.push(`${def.description} — XP: ${xp}/${maxXp} (${pct}%)`);
+        lines.push(t('ui.colonist.skill_tip_xp', { desc: def.description, xp, max: maxXp, pct }));
     }
     for (const [threshold, m] of Object.entries(milestones).sort((a, b) => Number(a[0]) - Number(b[0]))) {
         const lvl = Number(threshold);
         const unlocked = level >= lvl;
-        lines.push(unlocked ? `✓ Lvl ${lvl}: ${m.description}` : `  Lvl ${lvl}: ${m.description}`);
+        lines.push(t(unlocked ? 'ui.colonist.skill_milestone_done' : 'ui.colonist.skill_milestone', { lvl, desc: m.description }));
     }
     return lines.join('\n');
 }
@@ -62,17 +65,120 @@ function magicXpTip(def, level, acc) {
     const maxXp = MAGIC_STUDY_CONFIG.magicXpToLevel + level * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
     const pct = Math.floor((acc / maxXp) * 100);
     return level >= 10
-        ? `${def.description} (MAX)`
-        : `${def.description} (${pct}% to next level)`;
+        ? t('ui.colonist.skill_tip_max', { desc: def.description })
+        : t('ui.colonist.magic_tip_progress', { desc: def.description, pct });
 }
 
 function salvagePreview(item, game) {
     const recipe = Object.values(RECIPES).find(r => Object.keys(r.output)[0] === item.key);
-    if (!recipe) return '1 planks';
+    if (!recipe) return t('ui.inv.salvage_part', { n: 1, name: resourceName('planks') });
     const rate = game.research.isResearched('artisans_touch') ? WORK_CONFIG.artisanSalvageRate : SALVAGE_RATE;
     return Object.entries(recipe.input)
-        .map(([res, amt]) => `${Math.max(1, Math.floor(amt * rate))} ${res.replace(/_/g, ' ')}`)
+        .map(([res, amt]) => t('ui.inv.salvage_part', { n: Math.max(1, Math.floor(amt * rate)), name: resourceName(res) }))
         .join(', ');
+}
+
+// Realm name of an expedition. Saved expeditions keep an English realmName;
+// read the realm's config name so it follows the language.
+function expRealmName(exp) {
+    return REALMS[exp.realm]?.name ?? exp.realmName ?? '';
+}
+
+// Display text for an expedition status id (gathering, exploring, returning, complete).
+function expStatusName(status) {
+    const names = { gathering: t('ui.info.exp_status_gathering'), exploring: t('ui.info.exp_status_exploring'), returning: t('ui.info.exp_status_returning'), complete: t('ui.info.exp_status_complete') };
+    return names[status] || status;
+}
+
+// Colonist state ids (colonist.state) as display text.
+function colonistStateName(state) {
+    const names = {
+        idle: t('ui.colonist.state_idle'), fighting: t('ui.colonist.state_fighting'), moving: t('ui.colonist.state_moving'),
+        working: t('ui.colonist.state_working'), patrolling: t('ui.colonist.state_patrolling'), following: t('ui.colonist.state_following'),
+        sleeping: t('ui.colonist.state_sleeping'), sheltering: t('ui.colonist.state_sheltering'), hunting: t('ui.colonist.state_hunting'),
+        drafted: t('ui.colonist.state_drafted'), dead: t('ui.colonist.state_dead'), wandering: t('ui.colonist.state_wandering'),
+        retreating: t('ui.colonist.state_retreating'), fleeing: t('ui.colonist.state_fleeing'), engaging: t('ui.colonist.state_engaging'),
+        eating: t('ui.colonist.state_eating'),
+    };
+    return names[state] || state;
+}
+
+// Mood level ids from getMoodLabel() (also CSS classes) as display text.
+function moodName(level) {
+    const names = { inspired: t('ui.colonist.mood_inspired'), content: t('ui.colonist.mood_content'), stressed: t('ui.colonist.mood_stressed'), breaking: t('ui.colonist.mood_breaking') };
+    return names[level] || level;
+}
+
+// Room quality tier name (rooms.js results carry the tier's locale prefix).
+function roomTierName(q) {
+    return defName({ _loc: q.tierLoc, name: q.tierName });
+}
+
+// Workshop focus group: one STATION_GROUPS label, or two joined with '/'.
+function focusGroupName(group) {
+    return String(group).split('/').map(g => stationGroupName(g)).join('/');
+}
+
+// Name of a tamed animal's species (tamed config, then wild config, then entity).
+function tamedTypeName(type) {
+    return TAMED_ANIMALS[type]?.name || ANIMALS[type]?.name || entityName(type);
+}
+
+// Button label for a recipe. Recipe keys are a verb plus the output
+// (craft_iron_sword, brew_antidote), so the label is the verb's text with the
+// output item's name.
+function recipeLabel(key, recipe) {
+    if (key === 'cook_meal') return t('ui.craft.recipe_cook_meal');
+    if (key === 'repair_trinket') return t('ui.craft.recipe_repair_trinket');
+    const verbs = {
+        craft: 'ui.craft.recipe_craft', brew: 'ui.craft.recipe_brew', smelt: 'ui.craft.recipe_smelt',
+        tan: 'ui.craft.recipe_tan', weave: 'ui.craft.recipe_weave', cook: 'ui.craft.recipe_cook',
+    };
+    const verb = key.split('_')[0];
+    const output = Object.keys(recipe.output || {})[0];
+    if (verbs[verb] && output) return t(verbs[verb], { item: resourceName(output) });
+    return output ? resourceName(output) : key.replace(/_/g, ' ');
+}
+
+// Text of a saved ref ({ $t, p, fb } from ref()/defRef()) or plain string, with a
+// fallback for older saves that only have the English text.
+function refText(r, fallback) {
+    if (r && typeof r === 'object' && typeof r.$t === 'string') return t(r.$t, r.p, r.fb ?? fallback);
+    if (typeof r === 'string' && r) return r;
+    return fallback ?? '';
+}
+
+// Bestiary kill records (wildlife, guardians, raiders, summons) are keyed by
+// creature type in `sprite`; read the config name so it follows the language.
+function killEntryName(entry) {
+    if (entry.nameRef) return refText(entry.nameRef, entry.name);
+    if (ENTITIES[entry.sprite]) return entityName(entry.sprite);
+    return ANIMALS[entry.sprite]?.name || entry.name || '';
+}
+
+// Drops line of a bestiary kill record: the structured dropList when present,
+// else the English `drops` string older saves stored.
+function killDropsText(entry) {
+    if (Array.isArray(entry.dropList)) {
+        if (!entry.dropList.length) return t('ui.story.bestiary_drops_nothing');
+        return entry.dropList.map(d => (d.chance != null
+            ? t('ui.story.bestiary_drop_chance', { amount: d.amount, name: resourceName(d.item), pct: Math.round(d.chance * 100) })
+            : t('ui.story.bestiary_drop', { amount: d.amount, name: resourceName(d.item) }))).join(t('msg.main.list_separator'));
+    }
+    return refText(entry.dropsRef, entry.drops || t('ui.story.bestiary_drops_nothing'));
+}
+
+// "Year 2, Spring" for a story milestone's unlock info.
+function storyDate(info) {
+    const s = String(info.season ?? '');
+    return t('ui.story.unlock_date', { year: info.year, season: t(`season.${s}.name`, null, s.charAt(0).toUpperCase() + s.slice(1)) });
+}
+
+// Equipment set names are ids ('Colony', 'Expedition'); show them translated.
+function equipSetName(name) {
+    if (name === 'Colony') return t('ui.colonist.set_colony');
+    if (name === 'Expedition') return t('ui.colonist.set_expedition');
+    return name;
 }
 
 // Expedition canvas animation state, reset on a new game or load.
@@ -1242,7 +1348,7 @@ export class UI {
         const useF = this.game.settings.temperatureUnit === 'F';
         const temp = useF ? Math.round(tempC * 9 / 5 + 32) : tempC;
         const tempUnit = useF ? 'F' : 'C';
-        const speed = this.game.paused ? 'PAUSED' : `${this.game.speed}x`;
+        const speed = this.game.paused ? t('ui.main.paused') : t('ui.main.speed', { n: this.game.speed });
         const dayProgress = Math.floor((this.game.timeOfDay / CONFIG.TICKS_PER_DAY) * 24);
         const timeStr = `${String(dayProgress).padStart(2, '0')}:00`;
         const power = this.game.power;
@@ -1251,34 +1357,35 @@ export class UI {
             const crystalCount = this.game.mapIndex.getStructurePositions('mana_crystal').size;
             const reservoirBonus = this.game.research.isResearched('mana_reservoir') ? 3 : 0;
             const crystalMax = 4 + (this.game.manaCrystalBonus || 0) + reservoirBonus;
-            manaStr = `Mana:${power.getNetPower()} (${crystalCount}/${crystalMax})`;
-            if (power.unpowered.length > 0) manaStr += ` ${power.unpowered.length} dark`;
+            manaStr = power.unpowered.length > 0
+                ? t('ui.main.mana_status_dark', { net: power.getNetPower(), crystals: crystalCount, max: crystalMax, dark: power.unpowered.length })
+                : t('ui.main.mana_status', { net: power.getNetPower(), crystals: crystalCount, max: crystalMax });
         }
         const waves = this.game.waves;
         const voidEssence = r.void_essence || 0;
-        const waveStr = waves.active ? `Wave:${waves.currentWave}` : '';
+        const waveStr = waves.active ? t('ui.main.wave_status', { n: waves.currentWave }) : '';
 
         const alerts = CONFIG.STOCKPILE_ALERTS || {};
         const resStyle = (key, val) => (alerts[key] && val <= alerts[key]) ? ' style="color:#ff4444;font-weight:bold"' : '';
         const mgr = this.game.skinManager;
         const hasSkin = mgr && mgr.isActive;
-        const RES_ABBR = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', gold: 'Au', abyss_sliver: 'Ab' };
+        const RES_ABBR = { wood: t('ui.main.res_abbr_wood'), stone: t('ui.main.res_abbr_stone'), food: t('ui.main.res_abbr_food'), planks: t('ui.main.res_abbr_planks'), bricks: t('ui.main.res_abbr_bricks'), iron_ore: t('ui.main.res_abbr_iron_ore'), runite_ore: t('ui.main.res_abbr_runite_ore'), iron: t('ui.main.res_abbr_iron'), runite: t('ui.main.res_abbr_runite'), leather: t('ui.main.res_abbr_leather'), wool: t('ui.main.res_abbr_wool'), void_essence: t('ui.main.res_abbr_void_essence'), gold: t('ui.main.res_abbr_gold'), abyss_sliver: t('ui.main.res_abbr_abyss_sliver') };
         const resIcon = (key, label, color) => {
             if (hasSkin) {
                 const url = mgr.getItemSpriteDataURL(key);
-                if (url) return `<img src="${url}" style="width:12px;height:12px;vertical-align:middle;image-rendering:pixelated;margin-right:1px;" title="${label}">`;
+                if (url) return `<img src="${url}" style="width:12px;height:12px;vertical-align:middle;image-rendering:pixelated;margin-right:1px;" title="${escapeAttr(label)}">`;
             }
-            return `<span style="color:${color};font-weight:bold;margin-right:1px;" title="${label}">${RES_ABBR[key] || label.slice(0, 2)}</span>`;
+            return `<span style="color:${color};font-weight:bold;margin-right:1px;" title="${escapeAttr(label)}">${escapeHtml(RES_ABBR[key] || label.slice(0, 2))}</span>`;
         };
         const coreResources = [
-            { key: 'gold', label: 'Gold', color: '#ffdd00' },
-            { key: 'wood', label: 'Wood', color: '#8b6b3a', always: true },
-            { key: 'stone', label: 'Stone', color: '#999', always: true },
-            { key: 'food', label: 'Food', color: '#88cc44', always: true },
-            { key: 'iron', label: 'Iron', color: '#aaa' },
-            { key: 'runite', label: 'Runite', color: '#44ccff' },
-            { key: 'void_essence', label: 'Void', color: '#9933ff' },
-            { key: 'abyss_sliver', label: 'Abyss Sliver', color: '#6600cc' },
+            { key: 'gold', label: resourceName('gold'), color: '#ffdd00' },
+            { key: 'wood', label: resourceName('wood'), color: '#8b6b3a', always: true },
+            { key: 'stone', label: resourceName('stone'), color: '#999', always: true },
+            { key: 'food', label: resourceName('food'), color: '#88cc44', always: true },
+            { key: 'iron', label: resourceName('iron'), color: '#aaa' },
+            { key: 'runite', label: resourceName('runite'), color: '#44ccff' },
+            { key: 'void_essence', label: resourceName('void_essence'), color: '#9933ff' },
+            { key: 'abyss_sliver', label: resourceName('abyss_sliver'), color: '#6600cc' },
         ];
         // Resource-counter punch: note which core resources changed value this
         // update so we can replay a quick grow/shrink on their span once the DOM
@@ -1302,24 +1409,24 @@ export class UI {
                 const totalPerDay = spoilPerDay + eatPerDay;
                 if (totalPerDay > 0) {
                     const spoilClass = totalPerDay > eatPerDay * 1.25 ? 'spoil-warn' : 'spoil-ok';
-                    const tip = `~${eatPerDay} eaten + ~${spoilPerDay} spoiled per day`;
-                    spoilSuffix = `<span class="${spoilClass}" title="${tip}"> -${totalPerDay}/d</span>`;
+                    const tip = t('ui.main.food_use_tip', { eaten: eatPerDay, spoiled: spoilPerDay });
+                    spoilSuffix = `<span class="${spoilClass}" title="${escapeAttr(tip)}">${escapeHtml(t('ui.main.food_use_per_day', { n: totalPerDay }))}</span>`;
                 }
             }
             resHtml += `<span class="res" data-res="${res.key}"${alertAttr}>${resIcon(res.key, res.label, res.color)}${val}${spoilSuffix}</span>`;
         }
         // Resources pod: the core resource chips plus mana (if generating).
         const resPodHtml = resHtml +
-            (manaStr ? `<span class="res" style="color:${power.hasPower() ? '#aa44ff' : '#ff6666'}">${manaStr}</span>` : '');
+            (manaStr ? `<span class="res" style="color:${power.hasPower() ? '#aa44ff' : '#ff6666'}">${escapeHtml(manaStr)}</span>` : '');
 
         // Datetime pod: season/year, day, time, plus wave/badges.
         const datetimePodHtml =
             `<span class="info">${season}</span>` +
             `<span class="info status-extra">${dayStr}</span>` +
             `<span class="info">${timeStr}</span>` +
-            (waveStr ? `<span class="info" style="color:#cc00ff">${waveStr}</span>` : '') +
-            (CONFIG.PEACEFUL_MODE ? `<span class="peaceful">PEACEFUL</span>` : '') +
-            (this.game.settings.demoMode ? `<span class="demo-mode">DEMO</span>` : '');
+            (waveStr ? `<span class="info" style="color:#cc00ff">${escapeHtml(waveStr)}</span>` : '') +
+            (CONFIG.PEACEFUL_MODE ? `<span class="peaceful">${escapeHtml(t('ui.main.badge_peaceful'))}</span>` : '') +
+            (this.game.settings.demoMode ? `<span class="demo-mode">${escapeHtml(t('ui.main.badge_demo'))}</span>` : '');
 
         // Weather pod: icon, condition, temperature.
         const colonyPodHtml =
@@ -1399,42 +1506,38 @@ export class UI {
         this.updateTouchToolbar(true);
         const touch = isTouchUI();
         // No Esc key on a phone, so targeting gets a button to back out.
-        const cancelBtn = touch ? '<span class="mode-opt mode-back" data-mode-action="cancel-target">Cancel</span>' : '';
+        const cancelBtn = touch ? `<span class="mode-opt mode-back" data-mode-action="cancel-target">${escapeHtml(t('common.cancel'))}</span>` : '';
         if (input.spellTargeting) {
             const { spell } = input.spellTargeting;
-            let html = `<span class="mode-label" style="color:#bb88ff">SPELL TARGET: ${escapeHtml(spell.name)}</span>${cancelBtn}`;
-            html += touch
-                ? `<span class="mode-hint" style="color:#aa88ff">Tap target tile (range: ${spell.range || '∞'})</span>`
-                : `<span class="mode-hint" style="color:#aa88ff">Click target tile (range: ${spell.range || '∞'}) | [Esc] Cancel</span>`;
+            let html = `<span class="mode-label" style="color:#bb88ff">${escapeHtml(t('ui.main.spell_target', { name: spell.name }))}</span>${cancelBtn}`;
+            html += `<span class="mode-hint" style="color:#aa88ff">${escapeHtml(t(touch ? 'ui.main.spell_target_hint_touch' : 'ui.main.spell_target_hint', { range: spell.range || '∞' }))}</span>`;
             this.elements.modeBar.innerHTML = html;
             return;
         }
         if (input.guardPointTargeting) {
             const colonist = this.game.getColonist(input.guardPointTargeting.colonistId);
-            let html = `<span class="mode-label" style="color:#88ff88">SET GUARD POINT: ${escapeHtml(colonist.name)}</span>${cancelBtn}`;
-            html += touch
-                ? '<span class="mode-hint" style="color:#66ff66">Tap passable tile to set guard point</span>'
-                : '<span class="mode-hint" style="color:#66ff66">Click passable tile to set guard point | [Esc] Cancel</span>';
+            let html = `<span class="mode-label" style="color:#88ff88">${escapeHtml(t('ui.main.guard_point_target', { name: colonist.name }))}</span>${cancelBtn}`;
+            html += `<span class="mode-hint" style="color:#66ff66">${escapeHtml(t(touch ? 'ui.main.guard_point_hint_touch' : 'ui.main.guard_point_hint'))}</span>`;
             this.elements.modeBar.innerHTML = html;
             return;
         }
         if (input.mode !== 'normal') this._moreMenuOpen = false;
-        let html = `<span class="mode-label">Mode: ${input.mode.toUpperCase()}</span>`;
+        const modeNames = { normal: t('ui.main.mode_normal'), build: t('ui.main.mode_build'), zone: t('ui.main.mode_zone'), designate: t('ui.main.mode_designate') };
+        let html = `<span class="mode-label">${escapeHtml(t('ui.main.mode_label', { mode: modeNames[input.mode] || input.mode.toUpperCase() }))}</span>`;
+        const backBtn = `<span class="mode-opt mode-back" data-mode-action="back">${keyHint('Esc')}${escapeHtml(t('common.back'))}</span>`;
         if (input.mode === 'build') {
-            html += `<span class="mode-opt mode-back" data-mode-action="back">${keyHint('Esc')}Back</span>`;
+            html += backBtn;
             const deconActive = input.deconstructMode ? ' active' : '';
-            html += `<span class="mode-opt${deconActive}" data-mode-action="deconstruct" style="margin-left:8px;color:#ff6666">${keyHint('X')}Deconstruct</span>`;
-            html += touch
-                ? '<span class="mode-hint">Long-press to deconstruct or loot chests</span>'
-                : '<span class="mode-hint">[Tab]Cycle category | Right-click to deconstruct or loot chests</span>';
+            html += `<span class="mode-opt${deconActive}" data-mode-action="deconstruct" style="margin-left:8px;color:#ff6666">${keyHint('X')}${escapeHtml(t('ui.build.deconstruct'))}</span>`;
+            html += `<span class="mode-hint">${escapeHtml(t(touch ? 'ui.build.mode_hint_touch' : 'ui.build.mode_hint'))}</span>`;
             this._updateBuildPanel(input);
         } else if (input.mode === 'zone') {
-            html += `<span class="mode-opt mode-back" data-mode-action="back">${keyHint('Esc')}Back</span>`;
-            html += `<span class="mode-hint">${touch ? 'Drag to designate farm area' : 'Click+drag to designate farm area'}</span>`;
+            html += backBtn;
+            html += `<span class="mode-hint">${escapeHtml(t(touch ? 'ui.build.farm_hint_touch' : 'ui.build.farm_hint'))}</span>`;
             this._updateFarmPanel(input);
         } else if (input.mode === 'designate') {
-            html += `<span class="mode-opt mode-back" data-mode-action="back">${keyHint('Esc')}Back</span>`;
-            html += `<span class="mode-hint">${touch ? 'Drag to select area' : 'Click+drag to select area'}</span>`;
+            html += backBtn;
+            html += `<span class="mode-hint">${escapeHtml(t(touch ? 'ui.build.gather_hint_touch' : 'ui.build.gather_hint'))}</span>`;
             this._updateGatherPanel(input);
         } else if (isCompactLayout()) {
             html = this._compactNavHtml();
@@ -1443,7 +1546,7 @@ export class UI {
             html += '<span class="mode-options">';
             for (const item of nav) {
                 const pulse = item.action === 'story' && item.badge ? ' story-new-pulse' : '';
-                html += `<span class="mode-opt${pulse}" data-mode-action="${item.action}"${item.style ? ` style="${item.style}"` : ''}>${keyHint(item.key)}${item.label}${item.badgeHtml || ''}</span>`;
+                html += `<span class="mode-opt${pulse}" data-mode-action="${item.action}"${item.style ? ` style="${item.style}"` : ''}>${keyHint(item.key)}${escapeHtml(item.label)}${item.badgeHtml || ''}</span>`;
             }
             html += '</span>';
         }
@@ -1471,19 +1574,19 @@ export class UI {
         const researchNeedsAttention = !this.game.research.activeResearch && this.game.research.hasAvailableResearch();
         const pendingAutoCount = this.game.exploration?.pendingAutoSummaries?.length || 0;
         return [
-            { action: 'story', key: 'J', label: 'Story', badge: storyNew, badgeHtml: storyNew ? ' ✦' : '' },
-            { action: 'build', key: 'B', label: 'Build' },
-            { action: 'zone', key: 'F', label: 'Farm' },
-            { action: 'gather', key: 'G', label: 'Gather' },
-            { action: 'priority', key: 'P', label: 'Priority' },
-            { action: 'craft', key: 'C', label: 'Craft' },
-            { action: 'research', key: 'R', label: 'Research', badge: researchNeedsAttention, style: researchNeedsAttention ? 'color:#ffcc44' : '', badgeHtml: researchNeedsAttention ? ' •' : '' },
-            { action: 'inventory', key: 'I', label: 'Inventory' },
+            { action: 'story', key: 'J', label: t('ui.main.nav_story'), badge: storyNew, badgeHtml: storyNew ? ' ✦' : '' },
+            { action: 'build', key: 'B', label: t('ui.main.nav_build') },
+            { action: 'zone', key: 'F', label: t('ui.main.nav_farm') },
+            { action: 'gather', key: 'G', label: t('ui.main.nav_gather') },
+            { action: 'priority', key: 'P', label: t('ui.main.nav_priority') },
+            { action: 'craft', key: 'C', label: t('ui.main.nav_craft') },
+            { action: 'research', key: 'R', label: t('ui.main.nav_research'), badge: researchNeedsAttention, style: researchNeedsAttention ? 'color:#ffcc44' : '', badgeHtml: researchNeedsAttention ? ' •' : '' },
+            { action: 'inventory', key: 'I', label: t('ui.main.nav_inventory') },
             {
-                action: 'arcane', key: 'V', label: 'Rifts', badge: pendingAutoCount > 0, style: pendingAutoCount > 0 ? 'color:#44ff88' : '',
+                action: 'arcane', key: 'V', label: t('ui.main.nav_rifts'), badge: pendingAutoCount > 0, style: pendingAutoCount > 0 ? 'color:#44ff88' : '',
                 badgeHtml: pendingAutoCount > 0 ? ` <span style="background:#44ff88;color:#000;border-radius:8px;padding:0 4px;font-size:0.75em;">${pendingAutoCount}</span>` : '',
             },
-            { action: 'map', key: 'M', label: 'Map' },
+            { action: 'map', key: 'M', label: t('ui.main.nav_map') },
         ];
     }
 
@@ -1494,22 +1597,22 @@ export class UI {
         const items = this._navItems();
         const primary = items.filter(i => COMPACT_NAV_PRIMARY.includes(i.action));
         const rest = items.filter(i => !COMPACT_NAV_PRIMARY.includes(i.action));
-        const btn = (i) => `<button class="nav-btn" data-mode-action="${i.action}"${i.style ? ` style="${i.style}"` : ''}>${i.label}${i.badgeHtml || ''}</button>`;
+        const btn = (i) => `<button class="nav-btn" data-mode-action="${i.action}"${i.style ? ` style="${i.style}"` : ''}>${escapeHtml(i.label)}${i.badgeHtml || ''}</button>`;
         let html = '<div class="compact-nav">' + primary.map(btn).join('');
         const moreBadge = rest.some(i => i.badge) ? ' •' : '';
-        html += `<button class="nav-btn${this._moreMenuOpen ? ' active' : ''}" data-mode-action="more"${moreBadge ? ' style="color:#ffcc44"' : ''}>More${moreBadge}</button></div>`;
+        html += `<button class="nav-btn${this._moreMenuOpen ? ' active' : ''}" data-mode-action="more"${moreBadge ? ' style="color:#ffcc44"' : ''}>${escapeHtml(t('ui.main.nav_more'))}${moreBadge}</button></div>`;
         if (this._moreMenuOpen) {
             const s = this.game.settings;
             html += '<div class="more-menu">';
             html += '<div class="more-menu-grid">' + rest.map(btn).join('') + '</div>';
-            html += '<div class="more-menu-title">Map overlays</div><div class="more-menu-grid">';
+            html += `<div class="more-menu-title">${escapeHtml(t('ui.main.map_overlays'))}</div><div class="more-menu-grid">`;
             for (const [name, label, on] of [
-                ['WarmthOverlay', 'Warmth', s.showWarmthOverlay], ['DefenseOverlay', 'Defense', s.showDefenseOverlay],
-                ['RoomOverlay', 'Rooms', s.showRoomOverlay], ['AuraOverlay', 'Auras', s.showAuraOverlay],
+                ['WarmthOverlay', t('ui.main.overlay_warmth'), s.showWarmthOverlay], ['DefenseOverlay', t('ui.main.overlay_defense'), s.showDefenseOverlay],
+                ['RoomOverlay', t('ui.main.overlay_rooms'), s.showRoomOverlay], ['AuraOverlay', t('ui.main.overlay_auras'), s.showAuraOverlay],
             ]) {
-                html += `<button class="nav-btn${on ? ' active' : ''}" data-overlay="${name}">${label}</button>`;
+                html += `<button class="nav-btn${on ? ' active' : ''}" data-overlay="${name}">${escapeHtml(label)}</button>`;
             }
-            html += '</div><div class="more-menu-grid"><button class="nav-btn" data-mode-action="settings">Settings</button></div></div>';
+            html += `</div><div class="more-menu-grid"><button class="nav-btn" data-mode-action="settings">${escapeHtml(t('ui.main.nav_settings'))}</button></div></div>`;
         }
         return html;
     }
@@ -1578,7 +1681,7 @@ export class UI {
         show('touch-center-btn', normal && hasSel);
         show('touch-idle-btn', normal);
         const draft = document.getElementById('touch-draft-btn');
-        if (draft) draft.textContent = allDrafted ? 'Undraft' : 'Draft';
+        if (draft) draft.textContent = allDrafted ? t('ui.main.undraft') : t('ui.main.draft');
         // Build, farm and gather have their own bottom panel.
         bar.classList.toggle('toolbar-hidden', !normal);
     }
@@ -1589,7 +1692,7 @@ export class UI {
         let html = '<div class="build-panel-header"><div class="build-panel-tabs">';
         BUILD_CATEGORIES.forEach(cat => {
             const active = cat === input.buildCategory ? ' active' : '';
-            html += `<span class="build-tab${active}" data-build-cat="${cat}">${cat}</span>`;
+            html += `<span class="build-tab${active}" data-build-cat="${escapeAttr(cat)}">${escapeHtml(buildCategoryName(cat))}</span>`;
         });
         html += '</div>' + this._buildPanelControls() + '</div>';
         html += '<div class="build-grid">';
@@ -1611,11 +1714,11 @@ export class UI {
                 ? `<img src="${this._getBuildingSpriteURL(opt, isFloorType)}" class="build-card-icon--sprite">`
                 : `<span style="color:${escapeAttr(def.color)}">${escapeHtml(def.char)}</span>`;
             const costHtml = Object.entries(def.cost).map(([k, v]) => this._buildCostChip(k, v)).join('');
-            const overlayHtml = locked ? '<span class="build-card-overlay">LOCKED</span>' : atMax ? '<span class="build-card-overlay">MAX</span>' : '';
+            const overlayHtml = locked ? `<span class="build-card-overlay">${escapeHtml(t('ui.build.card_locked'))}</span>` : atMax ? `<span class="build-card-overlay">${escapeHtml(t('ui.build.card_max'))}</span>` : '';
             html += `<div class="build-card${active}${stateClass}" data-build-opt="${escapeAttr(opt)}">`;
             html += `<div class="build-card-key">${keyLabel}</div>`;
             html += `<div class="build-card-icon-wrap">${bldIcon}</div>`;
-            html += `<div class="build-card-name">${escapeHtml(BUILDINGS[opt]?.name || opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</div>`;
+            html += `<div class="build-card-name">${escapeHtml(buildingName(opt))}</div>`;
             html += `<div class="build-card-cost">${costHtml}</div>`;
             html += overlayHtml;
             html += `</div>`;
@@ -1631,9 +1734,9 @@ export class UI {
                     `<option value="${escapeAttr(k)}"${current === k ? ' selected' : ''}>${escapeHtml(def.name)}</option>`
                 ).join('');
                 html += `<div style="padding:6px 8px;background:#1a1a2e;border-top:1px solid #333;">` +
-                    `<div style="color:#888;font-size:10px;margin-bottom:3px;">Preview chalk pattern:</div>` +
+                    `<div style="color:#888;font-size:10px;margin-bottom:3px;">${escapeHtml(t('ui.build.preview_chalk'))}</div>` +
                     `<select id="complex-struct-select" style="width:100%;background:#222;color:#ccc;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:12px;" onchange="window.game.input._complexStructurePreview=this.value">` +
-                    `<option value="">-- None --</option>${opts}</select></div>`;
+                    `<option value="">${escapeHtml(t('ui.build.preview_chalk_none'))}</option>${opts}</select></div>`;
             }
         }
         const savedBuildScroll = panel.querySelector('.build-grid')?.scrollTop ?? 0;
@@ -1659,7 +1762,7 @@ export class UI {
     _updateFarmPanel(input) {
         const panel = this.elements.buildPanel;
         if (!panel) return;
-        let html = '<div class="build-panel-header"><div class="build-panel-title">Farm Crops</div>';
+        let html = `<div class="build-panel-header"><div class="build-panel-title">${escapeHtml(t('ui.build.farm_title'))}</div>`;
         html += this._buildPanelControls() + '</div>';
         html += '<div class="build-grid">';
         input.cropOptions.forEach((opt, i) => {
@@ -1669,8 +1772,8 @@ export class UI {
             const active = opt === input.cropType ? ' active' : '';
             const stateClass = locked ? ' build-card--locked' : '';
             const keyLabel = i < 9 ? i + 1 : (i === 9 ? '0' : '');
-            const overlayHtml = locked ? '<span class="build-card-overlay">LOCKED</span>' : '';
-            const seasons = crop.seasons.map(s => s.charAt(0).toUpperCase()).join('');
+            const overlayHtml = locked ? `<span class="build-card-overlay">${escapeHtml(t('ui.build.card_locked'))}</span>` : '';
+            const seasons = crop.seasons.map(s => t(`season.${s}.name`, null, s).charAt(0).toUpperCase()).join('');
             html += `<div class="build-card${active}${stateClass}" data-crop-opt="${opt}">`;
             html += `<div class="build-card-key">${keyLabel}</div>`;
             const cropSpriteURL = this.game.skinManager?.isActive && this._getCropSpriteURL(opt + '_ready');
@@ -1678,8 +1781,8 @@ export class UI {
                 ? `<img src="${cropSpriteURL}" class="build-card-icon--sprite">`
                 : `<span style="color:${crop.color}">${crop.readyChar}</span>`;
             html += `<div class="build-card-icon-wrap">${cropIcon}</div>`;
-            html += `<div class="build-card-name">${opt.charAt(0).toUpperCase() + opt.slice(1)}</div>`;
-            html += `<div class="build-card-cost"><span class="cost-chip" style="color:#88cc44">${crop.harvestYield}x</span><span class="cost-chip" style="color:#aaa">${seasons}</span></div>`;
+            html += `<div class="build-card-name">${escapeHtml(crop.name || resourceName(opt))}</div>`;
+            html += `<div class="build-card-cost"><span class="cost-chip" style="color:#88cc44">${escapeHtml(t('ui.build.crop_yield', { n: crop.harvestYield }))}</span><span class="cost-chip" style="color:#aaa">${escapeHtml(seasons)}</span></div>`;
             html += overlayHtml;
             html += `</div>`;
         });
@@ -1697,7 +1800,7 @@ export class UI {
     _updateGatherPanel(input) {
         const panel = this.elements.buildPanel;
         if (!panel) return;
-        let html = '<div class="build-panel-header"><div class="build-panel-title">Gather</div>';
+        let html = `<div class="build-panel-header"><div class="build-panel-title">${escapeHtml(t('ui.build.gather_title'))}</div>`;
         html += this._buildPanelControls() + '</div>';
         html += '<div class="build-grid">';
         const chopActive = input.designateMode === 'chop' ? ' active' : '';
@@ -1709,8 +1812,8 @@ export class UI {
         html += `<div class="build-card${chopActive}" data-designate-mode="chop">`;
         html += `<div class="build-card-key">1</div>`;
         html += `<div class="build-card-icon-wrap">${chopIcon}</div>`;
-        html += `<div class="build-card-name">Chop</div>`;
-        html += `<div class="build-card-cost"><span class="cost-chip" style="color:#8b6b3a">Wood</span></div>`;
+        html += `<div class="build-card-name">${escapeHtml(t('ui.build.gather_chop'))}</div>`;
+        html += `<div class="build-card-cost"><span class="cost-chip" style="color:#8b6b3a">${escapeHtml(resourceName('wood'))}</span></div>`;
         html += `</div>`;
         const pickURL = this.game.skinManager?.isActive && this.game.skinManager.getItemSpriteDataURL('iron_pickaxe');
         const mineIcon = pickURL
@@ -1719,8 +1822,8 @@ export class UI {
         html += `<div class="build-card${mineActive}" data-designate-mode="mine">`;
         html += `<div class="build-card-key">2</div>`;
         html += `<div class="build-card-icon-wrap">${mineIcon}</div>`;
-        html += `<div class="build-card-name">Mine</div>`;
-        html += `<div class="build-card-cost"><span class="cost-chip" style="color:#999">Stone</span></div>`;
+        html += `<div class="build-card-name">${escapeHtml(t('ui.build.gather_mine'))}</div>`;
+        html += `<div class="build-card-cost"><span class="cost-chip" style="color:#999">${escapeHtml(resourceName('stone'))}</span></div>`;
         html += `</div>`;
         html += '</div>';
         panel.innerHTML = html;
@@ -1737,12 +1840,12 @@ export class UI {
     // finger move the map instead of drawing a selection (two fingers always pan).
     _buildPanelControls() {
         const pan = isTouchUI()
-            ? `<span class="build-panel-pan${this.game.input?.touchPanMode ? ' active' : ''}" data-mode-action="pan">Pan</span>`
+            ? `<span class="build-panel-pan${this.game.input?.touchPanMode ? ' active' : ''}" data-mode-action="pan">${escapeHtml(t('ui.build.pan'))}</span>`
             : '';
         const undo = isTouchUI() && this.game.input?.canUndoPlacement
-            ? '<span class="build-panel-undo" data-mode-action="undo">Undo</span>'
+            ? `<span class="build-panel-undo" data-mode-action="undo">${escapeHtml(t('ui.build.undo'))}</span>`
             : '';
-        return `${undo}${pan}<span class="build-panel-close" data-mode-action="back">${keyHint('Esc')}${isTouchUI() ? '' : ' '}Close</span>`;
+        return `${undo}${pan}<span class="build-panel-close" data-mode-action="back">${keyHint('Esc')}${isTouchUI() ? '' : ' '}${escapeHtml(t('common.close'))}</span>`;
     }
 
     _hideBuildPanel() {
@@ -1771,10 +1874,10 @@ export class UI {
             if (!def) continue;
             const hp = Math.floor(def.hp * (1 + hpMult));
             const dmg = Math.floor((def.damage || 0) * (1 + damageMult));
-            parts.push(`${def.name} ${hp} HP`);
+            parts.push(t('ui.main.wave_preview_part', { name: def.name, hp }));
             wavePower += enemies * (w / totalWeight) * hp * dmg;
         }
-        let text = `${enemies} enemies (${parts.join(', ')})`;
+        let text = escapeHtml(t('ui.main.wave_preview', { n: enemies, parts: parts.join(', ') }));
         // Threat compares wave HP x damage against the fighters at home (HP x weapon DPS).
         // It ignores turrets, spells and terrain, so it is a rough guide, not a forecast.
         const fighters = this.game.colonists.filter(c => c.hp > 0 && !c.onExpedition && !c.golem);
@@ -1784,8 +1887,8 @@ export class UI {
         }, 0);
         if (colonyPower > 0 && wavePower > 0) {
             const ratio = wavePower / colonyPower;
-            const [label, color] = ratio < 0.5 ? ['Low', '#66dd66'] : ratio < 1 ? ['Manageable', '#ccdd55'] : ratio < 2 ? ['Risky', '#ffaa44'] : ['Deadly', '#ff4444'];
-            text += ` <span style="color:${color}">Threat: ${label} (~${ratio.toFixed(1)}x your fighters)</span>`;
+            const [label, color] = ratio < 0.5 ? [t('ui.main.threat_low'), '#66dd66'] : ratio < 1 ? [t('ui.main.threat_manageable'), '#ccdd55'] : ratio < 2 ? [t('ui.main.threat_risky'), '#ffaa44'] : [t('ui.main.threat_deadly'), '#ff4444'];
+            text += ` <span style="color:${color}">${escapeHtml(t('ui.main.threat_rating', { label, ratio: ratio.toFixed(1) }))}</span>`;
         }
         return text;
     }
@@ -1840,37 +1943,33 @@ export class UI {
     }
 
     _updateSkillTooltips(colonist) {
+        // Spans carry the skill key (data-skill / data-magic); matching on the
+        // displayed name would break once names are translated.
         const tips = this.elements.infoPanel.querySelectorAll('.skill-tip[data-tip]');
         for (const tip of tips) {
-            const text = tip.textContent;
-            const match = text.match(/^(.+):(\d+)$/);
-            if (!match) continue;
-            const name = match[1];
-            const skillEntry = Object.entries(SKILLS).find(([, def]) => def.name === name);
-            if (skillEntry) {
-                const [k, def] = skillEntry;
-                tip.dataset.tip = skillXpTip(def, k, colonist.skills[k] || 1, colonist.skillXp?.[k] || 0);
+            const k = tip.dataset.skill;
+            if (k && SKILLS[k]) {
+                tip.dataset.tip = skillXpTip(SKILLS[k], k, colonist.skills[k] || 1, colonist.skillXp?.[k] || 0);
                 continue;
             }
-            const magicEntry = Object.entries(MAGIC_SKILLS).find(([, def]) => def.name === name);
-            if (magicEntry) {
-                const [k, def] = magicEntry;
-                tip.dataset.tip = magicXpTip(def, colonist.magicSkills[k], colonist.magicXpAccumulator?.[k] || 0);
+            const m = tip.dataset.magic;
+            if (m && MAGIC_SKILLS[m]) {
+                tip.dataset.tip = magicXpTip(MAGIC_SKILLS[m], colonist.magicSkills[m], colonist.magicXpAccumulator?.[m] || 0) + (tip.dataset.attuned ? t('ui.colonist.attuned_suffix') : '');
             }
         }
     }
 
     _buildGolemForgeHtml() {
         if (!this.game.research.isResearched('golem_craft')) {
-            return `<div class="info-row" style="color:#888;">Requires Golem Craft research</div>`;
+            return `<div class="info-row" style="color:#888;">${escapeHtml(t('ui.tile.golem_requires_research'))}</div>`;
         }
-        let html = `<div class="info-row" style="color:#cc8833;font-weight:bold;">Golem Forge</div>`;
-        html += `<div class="info-row" style="margin-top:4px;"><b>Craft Golem:</b></div>`;
+        let html = `<div class="info-row" style="color:#cc8833;font-weight:bold;">${escapeHtml(t('ui.tile.golem_forge'))}</div>`;
+        html += `<div class="info-row" style="margin-top:4px;"><b>${escapeHtml(t('ui.tile.golem_craft'))}</b></div>`;
         for (const [key, def] of Object.entries(GOLEM_TYPES)) {
-            const costStr = Object.entries(def.cost).map(([r, n]) => `${n} ${r}`).join(', ');
+            const costStr = Object.entries(def.cost).map(([r, n]) => t('ui.inv.salvage_part', { n, name: resourceName(r) })).join(', ');
             const canAfford = this.game.resources.has(def.cost);
-            html += `<div class="info-actions"><button ${canAfford ? '' : 'disabled'} onclick="window.game.craftGolem('${key}')" style="background:#553311;color:#ffcc88;">${def.name}</button> <span style="color:#aaa;font-size:0.85em">${costStr}</span></div>`;
-            html += `<div class="info-row" style="color:#888;font-size:0.85em;margin-bottom:4px;">Specialty: ${def.specialty} (skill ${def.skillLevel || '-'}), HP: ${def.hp}</div>`;
+            html += `<div class="info-actions"><button ${canAfford ? '' : 'disabled'} onclick="window.game.craftGolem('${key}')" style="background:#553311;color:#ffcc88;">${escapeHtml(def.name)}</button> <span style="color:#aaa;font-size:0.85em">${escapeHtml(costStr)}</span></div>`;
+            html += `<div class="info-row" style="color:#888;font-size:0.85em;margin-bottom:4px;">${escapeHtml(t('ui.tile.golem_specialty', { specialty: SKILLS[def.specialty]?.name || def.specialty, skill: def.skillLevel || '-', hp: def.hp }))}</div>`;
         }
         return html;
     }
@@ -1884,24 +1983,24 @@ export class UI {
         if (!ruin) return '';
         let text = '';
         if (tile.structure === 'ancient_chest') {
-            text = tile.designation ? 'Marked for looting.' : 'A sealed chest. Right-click it in Build mode, or with colonists drafted, to have it looted.';
+            text = tile.designation ? t('ui.tile.chest_marked') : t('ui.tile.chest_sealed');
         } else if (tile.structure === 'rift_anchor') {
-            const name = CRYPT_CONFIG.chainNames[ruin.anchor?.chain] || 'a';
+            const name = CRYPT_CONFIG.chainNames[ruin.anchor?.chain];
             text = tile.designation
-                ? 'Marked for attuning.'
-                : `A dormant rift anchor to the ${name} realms. Right-click it in Build mode, or with colonists drafted, to have it attuned.`;
+                ? t('ui.tile.anchor_marked')
+                : name ? t('ui.tile.anchor_dormant', { name }) : t('ui.tile.anchor_dormant_unknown');
         } else if (tile.structure === 'warded_wall' && ruin.ward) {
-            text = `Warded wall. ${this.game.ruins.wardText(ruin)}`;
+            text = t('ui.tile.warded_wall', { ward: this.game.ruins.wardText(ruin) });
         }
-        return text ? `<div class="info-row" style="color:#d4a84a;">${text}</div>` : '';
+        return text ? `<div class="info-row" style="color:#d4a84a;">${escapeHtml(text)}</div>` : '';
     }
 
     _setRiftPortal(tile, x, y) {
         this._riftPortalChain = tile.structure === 'rift_anchor_active'
             ? (this.game.ruins.getRuinAt(x, y)?.anchor?.chain || null)
             : null;
-        this._riftPortalTitle = tile.structure === 'gathering_circle' ? 'Gathering Circle'
-            : this._riftPortalChain ? 'Rift Anchor' : 'Rift Gate';
+        this._riftPortalTitle = tile.structure === 'gathering_circle' ? t('ui.tile.portal_gathering_circle')
+            : this._riftPortalChain ? t('ui.tile.portal_rift_anchor') : t('ui.tile.portal_rift_gate');
         return tile.structure === 'rift_gate' || tile.structure === 'rift_anchor_active' || tile.structure === 'gathering_circle';
     }
 
@@ -1911,7 +2010,7 @@ export class UI {
 
     _buildRiftGateInnerHtml() {
         const expl = this.game.exploration;
-        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalTitle || 'Rift Gate'}</div>`;
+        let html = `<div class="info-row" style="color:#33ccff;font-weight:bold;">${escapeHtml(this._riftPortalTitle || t('ui.tile.portal_rift_gate'))}</div>`;
 
         const watchedExps = expl.expeditions.filter(e => !e.autoMode);
         const autoRunning = expl.expeditions.filter(e => e.autoMode).length;
@@ -1920,31 +2019,32 @@ export class UI {
                 if (exp.status === 'gathering') {
                     const names = exp.partyIds.map(id => {
                         const c = this.game.getColonist(id);
-                        return c ? escapeHtml(c.name) : '?';
+                        return c ? c.name : '?';
                     }).join(', ');
-                    html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(exp.realmName)} — assembling</div>`;
-                    html += `<div class="info-row" style="color:#888;">Party: ${names}</div>`;
+                    html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(t('ui.tile.exp_assembling', { realm: expRealmName(exp) }))}</div>`;
+                    html += `<div class="info-row" style="color:#888;">${escapeHtml(t('ui.tile.exp_party', { names }))}</div>`;
                 } else {
                     const elapsed = this.game.tick - exp.startTick;
                     const totalDur = Math.floor(exp.duration * 1.2);
                     const pct = Math.min(100, Math.floor((elapsed / totalDur) * 100));
-                    html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(exp.realmName)} — ${escapeHtml(exp.status)}${exp.combat ? ' [COMBAT]' : ''} (${pct}%)</div>`;
+                    const statusText = expStatusName(exp.status);
+                    html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(t(exp.combat ? 'ui.tile.exp_progress_combat' : 'ui.tile.exp_progress', { realm: expRealmName(exp), status: statusText, pct }))}</div>`;
 
                     const aliveParty = exp.partySnapshot.filter(p => p.hp > 0);
-                    html += `<div class="info-row" style="color:#888;">Party (${aliveParty.length}/${exp.partySnapshot.length} alive):</div>`;
+                    html += `<div class="info-row" style="color:#888;">${escapeHtml(t('ui.tile.exp_party_alive', { alive: aliveParty.length, total: exp.partySnapshot.length }))}</div>`;
                     for (const p of exp.partySnapshot) {
                         const hpPct = Math.max(0, Math.round((p.hp / p.maxHp) * 100));
                         const color = p.hp <= 0 ? '#664444' : hpPct < 30 ? '#ff4444' : hpPct < 60 ? '#ffaa44' : '#88cc88';
-                        const status = p.hp <= 0 ? ' [DOWN]' : '';
-                        const manaStr = p.maxMana > 0 ? ` | ${Math.round(p.mana)}/${p.maxMana} MP` : '';
+                        const status = p.hp <= 0 ? t('ui.tile.exp_member_down') : '';
+                        const manaStr = p.maxMana > 0 ? t('ui.tile.exp_member_mp', { mp: Math.round(p.mana), max: p.maxMana }) : '';
                         const shieldStr = p.shieldActive ? ' 🛡' : '';
                         const threatStr = getThreatDisplayHtml(getTargetPriority(p));
-                        html += `<div class="info-row" style="color:${color}; padding-left:8px;">${escapeHtml(p.name)} — ${Math.max(0, Math.round(p.hp))}/${p.maxHp} HP${manaStr}${shieldStr}${status}${threatStr}</div>`;
+                        html += `<div class="info-row" style="color:${color}; padding-left:8px;">${escapeHtml(t('ui.tile.exp_member_hp', { name: p.name, hp: Math.max(0, Math.round(p.hp)), max: p.maxHp }))}${escapeHtml(manaStr)}${shieldStr}${escapeHtml(status)}${threatStr}</div>`;
                     }
 
                     if (exp.combat) {
                         const enemiesAlive = exp.combat.enemies.filter(e => e.hp > 0).length;
-                        html += `<div class="info-row" style="color:#ff8844; margin-top:4px;">Enemies remaining: ${enemiesAlive}/${exp.combat.enemies.length}</div>`;
+                        html += `<div class="info-row" style="color:#ff8844; margin-top:4px;">${escapeHtml(t('ui.tile.exp_enemies_remaining', { n: enemiesAlive, total: exp.combat.enemies.length }))}</div>`;
                     }
 
                     html += `<div class="exp-log-container">`;
@@ -1957,7 +2057,7 @@ export class UI {
                             st.bold   ? 'font-weight:bold'  : '',
                             st.italic ? 'font-style:italic' : '',
                         ].filter(Boolean).join(';');
-                        html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(entry.text)}</div>`;
+                        html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(logEntryText(entry))}</div>`;
                     }
                     html += `</div>`;
                 }
@@ -1965,22 +2065,22 @@ export class UI {
         }
         if (autoRunning > 0) {
             const pendingCollect = expl.pendingAutoSummaries?.length || 0;
-            html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${autoRunning} auto expedition${autoRunning > 1 ? 's' : ''} running${pendingCollect > 0 ? ` — <span style="color:#44ff88">${pendingCollect} ready to collect</span>` : ''}</div>`;
+            html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${escapeHtml(tp('ui.tile.exp_auto_running', autoRunning))}${pendingCollect > 0 ? ` — <span style="color:#44ff88">${escapeHtml(t('ui.tile.exp_ready_to_collect', { n: pendingCollect }))}</span>` : ''}</div>`;
         }
 
         const dims = expl.getAvailableRealms(this.game)
             .filter(d => expl.canSend(this.game, d.key) && (!this._riftPortalChain || d.chain === this._riftPortalChain));
         if (dims.length > 0) {
-            html += `<div class="info-row" style="margin-top:6px;"><b>Send Expedition:</b></div>`;
+            html += `<div class="info-row" style="margin-top:6px;"><b>${escapeHtml(t('ui.tile.send_expedition'))}</b></div>`;
             const sortedDims = dims.slice().sort((a, b) => a.difficulty - b.difficulty);
             for (const dim of sortedDims) {
-                html += `<div class="info-actions"><button onclick="window.game.showExpeditionSetup(${jsArg(dim.key)})" style="background:#1a4466;color:#88ddff;">${escapeHtml(dim.name)} (Diff ${dim.difficulty})</button></div>`;
+                html += `<div class="info-actions"><button onclick="window.game.showExpeditionSetup(${jsArg(dim.key)})" style="background:#1a4466;color:#88ddff;">${escapeHtml(t('ui.tile.send_expedition_realm', { name: dim.name, diff: dim.difficulty }))}</button></div>`;
             }
         }
 
         if (expl.completedExpeditions.length > 0 && expl.expeditions.length === 0) {
             const last = expl.completedExpeditions[expl.completedExpeditions.length - 1];
-            html += `<div class="info-row" style="margin-top:6px;color:#88ccff;font-size:0.9em;">Last expedition: ${escapeHtml(last.realmName)}</div>`;
+            html += `<div class="info-row" style="margin-top:6px;color:#88ccff;font-size:0.9em;">${escapeHtml(t('ui.tile.last_expedition', { realm: expRealmName(last) }))}</div>`;
             html += `<div class="exp-log-container">`;
             const logSlice = last.log.slice(-10);
             for (const entry of logSlice) {
@@ -1991,7 +2091,7 @@ export class UI {
                     st.bold   ? 'font-weight:bold'  : '',
                     st.italic ? 'font-style:italic' : '',
                 ].filter(Boolean).join(';');
-                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(entry.text)}</div>`;
+                html += `<div class="exp-log-entry" style="${styleAttr};">${st.prefix}${escapeHtml(logEntryText(entry))}</div>`;
             }
             html += `</div>`;
         }
@@ -2008,40 +2108,46 @@ export class UI {
     }
 
     _spellTooltip(spell) {
-        const parts = [spell.school.charAt(0).toUpperCase() + spell.school.slice(1)];
+        const parts = [MAGIC_SKILLS[spell.school]?.name || spell.school.charAt(0).toUpperCase() + spell.school.slice(1)];
+        const pct = (v) => Math.round(v * 100);
         switch (spell.effect) {
-            case 'ranged_damage': parts.push(`${spell.damage} dmg, range ${spell.range}`); break;
-            case 'ranged_damage_aoe': parts.push(`${spell.damage} AoE dmg, range ${spell.range}, radius ${spell.radius}`); break;
-            case 'heal': parts.push(`Heals ${spell.healAmount} HP (self or ally) when below ${Math.round((spell.hpThreshold || 0.5) * 100)}%`); break;
-            case 'buff_defense': parts.push(`-${Math.round(spell.damageReduction * 100)}% dmg taken, ${spell.duration}t`); break;
-            case 'buff_speed': parts.push(`+${spell.workSpeedBonus > 1 ? Math.round((spell.workSpeedBonus - 1) * 100) + '% work speed' : ''}${spell.moveSpeedBonus ? ' +' + spell.moveSpeedBonus + ' move' : ''}, ${spell.duration}t`); break;
-            case 'summon': parts.push(`Summon (${spell.summonHp} HP, ${spell.summonDamage} dmg, ${spell.summonDuration}t)`); break;
-            case 'teleport': parts.push(`Teleport, range ${spell.range}`); break;
-            case 'boost_crops': parts.push(`${spell.growthMult}x growth, radius ${spell.radius}, ${spell.duration}t`); break;
-            case 'terraform': parts.push(`Flatten terrain, radius ${spell.radius}`); break;
-            case 'divination_modifier': parts.push(`Passive divination effect, ${spell.duration}t`); break;
-            case 'chain_damage': parts.push(`${spell.damage} dmg, arcs to ${spell.chainTargets} foes (${Math.round((spell.chainFalloff || 0.6) * 100)}% falloff), range ${spell.range}`); break;
-            case 'ranged_damage_slow': parts.push(`${spell.damage} dmg + slow (${Math.round((1 - (spell.slowMult || 0.5)) * 100)}% slower), range ${spell.range}`); break;
-            case 'chain_heal': parts.push(`Heals ${spell.healAmount} HP, arcs to ${spell.chainTargets} allies (${Math.round((spell.chainFalloff || 0.6) * 100)}% falloff)`); break;
-            case 'cleanse': parts.push(`Removes poison/slow debuffs from an ally, range ${spell.range}`); break;
-            case 'absorb_shield': parts.push(`Absorbs ${spell.absorbAmount} dmg, radius ${spell.radius}, ${spell.duration}t`); break;
-            case 'buff_quality': parts.push(`+${spell.qualityBonus} work quality, radius ${spell.radius}, ${spell.duration}t`); break;
-            case 'buff_rest': parts.push(`${Math.round((spell.restDecayMult || 1) * 100)}% rest decay, radius ${spell.radius}, ${spell.duration}t`); break;
-            case 'stun': parts.push(`Stuns a foe (${spell.stunRounds || 1} rnd / ${spell.stunDuration}t), range ${spell.range}`); break;
-            case 'summon_swarm': parts.push(`Summons ${spell.swarmCount} spectral wisps`); break;
-            case 'finish_construction': parts.push(`Instantly completes a build, range ${spell.range}`); break;
+            case 'ranged_damage': parts.push(t('ui.colonist.spell_ranged_damage', { dmg: spell.damage, range: spell.range })); break;
+            case 'ranged_damage_aoe': parts.push(t('ui.colonist.spell_ranged_damage_aoe', { dmg: spell.damage, range: spell.range, radius: spell.radius })); break;
+            case 'heal': parts.push(t('ui.colonist.spell_heal', { hp: spell.healAmount, pct: pct(spell.hpThreshold || 0.5) })); break;
+            case 'buff_defense': parts.push(t('ui.colonist.spell_buff_defense', { pct: pct(spell.damageReduction), t: spell.duration })); break;
+            case 'buff_speed': {
+                const work = spell.workSpeedBonus > 1 ? t('ui.colonist.spell_buff_speed_work', { pct: pct(spell.workSpeedBonus - 1) }) : '';
+                const move = spell.moveSpeedBonus ? t('ui.colonist.spell_buff_speed_move', { n: spell.moveSpeedBonus }) : '';
+                parts.push(t('ui.colonist.spell_buff_speed', { work, move, t: spell.duration }));
+                break;
+            }
+            case 'summon': parts.push(t('ui.colonist.spell_summon', { hp: spell.summonHp, dmg: spell.summonDamage, t: spell.summonDuration })); break;
+            case 'teleport': parts.push(t('ui.colonist.spell_teleport', { range: spell.range })); break;
+            case 'boost_crops': parts.push(t('ui.colonist.spell_boost_crops', { mult: spell.growthMult, radius: spell.radius, t: spell.duration })); break;
+            case 'terraform': parts.push(t('ui.colonist.spell_terraform', { radius: spell.radius })); break;
+            case 'divination_modifier': parts.push(t('ui.colonist.spell_divination_modifier', { t: spell.duration })); break;
+            case 'chain_damage': parts.push(t('ui.colonist.spell_chain_damage', { dmg: spell.damage, n: spell.chainTargets, falloff: pct(spell.chainFalloff || 0.6), range: spell.range })); break;
+            case 'ranged_damage_slow': parts.push(t('ui.colonist.spell_ranged_damage_slow', { dmg: spell.damage, pct: pct(1 - (spell.slowMult || 0.5)), range: spell.range })); break;
+            case 'chain_heal': parts.push(t('ui.colonist.spell_chain_heal', { hp: spell.healAmount, n: spell.chainTargets, falloff: pct(spell.chainFalloff || 0.6) })); break;
+            case 'cleanse': parts.push(t('ui.colonist.spell_cleanse', { range: spell.range })); break;
+            case 'absorb_shield': parts.push(t('ui.colonist.spell_absorb_shield', { n: spell.absorbAmount, radius: spell.radius, t: spell.duration })); break;
+            case 'buff_quality': parts.push(t('ui.colonist.spell_buff_quality', { n: spell.qualityBonus, radius: spell.radius, t: spell.duration })); break;
+            case 'buff_rest': parts.push(t('ui.colonist.spell_buff_rest', { pct: pct(spell.restDecayMult || 1), radius: spell.radius, t: spell.duration })); break;
+            case 'stun': parts.push(t('ui.colonist.spell_stun', { rounds: spell.stunRounds || 1, t: spell.stunDuration, range: spell.range })); break;
+            case 'summon_swarm': parts.push(t('ui.colonist.spell_summon_swarm', { n: spell.swarmCount })); break;
+            case 'finish_construction': parts.push(t('ui.colonist.spell_finish_construction', { range: spell.range })); break;
             case 'transmute': parts.push(spell.fromResource
-                ? `Converts ${spell.inputAmount} ${spell.fromResource.replace(/_/g, ' ')} → ${spell.outputAmount} ${spell.toResource.replace(/_/g, ' ')}`
-                : `Conjures ${spell.outputAmount} ${spell.toResource.replace(/_/g, ' ')}`); break;
-            case 'ripen_crops': parts.push(`Ripens crops past ${Math.round((spell.ripenThreshold || 0.5) * 100)}% growth, radius ${spell.radius}`); break;
+                ? t('ui.colonist.spell_transmute', { inN: spell.inputAmount, from: resourceName(spell.fromResource), outN: spell.outputAmount, to: resourceName(spell.toResource) })
+                : t('ui.colonist.spell_conjure', { n: spell.outputAmount, to: resourceName(spell.toResource) })); break;
+            case 'ripen_crops': parts.push(t('ui.colonist.spell_ripen_crops', { pct: pct(spell.ripenThreshold || 0.5), radius: spell.radius })); break;
             default: parts.push(spell.effect.replace(/_/g, ' '));
         }
-        if (spell.trigger === 'inCombat') parts.push('Trigger: in combat');
-        else if (spell.trigger === 'lowHealth') parts.push('Trigger: low HP');
-        else if (spell.trigger === 'woundedNearby') parts.push('Trigger: self or ally hurt');
-        else if (spell.trigger === 'hasTask') parts.push('Trigger: while working');
-        else if (spell.trigger === 'debuffNearby') parts.push('Trigger: ally afflicted');
-        else if (spell.trigger === 'canTransmute') parts.push('Trigger: when materials available');
+        const triggers = {
+            inCombat: 'ui.colonist.spell_trigger_in_combat', lowHealth: 'ui.colonist.spell_trigger_low_health',
+            woundedNearby: 'ui.colonist.spell_trigger_wounded_nearby', hasTask: 'ui.colonist.spell_trigger_has_task',
+            debuffNearby: 'ui.colonist.spell_trigger_debuff_nearby', canTransmute: 'ui.colonist.spell_trigger_can_transmute',
+        };
+        if (triggers[spell.trigger]) parts.push(t(triggers[spell.trigger]));
         return parts.join(' | ');
     }
 
@@ -2056,20 +2162,20 @@ export class UI {
             const limit = def.maxCount + getMaxCountBonus(def, structure, this.game);
             let placed = 0;
             for (const row of this.game.map) for (const t of row) if (t.structure === structure) placed++;
-            html += `<div class="info-row" style="color:#aa88ff;font-size:11px;">Placed: ${placed} / ${limit}</div>`;
+            html += `<div class="info-row" style="color:#aa88ff;font-size:11px;">${escapeHtml(t('ui.tile.placed_count', { n: placed, max: limit }))}</div>`;
         }
         if (def.power) {
             if (def.power.generates) {
-                html += `<div class="info-row" style="color:#88ff88;">Generates ${def.power.generates} mana</div>`;
+                html += `<div class="info-row" style="color:#88ff88;">${escapeHtml(t('ui.tile.power_generates', { n: def.power.generates }))}</div>`;
             }
             if (def.power.consumes) {
                 const isWinter = this.game.weather.season === 'winter';
                 let status;
-                if (def.power.seasonalHeat && !isWinter) status = '<span style="color:#888;">Idle until winter</span>';
+                if (def.power.seasonalHeat && !isWinter) status = `<span style="color:#888;">${escapeHtml(t('ui.tile.power_idle_winter'))}</span>`;
                 else if (x === undefined) status = '';
-                else if (this.game.power.isPowered(x, y)) status = '<span style="color:#88ff88;">Powered</span>';
-                else status = '<span style="color:#ff4444;">No power! (grid short on mana)</span>';
-                html += `<div class="info-row">Consumes ${def.power.consumes} mana${status ? ` — ${status}` : ''}</div>`;
+                else if (this.game.power.isPowered(x, y)) status = `<span style="color:#88ff88;">${escapeHtml(t('ui.tile.power_powered'))}</span>`;
+                else status = `<span style="color:#ff4444;">${escapeHtml(t('ui.tile.power_unpowered'))}</span>`;
+                html += `<div class="info-row">${escapeHtml(t('ui.tile.power_consumes', { n: def.power.consumes }))}${status ? ` — ${status}` : ''}</div>`;
                 if (x !== undefined) html += this._buildPowerPriorityHtml(structure, x, y);
             }
         }
@@ -2091,15 +2197,15 @@ export class UI {
 
     // Power priority picker for a mana consumer. Relays always draw first, so they get none.
     _buildPowerPriorityHtml(structure, x, y) {
-        if (structure === 'mana_relay') return `<div class="info-row" style="color:#888;font-size:11px;">Relays always draw mana first.</div>`;
+        if (structure === 'mana_relay') return `<div class="info-row" style="color:#888;font-size:11px;">${escapeHtml(t('ui.tile.power_relay_first'))}</div>`;
         const tile = this.game.map[y][x];
         const current = getPowerTier(tile, structure);
         const fallback = POWER_PRIORITY.byBuilding[structure] || POWER_PRIORITY.defaultTier;
-        let html = `<div class="info-row" style="font-size:11px;color:#aa88ff;">Power priority${tile.powerPriority ? '' : ' (default)'}:</div>`;
-        const options = POWER_PRIORITY.tiers.map(t => ({
-            value: t,
-            label: POWER_PRIORITY.labels[t] + (t === fallback ? '*' : ''),
-            title: t === fallback ? 'Default for this building' : '',
+        let html = `<div class="info-row" style="font-size:11px;color:#aa88ff;">${escapeHtml(t(tile.powerPriority ? 'ui.tile.power_priority' : 'ui.tile.power_priority_default'))}</div>`;
+        const options = POWER_PRIORITY.tiers.map(tier => ({
+            value: tier,
+            label: POWER_PRIORITY.labels[tier] + (tier === fallback ? '*' : ''),
+            title: tier === fallback ? t('ui.tile.power_priority_default_tip') : '',
         }));
         // Picking the default tier clears the override so later default changes still apply.
         html += this._choiceButtonsHtml(options, current, t =>
@@ -2138,11 +2244,11 @@ export class UI {
             'manaRegen', 'maxMana', 'warmth', 'critChance', 'critMultiplier', 'blockChance', 'gatherBonus',
             'craftSpeedBonus', 'qualityBonus', 'lightRadius', 'maxHpBonus', 'maxManaBonus', 'spellCooldownReduction',
         ]);
-        if (!equippedItem && !candidateItem) return escapeHtml(slotLabel) + ': empty';
+        if (!equippedItem && !candidateItem) return escapeHtml(t('ui.colonist.slot_empty', { slot: slotLabel }));
         if (!candidateItem) {
             const ws = weaponSummary(equippedItem);
             const weaponRows = ws
-                ? `<tr><td style="color:#888;padding-right:8px;">Speed</td><td style="color:#aaa;">${ws.speed} (${ws.dps.toFixed(1)} dps)</td></tr>`
+                ? `<tr><td style="color:#888;padding-right:8px;">${escapeHtml(t('ui.colonist.compare_speed'))}</td><td style="color:#aaa;">${escapeHtml(t('ui.colonist.compare_speed_value', { speed: ws.speed, dps: ws.dps.toFixed(1) }))}</td></tr>`
                 : '';
             const stats = getStats(equippedItem);
             const rows = Object.entries(stats).map(([k, v]) => {
@@ -2153,21 +2259,22 @@ export class UI {
             const onHitRows = getOnHitLines(equippedItem).map(line =>
                 `<tr><td colspan="2" style="color:#ffaa55;">${line}</td></tr>`
             ).join('');
-            const fallback = !weaponRows && !rows ? '<tr><td style="color:#666;">No stats</td></tr>' : '';
-            return `<div style="min-width:160px;"><div style="color:#ffdd88;margin-bottom:4px;font-weight:bold;">${escapeHtml(equippedItem.name)}</div>` +
-                (equippedItem.description ? `<div style="color:#888;font-size:10px;margin-bottom:4px;">${escapeHtml(equippedItem.description)}</div>` : '') +
+            const fallback = !weaponRows && !rows ? `<tr><td style="color:#666;">${escapeHtml(t('ui.colonist.compare_no_stats'))}</td></tr>` : '';
+            const eqDesc = itemDescription(equippedItem);
+            return `<div style="min-width:160px;"><div style="color:#ffdd88;margin-bottom:4px;font-weight:bold;">${escapeHtml(itemName(equippedItem))}</div>` +
+                (eqDesc ? `<div style="color:#888;font-size:10px;margin-bottom:4px;">${escapeHtml(eqDesc)}</div>` : '') +
                 `<table style="border-collapse:collapse;font-size:11px;">${weaponRows}${rows}${onHitRows}${fallback}</table></div>`;
         }
         const eqWs = weaponSummary(equippedItem);
         const cWs  = weaponSummary(candidateItem);
         const weaponCompareRows = (eqWs || cWs) ? (() => {
-            const eqStr = eqWs ? `${eqWs.dps.toFixed(1)} dps (${eqWs.speed})` : '-';
-            const cStr  = cWs  ? `${cWs.dps.toFixed(1)} dps (${cWs.speed})`   : '-';
+            const eqStr = eqWs ? escapeHtml(t('ui.colonist.compare_dps_value', { dps: eqWs.dps.toFixed(1), speed: eqWs.speed })) : '-';
+            const cStr  = cWs  ? escapeHtml(t('ui.colonist.compare_dps_value', { dps: cWs.dps.toFixed(1), speed: cWs.speed }))   : '-';
             let dpsColor = '#aaa';
             if (eqWs && cWs && eqWs.dps !== cWs.dps) {
                 dpsColor = cWs.dps > eqWs.dps ? '#66cc66' : '#cc6644';
             }
-            return `<tr><td style="color:#888;padding-right:6px;">DPS</td><td style="color:#aaa;">${eqStr}</td><td style="color:${dpsColor};font-weight:bold;">${cStr}</td></tr>`;
+            return `<tr><td style="color:#888;padding-right:6px;">${escapeHtml(t('ui.colonist.compare_dps'))}</td><td style="color:#aaa;">${eqStr}</td><td style="color:${dpsColor};font-weight:bold;">${cStr}</td></tr>`;
         })() : '';
         const eqStats = getStats(equippedItem);
         const cStats  = getStats(candidateItem);
@@ -2195,10 +2302,10 @@ export class UI {
                 `<td style="color:${inEq ? '#ffaa55' : '#444'};">${inEq ? '✓' : '-'}</td>` +
                 `<td style="color:${inC ? '#ffaa55' : '#444'};">${inC ? '✓' : '-'}</td></tr>`;
         }).join('');
-        const fallbackRow = !weaponCompareRows && !rowsHtml ? `<tr><td colspan="3" style="color:#666;">No stat differences</td></tr>` : '';
-        const eqName = equippedItem ? equippedItem.name : 'Empty';
+        const fallbackRow = !weaponCompareRows && !rowsHtml ? `<tr><td colspan="3" style="color:#666;">${escapeHtml(t('ui.colonist.compare_no_differences'))}</td></tr>` : '';
+        const eqName = equippedItem ? itemName(equippedItem) : t('ui.colonist.compare_empty');
         return `<div style="min-width:200px;"><table style="border-collapse:collapse;font-size:11px;width:100%;">` +
-            `<tr><th style="color:#666;text-align:left;padding-bottom:3px;">${escapeHtml(slotLabel)}</th><th style="color:#aaa;text-align:left;padding-right:6px;">${escapeHtml(eqName)}</th><th style="color:#ffdd88;text-align:left;">${escapeHtml(candidateItem.name)}</th></tr>` +
+            `<tr><th style="color:#666;text-align:left;padding-bottom:3px;">${escapeHtml(slotLabel)}</th><th style="color:#aaa;text-align:left;padding-right:6px;">${escapeHtml(eqName)}</th><th style="color:#ffdd88;text-align:left;">${escapeHtml(itemName(candidateItem))}</th></tr>` +
             weaponCompareRows + rowsHtml + onHitCompareRows + fallbackRow +
             `</table></div>`;
     }
@@ -2237,11 +2344,11 @@ export class UI {
         if (weaponItem) {
             const cd = weaponItem.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             const dps = (weaponItem.damage / cd).toFixed(1);
-            parts.push(`<span style="color:#ccc">DPS:</span> ${dps} (${weaponItem.damage}d, ${weaponSpeedLabel(cd)})`);
+            parts.push(`<span style="color:#ccc">${escapeHtml(t('ui.colonist.effects_dps_label'))}</span> ${escapeHtml(t('ui.colonist.effects_dps_value', { dps, dmg: weaponItem.damage, speed: weaponSpeedLabel(cd) }))}`);
         }
         for (const [stat, meta] of Object.entries(STAT_META)) {
             if (stat === 'damage') continue;
-            if (totals[stat]) parts.push(`<span style="color:#ccc">${meta.label}:</span> ${formatStatValue(stat, totals[stat])}`);
+            if (totals[stat]) parts.push(`<span style="color:#ccc">${escapeHtml(t('ui.colonist.stat_label', { label: meta.label }))}</span> ${formatStatValue(stat, totals[stat])}`);
         }
         for (const item of items) {
             for (const line of getOnHitLines(item)) {
@@ -2249,38 +2356,39 @@ export class UI {
             }
         }
         if (parts.length) {
-            const prefix = isViewingInactive ? `<span style="color:#5566aa">${escapeHtml(viewingSet)} set:</span> ` : '';
+            const prefix = isViewingInactive ? `<span style="color:#5566aa">${escapeHtml(t('ui.colonist.effects_set_prefix', { set: equipSetName(viewingSet) }))}</span> ` : '';
             sections.push(prefix + parts.join(sep));
         }
         const expParts = [];
         for (const [stat, meta] of Object.entries(STAT_META)) {
-            if (expeditionTotals[stat]) expParts.push(`<span style="color:#ccc">${meta.label}:</span> ${formatStatValue(stat, expeditionTotals[stat])}`);
+            if (expeditionTotals[stat]) expParts.push(`<span style="color:#ccc">${escapeHtml(t('ui.colonist.stat_label', { label: meta.label }))}</span> ${formatStatValue(stat, expeditionTotals[stat])}`);
         }
-        if (expParts.length) sections.push(`<span style="color:#33ccff">Expedition:</span> ${expParts.join(sep)}`);
+        if (expParts.length) sections.push(`<span style="color:#33ccff">${escapeHtml(t('ui.colonist.effects_expedition'))}</span> ${expParts.join(sep)}`);
         return sections.join('<br>');
     }
 
     _getTrinketTooltip(art) {
         const lines = [];
-        if (art.description) lines.push(art.description);
+        const desc = itemDescription(art);
+        if (desc) lines.push(desc);
         const equipped = getItemStatLines(art);
-        if (equipped.length) lines.push(`Equipped: ${equipped.join(', ')}`);
+        if (equipped.length) lines.push(t('ui.colonist.trinket_equipped', { effects: equipped.join(', ') }));
         if (art.pedestal) {
             const parts = getNestedEffectLines(art.pedestal);
             if (art.pedestal.radius === 'global') {
-                if (parts.length) lines.push(`Pedestal only (Colony-wide): ${parts.join(', ')}`);
+                if (parts.length) lines.push(t('ui.colonist.trinket_pedestal_global', { effects: parts.join(', ') }));
             } else {
-                if (parts.length) lines.push(`Aura (Radius ${art.pedestal.radius}, works when carried): ${parts.join(', ')}`);
+                if (parts.length) lines.push(t('ui.colonist.trinket_aura', { radius: art.pedestal.radius, effects: parts.join(', ') }));
             }
-            if (art.pedestal.manaCost) lines.push(`Pedestal mana: -${art.pedestal.manaCost}`);
+            if (art.pedestal.manaCost) lines.push(t('ui.colonist.trinket_pedestal_mana', { n: art.pedestal.manaCost }));
         }
         if (art.expedition) {
             const parts = getNestedEffectLines(art.expedition);
-            if (parts.length) lines.push(`Expedition: ${parts.join(', ')}`);
+            if (parts.length) lines.push(t('ui.colonist.trinket_expedition', { effects: parts.join(', ') }));
         }
-        if (art.durability) lines.push(`Breaks after ${art.durability.max} use(s). Repair at Anvil.`);
-        if (art.consumable) lines.push('Consumed on use');
-        return lines.join(' | ') || art.name;
+        if (art.durability) lines.push(t('ui.colonist.trinket_durability', { n: art.durability.max }));
+        if (art.consumable) lines.push(t('ui.colonist.trinket_consumable'));
+        return lines.join(' | ') || itemName(art);
     }
 
     // `expand`: also unfold a collapsed footer. The colony overview (shown on start and
@@ -2313,92 +2421,93 @@ export class UI {
             return `<span class="skill-tip" data-tip="${escapeAttr(trait.description)}">${escapeHtml(trait.name)}</span>`;
         });
         const thoughts = colonist.thoughts.slice(-5).map(t =>
-            `<span class="${t.moodEffect >= 0 ? 'positive' : 'negative'}">${escapeHtml(t.text)} (${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)})</span>`
+            `<span class="${t.moodEffect >= 0 ? 'positive' : 'negative'}">${escapeHtml(thoughtText(t))} (${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)})</span>`
         ).join('<br>');
 
-        const weaponTip = colonist.weapon ? getWeaponTooltip(colonist) : 'No weapon equipped';
-        const armorTip = colonist.armor ? `${colonist.armor.description || ''} ${getItemStatLines(colonist.armor).join(', ')}`.trim() : 'No armor equipped';
-        const helmetTip = colonist.helmet ? `${colonist.helmet.description || ''} ${getItemStatLines(colonist.helmet).join(', ')}`.trim() : 'No helmet equipped';
-        const clothesTip = colonist.clothes ? `${colonist.clothes.description || ''} ${getItemStatLines(colonist.clothes).join(', ')}`.trim() : 'No clothes equipped';
-        const toolTip = colonist.tool ? `${colonist.tool.description || ''} ${getItemStatLines(colonist.tool).join(', ')}`.trim() : 'No tool equipped';
-        const bootsTip = colonist.boots ? `${colonist.boots.description || ''} ${getItemStatLines(colonist.boots).join(', ')}`.trim() : 'No boots equipped';
-        const trinketTip = colonist.trinket ? this._getTrinketTooltip(colonist.trinket) : 'No trinket equipped';
+        const gearTip = (item) => `${itemDescription(item)} ${getItemStatLines(item).join(', ')}`.trim();
+        const weaponTip = colonist.weapon ? getWeaponTooltip(colonist) : t('ui.colonist.no_weapon');
+        const armorTip = colonist.armor ? gearTip(colonist.armor) : t('ui.colonist.no_armor');
+        const helmetTip = colonist.helmet ? gearTip(colonist.helmet) : t('ui.colonist.no_helmet');
+        const clothesTip = colonist.clothes ? gearTip(colonist.clothes) : t('ui.colonist.no_clothes');
+        const toolTip = colonist.tool ? gearTip(colonist.tool) : t('ui.colonist.no_tool');
+        const bootsTip = colonist.boots ? gearTip(colonist.boots) : t('ui.colonist.no_boots');
+        const trinketTip = colonist.trinket ? this._getTrinketTooltip(colonist.trinket) : t('ui.colonist.no_trinket');
 
         const nc = escapeAttr(colonist.nameColor || '#ffff00');
         const sectionHdr = 'color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333;margin-top:8px;padding-bottom:2px;margin-bottom:3px';
-        let html = `<div class="info-header" style="cursor:pointer;color:${nc}" onclick="window.game.selectColonistById(${colonist.id})">${escapeHtml(colonist.name)} ${colonist.drafted ? '[DRAFTED]' : ''}${colonist.guardMode ? '[GUARDING]' : ''}</div>`;
+        let html = `<div class="info-header" style="cursor:pointer;color:${nc}" onclick="window.game.selectColonistById(${colonist.id})">${escapeHtml(colonist.name)} ${colonist.drafted ? escapeHtml(t('ui.colonist.tag_drafted')) : ''}${colonist.guardMode ? escapeHtml(t('ui.colonist.tag_guarding')) : ''}</div>`;
 
         // --- Status ---
-        html += `<div style="${sectionHdr}">Status</div>`;
+        html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_status'))}</div>`;
         const hpPct = colonist.maxHp > 0 ? (colonist.hp / colonist.maxHp) * 100 : 100;
         const hpBar = statBarHtml({ key: `info:hp:${colonist.id}`, pct: hpPct, color: statColor(hpPct), max: colonist.maxHp, width: 90 });
-        html += `<div class="info-row">HP: ${Math.round(colonist.hp)}/${colonist.maxHp} ${hpBar} | Mood: <span class="mood-${moodLevel}">${colonist.mood.toFixed(0)} (${moodLevel})</span></div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.colonist.hp', { hp: Math.round(colonist.hp), max: colonist.maxHp }))} ${hpBar} | ${escapeHtml(t('ui.colonist.mood_label'))} <span class="mood-${moodLevel}">${escapeHtml(t('ui.colonist.mood_value', { n: colonist.mood.toFixed(0), mood: moodName(moodLevel) }))}</span></div>`;
         const hungerBar = statBarHtml({ key: `info:hunger:${colonist.id}`, pct: colonist.needs.hunger, color: statColor(colonist.needs.hunger), max: 100, width: 90 });
         const restBar = statBarHtml({ key: `info:rest:${colonist.id}`, pct: colonist.needs.rest, color: statColor(colonist.needs.rest), max: 100, width: 90 });
-        html += `<div class="info-row">Hunger: ${colonist.needs.hunger.toFixed(0)} ${hungerBar} Rest: ${colonist.needs.rest.toFixed(0)} ${restBar}</div>`;
-        html += `<div class="info-row">State: ${escapeHtml(colonist.state)} | Task: ${this.getColonistTaskDescription(colonist)}</div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.colonist.hunger', { n: colonist.needs.hunger.toFixed(0) }))} ${hungerBar} ${escapeHtml(t('ui.colonist.rest', { n: colonist.needs.rest.toFixed(0) }))} ${restBar}</div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.colonist.state', { state: colonistStateName(colonist.state) }))} | ${escapeHtml(t('ui.colonist.task_label'))} ${this.getColonistTaskDescription(colonist)}</div>`;
         const allTraits = traitSpanArr.filter(Boolean).join(', ');
-        if (allTraits) html += `<div class="info-row">Traits: ${allTraits}</div>`;
+        if (allTraits) html += `<div class="info-row">${escapeHtml(t('ui.colonist.traits_label'))} ${allTraits}</div>`;
         if (colonist.voidBound) {
-            html += `<div class="info-row"><span style="color:#bb66ff">◈ Void-Bound</span> <span style="color:#888;font-size:0.85em">(+15% combat damage, -10% work speed)</span></div>`;
+            html += `<div class="info-row"><span style="color:#bb66ff">${escapeHtml(t('ui.colonist.void_bound'))}</span> <span style="color:#888;font-size:0.85em">${escapeHtml(t('ui.colonist.void_bound_effect'))}</span></div>`;
         }
         const groups = this.game.colonistGroups || [];
-        const groupOptions = `<option value="">— None —</option>` + groups.map(g => `<option value="${escapeAttr(g)}"${colonist.group === g ? ' selected' : ''}>${escapeHtml(g)}</option>`).join('');
-        html += `<div class="info-row">Group: <select onchange="window.game.setColonistGroup(${colonist.id},this.value)">${groupOptions}</select></div>`;
-        html += `<div class="info-row">Bed: ${colonist.assignedBed ? `(${colonist.assignedBed.x},${colonist.assignedBed.y})` : 'None'}</div>`;
+        const groupOptions = `<option value="">${escapeHtml(t('ui.colonist.group_none'))}</option>` + groups.map(g => `<option value="${escapeAttr(g)}"${colonist.group === g ? ' selected' : ''}>${escapeHtml(g)}</option>`).join('');
+        html += `<div class="info-row">${escapeHtml(t('ui.colonist.group_label'))} <select onchange="window.game.setColonistGroup(${colonist.id},this.value)">${groupOptions}</select></div>`;
+        html += `<div class="info-row">${escapeHtml(colonist.assignedBed ? t('ui.colonist.bed_at', { x: colonist.assignedBed.x, y: colonist.assignedBed.y }) : t('ui.colonist.bed_none'))}</div>`;
         if (this.game.exploration) {
             const expl = this.game.exploration;
             const expLvl = expl.getExpeditionLevel(colonist.id);
             const xpData = expl.expeditionXP[colonist.id];
             if (colonist.onExpedition) {
-                html += `<div class="info-row"><span style="color:#cc88ff;">On Expedition</span></div>`;
+                html += `<div class="info-row"><span style="color:#cc88ff;">${escapeHtml(t('ui.colonist.on_expedition'))}</span></div>`;
             } else if (expl.isFatigued(colonist.id, this.game.tick)) {
                 const remaining = expl.getFatigueRemaining(colonist.id, this.game.tick);
                 const days = Math.ceil(remaining / CONFIG.TICKS_PER_DAY);
-                html += `<div class="info-row"><span style="color:#ff6644;">Fatigued</span> <span style="color:#888;">(${days} day${days !== 1 ? 's' : ''} remaining)</span></div>`;
+                html += `<div class="info-row"><span style="color:#ff6644;">${escapeHtml(t('ui.colonist.fatigued'))}</span> <span style="color:#888;">${escapeHtml(tp('ui.colonist.fatigue_days', days))}</span></div>`;
             }
             if (expLvl > 0 || xpData) {
                 const xp = xpData?.xp || 0;
                 const level = xpData?.level || 0;
                 const needed = 10 + level * 5;
                 const tip = adventurerLevelTooltip(level).replace(/"/g, '&quot;');
-                html += `<div class="info-row"><span class="skill-tip" data-tip="${tip}" style="color:#ffcc44;cursor:help;">Adventurer Lv${level}</span> <span style="color:#888;">(${xp}/${needed} XP)</span></div>`;
+                html += `<div class="info-row"><span class="skill-tip" data-tip="${tip}" style="color:#ffcc44;cursor:help;">${escapeHtml(t('ui.colonist.adventurer_level', { n: level }))}</span> <span style="color:#888;">${escapeHtml(t('ui.colonist.adventurer_xp', { xp, max: needed }))}</span></div>`;
             }
         }
 
         // --- Skills ---
-        html += `<div style="${sectionHdr}">Skills</div>`;
+        html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_skills'))}</div>`;
         html += `<div class="info-row">${Object.entries(SKILLS).map(([k, def]) => {
             const level = colonist.skills[k] || 1;
             const xpTip = skillXpTip(def, k, level, colonist.skillXp?.[k] || 0);
-            return `<span class="skill-tip" data-tip="${escapeAttr(xpTip)}">${escapeHtml(def.name)}:${level}</span>`;
+            return `<span class="skill-tip" data-skill="${escapeAttr(k)}" data-tip="${escapeAttr(xpTip)}">${escapeHtml(t('ui.colonist.skill_level', { name: def.name, n: level }))}</span>`;
         }).join(' ')}</div>`;
         const hasMagic = colonist.magicSkills && Object.values(colonist.magicSkills).some(v => v > 0);
         if (hasMagic) {
             const manaPct = colonist.maxMana > 0 ? (colonist.mana / colonist.maxMana) * 100 : 0;
             const manaBar = statBarHtml({ key: `info:mana:${colonist.id}`, pct: manaPct, color: '#aa88ff', max: colonist.maxMana, width: 90 });
-            html += `<div class="info-row"><span style="color:#aa88ff">Mana: ${manaBar} ${Math.floor(colonist.mana)}/${colonist.maxMana}</span></div>`;
+            html += `<div class="info-row"><span style="color:#aa88ff">${escapeHtml(t('ui.colonist.mana_label'))} ${manaBar} ${Math.floor(colonist.mana)}/${colonist.maxMana}</span></div>`;
             const attunedSchools = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
-            html += `<div class="info-row">Magic: ${Object.entries(MAGIC_SKILLS).filter(([k]) => colonist.magicSkills[k] > 0).map(([k, def]) => {
+            html += `<div class="info-row">${escapeHtml(t('ui.colonist.magic_label'))} ${Object.entries(MAGIC_SKILLS).filter(([k]) => colonist.magicSkills[k] > 0).map(([k, def]) => {
                 const level = colonist.magicSkills[k];
                 const isAttuned = attunedSchools.includes(k);
-                const tip = magicXpTip(def, level, colonist.magicXpAccumulator?.[k] || 0) + (isAttuned ? ' — attuned' : '');
+                const tip = magicXpTip(def, level, colonist.magicXpAccumulator?.[k] || 0) + (isAttuned ? t('ui.colonist.attuned_suffix') : '');
                 const style = isAttuned ? `color:${def.color};font-weight:bold` : 'color:#bb88ff';
-                return `<span class="skill-tip" data-tip="${escapeAttr(tip)}" style="${style}">${isAttuned ? '★' : ''}${escapeHtml(def.name)}:${level}</span>`;
+                return `<span class="skill-tip" data-magic="${escapeAttr(k)}"${isAttuned ? ' data-attuned="1"' : ''} data-tip="${escapeAttr(tip)}" style="${style}">${isAttuned ? '★' : ''}${escapeHtml(t('ui.colonist.skill_level', { name: def.name, n: level }))}</span>`;
             }).join(' ')}</div>`;
             if (attunedSchools.length > 0) {
-                const names = attunedSchools.map(k => `<span style="color:${MAGIC_SKILLS[k].color}">${MAGIC_SKILLS[k].name}</span>`).join(', ');
-                html += `<div class="info-row" style="font-size:0.85em">Attuned: ${names} <span style="color:#666">(only these autocast)</span></div>`;
+                const names = attunedSchools.map(k => `<span style="color:${MAGIC_SKILLS[k].color}">${escapeHtml(MAGIC_SKILLS[k].name)}</span>`).join(', ');
+                html += `<div class="info-row" style="font-size:0.85em">${escapeHtml(t('ui.colonist.attuned_label'))} ${names} <span style="color:#666">${escapeHtml(t('ui.colonist.attuned_note'))}</span></div>`;
             }
             if (attunedSchools.length < MAGIC_STUDY_CONFIG.attunementSlots) {
                 const missing = MAGIC_STUDY_CONFIG.attunementSlots - attunedSchools.length;
-                html += `<div class="info-row" style="color:#ff8844;font-size:0.85em">&#9888; ${missing} attunement slot${missing > 1 ? 's' : ''} unfilled. <span data-open-attune style="text-decoration:underline;cursor:pointer">Set in Priority &gt; Attunement</span></div>`;
+                html += `<div class="info-row" style="color:#ff8844;font-size:0.85em">&#9888; ${escapeHtml(tp('ui.colonist.attune_slots_unfilled', missing))} <span data-open-attune style="text-decoration:underline;cursor:pointer">${escapeHtml(t('ui.colonist.attune_set_link'))}</span></div>`;
             }
         }
 
         // --- Equipment ---
         if (!colonist.golem) {
-        html += `<div style="${sectionHdr}">Equipment</div>`;
+        html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_equipment'))}</div>`;
         const id = colonist.id;
         // Determine which set tab the player is currently viewing (may differ from activeSet while browsing).
         const viewingSet = this._colonistViewingSet?.[colonist.id] || colonist.activeSet || 'Colony';
@@ -2412,16 +2521,16 @@ export class UI {
             const isViewing = sn === viewingSet;
             const bg = isViewing ? '#2a2a4e' : '#111';
             const border = isViewing ? (isActive ? '#88aaff' : '#5566aa') : '#333';
-            const label = escapeHtml(isActive ? `${sn} ◆` : sn);
+            const label = escapeHtml(isActive ? `${equipSetName(sn)} ◆` : equipSetName(sn));
             html += `<button onclick="window.game.ui._setColonistViewingSet(${colonist.id},${jsArg(sn)})" style="flex:1;padding:2px 4px;background:${bg};border:1px solid ${border};border-radius:3px;color:${isViewing ? '#ddd' : '#888'};font-size:11px;cursor:pointer;">${label}</button>`;
         }
         html += `</div>`;
         if (!isViewingActive) {
-            html += `<div style="font-size:10px;color:#5566aa;margin-bottom:3px;">Previewing ${escapeHtml(viewingSet)} set. Chain icon = shared from ${escapeHtml(colonist.activeSet || 'Colony')}. Expedition set activates automatically on departure.</div>`;
+            html += `<div style="font-size:10px;color:#5566aa;margin-bottom:3px;">${escapeHtml(t('ui.colonist.set_preview_note', { set: equipSetName(viewingSet), active: equipSetName(colonist.activeSet || 'Colony') }))}</div>`;
         }
 
         const tomeName = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : null;
-        const tomeTip = tomeName ? (() => { const p = (colonist.tomeProgress?.[colonist.equippedTome] || 0); return `${tomeName} (${Math.floor(p / SPELL_TOMES[colonist.equippedTome].learningWork * 100)}%)`; })() : 'No tome equipped';
+        const tomeTip = tomeName ? (() => { const p = (colonist.tomeProgress?.[colonist.equippedTome] || 0); return t('ui.colonist.tome_progress', { name: tomeName, pct: Math.floor(p / SPELL_TOMES[colonist.equippedTome].learningWork * 100) }); })() : t('ui.colonist.no_tome');
         const slotStyle = 'position:relative;border:1px solid #444;border-radius:4px;padding:4px 2px;background:#1a1a2e;cursor:pointer;min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;';
 
         const _buildSetSlotHtml = (slot, label, fallbackChar, tipText) => {
@@ -2435,7 +2544,7 @@ export class UI {
                 const tipAttr = item
                     ? `data-compare="${compareHtml}"`
                     : `data-tip="${escapeAttr(tipText)}"`;
-                return `<div class="skill-tip" data-tut-slot="${slot}" ${tipAttr} style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
+                return `<div class="skill-tip" data-tut-slot="${slot}" ${tipAttr} style="${slotStyle}"><div style="color:#666;font-size:10px">${escapeHtml(label)}</div>${inner}${this._buildSlotSelect(colonist, slot)}</div>`;
             }
             // Inactive set: show set-specific override or shared fallback.
             const setItem = (colonist.equipmentSets?.[viewingSet])?.[slot] || null;
@@ -2444,18 +2553,18 @@ export class UI {
             const listName = SLOT_LIST[slot];
             if (setItem) {
                 // This set owns a dedicated item for this slot.
-                const compareHtml = escapeAttr(this._buildEquipCompareHtml(`${label} (${viewingSet} override)`, setItem, null));
-                const removeBtn = `<span onclick="window.game.removeItemFromSet(${colonist.id},${jsArg(viewingSet)},'${slot}')" style="position:absolute;top:1px;right:2px;color:#cc4444;font-size:10px;cursor:pointer;z-index:10;" title="Return to inventory">x</span>`;
+                const compareHtml = escapeAttr(this._buildEquipCompareHtml(t('ui.colonist.set_override_label', { slot: label, set: equipSetName(viewingSet) }), setItem, null));
+                const removeBtn = `<span onclick="window.game.removeItemFromSet(${colonist.id},${jsArg(viewingSet)},'${slot}')" style="position:absolute;top:1px;right:2px;color:#cc4444;font-size:10px;cursor:pointer;z-index:10;" title="${escapeAttr(t('ui.colonist.set_return_to_inventory'))}">x</span>`;
                 const assignSelect = this._buildSetAssignSelect(colonist, viewingSet, slot, listName);
-                return `<div class="skill-tip" data-compare="${compareHtml}" style="${slotStyle}">${removeBtn}<div style="color:#666;font-size:10px">${label}</div>${this._itemIcon(setItem.key, slot)}${assignSelect}</div>`;
+                return `<div class="skill-tip" data-compare="${compareHtml}" style="${slotStyle}">${removeBtn}<div style="color:#666;font-size:10px">${escapeHtml(label)}</div>${this._itemIcon(setItem.key, slot)}${assignSelect}</div>`;
             } else {
                 // Shared: dim the currently-equipped item and show chain icon.
                 const inner = sharedItem
-                    ? `<span style="opacity:0.4;">${this._itemIcon(sharedItem.key, slot)}</span><span style="position:absolute;bottom:2px;right:3px;font-size:9px;color:#5566aa;" title="Shared from ${escapeAttr(colonist.activeSet || 'Colony')} set">⛓</span>`
+                    ? `<span style="opacity:0.4;">${this._itemIcon(sharedItem.key, slot)}</span><span style="position:absolute;bottom:2px;right:3px;font-size:9px;color:#5566aa;" title="${escapeAttr(t('ui.colonist.set_shared_from', { set: equipSetName(colonist.activeSet || 'Colony') }))}">⛓</span>`
                     : `<span style="color:#222;font-size:14px">${fallbackChar}</span>`;
-                const tip = sharedItem ? `Shared: ${sharedItem.name} (from ${colonist.activeSet || 'Colony'} set). Click to assign a dedicated item.` : `No item. Click to assign.`;
+                const tip = sharedItem ? t('ui.colonist.set_shared_tip', { item: itemName(sharedItem), set: equipSetName(colonist.activeSet || 'Colony') }) : t('ui.colonist.set_no_item_tip');
                 const assignSelect = this._buildSetAssignSelect(colonist, viewingSet, slot, listName);
-                return `<div class="skill-tip" data-tip="${escapeAttr(tip)}" style="${slotStyle}"><div style="color:#666;font-size:10px">${label}</div>${inner}${assignSelect}</div>`;
+                return `<div class="skill-tip" data-tip="${escapeAttr(tip)}" style="${slotStyle}"><div style="color:#666;font-size:10px">${escapeHtml(label)}</div>${inner}${assignSelect}</div>`;
             }
         };
 
@@ -2463,20 +2572,20 @@ export class UI {
         // Row 1: Tome | Helmet | Armor | Trinket
         // Tome always uses the normal select (not part of equipment sets).
         html += `<div class="skill-tip" data-tut-slot="tome" data-tip="${escapeAttr(tomeTip)}" style="${slotStyle}">`;
-        html += `<div style="color:#666;font-size:10px">Tome</div>`;
+        html += `<div style="color:#666;font-size:10px">${escapeHtml(t('ui.colonist.slot_tome'))}</div>`;
         html += colonist.equippedTome ? `${this._itemIcon(colonist.equippedTome, 'tome')}` : `<span style="color:#333;font-size:14px">~</span>`;
         html += this._buildSlotSelect(colonist, 'tome');
         html += `</div>`;
-        html += _buildSetSlotHtml('helmet', 'Helmet', '^', helmetTip);
-        html += _buildSetSlotHtml('armor', 'Armor', '[]', armorTip);
-        html += _buildSetSlotHtml('trinket', 'Trinket', '*', trinketTip);
+        html += _buildSetSlotHtml('helmet', t('ui.colonist.slot_helmet'), '^', helmetTip);
+        html += _buildSetSlotHtml('armor', t('ui.colonist.slot_armor'), '[]', armorTip);
+        html += _buildSetSlotHtml('trinket', t('ui.colonist.slot_trinket'), '*', trinketTip);
         html += `</div>`;
         html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin:0 0 4px 0;text-align:center;">`;
         // Row 2: Weapon | Boots | Clothes | Offhand
-        html += _buildSetSlotHtml('weapon', 'Weapon', '/', weaponTip);
-        html += _buildSetSlotHtml('boots', 'Boots', '⌟', bootsTip);
-        html += _buildSetSlotHtml('clothes', 'Clothes', '◆', clothesTip);
-        html += _buildSetSlotHtml('tool', 'Offhand', '\\', toolTip);
+        html += _buildSetSlotHtml('weapon', t('ui.colonist.slot_weapon'), '/', weaponTip);
+        html += _buildSetSlotHtml('boots', t('ui.colonist.slot_boots'), '⌟', bootsTip);
+        html += _buildSetSlotHtml('clothes', t('ui.colonist.slot_clothes'), '◆', clothesTip);
+        html += _buildSetSlotHtml('tool', t('ui.colonist.slot_offhand'), '\\', toolTip);
         html += `</div>`;
 
         // --- Equipment Effects Summary ---
@@ -2488,30 +2597,30 @@ export class UI {
         // --- Sprite Layer Visibility Toggles ---
         {
             const VISUAL_SLOTS = [
-                { key: 'armor',   label: 'Armor'   },
-                { key: 'helmet',  label: 'Helmet'  },
-                { key: 'clothes', label: 'Clothes' },
-                { key: 'weapon',  label: 'Weapon'  },
-                { key: 'tool',    label: 'Tool'    },
+                { key: 'armor',   label: t('ui.colonist.slot_armor')   },
+                { key: 'helmet',  label: t('ui.colonist.slot_helmet')  },
+                { key: 'clothes', label: t('ui.colonist.slot_clothes') },
+                { key: 'weapon',  label: t('ui.colonist.slot_weapon')  },
+                { key: 'tool',    label: t('ui.colonist.slot_tool')    },
             ];
             const hiddenSlots = colonist.hiddenEquipmentSlots || {};
             const togglesHtml = VISUAL_SLOTS.map(s => {
                 const checked = !hiddenSlots[s.key] ? 'checked' : '';
-                return `<label class="eq-vis-toggle"><input type="checkbox" ${checked} onchange="window.game.toggleEquipmentSlotVisibility(${colonist.id},'${s.key}');window.game.ui.showColonistInfo(window.game.colonists.find(c=>c.id===${colonist.id}))">${s.label}</label>`;
+                return `<label class="eq-vis-toggle"><input type="checkbox" ${checked} onchange="window.game.toggleEquipmentSlotVisibility(${colonist.id},'${s.key}');window.game.ui.showColonistInfo(window.game.colonists.find(c=>c.id===${colonist.id}))">${escapeHtml(s.label)}</label>`;
             }).join('');
-            html += `<div class="eq-vis-row"><span class="eq-vis-label">Show:</span>${togglesHtml}</div>`;
+            html += `<div class="eq-vis-row"><span class="eq-vis-label">${escapeHtml(t('ui.colonist.show_layers'))}</span>${togglesHtml}</div>`;
         }
         } // end !colonist.golem equipment block
 
         // --- Spells ---
         const hasSpells = (colonist.knownSpells && colonist.knownSpells.length > 0) || colonist.equippedTome;
         if (hasSpells || hasMagic) {
-            html += `<div style="${sectionHdr}">Spells</div>`;
+            html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_spells'))}</div>`;
             if (colonist.equippedTome) {
                 const tomeDef = SPELL_TOMES[colonist.equippedTome];
                 const currentProgress = (colonist.tomeProgress && colonist.tomeProgress[colonist.equippedTome]) || 0;
                 const progress = Math.floor((currentProgress / tomeDef.learningWork) * 100);
-                html += `<div class="info-row"><span style="color:#bb88ff">Studying: ${escapeHtml(tomeDef.name)} (${progress}%)</span></div>`;
+                html += `<div class="info-row"><span style="color:#bb88ff">${escapeHtml(t('ui.colonist.studying', { name: tomeDef.name, pct: progress }))}</span></div>`;
             }
             if (colonist.knownSpells && colonist.knownSpells.length > 0) {
                 const attuned = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
@@ -2542,17 +2651,17 @@ export class UI {
                         spellHtml += `<input type="checkbox" ${checked} onchange="window.game.toggleSpell(${colonist.id},${jsArg(spellKey)})" style="margin-right:4px;vertical-align:middle">`;
                     }
                     const tipDesc = this._spellTooltip(spell);
-                    spellHtml += `<span class="skill-tip" data-tip="${escapeAttr(tipDesc)}" style="color:${greyed ? '#666' : '#bb88ff'}">${escapeHtml(spell.name)}</span> <span style="color:#666;font-size:0.85em">(${spell.manaCost} mana, ${spell.cooldown}t cd)</span>`;
+                    spellHtml += `<span class="skill-tip" data-tip="${escapeAttr(tipDesc)}" style="color:${greyed ? '#666' : '#bb88ff'}">${escapeHtml(spell.name)}</span> <span style="color:#666;font-size:0.85em">${escapeHtml(t('ui.colonist.spell_cost', { mana: spell.manaCost, cd: spell.cooldown }))}</span>`;
                     if (spell.castType === 'targeted') {
                         const disabled = onCooldown || !hasManaForSpell;
-                        const reason = onCooldown ? `${cdRemaining}t` : !hasManaForSpell ? 'low mana' : '';
+                        const reason = onCooldown ? t('ui.colonist.spell_cd_ticks', { n: cdRemaining }) : !hasManaForSpell ? t('ui.colonist.spell_low_mana') : '';
                         spellHtml += disabled
-                            ? ` <span style="color:#666">[${reason}]</span>`
-                            : ` <button onclick="window.game.startSpellTargeting(${colonist.id},${jsArg(spellKey)})" style="font-size:0.8em">Cast</button>`;
+                            ? ` <span style="color:#666">[${escapeHtml(reason)}]</span>`
+                            : ` <button onclick="window.game.startSpellTargeting(${colonist.id},${jsArg(spellKey)})" style="font-size:0.8em">${escapeHtml(t('ui.colonist.spell_cast'))}</button>`;
                     } else if (notAttuned) {
-                        spellHtml += ` <span style="color:#a66;font-size:0.8em">[not attuned]</span>`;
+                        spellHtml += ` <span style="color:#a66;font-size:0.8em">${escapeHtml(t('ui.colonist.spell_not_attuned'))}</span>`;
                     } else {
-                        spellHtml += ` <span style="color:#555;font-size:0.8em">[auto${onCooldown ? `, ${cdRemaining}t` : ''}]</span>`;
+                        spellHtml += ` <span style="color:#555;font-size:0.8em">${escapeHtml(onCooldown ? t('ui.colonist.spell_auto_cd', { n: cdRemaining }) : t('ui.colonist.spell_auto'))}</span>`;
                     }
                     return `<div class="info-row" style="padding-left:8px">${spellHtml}</div>`;
                 };
@@ -2560,38 +2669,39 @@ export class UI {
                 // Only draw the sub-headers when a split actually exists. A colonist
                 // with no attunement (or all spells in-school) reads as a flat list.
                 if (inactive.length > 0) {
-                    html += `<div class="info-row" style="padding-left:4px;color:#88cc88;font-size:0.85em;font-weight:bold">Active</div>`;
+                    html += `<div class="info-row" style="padding-left:4px;color:#88cc88;font-size:0.85em;font-weight:bold">${escapeHtml(t('ui.colonist.spells_active'))}</div>`;
                 }
                 for (const spellKey of active) html += renderSpellRow(spellKey, false);
                 if (inactive.length > 0) {
-                    html += `<div class="info-row" style="padding-left:4px;color:#a66;font-size:0.85em;font-weight:bold">Inactive — not attuned</div>`;
+                    html += `<div class="info-row" style="padding-left:4px;color:#a66;font-size:0.85em;font-weight:bold">${escapeHtml(t('ui.colonist.spells_inactive'))}</div>`;
                     for (const spellKey of inactive) html += renderSpellRow(spellKey, true);
                 }
             }
             if (colonist.activeEffects && colonist.activeEffects.length > 0) {
                 const effects = colonist.activeEffects.map(e => {
-                    const t = e.expiresAt - this.game.tick;
+                    const left = e.expiresAt - this.game.tick;
                     switch (e.type) {
-                        case 'absorb': return `<span style="color:#88ccff">Ward (${e.absorbRemaining} absorb)</span>`;
-                        case 'quality': return `<span style="color:#ffcc66">Diligence (+${e.qualityBonus} quality, ${t}t)</span>`;
-                        case 'rest': return `<span style="color:#aaffcc">Tireless (${t}t)</span>`;
-                        case 'shield': return `<span style="color:#88ccff">Shield (${t}t)</span>`;
-                        case 'speed': return `<span style="color:#ffff88">Haste (${t}t)</span>`;
-                        default: return `<span style="color:#88ffaa">${escapeHtml(e.type)} (${t}t)</span>`;
+                        case 'absorb': return `<span style="color:#88ccff">${escapeHtml(t('ui.colonist.effect_absorb', { n: e.absorbRemaining }))}</span>`;
+                        case 'quality': return `<span style="color:#ffcc66">${escapeHtml(t('ui.colonist.effect_quality', { n: e.qualityBonus, t: left }))}</span>`;
+                        case 'rest': return `<span style="color:#aaffcc">${escapeHtml(t('ui.colonist.effect_rest', { t: left }))}</span>`;
+                        case 'shield': return `<span style="color:#88ccff">${escapeHtml(t('ui.colonist.effect_shield', { t: left }))}</span>`;
+                        case 'speed': return `<span style="color:#ffff88">${escapeHtml(t('ui.colonist.effect_speed', { t: left }))}</span>`;
+                        default: return `<span style="color:#88ffaa">${escapeHtml(t('ui.colonist.effect_other', { name: e.type, t: left }))}</span>`;
                     }
                 }).join(', ');
-                html += `<div class="info-row">Effects: ${effects}</div>`;
+                html += `<div class="info-row">${escapeHtml(t('ui.colonist.effects_label'))} ${effects}</div>`;
             }
             if (colonist.activeAuras && colonist.activeAuras.length > 0) {
                 const auraSpans = colonist.activeAuras.map(a => {
                     const def = ALL_ITEMS[a.key];
-                    const tip = def ? this._getTrinketTooltip(def) : a.name;
+                    const auraName = def ? itemName(def) : a.name;
+                    const tip = def ? this._getTrinketTooltip(def) : auraName;
                     const clickAction = a.sourceType === 'pedestal'
                         ? `window.game.camera.centerOn(${a.x},${a.y})`
                         : `window.game.selectColonistById(${a.colonistId})`;
-                    return `<span class="skill-tip" data-tip="${escapeAttr(tip)}" style="color:#ccaa44;cursor:pointer;text-decoration:underline" onclick="${clickAction}">${escapeHtml(a.name)}</span>`;
+                    return `<span class="skill-tip" data-tip="${escapeAttr(tip)}" style="color:#ccaa44;cursor:pointer;text-decoration:underline" onclick="${clickAction}">${escapeHtml(auraName)}</span>`;
                 }).join(', ');
-                html += `<div class="info-row">Auras: ${auraSpans}</div>`;
+                html += `<div class="info-row">${escapeHtml(t('ui.colonist.auras_label'))} ${auraSpans}</div>`;
             }
         }
 
@@ -2608,43 +2718,43 @@ export class UI {
             })
             .filter(r => r.tier.key !== 'stranger');
         notableRelationships.sort((a, b) => b.opinion - a.opinion);
-        html += `<div style="${sectionHdr}">Relationships</div>`;
+        html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_relationships'))}</div>`;
         if (notableRelationships.length === 0) {
-            html += `<div class="info-row" style="color:#555">No notable relationships</div>`;
+            html += `<div class="info-row" style="color:#555">${escapeHtml(t('ui.colonist.no_relationships'))}</div>`;
         } else {
             const relHtml = notableRelationships.map(r => {
                 const tierDef = RELATIONSHIP_TIERS.find(t => t.key === r.tier.key) || r.tier;
-                return `<span style="color:${tierDef.color}">[${tierDef.name}]</span> <span style="cursor:pointer;text-decoration:underline" onclick="window.game.selectColonistById(${r.colonist.id})">${escapeHtml(r.colonist.name)}</span> <span style="color:#555;font-size:0.85em">(${r.opinion > 0 ? '+' : ''}${r.opinion})</span>`;
+                return `<span style="color:${tierDef.color}">[${escapeHtml(tierDef.name)}]</span> <span style="cursor:pointer;text-decoration:underline" onclick="window.game.selectColonistById(${r.colonist.id})">${escapeHtml(r.colonist.name)}</span> <span style="color:#555;font-size:0.85em">(${r.opinion > 0 ? '+' : ''}${r.opinion})</span>`;
             }).join('<br>');
             html += `<div class="info-row">${relHtml}</div>`;
         }
 
         // --- Thoughts ---
         if (thoughts) {
-            html += `<div style="${sectionHdr}">Thoughts</div>`;
+            html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_thoughts'))}</div>`;
             html += `<div class="info-thoughts">${thoughts}</div>`;
         }
 
         // --- Actions ---
-        html += `<div style="${sectionHdr}">Actions</div>`;
+        html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_actions'))}</div>`;
         html += `<div class="info-actions">`;
-        html += `<button onclick="window.game.toggleDraft(${colonist.id})">${colonist.drafted ? 'Undraft' : 'Draft'}</button>`;
-        html += `<button onclick="window.game.toggleGuard(${colonist.id})">${colonist.guardMode ? 'Unguard' : 'Guard'}</button>`;
-        if (colonist.guardMode) html += `<button onclick="window.game.input.startGuardPointTargeting(${colonist.id})">Set Guard Point</button>`;
-        html += `<button onclick="window.game.draftAll()">Draft All</button>`;
-        html += `<button onclick="window.game.undraftAll()">Undraft All</button>`;
-        html += `<button onclick="window.game.autoEquipBest(${colonist.id})" title="Auto-equip best available items into the active set (${escapeAttr(colonist.activeSet || 'Colony')})">Auto-equip Best</button>`;
+        html += `<button onclick="window.game.toggleDraft(${colonist.id})">${escapeHtml(colonist.drafted ? t('ui.main.undraft') : t('ui.main.draft'))}</button>`;
+        html += `<button onclick="window.game.toggleGuard(${colonist.id})">${escapeHtml(colonist.guardMode ? t('ui.colonist.unguard') : t('ui.colonist.guard'))}</button>`;
+        if (colonist.guardMode) html += `<button onclick="window.game.input.startGuardPointTargeting(${colonist.id})">${escapeHtml(t('ui.colonist.set_guard_point'))}</button>`;
+        html += `<button onclick="window.game.draftAll()">${escapeHtml(t('ui.colonist.draft_all'))}</button>`;
+        html += `<button onclick="window.game.undraftAll()">${escapeHtml(t('ui.colonist.undraft_all'))}</button>`;
+        html += `<button onclick="window.game.autoEquipBest(${colonist.id})" title="${escapeAttr(t('ui.colonist.auto_equip_tip', { set: equipSetName(colonist.activeSet || 'Colony') }))}">${escapeHtml(t('ui.colonist.auto_equip'))}</button>`;
         const others = this.game.colonists.filter(c => c.hp > 0 && c.id !== colonist.id);
         if (others.length > 0) {
-            html += `<select onchange="if(this.value)window.game.copyPriorities(${colonist.id},parseInt(this.value))"><option value="">Copy Priorities From...</option>`;
+            html += `<select onchange="if(this.value)window.game.copyPriorities(${colonist.id},parseInt(this.value))"><option value="">${escapeHtml(t('ui.colonist.copy_priorities'))}</option>`;
             for (const o of others) html += `<option value="${o.id}">${escapeHtml(o.name)}</option>`;
             html += `</select>`;
         }
-        html += `<button onclick="window.game.centerOnColonist(${colonist.id})">Center Camera</button>`;
+        html += `<button onclick="window.game.centerOnColonist(${colonist.id})">${escapeHtml(t('ui.colonist.center_camera'))}</button>`;
         const isFollowing = this.game.followingColonist === colonist.id;
-        html += `<button onclick="window.game.toggleFollow(${colonist.id})">${isFollowing ? 'Unfollow' : 'Follow'}</button>`;
+        html += `<button onclick="window.game.toggleFollow(${colonist.id})">${escapeHtml(isFollowing ? t('ui.colonist.unfollow') : t('ui.colonist.follow'))}</button>`;
         html += `</div>`;
-        html += `<div class="info-row">Color: <input type="color" value="${nc}" onchange="window.game.setColonistColor(${colonist.id}, this.value)"></div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.colonist.color_label'))} <input type="color" value="${nc}" onchange="window.game.setColonistColor(${colonist.id}, this.value)"></div>`;
         return html;
     }
 
@@ -2691,28 +2801,28 @@ export class UI {
         const waves = this.game.waves;
         const raiderCount = this.game.raiders.filter(r => r.hp > 0).length;
 
-        let html = '<div class="info-header">Colony Summary</div>';
-        html += `<div class="info-row">Population: ${alive}/${cap}${aliveGolems > 0 ? ` <span style="color:#aaa">(+${aliveGolems} golems)</span>` : ''}</div>`;
+        let html = `<div class="info-header">${escapeHtml(t('ui.info.summary_title'))}</div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.info.population', { n: alive, cap }))}${aliveGolems > 0 ? ` <span style="color:#aaa">${escapeHtml(tp('ui.info.population_golems', aliveGolems))}</span>` : ''}</div>`;
         const moodColor = avgMood >= 60 ? '#88cc44' : avgMood >= 35 ? '#ccaa44' : '#ff6644';
         const moodBar = statBarHtml({ key: 'overview:mood', pct: avgMood, color: moodColor, max: 100, width: 90 });
-        html += `<div class="info-row">Mood: ${avgMood}% ${moodBar} <span style="color:${moodColor}">(${moodLevel})</span></div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.info.mood', { n: avgMood }))} ${moodBar} <span style="color:${moodColor}">${escapeHtml(t('ui.info.mood_level', { mood: moodName(moodLevel) }))}</span></div>`;
 
-        html += '<div class="info-row" style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333;margin-top:8px;padding-bottom:2px">Alerts</div>';
+        html += `<div class="info-row" style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333;margin-top:8px;padding-bottom:2px">${escapeHtml(t('ui.info.alerts'))}</div>`;
         const alerts = [];
         if (waves.active) {
             const hpPct = waves.nexusMaxHp > 0 ? Math.round((waves.nexusHp / waves.nexusMaxHp) * 100) : 0;
             const hpColor = hpPct > 60 ? '#44ff44' : hpPct > 30 ? '#ffaa44' : '#ff4444';
             const hpBar = statBarHtml({ key: 'overview:nexushp', pct: hpPct, color: hpColor, max: waves.nexusMaxHp, width: 70 });
             const remaining = waves.enemiesToSpawn - waves.enemiesSpawned;
-            alerts.push(`<div class="info-row" style="color:#ff6644;font-weight:bold">[!] Wave ${waves.currentWave} active</div>`);
-            alerts.push(`<div class="info-row" style="color:#bb88ff">Nexus HP: ${waves.nexusHp}/${waves.nexusMaxHp} ${hpBar}</div>`);
-            alerts.push(`<div class="info-row" style="color:#ff8844">Enemies: ${waves.enemies.length} alive${remaining > 0 ? `, ${remaining} spawning` : ''}</div>`);
+            alerts.push(`<div class="info-row" style="color:#ff6644;font-weight:bold">${escapeHtml(t('ui.info.alert_wave_active', { n: waves.currentWave }))}</div>`);
+            alerts.push(`<div class="info-row" style="color:#bb88ff">${escapeHtml(t('ui.info.alert_nexus_hp', { hp: waves.nexusHp, max: waves.nexusMaxHp }))} ${hpBar}</div>`);
+            alerts.push(`<div class="info-row" style="color:#ff8844">${escapeHtml(remaining > 0 ? t('ui.info.alert_enemies_spawning', { n: waves.enemies.length, spawning: remaining }) : t('ui.info.alert_enemies', { n: waves.enemies.length }))}</div>`);
         }
-        if (raiderCount > 0) alerts.push(`<div class="info-row" style="color:#ff6644">[!] ${raiderCount} hostile${raiderCount > 1 ? 's' : ''} on the map</div>`);
-        if (lowHp > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowHpId}" style="color:#ff4444;cursor:pointer">${lowHp} badly hurt</div>`);
-        if (hungry > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${hungryId}" style="color:#ccaa44;cursor:pointer">${hungry} hungry</div>`);
-        if (lowRest > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowRestId}" style="color:#ccaa44;cursor:pointer">${lowRest} exhausted</div>`);
-        if (idle > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${idleId}" style="color:#88aaff;cursor:pointer">${idle} idle</div>`);
+        if (raiderCount > 0) alerts.push(`<div class="info-row" style="color:#ff6644">${escapeHtml(tp('ui.info.alert_hostiles', raiderCount))}</div>`);
+        if (lowHp > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowHpId}" style="color:#ff4444;cursor:pointer">${escapeHtml(t('ui.info.alert_hurt', { n: lowHp }))}</div>`);
+        if (hungry > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${hungryId}" style="color:#ccaa44;cursor:pointer">${escapeHtml(t('ui.info.alert_hungry', { n: hungry }))}</div>`);
+        if (lowRest > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${lowRestId}" style="color:#ccaa44;cursor:pointer">${escapeHtml(t('ui.info.alert_exhausted', { n: lowRest }))}</div>`);
+        if (idle > 0) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${idleId}" style="color:#88aaff;cursor:pointer">${escapeHtml(t('ui.info.alert_idle', { n: idle }))}</div>`);
         // Housing, tome and attunement alerts wait out the first day, and while the
         // walkthrough is on they wait until it has taught that topic, so a new colony
         // doesn't open on a list of things the player hasn't been shown yet.
@@ -2720,15 +2830,15 @@ export class UI {
         const walkthrough = this.game.settings.showTutorial && tut && !tut.isChecklist && !tut.isFinished();
         const taught = (...ids) => !walkthrough || ids.some(id => tut.completed.has(id));
         const settled = this.game.tick >= CONFIG.TICKS_PER_DAY;
-        if (homeless > 0 && settled && taught('bedroom', 'bedroom_bed')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${homelessId}" style="color:#ccaa44;cursor:pointer">${homeless} without a home</div>`);
-        if (noTome > 0 && settled && taught('tome')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${noTomeId}" style="color:#88aaff;cursor:pointer">${noTome} without a tome</div>`);
+        if (homeless > 0 && settled && taught('bedroom', 'bedroom_bed')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${homelessId}" style="color:#ccaa44;cursor:pointer">${escapeHtml(t('ui.info.alert_homeless', { n: homeless }))}</div>`);
+        if (noTome > 0 && settled && taught('tome')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${noTomeId}" style="color:#88aaff;cursor:pointer">${escapeHtml(t('ui.info.alert_no_tome', { n: noTome }))}</div>`);
         // At the cap, wanderers get turned away; point at the way to grow.
         if (alive >= cap && settled && taught('colony_growth') && cap < (WORLD_SIZE_COLONY[this.game.map[0].length]?.capMax ?? Infinity)) {
-            alerts.push(`<div class="info-row" style="color:#ff8866">At colonist cap (${alive}/${cap}). Reach milestones to grow (Rifts panel).</div>`);
+            alerts.push(`<div class="info-row" style="color:#ff8866">${escapeHtml(t('ui.info.alert_cap', { n: alive, cap }))}</div>`);
         }
-        if (missingAttune > 0 && settled && taught('attunement')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${missingAttuneId}" style="color:#bb88ff;cursor:pointer">${missingAttune} missing attunement${missingAttune > 1 ? 's' : ''}</div>`);
-        if (pendingTasks > 0) alerts.push(`<div class="info-row" style="color:#ccaa44">${pendingTasks} pending task${pendingTasks > 1 ? 's' : ''}</div>`);
-        if (alerts.length === 0) alerts.push('<div class="info-row" style="color:#88cc44">All is well.</div>');
+        if (missingAttune > 0 && settled && taught('attunement')) alerts.push(`<div class="info-row overview-alert" data-colonist-id="${missingAttuneId}" style="color:#bb88ff;cursor:pointer">${escapeHtml(tp('ui.info.alert_missing_attune', missingAttune))}</div>`);
+        if (pendingTasks > 0) alerts.push(`<div class="info-row" style="color:#ccaa44">${escapeHtml(tp('ui.info.alert_pending_tasks', pendingTasks))}</div>`);
+        if (alerts.length === 0) alerts.push(`<div class="info-row" style="color:#88cc44">${escapeHtml(t('ui.info.alert_all_well'))}</div>`);
         html += alerts.join('');
         return html;
     }
@@ -2781,21 +2891,21 @@ export class UI {
     _buildSlotSelect(colonist, slot) {
         const overlayStyle = 'position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;';
         const SLOT_CONFIG = {
-            weapon: { listName: 'weapons', label: 'Weapon', fallback: 'Fists', equipFn: 'equipWeapon', unequipFn: 'unequipWeapon', statRenderer: w => { const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown; const parts = [`${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`]; parts.push(...getOnHitLines(w)); return parts.join(', '); } },
-            armor: { listName: 'armors', label: 'Armor', fallback: 'None', equipFn: 'equipArmor', unequipFn: 'unequipArmor', statRenderer: a => getItemStatLines(a).join(', ') },
-            helmet: { listName: 'helmets', label: 'Helmet', fallback: 'None', equipFn: 'equipHelmet', unequipFn: 'unequipHelmet', statRenderer: h => getItemStatLines(h).join(', ') },
-            clothes: { listName: 'clothes', label: 'Clothes', fallback: 'None', equipFn: 'equipClothes', unequipFn: 'unequipClothes', statRenderer: c => getItemStatLines(c).join(', ') },
-            tool: { listName: 'tools', label: 'Offhand', fallback: 'None', equipFn: 'equipTool', unequipFn: 'unequipTool', statRenderer: t => {
-                const lines = getItemStatLines(t);
-                if (t.expedition) { const el = getNestedEffectLines(t.expedition); if (el.length) lines.push(...el); }
+            weapon: { listName: 'weapons', label: t('ui.colonist.slot_weapon'), fallback: t('ui.colonist.fists'), equipFn: 'equipWeapon', unequipFn: 'unequipWeapon', statRenderer: w => { const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown; const parts = [t('ui.colonist.weapon_stats', { dmg: w.damage, dps: (w.damage / cd).toFixed(1), speed: weaponSpeedLabel(cd) })]; parts.push(...getOnHitLines(w)); return parts.join(', '); } },
+            armor: { listName: 'armors', label: t('ui.colonist.slot_armor'), fallback: t('common.none'), equipFn: 'equipArmor', unequipFn: 'unequipArmor', statRenderer: a => getItemStatLines(a).join(', ') },
+            helmet: { listName: 'helmets', label: t('ui.colonist.slot_helmet'), fallback: t('common.none'), equipFn: 'equipHelmet', unequipFn: 'unequipHelmet', statRenderer: h => getItemStatLines(h).join(', ') },
+            clothes: { listName: 'clothes', label: t('ui.colonist.slot_clothes'), fallback: t('common.none'), equipFn: 'equipClothes', unequipFn: 'unequipClothes', statRenderer: c => getItemStatLines(c).join(', ') },
+            tool: { listName: 'tools', label: t('ui.colonist.slot_offhand'), fallback: t('common.none'), equipFn: 'equipTool', unequipFn: 'unequipTool', statRenderer: tool => {
+                const lines = getItemStatLines(tool);
+                if (tool.expedition) { const el = getNestedEffectLines(tool.expedition); if (el.length) lines.push(...el); }
                 return lines.join(', ');
             } },
-            trinket: { listName: 'trinkets', label: 'Trinket', fallback: 'None', equipFn: 'equipTrinket', unequipFn: 'unequipTrinket', statRenderer: a => {
+            trinket: { listName: 'trinkets', label: t('ui.colonist.slot_trinket'), fallback: t('common.none'), equipFn: 'equipTrinket', unequipFn: 'unequipTrinket', statRenderer: a => {
                 const lines = getItemStatLines(a);
                 if (a.expedition) { const el = getNestedEffectLines(a.expedition); if (el.length) lines.push(...el); }
                 return lines.join(', ');
             } },
-            boots: { listName: 'boots', label: 'Boots', fallback: 'None', equipFn: 'equipBoots', unequipFn: 'unequipBoots', statRenderer: b => {
+            boots: { listName: 'boots', label: t('ui.colonist.slot_boots'), fallback: t('common.none'), equipFn: 'equipBoots', unequipFn: 'unequipBoots', statRenderer: b => {
                 const lines = getItemStatLines(b);
                 if (b.expedition) { const el = getNestedEffectLines(b.expedition); if (el.length) lines.push(...el); }
                 return lines.join(', ');
@@ -2804,23 +2914,25 @@ export class UI {
         if (slot === 'tome') {
             const tomes = this.game.resources.tomes || [];
             let html = `<select style="${overlayStyle}" id="eq-tome-${colonist.id}" onchange="if(this.value==='unequip'){window.game.unequipTome(${colonist.id})}else if(this.value!==''){const i=window.game.ui._resolveSelectItemIndex(this,'tomes');if(i>=0)window.game.equipTome(${colonist.id},i)}">`;
-            const currentTome = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : 'None';
-            html += `<option value="">Tome: ${escapeHtml(currentTome)}</option>`;
-            if (colonist.equippedTome) html += `<option value="unequip">Unequip</option>`;
+            const currentTome = colonist.equippedTome ? SPELL_TOMES[colonist.equippedTome]?.name : t('common.none');
+            html += `<option value="">${escapeHtml(t('ui.colonist.slot_current', { slot: t('ui.colonist.slot_tome'), item: currentTome }))}</option>`;
+            if (colonist.equippedTome) html += `<option value="unequip">${escapeHtml(t('ui.colonist.unequip'))}</option>`;
 
             const attuned = Array.isArray(colonist.attunedSchools) ? colonist.attunedSchools : [];
             const attunedEntries = [];
             const otherEntries = [];
 
-            tomes.forEach((t, i) => {
-                const def = SPELL_TOMES[t.key];
+            tomes.forEach((tome, i) => {
+                const def = SPELL_TOMES[tome.key];
                 if (!def) return;
                 const spell = SPELLS[def.spell];
                 if (!spell) return;
                 if (colonist.knownSpells.includes(def.spell)) return;
                 const canStudy = (colonist.magicSkills[spell.school] || 0) >= def.minSchoolLevel;
-                const label = escapeHtml(`${def.name} (Lv ${def.minSchoolLevel})${canStudy ? '' : ` - need ${MAGIC_SKILLS[spell.school]?.name} ${def.minSchoolLevel}`}`);
-                const entry = { i, def, spell, canStudy, label, sig: this._itemSig(t) };
+                const label = escapeHtml(canStudy
+                    ? t('ui.colonist.tome_option', { name: def.name, lv: def.minSchoolLevel })
+                    : t('ui.colonist.tome_option_locked', { name: def.name, lv: def.minSchoolLevel, school: MAGIC_SKILLS[spell.school]?.name }));
+                const entry = { i, def, spell, canStudy, label, sig: this._itemSig(tome) };
                 if (attuned.includes(spell.school)) attunedEntries.push(entry);
                 else otherEntries.push(entry);
             });
@@ -2829,20 +2941,20 @@ export class UI {
             otherEntries.sort((a, b) => a.def.minSchoolLevel - b.def.minSchoolLevel);
 
             if (attunedEntries.length > 0) {
-                html += `<optgroup label="Attuned Schools">`;
+                html += `<optgroup label="${escapeAttr(t('ui.colonist.tome_group_attuned'))}">`;
                 attunedEntries.forEach(({ i, canStudy, label, sig }) => {
                     html += `<option value="${i}" data-sig="${sig}"${canStudy ? '' : ' disabled'}>${label}</option>`;
                 });
                 html += `</optgroup>`;
             }
             if (otherEntries.length > 0) {
-                html += `<optgroup label="Other Schools">`;
+                html += `<optgroup label="${escapeAttr(t('ui.colonist.tome_group_other'))}">`;
                 otherEntries.forEach(({ i, canStudy, label, sig }) => {
                     html += `<option value="${i}" data-sig="${sig}"${canStudy ? '' : ' disabled'}>${label}</option>`;
                 });
                 html += `</optgroup>`;
             }
-            if (tomes.length === 0 && !colonist.equippedTome) html += `<option disabled>No tomes available</option>`;
+            if (tomes.length === 0 && !colonist.equippedTome) html += `<option disabled>${escapeHtml(t('ui.colonist.no_tomes_available'))}</option>`;
             html += `</select>`;
             return html;
         }
@@ -2850,13 +2962,13 @@ export class UI {
         const items = this.game.resources[cfg.listName];
         const current = colonist[slot];
         let html = `<select style="${overlayStyle}" id="eq-${slot}-${colonist.id}" onchange="if(this.value==='unequip'){window.game.${cfg.unequipFn}(${colonist.id})}else if(this.value!==''){const i=window.game.ui._resolveSelectItemIndex(this,'${cfg.listName}');if(i>=0)window.game.${cfg.equipFn}(${colonist.id},i)}">`;
-        html += `<option value="">${cfg.label}: ${escapeHtml(current?.name || cfg.fallback)}</option>`;
-        if (current) html += `<option value="unequip">Unequip ${escapeHtml(current.name)}</option>`;
+        html += `<option value="">${escapeHtml(t('ui.colonist.slot_current', { slot: cfg.label, item: current ? itemName(current) : cfg.fallback }))}</option>`;
+        if (current) html += `<option value="unequip">${escapeHtml(t('ui.colonist.unequip_item', { item: itemName(current) }))}</option>`;
         items.forEach((item, i) => {
             const stats = cfg.statRenderer(item);
-            html += `<option value="${i}" data-sig="${this._itemSig(item)}">${escapeHtml(item.name)}${stats ? ` (${escapeHtml(stats)})` : ''}</option>`;
+            html += `<option value="${i}" data-sig="${this._itemSig(item)}">${escapeHtml(itemName(item))}${stats ? ` (${escapeHtml(stats)})` : ''}</option>`;
         });
-        if (items.length === 0 && !current) html += `<option disabled>No ${cfg.label.toLowerCase()}s available</option>`;
+        if (items.length === 0 && !current) html += `<option disabled>${escapeHtml(t({ weapon: 'ui.colonist.no_slot_items_weapon', armor: 'ui.colonist.no_slot_items_armor', helmet: 'ui.colonist.no_slot_items_helmet', clothes: 'ui.colonist.no_slot_items_clothes', tool: 'ui.colonist.no_slot_items_tool', trinket: 'ui.colonist.no_slot_items_trinket', boots: 'ui.colonist.no_slot_items_boots' }[slot]))}</option>`;
         html += `</select>`;
         return html;
     }
@@ -2909,22 +3021,22 @@ export class UI {
         const overlayStyle = 'position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;';
         const items = this.game.resources[listName] || [];
         const SLOT_CONFIG_LABELS = {
-            weapon: { label: 'Weapon', statRenderer: w => { const cd = w.attackCooldown || 20; return `${w.damage}d (${(w.damage/cd).toFixed(1)} dps)`; } },
-            armor:   { label: 'Armor',   statRenderer: a => getItemStatLines(a).join(', ') },
-            helmet:  { label: 'Helmet',  statRenderer: h => getItemStatLines(h).join(', ') },
-            clothes: { label: 'Clothes', statRenderer: c => getItemStatLines(c).join(', ') },
-            tool:    { label: 'Offhand', statRenderer: t => getItemStatLines(t).join(', ') },
-            trinket: { label: 'Trinket', statRenderer: a => getItemStatLines(a).join(', ') },
-            boots:   { label: 'Boots',   statRenderer: b => getItemStatLines(b).join(', ') },
+            weapon: { label: t('ui.colonist.slot_weapon'), statRenderer: w => { const cd = w.attackCooldown || 20; return t('ui.colonist.weapon_stats_short', { dmg: w.damage, dps: (w.damage/cd).toFixed(1) }); } },
+            armor:   { label: t('ui.colonist.slot_armor'),   statRenderer: a => getItemStatLines(a).join(', ') },
+            helmet:  { label: t('ui.colonist.slot_helmet'),  statRenderer: h => getItemStatLines(h).join(', ') },
+            clothes: { label: t('ui.colonist.slot_clothes'), statRenderer: c => getItemStatLines(c).join(', ') },
+            tool:    { label: t('ui.colonist.slot_offhand'), statRenderer: tool => getItemStatLines(tool).join(', ') },
+            trinket: { label: t('ui.colonist.slot_trinket'), statRenderer: a => getItemStatLines(a).join(', ') },
+            boots:   { label: t('ui.colonist.slot_boots'),   statRenderer: b => getItemStatLines(b).join(', ') },
         };
         const cfg = SLOT_CONFIG_LABELS[slot];
         let html = `<select style="${overlayStyle}" onchange="if(this.value!==''){const i=window.game.ui._resolveSelectItemIndex(this,'${listName}');if(i>=0)window.game.assignItemToSet(${colonist.id},${jsArg(setName)},'${slot}','${listName}',i);this.value=''}">`;
-        html += `<option value="">Assign ${cfg.label}...</option>`;
+        html += `<option value="">${escapeHtml(t('ui.colonist.assign_slot', { slot: cfg.label }))}</option>`;
         items.forEach((item, i) => {
             const stats = cfg.statRenderer(item);
-            html += `<option value="${i}" data-sig="${this._itemSig(item)}">${escapeHtml(item.name)}${stats ? ` (${escapeHtml(stats)})` : ''}</option>`;
+            html += `<option value="${i}" data-sig="${this._itemSig(item)}">${escapeHtml(itemName(item))}${stats ? ` (${escapeHtml(stats)})` : ''}</option>`;
         });
-        if (items.length === 0) html += `<option disabled>No items available</option>`;
+        if (items.length === 0) html += `<option disabled>${escapeHtml(t('ui.colonist.no_items_available'))}</option>`;
         html += `</select>`;
         return html;
     }
@@ -2934,23 +3046,26 @@ export class UI {
     _roomSizeRowHtml(q, roomType, cap) {
         const sz = q.size;
         const band = ROOM_SIZE_BANDS[roomType];
-        const noun = roomType === 'bedroom' ? 'bed' : 'station';
-        let actual = `${sz.tiles} tiles`;
+        const tiles = tp('ui.tile.room_tiles', sz.tiles);
+        let actual = tiles;
         if (band.metric !== 'total') {
             const per = Math.round(sz.value * 10) / 10;
-            actual += `, ${sz.count} ${noun}${sz.count === 1 ? '' : 's'} (${per}/${noun})`;
+            const count = tp(roomType === 'bedroom' ? 'ui.tile.room_beds' : 'ui.tile.room_stations', sz.count, { per });
+            actual = t('ui.tile.room_size_actual', { tiles, count });
         }
-        const ideal = sz.idealMax === Infinity ? `${sz.idealMin}+` : `${sz.idealMin}–${sz.idealMax}`;
+        const range = sz.idealMax === Infinity ? t('ui.tile.room_range_open', { min: sz.idealMin }) : t('ui.tile.room_range', { min: sz.idealMin, max: sz.idealMax });
+        const idealKey = { perBed: 'ui.tile.room_ideal_per_bed', perStation: 'ui.tile.room_ideal_per_station' }[band.metric] || 'ui.tile.room_ideal_tiles';
         const ok = sz.verdict === 'ideal';
-        const verdict = ok ? '' : ` <span style="color:#ffaa44;">(${sz.verdict})</span>`;
-        return `<div class="info-row" style="color:#888;font-size:0.85em;">  Size: +${sz.score} / ${cap} — ${actual}. <span style="color:${ok ? '#88ff88' : '#888'};">Ideal ${ideal} ${band.unit}</span>${verdict}</div>`;
+        const verdictName = { 'too small': t('ui.tile.room_too_small'), 'too large': t('ui.tile.room_too_large') }[sz.verdict] || sz.verdict;
+        const verdict = ok ? '' : ` <span style="color:#ffaa44;">(${escapeHtml(verdictName)})</span>`;
+        return `<div class="info-row" style="color:#888;font-size:0.85em;">${escapeHtml(t('ui.tile.room_size', { score: sz.score, cap, actual }))} <span style="color:${ok ? '#88ff88' : '#888'};">${escapeHtml(t(idealKey, { range }))}</span>${verdict}</div>`;
     }
 
     // Required-furniture checklist for a room section. Missing entries list the
     // pieces that would satisfy them in this room type.
     _roomRequirementsHtml(q, roomType) {
         const req = q.requirements;
-        let html = `<div class="info-row" style="color:#888;font-size:0.85em;">  Required furniture:</div>`;
+        let html = `<div class="info-row" style="color:#888;font-size:0.85em;">${escapeHtml(t('ui.tile.room_required_furniture'))}</div>`;
         for (const r of req.list) {
             const label = escapeHtml(FURNITURE_TYPES[r.type] || r.type);
             if (r.met) {
@@ -2958,12 +3073,12 @@ export class UI {
             } else {
                 const options = Object.entries(BUILDINGS)
                     .filter(([, b]) => b.furnitureType === r.type && !b.noBuild && furnitureCountsFor(b, roomType))
-                    .map(([k, b]) => (b.name || k).replace(/_/g, ' '));
+                    .map(([k]) => buildingName(k));
                 html += `<div class="info-row" style="color:#ff7766;font-size:0.85em;">    ✗ ${label} ${r.have}/${r.need}${options.length ? ` (${escapeHtml(options.join(', '))})` : ''}</div>`;
             }
         }
         if (!req.allMet) {
-            html += `<div class="info-row" style="color:#ffaa44;font-size:0.85em;">  Max quality ${req.ceiling} until all required furniture is placed</div>`;
+            html += `<div class="info-row" style="color:#ffaa44;font-size:0.85em;">${escapeHtml(t('ui.tile.room_quality_ceiling', { n: req.ceiling }))}</div>`;
         }
         return html;
     }
@@ -2974,51 +3089,58 @@ export class UI {
         const wq = this.game.workshopQualities[roomId];
         const th = this.game.townHallQualities[roomId];
         if (!rq && !wq && !th) {
-            html += `<div class="info-row">Room #${roomId}</div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.tile.room_id', { id: roomId }))}</div>`;
             return html;
         }
         if (th) {
-            html += `<div class="info-row" style="color:#ffdd66;font-weight:bold;">Town Hall — ${th.tierName} (${th.total}/100)</div>`;
-            html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → Mood +${th.moodEffect} for ${th.duration} ticks when relaxing here</div>`;
+            html += `<div class="info-row" style="color:#ffdd66;font-weight:bold;">${escapeHtml(t('ui.tile.room_townhall_title', { tier: roomTierName(th), n: th.total }))}</div>`;
+            html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">${escapeHtml(t('ui.tile.room_townhall_mood', { n: th.moodEffect, ticks: th.duration }))}</div>`;
             const b = th.breakdown;
             const thCaps = ROOM_SCORE_CAPS.townhall;
             html += this._roomRequirementsHtml(th, 'townhall');
             html += this._roomSizeRowHtml(th, 'townhall', thCaps.size);
-            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${thCaps.floor}</div>`;
-            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${thCaps.light}</div>`;
-            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${thCaps.decor} (${escapeHtml(th.decorList.map(d => d.replace(/_/g, ' ')).join(', '))})</div>`;
-            if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence} / ${thCaps.coherence}</div>`;
+            html += this._roomScoreRowsHtml(b, thCaps, th.decorList);
         }
         if (rq) {
-            html += `<div class="info-row" style="color:#aaccff;font-weight:bold;">${rq.tierName} (${rq.total}/100)</div>`;
-            html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → Mood +${rq.moodEffect} for ${rq.duration} ticks when sleeping here</div>`;
+            html += `<div class="info-row" style="color:#aaccff;font-weight:bold;">${escapeHtml(t('ui.tile.room_bedroom_title', { tier: roomTierName(rq), n: rq.total }))}</div>`;
+            html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">${escapeHtml(t('ui.tile.room_bedroom_mood', { n: rq.moodEffect, ticks: rq.duration }))}</div>`;
             const b = rq.breakdown;
             const rqCaps = ROOM_SCORE_CAPS.bedroom;
             html += this._roomRequirementsHtml(rq, 'bedroom');
             html += this._roomSizeRowHtml(rq, 'bedroom', rqCaps.size);
-            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${rqCaps.floor}</div>`;
-            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${rqCaps.light}</div>`;
-            if (b.decor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Decorations: +${b.decor} / ${rqCaps.decor} (${escapeHtml(rq.decorList.map(d => d.replace(/_/g, ' ')).join(', '))})</div>`;
-            if (b.coherence > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Coherence: +${b.coherence} / ${rqCaps.coherence}</div>`;
+            html += this._roomScoreRowsHtml(b, rqCaps, rq.decorList);
         }
         if (wq) {
-            const label = escapeHtml(wq.focusGroup ? `${wq.tierName} ${wq.focusGroup}` : wq.tierName);
-            html += `<div class="info-row" style="color:#ffcc44;font-weight:bold;">Workshop — ${label} (${wq.total}/100)</div>`;
+            const label = wq.focusGroup ? t('ui.tile.room_workshop_label', { tier: roomTierName(wq), group: focusGroupName(wq.focusGroup) }) : roomTierName(wq);
+            html += `<div class="info-row" style="color:#ffcc44;font-weight:bold;">${escapeHtml(t('ui.tile.room_workshop_title', { label, n: wq.total }))}</div>`;
             const b = wq.breakdown;
             const wqCaps = ROOM_SCORE_CAPS.workshop;
             html += this._roomRequirementsHtml(wq, 'workshop');
             html += this._roomSizeRowHtml(wq, 'workshop', wqCaps.size);
-            if (b.floor > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Flooring: +${b.floor} / ${wqCaps.floor}</div>`;
-            if (b.light > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Lighting: +${b.light} / ${wqCaps.light}</div>`;
-            if (b.focus > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Focus: +${b.focus} / ${wqCaps.focus}${wq.focusGroup ? ` (${escapeHtml(wq.focusGroup)})` : ''}</div>`;
-            if (b.support > 0) html += `<div class="info-row" style="color:#888;font-size:0.85em;">  Support: +${b.support} / ${wqCaps.support} (${escapeHtml(wq.supportList.map(s => s.replace(/_/g, ' ')).join(', '))})</div>`;
+            const row = (text) => `<div class="info-row" style="color:#888;font-size:0.85em;">${escapeHtml(text)}</div>`;
+            if (b.floor > 0) html += row(t('ui.tile.room_flooring', { n: b.floor, cap: wqCaps.floor }));
+            if (b.light > 0) html += row(t('ui.tile.room_lighting', { n: b.light, cap: wqCaps.light }));
+            if (b.focus > 0) html += row(wq.focusGroup ? t('ui.tile.room_focus_group', { n: b.focus, cap: wqCaps.focus, group: focusGroupName(wq.focusGroup) }) : t('ui.tile.room_focus', { n: b.focus, cap: wqCaps.focus }));
+            if (b.support > 0) html += row(t('ui.tile.room_support', { n: b.support, cap: wqCaps.support, list: wq.supportList.map(s => buildingName(s)).join(', ') }));
             if (wq.speedMult > 1 || wq.qualityBonus > 0) {
-                let bonusText = '';
-                if (wq.speedMult > 1) bonusText += `Speed: +${Math.round((wq.speedMult - 1) * 100)}%`;
-                if (wq.qualityBonus > 0) bonusText += `${bonusText ? ' | ' : ''}Quality: +${wq.qualityBonus} skill`;
-                html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">  → ${bonusText}</div>`;
+                const bonusParts = [];
+                if (wq.speedMult > 1) bonusParts.push(t('ui.tile.room_bonus_speed', { pct: Math.round((wq.speedMult - 1) * 100) }));
+                if (wq.qualityBonus > 0) bonusParts.push(t('ui.tile.room_bonus_quality', { n: wq.qualityBonus }));
+                html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">${escapeHtml(t('ui.tile.room_bonus', { bonus: bonusParts.join(' | ') }))}</div>`;
             }
         }
+        return html;
+    }
+
+    // Flooring / lighting / decor / coherence score rows shared by the bedroom
+    // and town hall sections.
+    _roomScoreRowsHtml(b, caps, decorList) {
+        const row = (text) => `<div class="info-row" style="color:#888;font-size:0.85em;">${escapeHtml(text)}</div>`;
+        let html = '';
+        if (b.floor > 0) html += row(t('ui.tile.room_flooring', { n: b.floor, cap: caps.floor }));
+        if (b.light > 0) html += row(t('ui.tile.room_lighting', { n: b.light, cap: caps.light }));
+        if (b.decor > 0) html += row(t('ui.tile.room_decor', { n: b.decor, cap: caps.decor, list: decorList.map(d => buildingName(d)).join(', ') }));
+        if (b.coherence > 0) html += row(t('ui.tile.room_coherence', { n: b.coherence, cap: caps.coherence }));
         return html;
     }
 
@@ -3028,18 +3150,17 @@ export class UI {
             c.assignedBed && c.assignedBed.x === x && c.assignedBed.y === y && c.hp > 0
         );
         if (assigned) {
-            html += `<div class="info-row">Assigned to: ${escapeHtml(assigned.name)}</div>`;
-            html += `<div class="info-actions"><button onclick="window.game.unassignBed(${x},${y})">Unassign</button></div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.tile.bed_assigned_to', { name: assigned.name }))}</div>`;
+            html += `<div class="info-actions"><button onclick="window.game.unassignBed(${x},${y})">${escapeHtml(t('ui.tile.bed_unassign'))}</button></div>`;
         } else {
-            html += `<div class="info-row">Unassigned bed</div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.tile.bed_unassigned'))}</div>`;
             html += `<div class="info-actions">`;
-            html += `<label>Assign: </label>`;
+            html += `<label>${escapeHtml(t('ui.tile.bed_assign_label'))} </label>`;
             html += `<select id="bed-assign-select" onchange="window.game.assignBedFromSelect(${x},${y},this.value)">`;
-            html += `<option value="">-- Select colonist --</option>`;
+            html += `<option value="">${escapeHtml(t('ui.tile.bed_select_colonist'))}</option>`;
             for (const c of this.game.colonists) {
                 if (c.hp <= 0) continue;
-                const hasBed = c.assignedBed ? ` (has bed)` : '';
-                html += `<option value="${c.id}">${escapeHtml(c.name)}${hasBed}</option>`;
+                html += `<option value="${c.id}">${escapeHtml(c.assignedBed ? t('ui.tile.bed_option_has_bed', { name: c.name }) : c.name)}</option>`;
             }
             html += `</select></div>`;
         }
@@ -3049,12 +3170,12 @@ export class UI {
     _buildNexusInfoHtml() {
         let html = '';
         const waves = this.game.waves;
-        html += `<div class="info-row" style="color:#9933ff;font-weight:bold;">Void Nexus</div>`;
-        html += `<div class="info-row">Highest Wave: ${waves.highestWaveCompleted} | Cap: ${waves.getColonistCap(this.game)}</div>`;
+        html += `<div class="info-row" style="color:#9933ff;font-weight:bold;">${escapeHtml(t('ui.tile.nexus_title'))}</div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.tile.nexus_stats', { wave: waves.highestWaveCompleted, cap: waves.getColonistCap(this.game) }))}</div>`;
         if (waves.active) {
-            html += `<div class="info-row" style="color:#ff4444;">Wave ${waves.currentWave} — ${waves.enemies.length} enemies alive</div>`;
+            html += `<div class="info-row" style="color:#ff4444;">${escapeHtml(t('ui.tile.nexus_wave_active', { n: waves.currentWave, alive: waves.enemies.length }))}</div>`;
         }
-        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('nexus')" style="background:#6622aa;color:white;">Open Rifts Panel</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('nexus')" style="background:#6622aa;color:white;">${escapeHtml(t('ui.tile.open_rifts_panel'))}</button></div>`;
         return html;
     }
 
@@ -3062,23 +3183,23 @@ export class UI {
         let html = '';
         if (tile.pedestalArtifact) {
             const artDef = ALL_ITEMS[tile.pedestalArtifact];
-            const broken = tile.pedestalInactive ? ' <span style="color:#ff4444;">(No Power)</span>' : '';
+            const broken = tile.pedestalInactive ? ` <span style="color:#ff4444;">${escapeHtml(t('ui.tile.pedestal_no_power'))}</span>` : '';
             const stats = getTilePedestalStats(tile);
             const level = getPedestalCharge(tile);
             const lv = PEDESTAL_CHARGE.levels[level];
             const chargeTag = level > 0 ? ` <span style="color:${lv.color};">[${escapeHtml(lv.name)}]</span>` : '';
-            html += `<div class="info-row" style="color:#ccaa44;">Placed: ${this._itemIcon(tile.pedestalArtifact, artDef?.type || 'trinket')}${escapeHtml(artDef?.name || tile.pedestalArtifact)}${chargeTag}${broken}</div>`;
+            html += `<div class="info-row" style="color:#ccaa44;">${escapeHtml(t('ui.tile.pedestal_placed_label'))} ${this._itemIcon(tile.pedestalArtifact, artDef?.type || 'trinket')}${escapeHtml(artDef ? itemName(artDef) : tile.pedestalArtifact)}${chargeTag}${broken}</div>`;
             html += this.getPedestalEffectDescription({ pedestal: stats });
             if (stats?.radius && stats.radius !== 'global') {
-                html += `<div class="info-row">Radius: ${stats.radius} | Mana: -${stats.manaCost || 0}</div>`;
+                html += `<div class="info-row">${escapeHtml(t('ui.tile.pedestal_radius', { radius: stats.radius, mana: stats.manaCost || 0 }))}</div>`;
             } else if (stats?.radius === 'global') {
-                html += `<div class="info-row">Effect: Colony-wide | Mana: -${stats.manaCost || 0}</div>`;
+                html += `<div class="info-row">${escapeHtml(t('ui.tile.pedestal_global', { mana: stats.manaCost || 0 }))}</div>`;
             }
             html += this._buildPedestalChargeHtml(artDef?.pedestal, level, x, y);
             if (stats?.manaCost) html += this._buildPowerPriorityHtml('artifact_pedestal', x, y);
-            html += `<div class="info-actions"><button onclick="window.game.retrievePedestalItem(${x},${y})">Retrieve Item</button></div>`;
+            html += `<div class="info-actions"><button onclick="window.game.retrievePedestalItem(${x},${y})">${escapeHtml(t('ui.tile.pedestal_retrieve'))}</button></div>`;
         } else {
-            html += `<div class="info-row" style="color:#888;">Empty — place an item</div>`;
+            html += `<div class="info-row" style="color:#888;">${escapeHtml(t('ui.tile.pedestal_empty'))}</div>`;
             const available = [
                 ...this.game.resources.trinkets,
                 ...this.game.resources.tools,
@@ -3089,12 +3210,12 @@ export class UI {
             if (available.length > 0) {
                 html += `<div class="info-actions"><select id="pedestal-select">`;
                 for (const art of available) {
-                    html += `<option value="${escapeAttr(art.key)}">${escapeHtml(art.name)}</option>`;
+                    html += `<option value="${escapeAttr(art.key)}">${escapeHtml(itemName(art))}</option>`;
                 }
                 html += `</select>`;
-                html += `<button onclick="window.game.placePedestalItem(${x},${y},document.getElementById('pedestal-select').value)">Place</button></div>`;
+                html += `<button onclick="window.game.placePedestalItem(${x},${y},document.getElementById('pedestal-select').value)">${escapeHtml(t('ui.tile.pedestal_place'))}</button></div>`;
             } else {
-                html += `<div class="info-row" style="color:#666;">No items with pedestal effects in inventory</div>`;
+                html += `<div class="info-row" style="color:#666;">${escapeHtml(t('ui.tile.pedestal_none_available'))}</div>`;
             }
         }
         return html;
@@ -3102,7 +3223,7 @@ export class UI {
 
     _buildRiftGateInfoHtml() {
         let html = '';
-        html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">${this._riftPortalTitle || 'Rift Gate'}</div>`;
+        html += `<div class="info-row" style="color:#33ccff;font-weight:bold;">${escapeHtml(this._riftPortalTitle || t('ui.tile.portal_rift_gate'))}</div>`;
         const expl = this.game.exploration;
         const watchedExp = expl.expeditions.find(e => !e.autoMode);
         const autoCount = expl.expeditions.filter(e => e.autoMode).length;
@@ -3110,12 +3231,12 @@ export class UI {
             const elapsed = this.game.tick - (watchedExp.startTick || this.game.tick);
             const totalDur = Math.floor((watchedExp.duration || 1) * 1.2);
             const pct = watchedExp.status === 'gathering' ? 0 : Math.min(100, Math.floor((elapsed / totalDur) * 100));
-            html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(watchedExp.realmName)} — ${escapeHtml(watchedExp.status)} (${pct}%)</div>`;
+            html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(t('ui.tile.exp_progress', { realm: expRealmName(watchedExp), status: expStatusName(watchedExp.status), pct }))}</div>`;
         }
         if (autoCount > 0) {
-            html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${autoCount} auto running</div>`;
+            html += `<div class="info-row" style="color:#66ccaa;font-size:0.9em;">${escapeHtml(t('ui.tile.exp_auto_count', { n: autoCount }))}</div>`;
         }
-        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('expeditions')" style="background:#1a4466;color:#88ddff;">Open Rifts Panel</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('expeditions')" style="background:#1a4466;color:#88ddff;">${escapeHtml(t('ui.tile.open_rifts_panel'))}</button></div>`;
         return html;
     }
 
@@ -3125,28 +3246,30 @@ export class UI {
         const max = getMaxPedestalCharge(pedestal);
         const options = PEDESTAL_CHARGE.levels.slice(0, max + 1).map((lv, i) => ({
             value: i,
-            label: `${lv.name} (${pedestal.manaCost * lv.costMult})`,
+            label: t('ui.tile.charge_option', { name: lv.name, mana: pedestal.manaCost * lv.costMult }),
             color: lv.color,
-            title: i === 0 ? 'Base effect' : `${lv.costMult}x mana: effects x${lv.strength}${pedestal.radius !== 'global' ? `, radius +${lv.radiusBonus}` : ''}`,
+            title: i === 0 ? t('ui.tile.charge_base')
+                : pedestal.radius !== 'global' ? t('ui.tile.charge_tip_radius', { mult: lv.costMult, strength: lv.strength, radius: lv.radiusBonus })
+                    : t('ui.tile.charge_tip', { mult: lv.costMult, strength: lv.strength }),
         }));
-        let html = `<div class="info-row" style="font-size:11px;color:#ccaa44;">Overcharge (mana):</div>`;
+        let html = `<div class="info-row" style="font-size:11px;color:#ccaa44;">${escapeHtml(t('ui.tile.charge_label'))}</div>`;
         html += this._choiceButtonsHtml(options, level, i => `window.game.setPedestalCharge(${x},${y},${i})`);
         if (max < PEDESTAL_CHARGE.levels.length - 1) {
-            html += `<div class="info-row" style="color:#888;font-size:11px;">Colony-wide trinkets can't go past ${escapeHtml(PEDESTAL_CHARGE.levels[max].name)}.</div>`;
+            html += `<div class="info-row" style="color:#888;font-size:11px;">${escapeHtml(t('ui.tile.charge_global_cap', { name: PEDESTAL_CHARGE.levels[max].name }))}</div>`;
         }
         return html;
     }
 
     _buildTradeRiftInfoHtml(tile, x, y) {
         let html = '';
-        html += `<div class="info-row" style="color:#66ccaa;font-weight:bold;">Trade Rift</div>`;
+        html += `<div class="info-row" style="color:#66ccaa;font-weight:bold;">${escapeHtml(t('ui.tile.trade_rift_title'))}</div>`;
         const requests = this.game.tradeRift.requests;
         const open = requests.filter(r => !r.fulfilled).length;
-        html += `<div class="info-row">${open} open request${open === 1 ? '' : 's'}</div>`;
+        html += `<div class="info-row">${escapeHtml(tp('ui.tile.trade_rift_open', open))}</div>`;
         if (!this.game.power.isPowered(x, y)) {
-            html += `<div class="info-row" style="color:#ff8844;">Unpowered — no mana to open the rift.</div>`;
+            html += `<div class="info-row" style="color:#ff8844;">${escapeHtml(t('ui.tile.trade_rift_unpowered'))}</div>`;
         }
-        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('requests')" style="background:#1a5544;color:#88ddcc;">Open Rifts Panel</button></div>`;
+        html += `<div class="info-actions"><button onclick="window.game.ui.toggleArcanePanel('requests')" style="background:#1a5544;color:#88ddcc;">${escapeHtml(t('ui.tile.open_rifts_panel'))}</button></div>`;
         return html;
     }
 
@@ -3157,8 +3280,8 @@ export class UI {
             const baseCd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             const dpt = (w.damage / baseCd).toFixed(1);
             let tip = w.description ? `${w.description} ` : '';
-            tip += `${w.damage}d (${dpt} dps, ${weaponSpeedLabel(baseCd)})`;
-            if (w.ranged) tip += `, range ${w.range}`;
+            tip += t('ui.colonist.weapon_stats', { dmg: w.damage, dps: dpt, speed: weaponSpeedLabel(baseCd) });
+            if (w.ranged) tip += t('ui.craft.tip_range', { n: w.range });
             const extras = getItemStatLines({ ...w, damage: undefined, ranged: undefined, range: undefined });
             if (extras.length) tip += `, ${extras.join(', ')}`;
             const onHit = getOnHitLines(w);
@@ -3190,9 +3313,9 @@ export class UI {
             return tip;
         }
         if (TOOLS[outputKey]) {
-            const t = TOOLS[outputKey];
-            let tip = t.description ? `${t.description} ` : '';
-            tip += getItemStatLines(t).join(', ');
+            const tool = TOOLS[outputKey];
+            let tip = tool.description ? `${tool.description} ` : '';
+            tip += getItemStatLines(tool).join(', ');
             return tip;
         }
         if (ALL_ITEMS[outputKey]?.type === 'trinket') {
@@ -3201,21 +3324,21 @@ export class UI {
         if (POTIONS[outputKey]) {
             const p = POTIONS[outputKey];
             let tip = p.description ? `${p.description} ` : '';
-            if (p.effect === 'heal') tip += `Heals ${p.healAmount} HP`;
-            else if (p.effect === 'speed') tip += `+${Math.round((p.workSpeedBonus - 1) * 100)}% work, +${Math.round(p.moveSpeedBonus * 100)}% move for ${p.duration} ticks`;
-            else if (p.effect === 'restoreMana') tip += `Restores ${p.manaAmount} mana`;
-            else if (p.effect === 'resistance') tip += `${Math.round(p.damageReduction * 100)}% damage reduction for ${p.duration} ticks`;
+            if (p.effect === 'heal') tip += t('ui.craft.potion_heal', { n: p.healAmount });
+            else if (p.effect === 'speed') tip += t('ui.craft.potion_speed', { work: Math.round((p.workSpeedBonus - 1) * 100), move: Math.round(p.moveSpeedBonus * 100), ticks: p.duration });
+            else if (p.effect === 'restoreMana') tip += t('ui.craft.potion_mana', { n: p.manaAmount });
+            else if (p.effect === 'resistance') tip += t('ui.craft.potion_resistance', { pct: Math.round(p.damageReduction * 100), ticks: p.duration });
             return tip.trim();
         }
         if (SPELL_TOMES[outputKey]) {
-            const t = SPELL_TOMES[outputKey];
-            const spell = SPELLS[t.spell];
-            let tip = t.description ? `${t.description} ` : '';
-            tip += `School: ${spell.school}, Lv ${t.minSchoolLevel}`;
-            if (spell.manaCost) tip += `, ${spell.manaCost} mana`;
-            if (spell.damage) tip += `, ${spell.damage} dmg`;
-            if (spell.healAmount) tip += `, heals ${spell.healAmount}`;
-            if (spell.range) tip += `, range ${spell.range}`;
+            const tome = SPELL_TOMES[outputKey];
+            const spell = SPELLS[tome.spell];
+            let tip = tome.description ? `${tome.description} ` : '';
+            tip += t('ui.craft.tome_school', { school: MAGIC_SKILLS[spell.school]?.name || spell.school, lv: tome.minSchoolLevel });
+            if (spell.manaCost) tip += t('ui.craft.tome_mana', { n: spell.manaCost });
+            if (spell.damage) tip += t('ui.craft.tome_damage', { n: spell.damage });
+            if (spell.healAmount) tip += t('ui.craft.tome_heals', { n: spell.healAmount });
+            if (spell.range) tip += t('ui.craft.tip_range', { n: spell.range });
             return tip;
         }
         return null;
@@ -3225,7 +3348,7 @@ export class UI {
     // one, e.g. "Crypt Warden"), else the type with underscores read as spaces.
     // Returned HTML-escaped (mods define animal names).
     _animalDisplayName(type) {
-        const name = ANIMALS[type]?.name || type.replace(/_/g, ' ');
+        const name = ANIMALS[type]?.name || entityName(type);
         return escapeHtml(name.charAt(0).toUpperCase() + name.slice(1));
     }
 
@@ -3236,13 +3359,13 @@ export class UI {
         this.setSummaryVisible(false);
         const def = ANIMALS[animal.type];
         let html = `<div class="info-header">${this._animalDisplayName(animal.type)}</div>`;
-        html += `<div class="info-row">HP: ${animal.hp}/${animal.maxHp}</div>`;
-        html += `<div class="info-row">${animal.hostile ? 'Hostile' : 'Passive'}</div>`;
-        if (def?.meatYield) html += `<div class="info-row">Meat yield: ${def.meatYield}</div>`;
-        if (def?.hideYield) html += `<div class="info-row">Hide yield: ${def.hideYield}</div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.colonist.hp', { hp: animal.hp, max: animal.maxHp }))}</div>`;
+        html += `<div class="info-row">${escapeHtml(animal.hostile ? t('ui.info.animal_hostile') : t('ui.info.animal_passive'))}</div>`;
+        if (def?.meatYield) html += `<div class="info-row">${escapeHtml(t('ui.info.animal_meat_yield', { n: def.meatYield }))}</div>`;
+        if (def?.hideYield) html += `<div class="info-row">${escapeHtml(t('ui.info.animal_hide_yield', { n: def.hideYield }))}</div>`;
         html += `<div class="info-actions">`;
         if (!animal.hostile) {
-            html += `<button onclick="window.game.huntAnimal(${animal.id})">Hunt</button>`;
+            html += `<button onclick="window.game.huntAnimal(${animal.id})">${escapeHtml(t('ui.info.animal_hunt'))}</button>`;
         }
         html += `</div>`;
         this.elements.infoPanel.innerHTML = html;
@@ -3266,28 +3389,27 @@ export class UI {
     }
 
     _buildRitualHtml(inner = false) {
-        const RES_LABEL = { void_essence: 'Void Essence', runite_ore: 'Runite Ore', runite: 'Runite', moonbloom: 'Moonbloom' };
         let html = inner ? '' : `<div id="ritual-altar-section">`;
-        html += `<div class="info-row" style="color:#cc99ff;font-weight:bold;margin-top:6px;">Rituals</div>`;
+        html += `<div class="info-row" style="color:#cc99ff;font-weight:bold;margin-top:6px;">${escapeHtml(t('ui.tile.rituals_title'))}</div>`;
         for (const [key, ritual] of Object.entries(RITUALS)) {
             const readyAt = this.game.ritualCooldowns[key] || 0;
             const onCooldown = this.game.tick < readyAt;
             const canAfford = this.game.resources.has(ritual.cost);
-            const costStr = Object.entries(ritual.cost).map(([r, n]) => `${n} ${RES_LABEL[r] || r}`).join(', ');
+            const costStr = Object.entries(ritual.cost).map(([r, n]) => t('ui.inv.salvage_part', { n, name: resourceName(r) })).join(', ');
             const disabled = onCooldown || !canAfford ? 'disabled' : '';
             let note = '';
             if (onCooldown) {
                 const ticksPerSec = (1000 / CONFIG.TICK_RATE) * this.game.speed;
                 const remaining = Math.ceil((readyAt - this.game.tick) / ticksPerSec);
-                note = `<span style="color:#cc7744;font-size:0.85em"> recovering ${remaining}s</span>`;
+                note = `<span style="color:#cc7744;font-size:0.85em">${escapeHtml(t('ui.tile.ritual_recovering', { n: remaining }))}</span>`;
             } else if (!canAfford) {
-                note = `<span style="color:#cc7744;font-size:0.85em"> need ${escapeHtml(costStr)}</span>`;
+                note = `<span style="color:#cc7744;font-size:0.85em">${escapeHtml(t('ui.tile.ritual_need', { cost: costStr }))}</span>`;
             }
             html += `<div class="info-row" style="border-top:1px solid #333;padding-top:4px;">`;
             html += `<div style="color:${escapeAttr(ritual.color)};font-weight:bold;">${escapeHtml(ritual.icon)} ${escapeHtml(ritual.name)}</div>`;
             html += `<div style="color:#aaa;font-size:0.85em">${escapeHtml(ritual.description)}</div>`;
-            html += `<div style="color:#999;font-size:0.8em">Cost: ${escapeHtml(costStr)}</div>`;
-            html += `<div class="info-actions"><button ${disabled} onclick="window.game.triggerRitual(${jsArg(key)})" style="background:#3a2a55;color:#cc99ff;">Perform</button>${note}</div>`;
+            html += `<div style="color:#999;font-size:0.8em">${escapeHtml(t('ui.tile.ritual_cost', { cost: costStr }))}</div>`;
+            html += `<div class="info-actions"><button ${disabled} onclick="window.game.triggerRitual(${jsArg(key)})" style="background:#3a2a55;color:#cc99ff;">${escapeHtml(t('ui.tile.ritual_perform'))}</button>${note}</div>`;
             html += `</div>`;
         }
         if (!inner) html += `</div>`;
@@ -3301,29 +3423,30 @@ export class UI {
         this._pendingColonistInfoHtml = null;
         this.setSummaryVisible(true);
         this._viewingRiftGate = this._setRiftPortal(tile, x, y);
-        let html = `<div class="info-header">Tile (${x},${y})</div>`;
-        html += `<div class="info-row">Terrain: ${escapeHtml(tile.terrain)}</div>`;
+        let html = `<div class="info-header">${escapeHtml(t('ui.tile.title', { x, y }))}</div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.tile.terrain', { name: terrainName(tile.terrain) }))}</div>`;
         if (tile.structure) {
-            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${escapeHtml(BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' '))}</div>`;
+            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${escapeHtml(buildingName(tile.structure))}</div>`;
             const maxHp = BUILDINGS[tile.structure]?.hp;
             if (maxHp) {
                 const currentHp = tile.structureHp !== undefined ? tile.structureHp : maxHp;
                 const hpColor = currentHp >= maxHp ? '#88ff88' : currentHp > maxHp * 0.5 ? '#ffcc00' : '#ff4444';
-                html += `<div class="info-row" style="color:${hpColor}">HP: ${currentHp} / ${maxHp}</div>`;
+                html += `<div class="info-row" style="color:${hpColor}">${escapeHtml(t('ui.tile.structure_hp', { hp: currentHp, max: maxHp }))}</div>`;
             }
             html += this.getStructureDescription(tile.structure, x, y);
         }
         if (tile.floor) {
-            html += `<div class="info-row" style="color:#999">Floor: ${escapeHtml(tile.floor.replace(/_/g,' '))}</div>`;
+            html += `<div class="info-row" style="color:#999">${escapeHtml(t('ui.tile.floor', { name: buildingName(tile.floor) }))}</div>`;
         }
-        if (tile.resource) html += `<div class="info-row">Resource: ${escapeHtml(tile.resource.type)} (${tile.resource.amount})</div>`;
+        if (tile.resource) html += `<div class="info-row">${escapeHtml(t('ui.tile.resource', { name: resourceName(tile.resource.type), n: tile.resource.amount }))}</div>`;
         if (tile.zone) {
-            html += `<div class="info-row">Zone: ${escapeHtml(tile.zone.crop)} (${escapeHtml(tile.zone.state)})</div>`;
+            const zoneStates = { empty: t('ui.tile.zone_empty'), growing: t('ui.tile.zone_growing'), ready: t('ui.tile.zone_ready') };
+            html += `<div class="info-row">${escapeHtml(t('ui.tile.zone', { crop: CROPS[tile.zone.crop]?.name || resourceName(tile.zone.crop), state: zoneStates[tile.zone.state] || tile.zone.state }))}</div>`;
             if (tile.zone.state === 'growing') {
                 const cropDef = CROPS[tile.zone.crop];
                 if (cropDef) {
                     const pct = Math.min(100, Math.round((tile.zone.growth / cropDef.growthTicks) * 100));
-                    html += `<div class="info-row" style="color:#88cc44">Growth: ${pct}%</div>`;
+                    html += `<div class="info-row" style="color:#88cc44">${escapeHtml(t('ui.tile.zone_growth', { pct }))}</div>`;
                 }
             }
         }
@@ -3357,13 +3480,13 @@ export class UI {
         if (tile.structure === 'arcane_core') {
             const cs = getComplexStructureAt(this.game, x, y);
             if (cs) {
-                html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
+                html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">${escapeHtml(t('ui.tile.pattern_active'))}</div>`;
                 const def = COMPLEX_STRUCTURES[cs.key];
                 if (def) html += `<div class="info-row" style="color:#88ff88;">${escapeHtml(def.description)}</div>`;
                 if (cs.effect.ritualAltar) { html += this._buildRitualHtml(); this._viewingRitualAltar = true; }
             } else {
                 this._viewingRitualAltar = false;
-                html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete. Surround with the required chalk layout to activate.</div>`;
+                html += `<div class="info-row" style="color:#ff8844;">${escapeHtml(t('ui.tile.pattern_incomplete'))}</div>`;
             }
         } else {
             this._viewingRitualAltar = false;
@@ -3378,10 +3501,10 @@ export class UI {
         const header = this.elements.infoPanel.querySelector(`[data-animal-header="${animalId}"]`);
         if (!header) return;
         const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-        const currentName = animal.name || cap(animal.type);
+        const currentName = animal.name || cap(tamedTypeName(animal.type));
         const color = header.style.color;
         header.innerHTML = `<input id="animal-rename-input-${animalId}" type="text" value="" placeholder="${escapeAttr(currentName)}" maxlength="24" style="background:#222;color:#eee;border:1px solid #666;padding:1px 4px;font-size:0.9em;width:110px;">` +
-            `<button onclick="window.game.ui._confirmAnimalRename(${animalId})" style="background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:4px;">OK</button>` +
+            `<button onclick="window.game.ui._confirmAnimalRename(${animalId})" style="background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:4px;">${escapeHtml(t('common.ok'))}</button>` +
             `<button onclick="window.game.ui._cancelAnimalRename(${animalId})" style="background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:2px;">✕</button>`;
         const input = document.getElementById(`animal-rename-input-${animalId}`);
         if (input) {
@@ -3412,10 +3535,10 @@ export class UI {
         const color = def?.color || '#ccaa88';
         header.style.color = color;
         const cap = s => escapeHtml(s.charAt(0).toUpperCase() + s.slice(1));
-        const headerName = animal.name ? `${escapeHtml(animal.name)} <span style="color:#888;font-size:0.85em;">(${cap(animal.type)})</span>` : cap(animal.type);
-        const petLabel = animal.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
+        const headerName = animal.name ? `${escapeHtml(animal.name)} <span style="color:#888;font-size:0.85em;">(${cap(tamedTypeName(animal.type))})</span>` : cap(tamedTypeName(animal.type));
+        const petLabel = animal.isPet ? ` <span style="color:#aaddff">${escapeHtml(t('ui.info.pet_tag'))}</span>` : '';
         const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
-        header.innerHTML = `${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${animalId})">Rename</button>`;
+        header.innerHTML = `${headerName} <span style="color:#888;font-size:0.85em;">${escapeHtml(t('ui.info.tamed_tag'))}</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${animalId})">${escapeHtml(t('ui.info.rename'))}</button>`;
     }
 
     showTileEntities(tile, x, y, colonists, animals, raiders = [], tamedAnimals = [], summons = []) {
@@ -3432,14 +3555,15 @@ export class UI {
 
         for (const r of raiders) {
             const def = ENTITIES[r.type];
-            const label = def?.name || (r.char === 'E' ? 'Void Enemy' : 'Raider');
+            const label = def?.name || (r.char === 'E' ? t('ui.info.void_enemy') : t('ui.info.raider'));
             const color = def?.color || (r.char === 'E' ? '#cc00ff' : '#ff3333');
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
             html += `<div class="info-header" style="color:${escapeAttr(color)};">${escapeHtml(label)}</div>`;
-            html += `<div class="info-row">HP: ${r.hp}/${r.maxHp}</div>`;
-            html += `<div class="info-row">Damage: ${r.weapon?.name ? escapeHtml(r.weapon.name) + ' ' : ''}${r.damage}d (${(r.damage / (r.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1)} dps)</div>`;
-            if (r.damageReduction) html += `<div class="info-row" style="color:#aaddff;">DR: ${Math.round(r.damageReduction * 100)}%</div>`;
-            html += `<div class="info-row">State: ${r.fleeing ? 'Fleeing' : 'Attacking'}</div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.colonist.hp', { hp: r.hp, max: r.maxHp }))}</div>`;
+            const rDps = (r.damage / (r.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1);
+            html += `<div class="info-row">${escapeHtml(r.weapon?.name ? t('ui.info.damage_weapon', { weapon: itemName(r.weapon), dmg: r.damage, dps: rDps }) : t('ui.info.damage', { dmg: r.damage, dps: rDps }))}</div>`;
+            if (r.damageReduction) html += `<div class="info-row" style="color:#aaddff;">${escapeHtml(t('ui.info.damage_reduction', { pct: Math.round(r.damageReduction * 100) }))}</div>`;
+            html += `<div class="info-row">${escapeHtml(r.fleeing ? t('ui.info.raider_fleeing') : t('ui.info.raider_attacking'))}</div>`;
             if (r.roles && r.roles.length > 0) html += getRoleInfoHtml(r);
             html += `</div>`;
         }
@@ -3454,30 +3578,30 @@ export class UI {
             const def = ANIMALS[a.type];
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            html += `<div class="info-header" style="color:${escapeAttr(color)};">${this._animalDisplayName(a.type)}${a.hostile ? ' (hostile)' : ''}</div>`;
-            html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
-            if (def?.meatYield) html += `<div class="info-row">Meat yield: ${def.meatYield}</div>`;
-            if (def?.hideYield) html += `<div class="info-row">Hide yield: ${def.hideYield}</div>`;
-            if (a.hostile && def?.damage) html += `<div class="info-row">Damage: ${def.damage}</div>`;
+            html += `<div class="info-header" style="color:${escapeAttr(color)};">${this._animalDisplayName(a.type)}${a.hostile ? escapeHtml(t('ui.info.hostile_tag')) : ''}</div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.colonist.hp', { hp: a.hp, max: a.maxHp }))}</div>`;
+            if (def?.meatYield) html += `<div class="info-row">${escapeHtml(t('ui.info.animal_meat_yield', { n: def.meatYield }))}</div>`;
+            if (def?.hideYield) html += `<div class="info-row">${escapeHtml(t('ui.info.animal_hide_yield', { n: def.hideYield }))}</div>`;
+            if (a.hostile && def?.damage) html += `<div class="info-row">${escapeHtml(t('ui.info.animal_damage', { n: def.damage }))}</div>`;
             if (def?.tameable) {
                 const tamedDef = TAMED_ANIMALS[a.type];
-                if (tamedDef?.produces) html += `<div class="info-row" style="color:#88cc88">Produces: ${escapeHtml(tamedDef.produces)} (every ${tamedDef.produceRate} ticks)</div>`;
-                if (tamedDef?.packAnimal) html += `<div class="info-row" style="color:#bbaa44">Pack animal (+${Math.round(tamedDef.expeditionSpeedBonus * 100)}% expedition speed)</div>`;
-                if (tamedDef?.happinessAura) html += `<div class="info-row" style="color:#ff88cc">Happiness aura (radius ${tamedDef.auraRadius})</div>`;
+                if (tamedDef?.produces) html += `<div class="info-row" style="color:#88cc88">${escapeHtml(t('ui.info.animal_produces', { name: resourceName(tamedDef.produces), n: tamedDef.produceRate }))}</div>`;
+                if (tamedDef?.packAnimal) html += `<div class="info-row" style="color:#bbaa44">${escapeHtml(t('ui.info.animal_pack', { pct: Math.round(tamedDef.expeditionSpeedBonus * 100) }))}</div>`;
+                if (tamedDef?.happinessAura) html += `<div class="info-row" style="color:#ff88cc">${escapeHtml(t('ui.info.animal_happiness_aura', { n: tamedDef.auraRadius }))}</div>`;
             }
-            html += `<div class="info-row">Speed: ${def?.speed || a.speed}</div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.info.animal_speed', { n: def?.speed || a.speed }))}</div>`;
             html += `<div class="info-actions">`;
-            html += `<button onclick="window.game.huntAnimal(${a.id})">Hunt</button>`;
+            html += `<button onclick="window.game.huntAnimal(${a.id})">${escapeHtml(t('ui.info.animal_hunt'))}</button>`;
             if (def?.tameable && this.game.research.isResearched('beast_binding')) {
                 const tamedDef = TAMED_ANIMALS[a.type];
                 const canAfford = tamedDef && this.game.resources.has({ food: tamedDef.foodToTame });
                 if (tamedDef?.dangerousTame) {
                     const bestTamer = this.game.colonists.filter(c => c.hp > 0).sort((a, b) => (b.skills.animals || 0) - (a.skills.animals || 0))[0];
                     const chance = bestTamer ? Math.round(getTameChance(bestTamer, a.type, this.game) * 100) : Math.round((tamedDef.baseTameChance || 0.4) * 100);
-                    html += `<button ${canAfford ? '' : 'disabled'} onclick="window.game.tameWildAnimal(${a.id})">Tame (${tamedDef.foodToTame} food) — ${chance}%</button>`;
-                    html += `<div class="info-row" style="color:#ff6644;font-size:0.85em">⚠ Dangerous! Retaliation: ${tamedDef.retaliationDamage} dmg on failure</div>`;
+                    html += `<button ${canAfford ? '' : 'disabled'} onclick="window.game.tameWildAnimal(${a.id})">${escapeHtml(t('ui.info.tame_chance', { food: tamedDef.foodToTame, pct: chance }))}</button>`;
+                    html += `<div class="info-row" style="color:#ff6644;font-size:0.85em">${escapeHtml(t('ui.info.tame_dangerous', { n: tamedDef.retaliationDamage }))}</div>`;
                 } else {
-                    html += `<button ${canAfford ? '' : 'disabled'} onclick="window.game.tameWildAnimal(${a.id})">Tame (${tamedDef?.foodToTame || '?'} food)</button>`;
+                    html += `<button ${canAfford ? '' : 'disabled'} onclick="window.game.tameWildAnimal(${a.id})">${escapeHtml(t('ui.info.tame', { food: tamedDef?.foodToTame || '?' }))}</button>`;
                 }
             }
             html += `</div></div>`;
@@ -3487,48 +3611,49 @@ export class UI {
             const def = TAMED_ANIMALS[a.type];
             const color = def?.color || '#ccaa88';
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
-            const petLabel = a.isPet ? ' <span style="color:#aaddff">Pet</span>' : '';
+            const petLabel = a.isPet ? ` <span style="color:#aaddff">${escapeHtml(t('ui.info.pet_tag'))}</span>` : '';
             const cap = s => escapeHtml(s.charAt(0).toUpperCase() + s.slice(1));
-            const headerName = a.name ? `${escapeHtml(a.name)} <span style="color:#888;font-size:0.85em;">(${cap(a.type)})</span>` : cap(a.type);
+            const headerName = a.name ? `${escapeHtml(a.name)} <span style="color:#888;font-size:0.85em;">(${cap(tamedTypeName(a.type))})</span>` : cap(tamedTypeName(a.type));
             const renameStyle = 'background:#333;color:#ccc;border:1px solid #555;padding:1px 5px;font-size:0.8em;cursor:pointer;margin-left:6px;vertical-align:middle;';
-            html += `<div class="info-header" style="color:${escapeAttr(color)};" data-animal-header="${a.id}">${headerName} <span style="color:#888;font-size:0.85em;">(Tamed)</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">Rename</button></div>`;
-            html += `<div class="info-row">HP: ${a.hp}/${a.maxHp}</div>`;
+            html += `<div class="info-header" style="color:${escapeAttr(color)};" data-animal-header="${a.id}">${headerName} <span style="color:#888;font-size:0.85em;">${escapeHtml(t('ui.info.tamed_tag'))}</span>${petLabel}<button style="${renameStyle}" onclick="window.game.ui.renameAnimalInPanel(${a.id})">${escapeHtml(t('ui.info.rename'))}</button></div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.colonist.hp', { hp: a.hp, max: a.maxHp }))}</div>`;
             if (a.level > 0) {
                 const lvlTip = escapeAttr(animalLevelTooltip(a.level, a.type)).replace(/\n/g, '&#10;');
-                html += `<div class="info-row" style="color:#ffcc44;" title="${lvlTip}">Animal Level ${a.level}${a.level >= 5 ? ' (Max)' : ''}</div>`;
+                html += `<div class="info-row" style="color:#ffcc44;" title="${lvlTip}">${escapeHtml(t(a.level >= 5 ? 'ui.info.animal_level_max' : 'ui.info.animal_level', { n: a.level }))}</div>`;
             }
             if (a.bondedColonistId) {
                 const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
-                const bondName = bonded ? escapeHtml(bonded.name) : 'Unknown';
+                const bondName = bonded ? bonded.name : t('common.unknown');
                 const PET_BOND_THRESHOLD = 5;
-                const bondDisplay = a.isPet ? `${bondName} (Pet)` : `${bondName} (Bond: ${a.bondLevel || 0}/${PET_BOND_THRESHOLD})`;
-                html += `<div class="info-row" style="color:#aaddff">Bonded: ${bondDisplay}</div>`;
+                const bondDisplay = a.isPet ? t('ui.info.bonded_pet', { name: bondName }) : t('ui.info.bonded_level', { name: bondName, n: a.bondLevel || 0, max: PET_BOND_THRESHOLD });
+                html += `<div class="info-row" style="color:#aaddff">${escapeHtml(bondDisplay)}</div>`;
             }
             if (def?.hungerRate) {
                 const threshold = def.hungerThreshold || 3;
                 const hunger = a.hunger || 0;
                 if (hunger >= threshold) {
-                    html += `<div class="info-row" style="color:#ff6644">Hungry! (${hunger}/${threshold}) — needs feeding</div>`;
+                    html += `<div class="info-row" style="color:#ff6644">${escapeHtml(t('ui.info.animal_hungry', { n: hunger, max: threshold }))}</div>`;
                 } else if (hunger > 0) {
-                    html += `<div class="info-row" style="color:#ddaa44">Hunger: ${hunger}/${threshold}</div>`;
+                    html += `<div class="info-row" style="color:#ddaa44">${escapeHtml(t('ui.info.animal_hunger', { n: hunger, max: threshold }))}</div>`;
                 }
             }
             if (a.roles && a.roles.length > 0) {
                 html += getRoleInfoHtml(a);
             } else {
                 if (def?.produces) {
-                    html += `<div class="info-row">Produces: ${escapeHtml(def.produces)} (every ${def.produceRate} ticks)</div>`;
-                    html += `<div class="info-row">Next in: ${a.produceCooldown} ticks</div>`;
+                    html += `<div class="info-row">${escapeHtml(t('ui.info.animal_produces', { name: resourceName(def.produces), n: def.produceRate }))}</div>`;
+                    html += `<div class="info-row">${escapeHtml(t('ui.info.animal_next_in', { n: a.produceCooldown }))}</div>`;
                 }
                 if (def?.guardAnimal) {
                     const stateColor = a.guardState === 'engaging' ? '#ff4444' : a.guardState === 'retreating' ? '#ffaa00' : '#44cc44';
-                    html += `<div class="info-row" style="color:${stateColor}">Guard: ${(a.guardState || 'patrolling').charAt(0).toUpperCase() + (a.guardState || 'patrolling').slice(1)}</div>`;
+                    const guardState = colonistStateName(a.guardState || 'patrolling');
+                    html += `<div class="info-row" style="color:${stateColor}">${escapeHtml(t('ui.info.animal_guard_state', { state: guardState.charAt(0).toUpperCase() + guardState.slice(1) }))}</div>`;
                 }
-                if (def?.packAnimal) html += `<div class="info-row" style="color:#bbaa44">Pack animal (+${Math.round(def.expeditionSpeedBonus * 100)}% expedition speed)</div>`;
-                if (def?.happinessAura) html += `<div class="info-row" style="color:#ff88cc">Happiness aura (radius ${def.auraRadius})</div>`;
+                if (def?.packAnimal) html += `<div class="info-row" style="color:#bbaa44">${escapeHtml(t('ui.info.animal_pack', { pct: Math.round(def.expeditionSpeedBonus * 100) }))}</div>`;
+                if (def?.happinessAura) html += `<div class="info-row" style="color:#ff88cc">${escapeHtml(t('ui.info.animal_happiness_aura', { n: def.auraRadius }))}</div>`;
             }
             html += getEffectInfoHtml(a);
-            if (a.onExpedition) html += `<div class="info-row" style="color:#33ccff">On expedition</div>`;
+            if (a.onExpedition) html += `<div class="info-row" style="color:#33ccff">${escapeHtml(t('ui.info.animal_on_expedition'))}</div>`;
             const isGuardAnimal = a.roles?.some(r => r.type === 'guard') || def?.guardAnimal;
             if (isGuardAnimal && !a.isPet) {
                 const aliveColonists = this.game.colonists.filter(c => c.hp > 0);
@@ -3537,7 +3662,7 @@ export class UI {
                         `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                     ).join('');
                     html += `<div class="info-row" style="margin-top:4px;">`;
-                    html += `<label style="color:#aaaaaa;font-size:0.85em;">Defends: </label>`;
+                    html += `<label style="color:#aaaaaa;font-size:0.85em;">${escapeHtml(t('ui.info.animal_defends'))} </label>`;
                     html += `<select onchange="window.game.rebondAnimal(${a.id}, parseInt(this.value))" style="background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;">${opts}</select>`;
                     html += `</div>`;
                 }
@@ -3552,7 +3677,7 @@ export class UI {
                         `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                     ).join('');
                     html += `<div class="info-row" style="margin-top:4px;">`;
-                    html += `<label style="color:#aaaaaa;font-size:0.85em;">Pet (${ownerPetCount}/${maxPets}): </label>`;
+                    html += `<label style="color:#aaaaaa;font-size:0.85em;">${escapeHtml(t('ui.info.animal_pet_owner', { n: ownerPetCount, max: maxPets }))} </label>`;
                     html += `<select onchange="window.game.rebondPet(${a.id}, parseInt(this.value))" style="background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;">${opts}</select>`;
                     html += `</div>`;
                 }
@@ -3563,14 +3688,14 @@ export class UI {
                 if (penPositions.length > 0) {
                     const penOpts = penPositions.map(p => {
                         const isCurrent = p.x === a.penX && p.y === a.penY;
-                        return `<option value="${p.x},${p.y}"${isCurrent ? ' selected' : ''}>Pen (${p.x}, ${p.y})</option>`;
+                        return `<option value="${p.x},${p.y}"${isCurrent ? ' selected' : ''}>${escapeHtml(t('ui.info.animal_pen_option', { x: p.x, y: p.y }))}</option>`;
                     }).join('');
                     html += `<div class="info-row" style="margin-top:4px;">`;
-                    html += `<label style="color:#aaaaaa;font-size:0.85em;">Pen: </label>`;
+                    html += `<label style="color:#aaaaaa;font-size:0.85em;">${escapeHtml(t('ui.info.animal_pen_label'))} </label>`;
                     html += `<select onchange="const [px,py]=this.value.split(',').map(Number);window.game.directAssignAnimalPen(${a.id},px,py)" style="background:#222;color:#eee;border:1px solid #555;padding:1px 3px;font-size:0.85em;">${penOpts}</select>`;
                     html += `</div>`;
                 } else {
-                    html += `<button onclick="window.game.reassignAnimalPen(${a.id})">Reassign pen</button>`;
+                    html += `<button onclick="window.game.reassignAnimalPen(${a.id})">${escapeHtml(t('ui.info.animal_reassign_pen'))}</button>`;
                 }
             }
             html += `</div>`;
@@ -3579,57 +3704,58 @@ export class UI {
         for (const s of summons) {
             const def = ENTITIES[s.type];
             const color = def?.color || s.color || '#9966ff';
-            const name = def?.name || s.type || 'Summon';
+            const name = def?.name || (s.type ? entityName(s.type) : t('ui.info.summon'));
             html += `<div style="border-bottom:1px solid #444;margin-bottom:6px;padding-bottom:6px;">`;
             html += `<div class="info-header" style="color:${escapeAttr(color)};">${escapeHtml(name)}</div>`;
-            html += `<div class="info-row">HP: ${s.hp}/${s.maxHp}</div>`;
-            html += `<div class="info-row">Damage: ${s.damage}d (${(s.damage / (s.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1)} dps)</div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.colonist.hp', { hp: s.hp, max: s.maxHp }))}</div>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.info.damage', { dmg: s.damage, dps: (s.damage / (s.attackCooldown || COLONIST_CONFIG.baseAttackCooldown)).toFixed(1) }))}</div>`;
             if (s.roles && s.roles.length > 0) {
                 html += getRoleInfoHtml(s);
             } else {
                 const remaining = s.expiresAt ? Math.max(0, s.expiresAt - (this.game.tick || 0)) : '?';
-                html += `<div class="info-row" style="color:#9966ff">Expires in ${remaining} ticks</div>`;
-                html += `<div class="info-row">State: ${escapeHtml(s.guardState || 'idle')}</div>`;
+                html += `<div class="info-row" style="color:#9966ff">${escapeHtml(t('ui.info.summon_expires', { n: remaining }))}</div>`;
+                html += `<div class="info-row">${escapeHtml(t('ui.colonist.state', { state: colonistStateName(s.guardState || 'idle') }))}</div>`;
             }
             html += `</div>`;
         }
 
-        html += `<div class="info-header" style="font-size:11px;color:#aaa;">Tile (${x},${y})</div>`;
+        html += `<div class="info-header" style="font-size:11px;color:#aaa;">${escapeHtml(t('ui.tile.title', { x, y }))}</div>`;
         if (tile.structure) {
-            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${escapeHtml(BUILDINGS[tile.structure]?.name || tile.structure.replace(/_/g,' '))}</div>`;
+            html += `<div class="info-row" style="color:#ddd;font-weight:bold;">${escapeHtml(buildingName(tile.structure))}</div>`;
             const maxHp = BUILDINGS[tile.structure]?.hp;
             if (maxHp) {
                 const currentHp = tile.structureHp !== undefined ? tile.structureHp : maxHp;
                 const hpColor = currentHp >= maxHp ? '#88ff88' : currentHp > maxHp * 0.5 ? '#ffcc00' : '#ff4444';
-                html += `<div class="info-row" style="color:${hpColor}">HP: ${currentHp} / ${maxHp}</div>`;
+                html += `<div class="info-row" style="color:${hpColor}">${escapeHtml(t('ui.tile.structure_hp', { hp: currentHp, max: maxHp }))}</div>`;
             }
             html += this.getStructureDescription(tile.structure, x, y);
             if (tile.structure === 'arcane_core') {
                 const cs = getComplexStructureAt(this.game, x, y);
                 if (cs) {
-                    html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">Pattern Active!</div>`;
+                    html += `<div class="info-row" style="color:#44ff44;font-weight:bold;">${escapeHtml(t('ui.tile.pattern_active'))}</div>`;
                     const def = COMPLEX_STRUCTURES[cs.key];
                     if (def) html += `<div class="info-row" style="color:#88ff88;">${escapeHtml(def.description)}</div>`;
                     if (cs.effect.ritualAltar) { html += this._buildRitualHtml(); this._viewingRitualAltar = true; }
                 } else {
                     this._viewingRitualAltar = false;
-                    html += `<div class="info-row" style="color:#ff8844;">Pattern incomplete. Surround with the required chalk layout to activate.</div>`;
+                    html += `<div class="info-row" style="color:#ff8844;">${escapeHtml(t('ui.tile.pattern_incomplete'))}</div>`;
                 }
             }
         }
-        if (tile.floor) html += `<div class="info-row" style="color:#999">Floor: ${escapeHtml(tile.floor.replace(/_/g,' '))}</div>`;
+        if (tile.floor) html += `<div class="info-row" style="color:#999">${escapeHtml(t('ui.tile.floor', { name: buildingName(tile.floor) }))}</div>`;
         if (tile.zone) {
-            html += `<div class="info-row">Zone: ${escapeHtml(tile.zone.crop)} (${escapeHtml(tile.zone.state)})</div>`;
+            const zoneStates = { empty: t('ui.tile.zone_empty'), growing: t('ui.tile.zone_growing'), ready: t('ui.tile.zone_ready') };
+            html += `<div class="info-row">${escapeHtml(t('ui.tile.zone', { crop: CROPS[tile.zone.crop]?.name || resourceName(tile.zone.crop), state: zoneStates[tile.zone.state] || tile.zone.state }))}</div>`;
             if (tile.zone.state === 'growing') {
                 const cropDef = CROPS[tile.zone.crop];
                 if (cropDef) {
                     const pct = Math.min(100, Math.round((tile.zone.growth / cropDef.growthTicks) * 100));
-                    html += `<div class="info-row" style="color:#88cc44">Growth: ${pct}%</div>`;
+                    html += `<div class="info-row" style="color:#88cc44">${escapeHtml(t('ui.tile.zone_growth', { pct }))}</div>`;
                 }
             }
         }
-        if (tile.resource) html += `<div class="info-row">Resource: ${escapeHtml(tile.resource.type)} (${tile.resource.amount})</div>`;
-        html += `<div class="info-row">Terrain: ${escapeHtml(tile.terrain)}</div>`;
+        if (tile.resource) html += `<div class="info-row">${escapeHtml(t('ui.tile.resource', { name: resourceName(tile.resource.type), n: tile.resource.amount }))}</div>`;
+        html += `<div class="info-row">${escapeHtml(t('ui.tile.terrain', { name: terrainName(tile.terrain) }))}</div>`;
         if (tile.roomId !== null) html += this._buildRoomQualityHtml(tile.roomId);
 
         if (tile.structure === 'bed') {
@@ -3666,25 +3792,27 @@ export class UI {
         this._pendingColonistInfoHtml = null;
         this.setSummaryVisible(false);
         const draftedCount = colonists.filter(c => c.drafted).length;
-        let html = `<div class="info-header">${colonists.length} Colonists Selected</div>`;
+        let html = `<div class="info-header">${escapeHtml(t('ui.info.multi_selected', { n: colonists.length }))}</div>`;
         html += `<div class="info-actions" style="margin-bottom:8px;">`;
-        html += `<button onclick="window.game.draftAllSelected()">Draft All</button>`;
-        html += `<button onclick="window.game.undraftAllSelected()">Undraft All</button>`;
+        html += `<button onclick="window.game.draftAllSelected()">${escapeHtml(t('ui.colonist.draft_all'))}</button>`;
+        html += `<button onclick="window.game.undraftAllSelected()">${escapeHtml(t('ui.colonist.undraft_all'))}</button>`;
         html += `</div>`;
-        html += `<div class="info-row" style="color:#888">${draftedCount} drafted</div>`;
+        html += `<div class="info-row" style="color:#888">${escapeHtml(t('ui.info.multi_drafted', { n: draftedCount }))}</div>`;
 
         for (const c of colonists) {
             const moodLevel = getMoodLabel(c.mood);
             html += `<div style="border-top:1px solid #333;margin-top:4px;padding-top:4px;">`;
             html += `<span class="info-header" style="cursor:pointer;color:${escapeAttr(c.nameColor || '#ffff00')}" onclick="window.game.selectColonistById(${c.id})">${escapeHtml(c.name)}</span>`;
             html += ` <span class="mood-${moodLevel}">${c.mood.toFixed(0)}</span>`;
-            html += ` <span style="color:#888">${escapeHtml(c.state)}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${c.golem ? ' [Golem]' : ''}</span>`;
-            html += `<div class="info-row">HP:${Math.round(c.hp)} H:${c.needs.hunger.toFixed(0)} R:${c.needs.rest.toFixed(0)}</div>`;
+            const tags = (c._relaxActivity ? t('ui.info.multi_tag_relaxing') : '') + (c.drafted ? t('ui.info.multi_tag_drafted') : '')
+                + (c.guardMode ? t('ui.info.multi_tag_guard') : '') + (c.golem ? t('ui.info.multi_tag_golem') : '');
+            html += ` <span style="color:#888">${escapeHtml(colonistStateName(c.state))}${escapeHtml(tags)}</span>`;
+            html += `<div class="info-row">${escapeHtml(t('ui.info.multi_stats', { hp: Math.round(c.hp), hunger: c.needs.hunger.toFixed(0), rest: c.needs.rest.toFixed(0) }))}</div>`;
             html += `<div class="info-actions">`;
-            html += `<button onclick="window.game.selectColonistById(${c.id})">Focus</button>`;
-            html += `<button onclick="window.game.toggleDraft(${c.id})">${c.drafted ? 'Undraft' : 'Draft'}</button>`;
-            html += `<button onclick="window.game.toggleGuard(${c.id})">${c.guardMode ? 'Unguard' : 'Guard'}</button>`;
-            if (c.guardMode) html += `<button onclick="window.game.input.startGuardPointTargeting(${c.id})">Set Guard Point</button>`;
+            html += `<button onclick="window.game.selectColonistById(${c.id})">${escapeHtml(t('ui.info.multi_focus'))}</button>`;
+            html += `<button onclick="window.game.toggleDraft(${c.id})">${escapeHtml(c.drafted ? t('ui.main.undraft') : t('ui.main.draft'))}</button>`;
+            html += `<button onclick="window.game.toggleGuard(${c.id})">${escapeHtml(c.guardMode ? t('ui.colonist.unguard') : t('ui.colonist.guard'))}</button>`;
+            if (c.guardMode) html += `<button onclick="window.game.input.startGuardPointTargeting(${c.id})">${escapeHtml(t('ui.colonist.set_guard_point'))}</button>`;
             html += `</div></div>`;
         }
 
@@ -3780,16 +3908,16 @@ export class UI {
         const attuneBadge = underAttuned > 0 ? ` <span style="color:#ff8844;font-size:0.85em">(${underAttuned})</span>` : '';
         const tabs =
             '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
-            `<button class="craft-tab${this._prioTab === 'work' ? ' active' : ''}" data-prio-tab="work">Work Priorities</button>` +
-            `<button class="craft-tab${this._prioTab === 'attune' ? ' active' : ''}" data-prio-tab="attune">Attunement${attuneBadge}</button>` +
-            `<button class="craft-tab${this._prioTab === 'groups' ? ' active' : ''}" data-prio-tab="groups">Groups</button>` +
+            `<button class="craft-tab${this._prioTab === 'work' ? ' active' : ''}" data-prio-tab="work">${escapeHtml(t('ui.panel.prio_tab_work'))}</button>` +
+            `<button class="craft-tab${this._prioTab === 'attune' ? ' active' : ''}" data-prio-tab="attune">${escapeHtml(t('ui.panel.prio_tab_attune'))}${attuneBadge}</button>` +
+            `<button class="craft-tab${this._prioTab === 'groups' ? ' active' : ''}" data-prio-tab="groups">${escapeHtml(t('ui.panel.prio_tab_groups'))}</button>` +
             '</div>';
 
         const body = this._prioTab === 'attune' ? this._attunementGridHtml() : this._prioTab === 'groups' ? this._colonistGroupsHtml() : this._workPriorityGridHtml();
         const heading = this._prioTab === 'attune'
-            ? `<h3>Magic Attunement (${MAGIC_STUDY_CONFIG.attunementSlots === 1 ? 'click a school to attune; one per colonist' : `click to toggle, max ${MAGIC_STUDY_CONFIG.attunementSlots}`})</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">Only spells from attuned schools autocast in the world and on expeditions. Free to change anytime.</div>`
+            ? `<h3>${escapeHtml(MAGIC_STUDY_CONFIG.attunementSlots === 1 ? t('ui.panel.attune_heading_one') : t('ui.panel.attune_heading_many', { n: MAGIC_STUDY_CONFIG.attunementSlots }))}</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">${escapeHtml(t('ui.panel.attune_note'))}</div>`
             : this._prioTab === 'groups' ? ''
-            : `<h3>Work Priorities (${isTouchUI() ? 'tap to cycle, long-press to reverse' : 'click to cycle'}, -=disabled)</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">1 = highest priority, 5 = lowest. Note: Golem priorities are locked to their specialization</div>`;
+            : `<h3>${escapeHtml(t(isTouchUI() ? 'ui.panel.prio_heading_touch' : 'ui.panel.prio_heading'))}</h3><div style="color: #888; font-size: 0.9em; margin-bottom: 8px;">${escapeHtml(t('ui.panel.prio_note'))}</div>`;
         let profileToolbar = '';
         if (this._prioTab === 'work') {
             const customProfiles = this.game.priorityProfiles || {};
@@ -3800,7 +3928,7 @@ export class UI {
             ];
             const selectedName = this._prioSelectedProfile || '';
             const profileOptions = allProfileNames
-                .map(name => `<option value="${escapeAttr(name)}"${name === selectedName ? ' selected' : ''}>${escapeHtml(name)}</option>`)
+                .map(name => `<option value="${escapeAttr(name)}"${name === selectedName ? ' selected' : ''}>${escapeHtml(PRIORITY_PROFILES[name] ? priorityProfileName(name) : name)}</option>`)
                 .join('');
 
             // Load draft from selected profile if selection changed or draft missing.
@@ -3822,8 +3950,8 @@ export class UI {
             let profileValueRow = '';
             if (this._prioProfileDraft) {
                 const hint = isBuiltIn
-                    ? '<span style="color:#666;font-size:10px;">Built-in profile (read-only)</span>'
-                    : `<span style="color:#666;font-size:10px;">${isTouchUI() ? 'Tap to cycle (1=highest, 5=lowest, -=off). Long-press to reverse.' : 'Click to cycle (1=highest, 5=lowest, -=off). Right-click to reverse.'}</span>`;
+                    ? `<span style="color:#666;font-size:10px;">${escapeHtml(t('ui.panel.profile_builtin'))}</span>`
+                    : `<span style="color:#666;font-size:10px;">${escapeHtml(t(isTouchUI() ? 'ui.panel.profile_hint_touch' : 'ui.panel.profile_hint'))}</span>`;
                 const cells = skills.map(s => {
                     const v = this._prioProfileDraft[s] ?? 0;
                     const display = v === 0 ? '-' : v;
@@ -3836,11 +3964,11 @@ export class UI {
                 const nameInput = isBuiltIn ? '' :
                     `<input id="prio-profile-name" value="${escapeAttr(selectedName)}" maxlength="20" style="background:#222;color:#ccc;border:1px solid #444;border-radius:3px;padding:2px 6px;font-size:12px;width:110px;" />`;
                 const saveBtn = isBuiltIn ? '' :
-                    `<button onclick="window.game.ui._saveProfileDraft()" style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">Save</button>`;
+                    `<button onclick="window.game.ui._saveProfileDraft()" style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">${escapeHtml(t('ui.panel.profile_save'))}</button>`;
                 profileValueRow =
                     `<div style="margin-bottom:6px;">${hint}</div>` +
                     `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">` +
-                    `<table style="border-collapse:collapse;"><tr><td style="font-size:11px;color:#888;padding-right:6px;">Values:</td>${cells}</tr></table>` +
+                    `<table style="border-collapse:collapse;"><tr><td style="font-size:11px;color:#888;padding-right:6px;">${escapeHtml(t('ui.panel.profile_values'))}</td>${cells}</tr></table>` +
                     `${nameInput}${saveBtn}` +
                     `</div>`;
             }
@@ -3848,9 +3976,9 @@ export class UI {
             profileToolbar =
                 `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">` +
                 `<select id="prio-profile-select" onchange="window.game.ui._onProfileSelectChange(this.value)" style="background:#222;color:#ccc;border:1px solid #444;border-radius:3px;padding:2px 4px;font-size:12px;">` +
-                `<option value="">-- Select Profile --</option>${profileOptions}</select>` +
-                `<button onclick="window.game.ui._applyProfileToAll()" style="background:#2a2a4e;color:#88aaff;border:1px solid #445;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">Apply to All</button>` +
-                `<button onclick="window.game.ui._newCustomProfile()" style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">New Profile</button>` +
+                `<option value="">${escapeHtml(t('ui.panel.profile_select'))}</option>${profileOptions}</select>` +
+                `<button onclick="window.game.ui._applyProfileToAll()" style="background:#2a2a4e;color:#88aaff;border:1px solid #445;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">${escapeHtml(t('ui.panel.profile_apply_all'))}</button>` +
+                `<button onclick="window.game.ui._newCustomProfile()" style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:2px 8px;cursor:pointer;font-size:12px;">${escapeHtml(t('ui.panel.profile_new'))}</button>` +
                 `</div>` +
                 profileValueRow;
         }
@@ -3924,7 +4052,7 @@ export class UI {
         // overwrite it; refuse instead.
         if (newName !== this._prioProfileDraftSource
             && (PRIORITY_PROFILES[newName] || this.game.settings.priorityProfiles[newName])) {
-            this.game.notifications.push({ text: `A profile named "${newName}" already exists`, tick: this.game.tick, type: 'danger' });
+            this.game.notifications.push({ text: t('ui.panel.profile_exists', { name: newName }), tick: this.game.tick, type: 'danger' });
             return;
         }
         if (newName !== this._prioProfileDraftSource) {
@@ -3941,14 +4069,14 @@ export class UI {
     _colonistGroupsHtml() {
         const groups = this.game.colonistGroups || [];
         const colonists = this.game.colonists.filter(c => !c.golem && c.hp > 0);
-        let html = '<h3>Colonist Groups</h3>';
-        html += '<div style="color:#888;font-size:0.9em;margin-bottom:10px;">Create named groups to organise colonists. Assign members from the colonist info panel or by dragging rows in the HUD.</div>';
+        let html = `<h3>${escapeHtml(t('ui.panel.groups_title'))}</h3>`;
+        html += `<div style="color:#888;font-size:0.9em;margin-bottom:10px;">${escapeHtml(t('ui.panel.groups_note'))}</div>`;
 
         if (groups.length === 0) {
-            html += '<div style="color:#666;font-style:italic;margin-bottom:10px;">No groups yet.</div>';
+            html += `<div style="color:#666;font-style:italic;margin-bottom:10px;">${escapeHtml(t('ui.panel.groups_none'))}</div>`;
         } else {
             html += '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">';
-            html += '<tr><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">Group</th><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">Members</th><th></th></tr>';
+            html += `<tr><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">${escapeHtml(t('ui.panel.groups_col_group'))}</th><th style="text-align:left;color:#888;font-size:0.8em;padding-bottom:4px;">${escapeHtml(t('ui.panel.groups_col_members'))}</th><th></th></tr>`;
             for (const g of groups) {
                 const members = colonists.filter(c => c.group === g);
                 const memberNames = members.length > 0 ? members.map(c => `<span style="color:${escapeAttr(c.nameColor || '#ffcc00')}">${escapeHtml(c.name)}</span>`).join(', ') : '<span style="color:#555">—</span>';
@@ -3956,7 +4084,7 @@ export class UI {
                 html += `<td style="padding:4px 8px 4px 0;font-weight:bold;color:#ffcc44;white-space:nowrap;">${escapeHtml(g)}</td>`;
                 html += `<td style="padding:4px 8px;font-size:0.88em;line-height:1.5;">${memberNames}</td>`;
                 html += `<td style="padding:4px 0;white-space:nowrap;">`;
-                html += `<button data-delete-group="${escapeAttr(g)}" style="background:none;border:1px solid #552222;color:#cc4444;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:0.85em;" title="Delete group and unassign all members">Delete</button>`;
+                html += `<button data-delete-group="${escapeAttr(g)}" style="background:none;border:1px solid #552222;color:#cc4444;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:0.85em;" title="${escapeAttr(t('ui.panel.groups_delete_tip'))}">${escapeHtml(t('ui.panel.groups_delete'))}</button>`;
                 html += `</td>`;
                 html += `</tr>`;
             }
@@ -3964,16 +4092,16 @@ export class UI {
         }
 
         html += '<div style="display:flex;gap:6px;align-items:center;margin-top:4px;">';
-        html += `<input data-add-group-input type="text" placeholder="New group name…" maxlength="32" style="background:#222;color:#eee;border:1px solid #555;border-radius:3px;padding:3px 6px;font-size:0.9em;flex:1;">`;
-        html += `<button data-add-group-confirm style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:0.9em;">Add Group</button>`;
+        html += `<input data-add-group-input type="text" placeholder="${escapeAttr(t('ui.panel.groups_new_placeholder'))}" maxlength="32" style="background:#222;color:#eee;border:1px solid #555;border-radius:3px;padding:3px 6px;font-size:0.9em;flex:1;">`;
+        html += `<button data-add-group-confirm style="background:#2a3a2a;color:#88dd88;border:1px solid #4a6a4a;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:0.9em;">${escapeHtml(t('ui.panel.groups_add'))}</button>`;
         html += '</div>';
         return html;
     }
 
     _workPriorityGridHtml() {
         const skills = Object.keys(SKILLS);
-        let html = '<table class="prio-grid"><tr><th>Colonist</th>';
-        skills.forEach(s => { html += `<th>${s.substring(0, 8)}</th>`; });
+        let html = `<table class="prio-grid"><tr><th>${escapeHtml(t('ui.panel.prio_col_colonist'))}</th>`;
+        skills.forEach(s => { html += `<th>${escapeHtml((SKILLS[s].name || s).substring(0, 8))}</th>`; });
         html += '<th></th></tr>';
 
         for (const c of this.game.colonists) {
@@ -3990,7 +4118,7 @@ export class UI {
                 html += `<td class="${cellClass}" data-colonist-id="${c.id}" data-skill="${s}" style="${cellStyle}">${display}</td>`;
             }
             if (!c.golem) {
-                html += `<td><button onclick="window.game.ui._applyProfileToColonist(${c.id})" style="background:#2a2a4e;color:#88aaff;border:1px solid #445;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px;">Apply</button></td>`;
+                html += `<td><button onclick="window.game.ui._applyProfileToColonist(${c.id})" style="background:#2a2a4e;color:#88aaff;border:1px solid #445;border-radius:3px;padding:1px 6px;cursor:pointer;font-size:11px;">${escapeHtml(t('ui.panel.profile_apply'))}</button></td>`;
             } else {
                 html += '<td></td>';
             }
@@ -4002,8 +4130,8 @@ export class UI {
 
     _attunementGridHtml() {
         const schools = Object.keys(MAGIC_SKILLS);
-        let html = '<table class="prio-grid"><tr><th>Colonist</th>';
-        schools.forEach(s => { html += `<th><span class="skill-tip" data-tip="${escapeAttr(MAGIC_SKILLS[s].summary || MAGIC_SKILLS[s].description)}" style="color:${MAGIC_SKILLS[s].color}">${MAGIC_SKILLS[s].name.substring(0, 8)}</span></th>`; });
+        let html = `<table class="prio-grid"><tr><th>${escapeHtml(t('ui.panel.prio_col_colonist'))}</th>`;
+        schools.forEach(s => { html += `<th><span class="skill-tip" data-tip="${escapeAttr(MAGIC_SKILLS[s].summary || MAGIC_SKILLS[s].description)}" style="color:${MAGIC_SKILLS[s].color}">${escapeHtml(MAGIC_SKILLS[s].name.substring(0, 8))}</span></th>`; });
         html += '</tr>';
 
         for (const c of this.game.colonists) {
@@ -4014,7 +4142,7 @@ export class UI {
             const nameCellStyle = isUnderAttuned
                 ? `color:${escapeAttr(c.nameColor || '#ffff00')};background:#2a1a00;`
                 : `color:${escapeAttr(c.nameColor || '#ffff00')}`;
-            const nameLabel = isUnderAttuned ? `${escapeHtml(c.name)} <span style="color:#ff8844;font-size:0.85em" title="Missing attunement slot(s)">⚠</span>` : escapeHtml(c.name);
+            const nameLabel = isUnderAttuned ? `${escapeHtml(c.name)} <span style="color:#ff8844;font-size:0.85em" title="${escapeAttr(t('ui.panel.attune_missing_tip'))}">⚠</span>` : escapeHtml(c.name);
             html += `<tr><td style="${nameCellStyle}">${nameLabel}</td>`;
             for (const s of schools) {
                 const level = (c.magicSkills && c.magicSkills[s]) || 0;
@@ -4024,7 +4152,7 @@ export class UI {
                     ? `background-color:${schoolColor};color:#000;font-weight:bold;text-shadow:none;`
                     : 'background-color:#1a1a2e;color:#666;';
                 const mark = isAttuned ? '★' : (level > 0 ? level : '-');
-                html += `<td class="prio-cell" data-colonist-id="${c.id}" data-attune="${s}" title="${MAGIC_SKILLS[s].name} (level ${level})" style="${cellStyle}">${mark}</td>`;
+                html += `<td class="prio-cell" data-colonist-id="${c.id}" data-attune="${s}" title="${escapeAttr(t('ui.panel.attune_cell_tip', { name: MAGIC_SKILLS[s].name, n: level }))}" style="${cellStyle}">${mark}</td>`;
             }
             html += '</tr>';
         }
@@ -4048,11 +4176,11 @@ export class UI {
         const recipes = getAvailableRecipes(this.game);
         const tabsContainer = this.elements.craftPanel.querySelector('.craft-tabs');
         const craftTabsScroll = tabsContainer ? tabsContainer.scrollLeft : 0;
-        let html = '<div class="panel-close" data-panel-close="craft">&times;</div><h3>Crafting Orders</h3>';
+        let html = `<div class="panel-close" data-panel-close="craft">&times;</div><h3>${escapeHtml(t('ui.craft.title'))}</h3>`;
         html += '<div class="craft-tabs">';
         for (const cat of RECIPE_CATEGORIES) {
             const active = cat === this._craftTab ? ' active' : '';
-            html += `<button class="craft-tab${active}" data-craft-tab="${escapeAttr(cat)}">${escapeHtml(cat)}</button>`;
+            html += `<button class="craft-tab${active}" data-craft-tab="${escapeAttr(cat)}">${escapeHtml(recipeCategoryName(cat))}</button>`;
         }
         html += '</div>';
         const hasEquipTiers = ['Weapons', 'Armor', 'Clothing', 'Tools', 'Trinkets'].includes(this._craftTab);
@@ -4083,41 +4211,41 @@ export class UI {
             if (this._craftHiddenTiers === undefined) this._craftHiddenTiers = new Set();
             const tiers = [1, 2, 3, 4];
             html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;flex-wrap:wrap;">';
-            html += '<span style="color:#888;font-size:0.82em;">Show tiers:</span>';
-            for (const t of tiers) {
-                const hidden = this._craftHiddenTiers.has(t);
-                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tier="${t}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#336633'};color:${hidden ? '#666' : '#ccc'};border:1px solid ${hidden ? '#444' : '#4a4'};border-radius:3px;cursor:pointer;">T${t}</button>`;
+            html += `<span style="color:#888;font-size:0.82em;">${escapeHtml(t('ui.craft.show_tiers'))}</span>`;
+            for (const tier of tiers) {
+                const hidden = this._craftHiddenTiers.has(tier);
+                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tier="${tier}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#336633'};color:${hidden ? '#666' : '#ccc'};border:1px solid ${hidden ? '#444' : '#4a4'};border-radius:3px;cursor:pointer;">${escapeHtml(t('ui.craft.tier_label', { n: tier }))}</button>`;
             }
             html += '</div>';
         }
         if (hasWeaponFilter) {
             if (this._weaponHiddenTypes === undefined) this._weaponHiddenTypes = new Set();
             const weaponTypes = [
-                { key: 'melee',  label: 'Melee',  color: '#c8a04a' },
-                { key: 'ranged', label: 'Ranged', color: '#4ac8a0' },
-                { key: 'magic',  label: 'Magic',  color: '#a04ac8' },
+                { key: 'melee',  label: t('ui.craft.weapon_melee'),  color: '#c8a04a' },
+                { key: 'ranged', label: t('ui.craft.weapon_ranged'), color: '#4ac8a0' },
+                { key: 'magic',  label: t('ui.craft.weapon_magic'),  color: '#a04ac8' },
             ];
             html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
-            html += '<span style="color:#888;font-size:0.82em;">Type:</span>';
+            html += `<span style="color:#888;font-size:0.82em;">${escapeHtml(t('ui.craft.filter_type'))}</span>`;
             for (const { key, label, color } of weaponTypes) {
                 const hidden = this._weaponHiddenTypes.has(key);
-                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-weapon-type="${key}" style="padding:1px 6px;font-size:0.82em;background:#1a1a2e;color:${hidden ? '#555' : color};border:1px solid ${hidden ? '#444' : color};border-radius:3px;cursor:pointer;">${label}</button>`;
+                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-weapon-type="${key}" style="padding:1px 6px;font-size:0.82em;background:#1a1a2e;color:${hidden ? '#555' : color};border:1px solid ${hidden ? '#444' : color};border-radius:3px;cursor:pointer;">${escapeHtml(label)}</button>`;
             }
             html += '</div>';
         }
         if (hasArmorFilter) {
             if (this._armorHiddenTypes === undefined) this._armorHiddenTypes = new Set();
             const armorTypes = [
-                { key: 'tank',    label: 'Tank',    color: '#c8a04a' },
-                { key: 'mage',    label: 'Mage',    color: '#a04ac8' },
-                { key: 'rogue',   label: 'Rogue',   color: '#4ac8a0' },
-                { key: 'support', label: 'Support', color: '#c84a4a' },
+                { key: 'tank',    label: t('ui.craft.armor_tank'),    color: '#c8a04a' },
+                { key: 'mage',    label: t('ui.craft.armor_mage'),    color: '#a04ac8' },
+                { key: 'rogue',   label: t('ui.craft.armor_rogue'),   color: '#4ac8a0' },
+                { key: 'support', label: t('ui.craft.armor_support'), color: '#c84a4a' },
             ];
             html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
-            html += '<span style="color:#888;font-size:0.82em;">Type:</span>';
+            html += `<span style="color:#888;font-size:0.82em;">${escapeHtml(t('ui.craft.filter_type'))}</span>`;
             for (const { key, label, color } of armorTypes) {
                 const hidden = this._armorHiddenTypes.has(key);
-                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-armor-type="${key}" style="padding:1px 6px;font-size:0.82em;background:#1a1a2e;color:${hidden ? '#555' : color};border:1px solid ${hidden ? '#444' : color};border-radius:3px;cursor:pointer;">${label}</button>`;
+                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-armor-type="${key}" style="padding:1px 6px;font-size:0.82em;background:#1a1a2e;color:${hidden ? '#555' : color};border:1px solid ${hidden ? '#444' : color};border-radius:3px;cursor:pointer;">${escapeHtml(label)}</button>`;
             }
             html += '</div>';
         }
@@ -4126,15 +4254,15 @@ export class UI {
             if (this._tomeHiddenSchools === undefined) this._tomeHiddenSchools = new Set();
             const levels = [0, 1, 2, 3, 4];
             html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
-            html += '<span style="color:#888;font-size:0.82em;">Schools:</span>';
+            html += `<span style="color:#888;font-size:0.82em;">${escapeHtml(t('ui.craft.filter_schools'))}</span>`;
             for (const [sk, sd] of Object.entries(MAGIC_SKILLS)) {
                 const hidden = this._tomeHiddenSchools.has(sk);
                 const col = hidden ? '#444' : sd.color;
-                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tome-school="${sk}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#1a1a2e'};color:${hidden ? '#555' : sd.color};border:1px solid ${col};border-radius:3px;cursor:pointer;">${sd.name}</button>`;
+                html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tome-school="${sk}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#1a1a2e'};color:${hidden ? '#555' : sd.color};border:1px solid ${col};border-radius:3px;cursor:pointer;">${escapeHtml(sd.name)}</button>`;
             }
             html += '</div>';
             html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #333;flex-wrap:wrap;">';
-            html += '<span style="color:#888;font-size:0.82em;">Min level:</span>';
+            html += `<span style="color:#888;font-size:0.82em;">${escapeHtml(t('ui.craft.filter_min_level'))}</span>`;
             for (const lv of levels) {
                 const hidden = this._tomeHiddenLevels.has(lv);
                 html += `<button class="craft-tier-btn${hidden ? '' : ' active'}" data-craft-tome-level="${lv}" style="padding:1px 6px;font-size:0.82em;background:${hidden ? '#1a1a2e' : '#336633'};color:${hidden ? '#666' : '#ccc'};border:1px solid ${hidden ? '#444' : '#4a4'};border-radius:3px;cursor:pointer;">${lv}</button>`;
@@ -4214,11 +4342,12 @@ export class UI {
                 return (aDef?.order ?? Infinity) - (bDef?.order ?? Infinity);
             });
         }
-        const EQUIP_TIER_NAMES = ['', 'Primitive', 'Iron', 'Runic', 'Void'];
+        const EQUIP_TIER_NAMES = ['', t('ui.craft.tier_primitive'), t('ui.craft.tier_iron'), t('ui.craft.tier_runic'), t('ui.craft.tier_void')];
+        const carpentry = t('ui.craft.group_carpentry'), textiles = t('ui.craft.group_textiles'), smithing = t('ui.craft.group_smithing');
         const MATERIALS_GROUPS = {
-            craft_planks: 'Carpentry', craft_bricks: 'Carpentry',
-            tan_leather: 'Textiles', weave_cloth: 'Textiles',
-            smelt_iron: 'Smithing', smelt_runite: 'Smithing', repair_trinket: 'Smithing',
+            craft_planks: carpentry, craft_bricks: carpentry,
+            tan_leather: textiles, weave_cloth: textiles,
+            smelt_iron: smithing, smelt_runite: smithing, repair_trinket: smithing,
         };
         let lastTier = null;
         let lastMaterialsGroup = null;
@@ -4229,8 +4358,8 @@ export class UI {
                 const def = WEAPONS[outputKey] || ARMORS[outputKey] || HELMETS[outputKey] || CLOTHES[outputKey] || BOOTS[outputKey] || TOOLS[outputKey] || TRINKETS[outputKey];
                 const tier = def?.tier;
                 if (tier !== undefined && tier !== lastTier) {
-                    const label = EQUIP_TIER_NAMES[tier] || `Tier ${tier}`;
-                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;color:#888;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;">Tier ${tier} — ${label}</div>`;
+                    const label = EQUIP_TIER_NAMES[tier] || t('ui.craft.tier_n', { n: tier });
+                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;color:#888;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;">${escapeHtml(t('ui.craft.tier_header', { n: tier, name: label }))}</div>`;
                     lastTier = tier;
                 }
             }
@@ -4241,49 +4370,49 @@ export class UI {
                 if (school && school !== lastTomeSchool) {
                     const schoolDef = MAGIC_SKILLS[school];
                     const color = schoolDef?.color || '#aaa';
-                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;color:${color};">${schoolDef?.name || school}</div>`;
+                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;color:${color};">${escapeHtml(schoolDef?.name || school)}</div>`;
                     lastTomeSchool = school;
                 }
             }
             if (this._craftTab === 'Materials') {
                 const group = MATERIALS_GROUPS[key];
                 if (group && group !== lastMaterialsGroup) {
-                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;color:#888;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;">${group}</div>`;
+                    html += `<div style="padding:3px 8px;margin-top:4px;font-size:0.8em;color:#888;border-top:1px solid #333;letter-spacing:0.08em;text-transform:uppercase;">${escapeHtml(group)}</div>`;
                     lastMaterialsGroup = group;
                 }
             }
             const inputStr = Object.entries(recipe.input).map(([k, v]) => {
-                if (k === 'foodstuffs') return `${v} foodstuffs (have ${this.game.resources.getFoodstuffTotal()})`;
-                return `${escapeHtml(k)}:${v}`;
+                if (k === 'foodstuffs') return escapeHtml(t('ui.craft.input_foodstuffs', { n: v, have: this.game.resources.getFoodstuffTotal() }));
+                return escapeHtml(t('ui.craft.amount', { name: resourceName(k), n: v }));
             }).join(' + ');
             const outputStr = Object.entries(recipe.output).map(([k, v]) => {
                 const tip = this.getCraftOutputTip(k);
-                if (tip) return `${this._itemIcon(k)}<span class="skill-tip" data-tip="${escapeAttr(tip)}">${escapeHtml(k.replace(/_/g, ' '))}${v > 1 ? ':' + v : ''}</span>`;
-                return `${escapeHtml(k)}:${v}`;
+                if (tip) return `${this._itemIcon(k)}<span class="skill-tip" data-tip="${escapeAttr(tip)}">${escapeHtml(v > 1 ? t('ui.craft.amount', { name: resourceName(k), n: v }) : resourceName(k))}</span>`;
+                return escapeHtml(t('ui.craft.amount', { name: resourceName(k), n: v }));
             }).join('+');
             const cls = canCraft ? 'craft-available' : 'craft-unavailable';
             const ct = this.game.settings.craftTargets[key] || {};
             const repeatCls = ct.repeat ? 'craft-repeat active' : 'craft-repeat';
             html += `<div class="craft-row ${cls}">`;
-            html += `<button ${canCraft ? '' : 'disabled'} data-craft-recipe="${escapeAttr(key)}" onclick="window.game.craft(${jsArg(key)})">${escapeHtml(key.replace(/_/g, ' '))}</button>`;
+            html += `<button ${canCraft ? '' : 'disabled'} data-craft-recipe="${escapeAttr(key)}" onclick="window.game.craft(${jsArg(key)})">${escapeHtml(recipeLabel(key, recipe))}</button>`;
             html += `<button ${canCraft ? '' : 'disabled'} onclick="window.game.craftMultiple(${jsArg(key)},5)" class="craft-multi">x5</button>`;
-            html += `<button onclick="window.game.toggleCraftRepeat(${jsArg(key)})" class="craft-multi ${repeatCls}" title="Auto-repeat">&#x27F3;</button>`;
-            html += `<input type="number" min="0" max="999" value="${parseInt(ct.target) || 0}" onchange="window.game.setCraftTarget(${jsArg(key)},this.value)" title="Maintain stock target (0=off)" style="width:35px;background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:3px;padding:1px 2px;text-align:center;font-size:0.85em;">`;
+            html += `<button onclick="window.game.toggleCraftRepeat(${jsArg(key)})" class="craft-multi ${repeatCls}" title="${escapeAttr(t('ui.craft.auto_repeat'))}">&#x27F3;</button>`;
+            html += `<input type="number" min="0" max="999" value="${parseInt(ct.target) || 0}" onchange="window.game.setCraftTarget(${jsArg(key)},this.value)" title="${escapeAttr(t('ui.craft.stock_target_tip'))}" style="width:35px;background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:3px;padding:1px 2px;text-align:center;font-size:0.85em;">`;
             html += `<span>${inputStr} → ${outputStr}</span>`;
             if (!hasStation) {
-                const stationName = (recipe.station || 'workbench').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                html += `<span style="color:#ff4444;font-size:0.85em;margin-left:auto;">Needs ${escapeHtml(stationName)}</span>`;
+                const stationName = buildingName(recipe.station || 'workbench');
+                html += `<span style="color:#ff4444;font-size:0.85em;margin-left:auto;">${escapeHtml(t('ui.craft.needs_station', { name: stationName }))}</span>`;
             }
             html += `</div>`;
         }
         if (filtered.length === 0) {
-            html += '<div style="color:#666; padding:8px;">No recipes available in this category.</div>';
+            html += `<div style="color:#666; padding:8px;">${escapeHtml(t('ui.craft.no_recipes'))}</div>`;
         }
         if (this._craftTab === 'Food & Potions') {
             const target = this.game.settings.autoCookTarget || 0;
             html += '<div style="margin-top:12px; padding-top:8px; border-top:1px solid #444;">';
             html += `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">`;
-            html += `<label style="color:#ccc; white-space:nowrap;">Auto-cook target:</label>`;
+            html += `<label style="color:#ccc; white-space:nowrap;">${escapeHtml(t('ui.craft.autocook_label'))}</label>`;
             html += `<div style="display:flex; align-items:center; gap:2px;">`;
             html += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)-10)" style="padding:2px 6px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;cursor:pointer;">-10</button>`;
             html += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)-1)" style="padding:2px 6px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;cursor:pointer;">-1</button>`;
@@ -4292,7 +4421,7 @@ export class UI {
             html += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)+10)" style="padding:2px 6px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;cursor:pointer;">+10</button>`;
             html += `</div>`;
             html += `</div>`;
-            html += `<div style="color:#777; font-size:0.83em; margin-top:4px;">Automatically queues cooking when food drops below target. Set 0 to disable.</div>`;
+            html += `<div style="color:#777; font-size:0.83em; margin-top:4px;">${escapeHtml(t('ui.craft.autocook_note'))}</div>`;
             html += '</div>';
         }
         const inputFocused = this.elements.craftPanel.contains(document.activeElement) &&
@@ -4326,10 +4455,10 @@ export class UI {
         const draggable = this._colonistHudLocked ? '' : ' draggable="true"';
         const dragId = this._colonistHudLocked ? '' : ` data-drag-colonist-id="${c.id}"`;
         if (c.hp <= 0) {
-            return `<div class="hud-colonist dead"><span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span style="color:#cc4444">DEAD</span></div>`;
+            return `<div class="hud-colonist dead"><span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span style="color:#cc4444">${escapeHtml(t('ui.colonist.hud_dead'))}</span></div>`;
         }
         if (c.onExpedition) {
-            return `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}><span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
+            return `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}><span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span style="color:#33ccff">${escapeHtml(t('ui.colonist.hud_exploring'))}</span></div>`;
         }
         const moodLevel = getMoodLabel(c.mood);
         const moodColor = moodLevel === 'inspired' ? '#66ffcc' : moodLevel === 'content' ? '#88cc88' : moodLevel === 'stressed' ? '#cccc44' : '#ff4444';
@@ -4337,21 +4466,22 @@ export class UI {
         const restColor = statColor(c.needs.rest);
         const hpColor = statColor(c.maxHp > 0 ? (c.hp / c.maxHp) * 100 : 100);
         const weaponIcon = c.weapon ? this._itemIcon(c.weapon.key, 'weapon') : '';
-        const weapon = escapeHtml(c.weapon?.name || 'Fists');
-        const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ' <span style="color:#ff6644">[Fatigued]</span>' : '';
+        const weapon = escapeHtml(c.weapon ? itemName(c.weapon) : t('ui.colonist.fists'));
+        const fatigueTag = this.game.exploration?.isFatigued(c.id, this.game.tick) ? ` <span style="color:#ff6644">${escapeHtml(t('ui.colonist.hud_fatigued'))}</span>` : '';
         const dot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
         const cManaPct = c.maxMana > 0 ? (c.mana / c.maxMana) * 100 : 0;
         const sparkline = this._moodSparklineSvg(c);
-        const moodThoughtLines = (c.thoughts || []).slice(-5).map(t => `${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)}: ${escapeAttr(t.text)}`).join('&#10;');
-        const moodTip = `Mood: ${c.mood.toFixed(0)} (${moodLevel})${moodThoughtLines ? '&#10;' + moodThoughtLines : ''}`;
+        const moodThoughtLines = (c.thoughts || []).slice(-5).map(t => `${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)}: ${escapeAttr(thoughtText(t))}`).join('&#10;');
+        const moodTip = `${escapeAttr(t('ui.colonist.hud_mood_tip', { n: c.mood.toFixed(0), mood: moodName(moodLevel) }))}${moodThoughtLines ? '&#10;' + moodThoughtLines : ''}`;
+        const tags = (c._relaxActivity ? t('ui.info.multi_tag_relaxing') : '') + (c.drafted ? t('ui.info.multi_tag_drafted') : '') + (c.guardMode ? t('ui.info.multi_tag_guard') : '');
         let row = `<div class="hud-colonist"${draggable} data-colonist-id="${c.id}"${dragId}>`;
-        row += `<span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${escapeHtml(c.state)}${c._relaxActivity ? ' [relaxing]' : ''}${c.drafted ? ' [D]' : ''}${c.guardMode ? ' [G]' : ''}${fatigueTag}</span>`;
+        row += `<span class="hud-name" style="color:${escapeAttr(c.nameColor || '#ffff00')}">${escapeHtml(c.name)}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${escapeHtml(colonistStateName(c.state))}${escapeHtml(tags)}${fatigueTag}</span>`;
         row += `<div class="hud-dots">`;
-        row += `<span class="hud-stat skill-tip" data-tip="${moodTip}"><span class="hud-stat-dot" style="color:${moodColor}">●</span>Mood${sparkline}</span>`;
-        row += dot('Food', hungerColor);
-        row += dot('Rest', restColor);
-        row += dot('HP', hpColor);
-        if (c.maxMana > 0) row += dot('MP', statColor(cManaPct));
+        row += `<span class="hud-stat skill-tip" data-tip="${moodTip}"><span class="hud-stat-dot" style="color:${moodColor}">●</span>${escapeHtml(t('ui.colonist.hud_mood'))}${sparkline}</span>`;
+        row += dot(escapeHtml(t('ui.colonist.hud_food')), hungerColor);
+        row += dot(escapeHtml(t('ui.colonist.hud_rest')), restColor);
+        row += dot(escapeHtml(t('ui.colonist.hud_hp')), hpColor);
+        if (c.maxMana > 0) row += dot(escapeHtml(t('ui.colonist.hud_mp')), statColor(cManaPct));
         row += `</div></div>`;
         return row;
     }
@@ -4372,8 +4502,8 @@ export class UI {
         const groups = this.game.colonistGroups || [];
 
         const locked = this._colonistHudLocked;
-        const lockBtn = `<button class="hud-lock-btn${locked ? ' locked' : ''}" onclick="window.game.ui._colonistHudLocked=!window.game.ui._colonistHudLocked;window.game.ui.forceUpdateColonistHud()" title="${locked ? 'Unlock panel' : 'Lock panel'}">${locked ? '🔒' : '🔓'}</button>`;
-        let html = `<div class="footer-panel-header" style="display:flex;justify-content:space-between;align-items:center;">Colonists${lockBtn}</div>`;
+        const lockBtn = `<button class="hud-lock-btn${locked ? ' locked' : ''}" onclick="window.game.ui._colonistHudLocked=!window.game.ui._colonistHudLocked;window.game.ui.forceUpdateColonistHud()" title="${escapeAttr(locked ? t('ui.colonist.hud_unlock') : t('ui.colonist.hud_lock'))}">${locked ? '🔒' : '🔓'}</button>`;
+        let html = `<div class="footer-panel-header" style="display:flex;justify-content:space-between;align-items:center;">${escapeHtml(t('ui.colonist.hud_title'))}${lockBtn}</div>`;
 
         // Build buckets: one per named group (in order) + ungrouped
         const buckets = new Map(); // groupName -> colonist[]
@@ -4397,13 +4527,13 @@ export class UI {
                 html += `<span class="hud-group-name">${escapeHtml(groupName)}</span>`;
                 if (!locked) {
                     html += `<span class="hud-group-actions">`;
-                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupUp(${jsArg(groupName)})" title="Move group up">▲</button>`;
-                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupDown(${jsArg(groupName)})" title="Move group down">▼</button>`;
+                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupUp(${jsArg(groupName)})" title="${escapeAttr(t('ui.colonist.hud_group_up'))}">▲</button>`;
+                    html += `<button class="hud-group-btn" onclick="event.stopPropagation();window.game.moveColonistGroupDown(${jsArg(groupName)})" title="${escapeAttr(t('ui.colonist.hud_group_down'))}">▼</button>`;
                     html += `</span>`;
                 }
                 html += `</div>`;
             } else if (groups.length > 0) {
-                html += `<div class="hud-group-header" style="color:#888;">Ungrouped</div>`;
+                html += `<div class="hud-group-header" style="color:#888;">${escapeHtml(t('ui.colonist.hud_ungrouped'))}</div>`;
             }
             for (const c of members) {
                 html += this._hudColonistRow(c);
@@ -4411,24 +4541,24 @@ export class UI {
         }
 
         if (golems.length > 0) {
-            html += '<div class="footer-panel-header" style="margin-top: 12px;">Golems</div>';
+            html += `<div class="footer-panel-header" style="margin-top: 12px;">${escapeHtml(t('ui.colonist.hud_golems'))}</div>`;
             const sortedGolems = [...golems].sort((a, b) => (b.hp > 0 ? 1 : 0) - (a.hp > 0 ? 1 : 0));
             for (const g of sortedGolems) {
                 if (g.hp <= 0) {
-                    html += `<div class="hud-colonist dead"><span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span style="color:#cc4444">DESTROYED</span></div>`;
+                    html += `<div class="hud-colonist dead"><span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span style="color:#cc4444">${escapeHtml(t('ui.colonist.hud_destroyed'))}</span></div>`;
                     continue;
                 }
                 if (g.onExpedition) {
-                    html += `<div class="hud-colonist" data-colonist-id="${g.id}"><span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span style="color:#33ccff">EXPLORING</span></div>`;
+                    html += `<div class="hud-colonist" data-colonist-id="${g.id}"><span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span style="color:#33ccff">${escapeHtml(t('ui.colonist.hud_exploring'))}</span></div>`;
                     continue;
                 }
                 const hpColor = statColor(g.maxHp > 0 ? (g.hp / g.maxHp) * 100 : 100);
                 const weaponIcon = g.weapon ? this._itemIcon(g.weapon.key, 'weapon') : '';
-                const weapon = escapeHtml(g.weapon?.name || 'None');
+                const weapon = escapeHtml(g.weapon ? itemName(g.weapon) : t('common.none'));
                 html += `<div class="hud-colonist" data-colonist-id="${g.id}">`;
-                html += `<span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${escapeHtml(g.state)}${g.drafted ? ' [D]' : ''}</span>`;
+                html += `<span class="hud-name" style="color:${escapeAttr(g.nameColor || '#ffff00')}">${escapeHtml(g.name)}</span> <span class="hud-weapon">${weaponIcon}${weapon}</span> <span class="hud-state">${escapeHtml(colonistStateName(g.state))}${g.drafted ? escapeHtml(t('ui.info.multi_tag_drafted')) : ''}</span>`;
                 const gDot = (label, color) => `<span class="hud-stat"><span class="hud-stat-dot" style="color:${color}">●</span>${label}</span>`;
-                html += `<div class="hud-dots">${gDot('HP', hpColor)}</div>`;
+                html += `<div class="hud-dots">${gDot(escapeHtml(t('ui.colonist.hud_hp')), hpColor)}</div>`;
                 html += `</div>`;
             }
         }
@@ -4453,9 +4583,9 @@ export class UI {
 
     updateEventLog() {
         const entries = this.game.eventLog.getRecent(10);
-        let html = '<div class="footer-panel-header">Event Log</div>';
+        let html = `<div class="footer-panel-header">${escapeHtml(t('ui.main.event_log_title'))}</div>`;
         if (entries.length === 0) {
-            html += '<div class="event-log-row" style="color:#666">No events yet.</div>';
+            html += `<div class="event-log-row" style="color:#666">${escapeHtml(t('ui.main.event_log_empty'))}</div>`;
         }
         for (let i = entries.length - 1; i >= 0; i--) {
             const e = entries[i];
@@ -4466,7 +4596,7 @@ export class UI {
             } else {
                 html += `<div class="event-log-row" style="${colorStyle}">`;
             }
-            html += `<span class="event-log-time">[${escapeHtml(e.time)}]</span> ${escapeHtmlKeepEntities(e.text)}`;
+            html += `<span class="event-log-time">[${escapeHtml(logEntryTime(e))}]</span> ${escapeHtmlKeepEntities(logEntryText(e))}`;
             html += `</div>`;
         }
         if (html !== this._lastEventLogHtml) {
@@ -4505,13 +4635,14 @@ export class UI {
         const equipCount = weapons.length + armors.length + helmets.length + clothes.length + tools.length + boots.length + trinkets.length;
         const consumeCount = potions.length + tomes.length;
 
-        let html = '<div class="panel-close" data-panel-close="inventory">&times;</div><h3>Inventory</h3>';
+        let html = `<div class="panel-close" data-panel-close="inventory">&times;</div><h3>${escapeHtml(t('ui.inv.title'))}</h3>`;
 
+        const tabLabel = (key, n) => escapeHtml(n ? t('ui.inv.tab_count', { name: t(key), n }) : t(key));
         html += '<div class="inv-tabs">';
-        html += `<button class="inv-tab-btn${activeTab === 'resources' ? ' active' : ''}" data-inv-tab="resources">Resources</button>`;
-        html += `<button class="inv-tab-btn${activeTab === 'equipment' ? ' active' : ''}" data-inv-tab="equipment">Equipment${equipCount ? ` (${equipCount})` : ''}</button>`;
-        html += `<button class="inv-tab-btn${activeTab === 'consumables' ? ' active' : ''}" data-inv-tab="consumables">Consumables${consumeCount ? ` (${consumeCount})` : ''}</button>`;
-        html += `<button class="inv-tab-btn${activeTab === 'animals' ? ' active' : ''}" data-inv-tab="animals">Animals${tamed.length ? ` (${tamed.length})` : ''}</button>`;
+        html += `<button class="inv-tab-btn${activeTab === 'resources' ? ' active' : ''}" data-inv-tab="resources">${tabLabel('ui.inv.tab_resources')}</button>`;
+        html += `<button class="inv-tab-btn${activeTab === 'equipment' ? ' active' : ''}" data-inv-tab="equipment">${tabLabel('ui.inv.tab_equipment', equipCount)}</button>`;
+        html += `<button class="inv-tab-btn${activeTab === 'consumables' ? ' active' : ''}" data-inv-tab="consumables">${tabLabel('ui.inv.tab_consumables', consumeCount)}</button>`;
+        html += `<button class="inv-tab-btn${activeTab === 'animals' ? ' active' : ''}" data-inv-tab="animals">${tabLabel('ui.inv.tab_animals', tamed.length)}</button>`;
         html += '</div>';
 
         html += '<div class="inv-tab-content">';
@@ -4542,8 +4673,9 @@ export class UI {
             reduction += poweredIceBoxes * 0.4;
             reduction = Math.min(0.9, reduction);
             const pct = Math.round(reduction * 100);
-            const seasonLabel = this.game.weather.season === 'summer' ? ' (summer +50% rot)' : this.game.weather.season === 'winter' ? ' (winter -50% rot)' : '';
-            html += `<div class="info-row" style="color:#aa8844;font-size:0.9em;">Food preservation: -${pct}% spoilage${seasonLabel}</div>`;
+            const season = this.game.weather.season;
+            const prKey = season === 'summer' ? 'ui.inv.preservation_summer' : season === 'winter' ? 'ui.inv.preservation_winter' : 'ui.inv.preservation';
+            html += `<div class="info-row" style="color:#aa8844;font-size:0.9em;">${escapeHtml(t(prKey, { pct }))}</div>`;
         }
 
         const buildingMats = ['wood', 'stone', 'planks', 'bricks', 'hides', 'leather', 'iron_ore', 'iron', 'runite_ore', 'runite', 'wool', 'cotton', 'cloth', 'void_essence'];
@@ -4555,38 +4687,38 @@ export class UI {
         const otherEntries = Object.entries(r).filter(([k, v]) => v > 0 && !buildingMats.includes(k) && !foodKeys.includes(k));
 
         if (buildingEntries.length > 0) {
-            html += '<div class="info-row" style="color:#aa8844;margin-bottom:4px;"><b>Building Materials</b></div>';
+            html += `<div class="info-row" style="color:#aa8844;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_building_materials'))}</b></div>`;
             for (const [key, amount] of buildingEntries) {
-                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(key.replace(/_/g, ' '))}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
+                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(resourceName(key))}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
             }
         }
 
         if (foodEntries.length > 0) {
             const spoilPerDay = this.game.resources.estimateDailyFoodSpoilage(this.game);
             const spoilLabel = spoilPerDay > 0
-                ? ` <span style="color:#cc6644;font-size:0.9em;">(-${spoilPerDay}/day spoilage)</span>`
+                ? ` <span style="color:#cc6644;font-size:0.9em;">${escapeHtml(t('ui.inv.spoilage_per_day', { n: spoilPerDay }))}</span>`
                 : '';
-            html += `<div class="info-row" style="color:#66aa44;margin-top:8px;margin-bottom:4px;"><b>Foodstuffs</b>${spoilLabel}</div>`;
+            html += `<div class="info-row" style="color:#66aa44;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_foodstuffs'))}</b>${spoilLabel}</div>`;
             for (const [key, amount] of foodEntries) {
                 const isFood = FOODSTUFFS.includes(key);
                 const isReserved = reserved[key];
                 let extra = '';
                 if (isFood) {
                     const cls = isReserved ? 'inv-reserve active' : 'inv-reserve';
-                    extra = `<button class="${cls}" data-reserve-food="${key}" title="${isReserved ? 'Unreserve — allow cooking' : 'Reserve — protect from cooking'}">${isReserved ? '🔒' : '🔓'}</button>`;
+                    extra = `<button class="${cls}" data-reserve-food="${key}" title="${escapeAttr(isReserved ? t('ui.inv.unreserve_tip') : t('ui.inv.reserve_tip'))}">${isReserved ? '🔒' : '🔓'}</button>`;
                 }
-                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(key.replace(/_/g, ' '))}</span>${extra}<span class="inv-amount">${Math.round(amount)}</span></div>`;
+                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(resourceName(key))}</span>${extra}<span class="inv-amount">${Math.round(amount)}</span></div>`;
             }
         }
 
         if (otherEntries.length > 0) {
-            html += '<div class="info-row" style="color:#8888cc;margin-top:8px;margin-bottom:4px;"><b>Other</b></div>';
+            html += `<div class="info-row" style="color:#8888cc;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_other'))}</b></div>`;
             for (const [key, amount] of otherEntries) {
-                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(key.replace(/_/g, ' '))}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
+                html += `<div class="inv-row"><span class="inv-name">${this._itemIcon(key, 'material')}${escapeHtml(resourceName(key))}</span><span class="inv-amount">${Math.round(amount)}</span></div>`;
             }
         }
 
-        if (!html) html = '<div class="info-row" style="color:#666;">No resources.</div>';
+        if (!html) html = `<div class="info-row" style="color:#666;">${escapeHtml(t('ui.inv.no_resources'))}</div>`;
         return html;
     }
 
@@ -4635,7 +4767,7 @@ export class UI {
     _buildCostChip(key, amount) {
         if (this.game.skinManager?.isActive) {
             const url = this.game.skinManager.getItemSpriteDataURL(key);
-            if (url) return `<span class="cost-chip"><img src="${url}" style="width:12px;height:12px;vertical-align:middle;image-rendering:pixelated;" title="${key}">${amount}</span>`;
+            if (url) return `<span class="cost-chip"><img src="${url}" style="width:12px;height:12px;vertical-align:middle;image-rendering:pixelated;" title="${escapeAttr(resourceName(key))}">${amount}</span>`;
         }
         const colors = {
             wood: '#8b6b3a', stone: '#999', food: '#88cc44', planks: '#c89648',
@@ -4644,12 +4776,12 @@ export class UI {
             gold: '#ffdd00',
         };
         const abbr = {
-            wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk',
-            iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le',
-            void_essence: 'Ve', hides: 'Hi', gold: 'Au',
+            wood: 'ui.main.res_abbr_wood', stone: 'ui.main.res_abbr_stone', food: 'ui.main.res_abbr_food', planks: 'ui.main.res_abbr_planks', bricks: 'ui.main.res_abbr_bricks',
+            iron_ore: 'ui.main.res_abbr_iron_ore', runite_ore: 'ui.main.res_abbr_runite_ore', iron: 'ui.main.res_abbr_iron', runite: 'ui.main.res_abbr_runite', leather: 'ui.main.res_abbr_leather',
+            void_essence: 'ui.build.cost_abbr_void_essence', hides: 'ui.build.cost_abbr_hides', gold: 'ui.main.res_abbr_gold',
         };
         const color = colors[key] || '#aaa';
-        const label = escapeHtml(abbr[key] || key.charAt(0).toUpperCase());
+        const label = escapeHtml(abbr[key] ? t(abbr[key]) : resourceName(key).charAt(0).toUpperCase());
         return `<span class="cost-chip" style="color:${color}">${label}${amount}</span>`;
     }
 
@@ -4657,19 +4789,20 @@ export class UI {
         const buildType = card.dataset.buildOpt;
         const def = BUILDINGS[buildType];
         if (!def) return;
-        let html = `<div class="build-tip-name">${escapeHtml(buildType.replace(/_/g, ' '))}</div>`;
+        let html = `<div class="build-tip-name">${escapeHtml(buildingName(buildType))}</div>`;
         html += `<div class="build-tip-desc">${escapeHtml(def.description || '')}</div>`;
         if (def.research) {
             const unlocked = this.game.research.isResearched(def.research);
-            html += `<div class="build-tip-meta" style="color:${unlocked ? '#66cc66' : '#cc6666'}">Research: ${escapeHtml(def.research.replace(/_/g, ' '))}${unlocked ? ' (done)' : ''}</div>`;
+            const researchName = RESEARCH[def.research]?.name || def.research.replace(/_/g, ' ');
+            html += `<div class="build-tip-meta" style="color:${unlocked ? '#66cc66' : '#cc6666'}">${escapeHtml(t(unlocked ? 'ui.build.tip_research_done' : 'ui.build.tip_research', { name: researchName }))}</div>`;
         }
         if (def.power) {
-            if (def.power.generates) html += `<div class="build-tip-meta" style="color:#aa44ff">Generates ${def.power.generates} mana</div>`;
-            if (def.power.consumes) html += `<div class="build-tip-meta" style="color:#ff8844">Consumes ${def.power.consumes} mana</div>`;
-            if (def.power.damage) html += `<div class="build-tip-meta" style="color:#ff4444">Damage: ${def.power.damage} (range ${def.power.range || '?'})</div>`;
+            if (def.power.generates) html += `<div class="build-tip-meta" style="color:#aa44ff">${escapeHtml(t('ui.tile.power_generates', { n: def.power.generates }))}</div>`;
+            if (def.power.consumes) html += `<div class="build-tip-meta" style="color:#ff8844">${escapeHtml(t('ui.tile.power_consumes', { n: def.power.consumes }))}</div>`;
+            if (def.power.damage) html += `<div class="build-tip-meta" style="color:#ff4444">${escapeHtml(t('ui.build.tip_damage', { n: def.power.damage, range: def.power.range || '?' }))}</div>`;
         }
         if (def.maxCount !== undefined) {
-            html += `<div class="build-tip-meta" style="color:#aaa">Max: ${def.maxCount + getMaxCountBonus(def, buildType, this.game)}</div>`;
+            html += `<div class="build-tip-meta" style="color:#aaa">${escapeHtml(t('ui.build.tip_max', { n: def.maxCount + getMaxCountBonus(def, buildType, this.game) }))}</div>`;
         }
         this._buildTooltip.innerHTML = html;
         this._buildTooltip.style.display = 'block';
@@ -4700,17 +4833,17 @@ export class UI {
     }
 
     _invTierDivider(tier, hasAbove) {
-        const TIER_NAMES = ['', 'Primitive', 'Iron', 'Runic', 'Void'];
-        const label = TIER_NAMES[tier] || `Tier ${tier}`;
+        const TIER_NAMES = ['', t('ui.craft.tier_primitive'), t('ui.craft.tier_iron'), t('ui.craft.tier_runic'), t('ui.craft.tier_void')];
+        const label = TIER_NAMES[tier] || t('ui.craft.tier_n', { n: tier });
         const mt = hasAbove ? 'margin-top:6px;' : '';
-        return `<div style="padding:2px 0;${mt}font-size:0.78em;color:#666;border-top:1px solid #2a2a2a;letter-spacing:0.08em;text-transform:uppercase;">Tier ${tier}: ${label}</div>`;
+        return `<div style="padding:2px 0;${mt}font-size:0.78em;color:#666;border-top:1px solid #2a2a2a;letter-spacing:0.08em;text-transform:uppercase;">${escapeHtml(t('ui.inv.tier_divider', { n: tier, name: label }))}</div>`;
     }
 
     _buildInvEquipment(weapons, armors, helmets, clothes, tools, boots, trinkets) {
         const sortByTier = arr => [...arr].sort((a, b) => (a.tier ?? Infinity) - (b.tier ?? Infinity));
         let html = '';
         if (weapons.length > 0) {
-            html += '<div class="info-row" style="color:#cc8888;margin-bottom:4px;"><b>Weapons:</b></div>';
+            html += `<div class="info-row" style="color:#cc8888;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_weapons'))}</b></div>`;
             let lastTier = null;
             sortByTier(weapons).forEach((w) => {
                 if (w.tier !== undefined && w.tier !== lastTier) {
@@ -4719,22 +4852,22 @@ export class UI {
                 }
                 const extras = getItemStatLines({ ...w, damage: undefined });
                 const cd = w.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
-                let stats = `${w.damage}d (${(w.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`;
+                let stats = t('ui.colonist.weapon_stats', { dmg: w.damage, dps: (w.damage / cd).toFixed(1), speed: weaponSpeedLabel(cd) });
                 if (extras.length) stats += `, ${extras.join(', ')}`;
                 const onHitStats = getOnHitLines(w);
                 if (onHitStats.length) stats += `, ${onHitStats.join(', ')}`;
-                const tip = w.description || '';
+                const tip = itemDescription(w);
                 const wec = ENCHANT_COST_BY_TIER[w.tier] ?? { resource: 'runite', amount: 5 };
-                const wecLabel = `${wec.amount} ${wec.resource.replace(/_/g, ' ')}`;
+                const wecLabel = t('ui.inv.salvage_part', { n: wec.amount, name: resourceName(wec.resource) });
                 const wi = weapons.indexOf(w);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${escapeHtml(w.name)}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(w)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(w)}">${this._itemIcon(w.key, 'weapon')}${escapeHtml(itemName(w))}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${w.name} for ${wecLabel}?`)})){window.game.enchantWeapon(${wi});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${w.name}?\n\nReturns: ${salvagePreview(w, this.game)}`)})){window.game.discardWeapon(${wi})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert(${jsArg(t('ui.inv.enchant_requires'))});}else if(confirm(${jsArg(t('ui.inv.enchant_confirm', { item: itemName(w), cost: wecLabel }))})){window.game.enchantWeapon(${wi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(t('ui.inv.salvage_confirm', { item: itemName(w), returns: salvagePreview(w, this.game) }))})){window.game.discardWeapon(${wi})}">♻</button></span></div>`;
             });
         }
         if (armors.length > 0) {
-            html += '<div class="info-row" style="color:#9966cc;margin-top:8px;margin-bottom:4px;"><b>Armor:</b></div>';
+            html += `<div class="info-row" style="color:#9966cc;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_armor'))}</b></div>`;
             let lastTier = null;
             sortByTier(armors).forEach((a) => {
                 if (a.tier !== undefined && a.tier !== lastTier) {
@@ -4742,18 +4875,18 @@ export class UI {
                     lastTier = a.tier;
                 }
                 const stats = getItemStatLines(a).join(', ');
-                const tip = a.description || '';
+                const tip = itemDescription(a);
                 const aec = ENCHANT_COST_BY_TIER[a.tier] ?? { resource: 'runite', amount: 5 };
-                const aecLabel = `${aec.amount} ${aec.resource.replace(/_/g, ' ')}`;
+                const aecLabel = t('ui.inv.salvage_part', { n: aec.amount, name: resourceName(aec.resource) });
                 const ai = armors.indexOf(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${escapeHtml(a.name)}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(a)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(a)}">${this._itemIcon(a.key, 'armor')}${escapeHtml(itemName(a))}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${a.name} for ${aecLabel}?`)})){window.game.enchantArmor(${ai});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${a.name}?\n\nReturns: ${salvagePreview(a, this.game)}`)})){window.game.discardArmor(${ai})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert(${jsArg(t('ui.inv.enchant_requires'))});}else if(confirm(${jsArg(t('ui.inv.enchant_confirm', { item: itemName(a), cost: aecLabel }))})){window.game.enchantArmor(${ai});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(t('ui.inv.salvage_confirm', { item: itemName(a), returns: salvagePreview(a, this.game) }))})){window.game.discardArmor(${ai})}">♻</button></span></div>`;
             });
         }
         if (helmets.length > 0) {
-            html += '<div class="info-row" style="color:#7799cc;margin-top:8px;margin-bottom:4px;"><b>Helmets:</b></div>';
+            html += `<div class="info-row" style="color:#7799cc;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_helmets'))}</b></div>`;
             let lastTier = null;
             sortByTier(helmets).forEach((h) => {
                 if (h.tier !== undefined && h.tier !== lastTier) {
@@ -4761,18 +4894,18 @@ export class UI {
                     lastTier = h.tier;
                 }
                 const stats = getItemStatLines(h).join(', ');
-                const tip = h.description || '';
+                const tip = itemDescription(h);
                 const hec = ENCHANT_COST_BY_TIER[h.tier] ?? { resource: 'runite', amount: 5 };
-                const hecLabel = `${hec.amount} ${hec.resource.replace(/_/g, ' ')}`;
+                const hecLabel = t('ui.inv.salvage_part', { n: hec.amount, name: resourceName(hec.resource) });
                 const hi = helmets.indexOf(h);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${escapeHtml(h.name)}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(h)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(h)}">${this._itemIcon(h.key, 'helmet')}${escapeHtml(itemName(h))}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${h.name} for ${hecLabel}?`)})){window.game.enchantHelmet(${hi});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${h.name}?\n\nReturns: ${salvagePreview(h, this.game)}`)})){window.game.discardHelmet(${hi})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert(${jsArg(t('ui.inv.enchant_requires'))});}else if(confirm(${jsArg(t('ui.inv.enchant_confirm', { item: itemName(h), cost: hecLabel }))})){window.game.enchantHelmet(${hi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(t('ui.inv.salvage_confirm', { item: itemName(h), returns: salvagePreview(h, this.game) }))})){window.game.discardHelmet(${hi})}">♻</button></span></div>`;
             });
         }
         if (boots.length > 0) {
-            html += '<div class="info-row" style="color:#aa8855;margin-top:8px;margin-bottom:4px;"><b>Boots:</b></div>';
+            html += `<div class="info-row" style="color:#aa8855;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_boots'))}</b></div>`;
             let lastTier = null;
             sortByTier(boots).forEach((b) => {
                 if (b.tier !== undefined && b.tier !== lastTier) {
@@ -4780,18 +4913,18 @@ export class UI {
                     lastTier = b.tier;
                 }
                 const stats = getItemStatLines(b).join(', ');
-                const tip = b.description || '';
+                const tip = itemDescription(b);
                 const bec = ENCHANT_COST_BY_TIER[b.tier] ?? { resource: 'runite', amount: 5 };
-                const becLabel = `${bec.amount} ${bec.resource.replace(/_/g, ' ')}`;
+                const becLabel = t('ui.inv.salvage_part', { n: bec.amount, name: resourceName(bec.resource) });
                 const bi = boots.indexOf(b);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${escapeHtml(b.name)}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(b)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(b)}">${this._itemIcon(b.key, 'boots')}${escapeHtml(itemName(b))}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${b.name} for ${becLabel}?`)})){window.game.enchantBoots(${bi});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${b.name}?\n\nReturns: ${salvagePreview(b, this.game)}`)})){window.game.discardBoots(${bi})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert(${jsArg(t('ui.inv.enchant_requires'))});}else if(confirm(${jsArg(t('ui.inv.enchant_confirm', { item: itemName(b), cost: becLabel }))})){window.game.enchantBoots(${bi});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(t('ui.inv.salvage_confirm', { item: itemName(b), returns: salvagePreview(b, this.game) }))})){window.game.discardBoots(${bi})}">♻</button></span></div>`;
             });
         }
         if (clothes.length > 0) {
-            html += '<div class="info-row" style="color:#cc8866;margin-top:8px;margin-bottom:4px;"><b>Clothes:</b></div>';
+            html += `<div class="info-row" style="color:#cc8866;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_clothes'))}</b></div>`;
             let lastTier = null;
             sortByTier(clothes).forEach((c) => {
                 if (c.tier !== undefined && c.tier !== lastTier) {
@@ -4799,37 +4932,37 @@ export class UI {
                     lastTier = c.tier;
                 }
                 const stats = getItemStatLines(c).join(', ');
-                const tip = c.description || '';
+                const tip = itemDescription(c);
                 const cec = ENCHANT_COST_BY_TIER[c.tier] ?? { resource: 'runite', amount: 5 };
-                const cecLabel = `${cec.amount} ${cec.resource.replace(/_/g, ' ')}`;
+                const cecLabel = t('ui.inv.salvage_part', { n: cec.amount, name: resourceName(cec.resource) });
                 const ci = clothes.indexOf(c);
-                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${escapeHtml(c.name)}</span>
+                html += `<div class="inv-row"><span class="inv-name skill-tip${this._enchantmentGlow(c)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(c)}">${this._itemIcon(c.key, 'clothes')}${escapeHtml(itemName(c))}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${c.name} for ${cecLabel}?`)})){window.game.enchantClothes(${ci});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${c.name}?\n\nReturns: ${salvagePreview(c, this.game)}`)})){window.game.discardClothes(${ci})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert(${jsArg(t('ui.inv.enchant_requires'))});}else if(confirm(${jsArg(t('ui.inv.enchant_confirm', { item: itemName(c), cost: cecLabel }))})){window.game.enchantClothes(${ci});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(t('ui.inv.salvage_confirm', { item: itemName(c), returns: salvagePreview(c, this.game) }))})){window.game.discardClothes(${ci})}">♻</button></span></div>`;
             });
         }
         if (tools.length > 0) {
-            html += '<div class="info-row" style="color:#88aacc;margin-top:8px;margin-bottom:4px;"><b>Tools:</b></div>';
+            html += `<div class="info-row" style="color:#88aacc;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_tools'))}</b></div>`;
             let lastTier = null;
-            sortByTier(tools).forEach((t) => {
-                if (t.tier !== undefined && t.tier !== lastTier) {
-                    html += this._invTierDivider(t.tier, lastTier !== null);
-                    lastTier = t.tier;
+            sortByTier(tools).forEach((tool) => {
+                if (tool.tier !== undefined && tool.tier !== lastTier) {
+                    html += this._invTierDivider(tool.tier, lastTier !== null);
+                    lastTier = tool.tier;
                 }
-                const stats = getItemStatLines(t).join(', ');
-                const tip = t.description || '';
-                const tec = ENCHANT_COST_BY_TIER[t.tier] ?? { resource: 'runite', amount: 5 };
-                const tecLabel = `${tec.amount} ${tec.resource.replace(/_/g, ' ')}`;
-                const ti = tools.indexOf(t);
-                html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(t)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(t)}">${this._itemIcon(t.key, 'tool')}${escapeHtml(t.name)}</span>
+                const stats = getItemStatLines(tool).join(', ');
+                const tip = itemDescription(tool);
+                const tec = ENCHANT_COST_BY_TIER[tool.tier] ?? { resource: 'runite', amount: 5 };
+                const tecLabel = t('ui.inv.salvage_part', { n: tec.amount, name: resourceName(tec.resource) });
+                const ti = tools.indexOf(tool);
+                html += `<div class="inv-row"><span class="inv-name skill-tip ${this._enchantmentGlow(tool)}" data-tip="${escapeAttr(tip)}" style="color:${this._qualityColor(tool)}">${this._itemIcon(tool.key, 'tool')}${escapeHtml(itemName(tool))}</span>
                         <span class="inv-amount">${stats}</span>
-                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert('Arcane Infusion is required before you can Enchant your equipment!');}else if(confirm(${jsArg(`Enchant ${t.name} for ${tecLabel}?`)})){window.game.enchantTool(${ti});}">✦</button>
-                        <button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${t.name}?\n\nReturns: ${salvagePreview(t, this.game)}`)})){window.game.discardTool(${ti})}">♻</button></span></div>`;
+                        <span class="inv-actions"><button class="inv-enchant" onclick="if(!window.game.research.isResearched('arcane_infusion')){alert(${jsArg(t('ui.inv.enchant_requires'))});}else if(confirm(${jsArg(t('ui.inv.enchant_confirm', { item: itemName(tool), cost: tecLabel }))})){window.game.enchantTool(${ti});}">✦</button>
+                        <button class="inv-delete" onclick="if(confirm(${jsArg(t('ui.inv.salvage_confirm', { item: itemName(tool), returns: salvagePreview(tool, this.game) }))})){window.game.discardTool(${ti})}">♻</button></span></div>`;
             });
         }
         if (trinkets.length > 0) {
-            html += '<div class="info-row" style="color:#ccaa44;margin-top:8px;margin-bottom:4px;"><b>Trinkets:</b></div>';
+            html += `<div class="info-row" style="color:#ccaa44;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_trinkets'))}</b></div>`;
             let lastTier = null;
             sortByTier(trinkets).forEach((a) => {
                 if (a.tier !== undefined && a.tier !== lastTier) {
@@ -4838,27 +4971,26 @@ export class UI {
                 }
                 const tip = this._getTrinketTooltip(a);
                 const ai = trinkets.indexOf(a);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(tip)}" style="color:${escapeAttr(a.textColor || "#d3d597")}">${this._itemIcon(a.key, 'trinket')}${escapeHtml(a.name)}</span><span class="inv-amount"></span><span class="inv-actions"><button class="inv-delete" onclick="if(confirm(${jsArg(`Salvage ${a.name}?\n\nReturns: ${salvagePreview(a, this.game)}`)})){window.game.discardTrinket(${ai})}">♻</button></span></div>`;
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(tip)}" style="color:${escapeAttr(a.textColor || "#d3d597")}">${this._itemIcon(a.key, 'trinket')}${escapeHtml(itemName(a))}</span><span class="inv-amount"></span><span class="inv-actions"><button class="inv-delete" onclick="if(confirm(${jsArg(t('ui.inv.salvage_confirm', { item: itemName(a), returns: salvagePreview(a, this.game) }))})){window.game.discardTrinket(${ai})}">♻</button></span></div>`;
             });
         }
-        if (!html) html = '<div class="info-row" style="color:#666;">No equipment in storage.</div>';
+        if (!html) html = `<div class="info-row" style="color:#666;">${escapeHtml(t('ui.inv.no_equipment'))}</div>`;
         return html;
     }
 
     _buildInvConsumables(potions, tomes, consumables) {
         let html = '';
         if (consumables && consumables.length > 0) {
-            html += '<div class="info-row" style="color:#aa44ff;margin-bottom:4px;"><b>Usable Items:</b></div>';
+            html += `<div class="info-row" style="color:#aa44ff;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_usable'))}</b></div>`;
             for (let i = 0; i < consumables.length; i++) {
                 const c = consumables[i];
-                const def = ALL_ITEMS[c.key];
-                const desc = def?.description || '';
+                const desc = itemDescription(c);
                 const icon = this._itemIcon(c.key);
-                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(desc)}">${icon}${escapeHtml(c.name)}</span><button class="inv-use" onclick="window.game.useConsumable(${i})">Use</button></div>`;
+                html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(desc)}">${icon}${escapeHtml(itemName(c))}</span><button class="inv-use" onclick="window.game.useConsumable(${i})">${escapeHtml(t('ui.inv.use'))}</button></div>`;
             }
         }
         if (potions.length > 0) {
-            html += '<div class="info-row" style="color:#cc88aa;margin-top:8px;margin-bottom:4px;"><b>Potions:</b> <span style="color:#666;font-size:0.8em;margin-left:4px;">Auto-use by colonists</span></div>';
+            html += `<div class="info-row" style="color:#cc88aa;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_potions'))}</b> <span style="color:#666;font-size:0.8em;margin-left:4px;">${escapeHtml(t('ui.inv.potions_auto_use'))}</span></div>`;
             const potionCounts = countByKey(potions, p => p.key ?? p.type);
             for (const [type, count] of Object.entries(potionCounts)) {
                 const def = POTIONS[type];
@@ -4868,14 +5000,14 @@ export class UI {
                 html += `<div class="inv-row" style="display:flex;align-items:center;gap:6px;">`;
                 html += `<span class="inv-name skill-tip" data-tip="${escapeAttr(potionTip)}" style="flex:1;">${this._itemIcon(type, 'potion')}${escapeHtml(def ? def.name : type)}</span>`;
                 html += `<span class="inv-amount">x${count}</span>`;
-                html += `<label style="display:flex;align-items:center;gap:3px;font-size:0.8em;color:#aaa;white-space:nowrap;cursor:pointer;" title="Allow colonists to auto-use this potion">`;
+                html += `<label style="display:flex;align-items:center;gap:3px;font-size:0.8em;color:#aaa;white-space:nowrap;cursor:pointer;" title="${escapeAttr(t('ui.inv.potion_auto_use_tip'))}">`;
                 html += `<input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="window.game.setPotionAutoUse(${jsArg(type)}, this.checked)" style="cursor:pointer;accent-color:#44cc88;">`;
                 html += `</label>`;
                 html += `</div>`;
             }
         }
         if (tomes.length > 0) {
-            html += '<div class="info-row" style="color:#bb88ff;margin-top:8px;margin-bottom:4px;"><b>Spell Tomes:</b></div>';
+            html += `<div class="info-row" style="color:#bb88ff;margin-top:8px;margin-bottom:4px;"><b>${escapeHtml(t('ui.inv.head_tomes'))}</b></div>`;
             const tomeCounts = countByKey(tomes, t => t.key);
             for (const [key, count] of Object.entries(tomeCounts)) {
                 const def = SPELL_TOMES[key];
@@ -4885,12 +5017,12 @@ export class UI {
                 html += `<div class="inv-row"><span class="inv-name skill-tip" data-tip="${escapeAttr(tomeTip)}">${this._itemIcon(key, 'tome')}${escapeHtml(def ? def.name : key)}</span><span class="inv-amount">x${count}${schoolName ? ` (${escapeHtml(schoolName)})` : ''}</span></div>`;
             }
         }
-        if (!html) html = '<div class="info-row" style="color:#666;">No consumables.</div>';
+        if (!html) html = `<div class="info-row" style="color:#666;">${escapeHtml(t('ui.inv.no_consumables'))}</div>`;
         return html;
     }
 
     _buildInvAnimals(tamed) {
-        if (!tamed.length) return '<div class="info-row" style="color:#666;">No tamed animals.</div>';
+        if (!tamed.length) return `<div class="info-row" style="color:#666;">${escapeHtml(t('ui.inv.no_tamed'))}</div>`;
 
         const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
         const PET_BOND_THRESHOLD = 5;
@@ -4912,46 +5044,45 @@ export class UI {
             const def = TAMED_ANIMALS[type] || {};
             const color = escapeAttr(def.color || '#ccaa88');
             html += `<div style="margin-bottom:8px;">`;
-            const irregularPlurals = { sheep: 'Sheep', goose: 'Geese' };
-            const typeLabel = escapeHtml(irregularPlurals[type] || (cap(type) + 's'));
-            html += `<div style="color:${color};font-weight:bold;border-bottom:1px solid #333;margin-bottom:4px;padding-bottom:2px;">${typeLabel} (${animals.length})</div>`;
+            const typeLabel = escapeHtml(t('ui.inv.animal_group', { name: cap(tamedTypeName(type)), n: animals.length }));
+            html += `<div style="color:${color};font-weight:bold;border-bottom:1px solid #333;margin-bottom:4px;padding-bottom:2px;">${typeLabel}</div>`;
 
             for (const a of animals) {
-                const displayName = escapeHtml(a.name || cap(a.type));
+                const displayName = escapeHtml(a.name || cap(tamedTypeName(a.type)));
                 html += `<div style="padding:4px 0 4px 8px;border-bottom:1px solid #2a2a2a;">`;
 
                 // name row: clickable name + rename button / inline input when editing
                 html += `<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">`;
                 if (this._renamingAnimalId === a.id) {
                     html += `<input data-animal-rename-input="${a.id}" type="text" value="" placeholder="${displayName}" style="background:#222;color:#eee;border:1px solid #666;padding:1px 4px;font-size:0.9em;width:100px;" maxlength="24" autofocus>`;
-                    html += `<button data-animal-rename-confirm="${a.id}" style="${btnStyle}">OK</button>`;
+                    html += `<button data-animal-rename-confirm="${a.id}" style="${btnStyle}">${escapeHtml(t('common.ok'))}</button>`;
                     html += `<button data-animal-rename-cancel style="${btnStyle}">✕</button>`;
                 } else if (this._releasingAnimalId === a.id) {
                     html += `<span style="color:#eee;font-weight:bold;">${displayName}</span>`;
-                    html += `<span style="color:#ff9944;font-size:0.85em;margin-left:4px;">Release into the wild?</span>`;
+                    html += `<span style="color:#ff9944;font-size:0.85em;margin-left:4px;">${escapeHtml(t('ui.inv.release_confirm'))}</span>`;
                     html += `<span style="margin-left:auto;display:flex;gap:4px;">`;
-                    html += `<button data-animal-release-confirm="${a.id}" style="${btnStyle.replace('#333','#882200')}">Yes</button>`;
-                    html += `<button data-animal-release-cancel style="${btnStyle}">No</button>`;
+                    html += `<button data-animal-release-confirm="${a.id}" style="${btnStyle.replace('#333','#882200')}">${escapeHtml(t('common.yes'))}</button>`;
+                    html += `<button data-animal-release-cancel style="${btnStyle}">${escapeHtml(t('common.no'))}</button>`;
                     html += `</span>`;
                 } else {
-                    html += `<span data-animal-goto="${a.id}" style="cursor:pointer;color:#eee;text-decoration:underline dotted;font-weight:bold;" title="Click to locate on map">${displayName}</span>`;
-                    html += `<button data-animal-rename="${a.id}" style="${btnStyle}" title="Rename">Rename</button>`;
-                    html += `<button data-animal-release="${a.id}" style="margin-left:auto;${btnStyle}" title="Release this animal back into the wild">Release</button>`;
+                    html += `<span data-animal-goto="${a.id}" style="cursor:pointer;color:#eee;text-decoration:underline dotted;font-weight:bold;" title="${escapeAttr(t('ui.inv.locate_tip'))}">${displayName}</span>`;
+                    html += `<button data-animal-rename="${a.id}" style="${btnStyle}" title="${escapeAttr(t('ui.info.rename'))}">${escapeHtml(t('ui.info.rename'))}</button>`;
+                    html += `<button data-animal-release="${a.id}" style="margin-left:auto;${btnStyle}" title="${escapeAttr(t('ui.inv.release_tip'))}">${escapeHtml(t('ui.inv.release'))}</button>`;
                 }
                 html += `</div>`;
 
                 // level
                 if (a.level > 0) {
                     const lvlTip = escapeAttr(animalLevelTooltip(a.level, a.type)).replace(/\n/g, '&#10;');
-                    html += `<div class="info-row" style="color:#ffcc44;font-size:0.9em;" title="${lvlTip}">Animal Level ${a.level}${a.level >= 5 ? ' (Max)' : ''}</div>`;
+                    html += `<div class="info-row" style="color:#ffcc44;font-size:0.9em;" title="${lvlTip}">${escapeHtml(t(a.level >= 5 ? 'ui.info.animal_level_max' : 'ui.info.animal_level', { n: a.level }))}</div>`;
                 }
 
                 // bond
                 if (a.bondedColonistId) {
                     const bonded = this.game.colonists.find(c => c.id === a.bondedColonistId);
-                    const bondName = bonded ? escapeHtml(bonded.name) : 'Unknown';
-                    const bondDisplay = a.isPet ? `${bondName} (Pet)` : `${bondName} (Bond: ${a.bondLevel || 0}/${PET_BOND_THRESHOLD})`;
-                    html += `<div class="info-row" style="color:#aaddff;font-size:0.9em;">Bonded: ${bondDisplay}</div>`;
+                    const bondName = bonded ? bonded.name : t('common.unknown');
+                    const bondDisplay = a.isPet ? t('ui.info.bonded_pet', { name: bondName }) : t('ui.info.bonded_level', { name: bondName, n: a.bondLevel || 0, max: PET_BOND_THRESHOLD });
+                    html += `<div class="info-row" style="color:#aaddff;font-size:0.9em;">${escapeHtml(bondDisplay)}</div>`;
                 }
 
                 // hunger
@@ -4959,14 +5090,14 @@ export class UI {
                     const threshold = def.hungerThreshold || 3;
                     const hunger = a.hunger || 0;
                     if (hunger >= threshold) {
-                        html += `<div class="info-row" style="color:#ff6644;font-size:0.9em;">Hungry! (${hunger}/${threshold})</div>`;
+                        html += `<div class="info-row" style="color:#ff6644;font-size:0.9em;">${escapeHtml(t('ui.inv.animal_hungry', { n: hunger, max: threshold }))}</div>`;
                     } else if (hunger > 0) {
-                        html += `<div class="info-row" style="color:#ddaa44;font-size:0.9em;">Hunger: ${hunger}/${threshold}</div>`;
+                        html += `<div class="info-row" style="color:#ddaa44;font-size:0.9em;">${escapeHtml(t('ui.info.animal_hunger', { n: hunger, max: threshold }))}</div>`;
                     }
                 }
 
                 if (a.onExpedition) {
-                    html += `<div class="info-row" style="color:#33ccff;font-size:0.9em;">On expedition</div>`;
+                    html += `<div class="info-row" style="color:#33ccff;font-size:0.9em;">${escapeHtml(t('ui.info.animal_on_expedition'))}</div>`;
                 } else {
                     const isGuard = a.roles && a.roles.some(r => r.type === 'guard');
                     if (isGuard && !a.isPet) {
@@ -4976,7 +5107,7 @@ export class UI {
                                 `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                             ).join('');
                             html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
-                            html += `<label style="color:#aaaaaa;">Defends: </label>`;
+                            html += `<label style="color:#aaaaaa;">${escapeHtml(t('ui.info.animal_defends'))} </label>`;
                             html += `<select data-animal-rebond="${a.id}" style="${selectStyle}">${opts}</select>`;
                             html += `</div>`;
                         }
@@ -4991,7 +5122,7 @@ export class UI {
                                 `<option value="${c.id}"${c.id === a.bondedColonistId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`
                             ).join('');
                             html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
-                            html += `<label style="color:#aaaaaa;">Pet (${ownerPetCount}/${maxPets}): </label>`;
+                            html += `<label style="color:#aaaaaa;">${escapeHtml(t('ui.info.animal_pet_owner', { n: ownerPetCount, max: maxPets }))} </label>`;
                             html += `<select data-animal-rebond-pet="${a.id}" style="${selectStyle}">${opts}</select>`;
                             html += `</div>`;
                         }
@@ -5002,14 +5133,14 @@ export class UI {
                         if (penPositions.length > 0) {
                             const penOpts = penPositions.map(p => {
                                 const isCurrent = p.x === a.penX && p.y === a.penY;
-                                return `<option value="${p.x},${p.y}"${isCurrent ? ' selected' : ''}>Pen (${p.x}, ${p.y})</option>`;
+                                return `<option value="${p.x},${p.y}"${isCurrent ? ' selected' : ''}>${escapeHtml(t('ui.info.animal_pen_option', { x: p.x, y: p.y }))}</option>`;
                             }).join('');
                             html += `<div class="info-row" style="font-size:0.9em;margin-top:2px;">`;
-                            html += `<label style="color:#aaaaaa;">Pen: </label>`;
+                            html += `<label style="color:#aaaaaa;">${escapeHtml(t('ui.info.animal_pen_label'))} </label>`;
                             html += `<select data-animal-pen="${a.id}" style="${selectStyle}">${penOpts}</select>`;
                             html += `</div>`;
                         } else {
-                            html += `<div class="info-row" style="color:#666;font-size:0.85em;">No beast circles built</div>`;
+                            html += `<div class="info-row" style="color:#666;font-size:0.85em;">${escapeHtml(t('ui.inv.no_beast_circles'))}</div>`;
                         }
                     }
                 }
@@ -5046,30 +5177,30 @@ export class UI {
     updateSaveSlotPanel() {
         const meta = getAllSlotsMeta();
         const primary = this.game.settings.primarySaveSlot;
-        let html = `<div class="settings-section"><div class="settings-section-title">Save Slots</div>`;
-        html += `<div style="color:#aaa;font-size:11px;margin-bottom:8px;">Saving to a slot marks it as your active slot — the <b>Save Game</b> button will always save to it.</div>`;
+        let html = `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.slots_title'))}</div>`;
+        html += `<div style="color:#aaa;font-size:11px;margin-bottom:8px;">${tHtml('ui.settings.slots_note_html')}</div>`;
         for (let i = 0; i < 10; i++) {
             const key = `colony_slot_manual_${i}`;
             const m = meta[key] || null;
             const isPrimary = key === primary;
             // Slot metadata can come from an imported or cloud save: escape it all.
             const seasonRaw = m ? String(m.season ?? '') : '';
-            const season = seasonRaw.charAt(0).toUpperCase() + seasonRaw.slice(1);
-            const gameStr = m ? escapeHtml(`${season} Y${m.year} · Day ${m.dayOfSeason} · ${m.colonistCount} colonist${m.colonistCount !== 1 ? 's' : ''}`) : '';
+            const season = t(`season.${seasonRaw}.name`, null, seasonRaw.charAt(0).toUpperCase() + seasonRaw.slice(1));
+            const gameStr = m ? escapeHtml(tp('ui.settings.slot_meta', m.colonistCount, { season, year: m.year, day: m.dayOfSeason })) : '';
             const dateStr = m ? escapeHtml(new Date(m.timestamp).toLocaleString()) : '';
             const thumbHtml = typeof m?.thumbnail === 'string' && m.thumbnail.startsWith('data:image/')
                 ? `<img class="slot-thumbnail" src="${escapeAttr(m.thumbnail)}" alt="">`
                 : `<div class="slot-thumbnail-placeholder"></div>`;
             const nameVal = escapeAttr(m?.label || '');
-            const primaryBadge = isPrimary ? `<span style="color:#ffcc00;font-size:10px;margin-right:4px;" title="Active save slot">&#9733; Active</span>` : '';
+            const primaryBadge = isPrimary ? `<span style="color:#ffcc00;font-size:10px;margin-right:4px;" title="${escapeAttr(t('ui.settings.slot_active_tip'))}">&#9733; ${escapeHtml(t('ui.settings.slot_active'))}</span>` : '';
             html += `<div class="slot-card${m ? '' : ' slot-empty'}${isPrimary ? ' slot-primary' : ''}">
                 ${thumbHtml}
-                <div class="slot-label">Slot ${i + 1}${isPrimary ? '<br><span style="color:#ffcc00;font-size:9px;">&#9733; ACTIVE</span>' : ''}</div>
-                <div class="slot-meta">${m ? `${gameStr}<br><span class="slot-timestamp">${dateStr}</span>` : '<span style="color:#555">Empty</span>'}</div>
-                <input class="slot-name-input" type="text" placeholder="Name…" value="${nameVal}" data-slot-name-key="${key}" maxlength="30" style="margin-right:4px;">
-                <button class="slot-save-btn" data-slot-save-key="${key}">Save</button>
-                <button class="slot-export-btn" ${m ? '' : 'disabled'} data-slot-export-key="${key}">Export</button>
-                <button class="slot-load-btn" ${m ? '' : 'disabled'} data-slot-load-key="${key}">Load</button>
+                <div class="slot-label">${escapeHtml(t('ui.settings.slot_n', { n: i + 1 }))}${isPrimary ? `<br><span style="color:#ffcc00;font-size:9px;">&#9733; ${escapeHtml(t('ui.settings.slot_active_badge'))}</span>` : ''}</div>
+                <div class="slot-meta">${m ? `${gameStr}<br><span class="slot-timestamp">${dateStr}</span>` : `<span style="color:#555">${escapeHtml(t('ui.settings.slot_empty'))}</span>`}</div>
+                <input class="slot-name-input" type="text" placeholder="${escapeAttr(t('ui.settings.slot_name_placeholder'))}" value="${nameVal}" data-slot-name-key="${key}" maxlength="30" style="margin-right:4px;">
+                <button class="slot-save-btn" data-slot-save-key="${key}">${escapeHtml(t('ui.settings.slot_save'))}</button>
+                <button class="slot-export-btn" ${m ? '' : 'disabled'} data-slot-export-key="${key}">${escapeHtml(t('ui.settings.slot_export'))}</button>
+                <button class="slot-load-btn" ${m ? '' : 'disabled'} data-slot-load-key="${key}">${escapeHtml(t('ui.settings.slot_load'))}</button>
             </div>`;
         }
         html += `</div>`;
@@ -5109,7 +5240,7 @@ export class UI {
         for (const name of skinNames) {
             const opt = document.createElement('option');
             opt.value = name;
-            opt.textContent = name === 'ascii' ? 'ASCII' : name.charAt(0).toUpperCase() + name.slice(1);
+            opt.textContent = name === 'ascii' ? t('ui.settings.skin_ascii') : name.charAt(0).toUpperCase() + name.slice(1);
             opt.selected = this.game.settings.activeSkin === name;
             el.appendChild(opt);
         }
@@ -5119,198 +5250,210 @@ export class UI {
         const s = this.game.settings;
         if (!this._settingsTab) this._settingsTab = 'general';
         const tab = this._settingsTab;
-        let html = '<div class="panel-close" data-panel-close="settings">&times;</div><h3>Settings</h3>';
+        let html = `<div class="panel-close" data-panel-close="settings">&times;</div><h3>${escapeHtml(t('ui.settings.title'))}</h3>`;
 
         // Tab bar (General / Graphics / Controls)
-        const tabs = [['general', 'General'], ['graphics', 'Graphics'], ['controls', 'Controls']];
+        const tabs = [['general', t('ui.settings.tab_general')], ['graphics', t('ui.settings.tab_graphics')], ['controls', t('ui.settings.tab_controls')]];
         html += `<div class="settings-tabs" style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #444;">`;
         for (const [key, label] of tabs) {
             const active = tab === key;
-            html += `<button onclick="window.game.ui._setSettingsTab('${key}')" class="settings-tab-btn${active ? ' active' : ''}" style="flex:1;padding:5px 8px;background:${active ? '#2a2a4e' : '#16162a'};color:${active ? '#ffcc00' : '#999'};border:1px solid #444;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-family:inherit;font-size:inherit;">${label}</button>`;
+            html += `<button onclick="window.game.ui._setSettingsTab('${key}')" class="settings-tab-btn${active ? ' active' : ''}" style="flex:1;padding:5px 8px;background:${active ? '#2a2a4e' : '#16162a'};color:${active ? '#ffcc00' : '#999'};border:1px solid #444;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-family:inherit;font-size:inherit;">${escapeHtml(label)}</button>`;
         }
         html += `</div>`;
 
         // ===== GENERAL TAB =====
         let general = '';
-        general += `<div class="settings-section"><div class="settings-section-title">Save / Load</div>`;
+        // Language applies on restart (boot.js loads the table once). Unlike the
+        // start screen there is no restart button here: it would drop unsaved progress.
+        general += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.language_title'))}</div>`;
+        general += `<div class="settings-row"><label for="set-language">${escapeHtml(t('ui.settings.language'))}</label><select id="set-language" onchange="window.setGameLanguage(this.value);window.game.ui.updateSettingsPanel()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        const chosenLanguage = s.language || getLanguage();
+        for (const lang of getAvailableLanguages()) {
+            general += `<option value="${escapeAttr(lang.code)}"${lang.code === chosenLanguage ? ' selected' : ''}>${escapeHtml(lang.label)}</option>`;
+        }
+        general += `</select></div>`;
+        if (chosenLanguage !== getLanguage()) general += `<div style="color:#aaa;font-size:11px;">${escapeHtml(t('ui.settings.language_restart_note'))}</div>`;
+        general += `</div>`;
+        general += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.section_save'))}</div>`;
         const primarySlot = this.game.settings.primarySaveSlot;
-        const primaryLabel = primarySlot ? `Slot ${parseInt(primarySlot.slice(-1)) + 1}` : 'none';
-        general += `<div style="color:#aaa;font-size:11px;margin-bottom:6px;">Active slot: <span style="color:${primarySlot ? '#ffcc00' : '#666'}">${primaryLabel}</span></div>`;
+        const primaryLabel = primarySlot ? t('ui.settings.slot_n', { n: parseInt(primarySlot.slice(-1)) + 1 }) : t('ui.settings.active_slot_none');
+        general += `<div style="color:#aaa;font-size:11px;margin-bottom:6px;">${escapeHtml(t('ui.settings.active_slot_label'))} <span style="color:${primarySlot ? '#ffcc00' : '#666'}">${escapeHtml(primaryLabel)}</span></div>`;
         general += `<div class="settings-row" style="gap:8px;">`;
-        general += `<button onclick="window.game.save()" class="settings-btn settings-btn-green"${primarySlot ? '' : ' title="No active slot selected"'}>Save Game</button>`;
-        general += `<button onclick="window.game.exportSave()" class="settings-btn settings-btn-blue">Export Save</button>`;
-        general += `<button onclick="window.game.toggleSaveSlotPanel()" class="settings-btn">Save to Slot…</button>`;
+        general += `<button onclick="window.game.save()" class="settings-btn settings-btn-green"${primarySlot ? '' : ` title="${escapeAttr(t('ui.settings.no_active_slot'))}"`}>${escapeHtml(t('ui.settings.save_game'))}</button>`;
+        general += `<button onclick="window.game.exportSave()" class="settings-btn settings-btn-blue">${escapeHtml(t('ui.settings.export_save'))}</button>`;
+        general += `<button onclick="window.game.toggleSaveSlotPanel()" class="settings-btn">${escapeHtml(t('ui.settings.save_to_slot'))}</button>`;
         general += `</div></div>`;
 
         {
             general += `<div class="settings-section" id="gdrive-settings-section">`;
-            general += `<div class="settings-section-title">Cloud Save (Google Drive)</div>`;
+            general += `<div class="settings-section-title">${escapeHtml(t('ui.settings.cloud_title'))}</div>`;
             general += `<div id="gdrive-status-row" style="min-height:28px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
-            general += `<span id="gdrive-status-label" style="color:#aaa;font-size:11px;">Checking…</span>`;
+            general += `<span id="gdrive-status-label" style="color:#aaa;font-size:11px;">${escapeHtml(t('ui.settings.cloud_checking'))}</span>`;
             general += `</div>`;
-            general += `<div style="font-size:10px;color:#888;margin-top:4px;"><a href="privacy.html" target="_blank" rel="noopener" style="color:#bb99dd;">Privacy Policy</a> &#183; <a href="terms.html" target="_blank" rel="noopener" style="color:#bb99dd;">Terms of Service</a></div>`;
+            general += `<div style="font-size:10px;color:#888;margin-top:4px;"><a href="privacy.html" target="_blank" rel="noopener" style="color:#bb99dd;">${escapeHtml(t('ui.settings.privacy_policy'))}</a> &#183; <a href="terms.html" target="_blank" rel="noopener" style="color:#bb99dd;">${escapeHtml(t('ui.settings.terms'))}</a></div>`;
             general += `</div>`;
         }
 
-        general += `<div class="settings-section"><button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">View Glossary</button></div>`;
+        general += `<div class="settings-section"><button onclick="window.game.showGlossary()" class="settings-btn settings-btn-purple">${escapeHtml(t('ui.settings.view_glossary'))}</button></div>`;
 
         // ===== GRAPHICS TAB =====
         let graphics = '';
-        graphics += `<div class="settings-section"><div class="settings-section-title">Visual</div>`;
+        graphics += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.section_visual'))}</div>`;
         graphics += `<div class="settings-row">`;
-        graphics += `<label for="set-skin">Tile Skin:</label>`;
+        graphics += `<label for="set-skin">${escapeHtml(t('ui.settings.tile_skin'))}</label>`;
         graphics += `<select id="set-skin" onchange="window.game.switchSkin(this.value)" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
         const skinNames = this.game.skinManager.getSkinNames();
         for (const name of skinNames) {
-            const display = name === 'ascii' ? 'ASCII' : name.charAt(0).toUpperCase() + name.slice(1);
+            const display = name === 'ascii' ? t('ui.settings.skin_ascii') : name.charAt(0).toUpperCase() + name.slice(1);
             graphics += `<option value="${escapeAttr(name)}" ${s.activeSkin === name ? 'selected' : ''}>${escapeHtml(display)}</option>`;
         }
         graphics += `</select></div>`;
         graphics += `<div class="settings-row">`;
-        graphics += `<label for="set-names">Colonist names:</label>`;
+        graphics += `<label for="set-names">${escapeHtml(t('ui.settings.colonist_names'))}</label>`;
         graphics += `<select id="set-names" onchange="window.game.settings.showColonistNames=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
-        for (const val of ['off', 'selected', 'always']) {
-            graphics += `<option value="${val}" ${s.showColonistNames === val ? 'selected' : ''}>${val.charAt(0).toUpperCase() + val.slice(1)}</option>`;
+        for (const [val, label] of [['off', t('ui.settings.names_off')], ['selected', t('ui.settings.names_selected')], ['always', t('ui.settings.names_always')]]) {
+            graphics += `<option value="${val}" ${s.showColonistNames === val ? 'selected' : ''}>${escapeHtml(label)}</option>`;
         }
         graphics += `</select></div>`;
         const uiScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1;
-        const uiScaleLabel = uiScale <= 0.8 ? 'Small' : uiScale >= 1.2 ? 'Large' : 'Medium';
+        const [scaleSmall, scaleMedium, scaleLarge] = [t('ui.settings.font_small'), t('ui.settings.font_medium'), t('ui.settings.font_large')];
+        const uiScaleLabel = uiScale <= 0.8 ? scaleSmall : uiScale >= 1.2 ? scaleLarge : scaleMedium;
         graphics += `<div class="settings-row">`;
-        graphics += `<label for="set-ui-font-size">UI Font Size: <span id="ui-font-size-val">${uiScaleLabel}</span></label>`;
-        graphics += `<input type="range" id="set-ui-font-size" min="0.75" max="1.4" step="0.05" value="${uiScale}" style="width:80px" oninput="const lbl=this.value<=0.8?'Small':this.value>=1.2?'Large':'Medium';document.getElementById('ui-font-size-val').textContent=lbl;window.setUIFontScale(this.value);window.game.settings.uiFontScale=parseFloat(this.value);window.game.saveSettingsToStorage()">`;
+        graphics += `<label for="set-ui-font-size">${escapeHtml(t('ui.settings.ui_font_size'))} <span id="ui-font-size-val">${escapeHtml(uiScaleLabel)}</span></label>`;
+        graphics += `<input type="range" id="set-ui-font-size" min="0.75" max="1.4" step="0.05" value="${uiScale}" style="width:80px" oninput="const lbl=this.value<=0.8?${jsArg(scaleSmall)}:this.value>=1.2?${jsArg(scaleLarge)}:${jsArg(scaleMedium)};document.getElementById('ui-font-size-val').textContent=lbl;window.setUIFontScale(this.value);window.game.settings.uiFontScale=parseFloat(this.value);window.game.saveSettingsToStorage()">`;
         graphics += `</div>`;
-        graphics += `<div class="settings-row"><label for="set-temp-unit">Temperature unit:</label><select id="set-temp-unit" onchange="window.game.settings.temperatureUnit=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['F','Fahrenheit (°F)'],['C','Celsius (°C)']]) {
-            graphics += `<option value="${val}"${s.temperatureUnit === val ? ' selected' : ''}>${label}</option>`;
+        graphics += `<div class="settings-row"><label for="set-temp-unit">${escapeHtml(t('ui.settings.temp_unit'))}</label><select id="set-temp-unit" onchange="window.game.settings.temperatureUnit=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['F', t('ui.settings.temp_f')], ['C', t('ui.settings.temp_c')]]) {
+            graphics += `<option value="${val}"${s.temperatureUnit === val ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }
         graphics += `</select></div>`;
         graphics += `</div>`;
 
-        general += `<div class="settings-section"><div class="settings-section-title">Audio</div>`;
+        general += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.section_audio'))}</div>`;
         general += `<div class="settings-row">`;
-        general += `<label for="set-music-vol">Music Volume: <span id="music-vol-val">${s.musicVolume}</span></label>`;
+        general += `<label for="set-music-vol">${escapeHtml(t('ui.settings.music_volume'))} <span id="music-vol-val">${s.musicVolume}</span></label>`;
         general += `<input type="range" id="set-music-vol" min="0" max="100" value="${s.musicVolume}" style="width:80px" oninput="document.getElementById('music-vol-val').textContent=this.value;window.game.settings.musicVolume=parseInt(this.value);if(window.soundManager)window.soundManager.setMusicVolume(parseInt(this.value))">`;
         general += `</div>`;
         general += `<div class="settings-row">`;
-        general += `<label for="set-sfx-vol">SFX Volume: <span id="sfx-vol-val">${s.sfxVolume}</span></label>`;
+        general += `<label for="set-sfx-vol">${escapeHtml(t('ui.settings.sfx_volume'))} <span id="sfx-vol-val">${s.sfxVolume}</span></label>`;
         general += `<input type="range" id="set-sfx-vol" min="0" max="100" value="${s.sfxVolume}" style="width:80px" oninput="document.getElementById('sfx-vol-val').textContent=this.value;window.game.settings.sfxVolume=parseInt(this.value);if(window.soundManager)window.soundManager.setSFXVolume(parseInt(this.value))">`;
         general += `</div></div>`;
 
-        general += `<div class="settings-section"><div class="settings-section-title">Gameplay</div>`;
+        general += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.section_gameplay'))}</div>`;
         general += `<div class="settings-row" style="gap:4px;">`;
-        general += `<label>Auto-cook target:</label>`;
+        general += `<label>${escapeHtml(t('ui.craft.autocook_label'))}</label>`;
         general += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)-10)" style="padding:1px 5px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;">-10</button>`;
         general += `<input type="number" min="0" max="200" value="${s.autoCookTarget||0}" onchange="window.game.setAutoCookTarget(parseInt(this.value)||0)" style="width:42px;text-align:center;background:#1a1a2e;color:#88cc88;border:1px solid #555;border-radius:3px;padding:1px;">`;
         general += `<button onclick="window.game.setAutoCookTarget((window.game.settings.autoCookTarget||0)+10)" style="padding:1px 5px;background:#2a2a3e;color:#ccc;border:1px solid #555;border-radius:3px;">+10</button>`;
         general += `</div>`;
         general += `<div class="settings-row">`;
-        general += `<label for="set-autosave">Auto-save interval:</label>`;
+        general += `<label for="set-autosave">${escapeHtml(t('ui.settings.autosave'))}</label>`;
         general += `<select id="set-autosave" onchange="window.game.settings.autoSaveInterval=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
-        for (const [val, label] of [[0, 'Off'], [12, 'Every 12 hours'], [24, 'Every 24 hours'], [48, 'Every 48 hours']]) {
-            general += `<option value="${val}" ${s.autoSaveInterval === val ? 'selected' : ''}>${label}</option>`;
+        for (const [val, label] of [[0, t('ui.settings.autosave_off')], [12, t('ui.settings.autosave_hours', { n: 12 })], [24, t('ui.settings.autosave_hours', { n: 24 })], [48, t('ui.settings.autosave_hours', { n: 48 })]]) {
+            general += `<option value="${val}" ${s.autoSaveInterval === val ? 'selected' : ''}>${escapeHtml(label)}</option>`;
         }
         general += `</select></div>`;
-        general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', 'Auto-pause on hostile event (raids)');
-        general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', 'Auto-pause on choice events (wanderers, void whispers)');
-        general += this._settingsCheck('set-pause-caravan', s.autoPauseCaravan, 'window.game.settings.autoPauseCaravan=this.checked', 'Auto-pause when a caravan arrives');
-        general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', 'Auto-pause on colonist death');
-        general += this._settingsCheck('set-pause-low-health', s.pauseOnLowHealth, 'window.game.settings.pauseOnLowHealth=this.checked', 'Auto-pause on critically low health');
-        general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', 'Auto-pause on research complete');
-        general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', 'Peaceful mode (no raids/hostile animals)');
-        general += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', 'Show tutorial hints');
+        general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', t('ui.settings.opt_pause_hostile'));
+        general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', t('ui.settings.opt_pause_event'));
+        general += this._settingsCheck('set-pause-caravan', s.autoPauseCaravan, 'window.game.settings.autoPauseCaravan=this.checked', t('ui.settings.opt_pause_caravan'));
+        general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', t('ui.settings.opt_pause_death'));
+        general += this._settingsCheck('set-pause-low-health', s.pauseOnLowHealth, 'window.game.settings.pauseOnLowHealth=this.checked', t('ui.settings.opt_pause_low_health'));
+        general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', t('ui.settings.opt_pause_research'));
+        general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', t('ui.settings.opt_peaceful'));
+        general += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', t('ui.settings.opt_tutorial'));
         const tutLevel = this.game.tutorial.level;
-        general += `<div class="settings-row"><label for="set-tutorial-level">Tutorial style:</label><select id="set-tutorial-level" onchange="window.game.tutorial.changeLevel(window.game,this.value)" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`
-            + [['none', 'New to colony sims'], ['some', 'Some experience'], ['veteran', "I've played Rifthold"]]
-                .map(([v, t]) => `<option value="${v}"${tutLevel === v ? ' selected' : ''}>${t}</option>`).join('')
+        general += `<div class="settings-row"><label for="set-tutorial-level">${escapeHtml(t('ui.settings.tutorial_style'))}</label><select id="set-tutorial-level" onchange="window.game.tutorial.changeLevel(window.game,this.value)" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`
+            + [['none', t('ui.settings.tutorial_none')], ['some', t('ui.settings.tutorial_some')], ['veteran', t('ui.settings.tutorial_veteran')]]
+                .map(([v, label]) => `<option value="${v}"${tutLevel === v ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')
             + `</select></div>`;
-        general += this._settingsCheck('set-tutorial-arrows', s.showTutorialArrows !== false, 'window.game.settings.showTutorialArrows=this.checked;window.game.saveSettingsToStorage()', 'Show tutorial arrows');
+        general += this._settingsCheck('set-tutorial-arrows', s.showTutorialArrows !== false, 'window.game.settings.showTutorialArrows=this.checked;window.game.saveSettingsToStorage()', t('ui.settings.opt_tutorial_arrows'));
         general += `</div>`;
 
-        general += `<div class="settings-section"><div class="settings-section-title">Accessibility</div>`;
-        general += this._settingsCheck('set-darken-pause', s.darkenOnPause, 'window.game.settings.darkenOnPause=this.checked;if(window.game.paused)document.getElementById("game").classList.toggle("paused",this.checked)', 'Darken screen when paused');
-        general += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', 'Pause when window loses focus');
-        general += this._settingsCheck('set-haptics', s.haptics !== false, 'window.game.settings.haptics=this.checked', 'Vibration feedback (phones)');
-        if (navigator.wakeLock) general += this._settingsCheck('set-keep-awake', s.keepScreenAwake, 'window.game.settings.keepScreenAwake=this.checked;window.game._syncWakeLock()', 'Keep screen awake while unpaused');
-        general += `<div class="settings-row"><label for="set-toolbar-mode">Mobile button bar:</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['auto','Auto'],['always','Always'],['never','Never']]) {
-            general += `<option value="${val}"${(s.toolbarMode || 'auto') === val ? ' selected' : ''}>${label}</option>`;
+        general += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.section_accessibility'))}</div>`;
+        general += this._settingsCheck('set-darken-pause', s.darkenOnPause, 'window.game.settings.darkenOnPause=this.checked;if(window.game.paused)document.getElementById("game").classList.toggle("paused",this.checked)', t('ui.settings.opt_darken_pause'));
+        general += this._settingsCheck('set-pause-focus', s.pauseOnFocusLoss, 'window.game.settings.pauseOnFocusLoss=this.checked', t('ui.settings.opt_pause_focus'));
+        general += this._settingsCheck('set-haptics', s.haptics !== false, 'window.game.settings.haptics=this.checked', t('ui.settings.opt_haptics'));
+        if (navigator.wakeLock) general += this._settingsCheck('set-keep-awake', s.keepScreenAwake, 'window.game.settings.keepScreenAwake=this.checked;window.game._syncWakeLock()', t('ui.settings.opt_keep_awake'));
+        general += `<div class="settings-row"><label for="set-toolbar-mode">${escapeHtml(t('ui.settings.toolbar_mode'))}</label><select id="set-toolbar-mode" onchange="window.game.settings.toolbarMode=this.value;const tb=document.getElementById('touch-toolbar');if(this.value==='always')tb.style.display='flex';else if(this.value==='never')tb.style.display='none';else tb.style.display='';window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['auto', t('ui.settings.toolbar_auto')], ['always', t('ui.settings.toolbar_always')], ['never', t('ui.settings.toolbar_never')]]) {
+            general += `<option value="${val}"${(s.toolbarMode || 'auto') === val ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }
         general += `</select></div>`;
-        general += `<div class="settings-row"><label for="set-layout-mode">Layout mode:</label><select id="set-layout-mode" onchange="window.game.setLayoutMode(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['auto','Auto (detect screen size)'],['separate','Separate'],['tabbed','Tabbed']]) {
-            general += `<option value="${val}"${s.layoutMode === val ? ' selected' : ''}>${label}</option>`;
+        general += `<div class="settings-row"><label for="set-layout-mode">${escapeHtml(t('ui.settings.layout_mode'))}</label><select id="set-layout-mode" onchange="window.game.setLayoutMode(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['auto', t('ui.settings.layout_auto')], ['separate', t('ui.settings.layout_separate')], ['tabbed', t('ui.settings.layout_tabbed')]]) {
+            general += `<option value="${val}"${s.layoutMode === val ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }
         general += `</select></div>`;
-        general += `<div class="settings-row"><label for="set-notif-dur">Notification duration:</label><select id="set-notif-dur" onchange="window.game.settings.notificationDuration=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['50','Short (50 ticks)'],['100','Normal (100 ticks)'],['200','Long (200 ticks)'],['500','Persistent (500 ticks)']]) {
-            general += `<option value="${val}"${s.notificationDuration === parseInt(val) ? ' selected' : ''}>${label}</option>`;
+        general += `<div class="settings-row"><label for="set-notif-dur">${escapeHtml(t('ui.settings.notif_duration'))}</label><select id="set-notif-dur" onchange="window.game.settings.notificationDuration=parseInt(this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['50', t('ui.settings.notif_short')], ['100', t('ui.settings.notif_normal')], ['200', t('ui.settings.notif_long')], ['500', t('ui.settings.notif_persistent')]]) {
+            general += `<option value="${val}"${s.notificationDuration === parseInt(val) ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }
         general += `</select></div>`;
-        general += `<div class="settings-row"><label for="set-colorblind">Colorblind mode:</label><select id="set-colorblind" onchange="window.game.settings.colorblindMode=this.value;document.getElementById('game-container').setAttribute('data-colorblind',this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['none','None'],['protanopia','Protanopia (red-blind)'],['deuteranopia','Deuteranopia (green-blind)'],['tritanopia','Tritanopia (blue-blind)']]) {
-            general += `<option value="${val}"${s.colorblindMode === val ? ' selected' : ''}>${label}</option>`;
+        general += `<div class="settings-row"><label for="set-colorblind">${escapeHtml(t('ui.settings.colorblind'))}</label><select id="set-colorblind" onchange="window.game.settings.colorblindMode=this.value;document.getElementById('game-container').setAttribute('data-colorblind',this.value);window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['none', t('common.none')], ['protanopia', t('ui.settings.colorblind_protanopia')], ['deuteranopia', t('ui.settings.colorblind_deuteranopia')], ['tritanopia', t('ui.settings.colorblind_tritanopia')]]) {
+            general += `<option value="${val}"${s.colorblindMode === val ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }
         general += `</select></div>`;
-        general += this._settingsCheck('set-colonist-highlight', s.showColonistHighlight, 'window.game.settings.showColonistHighlight=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show colonist color outline (sprite mode)');
-        general += this._settingsCheck('set-large-clicks', s.largeClickTargets, 'window.game.settings.largeClickTargets=this.checked;document.getElementById("game-container").classList.toggle("large-targets",this.checked)', 'Larger click targets (buttons & checkboxes)');
-        graphics += `<div class="settings-section"><div class="settings-section-title">Effects & Performance</div>`;
-        graphics += this._settingsCheck('set-overlays', s.showOverlays, 'window.game.ui._toggleAllEffects(this.checked)', 'Master toggle: all combat/overlay effects');
-        graphics += this._settingsCheck('set-night', s.showNightLighting, 'window.game.settings.showNightLighting=this.checked', 'Show night lighting/darkness (High Performance Impact)');
-        graphics += this._settingsCheck('set-weather', s.showWeatherParticles, 'window.game.settings.showWeatherParticles=this.checked', 'Show weather particles');
-        graphics += `<div class="settings-row"><label for="set-particle-density">Particle Density: <span id="particle-density-val">${s.particleDensity || 100}%</span></label>`;
+        general += this._settingsCheck('set-colonist-highlight', s.showColonistHighlight, 'window.game.settings.showColonistHighlight=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', t('ui.settings.opt_colonist_highlight'));
+        general += this._settingsCheck('set-large-clicks', s.largeClickTargets, 'window.game.settings.largeClickTargets=this.checked;document.getElementById("game-container").classList.toggle("large-targets",this.checked)', t('ui.settings.opt_large_clicks'));
+        graphics += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.section_effects'))}</div>`;
+        graphics += this._settingsCheck('set-overlays', s.showOverlays, 'window.game.ui._toggleAllEffects(this.checked)', t('ui.settings.opt_overlays'));
+        graphics += this._settingsCheck('set-night', s.showNightLighting, 'window.game.settings.showNightLighting=this.checked', t('ui.settings.opt_night'));
+        graphics += this._settingsCheck('set-weather', s.showWeatherParticles, 'window.game.settings.showWeatherParticles=this.checked', t('ui.settings.opt_weather'));
+        graphics += `<div class="settings-row"><label for="set-particle-density">${escapeHtml(t('ui.settings.particle_density'))} <span id="particle-density-val">${s.particleDensity || 100}%</span></label>`;
         graphics += `<input type="range" id="set-particle-density" min="10" max="100" step="10" value="${s.particleDensity || 100}" style="width:80px" oninput="document.getElementById('particle-density-val').textContent=this.value+'%';window.game.settings.particleDensity=parseInt(this.value);window.game.saveSettingsToStorage()">`;
         graphics += `</div>`;
-        graphics += this._settingsCheck('set-damage-flash', s.showDamageFlash, 'window.game.settings.showDamageFlash=this.checked', 'Damage flash on hit');
-        graphics += this._settingsCheck('set-screen-shake', s.enableScreenShake, 'window.game.settings.enableScreenShake=this.checked', 'Enable screen shake');
-        graphics += this._settingsCheck('set-combat-particles', s.showCombatParticles, 'window.game.settings.showCombatParticles=this.checked', 'Combat/action particles (sparks, skulls)');
-        graphics += this._settingsCheck('set-projectiles', s.showProjectiles, 'window.game.settings.showProjectiles=this.checked', 'Projectile trails (arrows, bolts)');
-        graphics += this._settingsCheck('set-equip-overlays', s.showEquipmentOverlays, 'window.game.settings.showEquipmentOverlays=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', 'Show equipped armor/helmets on colonists (sprite mode)');
-        graphics += this._settingsCheck('set-progress-bars', s.showProgressBars, 'window.game.settings.showProgressBars=this.checked', 'Progress & health bars');
-        graphics += this._settingsCheck('set-portal-path', s.showPortalPath, 'window.game.settings.showPortalPath=this.checked', 'Portal path highlighting');
-        graphics += this._settingsCheck('set-breathing', s.showBreathing, 'window.game.settings.showBreathing=this.checked', 'Entity breathing animation');
-        graphics += this._settingsCheck('set-walk-sway', s.showWalkSway, 'window.game.settings.showWalkSway=this.checked', 'Walking sway animation');
-        graphics += this._settingsCheck('set-attack-swing', s.showAttackSwing, 'window.game.settings.showAttackSwing=this.checked', 'Attack swing animation');
-        graphics += this._settingsCheck('set-action-anims', s.showActionAnimations, 'window.game.settings.showActionAnimations=this.checked', 'Action animations (attack, cast, work, hit)');
-        graphics += this._settingsCheck('set-tree-sway', s.showTreeSway, 'window.game.settings.showTreeSway=this.checked', 'Tree sway (wind, stronger in storms)');
-        graphics += this._settingsCheck('set-terrain-detail', s.showTerrainDetail, 'window.game.settings.showTerrainDetail=this.checked', 'Terrain detail (grass tufts, water waves)');
-        graphics += this._settingsCheck('set-expedition-extras', s.showExpeditionExtras, 'window.game.settings.showExpeditionExtras=this.checked', 'Expedition extra animations');
-        graphics += this._settingsCheck('set-reduce-motion', s.reduceMotion, 'window.game.settings.reduceMotion=this.checked', 'Reduce motion (damps ambient sway/breathing/pulses)');
-        graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', 'Show minimap');
-        graphics += `<div class="settings-row"><label for="set-dither-dist">Dithering Distance:</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['none','Off'],['minimal','Minimal'],['light','Light (default)'],['normal','Normal'],['heavy','Heavy'],['extreme','Extreme']]) {
-            graphics += `<option value="${val}"${(s.ditherDistance || 'light') === val ? ' selected' : ''}>${label}</option>`;
+        graphics += this._settingsCheck('set-damage-flash', s.showDamageFlash, 'window.game.settings.showDamageFlash=this.checked', t('ui.settings.opt_damage_flash'));
+        graphics += this._settingsCheck('set-screen-shake', s.enableScreenShake, 'window.game.settings.enableScreenShake=this.checked', t('ui.settings.opt_screen_shake'));
+        graphics += this._settingsCheck('set-combat-particles', s.showCombatParticles, 'window.game.settings.showCombatParticles=this.checked', t('ui.settings.opt_combat_particles'));
+        graphics += this._settingsCheck('set-projectiles', s.showProjectiles, 'window.game.settings.showProjectiles=this.checked', t('ui.settings.opt_projectiles'));
+        graphics += this._settingsCheck('set-equip-overlays', s.showEquipmentOverlays, 'window.game.settings.showEquipmentOverlays=this.checked;window.game.renderer?.skinManager?._compositeCache.clear()', t('ui.settings.opt_equip_overlays'));
+        graphics += this._settingsCheck('set-progress-bars', s.showProgressBars, 'window.game.settings.showProgressBars=this.checked', t('ui.settings.opt_progress_bars'));
+        graphics += this._settingsCheck('set-portal-path', s.showPortalPath, 'window.game.settings.showPortalPath=this.checked', t('ui.settings.opt_portal_path'));
+        graphics += this._settingsCheck('set-breathing', s.showBreathing, 'window.game.settings.showBreathing=this.checked', t('ui.settings.opt_breathing'));
+        graphics += this._settingsCheck('set-walk-sway', s.showWalkSway, 'window.game.settings.showWalkSway=this.checked', t('ui.settings.opt_walk_sway'));
+        graphics += this._settingsCheck('set-attack-swing', s.showAttackSwing, 'window.game.settings.showAttackSwing=this.checked', t('ui.settings.opt_attack_swing'));
+        graphics += this._settingsCheck('set-action-anims', s.showActionAnimations, 'window.game.settings.showActionAnimations=this.checked', t('ui.settings.opt_action_anims'));
+        graphics += this._settingsCheck('set-tree-sway', s.showTreeSway, 'window.game.settings.showTreeSway=this.checked', t('ui.settings.opt_tree_sway'));
+        graphics += this._settingsCheck('set-terrain-detail', s.showTerrainDetail, 'window.game.settings.showTerrainDetail=this.checked', t('ui.settings.opt_terrain_detail'));
+        graphics += this._settingsCheck('set-expedition-extras', s.showExpeditionExtras, 'window.game.settings.showExpeditionExtras=this.checked', t('ui.settings.opt_expedition_extras'));
+        graphics += this._settingsCheck('set-reduce-motion', s.reduceMotion, 'window.game.settings.reduceMotion=this.checked', t('ui.settings.opt_reduce_motion'));
+        graphics += this._settingsCheck('set-minimap', s.showMinimap, 'window.game.settings.showMinimap=this.checked;document.getElementById("minimap-container").style.display=this.checked?"":"none"', t('ui.settings.opt_minimap'));
+        graphics += `<div class="settings-row"><label for="set-dither-dist">${escapeHtml(t('ui.settings.dither_distance'))}</label><select id="set-dither-dist" onchange="window.game.settings.ditherDistance=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['none', t('ui.settings.dither_off')], ['minimal', t('ui.settings.dither_minimal')], ['light', t('ui.settings.dither_light')], ['normal', t('ui.settings.dither_normal')], ['heavy', t('ui.settings.dither_heavy')], ['extreme', t('ui.settings.dither_extreme')]]) {
+            graphics += `<option value="${val}"${(s.ditherDistance || 'light') === val ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }
         graphics += `</select></div>`;
-        graphics += `<div class="settings-row"><label for="set-dither-qual">Dithering Quality:</label><select id="set-dither-qual" onchange="window.game.settings.ditherQuality=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
-        for (const [val, label] of [['chunky','Chunky (4x4 blocks)'],['low','Low (3x3 blocks)'],['medium','Medium (2x2 blocks, default)'],['high','High (single pixels)']]) {
-            graphics += `<option value="${val}"${(s.ditherQuality || 'medium') === val ? ' selected' : ''}>${label}</option>`;
+        graphics += `<div class="settings-row"><label for="set-dither-qual">${escapeHtml(t('ui.settings.dither_quality'))}</label><select id="set-dither-qual" onchange="window.game.settings.ditherQuality=this.value;window.game.saveSettingsToStorage()" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
+        for (const [val, label] of [['chunky', t('ui.settings.dither_chunky')], ['low', t('ui.settings.dither_low')], ['medium', t('ui.settings.dither_medium')], ['high', t('ui.settings.dither_high')]]) {
+            graphics += `<option value="${val}"${(s.ditherQuality || 'medium') === val ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }
         graphics += `</select></div>`;
-        graphics += this._settingsCheck('set-fullscreen', s.enableFullscreen, 'window.game.settings.enableFullscreen=this.checked;if(window.electronAPI?.setFullscreen){window.electronAPI.setFullscreen(this.checked)}else if(this.checked){document.documentElement.requestFullscreen().catch(()=>{})}else if(document.fullscreenElement){document.exitFullscreen().catch(()=>{})}', 'Fullscreen mode');
-        graphics += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', 'Show FPS counter (top-right of game grid)');
-        graphics += this._settingsCheck('set-fps-cap', s.fpsCap === 30, 'window.game.settings.fpsCap=this.checked?30:60', 'Cap framerate to 30 FPS (reduces CPU/GPU usage)');
-        graphics += this._settingsCheck('set-crt-scanlines', s.showCrtScanlines, 'window.game.settings.showCrtScanlines=this.checked;if(window.game.renderer?.crtRenderer)window.game.renderer.crtRenderer._scanlinePattern=null;window.game.saveSettingsToStorage()', 'CRT scanline overlay');
-        graphics += this._settingsCheck('set-crt-warp', s.showCrtWarp, 'window.game.settings.showCrtWarp=this.checked;document.getElementById("game-area")?.classList.toggle("crt-warp",this.checked);window.game.saveSettingsToStorage()', 'CRT barrel warp (lens distortion)');
+        graphics += this._settingsCheck('set-fullscreen', s.enableFullscreen, 'window.game.settings.enableFullscreen=this.checked;if(window.electronAPI?.setFullscreen){window.electronAPI.setFullscreen(this.checked)}else if(this.checked){document.documentElement.requestFullscreen().catch(()=>{})}else if(document.fullscreenElement){document.exitFullscreen().catch(()=>{})}', t('ui.settings.opt_fullscreen'));
+        graphics += this._settingsCheck('set-fps', s.showFps, 'window.game.settings.showFps=this.checked', t('ui.settings.opt_fps'));
+        graphics += this._settingsCheck('set-fps-cap', s.fpsCap === 30, 'window.game.settings.fpsCap=this.checked?30:60', t('ui.settings.opt_fps_cap'));
+        graphics += this._settingsCheck('set-crt-scanlines', s.showCrtScanlines, 'window.game.settings.showCrtScanlines=this.checked;if(window.game.renderer?.crtRenderer)window.game.renderer.crtRenderer._scanlinePattern=null;window.game.saveSettingsToStorage()', t('ui.settings.opt_crt_scanlines'));
+        graphics += this._settingsCheck('set-crt-warp', s.showCrtWarp, 'window.game.settings.showCrtWarp=this.checked;document.getElementById("game-area")?.classList.toggle("crt-warp",this.checked);window.game.saveSettingsToStorage()', t('ui.settings.opt_crt_warp'));
         graphics += `</div>`;
 
         // ===== CONTROLS TAB =====
         let controls = this._keybindingsSectionHtml();
 
         if (!this.game.settings.demoMode) {
-        general += `<details class="settings-section settings-debug"><summary class="settings-section-title" style="color:#ff6666;cursor:pointer;list-style:revert;">Debug / Testing</summary>`;
-        general += `<button onclick="if(confirm('Grant 999 of all resources?'))window.game.cheatResources()" class="settings-btn settings-btn-danger" style="margin-top:8px;">Grant 999 Resources</button>`;
-        general += `<button onclick="if(confirm('Complete all research?'))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">Grant All Research</button>`;
-        general += `<button onclick="if(confirm('Grant all starter spells (level 0) to every colonist and set magic skills to 1?'))window.game.cheatGrantStarterSpells()" class="settings-btn settings-btn-danger">Grant All Starter Spells + Magic Lvl 1</button>`;
-        general += `<button onclick="if(confirm('Grant all spells to every colonist and set magic skills to 8?'))window.game.cheatGrantAllSpells()" class="settings-btn settings-btn-danger">Grant All Spells + Magic Lvl 8</button>`;
-        general += `<button onclick="if(confirm('Set all colonists to Adventurer Lv10?'))window.game.cheatGrantAdventurerLv10()" class="settings-btn settings-btn-danger">Set Adventurer Lv10</button>`;
-        general += `<button onclick="window.game.cheatSpawnColonist()" class="settings-btn settings-btn-danger">Grant New Colonist</button>`;
+        general += `<details class="settings-section settings-debug"><summary class="settings-section-title" style="color:#ff6666;cursor:pointer;list-style:revert;">${escapeHtml(t('ui.settings.debug_title'))}</summary>`;
+        general += `<button onclick="if(confirm(${jsArg(t('ui.settings.debug_confirm_1'))}))window.game.cheatResources()" class="settings-btn settings-btn-danger" style="margin-top:8px;">${escapeHtml(t('ui.settings.debug_grant_999_resources'))}</button>`;
+        general += `<button onclick="if(confirm(${jsArg(t('ui.settings.debug_confirm_2'))}))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_grant_all_research'))}</button>`;
+        general += `<button onclick="if(confirm(${jsArg(t('ui.settings.debug_confirm_3'))}))window.game.cheatGrantStarterSpells()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_grant_all_starter_spells_magic_lvl_1'))}</button>`;
+        general += `<button onclick="if(confirm(${jsArg(t('ui.settings.debug_confirm_4'))}))window.game.cheatGrantAllSpells()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_grant_all_spells_magic_lvl_8'))}</button>`;
+        general += `<button onclick="if(confirm(${jsArg(t('ui.settings.debug_confirm_5'))}))window.game.cheatGrantAdventurerLv10()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_set_adventurer_lv10'))}</button>`;
+        general += `<button onclick="window.game.cheatSpawnColonist()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_grant_new_colonist'))}</button>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-trinket-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const [key, def] of Object.entries(TRINKETS)) {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('trinket',document.getElementById('debug-trinket-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Trinket</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('trinket',document.getElementById('debug-trinket-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_trinket'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-boots-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -5318,7 +5461,7 @@ export class UI {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('boots',document.getElementById('debug-boots-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Boots</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('boots',document.getElementById('debug-boots-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_boots'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-weapon-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -5327,7 +5470,7 @@ export class UI {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('weapon',document.getElementById('debug-weapon-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Weapon</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('weapon',document.getElementById('debug-weapon-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_weapon'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-armor-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -5335,7 +5478,7 @@ export class UI {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('armor',document.getElementById('debug-armor-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Armor</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('armor',document.getElementById('debug-armor-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_armor'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-tool-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -5343,7 +5486,7 @@ export class UI {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('tool',document.getElementById('debug-tool-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Tool</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('tool',document.getElementById('debug-tool-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_tool'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:4px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-helmet-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -5351,7 +5494,7 @@ export class UI {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('helmet',document.getElementById('debug-helmet-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Helmet</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('helmet',document.getElementById('debug-helmet-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_helmet'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-clothes-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -5359,24 +5502,24 @@ export class UI {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatSpawnItem('clothes',document.getElementById('debug-clothes-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Clothes</button>`;
+        general += `<button onclick="window.game.cheatSpawnItem('clothes',document.getElementById('debug-clothes-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_clothes'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-resource-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:80px;">`;
         for (const key of Object.keys(this.game.resources.stockpile)) {
-            general += `<option value="${escapeAttr(key)}">${escapeHtml(key.replace(/_/g, ' '))}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(resourceName(key))}</option>`;
         }
         general += `</select>`;
         general += `<input id="debug-resource-amount" type="number" value="50" min="1" max="999" style="width:50px;background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
-        general += `<button onclick="window.game.cheatAddResource(document.getElementById('debug-resource-select').value, parseInt(document.getElementById('debug-resource-amount').value)||50)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Grant Resource</button>`;
+        general += `<button onclick="window.game.cheatAddResource(document.getElementById('debug-resource-select').value, parseInt(document.getElementById('debug-resource-amount').value)||50)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_grant_resource'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-event-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
         for (const key of Object.keys(EVENTS)) {
-            general += `<option value="${escapeAttr(key)}">${escapeHtml(key.replace(/_/g, ' '))}</option>`;
+            general += `<option value="${escapeAttr(key)}">${escapeHtml(EVENTS[key]?.name || key.replace(/_/g, ' '))}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatTriggerEvent(document.getElementById('debug-event-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Trigger Event</button>`;
+        general += `<button onclick="window.game.cheatTriggerEvent(document.getElementById('debug-event-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_trigger_event'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<select id="debug-raid-select" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;flex:1;min-width:120px;">`;
@@ -5384,27 +5527,27 @@ export class UI {
             general += `<option value="${escapeAttr(key)}">${escapeHtml(def.name)}</option>`;
         }
         general += `</select>`;
-        general += `<button onclick="window.game.cheatTriggerRaid(document.getElementById('debug-raid-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Trigger Raid</button>`;
+        general += `<button onclick="window.game.cheatTriggerRaid(document.getElementById('debug-raid-select').value)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_trigger_raid'))}</button>`;
         general += `</div>`;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;flex-wrap:wrap;">`;
         general += `<input id="debug-time-amount" type="number" value="300" min="1" max="9999" style="width:60px;background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;">`;
-        general += `<button onclick="window.game.cheatAdvanceTime(parseInt(document.getElementById('debug-time-amount').value)||300)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Advance Ticks</button>`;
-        general += `<span style="color:#666;font-size:10px;">(300=1 day)</span>`;
+        general += `<button onclick="window.game.cheatAdvanceTime(parseInt(document.getElementById('debug-time-amount').value)||300)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_advance_ticks'))}</button>`;
+        general += `<span style="color:#666;font-size:10px;">${escapeHtml(t('ui.settings.debug_ticks_note'))}</span>`;
         general += `</div>`;
-        if (window.trailerDirectorAvailable) general += `<button onclick="window.toggleTrailerDirector?.()" class="settings-btn settings-btn-danger">Toggle Trailer Director</button>`;
-        general += `<button onclick="window.game.cheatUnlockAllStory()" class="settings-btn settings-btn-danger">Unlock All Story Milestones</button>`;
-        general += `<button onclick="window.game.cheatUnlockAllBestiary()" class="settings-btn settings-btn-danger">Unlock All Bestiary Entries</button>`;
+        if (window.trailerDirectorAvailable) general += `<button onclick="window.toggleTrailerDirector?.()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_toggle_trailer_director'))}</button>`;
+        general += `<button onclick="window.game.cheatUnlockAllStory()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_unlock_all_story_milestones'))}</button>`;
+        general += `<button onclick="window.game.cheatUnlockAllBestiary()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_unlock_all_bestiary_entries'))}</button>`;
         const curMax = this.game.debugMaxSpeed || 3;
         general += `<div class="settings-row" style="margin-top:8px;gap:4px;align-items:center;">`;
-        general += `<label for="debug-max-speed">Max speed:</label>`;
+        general += `<label for="debug-max-speed">${escapeHtml(t('ui.settings.debug_max_speed'))}</label>`;
         general += `<input id="debug-max-speed" type="number" min="1" max="10" value="${curMax}" style="width:42px;background:#1a1a2e;color:#ffaaaa;border:1px solid #555;border-radius:3px;padding:1px;text-align:center;">`;
-        general += `<button onclick="window.game.setDebugMaxSpeed(parseInt(document.getElementById('debug-max-speed').value)||3)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">Set Max Speed</button>`;
-        general += `<span style="color:#666;font-size:10px;">(default 3)</span>`;
+        general += `<button onclick="window.game.setDebugMaxSpeed(parseInt(document.getElementById('debug-max-speed').value)||3)" class="settings-btn settings-btn-danger" style="white-space:nowrap;">${escapeHtml(t('ui.settings.debug_set_max_speed'))}</button>`;
+        general += `<span style="color:#666;font-size:10px;">${escapeHtml(t('ui.settings.debug_speed_note'))}</span>`;
         general += `</div>`;
         general += `</details>`;
         }
 
-        general += `<div class="settings-section" style="text-align:center;"><button onclick="if(confirm('Reset all settings to their default values? (Keybindings are reset separately on the Controls tab.)'))window.game.resetAllSettings()" class="settings-btn settings-btn-danger">Reset all settings to Default</button></div>`;
+        general += `<div class="settings-section" style="text-align:center;"><button onclick="if(confirm(${jsArg(t('ui.settings.reset_confirm'))}))window.game.resetAllSettings()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.reset_all'))}</button></div>`;
 
         html += tab === 'graphics' ? graphics : tab === 'controls' ? controls : general;
         this.elements.settingsPanel.innerHTML = html;
@@ -5418,26 +5561,26 @@ export class UI {
         const connected = await api.enabled().catch(() => false);
         if (connected) {
             const ts = getLastSyncTime();
-            const syncLabel = ts ? new Date(ts).toLocaleString() : 'never';
-            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; Connected</span><span style="color:#888;font-size:10px;">Saves sync automatically</span><span id="gdrive-last-sync-label" style="color:#aaa;font-size:10px;flex:1;">Last synced: ${syncLabel}</span><button id="gdrive-sync-now-btn" onclick="window.game.ui._forceSyncNow()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Sync Now</button><button onclick="window.game.ui._disconnectGdrive()" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">Disconnect</button>`;
+            const syncLabel = ts ? new Date(ts).toLocaleString() : t('ui.settings.cloud_never');
+            row.innerHTML = `<span style="color:#66ff99;font-size:11px;">&#10003; ${escapeHtml(t('ui.settings.cloud_connected'))}</span><span style="color:#888;font-size:10px;">${escapeHtml(t('ui.settings.cloud_auto_sync'))}</span><span id="gdrive-last-sync-label" style="color:#aaa;font-size:10px;flex:1;">${escapeHtml(t('ui.settings.cloud_last_synced', { time: syncLabel }))}</span><button id="gdrive-sync-now-btn" onclick="window.game.ui._forceSyncNow()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.settings.cloud_sync_now'))}</button><button onclick="window.game.ui._disconnectGdrive()" class="settings-btn settings-btn-danger" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.settings.cloud_disconnect'))}</button>`;
         } else {
-            row.innerHTML = `<span style="color:#aaa;font-size:11px;flex:1;">Not connected &mdash; saves stay local only</span><button onclick="window.game.ui._connectGdrive()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Connect Google Drive</button>`;
+            row.innerHTML = `<span style="color:#aaa;font-size:11px;flex:1;">${escapeHtml(t('ui.settings.cloud_not_connected'))}</span><button onclick="window.game.ui._connectGdrive()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.settings.cloud_connect'))}</button>`;
         }
     }
 
     async _connectGdrive() {
         const row = document.getElementById('gdrive-status-row');
-        if (row) row.innerHTML = `<span style="color:#ffcc00;font-size:11px;">Opening browser… complete sign-in then return here.</span>`;
+        if (row) row.innerHTML = `<span style="color:#ffcc00;font-size:11px;">${escapeHtml(t('ui.settings.cloud_opening'))}</span>`;
         try {
             await getGdriveAPI().beginAuth();
             this._updateGdriveStatus();
         } catch (e) {
-            if (row) row.innerHTML = `<span style="color:#ff6666;font-size:11px;">Connection failed. Try again.</span><button onclick="window.game.ui._connectGdrive()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">Retry</button>`;
+            if (row) row.innerHTML = `<span style="color:#ff6666;font-size:11px;">${escapeHtml(t('ui.settings.cloud_failed'))}</span><button onclick="window.game.ui._connectGdrive()" class="settings-btn settings-btn-blue" style="padding:2px 8px;font-size:11px;">${escapeHtml(t('ui.settings.cloud_retry'))}</button>`;
         }
     }
 
     async _disconnectGdrive() {
-        if (!confirm('Disconnect Google Drive? Your saves will remain local and will no longer sync.')) return;
+        if (!confirm(t('ui.settings.cloud_disconnect_confirm'))) return;
         await getGdriveAPI().revoke().catch(() => {});
         this._updateGdriveStatus();
     }
@@ -5445,7 +5588,7 @@ export class UI {
     async _forceSyncNow() {
         const label = document.getElementById('gdrive-last-sync-label');
         const btn = document.getElementById('gdrive-sync-now-btn');
-        if (label) label.textContent = 'Syncing...';
+        if (label) label.textContent = t('ui.settings.cloud_syncing');
         if (btn) btn.disabled = true;
         try {
             await forceSyncNow();
@@ -5465,24 +5608,24 @@ export class UI {
     // Controls tab body: grouped rebindable keys + reset button. Delegates row
     // rendering to the shared keybindings-ui helper (also used by the start screen).
     _keybindingsSectionHtml() {
-        let html = `<div class="settings-section"><div class="settings-section-title">Controls / Keybindings</div>`;
+        let html = `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.controls_title'))}</div>`;
         html += keybindingRowsHtml('window.game.ui._startRebind', 'window.game.ui._resetRebind');
-        html += `<div class="settings-row" style="margin-top:6px;"><button onclick="window.game.resetKeyBindings()" class="settings-btn settings-btn-danger">Reset all keybinds to Default</button></div>`;
+        html += `<div class="settings-row" style="margin-top:6px;"><button onclick="window.game.resetKeyBindings()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.reset_keybinds'))}</button></div>`;
         html += `</div>`;
         html += `<div class="settings-section">`;
-        html += `<div class="settings-section-title">Recording Mode Hotkeys</div>`;
-        html += `<div style="opacity:0.7;font-size:0.85em;margin-bottom:6px;">Active only while recording mode is on (<kbd style="background:#333;padding:1px 4px;border-radius:3px;">\\</kbd>). Not rebindable.</div>`;
+        html += `<div class="settings-section-title">${escapeHtml(t('ui.settings.recording_title'))}</div>`;
+        html += `<div style="opacity:0.7;font-size:0.85em;margin-bottom:6px;">${tHtml('ui.settings.recording_note_html')}</div>`;
         html += `<table style="width:100%;border-collapse:collapse;font-size:0.9em;">`;
         const rows = [
-            ['T', 'Timelapse toggle (1x / 15x speed)'],
-            ['C', 'Cinematic pan mode (smooth WASD glide)'],
-            ['G', 'Equip next item on selected colonist'],
-            ['H', 'Toggle building ghosts (hide unbuilt construction)'],
-            ['V', 'Show / hide expedition panel as overlay'],
-            [', / .', 'Fine speed control (1x up to 20x)'],
+            ['T', t('ui.settings.rec_timelapse')],
+            ['C', t('ui.settings.rec_cinematic')],
+            ['G', t('ui.settings.rec_equip_next')],
+            ['H', t('ui.settings.rec_ghosts')],
+            ['V', t('ui.settings.rec_expedition')],
+            [', / .', t('ui.settings.rec_speed')],
         ];
         for (const [key, desc] of rows) {
-            html += `<tr><td style="padding:3px 8px 3px 0;white-space:nowrap;"><kbd style="background:#333;padding:1px 5px;border-radius:3px;color:#ffcc00;">${key}</kbd></td><td style="padding:3px 0;opacity:0.85;">${desc}</td></tr>`;
+            html += `<tr><td style="padding:3px 8px 3px 0;white-space:nowrap;"><kbd style="background:#333;padding:1px 5px;border-radius:3px;color:#ffcc00;">${key}</kbd></td><td style="padding:3px 0;opacity:0.85;">${escapeHtml(desc)}</td></tr>`;
         }
         html += `</table>`;
         html += `</div>`;
@@ -5505,10 +5648,10 @@ export class UI {
                 this.game.input.applyKeyBindings();
                 this.updateSettingsPanel();
                 if (conflicts.length) {
-                    this.game.notifications.push({ text: `"${formatKeyLabel(key)}" is also bound to ${conflicts.join(', ')}`, tick: this.game.tick, type: 'danger' });
+                    this.game.notifications.push({ text: t('ui.settings.rebind_conflict', { key: formatKeyLabel(key), actions: conflicts.join(', ') }), tick: this.game.tick, type: 'danger' });
                 }
             },
-            (key) => { this.game.notifications.push({ text: `"${formatKeyLabel(key)}" is reserved and cannot be rebound`, tick: this.game.tick, type: 'danger' }); }
+            (key) => { this.game.notifications.push({ text: t('ui.settings.rebind_reserved', { key: formatKeyLabel(key) }), tick: this.game.tick, type: 'danger' }); }
         );
     }
 
@@ -5519,7 +5662,7 @@ export class UI {
 
     _settingsCheck(id, checked, onchange, label) {
         const safeHandler = (onchange + ';window.game.saveSettingsToStorage()').replace(/"/g, '&quot;');
-        return `<div class="settings-row"><input type="checkbox" id="${id}" ${checked ? 'checked' : ''} onchange="${safeHandler}"><label for="${id}">${label}</label></div>`;
+        return `<div class="settings-row"><input type="checkbox" id="${id}" ${checked ? 'checked' : ''} onchange="${safeHandler}"><label for="${id}">${escapeHtml(label)}</label></div>`;
     }
 
     _toggleAllEffects(on) {
@@ -5578,14 +5721,22 @@ export class UI {
     _showTileTooltip(x, y) {
         const tooltip = document.getElementById('tile-tooltip');
         const tile = this.game.map[y][x];
-        const parts = [tile.sealed ? `(${x},${y}) unexplored` : `(${x},${y}) ${tile.terrain}`];
-        if (tile.structure && !tile.sealed) parts.push(`Structure: ${tile.structure.replace(/_/g, ' ')}`);
-        if (tile.resource) parts.push(`Resource: ${tile.resource.type}${tile.resource.amount > 1 ? ' x' + tile.resource.amount : ''}`);
+        const parts = [tile.sealed ? t('ui.tile.tip_unexplored', { x, y }) : t('ui.tile.tip_terrain', { x, y, terrain: terrainName(tile.terrain) })];
+        if (tile.structure && !tile.sealed) parts.push(t('ui.tile.tip_structure', { name: buildingName(tile.structure) }));
+        if (tile.resource) parts.push(tile.resource.amount > 1
+            ? t('ui.tile.tip_resource_amount', { name: resourceName(tile.resource.type), n: tile.resource.amount })
+            : t('ui.tile.tip_resource', { name: resourceName(tile.resource.type) }));
         if (tile.designation) {
-            const task = this.game.taskQueue.getAllByPosition(x, y).find(t => t.type === tile.designation.type);
-            parts.push(task?.doFirst ? `[${tile.designation.type}, do first]` : `[${tile.designation.type}] ${isTouchUI() ? 'long-press' : 'right-click'} to do first`);
+            const task = this.game.taskQueue.getAllByPosition(x, y).find(tk => tk.type === tile.designation.type);
+            const desNames = {
+                build: t('ui.tile.des_build'), chop: t('ui.tile.des_chop'), mine: t('ui.tile.des_mine'),
+                deconstruct: t('ui.tile.des_deconstruct'), loot_chest: t('ui.tile.des_loot_chest'), attune_anchor: t('ui.tile.des_attune_anchor'),
+            };
+            const des = desNames[tile.designation.type] || tile.designation.type;
+            parts.push(task?.doFirst ? t('ui.tile.tip_designation_first', { des })
+                : t(isTouchUI() ? 'ui.tile.tip_designation_touch' : 'ui.tile.tip_designation', { des }));
         }
-        if (tile.zone) parts.push(`Farm: ${tile.zone.crop}`);
+        if (tile.zone) parts.push(t('ui.tile.tip_farm', { crop: CROPS[tile.zone.crop]?.name || resourceName(tile.zone.crop) }));
         const nameMode = this.game.settings.showColonistNames;
         if (nameMode === 'selected' || nameMode === 'always') {
             const colHere = this.game.colonists.find(c => c.x === x && c.y === y && c.hp > 0 && !c.onExpedition);
@@ -5645,7 +5796,7 @@ export class UI {
             // Only notifs that weren't shown last render get the enter animation.
             const enter = (!reduceMotion && !prevKeys.has(key)) ? ' notif-enter' : '';
             return `<div class="notif notif-${escapeAttr(n.type)}${enter}" data-notif-index="${i}">${escapeHtmlKeepEntities(n.text)}</div>`;
-        }).join('') + (compact && hiddenCount > 0 ? `<div class="notif notif-more">+${hiddenCount} more in Log</div>` : '');
+        }).join('') + (compact && hiddenCount > 0 ? `<div class="notif notif-more">${escapeHtml(t('ui.main.notif_more', { n: hiddenCount }))}</div>` : '');
         this._notifKeys = new Set(shown.map(n => `${n.tick}${n.text}`));
         this._notifSig = sig;
         this._notifShown = shown;
@@ -5662,7 +5813,7 @@ export class UI {
         let best = null;
         let bestScore = 0;
         for (const e of sameTick) {
-            const score = [...words(e.text)].filter(w => mine.has(w)).length;
+            const score = [...words(logEntryText(e))].filter(w => mine.has(w)).length;
             if (score > bestScore) { bestScore = score; best = e.linkedEntity; }
         }
         return best;
@@ -5716,21 +5867,21 @@ export class UI {
             html += `<div class="event-text">◈ ${escapeHtmlKeepEntities(evt.title)} ◈</div>`;
             const waves = this.game.waves;
             const waveCtx = waves.active
-                ? `The Nexus trembles — Wave ${waves.currentWave} rages`
-                : `The Nexus pulses before Wave ${waves.highestWaveCompleted + 1}`;
-            html += `<div class="void-whisper-context">◈ ${waveCtx} ◈</div>`;
+                ? t('ui.panel.whisper_wave_active', { n: waves.currentWave })
+                : t('ui.panel.whisper_wave_next', { n: waves.highestWaveCompleted + 1 });
+            html += `<div class="void-whisper-context">◈ ${escapeHtml(waveCtx)} ◈</div>`;
             html += `<div style="color:#aa88cc;font-size:0.9em;margin-bottom:6px;">${escapeHtmlKeepEntities(evt.text)}</div>`;
             html += `<div class="void-whisper-body">`;
-            html += `<div style="color:#cc66ff;font-size:0.85em;margin-bottom:3px;"><b>It asks:</b> ${escapeHtmlKeepEntities(evt.askText)}</div>`;
-            html += `<div style="color:#88ddaa;font-size:0.85em;"><b>It offers:</b> ${escapeHtmlKeepEntities(evt.rewardText)}</div>`;
+            html += `<div style="color:#cc66ff;font-size:0.85em;margin-bottom:3px;"><b>${escapeHtml(t('ui.panel.whisper_asks'))}</b> ${escapeHtmlKeepEntities(evt.askText)}</div>`;
+            html += `<div style="color:#88ddaa;font-size:0.85em;"><b>${escapeHtml(t('ui.panel.whisper_offers'))}</b> ${escapeHtmlKeepEntities(evt.rewardText)}</div>`;
             html += `</div>`;
         } else {
             html += `<div class="event-text">${escapeHtmlKeepEntities(evt.text)}</div>`;
         }
         html += `<div class="event-choices">`;
         if (evt.type === 'trade') {
-            html += `<button onclick="window.game.openTradePanel()">Open Trade</button>`;
-            html += `<button onclick="window.game.dismissTrader()">Dismiss</button>`;
+            html += `<button onclick="window.game.openTradePanel()">${escapeHtml(t('ui.trade.open'))}</button>`;
+            html += `<button onclick="window.game.dismissTrader()">${escapeHtml(t('ui.trade.dismiss'))}</button>`;
         } else {
             evt.choices.forEach((choice, i) => {
                 html += `<button onclick="window.game.resolveEvent(${i})">${escapeHtmlKeepEntities(choice)}</button>`;
@@ -5741,7 +5892,7 @@ export class UI {
     }
 
     _formatResourceName(key) {
-        return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        return resourceName(key);
     }
 
     _tradeResIcon(key) {
@@ -5758,9 +5909,15 @@ export class UI {
             potatoes: '#c8a060', moonbloom: '#cc88ff', eggs: '#eecc88',
             milk: '#eeeedd', wool: '#ddd', gold: '#ffdd00',
         };
-        const abbr = { wood: 'W', stone: 'S', food: 'F', planks: 'P', bricks: 'Bk', iron_ore: 'Or', runite_ore: 'RO', iron: 'Fe', runite: 'Ru', leather: 'Le', wool: 'Wl', void_essence: 'V', hides: 'Hi', meat: 'Mt', wheat: 'Wh', berries: 'Be', corn: 'Cn', potatoes: 'Po', moonbloom: 'Mb', eggs: 'Eg', milk: 'Mk', gold: 'Au' };
+        const abbr = {
+            wood: 'ui.main.res_abbr_wood', stone: 'ui.main.res_abbr_stone', food: 'ui.main.res_abbr_food', planks: 'ui.main.res_abbr_planks', bricks: 'ui.main.res_abbr_bricks',
+            iron_ore: 'ui.main.res_abbr_iron_ore', runite_ore: 'ui.main.res_abbr_runite_ore', iron: 'ui.main.res_abbr_iron', runite: 'ui.main.res_abbr_runite', leather: 'ui.main.res_abbr_leather',
+            wool: 'ui.main.res_abbr_wool', void_essence: 'ui.main.res_abbr_void_essence', hides: 'ui.build.cost_abbr_hides', meat: 'ui.trade.abbr_meat', wheat: 'ui.trade.abbr_wheat',
+            berries: 'ui.trade.abbr_berries', corn: 'ui.trade.abbr_corn', potatoes: 'ui.trade.abbr_potatoes', moonbloom: 'ui.trade.abbr_moonbloom', eggs: 'ui.trade.abbr_eggs',
+            milk: 'ui.trade.abbr_milk', gold: 'ui.main.res_abbr_gold',
+        };
         const color = colors[key] || '#aaa';
-        const ch = escapeHtml(abbr[key] || this._formatResourceName(key).slice(0, 2));
+        const ch = escapeHtml(abbr[key] ? t(abbr[key]) : this._formatResourceName(key).slice(0, 2));
         return `<span style="color:${color};font-weight:bold;margin-right:3px;font-size:0.9em;">${ch}</span>`;
     }
 
@@ -5768,11 +5925,12 @@ export class UI {
         if (!item) return '';
         if (item.type === 'trinket') return this._getTrinketTooltip(item);
         const lines = [];
-        if (item.description) lines.push(item.description);
+        const desc = itemDescription(item);
+        if (desc) lines.push(desc);
         if (item.type === 'weapon') {
             const cd = item.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
-            let statStr = `${item.damage}d (${(item.damage / cd).toFixed(1)} dps, ${weaponSpeedLabel(cd)})`;
-            if (item.ranged) statStr += `, range ${item.range}`;
+            let statStr = t('ui.colonist.weapon_stats', { dmg: item.damage, dps: (item.damage / cd).toFixed(1), speed: weaponSpeedLabel(cd) });
+            if (item.ranged) statStr += t('ui.craft.tip_range', { n: item.range });
             const extras = getItemStatLines({ ...item, damage: undefined, ranged: undefined, range: undefined });
             if (extras.length) statStr += `, ${extras.join(', ')}`;
             const onHit = getOnHitLines(item);
@@ -5782,7 +5940,7 @@ export class UI {
             const stats = getItemStatLines(item);
             if (stats.length) lines.push(stats.join(', '));
         }
-        return lines.join(' | ') || item.name;
+        return lines.join(' | ') || itemName(item);
     }
 
     _getExclusiveItemTooltip(item) {
@@ -5809,21 +5967,21 @@ export class UI {
 
         const ratio = (effectiveMarkup / effectiveDiscount).toFixed(2);
         let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">`;
-        html += `<div class="event-text" style="font-size:0.95em;margin:0;">${escapeHtml(data.merchantName || 'Trade Caravan')}</div>`;
+        html += `<div class="event-text" style="font-size:0.95em;margin:0;">${escapeHtml(data.merchantName || t('ui.trade.caravan'))}</div>`;
         html += `<div class="trade-step-selector">`;
         for (const s of [1, 10, 100]) {
             html += `<button class="trade-step-btn${step === s ? ' active' : ''}" onclick="window.game.ui._tradeStep=${s};window.game.ui._tradeDirty=true;">±${s}</button>`;
         }
         html += `</div></div>`;
 
-        html += `<div class="trade-ratio-bar">Trade ratio: <b>${ratio}:1</b> — sell at <b>${Math.round(effectiveDiscount * 100)}%</b>, buy at <b>${Math.round(effectiveMarkup * 100)}%</b></div>`;
+        html += `<div class="trade-ratio-bar">${tHtml('ui.trade.ratio_html', { ratio, sell: Math.round(effectiveDiscount * 100), buy: Math.round(effectiveMarkup * 100) })}</div>`;
 
         const bonuses = [];
-        if (this.game.research.isResearched('trade_routes')) bonuses.push('Trade Routes');
+        if (this.game.research.isResearched('trade_routes')) bonuses.push(RESEARCH.trade_routes?.name || t('ui.trade.bonus_trade_routes'));
         const artMult = getPedestalEffect(this.game, 'tradeMarkupMult');
-        if (artMult < 1) bonuses.push(`Trinket: ${Math.round((1 - artMult) * 100)}% off`);
+        if (artMult < 1) bonuses.push(t('ui.trade.bonus_trinket', { pct: Math.round((1 - artMult) * 100) }));
         if (bonuses.length > 0) {
-            html += `<div class="trade-bonuses">${bonuses.join(' | ')}</div>`;
+            html += `<div class="trade-bonuses">${escapeHtml(bonuses.join(' | '))}</div>`;
         }
 
         html += `<div class="trade-grid">`;
@@ -5831,12 +5989,12 @@ export class UI {
         // Trader sells column
         const goldReqAmt = request.__gold || 0;
         html += `<div class="trade-column">`;
-        html += `<div class="trade-column-header sell">Trader Sells</div>`;
+        html += `<div class="trade-column-header sell">${escapeHtml(t('ui.trade.trader_sells'))}</div>`;
         html += `<div class="trade-item-row${goldReqAmt > 0 ? ' selected' : ''}">`;
-        html += `<div class="trade-item-name">${this._tradeResIcon('gold')}Gold <span style="color:#888;">×${fmtGold(data.traderGold)}</span>`;
+        html += `<div class="trade-item-name">${this._tradeResIcon('gold')}${escapeHtml(resourceName('gold'))} <span style="color:#888;">×${fmtGold(data.traderGold)}</span>`;
         if (goldReqAmt > 0) html += `<span class="trade-item-badge">${fmtGold(goldReqAmt)}</span>`;
         html += `</div>`;
-        html += `<div class="trade-item-value" style="color:#ffdd00;">1.0g</div>`;
+        html += `<div class="trade-item-value" style="color:#ffdd00;">${escapeHtml(t('ui.trade.gold_value', { n: '1.0' }))}</div>`;
         html += `<div class="trade-item-buttons">`;
         html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRequestGold(-${step})">−</button>`;
         html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequestGold(${step})">+</button>`;
@@ -5849,7 +6007,7 @@ export class UI {
             html += `<div class="trade-item-name">${this._tradeResIcon(res)}${escapeHtml(this._formatResourceName(res))} <span style="color:#888;">×${amt}</span>`;
             if (reqAmt > 0) html += `<span class="trade-item-badge">${reqAmt}</span>`;
             html += `</div>`;
-            html += `<div class="trade-item-value">${val}g</div>`;
+            html += `<div class="trade-item-value">${escapeHtml(t('ui.trade.gold_value', { n: val }))}</div>`;
             html += `<div class="trade-item-buttons">`;
             html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest(${jsArg(res)},${step})">−</button>`;
             html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest(${jsArg(res)},${step})">+</button>`;
@@ -5869,9 +6027,9 @@ export class UI {
                 const price = Math.round(getItemTradeValue(item) * effectiveMarkup * exTierMarkup);
                 const exPitch = request[slotKey] ? -3 : 3;
                 html += `<div class="trade-exclusive-row skill-tip" data-tip="${escapeAttr(tip)}">`;
-                html += `<div class="trade-item-name">${exIcon}${escapeHtml(item.name || item.key)}</div>`;
-                html += `<div class="trade-item-value">${price}g</div>`;
-                html += `<button class="trade-exclusive-toggle${isSelected}" onclick="window.soundManager?.playSFXPitched('button_click',${exPitch});window.game.${request[slotKey] ? 'tradeRemoveRequest' : 'tradeRequest'}('${slotKey}',1)">${request[slotKey] ? 'Remove' : 'Buy'}</button>`;
+                html += `<div class="trade-item-name">${exIcon}${escapeHtml(itemName(item) || item.key)}</div>`;
+                html += `<div class="trade-item-value">${escapeHtml(t('ui.trade.gold_value', { n: price }))}</div>`;
+                html += `<button class="trade-exclusive-toggle${isSelected}" onclick="window.soundManager?.playSFXPitched('button_click',${exPitch});window.game.${request[slotKey] ? 'tradeRemoveRequest' : 'tradeRequest'}('${slotKey}',1)">${escapeHtml(request[slotKey] ? t('ui.trade.remove') : t('ui.trade.buy'))}</button>`;
                 html += `</div>`;
             }
         }
@@ -5885,10 +6043,10 @@ export class UI {
                 const val = (getItemTradeValue(def) * effectiveMarkup).toFixed(1);
                 const selected = reqAmt > 0 ? ' selected' : '';
                 html += `<div class="trade-item-row${selected}">`;
-                html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${escapeHtml(def?.name || key)} <span style="color:#888;">×${amt}</span>`;
+                html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${escapeHtml(def ? itemName(def) : key)} <span style="color:#888;">×${amt}</span>`;
                 if (reqAmt > 0) html += `<span class="trade-item-badge">${reqAmt}</span>`;
                 html += `</div>`;
-                html += `<div class="trade-item-value">${val}g</div>`;
+                html += `<div class="trade-item-value">${escapeHtml(t('ui.trade.gold_value', { n: val }))}</div>`;
                 html += `<div class="trade-item-buttons">`;
                 html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveRequest(${jsArg(reqKey)},${step})">−</button>`;
                 html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeRequest(${jsArg(reqKey)},${step})">+</button>`;
@@ -5919,16 +6077,16 @@ export class UI {
         }
 
         html += `<div class="trade-column">`;
-        html += `<div class="trade-column-header offer">You Offer</div>`;
+        html += `<div class="trade-column-header offer">${escapeHtml(t('ui.trade.you_offer'))}</div>`;
 
         // Gold offer row (always shown if player has gold)
         if (playerGold > 0) {
             const selected = goldOffer > 0 ? ' selected' : '';
             html += `<div class="trade-item-row${selected}">`;
-            html += `<div class="trade-item-name">${this._tradeResIcon('gold')}Gold <span style="color:#888;">×${fmtGold(playerGold)}</span>`;
+            html += `<div class="trade-item-name">${this._tradeResIcon('gold')}${escapeHtml(resourceName('gold'))} <span style="color:#888;">×${fmtGold(playerGold)}</span>`;
             if (goldOffer > 0) html += `<span class="trade-item-badge">${fmtGold(goldOffer)}</span>`;
             html += `</div>`;
-            html += `<div class="trade-item-value" style="color:#ffdd00;">1.0g</div>`;
+            html += `<div class="trade-item-value" style="color:#ffdd00;">${escapeHtml(t('ui.trade.gold_value', { n: '1.0' }))}</div>`;
             html += `<div class="trade-item-buttons">`;
             html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeGold(-${step})">−</button>`;
             html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeGold(${step})">+</button>`;
@@ -5948,7 +6106,7 @@ export class UI {
             html += `<div class="trade-item-name">${this._tradeResIcon(res)}${escapeHtml(this._formatResourceName(res))} <span style="color:#888;">×${amt}</span>`;
             if (offAmt > 0) html += `<span class="trade-item-badge">${offAmt}</span>`;
             html += `</div>`;
-            html += `<div class="trade-item-value">${val}g</div>`;
+            html += `<div class="trade-item-value">${escapeHtml(t('ui.trade.gold_value', { n: val }))}</div>`;
             html += `<div class="trade-item-buttons">`;
             html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer(${jsArg(res)},${step})">−</button>`;
             html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer(${jsArg(res)},${step})">+</button>`;
@@ -5957,7 +6115,7 @@ export class UI {
 
         // Equipment items player can sell
         if (offerableEquip.length > 0) {
-            html += `<div class="trade-section-label" style="color:#aaa;font-size:0.8em;padding:4px 0 2px;border-top:1px solid #333;margin-top:4px;">Equipment</div>`;
+            html += `<div class="trade-section-label" style="color:#aaa;font-size:0.8em;padding:4px 0 2px;border-top:1px solid #333;margin-top:4px;">${escapeHtml(t('ui.trade.section_equipment'))}</div>`;
             for (const { key, item, type } of offerableEquip) {
                 const val = (getItemTradeValue(item) * effectiveDiscount).toFixed(1);
                 const isOffered = !!offer[key];
@@ -5965,10 +6123,10 @@ export class UI {
                 const icon = this._itemIcon(item.key || key, type);
                 const tip = escapeAttr(this._getEquipmentTooltip(item));
                 html += `<div class="trade-item-row${selected}">`;
-                html += `<div class="trade-item-name skill-tip" data-tip="${tip}">${icon}${escapeHtml(item.name)}`;
+                html += `<div class="trade-item-name skill-tip" data-tip="${tip}">${icon}${escapeHtml(itemName(item))}`;
                 if (isOffered) html += `<span class="trade-item-badge">1</span>`;
                 html += `</div>`;
-                html += `<div class="trade-item-value">${val}g</div>`;
+                html += `<div class="trade-item-value">${escapeHtml(t('ui.trade.gold_value', { n: val }))}</div>`;
                 html += `<div class="trade-item-buttons">`;
                 if (isOffered) {
                     html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer('${key}',1)">−</button>`;
@@ -5988,7 +6146,7 @@ export class UI {
             }
             const sellablePotions = Object.entries(potionCounts).filter(([, c]) => c > 0);
             if (sellablePotions.length > 0) {
-                html += `<div class="trade-section-label" style="color:#aaa;font-size:0.8em;padding:4px 0 2px;border-top:1px solid #333;margin-top:4px;">Potions</div>`;
+                html += `<div class="trade-section-label" style="color:#aaa;font-size:0.8em;padding:4px 0 2px;border-top:1px solid #333;margin-top:4px;">${escapeHtml(t('ui.trade.section_potions'))}</div>`;
                 for (const [key, count] of sellablePotions) {
                     const def = ALL_ITEMS[key];
                     const offKey = `__potion_${key}`;
@@ -5996,10 +6154,10 @@ export class UI {
                     const val = (getItemTradeValue(def) * effectiveDiscount).toFixed(1);
                     const selected = offAmt > 0 ? ' selected' : '';
                     html += `<div class="trade-item-row${selected}">`;
-                    html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${escapeHtml(def?.name || key)} <span style="color:#888;">×${count}</span>`;
+                    html += `<div class="trade-item-name">${this._itemIcon(key, 'potion')}${escapeHtml(def ? itemName(def) : key)} <span style="color:#888;">×${count}</span>`;
                     if (offAmt > 0) html += `<span class="trade-item-badge">${offAmt}</span>`;
                     html += `</div>`;
-                    html += `<div class="trade-item-value">${val}g</div>`;
+                    html += `<div class="trade-item-value">${escapeHtml(t('ui.trade.gold_value', { n: val }))}</div>`;
                     html += `<div class="trade-item-buttons">`;
                     html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.tradeRemoveOffer(${jsArg(offKey)},${step})">−</button>`;
                     html += `<button class="trade-btn" onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.tradeOffer(${jsArg(offKey)},${step})">+</button>`;
@@ -6021,20 +6179,20 @@ export class UI {
         html += `<div class="trade-deal-meter">`;
         html += `<div class="trade-meter-bar"><div class="trade-meter-fill ${canTrade ? (overpay > 0 ? 'warning' : 'valid') : 'invalid'}" style="width:${meterPercent}%"></div></div>`;
         html += `<div class="trade-meter-text">`;
-        html += `<span class="offer-val">Offer: ${offerVal.toFixed(1)}g</span>`;
+        html += `<span class="offer-val">${escapeHtml(t('ui.trade.meter_offer', { n: offerVal.toFixed(1) }))}</span>`;
         if (reqVal > 0 || hasOffer) {
             if (diff > 0) {
-                html += `<span class="deficit">Overpay: −${diff.toFixed(1)}g</span>`;
+                html += `<span class="deficit">${escapeHtml(t('ui.trade.meter_overpay', { n: diff.toFixed(1) }))}</span>`;
             } else if (diff < 0) {
-                html += `<span class="deficit">Need: ${Math.abs(diff).toFixed(1)}g</span>`;
+                html += `<span class="deficit">${escapeHtml(t('ui.trade.meter_need', { n: Math.abs(diff).toFixed(1) }))}</span>`;
             } else if (diff === 0 && hasRequest) {
-                html += `<span class="surplus">Even trade</span>`;
+                html += `<span class="surplus">${escapeHtml(t('ui.trade.meter_even'))}</span>`;
             }
         }
-        html += `<span class="request-val">Cost: ${reqVal.toFixed(1)}g</span>`;
+        html += `<span class="request-val">${escapeHtml(t('ui.trade.meter_cost', { n: reqVal.toFixed(1) }))}</span>`;
         html += `</div>`;
         if (overpay > 0) {
-            html += `<div class="trade-meter-warning">You will lose ${overpay.toFixed(1)}g in value!</div>`;
+            html += `<div class="trade-meter-warning">${escapeHtml(t('ui.trade.meter_lose_warning', { n: overpay.toFixed(1) }))}</div>`;
         }
         html += `</div>`;
 
@@ -6045,18 +6203,18 @@ export class UI {
         const canBalanceDeficit = diff < 0 && (-diff) <= (playerGold - goldOffer);
         const canBalanceSurplus = resourceSurplus > 0 && traderGoldAvailable > 0;
         const canBalance = canBalanceDeficit || canBalanceSurplus;
-        let balanceLabel = 'Balance';
-        if (canBalanceDeficit) balanceLabel = `Balance (+${(-diff).toFixed(1)}g)`;
-        else if (canBalanceSurplus) balanceLabel = `Balance (get ${Math.min(resourceSurplus, traderGoldAvailable).toFixed(1)}g)`;
+        let balanceLabel = t('ui.trade.balance');
+        if (canBalanceDeficit) balanceLabel = t('ui.trade.balance_pay', { n: (-diff).toFixed(1) });
+        else if (canBalanceSurplus) balanceLabel = t('ui.trade.balance_get', { n: Math.min(resourceSurplus, traderGoldAvailable).toFixed(1) });
         html += `<div class="trade-actions">`;
         if (overpay > 0) {
-            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.confirmTrade()" style="border-color:#aa4400;color:#ffaa66;">Confirm (lose ${overpay.toFixed(1)}g)</button>`;
+            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.confirmTrade()" style="border-color:#aa4400;color:#ffaa66;">${escapeHtml(t('ui.trade.confirm_lose', { n: overpay.toFixed(1) }))}</button>`;
         } else {
-            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.confirmTrade()">Confirm Trade</button>`;
+            html += `<button class="confirm" ${canTrade ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.confirmTrade()">${escapeHtml(t('ui.trade.confirm'))}</button>`;
         }
-        html += `<button ${canBalance ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.balanceTradeWithGold()" style="border-color:#aa8800;color:#ffdd88;">${balanceLabel}</button>`;
-        html += `<button onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.clearTradeSelection()">Clear</button>`;
-        html += `<button onclick="window.soundManager?.playSFXPitched('open_close_click',-3);window.game.dismissTrader()">Done</button>`;
+        html += `<button ${canBalance ? '' : 'disabled'} onclick="window.soundManager?.playSFXPitched('button_click',3);window.game.balanceTradeWithGold()" style="border-color:#aa8800;color:#ffdd88;">${escapeHtml(balanceLabel)}</button>`;
+        html += `<button onclick="window.soundManager?.playSFXPitched('button_click',-3);window.game.clearTradeSelection()">${escapeHtml(t('ui.trade.clear'))}</button>`;
+        html += `<button onclick="window.soundManager?.playSFXPitched('open_close_click',-3);window.game.dismissTrader()">${escapeHtml(t('ui.trade.done'))}</button>`;
         html += `</div>`;
 
         const panelScrollTop = this.elements.eventPanel.scrollTop;
@@ -6098,7 +6256,7 @@ export class UI {
 
     _buildSocialSummaryHtml() {
         const colonists = this.game.colonists.filter(c => c.hp > 0 && !c.golem);
-        if (colonists.length < 2) return '<div style="color:#666;padding:8px;">Not enough colonists for relationships yet.</div>';
+        if (colonists.length < 2) return `<div style="color:#666;padding:8px;">${escapeHtml(t('ui.story.social_not_enough'))}</div>`;
 
         const TIER_COLORS = {
             lovers:       '#ff88cc',
@@ -6132,9 +6290,9 @@ export class UI {
                 const other = src === a ? b : a;
                 if (src.thoughts) {
                     src.thoughts
-                        .filter(t => t.text && (t.text.includes(other.name) || t.targetId === other.id))
+                        .filter(th => th.targetId === other.id)
                         .slice(-2)
-                        .forEach(t => tipLines.push(escapeAttr(`${src.name}: ${t.moodEffect > 0 ? '+' : ''}${t.moodEffect.toFixed(0)} ${t.text}`)));
+                        .forEach(th => tipLines.push(escapeAttr(t('ui.story.social_thought_line', { name: src.name, n: `${th.moodEffect > 0 ? '+' : ''}${th.moodEffect.toFixed(0)}`, text: thoughtText(th) }))));
                 }
             }
             const tip = tipLines.length ? tipLines.join('&#10;') : '';
@@ -6144,16 +6302,16 @@ export class UI {
             if (synCfg) {
                 if (score >= synCfg.allyOpinion) {
                     const pct = Math.round(synCfg.allyDamageBonus * 100);
-                    synergyTag = `<span style="color:#66dd88;font-size:10px;" title="Each gains +${pct}% damage when on the same expedition">+${pct}% dmg</span>`;
+                    synergyTag = `<span style="color:#66dd88;font-size:10px;" title="${escapeAttr(t('ui.story.synergy_ally_tip', { pct }))}">${escapeHtml(t('ui.story.synergy_ally', { pct }))}</span>`;
                 } else if (score <= synCfg.rivalOpinion) {
                     const pct = Math.round(synCfg.rivalDamagePenalty * 100);
-                    synergyTag = `<span style="color:#dd4444;font-size:10px;" title="Each suffers -${pct}% damage when on the same expedition">-${pct}% dmg</span>`;
+                    synergyTag = `<span style="color:#dd4444;font-size:10px;" title="${escapeAttr(t('ui.story.synergy_rival_tip', { pct }))}">${escapeHtml(t('ui.story.synergy_rival', { pct }))}</span>`;
                 }
             }
 
             html += `<div ${tipAttr} style="display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:3px;background:#1a1a1a;cursor:${tip ? 'help' : 'default'};">` +
                 `<span style="color:${escapeAttr(a.nameColor || '#ffff00')};font-size:11px;min-width:70px;">${escapeHtml(a.name)}</span>` +
-                `<span style="color:${color};font-size:10px;min-width:80px;text-align:center;">${tier.key.replace('_', ' ')}</span>` +
+                `<span style="color:${color};font-size:10px;min-width:80px;text-align:center;">${escapeHtml(tier.name || tier.key.replace('_', ' '))}</span>` +
                 `<span style="color:${escapeAttr(b.nameColor || '#ffff00')};font-size:11px;min-width:70px;">${escapeHtml(b.name)}</span>` +
                 `<span style="color:${color};font-size:10px;">${sign}${score}</span>` +
                 (synergyTag ? `<span style="margin-left:auto;">${synergyTag}</span>` : '') +
@@ -6168,7 +6326,7 @@ export class UI {
         const unlocked = this.game.story.unlocked;
 
         let html = '<div class="panel-close" data-panel-close="story">&times;</div>';
-        html += '<h3 style="color:#ffcc44">Story</h3>';
+        html += `<h3 style="color:#ffcc44">${escapeHtml(t('ui.story.title'))}</h3>`;
         const tabCounts = {};
         for (const [key, m] of Object.entries(STORY_MILESTONES)) {
             if (!tabCounts[m.tab]) tabCounts[m.tab] = { total: 0, unlocked: 0 };
@@ -6186,22 +6344,22 @@ export class UI {
         const tabLabel = (name, label) => {
             const c = tabCounts[name] || { unlocked: 0, total: 0 };
             const badge = tabHasNew(name) ? newBadge : '';
-            return `${escapeHtml(label)} (${c.unlocked}/${c.total})${badge}`;
+            return `${escapeHtml(t('ui.story.tab_count', { name: label, n: c.unlocked, total: c.total }))}${badge}`;
         };
 
         const FIXED_TABS = [
-            { key: 'colony',   label: 'Colony' },
-            { key: 'research', label: 'Research' },
-            { key: 'races',    label: 'Races' },
-            { key: 'realms',   label: 'Realms' },
-            { key: 'combat',   label: 'Combat' },
+            { key: 'colony',   label: t('ui.story.tab_colony') },
+            { key: 'research', label: t('ui.story.tab_research') },
+            { key: 'races',    label: t('ui.story.tab_races') },
+            { key: 'realms',   label: t('ui.story.tab_realms') },
+            { key: 'combat',   label: t('ui.story.tab_combat') },
         ];
         const SPECIAL_TABS = new Set(['bestiary', 'social']);
-        const fixedTabKeys = new Set(FIXED_TABS.map(t => t.key));
+        const fixedTabKeys = new Set(FIXED_TABS.map(ft => ft.key));
         const modTabs = [...new Set(
             Object.values(STORY_MILESTONES)
                 .map(m => m.tab)
-                .filter(t => t && !fixedTabKeys.has(t) && !SPECIAL_TABS.has(t))
+                .filter(tb => tb && !fixedTabKeys.has(tb) && !SPECIAL_TABS.has(tb))
         )].map(key => ({ key, label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }));
 
         const bestiarySize = (this.game.exploration?.bestiary?.size || 0) +
@@ -6214,8 +6372,8 @@ export class UI {
             if (!tabCounts[key]) continue;
             html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${escapeAttr(key)}">${tabLabel(key, label)}</button>`;
         }
-        html += `<button class="story-tab-btn${tab === 'bestiary' ? ' active' : ''}" data-story-tab="bestiary">Bestiary (${bestiarySize})</button>`;
-        html += `<button class="story-tab-btn${tab === 'social' ? ' active' : ''}" data-story-tab="social">Social</button>`;
+        html += `<button class="story-tab-btn${tab === 'bestiary' ? ' active' : ''}" data-story-tab="bestiary">${escapeHtml(t('ui.story.tab_bestiary', { n: bestiarySize }))}</button>`;
+        html += `<button class="story-tab-btn${tab === 'social' ? ' active' : ''}" data-story-tab="social">${escapeHtml(t('ui.story.tab_social'))}</button>`;
         for (const { key, label } of modTabs) {
             html += `<button class="story-tab-btn${tab === key ? ' active' : ''}" data-story-tab="${escapeAttr(key)}">${tabLabel(key, label)}</button>`;
         }
@@ -6230,10 +6388,10 @@ export class UI {
             const bestiary = this.game.exploration?.bestiary;
             const _bestiaryEntryHtml = (entry, spriteHtml) => {
                 const realmName = entry.realms
-                    ? escapeHtml(entry.realms.map(r => REALMS[r]?.name || r).join(', '))
-                    : escapeHtml(REALMS[entry.realm]?.name || entry.realm);
+                    ? entry.realms.map(r => REALMS[r]?.name || r).join(', ')
+                    : (REALMS[entry.realm]?.name || entry.realm);
                 const entryTypeKey = entry.key?.split(':')[1];
-                const lore = escapeHtml(entry.lore || EXPEDITION_ENEMIES[entryTypeKey]?.lore || NPC_ENCOUNTERS[entryTypeKey]?.lore || '');
+                const lore = escapeHtml(refText(entry.loreRef, entry.lore || EXPEDITION_ENEMIES[entryTypeKey]?.lore || NPC_ENCOUNTERS[entryTypeKey]?.lore || ''));
                 const catColors = { regular: '#ff4444', boss: '#ffcc44', npc: '#44ccff' };
                 const catKey = entry.category === 'elite' ? 'regular' : (entry.category || 'regular');
                 if (!spriteHtml) {
@@ -6242,8 +6400,8 @@ export class UI {
                     spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${escapeAttr(color)};vertical-align:middle;margin-right:6px;">${symbol}</span>`;
                 }
                 let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div style="flex:1;">`;
-                h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(entry.name)}</div>`;
-                h += `<div class="story-entry-text" style="font-size:0.8em;">Found in: ${realmName} | Encountered: ${entry.count}x</div>`;
+                h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(refText(entry.nameRef, entry.name))}</div>`;
+                h += `<div class="story-entry-text" style="font-size:0.8em;">${tHtml('ui.story.bestiary_found_html', { realms: realmName, n: entry.count })}</div>`;
                 if (entry.category === 'boss' && entry.phases?.length > 1) {
                     const phaseIdx = this._bossPhaseView.get(entry.key) || 0;
                     const phase = entry.phases[phaseIdx];
@@ -6255,15 +6413,15 @@ export class UI {
                     h += canPrev
                         ? `<button style="${btnStyle}" data-boss-phase-nav="${escapeAttr(entry.key)}" data-boss-phase-dir="-1">&#9664;</button>`
                         : `<span style="${disabledStyle}">&#9664;</span>`;
-                    h += `<span style="color:#ffcc44;">Phase ${phaseIdx + 1}/${entry.phases.length}: ${escapeHtml(phase.name || '')}</span>`;
+                    h += `<span style="color:#ffcc44;">${escapeHtml(t('ui.story.bestiary_phase', { n: phaseIdx + 1, total: entry.phases.length, name: refText(phase.nameRef, phase.name || '') }))}</span>`;
                     h += canNext
                         ? `<button style="${btnStyle}" data-boss-phase-nav="${escapeAttr(entry.key)}" data-boss-phase-dir="1">&#9654;</button>`
                         : `<span style="${disabledStyle}">&#9654;</span>`;
                     h += `</div>`;
                 }
                 if (entry.eliteCounts && Object.keys(entry.eliteCounts).length > 0) {
-                    const eliteParts = Object.values(entry.eliteCounts).map(e => `${escapeHtml(e.name)} ×${e.count}`);
-                    h += `<div class="story-entry-text" style="font-size:0.75em;color:#ff8844;">Elites: ${eliteParts.join(', ')}</div>`;
+                    const eliteParts = Object.values(entry.eliteCounts).map(e => t('ui.story.bestiary_elite_count', { name: refText(e.nameRef, e.name), n: e.count }));
+                    h += `<div class="story-entry-text" style="font-size:0.75em;color:#ff8844;">${escapeHtml(t('ui.story.bestiary_elites', { list: eliteParts.join(', ') }))}</div>`;
                 }
                 if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
                 return h + `</div></div>`;
@@ -6273,10 +6431,10 @@ export class UI {
                     spriteHtml = `<span style="display:inline-block;width:48px;text-align:center;font-size:2em;color:${escapeAttr(entry.color)};vertical-align:middle;margin-right:6px;">${escapeHtml(entry.char)}</span>`;
                 }
                 let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
-                h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(entry.name)}</div>`;
-                let statLine = hideDrops ? `Defeated: ${entry.count}x` : `Killed: ${entry.count}x | Drops: ${escapeHtml(entry.drops || 'Nothing')}`;
-                if (showTamed && entry.tameCount) statLine += ` | Tamed: ${entry.tameCount}x`;
-                h += `<div class="story-entry-text" style="font-size:0.8em;">${statLine}</div>`;
+                h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(killEntryName(entry))}</div>`;
+                let statLine = hideDrops ? t('ui.story.bestiary_defeated', { n: entry.count }) : t('ui.story.bestiary_killed', { n: entry.count, drops: killDropsText(entry) });
+                if (showTamed && entry.tameCount) statLine = t('ui.story.bestiary_with_tamed', { line: statLine, n: entry.tameCount });
+                h += `<div class="story-entry-text" style="font-size:0.8em;">${escapeHtml(statLine)}</div>`;
                 if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${escapeHtml(lore)}</div>`;
                 return h + `</div></div>`;
             };
@@ -6298,10 +6456,10 @@ export class UI {
                 const collapsed = this._collapsedBestiarySections.has(key);
                 const arrow = collapsed ? '&#9654;' : '&#9660;';
                 const countStr = count > 0 ? ` (${count})` : '';
-                return `<div class="realm-group-header" data-bestiary-section="${key}" style="color:${color};">${arrow} ${label}${countStr}</div>`;
+                return `<div class="realm-group-header" data-bestiary-section="${key}" style="color:${color};">${arrow} ${escapeHtml(label)}${countStr}</div>`;
             };
             const _emptyHint = (msg) =>
-                `<div class="story-entry locked" style="margin:2px 0;"><div class="story-entry-text">${msg}</div></div>`;
+                `<div class="story-entry locked" style="margin:2px 0;"><div class="story-entry-text">${escapeHtml(msg)}</div></div>`;
 
             // Expedition sections
             const categories = { regular: [], boss: [], npc: [] };
@@ -6310,11 +6468,11 @@ export class UI {
                 if (categories[cat]) categories[cat].push(entry);
             }
             const catColors = { regular: '#ff4444', boss: '#ffcc44', npc: '#44ccff' };
-            const catNames = { regular: 'Enemies', boss: 'Bosses', npc: 'Encounters' };
+            const catNames = { regular: t('ui.story.bestiary_enemies'), boss: t('ui.story.bestiary_bosses'), npc: t('ui.story.bestiary_encounters') };
             const catHints = {
-                regular: 'Send colonists on expeditions to encounter enemies.',
-                boss:    'Reach the final encounter of an expedition chain to face a boss.',
-                npc:     'Some expedition events end with a peaceful encounter instead of combat.',
+                regular: t('ui.story.bestiary_hint_enemies'),
+                boss:    t('ui.story.bestiary_hint_bosses'),
+                npc:     t('ui.story.bestiary_hint_encounters'),
             };
             for (const catKey of ['regular', 'boss', 'npc']) {
                 const catEntries = categories[catKey];
@@ -6342,10 +6500,10 @@ export class UI {
             const isGuardianKill = e => !!ANIMALS[e.sprite]?.guardian;
             const wildlifeKills = animalKills.filter(e => !isGuardianKill(e));
             const guardianKills = animalKills.filter(isGuardianKill);
-            html += _sectionHeader('wildlife', 'Wildlife', '#88cc44', wildlifeKills.length);
+            html += _sectionHeader('wildlife', t('ui.story.bestiary_wildlife'), '#88cc44', wildlifeKills.length);
             if (!this._collapsedBestiarySections.has('wildlife')) {
                 if (wildlifeKills.length === 0) {
-                    html += _emptyHint('Hunt or tame a wild animal to add it here.');
+                    html += _emptyHint(t('ui.story.bestiary_hint_wildlife'));
                 } else {
                     for (const entry of wildlifeKills) {
                         html += _killEntryHtml(entry, _getSpriteHtml(entry.sprite), ANIMALS[entry.sprite]?.lore || entry.lore || '', true);
@@ -6354,10 +6512,10 @@ export class UI {
             }
 
             // Crypt guardians section
-            html += _sectionHeader('crypt_guardians', 'Crypt Guardians', '#bba0e0', guardianKills.length);
+            html += _sectionHeader('crypt_guardians', t('ui.story.bestiary_guardians'), '#bba0e0', guardianKills.length);
             if (!this._collapsedBestiarySections.has('crypt_guardians')) {
                 if (guardianKills.length === 0) {
-                    html += _emptyHint('Breach an ancient crypt and defeat its guardians to add them here.');
+                    html += _emptyHint(t('ui.story.bestiary_hint_guardians'));
                 } else {
                     for (const entry of guardianKills) {
                         html += _killEntryHtml(entry, _getSpriteHtml(entry.sprite), ANIMALS[entry.sprite]?.lore || entry.lore || '', false, true);
@@ -6367,10 +6525,10 @@ export class UI {
 
             // Raider section
             const raiderKills = [...(this.game.exploration?.raiderKills?.values() || [])];
-            html += _sectionHeader('raiders', 'Raiders', '#ff6644', raiderKills.length);
+            html += _sectionHeader('raiders', t('ui.story.bestiary_raiders'), '#ff6644', raiderKills.length);
             if (!this._collapsedBestiarySections.has('raiders')) {
                 if (raiderKills.length === 0) {
-                    html += _emptyHint('Survive a raid and defeat enemy raiders to add them here.');
+                    html += _emptyHint(t('ui.story.bestiary_hint_raiders'));
                 } else {
                     for (const entry of raiderKills) {
                         html += _killEntryHtml(entry, _getSpriteHtml(entry.sprite), ENTITIES[entry.sprite]?.lore || entry.lore || '');
@@ -6380,17 +6538,17 @@ export class UI {
 
             // Summons section
             const summonsSeen = [...(this.game.exploration?.summonsSeen?.values() || [])];
-            html += _sectionHeader('summons', 'Summons', '#9966ff', summonsSeen.length);
+            html += _sectionHeader('summons', t('ui.story.bestiary_summons'), '#9966ff', summonsSeen.length);
             if (!this._collapsedBestiarySections.has('summons')) {
                 if (summonsSeen.length === 0) {
-                    html += _emptyHint('Summon creatures during combat to add them here.');
+                    html += _emptyHint(t('ui.story.bestiary_hint_summons'));
                 } else {
                     for (const entry of summonsSeen) {
                         const lore = escapeHtml(ENTITIES[entry.sprite]?.lore || entry.lore || '');
                         const spriteHtml = _getSpriteHtml(entry.sprite) ||
                             `<span style="display:inline-block;width:24px;text-align:center;font-size:1.2em;color:${escapeAttr(entry.color)};vertical-align:middle;margin-right:6px;">${escapeHtml(entry.char)}</span>`;
                         let h = `<div class="story-entry unlocked" style="padding:4px 8px;display:flex;align-items:center;">${spriteHtml}<div>`;
-                        h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(entry.name)}</div>`;
+                        h += `<div class="story-entry-title" style="font-size:0.9em;">${escapeHtml(killEntryName(entry))}</div>`;
                         if (lore) h += `<div class="story-entry-text" style="font-size:0.8em;font-style:italic;color:#aaa;margin-top:2px;">${lore}</div>`;
                         html += h + `</div></div>`;
                     }
@@ -6412,26 +6570,26 @@ export class UI {
                 const groupUnlocked = group.entries.filter(([k]) => unlocked.has(k)).length;
                 const collapsed = this._collapsedRealmGroups.has(group.name);
                 const arrow = collapsed ? '&#9654;' : '&#9660;';
-                html += `<div class="realm-group-header" data-realm-group="${escapeAttr(group.name)}">${arrow} ${escapeHtml(group.name)} (${groupUnlocked}/${group.entries.length})</div>`;
+                html += `<div class="realm-group-header" data-realm-group="${escapeAttr(group.name)}">${arrow} ${escapeHtml(t('ui.story.tab_count', { name: realmGroupName(group.name), n: groupUnlocked, total: group.entries.length }))}</div>`;
                 if (!collapsed) {
                     for (const [key, milestone] of group.entries) {
                         if (unlocked.has(key)) {
                             const info = unlocked.get(key);
-                            const dateStr = info ? escapeHtml(`Year ${info.year}, ${String(info.season ?? '').charAt(0).toUpperCase() + String(info.season ?? '').slice(1)}`) : '';
+                            const dateStr = info ? escapeHtml(storyDate(info)) : '';
                             const isNew = newAtOpen.has(key);
                             html += `<div class="story-entry unlocked${isNew ? ' story-entry-new' : ''}">`;
                             if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
-                            const realmNewBadge = isNew ? `<span class="story-new-badge">NEW</span> ` : '';
+                            const realmNewBadge = isNew ? `<span class="story-new-badge">${escapeHtml(t('ui.story.new_badge'))}</span> ` : '';
                             html += `<div class="story-entry-title">${realmNewBadge}${escapeHtml(milestone.title)}</div>`;
                             html += `<div class="story-entry-text">${sanitizeHtml(milestone.text)}</div>`;
                             if (milestone.epilogueButton) {
-                                html += `<div style="text-align:center;margin-top:12px;"><button data-story-action="outro" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">Return Home (Epilogue)</button></div>`;
+                                html += `<div style="text-align:center;margin-top:12px;"><button data-story-action="outro" style="padding:8px 20px;background:#44331a;color:#ffcc44;border:1px solid #665522;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;">${escapeHtml(t('ui.story.epilogue_button'))}</button></div>`;
                             }
                             html += `</div>`;
                         } else {
                             html += `<div class="story-entry locked">`;
-                            html += `<div class="story-entry-title">???</div>`;
-                            html += `<div class="story-entry-text">This tale has yet to unfold...</div>`;
+                            html += `<div class="story-entry-title">${escapeHtml(t('ui.story.locked_title'))}</div>`;
+                            html += `<div class="story-entry-text">${escapeHtml(t('ui.story.locked_text'))}</div>`;
                             html += `</div>`;
                         }
                     }
@@ -6454,19 +6612,19 @@ export class UI {
             const lockedEntries = entries.filter(([k]) => !unlocked.has(k));
             for (const [key, milestone] of unlockedEntries) {
                 const info = unlocked.get(key);
-                const dateStr = info ? escapeHtml(`Year ${info.year}, ${String(info.season ?? '').charAt(0).toUpperCase() + String(info.season ?? '').slice(1)}`) : '';
+                const dateStr = info ? escapeHtml(storyDate(info)) : '';
                 const isNew = newAtOpen.has(key);
                 html += `<div class="story-entry unlocked${isNew ? ' story-entry-new' : ''}">`;
                 if (dateStr) html += `<div style="color:#888;font-size:10px;margin-bottom:2px;">${dateStr}</div>`;
-                const newBadge = isNew ? `<span class="story-new-badge">NEW</span> ` : '';
+                const newBadge = isNew ? `<span class="story-new-badge">${escapeHtml(t('ui.story.new_badge'))}</span> ` : '';
                 html += `<div class="story-entry-title">${newBadge}${escapeHtml(milestone.title)}</div>`;
                 html += `<div class="story-entry-text">${sanitizeHtml(milestone.text)}</div>`;
                 html += `</div>`;
             }
             for (const [,] of lockedEntries) {
                 html += `<div class="story-entry locked">`;
-                html += `<div class="story-entry-title">???</div>`;
-                html += `<div class="story-entry-text">This tale has yet to unfold...</div>`;
+                html += `<div class="story-entry-title">${escapeHtml(t('ui.story.locked_title'))}</div>`;
+                html += `<div class="story-entry-text">${escapeHtml(t('ui.story.locked_text'))}</div>`;
                 html += `</div>`;
             }
         }
@@ -6499,9 +6657,9 @@ function statColor(value) {
 }
 
 function weaponSpeedLabel(cd) {
-    if (cd <= 2) return 'fast';
-    if (cd >= 5) return 'slow';
-    return 'normal';
+    if (cd <= 2) return t('ui.colonist.weapon_speed_fast');
+    if (cd >= 5) return t('ui.colonist.weapon_speed_slow');
+    return t('ui.colonist.weapon_speed_normal');
 }
 
 function getWeaponTooltip(colonist) {
@@ -6510,15 +6668,14 @@ function getWeaponTooltip(colonist) {
     const atkSpeed = 1 + getEquipmentStat(colonist, 'attackSpeed');
     const effCd = Math.max(1, Math.round(baseCd / atkSpeed));
     const baseDpt = (w.damage / baseCd).toFixed(1);
-    let tip = w.description ? `${w.description} ` : '';
-    tip += `${w.damage}d`;
+    const desc = itemDescription(w);
+    let tip = desc ? `${desc} ` : '';
     if (baseCd !== effCd) {
-        const effDpt = (w.damage / effCd).toFixed(1);
-        tip += `, ${baseDpt} dps → ${effDpt} dps`;
+        tip += t('ui.colonist.weapon_tip_haste', { dmg: w.damage, dps: baseDpt, eff: (w.damage / effCd).toFixed(1) });
     } else {
-        tip += ` (${baseDpt} dps, ${weaponSpeedLabel(baseCd)})`;
+        tip += t('ui.colonist.weapon_stats', { dmg: w.damage, dps: baseDpt, speed: weaponSpeedLabel(baseCd) });
     }
-    if (w.ranged) tip += `, range ${w.range}`;
+    if (w.ranged) tip += t('ui.craft.tip_range', { n: w.range });
     const extras = getItemStatLines({ ...w, damage: undefined, ranged: undefined, range: undefined });
     if (extras.length) tip += `, ${extras.join(', ')}`;
     const onHit = getOnHitLines(w);

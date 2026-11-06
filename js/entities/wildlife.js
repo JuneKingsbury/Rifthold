@@ -53,12 +53,17 @@ export function updateWildlife(game) {
                         if (d?.meatYield) drops.push(`${d.meatYield} meat`);
                         if (d?.hideYield) drops.push(`${d.hideYield} hides`);
                         if (d?.woolYield) drops.push(`${d.woolYield} wool`);
+                        const dropList = [];
+                        if (d?.meatYield) dropList.push({ item: 'meat', amount: d.meatYield });
+                        if (d?.hideYield) dropList.push({ item: 'hides', amount: d.hideYield });
+                        if (d?.woolYield) dropList.push({ item: 'wool', amount: d.woolYield });
                         game.exploration.wildlifeKills.set(animal.type, {
                             name: d?.name || animal.type.charAt(0).toUpperCase() + animal.type.slice(1),
                             char: d?.char || '?',
                             color: d?.color || '#888888',
                             sprite: animal.type,
                             drops: drops.length ? drops.join(', ') : 'Nothing',
+                            dropList,
                             count: 1
                         });
                     }

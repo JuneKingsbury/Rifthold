@@ -8,6 +8,13 @@ globalThis.window = globalThis;
 globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
 
 const ROOT = new URL('../../js/', import.meta.url);
+// Config text lives in locale/en.json and is filled in when config loads (see
+// stampLoc in js/core/i18n.js), so the table has to be loaded first.
+{
+    const { loadLocaleData } = await import(new URL('core/i18n.js', ROOT));
+    const fs = await import('node:fs');
+    loadLocaleData('en', JSON.parse(fs.readFileSync(new URL('../../locale/en.json', import.meta.url), 'utf8')));
+}
 const { ExplorationSystem } = await import(new URL('systems/exploration.js', ROOT));
 const { createExpeditionForecast } = await import(new URL('systems/expedition-forecast.js', ROOT));
 const CFG = await import(new URL('core/config.js', ROOT));

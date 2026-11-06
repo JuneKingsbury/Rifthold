@@ -1,7 +1,7 @@
 import { WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS } from '../core/config.js';
 import { EffectPicker, formatEffectsCode, STAT_KEYS } from './effect-picker.js';
 import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
-import { toJsLiteral } from './config-source.js';
+import { toJsLiteral, localeBlock } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_equipment_drafts';
 
@@ -343,7 +343,8 @@ class EquipmentEditor {
         if (!item || !item.key) return '';
         const key = /^[A-Za-z_$][\w$]*$/.test(item.key) ? item.key : toJsLiteral(item.key);
         let out = `${key}: {\n`;
-        out += `    name: ${toJsLiteral(item.name || item.key)},\n`;
+        // The name goes to locale/en.json (listed after the entry).
+        const strings = { [`item.${item.key}.name`]: item.name || item.key };
         if (item.effects && item.effects.length) {
             out += formatEffectsCode(item.effects) + ',\n';
         }
@@ -355,7 +356,7 @@ class EquipmentEditor {
             if (item.skinKey) out += `    skinKey: ${toJsLiteral(item.skinKey)},\n`;
         }
         out += `},`;
-        return out;
+        return out + localeBlock(strings);
     }
 
     _addToBatch() {

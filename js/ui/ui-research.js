@@ -1,9 +1,17 @@
-import { RESEARCH, RESEARCH_TABS, DEMO_LOCKED_RESEARCH, BUILDINGS } from '../core/config.js';
+import { RESEARCH, RESEARCH_TABS, DEMO_LOCKED_RESEARCH, BUILDINGS, RECIPES } from '../core/config.js';
 import { escapeHtml, escapeAttr, jsArg } from './ui-utils.js';
+import { t as tr } from '../core/i18n.js';
+import { buildingName, resourceName } from '../core/names.js';
 
 export function installResearchPanel(UI) {
     Object.assign(UI.prototype, researchMethods);
 }
+
+// A recipe has no name of its own; show what it makes.
+const recipeLabel = (key) => {
+    const out = Object.keys(RECIPES[key]?.output || {})[0];
+    return resourceName(out || key);
+};
 
 const MIN_SCALE = 0.35;
 const MAX_SCALE = 1.5;
@@ -51,21 +59,21 @@ const researchMethods = {
         const lt = (id, text) => { liveText[id] = text; return `<span data-rlive="${id}">\u0001${id}\u0001</span>`; };
         const lw = (id, pct) => { liveWidth[id] = pct; return `\u0002${id}\u0002`; };
 
-        let html = '<div class="research-drag-handle"></div><div class="panel-close" data-panel-close="research">&times;</div><h3>Research</h3>';
+        let html = `<div class="research-drag-handle"></div><div class="panel-close" data-panel-close="research">&times;</div><h3>${escapeHtml(tr('ui.research.title'))}</h3>`;
 
         if (research.activeResearch) {
             const activeTech = RESEARCH[research.activeResearch];
             const prog = research.getProgress(research.activeResearch);
             const pct = Math.min(100, Math.floor((prog / activeTech.cost) * 100));
             html += `<div class="info-row" style="color:#aa88ff; font-weight:bold; margin-bottom:6px;">`;
-            html += lt('hdr', `Researching: ${activeTech.name} (${Math.floor(prog)}/${activeTech.cost})`);
-            html += `<button style="margin-left:8px;font-size:10px;padding:1px 6px;cursor:pointer;" onclick="window.game.cancelResearch()">Cancel</button>`;
+            html += lt('hdr', tr('ui.research.researching', { name: activeTech.name, prog: Math.floor(prog), cost: activeTech.cost }));
+            html += `<button style="margin-left:8px;font-size:10px;padding:1px 6px;cursor:pointer;" onclick="window.game.cancelResearch()">${escapeHtml(tr('common.cancel'))}</button>`;
             html += `</div>`;
             html += `<div style="background:#333;border-radius:3px;height:6px;margin-bottom:8px;"><div data-rlive-w="hdr" style="background:#aa88ff;height:100%;border-radius:3px;width:${lw('hdr', pct)}%;transition:width 0.3s;"></div></div>`;
         } else {
             const hasAvail = research.hasAvailableResearch();
             html += `<div class="info-row" style="color:${hasAvail ? '#ffcc44' : '#888'}; font-weight:bold; margin-bottom:6px;">`;
-            html += hasAvail ? 'No research selected — tome study speed doubled' : 'All available research complete';
+            html += escapeHtml(hasAvail ? tr('ui.research.none_selected') : tr('ui.research.all_complete'));
             html += `</div>`;
         }
 
@@ -85,7 +93,7 @@ const researchMethods = {
         // Hide-completed toggle
         const hideCompleted = this._researchHideCompleted || false;
         html += `<button class="research-tab-btn research-hide-toggle${hideCompleted ? ' active' : ''}" data-research-hide-toggle>`;
-        html += hideCompleted ? 'Show all' : 'Hide done';
+        html += escapeHtml(hideCompleted ? tr('ui.research.show_all') : tr('ui.research.hide_done'));
         html += `</button>`;
         html += '</div>';
 
@@ -117,10 +125,10 @@ const researchMethods = {
                 // Build tooltip text (used on hover for all nodes)
                 const tooltipLines = [tech.description];
                 if (!completed && !demoLocked) {
-                    tooltipLines.push(`Cost: ${tech.cost} pts`);
-                    if (tech.unlocks?.buildings?.length) tooltipLines.push(`Unlocks: ${tech.unlocks.buildings.map(b => b.replace(/_/g, ' ')).join(', ')}`);
-                    if (tech.unlocks?.recipes?.length) tooltipLines.push(`Recipes: ${tech.unlocks.recipes.map(r => r.replace(/_/g, ' ')).join(', ')}`);
-                    if (tech.unlocks?.crops?.length) tooltipLines.push(`Crops: ${tech.unlocks.crops.map(c => c.replace(/_/g, ' ')).join(', ')}`);
+                    tooltipLines.push(tr('ui.research.tip_cost', { cost: tech.cost }));
+                    if (tech.unlocks?.buildings?.length) tooltipLines.push(tr('ui.research.tip_unlocks', { list: tech.unlocks.buildings.map(b => buildingName(b)).join(', ') }));
+                    if (tech.unlocks?.recipes?.length) tooltipLines.push(tr('ui.research.tip_recipes', { list: tech.unlocks.recipes.map(r => recipeLabel(r)).join(', ') }));
+                    if (tech.unlocks?.crops?.length) tooltipLines.push(tr('ui.research.tip_crops', { list: tech.unlocks.crops.map(c => resourceName(c)).join(', ') }));
                 }
                 const tooltip = tooltipLines.join(' | ');
 
@@ -129,19 +137,19 @@ const researchMethods = {
                 html += `<div class="research-node-name">${escapeHtml(tech.name)}</div>`;
                 html += `<div class="research-node-desc">${escapeHtml(tech.description)}</div>`;
                 if (demoLocked) {
-                    html += `<div class="research-node-cost" style="color:#ff6666;">Available in Full Version</div>`;
+                    html += `<div class="research-node-cost" style="color:#ff6666;">${escapeHtml(tr('ui.research.full_version'))}</div>`;
                 } else if (completed) {
-                    html += `<div class="research-node-cost">Researched</div>`;
+                    html += `<div class="research-node-cost">${escapeHtml(tr('ui.research.researched'))}</div>`;
                 } else if (isActive) {
                     const pct = Math.min(100, Math.floor((prog / tech.cost) * 100));
-                    html += `<div class="research-node-cost">${lt('node', `${Math.floor(prog)}/${tech.cost} pts (${pct}%)`)}</div>`;
+                    html += `<div class="research-node-cost">${lt('node', tr('ui.research.node_active', { prog: Math.floor(prog), cost: tech.cost, pct }))}</div>`;
                     html += `<div class="research-node-progress"><div class="research-node-progress-fill" data-rlive-w="node" style="width:${lw('node', pct)}%"></div></div>`;
                 } else if (prog > 0) {
                     const pct = Math.min(100, Math.floor((prog / tech.cost) * 100));
-                    html += `<div class="research-node-cost">${Math.floor(prog)}/${tech.cost} pts (paused)</div>`;
+                    html += `<div class="research-node-cost">${escapeHtml(tr('ui.research.node_paused', { prog: Math.floor(prog), cost: tech.cost }))}</div>`;
                     html += `<div class="research-node-progress"><div class="research-node-progress-fill research-node-progress-paused" style="width:${pct}%"></div></div>`;
                 } else {
-                    html += `<div class="research-node-cost">${tech.cost} pts</div>`;
+                    html += `<div class="research-node-cost">${escapeHtml(tr('ui.research.node_cost', { cost: tech.cost }))}</div>`;
                 }
                 // Gate requirements. Show on locked nodes too so players can plan ahead.
                 if (!completed && !demoLocked) {
@@ -151,9 +159,9 @@ const researchMethods = {
                         for (const gate of gateLines) {
                             const color = gate.met ? '#66cc66' : '#cc8844';
                             const pct = gate.required > 0 ? Math.round((gate.current / gate.required) * 100) : 100;
-                            const countText = gate.required > 1 ? ` ${gate.current}/${gate.required}` : '';
+                            const gateText = gate.required > 1 ? tr('ui.research.gate_count', { label: gate.label, current: gate.current, required: gate.required }) : gate.label;
                             html += `<div class="research-gate">` +
-                                `<div class="gate-bar-label" style="color:${color};">${escapeHtml(gate.label)}${countText}</div>` +
+                                `<div class="gate-bar-label" style="color:${color};">${escapeHtml(gateText)}</div>` +
                                 `<div class="gate-bar"><div class="gate-bar-fill${gate.met ? ' gate-bar-met' : ''}" style="width:${pct}%"></div></div>` +
                                 `</div>`;
                         }
@@ -169,14 +177,14 @@ const researchMethods = {
                         const reqCompleted = research.completed.has(req);
                         const reqAvailable = !reqCompleted && reqTech.requires.every(r => research.completed.has(r));
                         const badgeColor = reqCompleted ? '#66cc66' : reqAvailable ? '#cc8833' : '#666';
-                        html += `<span class="research-cross-tab" data-jump-tab="${escapeAttr(reqTech.tab)}" style="border-color:${badgeColor}; color:${badgeColor}">${escapeHtml(reqTech.name)} (${escapeHtml(reqTab?.name || reqTech.tab)} →)</span>`;
+                        html += `<span class="research-cross-tab" data-jump-tab="${escapeAttr(reqTech.tab)}" style="border-color:${badgeColor}; color:${badgeColor}">${escapeHtml(tr('ui.research.cross_tab', { name: reqTech.name, tab: reqTab?.name || reqTech.tab }))}</span>`;
                     }
                     html += '</div>';
                 }
                 if (available && !isActive) {
-                    html += `<button class="research-node-btn" onclick="event.stopPropagation();window.game.selectResearch(${jsArg(key)})">Select</button>`;
+                    html += `<button class="research-node-btn" onclick="event.stopPropagation();window.game.selectResearch(${jsArg(key)})">${escapeHtml(tr('ui.research.select'))}</button>`;
                 } else if (isActive) {
-                    html += `<button class="research-node-btn" onclick="event.stopPropagation();window.game.cancelResearch()" style="background:#663333;">Cancel</button>`;
+                    html += `<button class="research-node-btn" onclick="event.stopPropagation();window.game.cancelResearch()" style="background:#663333;">${escapeHtml(tr('common.cancel'))}</button>`;
                 }
                 html += `</div>`;
             }
@@ -184,9 +192,9 @@ const researchMethods = {
         }
         html += `</div>`; // .research-world
         html += `<div class="research-zoom-controls">`;
-        html += `<button class="research-zoom-btn" data-zoom="in" title="Zoom in">+</button>`;
-        html += `<button class="research-zoom-btn" data-zoom="reset" title="Reset view">&#8635;</button>`;
-        html += `<button class="research-zoom-btn" data-zoom="out" title="Zoom out">&minus;</button>`;
+        html += `<button class="research-zoom-btn" data-zoom="in" title="${escapeAttr(tr('ui.research.zoom_in'))}">+</button>`;
+        html += `<button class="research-zoom-btn" data-zoom="reset" title="${escapeAttr(tr('ui.research.zoom_reset'))}">&#8635;</button>`;
+        html += `<button class="research-zoom-btn" data-zoom="out" title="${escapeAttr(tr('ui.research.zoom_out'))}">&minus;</button>`;
         html += `</div>`;
         html += `</div>`; // .research-tree
 
@@ -652,8 +660,8 @@ const researchMethods = {
             for (const [building, count] of Object.entries(tech.requiresBuildings)) {
                 const found = game.mapIndex ? game.mapIndex.getStructurePositions(building).size : 0;
                 const label = count > 1
-                    ? `Build ${count}x ${building.replace(/_/g, ' ')}`
-                    : `Build ${building.replace(/_/g, ' ')}`;
+                    ? tr('ui.research.gate_build_n', { n: count, name: buildingName(building) })
+                    : tr('ui.research.gate_build', { name: buildingName(building) });
                 gates.push({ label, met: found >= count, current: Math.min(found, count), required: count });
             }
         }
@@ -662,11 +670,11 @@ const researchMethods = {
             const { stat, min } = tech.requiresMilestone;
             const current = game.stats?.[stat] || 0;
             const labels = {
-                raidsDefeated: 'Survive a raid',
-                wavesCompleted: 'Complete void waves',
-                expeditionsCompleted: 'Complete an expedition',
-                superiorItemsCrafted: 'Craft a Superior item',
-                itemsEnchanted: `Enchant items`,
+                raidsDefeated: tr('ui.research.gate_raid'),
+                wavesCompleted: tr('ui.research.gate_waves'),
+                expeditionsCompleted: tr('ui.research.gate_expedition'),
+                superiorItemsCrafted: tr('ui.research.gate_superior'),
+                itemsEnchanted: tr('ui.research.gate_enchant'),
             };
             gates.push({ label: labels[stat] || stat, met: current >= min, current: Math.min(current, min), required: min });
         }
@@ -677,7 +685,7 @@ const researchMethods = {
                 if (t.tab === tech.tab && research.completed.has(k)) tabCompleted++;
             }
             gates.push({
-                label: `Techs in tab`,
+                label: tr('ui.research.gate_tab_count'),
                 met: tabCompleted >= tech.requiresTabCount,
                 current: Math.min(tabCompleted, tech.requiresTabCount),
                 required: tech.requiresTabCount,

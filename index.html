@@ -55,322 +55,328 @@
     </div>
     <div id="world-size-modal" style="display:none;">
         <div class="tut-level-box">
-            <h2>Choose World Size</h2>
-            <p>Larger worlds have more room to expand but take longer to generate and require more memory.</p>
+            <h2 data-i18n="html.world_size.title">Choose World Size</h2>
+            <p data-i18n="html.world_size.intro">Larger worlds have more room to expand but take longer to generate and require more memory.</p>
             <div class="tut-level-cards">
                 <button class="tut-level-card" data-world-size="small">
-                    <span class="tut-level-name">Small</span>
-                    <span class="tut-level-desc">128 × 128 tiles - an extra cozy experience where nothing is too far away. Fast to generate, easy to manage, runs well on any hardware.</span>
+                    <span class="tut-level-name" data-i18n="html.world_size.small.name">Small</span>
+                    <span class="tut-level-desc" data-i18n="html.world_size.small.desc">128 × 128 tiles - an extra cozy experience where nothing is too far away. Fast to generate, easy to manage, runs well on any hardware.</span>
                     <span class="tut-level-stats" data-world-stats="small"></span>
                 </button>
                 <button class="tut-level-card" data-world-size="medium">
-                    <span class="tut-level-name">Medium</span>
-                    <span class="tut-level-desc">256 × 256 tiles - a generous frontier with plenty of room to expand.</span>
+                    <span class="tut-level-name" data-i18n="html.world_size.medium.name">Medium</span>
+                    <span class="tut-level-desc" data-i18n="html.world_size.medium.desc">256 × 256 tiles - a generous frontier with plenty of room to expand.</span>
                     <span class="tut-level-stats" data-world-stats="medium"></span>
                 </button>
                 <button class="tut-level-card" data-world-size="large">
-                    <span class="tut-level-name">Large</span>
-                    <span class="tut-level-desc">384 × 384 tiles - a vast wilderness fit for an even bigger colony. Recommended for experienced players.</span>
+                    <span class="tut-level-name" data-i18n="html.world_size.large.name">Large</span>
+                    <span class="tut-level-desc" data-i18n="html.world_size.large.desc">384 × 384 tiles - a vast wilderness fit for an even bigger colony. Recommended for experienced players.</span>
                     <span class="tut-level-stats" data-world-stats="large"></span>
                 </button>
             </div>
             <div class="tut-level-footer">
                 <span></span>
-                <span class="tut-level-link" data-world-cancel>Back</span>
+                <span class="tut-level-link" data-world-cancel data-i18n="html.world_size.back">Back</span>
             </div>
         </div>
     </div>
     <div id="tutorial-level-modal" style="display:none;">
         <div class="tut-level-box">
-            <h2>How familiar are you with colony sims?</h2>
-            <p>This sets how much the tutorial explains. You can change it later in Settings.</p>
+            <h2 data-i18n="html.tutorial_level.title">How familiar are you with colony sims?</h2>
+            <p data-i18n="html.tutorial_level.intro">This sets how much the tutorial explains. You can change it later in Settings.</p>
             <div class="tut-level-cards">
                 <button class="tut-level-card" data-tut-level="none">
-                    <span class="tut-level-name">No Experience</span>
-                    <span class="tut-level-desc">I've never played a game like this. Walk me through the basics and show me where to click.</span>
+                    <span class="tut-level-name" data-i18n="html.tutorial_level.none.name">No Experience</span>
+                    <span class="tut-level-desc" data-i18n="html.tutorial_level.none.desc">I've never played a game like this. Walk me through the basics and show me where to click.</span>
                 </button>
                 <button class="tut-level-card" data-tut-level="some">
-                    <span class="tut-level-name">Some Experience</span>
-                    <span class="tut-level-desc">I've played games like RimWorld or Dwarf Fortress. Just show me how Rifthold works.</span>
+                    <span class="tut-level-name" data-i18n="html.tutorial_level.some.name">Some Experience</span>
+                    <span class="tut-level-desc" data-i18n="html.tutorial_level.some.desc">I've played games like RimWorld or Dwarf Fortress. Just show me how Rifthold works.</span>
                 </button>
                 <button class="tut-level-card" data-tut-level="veteran">
-                    <span class="tut-level-name">I've Played Rifthold</span>
-                    <span class="tut-level-desc">No walkthrough, just a short list of goals to work toward.</span>
+                    <span class="tut-level-name" data-i18n="html.tutorial_level.veteran.name">I've Played Rifthold</span>
+                    <span class="tut-level-desc" data-i18n="html.tutorial_level.veteran.desc">No walkthrough, just a short list of goals to work toward.</span>
                 </button>
             </div>
             <div class="tut-level-footer">
-                <span class="tut-level-link" data-tut-skip>Skip the tutorial</span>
-                <span class="tut-level-link" data-tut-cancel>Back</span>
+                <span class="tut-level-link" data-tut-skip data-i18n="html.tutorial_level.skip">Skip the tutorial</span>
+                <span class="tut-level-link" data-tut-cancel data-i18n="html.tutorial_level.back">Back</span>
             </div>
         </div>
     </div>
     <div id="start-screen" style="visibility:hidden">
         <canvas id="start-bg-canvas"></canvas>
         <h1>Rifthold</h1>
-        <h2>Arcane Frontiers</h2>
-        <div id="demo-banner-start" style="display:none;">DEMO MODE</div>
-        <p>
-            Oversee a newly formed colony of strangers in a world of untapped magic. Build homes, make friends, and explore the unknown.
-        </p>
+        <h2 data-i18n="html.start.subtitle">Arcane Frontiers</h2>
+        <div id="demo-banner-start" style="display:none;" data-i18n="html.start.demo_banner">DEMO MODE</div>
+        <p data-i18n="html.start.intro">Oversee a newly formed colony of strangers in a world of untapped magic. Build homes, make friends, and explore the unknown.</p>
         <div class="start-btn-grid">
             <div class="start-btn-row">
-                <button id="start-game">New Game</button>
-                <button id="load-game">Load Game</button>
+                <button id="start-game" data-i18n="html.start.new_game">New Game</button>
+                <button id="load-game" data-i18n="html.start.load_game">Load Game</button>
             </div>
             <div class="start-btn-row">
-                <button id="start-colonists" data-modal-open>Party Setup</button>
-                <button id="start-settings" data-modal-open>Settings</button>
+                <button id="start-colonists" data-modal-open data-i18n="html.start.party_setup">Party Setup</button>
+                <button id="start-settings" data-modal-open data-i18n="html.start.settings">Settings</button>
             </div>
             <div class="start-btn-row">
-                <button id="start-glossary" data-modal-open>Glossary</button>
-                <button id="start-credits" data-modal-open>Credits</button>
+                <button id="start-glossary" data-modal-open data-i18n="html.start.glossary">Glossary</button>
+                <button id="start-credits" data-modal-open data-i18n="html.start.credits">Credits</button>
             </div>
             <div class="start-btn-row" id="start-quit-row">
-                <button id="start-mods">Mods</button>
-                <button id="start-quit" style="display:none">Quit Game</button>
+                <button id="start-mods" data-i18n="html.start.mods">Mods</button>
+                <button id="start-quit" style="display:none" data-i18n="html.start.quit">Quit Game</button>
             </div>
         </div>
         <details id="start-controls-details" style="font-size:12px; color:#999; max-width:500px; text-align:center;">
-            <summary style="cursor:pointer; color:#aaa; list-style:none; user-select:none;">&#9660; Controls</summary>
-            <p style="margin:6px 0 0; text-align:left;">
-                [WASD]/[Arrows]=Pan | [B]=Build | [F]=Farm | [G]=Gather | [P]=Priorities | [M]=World Map | [C]=Craft | [R]=Research | [I]=Inventory | [V]=Rifts | [J]=Story | [H]=Warmth Overlay | [Y]=Defense Overlay | [U]=Room Quality Overlay | [K]=Aura Overlay | [Esc]=Settings | [Tab]=Toggle Chop/Mine | [Space]=Pause | [,/&lt;]/[./&gt;]=Speed | [+]/[-]/[Wheel]=Zoom | [/]=Reset Minimap | [Q]=Draft/Undraft | [E]=Select All | [N]=Next Idle | [<b>[</b>]/[<b>]</b>]=Cycle Colonist | [Click]=Select/Place | [Click+Drag]=Area select | [Middle-drag]=Pan | [Right-click]=Cancel/Mark for Destruction | [Esc]=Close/Cancel<br>
-                Keys can be remapped in Settings &rarr; Controls / Keybindings.
-            </p>
+            <summary style="cursor:pointer; color:#aaa; list-style:none; user-select:none;">&#9660; <span data-i18n="html.start.controls">Controls</span></summary>
+            <p style="margin:6px 0 0; text-align:left;" data-i18n-html="html.start.controls_list_html">[WASD]/[Arrows]=Pan | [B]=Build | [F]=Farm | [G]=Gather | [P]=Priorities | [M]=World Map | [C]=Craft | [R]=Research | [I]=Inventory | [V]=Rifts | [J]=Story | [H]=Warmth Overlay | [Y]=Defense Overlay | [U]=Room Quality Overlay | [K]=Aura Overlay | [Esc]=Settings | [Tab]=Toggle Chop/Mine | [Space]=Pause | [,/&lt;]/[./&gt;]=Speed | [+]/[-]/[Wheel]=Zoom | [/]=Reset Minimap | [Q]=Draft/Undraft | [E]=Select All | [N]=Next Idle | [<b>[</b>]/[<b>]</b>]=Cycle Colonist | [Click]=Select/Place | [Click+Drag]=Area select | [Middle-drag]=Pan | [Right-click]=Cancel/Mark for Destruction | [Esc]=Close/Cancel<br>Keys can be remapped in Settings &rarr; Controls / Keybindings.</p>
         </details>
         <div id="version-label" style="color:#999;"></div>
         <input type="file" id="import-file" accept=".json" style="display:none">
         <div id="start-settings-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(600px, 92vw); max-width:92vw; max-height:80vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
             <button data-modal-close onclick="document.getElementById('start-settings-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="position:absolute; top:8px; right:12px; background:none; border:none; color:#aaa; font-size:18px; cursor:pointer; z-index:1;">&times;</button>
             <div style="margin-bottom:12px; padding-right:24px;">
-                <div style="color:#ffcc00; font-weight:bold;">Game Settings</div>
+                <div style="color:#ffcc00; font-weight:bold;" data-i18n="html.settings.title">Game Settings</div>
             </div>
             <div class="settings-tabs" style="display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid #444;">
-                <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">General</button>
-                <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Graphics</button>
-                <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Controls</button>
-                <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;">Dev Tools</button>
+                <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.general">General</button>
+                <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.graphics">Graphics</button>
+                <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.controls">Controls</button>
+                <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.devtools">Dev Tools</button>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">
-                <div class="settings-section-title">Visual</div>
+                <div class="settings-section-title" data-i18n="html.settings.section.visual">Visual</div>
                 <div class="settings-row">
-                    <label for="start-skin">Tile Skin:</label>
+                    <label for="start-skin" data-i18n="html.settings.skin.label">Tile Skin:</label>
                     <select id="start-skin" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
                         <option value="ascii">ASCII (default)</option>
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label for="start-names">Colonist names:</label>
+                    <label for="start-names" data-i18n="html.settings.names.label">Colonist names:</label>
                     <select id="start-names" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="off">Off</option>
-                        <option value="selected" selected>Selected</option>
-                        <option value="always">Always</option>
+                        <option value="off" data-i18n="html.settings.names.off">Off</option>
+                        <option value="selected" selected data-i18n="html.settings.names.selected">Selected</option>
+                        <option value="always" data-i18n="html.settings.names.always">Always</option>
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label for="start-ui-font-size">UI Font Size: <span id="start-ui-font-val">Medium</span></label>
-                    <input type="range" id="start-ui-font-size" min="0.75" max="1.4" step="0.05" value="1" style="width:80px" oninput="document.getElementById('start-ui-font-val').textContent=this.value<=0.8?'Small':this.value>=1.2?'Large':'Medium'">
+                    <label for="start-ui-font-size"><span data-i18n="html.settings.ui_font_size.label">UI Font Size: </span><span id="start-ui-font-val" data-i18n="ui.start.font_medium">Medium</span></label>
+                    <input type="range" id="start-ui-font-size" min="0.75" max="1.4" step="0.05" value="1" style="width:80px" oninput="document.getElementById('start-ui-font-val').textContent=window._fontScaleLabel(this.value)">
                 </div>
                 <div class="settings-row">
-                    <label for="start-temp-unit">Temperature unit:</label>
+                    <label for="start-temp-unit" data-i18n="html.settings.temp_unit.label">Temperature unit:</label>
                     <select id="start-temp-unit" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="F" selected>Fahrenheit (&deg;F)</option>
-                        <option value="C">Celsius (&deg;C)</option>
+                        <option value="F" selected data-i18n="html.settings.temp_unit.f">Fahrenheit (&deg;F)</option>
+                        <option value="C" data-i18n="html.settings.temp_unit.c">Celsius (&deg;C)</option>
                     </select>
                 </div>
             </div>
             <div class="settings-section" data-start-tab="general">
-                <div class="settings-section-title">Save Data</div>
+                <div class="settings-section-title" data-i18n="ui.settings.language_title">Language</div>
+                <div class="settings-row">
+                    <label for="start-language" data-i18n="ui.settings.language">Language:</label>
+                    <select id="start-language" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;"></select>
+                </div>
+                <div id="start-language-note" class="settings-row" style="display:none; gap:8px; color:#aaa; font-size:11px;">
+                    <span data-i18n="ui.settings.language_restart_note">The new language applies after a restart.</span>
+                    <button id="start-language-restart" data-i18n="ui.settings.language_restart_now" style="padding:2px 8px;font-size:11px;">Restart now</button>
+                </div>
+            </div>
+            <div class="settings-section" data-start-tab="general">
+                <div class="settings-section-title" data-i18n="html.settings.section.save_data">Save Data</div>
                 <div class="settings-row" style="gap:8px;">
-                    <button id="export-game" disabled style="flex:1;padding:4px 8px;font-size:11px;">Export Save</button>
-                    <button id="import-game" style="flex:1;padding:4px 8px;font-size:11px;">Import Save</button>
+                    <button id="export-game" disabled style="flex:1;padding:4px 8px;font-size:11px;" data-i18n="html.settings.export_game">Export Save</button>
+                    <button id="import-game" style="flex:1;padding:4px 8px;font-size:11px;" data-i18n="html.settings.import_game">Import Save</button>
                 </div>
             </div>
             <div id="start-gdrive-section" class="settings-section" data-start-tab="general" style="display:none;">
-                <div class="settings-section-title">Cloud Save (Google Drive)</div>
+                <div class="settings-section-title" data-i18n="html.settings.section.cloud_save_google_drive">Cloud Save (Google Drive)</div>
                 <div id="start-gdrive-status-row" style="min-height:28px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <span style="color:#aaa;font-size:11px;">Checking&#x2026;</span>
                 </div>
                 <div style="font-size:10px;color:#888;margin-top:4px;">
-                    <a href="privacy.html" target="_blank" rel="noopener" style="color:#bb99dd;">Privacy Policy</a>
+                    <a href="privacy.html" target="_blank" rel="noopener" style="color:#bb99dd;" data-i18n="html.settings.privacy_policy">Privacy Policy</a>
                     &#183;
-                    <a href="terms.html" target="_blank" rel="noopener" style="color:#bb99dd;">Terms of Service</a>
+                    <a href="terms.html" target="_blank" rel="noopener" style="color:#bb99dd;" data-i18n="html.settings.terms_of_service">Terms of Service</a>
                 </div>
             </div>
             <div class="settings-section" data-start-tab="general">
-                <div class="settings-section-title">Audio</div>
+                <div class="settings-section-title" data-i18n="html.settings.section.audio">Audio</div>
                 <div class="settings-row">
-                    <label for="start-music-vol">Music Volume: <span id="start-music-vol-val">70</span></label>
+                    <label for="start-music-vol"><span data-i18n="html.settings.music_vol.label">Music Volume: </span><span id="start-music-vol-val">70</span></label>
                     <input type="range" id="start-music-vol" min="0" max="100" value="70" style="width:80px" oninput="document.getElementById('start-music-vol-val').textContent=this.value">
                 </div>
                 <div class="settings-row">
-                    <label for="start-sfx-vol">SFX Volume: <span id="start-sfx-vol-val">80</span></label>
+                    <label for="start-sfx-vol"><span data-i18n="html.settings.sfx_vol.label">SFX Volume: </span><span id="start-sfx-vol-val">80</span></label>
                     <input type="range" id="start-sfx-vol" min="0" max="100" value="80" style="width:80px" oninput="document.getElementById('start-sfx-vol-val').textContent=this.value">
                 </div>
             </div>
             <div class="settings-section" data-start-tab="general">
-                <div class="settings-section-title">Gameplay</div>
+                <div class="settings-section-title" data-i18n="html.settings.section.gameplay">Gameplay</div>
                 <div class="settings-row">
-                    <label for="start-autocook">Auto-cook meal target:</label>
+                    <label for="start-autocook" data-i18n="html.settings.autocook.label">Auto-cook meal target:</label>
                     <select id="start-autocook" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="0" selected>Off</option>
-                        <option value="5">5 meals</option>
-                        <option value="10">10 meals</option>
-                        <option value="20">20 meals</option>
-                        <option value="50">50 meals</option>
+                        <option value="0" selected data-i18n="html.settings.autocook.0">Off</option>
+                        <option value="5" data-i18n="html.settings.autocook.5">5 meals</option>
+                        <option value="10" data-i18n="html.settings.autocook.10">10 meals</option>
+                        <option value="20" data-i18n="html.settings.autocook.20">20 meals</option>
+                        <option value="50" data-i18n="html.settings.autocook.50">50 meals</option>
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label for="start-autosave">Auto-save interval:</label>
+                    <label for="start-autosave" data-i18n="html.settings.autosave.label">Auto-save interval:</label>
                     <select id="start-autosave" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="0">Off</option>
-                        <option value="12">Every 12 hours</option>
-                        <option value="24" selected>Every 24 hours</option>
-                        <option value="48">Every 48 hours</option>
+                        <option value="0" data-i18n="html.settings.autosave.0">Off</option>
+                        <option value="12" data-i18n="html.settings.autosave.12">Every 12 hours</option>
+                        <option value="24" selected data-i18n="html.settings.autosave.24">Every 24 hours</option>
+                        <option value="48" data-i18n="html.settings.autosave.48">Every 48 hours</option>
                     </select>
                 </div>
-                <div class="settings-row"><input type="checkbox" id="start-autopause-hostile" checked><label for="start-autopause-hostile">Auto-pause on hostile event (raids)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-autopause-event" checked><label for="start-autopause-event">Auto-pause on choice events (wanderers, void whispers)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-autopause-caravan"><label for="start-autopause-caravan">Auto-pause when a caravan arrives</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-death" checked><label for="start-pause-death">Auto-pause on colonist death</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-low-health" checked><label for="start-pause-low-health">Auto-pause on critically low colonist health</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-research" checked><label for="start-pause-research">Auto-pause on research complete</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check">Peaceful mode (no raids/hostile animals)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode">Demo Mode (locks advanced research)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-autopause-hostile" checked><label for="start-autopause-hostile" data-i18n="html.settings.autopause_hostile.label">Auto-pause on hostile event (raids)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-autopause-event" checked><label for="start-autopause-event" data-i18n="html.settings.autopause_event.label">Auto-pause on choice events (wanderers, void whispers)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-autopause-caravan"><label for="start-autopause-caravan" data-i18n="html.settings.autopause_caravan.label">Auto-pause when a caravan arrives</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-pause-death" checked><label for="start-pause-death" data-i18n="html.settings.pause_death.label">Auto-pause on colonist death</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-pause-low-health" checked><label for="start-pause-low-health" data-i18n="html.settings.pause_low_health.label">Auto-pause on critically low colonist health</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-pause-research" checked><label for="start-pause-research" data-i18n="html.settings.pause_research.label">Auto-pause on research complete</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check" data-i18n="html.settings.peaceful_check.label">Peaceful mode (no raids/hostile animals)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode" data-i18n="html.settings.demo_mode.label">Demo Mode (locks advanced research)</label></div>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">
-                <div class="settings-section-title">Effects & Performance</div>
-                <div class="settings-row"><input type="checkbox" id="start-overlays" checked onchange="document.querySelectorAll('#start-night,#start-weather,#start-damage-flash,#start-screen-shake,#start-combat-particles,#start-projectiles,#start-equip-overlays,#start-progress-bars,#start-portal-path,#start-breathing,#start-walk-sway,#start-attack-swing,#start-action-anims,#start-tree-sway,#start-terrain-detail,#start-expedition-extras,#start-minimap').forEach(el=>el.checked=this.checked)"><label for="start-overlays">Master toggle: all combat/overlay effects</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-night" checked><label for="start-night">Show night lighting/darkness (High Performance Impact)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-weather" checked><label for="start-weather">Show weather particles</label></div>
-                <div class="settings-row"><label for="start-particle-density">Particle Density: <span id="start-particle-density-val">100%</span></label><input type="range" id="start-particle-density" min="10" max="100" step="10" value="100" style="width:80px" oninput="document.getElementById('start-particle-density-val').textContent=this.value+'%'"></div>
-                <div class="settings-row"><input type="checkbox" id="start-damage-flash" checked><label for="start-damage-flash">Damage flash on hit</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-screen-shake" checked><label for="start-screen-shake">Enable screen shake</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-combat-particles" checked><label for="start-combat-particles">Combat/action particles (sparks, skulls)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-projectiles" checked><label for="start-projectiles">Projectile trails (arrows, bolts)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-equip-overlays" checked><label for="start-equip-overlays">Show equipped armor/helmets on colonists (sprite mode)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-progress-bars" checked><label for="start-progress-bars">Progress & health bars</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-portal-path" checked><label for="start-portal-path">Portal path highlighting</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-breathing" checked><label for="start-breathing">Entity breathing animation</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-walk-sway" checked><label for="start-walk-sway">Walking sway animation</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-attack-swing" checked><label for="start-attack-swing">Attack swing animation</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-action-anims" checked><label for="start-action-anims">Action animations (attack, cast, work, hit)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-tree-sway" checked><label for="start-tree-sway">Tree sway (wind, stronger in storms)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-terrain-detail" checked><label for="start-terrain-detail">Terrain detail (grass tufts, water waves)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-expedition-extras" checked><label for="start-expedition-extras">Expedition extra animations</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-reduce-motion"><label for="start-reduce-motion">Reduce motion (damps ambient sway/breathing/pulses)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-minimap" checked><label for="start-minimap">Show minimap</label></div>
+                <div class="settings-section-title" data-i18n="html.settings.section.effects_performance">Effects & Performance</div>
+                <div class="settings-row"><input type="checkbox" id="start-overlays" checked onchange="document.querySelectorAll('#start-night,#start-weather,#start-damage-flash,#start-screen-shake,#start-combat-particles,#start-projectiles,#start-equip-overlays,#start-progress-bars,#start-portal-path,#start-breathing,#start-walk-sway,#start-attack-swing,#start-action-anims,#start-tree-sway,#start-terrain-detail,#start-expedition-extras,#start-minimap').forEach(el=>el.checked=this.checked)"><label for="start-overlays" data-i18n="html.settings.overlays.label">Master toggle: all combat/overlay effects</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-night" checked><label for="start-night" data-i18n="html.settings.night.label">Show night lighting/darkness (High Performance Impact)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-weather" checked><label for="start-weather" data-i18n="html.settings.weather.label">Show weather particles</label></div>
+                <div class="settings-row"><label for="start-particle-density"><span data-i18n="html.settings.particle_density.label">Particle Density: </span><span id="start-particle-density-val">100%</span></label><input type="range" id="start-particle-density" min="10" max="100" step="10" value="100" style="width:80px" oninput="document.getElementById('start-particle-density-val').textContent=this.value+'%'"></div>
+                <div class="settings-row"><input type="checkbox" id="start-damage-flash" checked><label for="start-damage-flash" data-i18n="html.settings.damage_flash.label">Damage flash on hit</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-screen-shake" checked><label for="start-screen-shake" data-i18n="html.settings.screen_shake.label">Enable screen shake</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-combat-particles" checked><label for="start-combat-particles" data-i18n="html.settings.combat_particles.label">Combat/action particles (sparks, skulls)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-projectiles" checked><label for="start-projectiles" data-i18n="html.settings.projectiles.label">Projectile trails (arrows, bolts)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-equip-overlays" checked><label for="start-equip-overlays" data-i18n="html.settings.equip_overlays.label">Show equipped armor/helmets on colonists (sprite mode)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-progress-bars" checked><label for="start-progress-bars" data-i18n="html.settings.progress_bars.label">Progress & health bars</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-portal-path" checked><label for="start-portal-path" data-i18n="html.settings.portal_path.label">Portal path highlighting</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-breathing" checked><label for="start-breathing" data-i18n="html.settings.breathing.label">Entity breathing animation</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-walk-sway" checked><label for="start-walk-sway" data-i18n="html.settings.walk_sway.label">Walking sway animation</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-attack-swing" checked><label for="start-attack-swing" data-i18n="html.settings.attack_swing.label">Attack swing animation</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-action-anims" checked><label for="start-action-anims" data-i18n="html.settings.action_anims.label">Action animations (attack, cast, work, hit)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-tree-sway" checked><label for="start-tree-sway" data-i18n="html.settings.tree_sway.label">Tree sway (wind, stronger in storms)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-terrain-detail" checked><label for="start-terrain-detail" data-i18n="html.settings.terrain_detail.label">Terrain detail (grass tufts, water waves)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-expedition-extras" checked><label for="start-expedition-extras" data-i18n="html.settings.expedition_extras.label">Expedition extra animations</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-reduce-motion"><label for="start-reduce-motion" data-i18n="html.settings.reduce_motion.label">Reduce motion (damps ambient sway/breathing/pulses)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-minimap" checked><label for="start-minimap" data-i18n="html.settings.minimap.label">Show minimap</label></div>
                 <div class="settings-row">
-                    <label for="start-dither-dist">Dithering Distance:</label>
+                    <label for="start-dither-dist" data-i18n="html.settings.dither_dist.label">Dithering Distance:</label>
                     <select id="start-dither-dist" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="none">Off</option>
-                        <option value="minimal">Minimal</option>
-                        <option value="light" selected>Light (default)</option>
-                        <option value="normal">Normal</option>
-                        <option value="heavy">Heavy</option>
-                        <option value="extreme">Extreme</option>
+                        <option value="none" data-i18n="html.settings.dither_dist.none">Off</option>
+                        <option value="minimal" data-i18n="html.settings.dither_dist.minimal">Minimal</option>
+                        <option value="light" selected data-i18n="html.settings.dither_dist.light">Light (default)</option>
+                        <option value="normal" data-i18n="html.settings.dither_dist.normal">Normal</option>
+                        <option value="heavy" data-i18n="html.settings.dither_dist.heavy">Heavy</option>
+                        <option value="extreme" data-i18n="html.settings.dither_dist.extreme">Extreme</option>
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label for="start-dither-qual">Dithering Quality:</label>
+                    <label for="start-dither-qual" data-i18n="html.settings.dither_qual.label">Dithering Quality:</label>
                     <select id="start-dither-qual" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="chunky">Chunky (4x4 blocks)</option>
-                        <option value="low">Low (3x3 blocks)</option>
-                        <option value="medium" selected>Medium (2x2 blocks, default)</option>
-                        <option value="high">High (single pixels)</option>
+                        <option value="chunky" data-i18n="html.settings.dither_qual.chunky">Chunky (4x4 blocks)</option>
+                        <option value="low" data-i18n="html.settings.dither_qual.low">Low (3x3 blocks)</option>
+                        <option value="medium" selected data-i18n="html.settings.dither_qual.medium">Medium (2x2 blocks, default)</option>
+                        <option value="high" data-i18n="html.settings.dither_qual.high">High (single pixels)</option>
                     </select>
                 </div>
-                <div class="settings-row"><input type="checkbox" id="start-fullscreen"><label for="start-fullscreen">Fullscreen mode</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-fps"><label for="start-fps">Show FPS counter</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-fps-cap"><label for="start-fps-cap">Cap framerate to 30 FPS (reduces CPU/GPU usage)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-crt-scanlines" checked><label for="start-crt-scanlines">CRT scanline overlay</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-crt-warp" checked><label for="start-crt-warp">CRT barrel warp (lens distortion)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-fullscreen"><label for="start-fullscreen" data-i18n="html.settings.fullscreen.label">Fullscreen mode</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-fps"><label for="start-fps" data-i18n="html.settings.fps.label">Show FPS counter</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-fps-cap"><label for="start-fps-cap" data-i18n="html.settings.fps_cap.label">Cap framerate to 30 FPS (reduces CPU/GPU usage)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-crt-scanlines" checked><label for="start-crt-scanlines" data-i18n="html.settings.crt_scanlines.label">CRT scanline overlay</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-crt-warp" checked><label for="start-crt-warp" data-i18n="html.settings.crt_warp.label">CRT barrel warp (lens distortion)</label></div>
             </div>
             <div class="settings-section" data-start-tab="general">
-                <div class="settings-section-title">Accessibility</div>
-                <div class="settings-row"><input type="checkbox" id="start-darken-pause" checked><label for="start-darken-pause">Darken screen when paused</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-pause-focus" checked><label for="start-pause-focus">Pause when window loses focus</label></div>
+                <div class="settings-section-title" data-i18n="html.settings.section.accessibility">Accessibility</div>
+                <div class="settings-row"><input type="checkbox" id="start-darken-pause" checked><label for="start-darken-pause" data-i18n="html.settings.darken_pause.label">Darken screen when paused</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-pause-focus" checked><label for="start-pause-focus" data-i18n="html.settings.pause_focus.label">Pause when window loses focus</label></div>
                 <div class="settings-row">
-                    <label for="start-toolbar-mode">Mobile button bar:</label>
+                    <label for="start-toolbar-mode" data-i18n="html.settings.toolbar_mode.label">Mobile button bar:</label>
                     <select id="start-toolbar-mode" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="auto" selected>Auto</option>
-                        <option value="always">Always</option>
-                        <option value="never">Never</option>
+                        <option value="auto" selected data-i18n="html.settings.toolbar_mode.auto">Auto</option>
+                        <option value="always" data-i18n="html.settings.toolbar_mode.always">Always</option>
+                        <option value="never" data-i18n="html.settings.toolbar_mode.never">Never</option>
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label for="start-layout-mode">Layout mode:</label>
+                    <label for="start-layout-mode" data-i18n="html.settings.layout_mode.label">Layout mode:</label>
                     <select id="start-layout-mode" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="auto" selected>Auto (detect screen size)</option>
-                        <option value="separate">Separate</option>
-                        <option value="tabbed">Tabbed</option>
+                        <option value="auto" selected data-i18n="html.settings.layout_mode.auto">Auto (detect screen size)</option>
+                        <option value="separate" data-i18n="html.settings.layout_mode.separate">Separate</option>
+                        <option value="tabbed" data-i18n="html.settings.layout_mode.tabbed">Tabbed</option>
                     </select>
                 </div>
                 <div class="settings-row">
-                    <label for="start-notif-dur">Notification duration:</label>
+                    <label for="start-notif-dur" data-i18n="html.settings.notif_dur.label">Notification duration:</label>
                     <select id="start-notif-dur" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="50">Short (50 ticks)</option>
-                        <option value="100" selected>Normal (100 ticks)</option>
-                        <option value="200">Long (200 ticks)</option>
-                        <option value="500">Persistent (500 ticks)</option>
+                        <option value="50" data-i18n="html.settings.notif_dur.50">Short (50 ticks)</option>
+                        <option value="100" selected data-i18n="html.settings.notif_dur.100">Normal (100 ticks)</option>
+                        <option value="200" data-i18n="html.settings.notif_dur.200">Long (200 ticks)</option>
+                        <option value="500" data-i18n="html.settings.notif_dur.500">Persistent (500 ticks)</option>
                     </select>
                 </div>
-                <div class="settings-row"><input type="checkbox" id="start-colonist-highlight"><label for="start-colonist-highlight">Show colonist color outline (sprite mode)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-large-clicks"><label for="start-large-clicks">Larger click targets (buttons & checkboxes)</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-haptics" checked><label for="start-haptics">Vibration feedback (phones)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-colonist-highlight"><label for="start-colonist-highlight" data-i18n="html.settings.colonist_highlight.label">Show colonist color outline (sprite mode)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-large-clicks"><label for="start-large-clicks" data-i18n="html.settings.large_clicks.label">Larger click targets (buttons & checkboxes)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-haptics" checked><label for="start-haptics" data-i18n="html.settings.haptics.label">Vibration feedback (phones)</label></div>
                 <div class="settings-row">
-                    <label for="start-colorblind">Colorblind mode:</label>
+                    <label for="start-colorblind" data-i18n="html.settings.colorblind.label">Colorblind mode:</label>
                     <select id="start-colorblind" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">
-                        <option value="none" selected>None</option>
-                        <option value="protanopia">Protanopia (red-blind)</option>
-                        <option value="deuteranopia">Deuteranopia (green-blind)</option>
-                        <option value="tritanopia">Tritanopia (blue-blind)</option>
+                        <option value="none" selected data-i18n="html.settings.colorblind.none">None</option>
+                        <option value="protanopia" data-i18n="html.settings.colorblind.protanopia">Protanopia (red-blind)</option>
+                        <option value="deuteranopia" data-i18n="html.settings.colorblind.deuteranopia">Deuteranopia (green-blind)</option>
+                        <option value="tritanopia" data-i18n="html.settings.colorblind.tritanopia">Tritanopia (blue-blind)</option>
                     </select>
                 </div>
             </div>
             <div class="settings-section" data-start-tab="general" style="border-bottom:none; text-align:center;">
-                <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset all settings to Default</button>
+                <button id="start-reset-defaults" style="padding:6px 16px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;" data-i18n="html.settings.reset_defaults">Reset all settings to Default</button>
             </div>
             <div class="settings-section" data-start-tab="controls" style="display:none;">
-                <div class="settings-section-title">Controls / Keybindings</div>
+                <div class="settings-section-title" data-i18n="html.settings.section.controls_keybindings">Controls / Keybindings</div>
                 <div id="start-keybindings"></div>
                 <div class="settings-row" style="margin-top:6px;">
-                    <button id="start-reset-keybinds" style="padding:4px 10px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;">Reset all keybinds to Default</button>
+                    <button id="start-reset-keybinds" style="padding:4px 10px; font-size:11px; background:#442222; border:1px solid #664444; color:#ff8888; border-radius:4px; cursor:pointer;" data-i18n="html.settings.reset_keybinds">Reset all keybinds to Default</button>
                 </div>
             </div>
             <div class="settings-section" data-start-tab="devtools" style="display:none;">
-                <div class="settings-section-title">Dev Tools</div>
+                <div class="settings-section-title" data-i18n="html.settings.section.dev_tools">Dev Tools</div>
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-blueprint" style="width:100%;padding:6px 10px;">Blueprint</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Design building layouts visually on a grid</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-blueprint" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.blueprint.button">Blueprint</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.blueprint.desc">Design building layouts visually on a grid</td>
                     </tr>
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-skin-editor" style="width:100%;padding:6px 10px;">Skin</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Pixel art editor for custom game sprites</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-skin-editor" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.skin_editor.button">Skin</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.skin_editor.desc">Pixel art editor for custom game sprites</td>
                     </tr>
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor" style="width:100%;padding:6px 10px;">Realm</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Create expedition realms with loot, enemies, and events</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.realm_editor.button">Realm</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.realm_editor.desc">Create expedition realms with loot, enemies, and events</td>
                     </tr>
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-entity-editor" style="width:100%;padding:6px 10px;">Entity</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Define animals and creatures with roles and behaviors</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-entity-editor" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.entity_editor.button">Entity</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.entity_editor.desc">Define animals and creatures with roles and behaviors</td>
                     </tr>
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor" style="width:100%;padding:6px 10px;">Equipment</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Create weapons, armor, tools, and artifacts</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.equipment_editor.button">Equipment</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.equipment_editor.desc">Create weapons, armor, tools, and artifacts</td>
                     </tr>
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-spell-editor" style="width:100%;padding:6px 10px;">Spell</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Design spells and their associated tome recipes</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-spell-editor" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.spell_editor.button">Spell</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.spell_editor.desc">Design spells and their associated tome recipes</td>
                     </tr>
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor-pro" style="width:100%;padding:6px 10px;">Equipment Pro</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Full equipment file editor with in-game preview</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-equipment-editor-pro" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.equipment_editor_pro.button">Equipment Pro</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.equipment_editor_pro.desc">Full equipment file editor with in-game preview</td>
                     </tr>
                     <tr>
-                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor-pro" style="width:100%;padding:6px 10px;">Realm Pro</button></td>
-                        <td style="padding:4px 0; color:#aaa; font-size:11px;">Full exploration file editor with in-game preview</td>
+                        <td style="padding:4px 8px 4px 0;"><button id="start-realm-editor-pro" style="width:100%;padding:6px 10px;" data-i18n="html.devtools.realm_editor_pro.button">Realm Pro</button></td>
+                        <td style="padding:4px 0; color:#aaa; font-size:11px;" data-i18n="html.devtools.realm_editor_pro.desc">Full exploration file editor with in-game preview</td>
                     </tr>
                 </table>
             </div>
@@ -380,7 +386,7 @@
     <div id="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999;"></div>
     <div id="glossary-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:640px; max-width:90vw; max-height:80vh; overflow-y:auto; font-size:12px; line-height:1.6; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Game Glossary</div>
+            <div style="color:#ffcc00; font-weight:bold; font-size:14px;" data-i18n="html.glossary.title">Game Glossary</div>
             <button data-modal-close onclick="document.getElementById('glossary-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
         </div>
         <div id="glossary-body"></div>
@@ -388,7 +394,7 @@
 
     <div id="credits-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:400px; max-width:90vw; max-height:80vh; overflow-y:auto; font-size:12px; line-height:1.6; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Credits</div>
+            <div style="color:#ffcc00; font-weight:bold; font-size:14px;" data-i18n="html.credits.title">Credits</div>
             <button data-modal-close onclick="document.getElementById('credits-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
         </div>
         <div id="credits-body"></div>
@@ -396,7 +402,7 @@
 
     <div id="changelog-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:640px; max-width:90vw; max-height:80vh; overflow-y:auto; font-size:12px; line-height:1.6; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Changelog</div>
+            <div style="color:#ffcc00; font-weight:bold; font-size:14px;" data-i18n="html.changelog.title">Changelog</div>
             <button data-modal-close onclick="document.getElementById('changelog-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
         </div>
         <div id="changelog-body"></div>
@@ -405,10 +411,10 @@
 
     <div id="colonists-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:700px; max-width:95vw; max-height:85vh; overflow-y:auto; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Starting Colonists</div>
+            <div style="color:#ffcc00; font-weight:bold; font-size:14px;" data-i18n="html.colonists.title">Starting Colonists</div>
             <button data-modal-close onclick="document.getElementById('colonists-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
         </div>
-        <div style="color:#aaa; font-size:11px; margin-bottom:14px;">Customize your starting colonists. Skill points: 18 total (max 8 per skill). Traits budget: 3 points (up to 3 traits). Random colonists get slightly more points to offset the luck of the draw.</div>
+        <div style="color:#aaa; font-size:11px; margin-bottom:14px;" data-i18n="html.colonists.intro">Customize your starting colonists. Skill points: 18 total (max 8 per skill). Traits budget: 3 points (up to 3 traits). Random colonists get slightly more points to offset the luck of the draw.</div>
         <div id="colonist-slots-container" style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;"></div>
     </div>
 
@@ -417,12 +423,12 @@
 
     <div id="save-slots-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:24px; border:1px solid #555; border-radius:8px; background:#1e1e32; text-align:left; width:min(600px,94vw); max-height:82vh; overflow-y:auto; font-size:12px; color:#ccc; z-index:1000; box-shadow:0 8px 32px rgba(0,0,0,0.7);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-            <div style="color:#ffcc00; font-weight:bold; font-size:14px;">Load Game</div>
+            <div style="color:#ffcc00; font-weight:bold; font-size:14px;" data-i18n="html.save_slots.title">Load Game</div>
             <button data-modal-close onclick="document.getElementById('save-slots-panel').style.display='none';document.getElementById('modal-backdrop').style.display='none'" style="background:none; border:none; color:#aaa; font-size:18px; cursor:pointer;">&times;</button>
         </div>
-        <div style="color:#aaa; font-size:11px; margin-bottom:8px;">Auto-saves</div>
+        <div style="color:#aaa; font-size:11px; margin-bottom:8px;" data-i18n="html.save_slots.auto">Auto-saves</div>
         <div id="save-slots-auto"></div>
-        <div style="color:#aaa; font-size:11px; margin:12px 0 8px;">Manual Saves</div>
+        <div style="color:#aaa; font-size:11px; margin:12px 0 8px;" data-i18n="html.save_slots.manual">Manual Saves</div>
         <div id="save-slots-manual"></div>
     </div>
 
@@ -449,12 +455,12 @@
             </div>
             <div class="hud-pod hud-pod--controls">
                 <span class="status-controls">
-                    <button id="btn-pause" title="Pause">||</button>
-                    <button id="btn-speed-1" title="1x Speed">1x</button>
-                    <button id="btn-speed-2" title="2x Speed">2x</button>
-                    <button id="btn-speed-3" title="3x Speed">3x</button>
+                    <button id="btn-pause" title="Pause" data-i18n-title="html.hud.pause_title">||</button>
+                    <button id="btn-speed-1" title="1x Speed" data-i18n-title="html.hud.speed_1_title">1x</button>
+                    <button id="btn-speed-2" title="2x Speed" data-i18n-title="html.hud.speed_2_title">2x</button>
+                    <button id="btn-speed-3" title="3x Speed" data-i18n-title="html.hud.speed_3_title">3x</button>
                     <span class="status-controls-sep"></span>
-                    <button id="btn-settings" title="Settings">&#9881;</button>
+                    <button id="btn-settings" title="Settings" data-i18n-title="html.hud.settings_title">&#9881;</button>
                 </span>
             </div>
         </div>
@@ -474,10 +480,10 @@
         <div id="game-footer">
             <div id="footer-resize-handle" class="resize-handle resize-handle-top"></div>
             <div id="footer-tabs">
-                <button class="footer-tab" data-tab="info">Info</button>
-                <button class="footer-tab" data-tab="colonists">Colonists</button>
-                <button class="footer-tab" data-tab="log">Log</button>
-                <button class="footer-tab" data-tab="minimap">Map</button>
+                <button class="footer-tab" data-tab="info" data-i18n="html.footer.tab.info">Info</button>
+                <button class="footer-tab" data-tab="colonists" data-i18n="html.footer.tab.colonists">Colonists</button>
+                <button class="footer-tab" data-tab="log" data-i18n="html.footer.tab.log">Log</button>
+                <button class="footer-tab" data-tab="minimap" data-i18n="html.footer.tab.minimap">Map</button>
                 <button class="footer-tab footer-size-btn" data-footer-size title="Expand panel">&#9650;</button>
             </div>
             <div id="footer-content">
@@ -494,14 +500,14 @@
         </div>
         <div id="touch-toolbar">
             <!-- ui.updateTouchToolbar shows only the buttons that apply to the current selection and mode. -->
-            <button id="touch-prev-btn" title="Previous colonist" onclick="window.game?.cycleColonist(-1)" hidden>&#9664;</button>
-            <button id="touch-next-btn" title="Next colonist" onclick="window.game?.cycleColonist(1)" hidden>&#9654;</button>
-            <button id="touch-center-btn" onclick="window.game?.input.centerOnSelection()" hidden>Center</button>
+            <button id="touch-prev-btn" title="Previous colonist" data-i18n-title="html.touch.prev_title" onclick="window.game?.cycleColonist(-1)" hidden>&#9664;</button>
+            <button id="touch-next-btn" title="Next colonist" data-i18n-title="html.touch.next_title" onclick="window.game?.cycleColonist(1)" hidden>&#9654;</button>
+            <button id="touch-center-btn" onclick="window.game?.input.centerOnSelection()" hidden data-i18n="html.touch.center">Center</button>
             <button id="touch-draft-btn" onclick="window.game?.input.toggleDraftSelected()" hidden>Draft</button>
-            <button id="touch-rally-btn" onclick="window.game?.input.toggleRallyMode()" hidden>Rally</button>
-            <button id="touch-selectall-btn" onclick="window.game?.input.selectAllColonists()">Select All</button>
-            <button id="touch-destroy-btn" onclick="window.game?.input.toggleDestroyMode()">Destroy</button>
-            <button id="touch-idle-btn" onclick="window.game?.cycleIdleColonist()">Next Idle</button>
+            <button id="touch-rally-btn" onclick="window.game?.input.toggleRallyMode()" hidden data-i18n="html.touch.rally">Rally</button>
+            <button id="touch-selectall-btn" onclick="window.game?.input.selectAllColonists()" data-i18n="html.touch.selectall">Select All</button>
+            <button id="touch-destroy-btn" onclick="window.game?.input.toggleDestroyMode()" data-i18n="html.touch.destroy">Destroy</button>
+            <button id="touch-idle-btn" onclick="window.game?.cycleIdleColonist()" data-i18n="html.touch.idle">Next Idle</button>
         </div>
         <div id="panel-overlay" class="panel-overlay"></div>
         <div id="priority-panel"></div>
@@ -521,30 +527,30 @@
             <div style="height:60vh;"></div>
             <div style="color:#ffcc44;font-size:22px;font-weight:bold;margin-bottom:24px;">Rifthold</div>
             <div style="max-width:500px;margin:0 auto;line-height:1.8;color:#ccc;font-size:13px;text-align:left;white-space:pre-wrap;tab-size:4;">
-                <p>&Tab;With the Crusade halted, your colonists could finally return to their homes. For some this meant a quick trip through the rifts to start rebuilding their old homes, anxiously awaiting the return of their friends and family they've spent all these years separated from. For others this meant staying put, comfortable in the colony they helped grow and this new family of once strangers that they've built together.</p>
-                <p>&Tab;The choice was easy for you. This community has quickly become yours, with all of your actions helping push the colonists towards a safe and happy life in the Frontier. You'll stay as long as you're needed for your friends who now call this colony their home.</p>
+                <p data-i18n="html.outro.story_0">&Tab;With the Crusade halted, your colonists could finally return to their homes. For some this meant a quick trip through the rifts to start rebuilding their old homes, anxiously awaiting the return of their friends and family they've spent all these years separated from. For others this meant staying put, comfortable in the colony they helped grow and this new family of once strangers that they've built together.</p>
+                <p data-i18n="html.outro.story_1">&Tab;The choice was easy for you. This community has quickly become yours, with all of your actions helping push the colonists towards a safe and happy life in the Frontier. You'll stay as long as you're needed for your friends who now call this colony their home.</p>
             </div>
-            <div style="margin-top:60px;color:#888;font-size:11px;letter-spacing:1px;">CREDITS</div>
+            <div style="margin-top:60px;color:#888;font-size:11px;letter-spacing:1px;" data-i18n="html.outro.credits">CREDITS</div>
             <div style="margin-top:20px;color:#ccc;font-size:12px;">
-                <div style="color:#aaa;margin-bottom:6px;"><b>Design &amp; Development</b></div>
+                <div style="color:#aaa;margin-bottom:6px;"><b data-i18n="html.outro.design_development">Design &amp; Development</b></div>
                 <div style="margin-bottom:20px;">Juniper Kingsbury</div>
-                <div style="color:#aaa;margin-bottom:6px;"><b>Additional Sprites</b></div>
-                <div style="margin-bottom:4px;">Mini World by Shade</div>
-                <div style="margin-bottom:4px;">Puny World by Shade</div>
-                <div style="margin-bottom:4px;">Puny Dungeon by Shade</div>
-                <div style="margin-bottom:4px;">16x16 Items by Glionox</div>
-                <div style="margin-bottom:4px;">Free Effect and Bullet 16x16 by BDragon1727</div>
-                <div style="margin-bottom:20px;">Free Smoke Fx Pixel 2 by BDragon1727</div>
-                <div style="color:#aaa;margin-bottom:6px;"><b>Music &amp; SFX</b></div>
-                <div style="margin-bottom:4px;">NOT JAM MUSIC PACK by NOT JAM</div>
-                <div style="margin-bottom:4px;">bfxr by increpare</div>
-                <div style="margin-bottom:20px;">Retro Sounds by DASK</div>
+                <div style="color:#aaa;margin-bottom:6px;"><b data-i18n="html.outro.additional_sprites">Additional Sprites</b></div>
+                <div style="margin-bottom:4px;" data-i18n="html.outro.credit.mini_world">Mini World by Shade</div>
+                <div style="margin-bottom:4px;" data-i18n="html.outro.credit.puny_world">Puny World by Shade</div>
+                <div style="margin-bottom:4px;" data-i18n="html.outro.credit.puny_dungeon">Puny Dungeon by Shade</div>
+                <div style="margin-bottom:4px;" data-i18n="html.outro.credit.16x16_items">16x16 Items by Glionox</div>
+                <div style="margin-bottom:4px;" data-i18n="html.outro.credit.free_effect_and_bullet_16x16">Free Effect and Bullet 16x16 by BDragon1727</div>
+                <div style="margin-bottom:20px;" data-i18n="html.outro.credit.free_smoke_fx_pixel_2">Free Smoke Fx Pixel 2 by BDragon1727</div>
+                <div style="color:#aaa;margin-bottom:6px;"><b data-i18n="html.outro.music_sfx">Music &amp; SFX</b></div>
+                <div style="margin-bottom:4px;" data-i18n="html.outro.credit.not_jam_music_pack">NOT JAM MUSIC PACK by NOT JAM</div>
+                <div style="margin-bottom:4px;" data-i18n="html.outro.credit.bfxr">bfxr by increpare</div>
+                <div style="margin-bottom:20px;" data-i18n="html.outro.credit.retro_sounds">Retro Sounds by DASK</div>
             </div>
-            <button id="outro-return-btn" style="padding:10px 28px;background:#2a2a3e;color:#ffcc44;border:1px solid #555;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;margin-bottom:5vh;">Return to Title</button>
+            <button id="outro-return-btn" style="padding:10px 28px;background:#2a2a3e;color:#ffcc44;border:1px solid #555;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;margin-bottom:5vh;" data-i18n="html.outro.return_to_title">Return to Title</button>
             <div style="max-width:500px;margin:0 auto;line-height:1.8;color:#ccc;font-size:13px;">
-                <i>"Thank you for playing my game. I hope your colony brought you joy!"</i> -Juniper
+                <i data-i18n="html.outro.thanks">"Thank you for playing my game. I hope your colony brought you joy!"</i> -Juniper
             </div>
-            <img class="pixel-art" src="portraits/juniper_heart.png" alt="A drawing of game dev Juniper" style="margin-top:20px;">
+            <img class="pixel-art" src="portraits/juniper_heart.png" data-i18n-alt="html.outro.portrait_alt" alt="A drawing of game dev Juniper" style="margin-top:20px;">
         </div>
     </div>
 

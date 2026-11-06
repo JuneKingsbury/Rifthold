@@ -891,7 +891,9 @@ function _placeBiomeLandmarks(map, biomeMap, W, H, seed) {
         placed.push({ x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
         const chalk = _rollLandmarkChalk(blueprint);
         placedLandmarks.push({ blueprint, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height, chalk });
-        generatedRuins.push({ kind: 'landmark', blueprint: blueprint.name, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
+        // Saved by id: the name is display text in the active language.
+        const blueprintId = Object.keys(LANDMARK_BLUEPRINTS).find(k => LANDMARK_BLUEPRINTS[k] === blueprint);
+        generatedRuins.push({ kind: 'landmark', blueprint: blueprintId, x: cx2, y: cy2, w: blueprint.width, h: blueprint.height });
 
         // Paint floor terrain under the footprint.
         if (blueprint.floorTerrain) {

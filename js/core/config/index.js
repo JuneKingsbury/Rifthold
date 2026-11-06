@@ -1,3 +1,4 @@
+import { stampLoc } from '../i18n.js';
 // Config hub: every subsystem imports from '../core/config.js', which surfaces
 // this module. Symbols are grouped into feature-cohesive source files and
 // re-exported here so consumer import paths stay stable regardless of which file
@@ -20,6 +21,9 @@ export const ALL_ITEMS = { ..._BASE_ALL_ITEMS };
 for (const [key, def] of Object.entries(SPELL_TOMES)) {
     ALL_ITEMS[key] = { ...def, type: 'tome' };
 }
+// Entries are copies of already-stamped item defs; registering ALL_ITEMS lets
+// restampConfig() reach the copies mods add to it.
+stampLoc(ALL_ITEMS, 'item');
 
 export { RECIPE_CATEGORIES, MATERIALS, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, CONSUMABLES, ITEM_CHARS, EQUIPMENT_OVERLAY_OFFSETS, RECIPES, WEAPON_ENCHANTMENT_EFFECTS, ARMOR_ENCHANTMENT_EFFECTS, CLOTHES_ENCHANTMENT_EFFECTS, TOOL_ENCHANTMENT_EFFECTS, BOOTS_ENCHANTMENT_EFFECTS };
 export { MAGIC_SKILLS, MANA_CONFIG, POWER_PRIORITY, PEDESTAL_CHARGE, SPELLS, SPELL_TOMES, RESEARCH_TABS, RESEARCH, DEMO_LOCKED_RESEARCH, RITUALS };

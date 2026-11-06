@@ -1,4 +1,4 @@
-import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, INDESTRUCTIBLE_STRUCTURES, PLANT_STRUCTURES, RESEARCH, ALL_ITEMS, TRAITS, POTIONS } from '../core/config.js';
+import { COLONIST_CONFIG, THOUGHTS, BUILDINGS, RESOURCES, IMPASSABLE_STRUCTURES, WORK_CONFIG, ENCHANTMENT_TIERS, QUALITY_TIERS, TAMED_ANIMALS, MAGIC_STUDY_CONFIG, SPELL_TOMES, SPELLS, MAGIC_SKILLS, COMBAT_VISUALS, INDESTRUCTIBLE_STRUCTURES, PLANT_STRUCTURES, RESEARCH, ALL_ITEMS, TRAITS, POTIONS, SKILLS } from '../core/config.js';
 import { spawnParticle, spawnYieldFloaty } from '../ui/overlay-renderer.js';
 import { completeTame, finalizeTame, attemptDangerousTame } from './taming.js';
 import { getPedestalEffect } from '../systems/artifacts.js';
@@ -6,7 +6,9 @@ import { getEquippedItems, getEquipmentStat, addThought, recalcMaxMana, invalida
 import { getHarvestYield } from '../systems/farming.js';
 import { manhattanDist } from '../world/pathfinding.js';
 import { getCraftQualityBonus, getResearchSpeedMult } from '../systems/complexBuildings.js';
-import { applySpecificQuality, applyEnchantmentEffect } from './item-roll.js';
+import { applySpecificQuality, applyEnchantmentEffect, itemName, itemRef } from './item-roll.js';
+import { t as tr, ref, defRef } from '../core/i18n.js';
+import { resourceName, entityName } from '../core/names.js';
 
 // Scavenger trait: small chance to double the amount of one resource in a
 // gather yield ({ resourceKey: amount }). Mutates `output` in place. A floating
@@ -19,7 +21,7 @@ function applyScavenger(colonist, output, game) {
     const key = keys[Math.floor(Math.random() * keys.length)];
     const bonus = output[key];
     output[key] += bonus;
-    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Scavenged +${bonus} ${key.replace(/_/g, ' ')}`, color: '#ffdd44', fontSize: 10, ttl: 18, maxTtl: 18 });
+    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.task.float_scavenged', { amount: bonus, resource: resourceName(key) }), color: '#ffdd44', fontSize: 10, ttl: 18, maxTtl: 18 });
 }
 
 // Emit a "+N [sprite]" yield floaty for each resource in a gather/harvest output
@@ -110,7 +112,7 @@ function applyEnchantment(item, colonist, game, type) {
 
 function applyThought(colonist, thoughtKey, tick) {
     const t = THOUGHTS[thoughtKey];
-    if (t) addThought(colonist, t.text, t.moodEffect, t.duration, tick);
+    if (t) addThought(colonist, thoughtKey, t.moodEffect, t.duration, tick);
 }
 
 function autoAssignNewBed(game, x, y) {
@@ -159,9 +161,9 @@ function advanceTomeStudy(colonist, game, rate, sessions = 1) {
         colonist.magicSkills[school] = Math.min(10, colonist.magicSkills[school] + 1);
         magicXpNeeded = MAGIC_STUDY_CONFIG.magicXpToLevel + colonist.magicSkills[school] * MAGIC_STUDY_CONFIG.magicXpScalePerLevel;
         recalcMaxMana(colonist);
-        game.notifications.push({ text: `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}`, tick: game.tick, type: 'success' });
-        game.eventLog.add(game, `${colonist.name}'s ${MAGIC_SKILLS[school].name} increased to ${colonist.magicSkills[school]}!`, 'success', { type: 'colonist', id: colonist.id });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${MAGIC_SKILLS[school].name} lvl ${colonist.magicSkills[school]}`, color: '#aa66ff', fontSize: 11, ttl: 20, maxTtl: 20 });
+        game.notifications.push({ text: tr('msg.colonist.magic_skill_up_toast', { name: colonist.name, school: MAGIC_SKILLS[school].name, level: colonist.magicSkills[school] }), tick: game.tick, type: 'success' });
+        game.eventLog.add(game, { key: 'msg.colonist.magic_skill_up_log', params: { name: colonist.name, school: defRef(MAGIC_SKILLS[school]), level: colonist.magicSkills[school] } }, 'success', { type: 'colonist', id: colonist.id });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.magic_skill_up_float', { school: MAGIC_SKILLS[school].name, level: colonist.magicSkills[school] }), color: '#aa66ff', fontSize: 11, ttl: 20, maxTtl: 20 });
     }
 
     // Breadth penalty: learning a tome takes longer the more OTHER schools this
@@ -179,8 +181,8 @@ function advanceTomeStudy(colonist, game, rate, sessions = 1) {
         colonist.equippedTome = null;
         delete colonist.tomeProgress[tomeKey];
         applyThought(colonist, 'learned_spell', game.tick);
-        game.notifications.push({ text: `${colonist.name} learned ${spellDef.name}!`, tick: game.tick, type: 'success' });
-        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Learned ${spellDef.name}!`, color: '#aa66ff', fontSize: 13, ttl: 25, maxTtl: 25 });
+        game.notifications.push({ text: tr('msg.task.learned_spell_toast', { name: colonist.name, spell: spellDef.name }), tick: game.tick, type: 'success' });
+        game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.task.learned_spell_float', { spell: spellDef.name }), color: '#aa66ff', fontSize: 13, ttl: 25, maxTtl: 25 });
     }
 }
 
@@ -375,7 +377,7 @@ export function completeTask(colonist, task, game) {
                     applyEnchantment(item, colonist, game, task.itemType);
                     game.resources.addItem(item);
                     applyThought(colonist, 'enchanted an item', game.tick);
-                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Enchanted ${item.name}`, color: '#ff00f7', fontSize: 10, ttl: 20, maxTtl: 20 });
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.task.float_enchanted', { item: itemName(item) }), color: '#ff00f7', fontSize: 10, ttl: 20, maxTtl: 20 });
                     window.soundManager?.playSFXAt('enchant_complete', colonist.x, colonist.y);
                 }
                 const tile = game.map[colonist.y]?.[colonist.x];
@@ -411,8 +413,9 @@ export function completeTask(colonist, task, game) {
                     game.resources.add(output);
                 }
                 applyThought(colonist, 'crafted', game.tick);
-                const craftedName = Object.keys(task.recipe.output)[0]?.replace(/_/g, ' ') || 'item';
-                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `Crafted ${craftedName}`, color: '#ffcc00', fontSize: 10, ttl: 20, maxTtl: 20 });
+                const craftedKey = Object.keys(task.recipe.output)[0];
+                const craftedName = craftedKey ? resourceName(craftedKey) : tr('msg.task.crafted_item_fallback');
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.task.float_crafted', { item: craftedName }), color: '#ffcc00', fontSize: 10, ttl: 20, maxTtl: 20 });
                 window.soundManager?.playSFXAt('craft_complete', colonist.x, colonist.y);
                 if (game.tutorial && output.planks) game.tutorial.flags.craftedPlanks = true;
             }
@@ -484,16 +487,16 @@ export function completeTask(colonist, task, game) {
                 const tech = RESEARCH[completedKey];
                 const name = tech?.name || completedKey.replace(/_/g, ' ');
                 const desc = tech?.description || '';
-                game.notifications.push({ text: `Research complete: ${name}!`, tick: game.tick, type: 'success' });
-                game.eventLog.add(game, `Research unlocked: ${name}`, 'success', null);
+                game.notifications.push({ text: tr('msg.task.research_complete_toast', { research: name }), tick: game.tick, type: 'success' });
+                game.eventLog.add(game, { key: 'msg.task.research_unlocked_log', params: { research: tech ? defRef(tech) : name } }, 'success', null);
                 game.story.checkMilestone(`research_${completedKey}`, game);
                 game.combatEffects.push({ x: colonist.x, y: colonist.y, char: COMBAT_VISUALS.researchCompleteChar, color: COMBAT_VISUALS.researchCompleteColor, ttl: COMBAT_VISUALS.researchCompleteTtl });
                 window.soundManager?.playSFXAt('research_complete', colonist.x, colonist.y);
                 if (!game.events.pendingEvent) {
                     game.events.pendingEvent = {
                         type: 'research_complete',
-                        text: `Research Complete: ${name}!${desc ? ' ' + desc : ''}`,
-                        choices: ['Dismiss', 'Go to Research'],
+                        text: desc ? tr('msg.task.research_complete_event_desc', { research: name, description: desc }) : tr('msg.task.research_complete_event', { research: name }),
+                        choices: [tr('msg.task.choice_dismiss'), tr('msg.task.choice_go_to_research')],
                     };
                     if (game.settings.pauseOnResearch && !game.paused) {
                         game.togglePause();
@@ -523,7 +526,7 @@ export function completeTask(colonist, task, game) {
                 }
                 if (tameResult === true) {
                     applyThought(colonist, 'tamed_animal', game.tick);
-                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Tamed!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.task.float_tamed'), color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
                 } else if (tameResult === 'lead') {
                     // Animal is pending lead. Enqueue a lead task and claim it immediately
                     // so this colonist walks it to the pen without releasing to the pool.
@@ -562,7 +565,7 @@ export function completeTask(colonist, task, game) {
             if (task.targetAnimalId) {
                 finalizeTame(game, task.targetAnimalId, colonist.id, task.penX, task.penY);
                 applyThought(colonist, 'tamed_animal', game.tick);
-                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: 'Settled in!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.task.float_settled_in'), color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
             }
             break;
         }
@@ -575,9 +578,9 @@ export function completeTask(colonist, task, game) {
                     animal._relocateTaskQueued = false;
                     if (animal._path) animal._path = null;
                     if (animal._pathTarget) animal._pathTarget = null;
-                    const animalLabel = animal.name || animal.type;
-                    game.notifications.push({ text: `${animalLabel} moved to new pen`, tick: game.tick, type: 'success' });
-                    game.overlays.push({ type: 'floating_text', x: task.penX, y: task.penY, text: 'Settled!', color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
+                    const animalLabel = animal.name || entityName(animal.type);
+                    game.notifications.push({ text: tr('msg.task.animal_moved_pen', { animal: animalLabel }), tick: game.tick, type: 'success' });
+                    game.overlays.push({ type: 'floating_text', x: task.penX, y: task.penY, text: tr('msg.task.float_settled'), color: '#44ff44', fontSize: 11, ttl: 12, maxTtl: 12 });
                 }
             }
             break;
@@ -608,7 +611,7 @@ export function completeTask(colonist, task, game) {
                             animal.roles.push({ type: 'pet' });
                             if (!animal.roleState) animal.roleState = {};
                             animal.roleState.pet = { state: 'following', noHostileTicks: 0 };
-                            game.notifications.push({ text: `${animal.type} bonded with ${owner.name} as a pet!`, tick: game.tick, type: 'success' });
+                            game.notifications.push({ text: tr('msg.task.pet_bonded', { animal: entityName(animal.type), name: owner.name }), tick: game.tick, type: 'success' });
                         }
                     }
 
@@ -640,8 +643,8 @@ export function completeTask(colonist, task, game) {
                         game.resources.stockpile.runite -= 1;
                         target.trinketBroken = false;
                         invalidateEquipStatCache(target);
-                        const artName = target.trinket?.name || 'trinket';
-                        game.eventLog.add(game, `${artName} repaired at the anvil`, 'success', null);
+                        const artName = target.trinket ? itemRef(target.trinket) : ref('msg.task.trinket_fallback');
+                        game.eventLog.add(game, { key: 'msg.task.trinket_repaired', params: { item: artName } }, 'success', null);
                     }
                 }
             }
@@ -770,14 +773,15 @@ export function completeTask(colonist, task, game) {
                 colonist.skillXp[task.skillRequired] -= xpNeeded;
                 colonist.skills[task.skillRequired]++;
                 xpNeeded = COLONIST_CONFIG.skillXpToLevel + colonist.skills[task.skillRequired] * COLONIST_CONFIG.skillXpScalePerLevel;
-                game.eventLog.add(game, `${colonist.name}'s ${task.skillRequired} skill increased to ${colonist.skills[task.skillRequired]}!`, 'success', { type: 'colonist', id: colonist.id });
-                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${task.skillRequired} lvl ${colonist.skills[task.skillRequired]}`, color: '#44ff44', fontSize: 11, ttl: 20, maxTtl: 20 });
+                const skillDef = SKILLS[task.skillRequired];
+                game.eventLog.add(game, { key: 'msg.task.skill_up_log', params: { name: colonist.name, skill: skillDef ? defRef(skillDef) : task.skillRequired, level: colonist.skills[task.skillRequired] } }, 'success', { type: 'colonist', id: colonist.id });
+                game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.task.skill_up_float', { skill: skillDef?.name ?? task.skillRequired, level: colonist.skills[task.skillRequired] }), color: '#44ff44', fontSize: 11, ttl: 20, maxTtl: 20 });
                 // Check skill milestones at level 5 and 10
                 const newLevel = colonist.skills[task.skillRequired];
                 if (newLevel === 5 || newLevel === 10) {
-                    const label = newLevel === 5 ? 'Journeyman' : 'Master';
-                    game.eventLog.add(game, `${colonist.name} is now a ${label} ${task.skillRequired} (level ${newLevel})!`, 'success', { type: 'colonist', id: colonist.id });
-                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: `${label}!`, color: '#ffdd44', fontSize: 12, ttl: 25, maxTtl: 25 });
+                    const rank = newLevel === 5 ? 'journeyman' : 'master';
+                    game.eventLog.add(game, { key: `msg.task.skill_rank_${rank}_log`, params: { name: colonist.name, skill: skillDef ? defRef(skillDef) : task.skillRequired, level: newLevel } }, 'success', { type: 'colonist', id: colonist.id });
+                    game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr(`msg.task.skill_rank_${rank}_float`), color: '#ffdd44', fontSize: 12, ttl: 25, maxTtl: 25 });
                 }
             }
         }

@@ -1,9 +1,10 @@
 import { CONFIG, EVENTS, THOUGHTS, SKILLS, TRADE_VALUES, TRADER_MARKUP, TRADER_DISCOUNT, TIER_BUY_MARKUP, ALL_ITEMS, MERCHANTS, BLIGHT_CONFIG, TRAITS, ARRIVAL_BONDS, PLANT_STRUCTURES, TERRAIN } from '../core/config.js';
 import { rollItem, getItemTradeValue } from '../entities/item-roll.js';
-import { createColonist, addThought } from '../entities/colonist.js';
+import { createColonist, addThought, applyThought } from '../entities/colonist.js';
 import { createWildAnimal, getNextId } from '../entities/entity-factory.js';
 import { getPedestalEffect } from './artifacts.js';
 import { isPassable } from '../world/map.js';
+import { t, tp, hasKey, defMessage, defRef, defText } from '../core/i18n.js';
 
 /**
  * Computes effective trade rates for the current game state.
@@ -228,10 +229,19 @@ export class EventSystem {
         }
 
         if (count > 0) {
-            const msg = def.notification.replace('{count}', count);
-            game.notifications.push({ text: msg, tick: game.tick, type: 'event' });
-            game.eventLog.add(game, def.logMessage.replace('{count}', count), def.logType, { type: 'position', x: center.x, y: center.y });
+            this._announce(game, def, { count }, 'event', { type: 'position', x: center.x, y: center.y });
         }
+    }
+
+    // Toast and event-log line for a config event. Mod events may leave out
+    // `notification` or `logMessage`; whatever is missing is skipped.
+    _announce(game, def, params, type, linked) {
+        if (def.notification) {
+            let msg = def.notification;
+            for (const [k, v] of Object.entries(params)) msg = msg.replace(`{${k}}`, v);
+            game.notifications.push({ text: msg, tick: game.tick, type });
+        }
+        if (def.logMessage) game.eventLog.add(game, defMessage(def, 'logMessage', params), def.logType, linked);
     }
 
     handleSpawnAnimals(def, game) {
@@ -246,9 +256,7 @@ export class EventSystem {
             }
             totalCount += count;
         }
-        const msg = def.notification.replace('{count}', totalCount);
-        game.notifications.push({ text: msg, tick: game.tick, type: 'event' });
-        game.eventLog.add(game, def.logMessage.replace('{count}', totalCount), def.logType, null);
+        this._announce(game, def, { count: totalCount }, 'event', null);
     }
 
     handleMood(def, game) {
@@ -256,9 +264,7 @@ export class EventSystem {
         if (alive.length === 0) return;
         const colonist = alive[Math.floor(Math.random() * alive.length)];
         addThought(colonist, def.thought, def.moodChange, def.moodDuration, game.tick);
-        const msg = def.notification.replace('{name}', colonist.name);
-        game.notifications.push({ text: msg, tick: game.tick, type: 'success' });
-        game.eventLog.add(game, def.logMessage.replace('{name}', colonist.name), def.logType, { type: 'colonist', id: colonist.id });
+        this._announce(game, def, { name: colonist.name }, 'success', { type: 'colonist', id: colonist.id });
     }
 
     handleTrinketFind(def, game) {
@@ -273,9 +279,7 @@ export class EventSystem {
                 game.resources.addItem(item);
             }
         }
-        const msg = def.notification.replace('{name}', colonist.name);
-        game.notifications.push({ text: msg, tick: game.tick, type: 'success' });
-        game.eventLog.add(game, def.logMessage.replace('{name}', colonist.name), def.logType, { type: 'colonist', id: colonist.id });
+        this._announce(game, def, { name: colonist.name }, 'success', { type: 'colonist', id: colonist.id });
     }
 
     handleCropDamage(def, game) {
@@ -294,9 +298,7 @@ export class EventSystem {
             }
         }
         if (count > 0) {
-            const msg = def.notification.replace('{count}', count);
-            game.notifications.push({ text: msg, tick: game.tick, type: 'danger' });
-            game.eventLog.add(game, def.logMessage.replace('{count}', count), def.logType, null);
+            this._announce(game, def, { count }, 'danger', null);
             if (def.thought) {
                 for (const c of game.colonists) {
                     addThought(c, def.thought, def.moodChange, def.moodDuration, game.tick);
@@ -354,9 +356,7 @@ export class EventSystem {
             });
         }
 
-        const msg = def.notification.replace('{count}', count);
-        game.notifications.push({ text: msg, tick: game.tick, type: 'danger' });
-        game.eventLog.add(game, def.logMessage.replace('{count}', count), def.logType, infected[0] ? { type: 'position', x: infected[0].x, y: infected[0].y } : null);
+        this._announce(game, def, { count }, 'danger', infected[0] ? { type: 'position', x: infected[0].x, y: infected[0].y } : null);
         if (def.thought) {
             for (const c of game.colonists) {
                 addThought(c, def.thought, def.moodChange, def.moodDuration, game.tick);
@@ -404,8 +404,7 @@ export class EventSystem {
             });
         }
 
-        game.notifications.push({ text: def.notification, tick: game.tick, type: 'danger' });
-        game.eventLog.add(game, def.logMessage, def.logType, spawned[0] ? { type: 'position', x: spawned[0].x, y: spawned[0].y } : null);
+        this._announce(game, def, {}, 'danger', spawned[0] ? { type: 'position', x: spawned[0].x, y: spawned[0].y } : null);
         if (def.thought) {
             for (const c of game.colonists) {
                 addThought(c, def.thought, def.moodChange, def.moodDuration, game.tick);
@@ -432,12 +431,12 @@ export class EventSystem {
 
         this.pendingEvent = {
             type: 'wanderer',
-            text: `A wanderer named ${wanderer.name} (${bias}) wants to join your colony! (${aliveColonists.length + 1}/${cap} cap)`,
-            choices: ['Accept', 'Reject'],
+            text: t('msg.events.wanderer_offer', { name: wanderer.name, skill: SKILLS[bias]?.name ?? bias, n: aliveColonists.length + 1, cap }),
+            choices: [t('msg.events.choice_accept'), t('msg.events.choice_reject')],
             data: wanderer,
         };
-        game.notifications.push({ text: `A wanderer approaches!`, tick: game.tick, type: 'event' });
-        game.eventLog.add(game, `A wanderer named ${wanderer.name} approaches`, 'event', { type: 'position', x: edge.x, y: edge.y });
+        game.notifications.push({ text: t('msg.events.wanderer_approaches'), tick: game.tick, type: 'event' });
+        game.eventLog.add(game, { key: 'msg.events.wanderer_approaches_log', params: { name: wanderer.name } }, 'event', { type: 'position', x: edge.x, y: edge.y });
         if (game.settings.autoPauseEvent && !game.paused) {
             game.togglePause();
             game._eventPaused = true;
@@ -449,18 +448,17 @@ export class EventSystem {
             const aliveColonists = game.colonists.filter(c => c.hp > 0 && !c.golem);
             const cap = game.waves.getColonistCap(game);
             if (aliveColonists.length >= cap) {
-                game.notifications.push({ text: `Colony is at capacity (${cap})! Reach more milestones to expand.`, tick: game.tick, type: 'danger' });
+                game.notifications.push({ text: t('msg.events.colony_at_capacity', { cap }), tick: game.tick, type: 'danger' });
                 this.pendingEvent = null;
                 return;
             }
             game.addColonist(this.pendingEvent.data);
-            game.notifications.push({ text: `${this.pendingEvent.data.name} joined!`, tick: game.tick, type: 'success' });
-            game.eventLog.add(game, `${this.pendingEvent.data.name} joined the colony`, 'success', { type: 'colonist', id: this.pendingEvent.data.id });
+            game.notifications.push({ text: t('msg.events.colonist_joined', { name: this.pendingEvent.data.name }), tick: game.tick, type: 'success' });
+            game.eventLog.add(game, { key: 'msg.events.colonist_joined_log', params: { name: this.pendingEvent.data.name } }, 'success', { type: 'colonist', id: this.pendingEvent.data.id });
             game.story.checkPopulation(game);
-            const t = THOUGHTS.new_colonist;
             for (const c of game.colonists) {
                 if (c.id !== this.pendingEvent.data.id) {
-                    addThought(c, t.text, t.moodEffect, t.duration, game.tick);
+                    applyThought(c, 'new_colonist', game.tick);
                 }
             }
             this._rollArrivalBond(game, this.pendingEvent.data);
@@ -495,13 +493,13 @@ export class EventSystem {
 
         const th = THOUGHTS[bond.thoughtKey];
         if (th) {
-            addThought(newcomer, th.text, th.moodEffect, th.duration, game.tick);
-            addThought(other, th.text, th.moodEffect, th.duration, game.tick);
+            addThought(newcomer, bond.thoughtKey, th.moodEffect, th.duration, game.tick);
+            addThought(other, bond.thoughtKey, th.moodEffect, th.duration, game.tick);
         }
-        const text = bond.arrivalText.replace('{a}', newcomer.name).replace('{b}', other.name);
+        const names = { a: newcomer.name, b: other.name };
         const type = bond.opinion >= 0 ? 'success' : 'warning';
-        game.eventLog.add(game, text, type, { type: 'colonist', id: newcomer.id });
-        game.notifications.push({ text, tick: game.tick, type: type === 'success' ? 'success' : 'event' });
+        game.eventLog.add(game, defMessage(bond, 'arrivalText', names), type, { type: 'colonist', id: newcomer.id });
+        game.notifications.push({ text: defText(bond, 'arrivalText', names), tick: game.tick, type: type === 'success' ? 'success' : 'event' });
     }
 
     /**
@@ -587,14 +585,17 @@ export class EventSystem {
         const [gMin, gMax] = merchant.goldRange;
         const traderGold = gMin + Math.floor(Math.random() * (gMax - gMin + 1));
 
+        // One whole sentence per merchant (the article depends on the name). Mod
+        // merchants without one get a sentence with the bare name.
+        const arrivesKey = `msg.events.merchant_arrives.${merchant.key}`;
         this.pendingEvent = {
             type: 'trade',
-            text: `${'aeiouAEIOU'.includes(merchant.name[0]) ? 'An' : 'A'} ${merchant.name} arrives! Barter resources with the merchant.`,
-            choices: ['Open Trade', 'Dismiss'],
-            data: { traderResources, exclusiveItems, traderPotions, traderGold, merchantName: merchant.name, buyCategories: merchant.buyCategories || null, merchantResourcePool: merchant.resourcePool || null, saturation: {} },
+            text: merchant.key && hasKey(arrivesKey) ? t(arrivesKey) : t('msg.events.merchant_arrives_generic', { name: merchant.name }),
+            choices: [t('msg.events.choice_open_trade'), t('msg.events.choice_dismiss')],
+            data: { traderResources, exclusiveItems, traderPotions, traderGold, merchantName: merchant.name, merchantKey: merchant.key ?? null, buyCategories: merchant.buyCategories || null, merchantResourcePool: merchant.resourcePool || null, saturation: {} },
         };
-        game.notifications.push({ text: `${merchant.name} arrived!`, tick: game.tick, type: 'event' });
-        game.eventLog.add(game, `${merchant.name} arrived`, 'event', null);
+        game.notifications.push({ text: t('msg.events.merchant_arrived', { name: merchant.name }), tick: game.tick, type: 'event' });
+        game.eventLog.add(game, { key: 'msg.events.merchant_arrived_log', params: { name: defRef(merchant) } }, 'event', null);
         if (game.settings.autoPauseCaravan && !game.paused) {
             game.togglePause();
             game._eventPaused = true;
@@ -722,7 +723,7 @@ export class EventSystem {
         if (goldOffer > 0) data.traderGold += goldOffer;
 
         const goldStr = goldRequested % 1 !== 0 ? goldRequested.toFixed(1) : String(goldRequested);
-        game.notifications.push({ text: `Trade complete!${goldRequested > 0 ? ` +${goldStr}g` : ''}`, tick: game.tick, type: 'success' });
+        game.notifications.push({ text: goldRequested > 0 ? t('msg.events.trade_complete_gold', { gold: goldStr }) : t('msg.events.trade_complete'), tick: game.tick, type: 'success' });
         game.story.checkMilestone('first_trade_completed', game);
         return true;
     }
@@ -745,100 +746,104 @@ export class EventSystem {
         return [
             {
                 key: 'blood_tithe',
-                title: 'Blood Tithe',
-                text: 'A voice from the Nexus: "Pay with flesh and I shall reward you."',
-                ask: 'Your strongest colonist takes a wound (30% of max HP).',
-                reward: '+8 void essence',
+                title: t('msg.events.whisper.blood_tithe.title'),
+                text: t('msg.events.whisper.blood_tithe.text'),
+                ask: t('msg.events.whisper.blood_tithe.ask'),
+                reward: t('msg.events.whisper.blood_tithe.reward'),
                 condition: (g) => g.colonists.some(c => c.hp > 0 && !c.golem),
                 apply: (g) => {
                     const alive = g.colonists.filter(c => c.hp > 0 && !c.golem);
                     const strongest = alive.reduce((best, c) => (c.maxHp > best.maxHp ? c : best), alive[0]);
                     strongest.hp = Math.max(1, strongest.hp - Math.floor(strongest.maxHp * 0.30));
                     g.resources.add({ void_essence: 8 });
-                    g.eventLog.add(g, `${strongest.name} bleeds for the Nexus. +8 void essence.`, 'danger', { type: 'colonist', id: strongest.id });
+                    g.eventLog.add(g, { key: 'msg.events.whisper.blood_tithe.log', params: { name: strongest.name } }, 'danger', { type: 'colonist', id: strongest.id });
                 },
             },
             {
                 key: 'dream_tax',
-                title: 'Dream Tax',
-                text: 'A voice from the Nexus: "Your sleep belongs to me tonight. Give it freely."',
-                ask: 'All colonists lose rest (fatigue increases).',
-                reward: '+1 rare item drop from next expedition',
+                title: t('msg.events.whisper.dream_tax.title'),
+                text: t('msg.events.whisper.dream_tax.text'),
+                ask: t('msg.events.whisper.dream_tax.ask'),
+                reward: t('msg.events.whisper.dream_tax.reward'),
                 apply: (g) => {
                     for (const c of g.colonists.filter(c => c.hp > 0)) {
                         c.needs.rest = Math.max(0, c.needs.rest - 30);
                     }
                     g._voidWhisperNextExpRareMult = (g._voidWhisperNextExpRareMult || 1) * 2.0;
-                    g.eventLog.add(g, `The colonists sleep fitfully. Next expedition has doubled rare loot chance.`, 'event', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.dream_tax.log' }, 'event', null);
                 },
             },
             {
                 key: 'name_price',
-                title: 'The Price of a Name',
-                text: 'A voice from the Nexus: "Give me a name. Let me carry it for a while."',
-                ask: 'A random colonist gains "Void-Marked" thought (-10 mood, 2 days).',
-                reward: 'Next raid timing revealed precisely',
+                title: t('msg.events.whisper.name_price.title'),
+                text: t('msg.events.whisper.name_price.text'),
+                ask: t('msg.events.whisper.name_price.ask'),
+                reward: t('msg.events.whisper.name_price.reward'),
                 condition: (g) => g.colonists.some(c => c.hp > 0),
                 apply: (g) => {
                     const alive = g.colonists.filter(c => c.hp > 0);
                     const target = alive[Math.floor(Math.random() * alive.length)];
-                    addThought(target, 'The void knows my name', -10, 960, g.tick);
+                    addThought(target, 'void_knows_name', -10, 960, g.tick);
                     const nextRaid = g.combat?.nextRaidTick;
-                    const raidMsg = nextRaid
-                        ? `Next raid in approximately ${Math.max(0, Math.round((nextRaid - g.tick) / 600))} seasons.`
-                        : 'No raid is currently scheduled.';
-                    g.notifications.push({ text: `The Void reveals: ${raidMsg}`, tick: g.tick, type: 'event' });
-                    g.eventLog.add(g, `${target.name} feels watched by something vast. ${raidMsg}`, 'event', { type: 'colonist', id: target.id });
+                    const n = nextRaid ? Math.max(0, Math.round((nextRaid - g.tick) / 600)) : 0;
+                    g.notifications.push({
+                        text: nextRaid ? tp('msg.events.whisper.name_price.reveal_raid', n) : t('msg.events.whisper.name_price.reveal_no_raid'),
+                        tick: g.tick, type: 'event',
+                    });
+                    g.eventLog.add(g, nextRaid
+                        ? { key: 'msg.events.whisper.name_price.log_raid', params: { name: target.name, n } }
+                        : { key: 'msg.events.whisper.name_price.log_no_raid', params: { name: target.name } },
+                    'event', { type: 'colonist', id: target.id });
                 },
             },
             {
                 key: 'hunger_rite',
-                title: 'Hunger Rite',
-                text: 'A voice from the Nexus: "Feed the hunger between worlds. A small tithe."',
-                ask: 'Consume 15 food from stockpile.',
-                reward: '+25% crafting speed for 1 season (2400 ticks)',
+                title: t('msg.events.whisper.hunger_rite.title'),
+                text: t('msg.events.whisper.hunger_rite.text'),
+                ask: t('msg.events.whisper.hunger_rite.ask'),
+                reward: t('msg.events.whisper.hunger_rite.reward'),
                 condition: (g) => (g.resources.stockpile.food || 0) >= 15,
                 apply: (g) => {
                     g.resources.deduct({ food: 15 });
                     if (!g.activeColonyBuffs) g.activeColonyBuffs = [];
                     g.activeColonyBuffs.push({ type: 'crafting_speed', mult: 1.25, expiresAt: g.tick + 2400 });
-                    g.eventLog.add(g, `15 food offered. Colony gains +25% crafting speed for a season.`, 'success', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.hunger_rite.log' }, 'success', null);
                 },
             },
             {
                 key: 'silence_gift',
-                title: 'Gift of Silence',
-                text: 'A voice from the Nexus: "Still the world. Let me think. You will be compensated."',
-                ask: 'Research pauses for 600 ticks.',
-                reward: '+12 void essence',
+                title: t('msg.events.whisper.silence_gift.title'),
+                text: t('msg.events.whisper.silence_gift.text'),
+                ask: t('msg.events.whisper.silence_gift.ask'),
+                reward: t('msg.events.whisper.silence_gift.reward'),
                 condition: (g) => g.research && !g.research.paused,
                 apply: (g) => {
                     g._voidWhisperResearchPauseUntil = g.tick + 600;
                     g.resources.add({ void_essence: 12 });
-                    g.eventLog.add(g, `Research quieted for the void. +12 void essence.`, 'event', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.silence_gift.log' }, 'event', null);
                 },
             },
             {
                 key: 'shaken_veil',
-                title: 'The Veil Parts',
-                text: 'A voice from the Nexus: "Look. I will show you what I am. Do not look away."',
-                ask: 'A colonist gets "Shaken" (-15 mood, 3 days).',
-                reward: 'Unlock a void story entry',
+                title: t('msg.events.whisper.shaken_veil.title'),
+                text: t('msg.events.whisper.shaken_veil.text'),
+                ask: t('msg.events.whisper.shaken_veil.ask'),
+                reward: t('msg.events.whisper.shaken_veil.reward'),
                 condition: (g) => g.colonists.some(c => c.hp > 0),
                 apply: (g) => {
                     const alive = g.colonists.filter(c => c.hp > 0);
                     const target = alive[Math.floor(Math.random() * alive.length)];
-                    addThought(target, 'Saw beyond the veil', -15, 1440, g.tick);
+                    addThought(target, 'saw_beyond_veil', -15, 1440, g.tick);
                     g.story.checkMilestone('void_whisper_veil_parted', g);
-                    g.eventLog.add(g, `${target.name} glimpsed beyond the Nexus. They are shaken.`, 'danger', { type: 'colonist', id: target.id });
+                    g.eventLog.add(g, { key: 'msg.events.whisper.shaken_veil.log', params: { name: target.name } }, 'danger', { type: 'colonist', id: target.id });
                 },
             },
             {
                 key: 'offering_stone',
-                title: 'Offering in Stone',
-                text: 'A voice from the Nexus: "Unmake something. Show me you understand that things can end."',
-                ask: 'A void wall is consumed (if present). Otherwise a stone wall.',
-                reward: 'Next wave spawns 20% fewer enemies',
+                title: t('msg.events.whisper.offering_stone.title'),
+                text: t('msg.events.whisper.offering_stone.text'),
+                ask: t('msg.events.whisper.offering_stone.ask'),
+                reward: t('msg.events.whisper.offering_stone.reward'),
                 apply: (g) => {
                     // Prefer a void wall, else a stone wall. Ruin walls are not the
                     // colony's to offer.
@@ -860,7 +865,7 @@ export class EventSystem {
                         break;
                     }
                     g._voidWhisperWaveEnemyMult = (g._voidWhisperWaveEnemyMult || 1) * 0.80;
-                    g.eventLog.add(g, `A wall crumbles as tribute. Next wave: -20% enemies.`, 'event', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.offering_stone.log' }, 'event', null);
                 },
             },
         ];
@@ -885,11 +890,11 @@ export class EventSystem {
             text: whisper.text,
             askText: whisper.ask,
             rewardText: whisper.reward,
-            choices: ['Accept', 'Refuse'],
+            choices: [t('msg.events.choice_accept'), t('msg.events.choice_refuse')],
             data: { whisperKey: whisper.key },
         };
-        game.notifications.push({ text: `The Void Nexus stirs before Wave ${game.waves.highestWaveCompleted + 1}...`, tick: game.tick, type: 'event' });
-        game.eventLog.add(game, 'The Void Nexus pulsed with intent.', 'event', null);
+        game.notifications.push({ text: t('msg.events.void_whisper_stirs', { wave: game.waves.highestWaveCompleted + 1 }), tick: game.tick, type: 'event' });
+        game.eventLog.add(game, { key: 'msg.events.void_whisper_pulsed' }, 'event', null);
         if (game.settings?.autoPauseEvent && !game.paused) {
             game.togglePause();
             game._eventPaused = true;
@@ -910,7 +915,7 @@ export class EventSystem {
         } else {
             game.voidWhisperStats.refused++;
             if (game.voidWhisperStats.refused >= 3) game.story.checkMilestone('void_whisper_refused_3', game);
-            game.eventLog.add(game, 'The Nexus falls silent. For now.', 'event', null);
+            game.eventLog.add(game, { key: 'msg.events.void_whisper_refused' }, 'event', null);
         }
 
         this.pendingEvent = null;
@@ -920,24 +925,24 @@ export class EventSystem {
         return [
             {
                 key: 'crucible',
-                title: 'The Crucible',
-                text: 'The rift hungers. Feed it violence and I will amplify the spoils.',
-                ask: 'Immediately starts the next wave',
-                reward: '+50% bonus void essence from this wave',
+                title: t('msg.events.whisper.crucible.title'),
+                text: t('msg.events.whisper.crucible.text'),
+                ask: t('msg.events.whisper.crucible.ask'),
+                reward: t('msg.events.whisper.crucible.reward'),
                 condition: (g) => !g.waves.active && g.waves.findNexus(g) !== null,
                 apply: (g) => {
                     g._voidWhisperForcedWaveBonusMult = 1.5;
                     g.waves.startWave(g);
                     g.camera.centerOn(g.waves.nexusPosition.x, g.waves.nexusPosition.y);
-                    g.eventLog.add(g, 'The Crucible begins! Wave forced with +50% essence reward.', 'danger', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.crucible.log' }, 'danger', null);
                 },
             },
             {
                 key: 'void_pact',
-                title: 'Void Pact',
-                text: 'One of yours could be so much more. Let me reshape them. But know, if the Nexus falls, they fall with it.',
-                ask: 'A colonist becomes Void-Bound: +15% combat damage, -10% work speed',
-                reward: 'Permanent combat buff. But if the next wave is lost, they die',
+                title: t('msg.events.whisper.void_pact.title'),
+                text: t('msg.events.whisper.void_pact.text'),
+                ask: t('msg.events.whisper.void_pact.ask'),
+                reward: t('msg.events.whisper.void_pact.reward'),
                 condition: (g) => {
                     const eligible = g.colonists.filter(c => c.hp > 0 && !c.golem && !c.voidBound);
                     return eligible.length >= 2;
@@ -951,45 +956,45 @@ export class EventSystem {
                     }, eligible[0]);
                     target.voidBound = true;
                     g._voidWhisperPactColonist = target.id;
-                    addThought(target, 'I feel off', -5, 960, g.tick);
-                    g.eventLog.add(g, `${target.name} is now Void-Bound. +15% combat damage, -10% work speed. If the next wave fails, the void will claim them.`, 'event', { type: 'colonist', id: target.id });
+                    addThought(target, 'feel_off', -5, 960, g.tick);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.void_pact.log', params: { name: target.name } }, 'event', { type: 'colonist', id: target.id });
                 },
             },
             {
                 key: 'fortification',
-                title: 'Nexus Fortification',
-                text: 'Give me stone. Give me iron. I will protect you from what comes next.',
-                ask: 'Consume 10 stone and 5 iron',
-                reward: 'Nexus gets +50% max HP for the next wave',
+                title: t('msg.events.whisper.fortification.title'),
+                text: t('msg.events.whisper.fortification.text'),
+                ask: t('msg.events.whisper.fortification.ask'),
+                reward: t('msg.events.whisper.fortification.reward'),
                 condition: (g) => (g.resources.stockpile.stone || 0) >= 10 && (g.resources.stockpile.iron || 0) >= 5,
                 apply: (g) => {
                     g.resources.deduct({ stone: 10, iron: 5 });
                     g._voidWhisperNexusHpMult = 1.5;
-                    g.eventLog.add(g, 'Stone and iron consumed. The Nexus hardens. Next wave: +50% Nexus HP.', 'success', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.fortification.log' }, 'success', null);
                 },
             },
             {
                 key: 'hastened_swarm',
-                title: 'Hastened Swarm',
-                text: 'They will come faster. But each one carries more of what you seek.',
-                ask: 'Next wave enemies spawn twice as fast',
-                reward: '+100% void essence per kill during that wave',
+                title: t('msg.events.whisper.hastened_swarm.title'),
+                text: t('msg.events.whisper.hastened_swarm.text'),
+                ask: t('msg.events.whisper.hastened_swarm.ask'),
+                reward: t('msg.events.whisper.hastened_swarm.reward'),
                 condition: (g) => g.waves.findNexus(g) !== null,
                 apply: (g) => {
                     g._voidWhisperHastenedSwarm = true;
-                    g.eventLog.add(g, 'The swarm hastens. Next wave: 2x spawn rate, 2x void essence per kill.', 'event', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.hastened_swarm.log' }, 'event', null);
                 },
             },
             {
                 key: 'tide_caller',
-                title: 'Tide Caller',
-                text: 'Let me summon something fiercer. Entertain me and you shall earn my favor.',
-                ask: `Next wave treated as Wave ${game.waves.highestWaveCompleted + 3} for enemy strength`,
-                reward: 'Permanent colony buff (+5% research, crafting, or combat) + bonus void essence',
+                title: t('msg.events.whisper.tide_caller.title'),
+                text: t('msg.events.whisper.tide_caller.text'),
+                ask: t('msg.events.whisper.tide_caller.ask', { wave: game.waves.highestWaveCompleted + 3 }),
+                reward: t('msg.events.whisper.tide_caller.reward'),
                 condition: (g) => g.waves.findNexus(g) !== null && g.waves.highestWaveCompleted >= 1,
                 apply: (g) => {
                     g._voidWhisperTideCallerActive = true;
-                    g.eventLog.add(g, 'The tide rises. Next wave will be far more dangerous — but the rewards will match.', 'danger', null);
+                    g.eventLog.add(g, { key: 'msg.events.whisper.tide_caller.log' }, 'danger', null);
                 },
             },
         ];
@@ -1001,7 +1006,7 @@ export class EventSystem {
         const WHISPERS = this._buildVoidCommunionWhispers(game);
         const eligible = WHISPERS.filter(w => !w.condition || w.condition(game));
         if (eligible.length === 0) {
-            game.notifications.push({ text: 'The void has nothing to offer right now.', tick: game.tick, type: 'event' });
+            game.notifications.push({ text: t('msg.events.void_communion_nothing'), tick: game.tick, type: 'event' });
             return;
         }
 
@@ -1017,11 +1022,11 @@ export class EventSystem {
             text: whisper.text,
             askText: whisper.ask,
             rewardText: whisper.reward,
-            choices: ['Accept', 'Refuse'],
+            choices: [t('msg.events.choice_accept'), t('msg.events.choice_refuse')],
             data: { whisperKey: whisper.key },
         };
-        game.notifications.push({ text: `You commune with the void before Wave ${game.waves.highestWaveCompleted + 1}...`, tick: game.tick, type: 'event' });
-        game.eventLog.add(game, 'You reach into the Nexus. Something answers.', 'event', null);
+        game.notifications.push({ text: t('msg.events.void_communion_start', { wave: game.waves.highestWaveCompleted + 1 }), tick: game.tick, type: 'event' });
+        game.eventLog.add(game, { key: 'msg.events.void_communion_answered' }, 'event', null);
         if (game.settings?.autoPauseEvent && !game.paused) {
             game.togglePause();
             game._eventPaused = true;

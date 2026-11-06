@@ -1,4 +1,5 @@
 import { STORY_MILESTONES } from '../core/config.js';
+import { t, defRef } from '../core/i18n.js';
 
 export class StorySystem {
     constructor() {
@@ -16,8 +17,8 @@ export class StorySystem {
                 season: game.weather.season,
             });
             window.electronAPI?.steam?.activateAchievement(key);
-            game.notifications.push({ text: `Story: "${milestone.title}"`, tick: game.tick, type: 'story' });
-            game.eventLog.add(game, `Story unlocked: ${milestone.title}`, 'event', null);
+            game.notifications.push({ text: t('msg.story.unlocked_toast', { title: milestone.title }), tick: game.tick, type: 'story' });
+            game.eventLog.add(game, { key: 'msg.story.unlocked_log', params: { title: defRef(milestone, 'title') } }, 'event', null);
             unlockedAny = true;
         }
         return unlockedAny;

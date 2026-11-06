@@ -4,7 +4,8 @@
 // rather than through game.settings. The in-game panel passes an onApply
 // callback so it can additionally re-apply bindings to the live InputHandler.
 import { DEFAULT_KEYMAP, KEYBIND_ACTIONS } from '../core/config.js';
-import { escapeHtml } from './ui-utils.js';
+import { escapeHtml, escapeAttr } from './ui-utils.js';
+import { t } from '../core/i18n.js';
 
 const SETTINGS_KEY = 'colony_settings';
 // Keys handled structurally by the input handler. Not rebindable.
@@ -88,8 +89,10 @@ function actionsUsingKey(key, exceptAction, overrides) {
 
 // Human-readable label for a stored key string.
 export function formatKeyLabel(key) {
-    const names = { ' ': 'Space', 'arrowup': '↑', 'arrowdown': '↓', 'arrowleft': '←', 'arrowright': '→', 'home': 'Home', 'escape': 'Esc', 'tab': 'Tab' };
-    if (names[key]) return names[key];
+    const names = { ' ': 'ui.keybinds.key_space', 'home': 'ui.keybinds.key_home', 'escape': 'ui.keybinds.key_esc', 'tab': 'ui.keybinds.key_tab' };
+    const arrows = { 'arrowup': '↑', 'arrowdown': '↓', 'arrowleft': '←', 'arrowright': '→' };
+    if (names[key]) return t(names[key]);
+    if (arrows[key]) return arrows[key];
     return key.length === 1 ? key.toUpperCase() : key;
 }
 
@@ -106,9 +109,9 @@ export function isReservedKey(key) {
 export function keybindingRowsHtml(rebindExpr, resetExpr) {
     const overrides = getStoredBindings();
     const conflicts = conflictingKeys(overrides);
-    let html = `<div style="color:#888;font-size:10px;margin-bottom:6px;">Click a key, then press the new key. Number keys, Tab and Esc are fixed. <span style="color:#ff6666;">Red</span> = key bound to more than one action.</div>`;
+    let html = `<div style="color:#888;font-size:10px;margin-bottom:6px;">${escapeHtml(t('ui.keybinds.help'))} <span style="color:#ff6666;">${escapeHtml(t('ui.keybinds.red'))}</span> ${escapeHtml(t('ui.keybinds.red_meaning'))}</div>`;
     for (const group of KEYBIND_ACTIONS) {
-        html += `<div style="color:#88aaff;font-size:11px;margin:4px 0 2px;">${group.group}</div>`;
+        html += `<div style="color:#88aaff;font-size:11px;margin:4px 0 2px;">${escapeHtml(group.group)}</div>`;
         for (const { action, label } of group.items) {
             const keys = effectiveKeys(action, overrides);
             const keyLabel = escapeHtml(keys.map(k => formatKeyLabel(k)).join(' / ') || '—');
@@ -116,9 +119,9 @@ export function keybindingRowsHtml(rebindExpr, resetExpr) {
             const color = hasConflict ? '#ff6666' : '#ffcc00';
             const border = hasConflict ? '#aa3333' : '#555';
             html += `<div class="settings-row" style="justify-content:space-between;gap:6px;">`;
-            html += `<label style="flex:1;">${label}</label>`;
-            html += `<button data-rebind-action="${action}"${hasConflict ? ' title="Conflicts with another action"' : ''} onclick="${rebindExpr}('${action}', this)" style="min-width:54px;background:#1a1a2e;color:${color};border:1px solid ${border};border-radius:3px;padding:2px 8px;cursor:pointer;font-family:inherit;">${keyLabel}</button>`;
-            html += `<button title="Reset to default" onclick="${resetExpr}('${action}')" style="background:#2a2a3e;color:#aaa;border:1px solid #555;border-radius:3px;padding:2px 6px;cursor:pointer;font-family:inherit;font-size:10px;">Default</button>`;
+            html += `<label style="flex:1;">${escapeHtml(label)}</label>`;
+            html += `<button data-rebind-action="${action}"${hasConflict ? ` title="${escapeAttr(t('ui.keybinds.conflict'))}"` : ''} onclick="${rebindExpr}('${action}', this)" style="min-width:54px;background:#1a1a2e;color:${color};border:1px solid ${border};border-radius:3px;padding:2px 8px;cursor:pointer;font-family:inherit;">${keyLabel}</button>`;
+            html += `<button title="${escapeAttr(t('ui.keybinds.reset_tip'))}" onclick="${resetExpr}('${action}')" style="background:#2a2a3e;color:#aaa;border:1px solid #555;border-radius:3px;padding:2px 6px;cursor:pointer;font-family:inherit;font-size:10px;">${escapeHtml(t('ui.keybinds.default'))}</button>`;
             html += `</div>`;
         }
     }
@@ -149,7 +152,7 @@ export function beginRebindCapture(action, btn, onApply, onError) {
     cancelRebindCapture();
     const prevLabel = btn.textContent;
     const prevColor = btn.style.color;
-    btn.textContent = 'Press…';
+    btn.textContent = t('ui.keybinds.press');
     btn.style.color = '#ff8888';
     const restore = () => {
         btn.textContent = prevLabel;

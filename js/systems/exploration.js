@@ -6,6 +6,11 @@ import { REALMS, DEMO_ALLOWED_REALM_CHAINS, EXPLORATION_CONFIG, EXPEDITION_DIFFI
     REALM_EVENTS, REALM_EVENT_CONFIG, BESTIARY_CONFIG, NODE_MAP_CONFIG, THOUGHTS, CRYPT_CONFIG, COMBAT_VISUALS,
 } from '../core/config.js';
 import { getEquipmentStat, getEquippedItems, invalidateEquipStatCache, isSpellAttuned, applyWeaponOnHit, addThought } from '../entities/colonist.js';
+import { itemName, itemRef } from '../entities/item-roll.js';
+import { setLogMessage } from '../ui/eventlog.js';
+// `t` is aliased: this file uses `t` for traits and targets in many loops.
+import { t as tr, tp, hasKey, ref, defRef, defMessage } from '../core/i18n.js';
+import { resourceRef, entityRef, entityName } from '../core/names.js';
 import { checkColonyMilestones } from '../entities/waves.js';
 import { getBestDivinationLevel, generateRealmScry } from './omens.js';
 
@@ -162,7 +167,7 @@ export class ExplorationSystem {
         const hint = generateRealmScry(dim, level);
         if (!hint) return null;
         this.realmScries[realmKey] = hint;
-        game.eventLog.add(game, `A diviner scries ${dim.name}: ${hint.title}`, 'event', null);
+        game.eventLog.add(game, { key: 'msg.exp.scry', params: { realm: defRef(dim), title: hint.titleKey ? ref(hint.titleKey, hint.title) : hint.title } }, 'event', null);
         return hint;
     }
 
@@ -291,7 +296,7 @@ export class ExplorationSystem {
                     (consumedItems[c.id] ||= []).push(item);
                     c.trinket = null;
                     invalidateEquipStatCache(c);
-                    game.eventLog.add(game, `${c.name}'s ${item.name} crumbles to dust as the expedition begins`, 'event', null);
+                    game.eventLog.add(game, { key: 'msg.exp.trinket_crumbles', params: { name: c.name, item: itemRef(item) } }, 'event', null);
                 }
             }
         }
@@ -349,8 +354,8 @@ export class ExplorationSystem {
             loot: {},
             defeated: [],
             log: packAnimals.length > 0
-                ? [{ tick: 0, text: `Party gathering at the circle (${packAnimals.length} pack animal${packAnimals.length > 1 ? 's' : ''})`, type: 'info' }]
-                : [{ tick: 0, text: `Party gathering at the circle`, type: 'info' }],
+                ? [setLogMessage({ tick: 0, type: 'info' }, { key: 'msg.exp.gathering_with_packs', params: { n: packAnimals.length } })]
+                : [setLogMessage({ tick: 0, type: 'info' }, { key: 'msg.exp.gathering' })],
             combat: null,
             summons: [],
             lastMicroEventTick: 0,
@@ -382,9 +387,15 @@ export class ExplorationSystem {
         // A launched expedition consumes any scry hint for that realm: the next
         // rift is freshly random, so the reveal shouldn't linger.
         delete this.realmScries[realmKey];
-        const diffLabel = diffSettings.name !== 'Normal' ? ` (${diffSettings.name})` : '';
-        const mutLabel = mutators.length > 0 ? ` [${mutators.map(k => EXPEDITION_MUTATORS[k]?.name || k).join(', ')}]` : '';
-        game.eventLog.add(game, `Expedition assembling for ${dim.name}${diffLabel}${mutLabel}`, 'event', null);
+        // Difficulty and mutators are refs so the saved line follows the language.
+        const params = { realm: defRef(dim) };
+        let key = 'msg.exp.assembling';
+        if (diffSettings !== EXPEDITION_DIFFICULTY[1]) { params.difficulty = defRef(diffSettings); key += '_diff'; }
+        if (mutators.length > 0) {
+            params.mutators = listRef(mutators.map(k => EXPEDITION_MUTATORS[k] ? defRef(EXPEDITION_MUTATORS[k]) : k));
+            key += '_mut';
+        }
+        game.eventLog.add(game, { key, params }, 'event', null);
         return expedition;
     }
 
@@ -480,7 +491,7 @@ export class ExplorationSystem {
                     for (let si = exp.summons.length - 1; si >= 0; si--) {
                         exp.summons[si].ticksRemaining--;
                         if (exp.summons[si].ticksRemaining <= 0) {
-                            this._addLog(exp, game, `The ${exp.summons[si].name} fades away.`, 'info');
+                            this._addLog(exp, game, { key: 'msg.exp.summon_fades', params: { summon: companionRef(exp.summons[si]) } }, 'info', { fx: { kind: 'summon_end', summon: exp.summons[si].name } });
                             exp.summons.splice(si, 1);
                         }
                     }
@@ -505,7 +516,7 @@ export class ExplorationSystem {
                     exp.status = 'returning';
                     exp.retreatStartTick = game.tick;
                     exp.retreatTick = game.tick + EXPLORATION_CONFIG.retreatTicks;
-                    this._addLog(exp, game, 'All explorers defeated. Retreating empty-handed.', 'danger');
+                    this._addLog(exp, game, { key: 'msg.exp.all_defeated' }, 'danger');
                     exp.loot = {};
                 }
 
@@ -515,7 +526,7 @@ export class ExplorationSystem {
                 if (expeditionDone && exp.status === 'exploring') {
                     exp.status = 'returning';
                     exp.walkOffTick = game.tick + (exp.bossEncounter ? 80 : 60);
-                    this._addLog(exp, game, 'Expedition complete. Returning home.', 'success');
+                    this._addLog(exp, game, { key: 'msg.exp.complete' }, 'success');
                 }
             }
 
@@ -533,7 +544,7 @@ export class ExplorationSystem {
     retreatExpedition(game, expId) {
         const exp = this.expeditions.find(e => e.id === expId);
         if (exp?.status === 'gathering') {
-            this._cancelGathering(exp, game, 'recalled before departure');
+            this._cancelGathering(exp, game, 'recalled');
             this.expeditions = this.expeditions.filter(e => e !== exp);
             return true;
         }
@@ -542,7 +553,7 @@ export class ExplorationSystem {
         exp.manualRetreat = true;
         exp.retreatStartTick = game.tick;
         exp.retreatTick = game.tick + Math.floor(EXPLORATION_CONFIG.retreatTicks * 0.5);
-        this._addLog(exp, game, 'Retreat ordered. Returning with collected loot.', 'info');
+        this._addLog(exp, game, { key: 'msg.exp.retreat_ordered' }, 'info');
         return true;
     }
 
@@ -593,8 +604,7 @@ export class ExplorationSystem {
         if (!choice) return false;
 
         const member = exp.partySnapshot.find(p => p.hp > 0) || exp.partySnapshot[0];
-        const logText = (choice.logText || '').replace('{name}', member?.name || 'The party');
-        if (logText) this._addLog(exp, game, logText, 'info');
+        if (choice.logText) this._addLog(exp, game, defMessage(choice, 'logText', { name: this._actorName(member) }), 'info');
 
         exp.pendingDecision = null;
         this._applyDecisionEffects(exp, game, choice.effects || {}, decision.encounterIndex);
@@ -622,7 +632,7 @@ export class ExplorationSystem {
         const puzzle = exp.pendingDecision;
 
         if (checkIndex === -1) {
-            this._addLog(exp, game, 'The party decides to move on.', 'info');
+            this._addLog(exp, game, { key: 'msg.exp.puzzle_move_on' }, 'info');
             if (exp.nodeMap) {
                 const node = exp.nodeMap.find(n => n.encounterIndex === puzzle.encounterIndex && !n.completed);
                 if (node) node.completed = true;
@@ -678,16 +688,14 @@ export class ExplorationSystem {
         const success = Math.random() < successChance;
 
         if (success && check.success) {
-            const text = check.success.text.replace('{name}', bestMember?.name || 'The party');
-            this._addLog(exp, game, text, 'success');
+            this._addLog(exp, game, defMessage(check.success, 'text', { name: this._actorName(bestMember) }), 'success');
             if (check.success.reward) this._applyPuzzleReward(exp, game, check.success.reward);
             if (check.success.penalty) this._applyPuzzlePenalty(exp, game, check.success.penalty, bestMember, puzzle.encounterIndex);
             exp.summary.puzzlesSolved++;
             this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerPuzzleSolved);
             this._stampResolution(exp, game, true);
         } else if (check.failure) {
-            const text = check.failure.text.replace('{name}', bestMember?.name || 'The party');
-            this._addLog(exp, game, text, 'danger');
+            this._addLog(exp, game, defMessage(check.failure, 'text', { name: this._actorName(bestMember) }), 'danger');
             if (check.failure.penalty) this._applyPuzzlePenalty(exp, game, check.failure.penalty, bestMember, puzzle.encounterIndex);
             this._stampResolution(exp, game, false);
         }
@@ -710,7 +718,7 @@ export class ExplorationSystem {
         const npc = exp.pendingDecision;
 
         if (choiceIndex === -1) {
-            this._addLog(exp, game, 'The party moves on.', 'info');
+            this._addLog(exp, game, { key: 'msg.exp.npc_move_on' }, 'info');
             if (exp.nodeMap) {
                 const node = exp.nodeMap.find(n => n.encounterIndex === npc.encounterIndex && !n.completed);
                 if (node) node.completed = true;
@@ -730,7 +738,7 @@ export class ExplorationSystem {
             if (req.spellAny) {
                 const hasCaster = alive.some(m => m.knownSpells?.some(s => req.spellAny.includes(s)));
                 if (!hasCaster) {
-                    this._addLog(exp, game, 'No one in the party can do that.', 'info');
+                    this._addLog(exp, game, { key: 'msg.exp.npc_no_one_can' }, 'info');
                     return false;
                 }
             }
@@ -741,7 +749,7 @@ export class ExplorationSystem {
             if (choice.cost.mana) {
                 const caster = alive.find(m => m.mana >= choice.cost.mana);
                 if (!caster) {
-                    this._addLog(exp, game, 'Not enough mana to do that.', 'info');
+                    this._addLog(exp, game, { key: 'msg.exp.npc_no_mana' }, 'info');
                     return false;
                 }
                 caster.mana -= choice.cost.mana;
@@ -749,7 +757,7 @@ export class ExplorationSystem {
             if (choice.cost.potionSlots) {
                 const totalPotions = Object.values(exp.potionSupply || {}).reduce((s, v) => s + v, 0);
                 if (totalPotions < choice.cost.potionSlots) {
-                    this._addLog(exp, game, 'Not enough potions to share.', 'info');
+                    this._addLog(exp, game, { key: 'msg.exp.npc_no_potions' }, 'info');
                     return false;
                 }
                 const potionKeys = Object.keys(exp.potionSupply || {});
@@ -766,7 +774,7 @@ export class ExplorationSystem {
                 const res = choice.cost.loot.resource;
                 const amt = choice.cost.loot.amount;
                 if ((game.resources.stockpile[res] || 0) < amt) {
-                    this._addLog(exp, game, `Not enough ${res.replace(/_/g, ' ')} to do that.`, 'info');
+                    this._addLog(exp, game, { key: 'msg.exp.npc_no_resource', params: { resource: resourceRef(res) } }, 'info');
                     return false;
                 }
                 game.resources.deduct({ [res]: amt });
@@ -774,8 +782,7 @@ export class ExplorationSystem {
         }
 
         if (choice.result) {
-            const text = choice.result.text.replace('{name}', member?.name || 'The party');
-            this._addLog(exp, game, text, choice.result.reward ? 'success' : 'info');
+            this._addLog(exp, game, defMessage(choice.result, 'text', { name: this._actorName(member) }), choice.result.reward ? 'success' : 'info');
             if (choice.result.reward) this._applyNpcReward(exp, game, choice.result.reward);
             if (choice.result.penalty) this._applyPuzzlePenalty(exp, game, choice.result.penalty, member, npc.encounterIndex);
             // A rewarding parley reads as success; a penalty-only outcome as failure.
@@ -808,7 +815,7 @@ export class ExplorationSystem {
         if (checkIndex === -1) {
             this._applyTrapDamage(exp, game, trapDef, alive, ds);
             const member = alive[randInt(0, alive.length - 1)];
-            this._addLog(exp, game, `The party braces for impact!`, 'info');
+            this._addLog(exp, game, { key: 'msg.exp.trap_brace' }, 'info');
             const remaining = trap.remainingTicks;
             exp.pendingDecision = null;
             exp.nextEncounterTick = game.tick + (remaining ?? Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing));
@@ -859,12 +866,12 @@ export class ExplorationSystem {
         const success = Math.random() < successChance;
 
         if (success) {
-            const text = (check.successText || 'Trap avoided!').replace('{name}', bestMember?.name || 'The party');
-            this._addLog(exp, game, text, 'success');
+            const name = this._actorName(bestMember);
+            this._addLog(exp, game, check.successText ? defMessage(check, 'successText', { name }) : { key: 'msg.exp.trap_avoided' }, 'success');
             this._stampResolution(exp, game, true);
         } else {
-            const text = (check.failText || 'The trap triggers!').replace('{name}', bestMember?.name || 'The party');
-            this._addLog(exp, game, text, 'danger');
+            const name = this._actorName(bestMember);
+            this._addLog(exp, game, check.failText ? defMessage(check, 'failText', { name }) : { key: 'msg.exp.trap_triggers' }, 'danger');
             this._applyTrapDamage(exp, game, trapDef, alive, ds);
             this._stampResolution(exp, game, false);
         }
@@ -902,26 +909,26 @@ export class ExplorationSystem {
 
         if (dmg > 0) {
             member.hp -= dmg;
-            this._addLog(exp, game, `${member.name} takes ${dmg} damage!`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.takes_damage', params: { name: member.name, dmg } }, 'danger');
             if (exp.summary) exp.summary.damageTaken[member.id] = (exp.summary.damageTaken[member.id] || 0) + dmg;
         }
 
         if (trapDef.damageType === 'dot' && trapDef.dotDamage) {
             if (this._memberHasPoisonImmunity(member)) {
-                this._addLog(exp, game, `${member.name} resists the poison!`, 'combat');
+                this._addLog(exp, game, { key: 'msg.exp.resists_poison', params: { name: member.name } }, 'combat');
             } else {
                 exp.activeEffects.push({
                     type: 'dot', targetId: member.id,
                     damageRange: trapDef.dotDamage, ticksRemaining: trapDef.dotTicks,
                     interval: trapDef.dotInterval, lastTick: game.tick,
                 });
-                this._addLog(exp, game, `${member.name} is poisoned!`, 'danger');
+                this._addLog(exp, game, { key: 'msg.exp.poisoned', params: { name: member.name } }, 'danger');
             }
         }
         if (trapDef.damageType === 'mana' && trapDef.manaDrain) {
             const drain = randInt(trapDef.manaDrain[0], trapDef.manaDrain[1]);
             member.mana = Math.max(0, member.mana - drain);
-            this._addLog(exp, game, `${member.name} loses ${drain} mana!`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.loses_mana', params: { name: member.name, amount: drain } }, 'danger');
         }
         if (trapDef.damageType === 'equipment' && trapDef.effect?.disableRandomSlot) {
             const equipSlots = ['weapon', 'armor', 'helmet', 'clothes', 'boots', 'tool', 'trinket'];
@@ -930,7 +937,7 @@ export class ExplorationSystem {
                 const slot = equippedSlots[randInt(0, equippedSlots.length - 1)];
                 if (!member._disabledSlots) member._disabledSlots = {};
                 member._disabledSlots[slot] = (trapDef.effect.disableDuration || 3);
-                this._addLog(exp, game, `${member.name}'s ${slot} was disabled!`, 'danger');
+                this._addLog(exp, game, { key: 'msg.exp.slot_disabled', params: { name: member.name, slot: ref(`msg.exp.slot.${slot}`, slot) } }, 'danger');
             }
         }
 
@@ -1000,11 +1007,33 @@ export class ExplorationSystem {
         return value;
     }
 
-    _addLog(exp, game, text, type = 'info', meta = null) {
+    // `message` is { key, params } or a plain string; see js/ui/eventlog.js.
+    // `meta` adds fields to the entry: itemKey for loot icons, and fx, a structured
+    // description of combat lines for the expedition visualizer:
+    //   { kind: 'cast', caster, effect: 'heal'|'shield'|'phase'|'damage'|'other', school, amount, area }
+    //   { kind: 'summon', caster }      { kind: 'summon_end', summon }
+    //   { kind: 'boss_phase', phaseName } { kind: 'boss_entrance' }
+    //   { kind: 'kill', byParty }        { kind: 'hit', byParty, target, amount }
+    //   { kind: 'miss', byParty, dodger }
+    // caster, dodger and hit targets on the party side are party member names;
+    // byParty is true when the party's side acts (or, for kills, an enemy dies).
+    _addLog(exp, game, message, type = 'info', meta = null) {
         const tick = game ? game.tick : 0;
-        const entry = { tick, text, type };
+        const entry = setLogMessage({ tick, type }, message);
         if (meta) Object.assign(entry, meta);
         exp.log.push(entry);
+    }
+
+    // Name param for the member a log line is about, or "The party".
+    _actorName(member) {
+        return member?.name || ref('msg.exp.label.the_party', 'The party');
+    }
+
+    // A random discovery line for `member`: the realm's own, else the generic ones.
+    _discoveryLine(dimEvents, member) {
+        const params = { name: member.name };
+        if (dimEvents && dimEvents.discoveries) return lineMessage(dimEvents, 'discoveries', randInt(0, dimEvents.discoveries.length - 1), params);
+        return eventLine('discoveries', randInt(0, EXPLORATION_EVENTS.discoveries.length - 1), params);
     }
 
     _checkExpeditionRevive(exp, member, game) {
@@ -1017,7 +1046,7 @@ export class ExplorationSystem {
                 member.hp = Math.floor(member.maxHp * item.autoReviveHp);
                 member._reviveUsed = true;
                 member[slot] = null;
-                this._addLog(exp, game, `${member.name}'s ${item.name} shatters, bringing them back!`, 'success');
+                this._addLog(exp, game, { key: 'msg.exp.revive_item', params: { name: member.name, item: itemRef(item) } }, 'success');
                 const colonist = game.getColonist(member.id);
                 if (colonist) {
                     if (slot === 'trinket') {
@@ -1031,7 +1060,7 @@ export class ExplorationSystem {
             }
         }
         exp.defeated.push(member.id);
-        this._addLog(exp, game, pickRandom(EXPLORATION_EVENTS.combatDefeat).replace('{name}', member.name), 'danger');
+        this._addLog(exp, game, eventLine('combatDefeat', randInt(0, EXPLORATION_EVENTS.combatDefeat.length - 1), { name: member.name }), 'danger');
         window.soundManager?.playExpSFX('colonist_death');
     }
 
@@ -1119,7 +1148,8 @@ export class ExplorationSystem {
 
     // Abort an expedition that never left: release everyone (arrived members step
     // back out of the gate), free the animals and return the potions. Consumable
-    // trinkets already crumbled at launch and are not refunded.
+    // trinkets already crumbled at launch and are not refunded. `reason` picks the
+    // log line: 'recalled' or 'no_survivors'.
     _cancelGathering(exp, game, reason) {
         for (const id of exp.partyIds) {
             const c = game.getColonist(id);
@@ -1140,7 +1170,7 @@ export class ExplorationSystem {
         this._returnPotions(exp, game);
         exp.potionSupply = {};
         exp.status = 'complete';
-        game.eventLog.add(game, `Expedition to ${exp.realmName} called off: ${reason}`, 'warning', null);
+        game.eventLog.add(game, { key: `msg.exp.called_off.${reason}`, params: { realm: realmRef(exp.realm, exp.realmName) } }, 'warning', null);
     }
 
     _returnPotions(exp, game) {
@@ -1205,7 +1235,7 @@ export class ExplorationSystem {
         }
 
         if (exp.partyIds.length === 0) {
-            this._cancelGathering(exp, game, 'no one survived to depart');
+            this._cancelGathering(exp, game, 'no_survivors');
             return;
         }
         if (!allReady && !timedOut) return;
@@ -1235,8 +1265,8 @@ export class ExplorationSystem {
         exp.startTick = game.tick;
         exp.nextEncounterTick = game.tick + Math.floor(exp.duration * EXPLORATION_CONFIG.encounterSpacing);
         exp.partySnapshot = this._buildPartySnapshot(exp, game);
-        this._addLog(exp, game, `Party teleported into ${REALMS[exp.realm].name}`, 'info');
-        game.eventLog.add(game, `Expedition entered ${exp.realmName}`, 'event', null);
+        this._addLog(exp, game, { key: 'msg.exp.teleported', params: { realm: realmRef(exp.realm) } }, 'info');
+        game.eventLog.add(game, { key: 'msg.exp.entered', params: { realm: realmRef(exp.realm, exp.realmName) } }, 'event', null);
         exp.lastMicroEventTick = game.tick;
         // Consume void whisper rare loot bonus if one was promised.
         if (game._voidWhisperNextExpRareMult) {
@@ -1407,6 +1437,8 @@ export class ExplorationSystem {
                     hp: bossHp, maxHp: bossHp, damage: bossDmg,
                     damageReduction: phase0.damageReduction || 0,
                     isBoss: true, name: (boss.dynamicMasks && phase0.displayName) ? phase0.displayName : boss.name,
+                    nameRef: (boss.dynamicMasks && phase0.displayName) ? (phase0.displayNameRef || phase0.displayName) : defRef(boss),
+                    maskKey: boss.dynamicMasks ? (phase0.maskKey ?? null) : null,
                     enraged: false,
                     color: phase0.color,
                     sprite: phase0.sprite,
@@ -1432,13 +1464,16 @@ export class ExplorationSystem {
     // (phase-0) form. Only appearance and generic combat abilities are copied;
     // HP/damage come from the Unraveler's own phase budget, and realm-specific
     // hooks (e.g. voidPactChoice) are deliberately NOT carried over.
-    _buildBossMask(bossKey, otherBoss) {
+    // `realmKey` is the borrowed boss's realm: the mask's stable id.
+    _buildBossMask(realmKey, otherBoss) {
         const p0 = otherBoss.phases?.[0] || {};
         return {
-            maskKey: bossKey,
+            maskKey: realmKey,
             // displayName is the HP-bar identity; label is the combat-log phase tag.
-            displayName: `${otherBoss.name}, Unraveled`,
+            displayName: tr('msg.exp.boss.unraveled', { boss: otherBoss.name }),
+            displayNameRef: ref('msg.exp.boss.unraveled', null, { boss: defRef(otherBoss) }),
             label: otherBoss.name,
+            labelRef: defRef(otherBoss),
             sprite: p0.sprite || otherBoss.sprite,
             color: p0.color || otherBoss.color || '#cc33cc',
             // Deep-copy abilities so a mid-fight mutation never aliases config.
@@ -1454,7 +1489,7 @@ export class ExplorationSystem {
         if (!this._allMasksCache) {
             this._allMasksCache = Object.entries(REALMS)
                 .filter(([, r]) => r.boss && !r.boss.dynamicMasks && Array.isArray(r.boss.phases) && r.boss.phases.length > 0)
-                .map(([, r]) => this._buildBossMask(r.boss.name, r.boss));
+                .map(([k, r]) => this._buildBossMask(k, r.boss));
         }
         return this._allMasksCache.slice();
     }
@@ -1494,7 +1529,10 @@ export class ExplorationSystem {
             phases.push({
                 // name = combat-log phase label; displayName = HP-bar identity.
                 name: mask ? mask.label : slot.name,
+                nameRef: mask ? mask.labelRef : phaseNameRef(slot),
+                maskKey: mask ? mask.maskKey : null,
                 displayName: mask ? mask.displayName : null,
+                displayNameRef: mask ? mask.displayNameRef : null,
                 hp: slot.hp,
                 damage: Math.round(slot.damage * buff),
                 damageReduction: slot.damageReduction || 0,
@@ -1502,16 +1540,16 @@ export class ExplorationSystem {
                 sprite: mask ? mask.sprite : slot.sprite,
                 abilities: mask ? mask.abilities.map(a => ({ ...a })) : (slot.abilities || []),
                 autoChaosTick: slot.autoChaosTick || false,
-                transitionText: isLastMask
-                    ? 'The borrowed faces slough away all at once. What is left underneath wears nothing but itself.'
-                    : 'The stolen shape destabilizes, and the Unraveler drags a different face over itself.',
+                transitionText: tr(isLastMask ? 'msg.exp.boss.mask_drop' : 'msg.exp.boss.mask_shift'),
+                transitionKey: isLastMask ? 'msg.exp.boss.mask_drop' : 'msg.exp.boss.mask_shift',
                 armorText: slot.armorText || null,
+                armorLoc: slot.armorText ? slot._loc : null,
             });
         }
         // Finale: the true, undisguised Unraveler. Uses the finale SLOT's stats (the
         // phase a static boss would end on at this difficulty) but restores the real
         // sprite/name so the disguise visibly drops for the climax.
-        phases.push({ ...finaleSlot, displayName: boss.name });
+        phases.push({ ...finaleSlot, displayName: boss.name, displayNameRef: defRef(boss) });
         return phases;
     }
 
@@ -1550,16 +1588,15 @@ export class ExplorationSystem {
             const rareEncounterMult = getPartyExpeditionEffect(exp.partySnapshot, 'rareEncounterMult', exp.realm) * (exp.potionLootBoosts?.rareEncounterMult || 1) * xpRareMult;
             for (const rare of dimEvents.rare) {
                 if (Math.random() < rare.chance * rareEncounterMult * ds.rareLootMult * this._getMutatorEffect(exp, 'rareLootMult')) {
-                    const msg = rare.text.replace('{name}', member.name);
+                    const line = messageParam(defMessage(rare, 'text', { name: member.name }));
                     if (rare.loot.item) {
                         if (!exp.loot._items) exp.loot._items = [];
                         exp.loot._items.push(rare.loot.item);
-                        const itemName = ALL_ITEMS[rare.loot.item]?.name || rare.loot.item;
-                        this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: rare.loot.item });
+                        this._addLog(exp, game, { key: 'msg.exp.loot_line_item', params: { line, item: resourceRef(rare.loot.item) } }, 'loot', { itemKey: rare.loot.item });
                     } else {
                         const amount = Math.round(randInt(rare.loot.amount[0], rare.loot.amount[1]) * ds.lootAmountMult * this._realmResourceMult(exp, rare.loot.resource));
                         exp.loot[rare.loot.resource] = (exp.loot[rare.loot.resource] || 0) + amount;
-                        this._addLog(exp, game, `${msg} (+${amount} ${rare.loot.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: rare.loot.resource });
+                        this._addLog(exp, game, { key: 'msg.exp.loot_line_resource', params: { line, amount, resource: resourceRef(rare.loot.resource) } }, 'loot', { itemKey: rare.loot.resource });
                     }
                     window.soundManager?.playExpSFX('loot_drop');
                     return;
@@ -1577,27 +1614,26 @@ export class ExplorationSystem {
             exp.pendingDecision = {
                 type: 'trap',
                 trapKey,
-                text: trapDef.text,
+                text: defMessage(trapDef, 'text'),
+                _loc: trapDef._loc,
                 checks: trapDef.checks,
                 remainingTicks: Math.max(0, exp.nextEncounterTick - game.tick),
             };
-            this._addLog(exp, game, trapDef.text, 'danger');
+            this._addLog(exp, game, defMessage(trapDef, 'text'), 'danger');
             window.soundManager?.playExpSFX('wave_alert');
         } else if (roll < EXPLORATION_CONFIG.trapChance + EXPLORATION_CONFIG.findItemChance) {
             const lootEntry = this._rollLoot(dim, ds);
             const lootMult = getPartyExpeditionEffect(exp.partySnapshot, 'lootMult', exp.realm) * (exp.potionLootBoosts?.lootMult || 1);
-            const discPool = (dimEvents && dimEvents.discoveries) || EXPLORATION_EVENTS.discoveries;
-            const msg = pickRandom(discPool).replace('{name}', member.name);
+            const line = messageParam(this._discoveryLine(dimEvents, member));
             if (lootEntry) {
                 if (lootEntry.item) {
                     if (!exp.loot._items) exp.loot._items = [];
                     exp.loot._items.push(lootEntry.item);
-                    const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
-                    this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: lootEntry.item });
+                    this._addLog(exp, game, { key: 'msg.exp.loot_line_item', params: { line, item: resourceRef(lootEntry.item) } }, 'loot', { itemKey: lootEntry.item });
                 } else {
                     const boostedAmount = Math.floor(lootEntry.amount * lootMult * this._realmResourceMult(exp, lootEntry.resource));
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + boostedAmount;
-                    this._addLog(exp, game, `${msg} (+${boostedAmount} ${lootEntry.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: lootEntry.resource });
+                    this._addLog(exp, game, { key: 'msg.exp.loot_line_resource', params: { line, amount: boostedAmount, resource: resourceRef(lootEntry.resource) } }, 'loot', { itemKey: lootEntry.resource });
                 }
                 window.soundManager?.playExpSFX('loot_drop');
             }
@@ -1605,12 +1641,25 @@ export class ExplorationSystem {
             const currentEnc = exp.encounters[exp.currentEncounter];
             const crossAmbient = currentEnc?._crossRealmAmbient;
             const ambientPool = crossAmbient || (dimEvents && dimEvents.ambient) || EXPLORATION_EVENTS.ambient;
-            let msg = pickRandom(ambientPool).replace('{name}', member.name);
-            if (crossAmbient && currentEnc?._crossRealmKey) {
-                const crossName = REALMS[currentEnc._crossRealmKey]?.name || 'another realm';
-                msg = `[Echoing from ${crossName}] ${msg}`;
+            const i = randInt(0, ambientPool.length - 1);
+            const params = { name: member.name };
+            let line;
+            if (crossAmbient) {
+                // The encounter saved the other realm's lines; key them by that realm.
+                const crossEvents = REALMS[currentEnc._crossRealmKey]?.events;
+                line = crossEvents?.ambient?.length === crossAmbient.length
+                    ? lineMessage(crossEvents, 'ambient', i, params)
+                    : lineMessage({ ambient: crossAmbient }, 'ambient', i, params);
+            } else if (dimEvents && dimEvents.ambient) {
+                line = lineMessage(dimEvents, 'ambient', i, params);
+            } else {
+                line = eventLine('ambient', i, params);
             }
-            this._addLog(exp, game, msg, 'ambient');
+            if (crossAmbient && currentEnc?._crossRealmKey) {
+                const realm = REALMS[currentEnc._crossRealmKey] ? defRef(REALMS[currentEnc._crossRealmKey]) : ref('msg.exp.label.another_realm', 'another realm');
+                line = { key: 'msg.exp.cross_realm_echo', params: { realm, line: messageParam(line) } };
+            }
+            this._addLog(exp, game, line, 'ambient');
         }
     }
 
@@ -1638,20 +1687,22 @@ export class ExplorationSystem {
         // Scout (Adventurer Lv3): any member with this ability previews what lies ahead.
         const hasScout = exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 3);
         if (hasScout) {
-            const typeLabel = { combat: 'a combat encounter', decision: 'a choice', puzzle: 'a puzzle', npc: 'a stranger', loot: 'a cache of loot' }[encounter.type] || 'an unknown encounter';
+            const typeKey = ['combat', 'decision', 'puzzle', 'npc', 'loot'].includes(encounter.type) ? encounter.type : 'unknown';
             const isBoss = encounter.isBoss;
-            this._addLog(exp, game, `[Scout] ${isBoss ? 'Boss ahead!' : `Coming up: ${typeLabel}.`}`, 'info');
+            this._addLog(exp, game, isBoss ? { key: 'msg.exp.scout_boss' } : { key: `msg.exp.scout.${typeKey}` }, 'info');
         }
 
         if (encounter.type === 'decision') {
             exp.pendingDecision = {
                 type: 'decision',
                 decisionKey: encounter.decisionKey,
-                text: encounter.text,
+                // { key, params } for the prompt; _loc keys the choice/check text too.
+                text: defMessage(encounter, 'text'),
+                _loc: encounter._loc,
                 choices: encounter.choices,
                 encounterIndex: exp.currentEncounter,
             };
-            this._addLog(exp, game, encounter.text, 'info');
+            this._addLog(exp, game, defMessage(encounter, 'text'), 'info');
             return;
         }
 
@@ -1659,11 +1710,13 @@ export class ExplorationSystem {
             exp.pendingDecision = {
                 type: 'puzzle',
                 puzzleKey: encounter.puzzleKey,
-                text: encounter.text,
+                // { key, params } for the prompt; _loc keys the choice/check text too.
+                text: defMessage(encounter, 'text'),
+                _loc: encounter._loc,
                 checks: encounter.checks,
                 encounterIndex: exp.currentEncounter,
             };
-            this._addLog(exp, game, encounter.text, 'info');
+            this._addLog(exp, game, defMessage(encounter, 'text'), 'info');
             return;
         }
 
@@ -1672,30 +1725,33 @@ export class ExplorationSystem {
                 type: 'npc',
                 npcKey: encounter.npcKey,
                 sprite: encounter.sprite || null,
-                text: encounter.text,
+                // { key, params } for the prompt; _loc keys the choice/check text too.
+                text: defMessage(encounter, 'text'),
+                _loc: encounter._loc,
                 choices: encounter.choices,
                 encounterIndex: exp.currentEncounter,
             };
-            this._addLog(exp, game, encounter.text, 'info');
-            this._updateBestiary(exp, 'npc', encounter.npcKey, { name: encounter.name || encounter.text.slice(0, 40), lore: encounter.lore || '', sprite: encounter.sprite || null }, game);
+            this._addLog(exp, game, defMessage(encounter, 'text'), 'info');
+            this._updateBestiary(exp, 'npc', encounter.npcKey, {
+                name: encounter.name || encounter.text.slice(0, 40), lore: encounter.lore || '', sprite: encounter.sprite || null,
+                nameRef: locRef(encounter, 'name'), loreRef: locRef(encounter, 'lore'),
+            }, game);
             return;
         }
 
         if (encounter.type === 'loot') {
             const member = exp.partySnapshot.find(p => p.hp > 0) || exp.partySnapshot[0];
             const dim = REALMS[exp.realm];
-            const discPool = (dim.events && dim.events.discoveries) || EXPLORATION_EVENTS.discoveries;
-            const msg = pickRandom(discPool).replace('{name}', member.name);
+            const line = messageParam(this._discoveryLine(dim.events, member));
             if (encounter.item) {
                 if (!exp.loot._items) exp.loot._items = [];
                 exp.loot._items.push(encounter.item);
-                const itemName = ALL_ITEMS[encounter.item]?.name || encounter.item;
-                this._addLog(exp, game, `${msg} (found ${itemName}!)`, 'loot', { itemKey: encounter.item });
+                this._addLog(exp, game, { key: 'msg.exp.loot_line_item', params: { line, item: resourceRef(encounter.item) } }, 'loot', { itemKey: encounter.item });
             } else {
                 const streakMult = exp.streakMultiplier || 1.0;
                 const amount = Math.floor(encounter.amount * streakMult * this._realmResourceMult(exp, encounter.resource));
                 exp.loot[encounter.resource] = (exp.loot[encounter.resource] || 0) + amount;
-                this._addLog(exp, game, `${msg} (+${amount} ${encounter.resource.replace(/_/g, ' ')})`, 'loot', { itemKey: encounter.resource });
+                this._addLog(exp, game, { key: 'msg.exp.loot_line_resource', params: { line, amount, resource: resourceRef(encounter.resource) } }, 'loot', { itemKey: encounter.resource });
             }
             window.soundManager?.playExpSFX('loot_drop');
             if (exp.nodeMap) {
@@ -1711,8 +1767,10 @@ export class ExplorationSystem {
         if (encounter.isBoss) {
             const bossEnemy = enemies.find(e => e.isBoss);
             const dim = REALMS[exp.realm];
-            const approachMsg = dim.boss?.approachText || `A powerful foe blocks the path: ${bossEnemy.name}!`;
-            this._addLog(exp, game, approachMsg, 'danger');
+            const approachMsg = dim.boss?.approachText
+                ? defMessage(dim.boss, 'approachText')
+                : { key: 'msg.exp.boss_approach', params: { boss: enemyNameRef(bossEnemy) } };
+            this._addLog(exp, game, approachMsg, 'danger', { fx: { kind: 'boss_entrance' } });
             window.soundManager?.playExpSFX('wave_alert');
             // Bestiary records the boss's TRUE identity. For dynamic-mask bosses the
             // spawned enemy starts disguised as a random mask, so recording
@@ -1723,7 +1781,11 @@ export class ExplorationSystem {
             const bestiaryName = trueFinale ? dim.boss.name : bossEnemy.name;
             const bestiarySprite = trueFinale ? (trueFinale.sprite || dim.boss?.sprite) : (bossEnemy.sprite || dim.boss?.sprite);
             const bestiaryColor = trueFinale ? (trueFinale.color || dim.boss?.color) : (bossEnemy.color || dim.boss?.color);
-            this._updateBestiary(exp, 'boss', bestiaryName, { name: bestiaryName, sprite: bestiarySprite, color: bestiaryColor, lore: dim.boss?.lore || '', bossPhases: encounter.bossPhases || [] }, game);
+            // Keyed by realm (one boss per realm): the name follows the language.
+            this._updateBestiary(exp, 'boss', exp.realm, {
+                name: bestiaryName, sprite: bestiarySprite, color: bestiaryColor, lore: dim.boss?.lore || '', bossPhases: encounter.bossPhases || [],
+                nameRef: trueFinale ? locRef(dim.boss, 'name') : (bossEnemy.nameRef || null), loreRef: locRef(dim.boss, 'lore'),
+            }, game);
 
             if (encounter.bossPhases) {
                 exp.bossPhaseData = {
@@ -1734,18 +1796,21 @@ export class ExplorationSystem {
                 };
             }
         } else {
-            const startMsg = pickRandom(EXPLORATION_EVENTS.combatStart);
-            const eliteNames = enemies.filter(e => e.elite).map(e => e.eliteName);
-            const eliteNote = eliteNames.length > 0 ? ` (includes ${eliteNames.join(', ')} elite!)` : '';
-            this._addLog(exp, game, `${startMsg} (${enemies.length} foes)${eliteNote}`, 'combat');
+            const line = messageParam(eventLine('combatStart', randInt(0, EXPLORATION_EVENTS.combatStart.length - 1)));
+            const elites = enemies.filter(e => e.elite).map(eliteRef);
+            this._addLog(exp, game, elites.length > 0
+                ? { key: 'msg.exp.combat_start_elite', params: { line, n: enemies.length, elites: listRef(elites) } }
+                : { key: 'msg.exp.combat_start', params: { line, n: enemies.length } }, 'combat');
             window.soundManager?.playExpSFX('wave_alert');
 
             for (const e of enemies) {
                 const bKey = e.typeKey || `enemy_${exp.realm}`;
-                const bName = e.name || `${REALMS[exp.realm]?.name || exp.realm} Creature`;
+                const bName = e.name || tr('msg.exp.label.realm_creature', { realm: REALMS[exp.realm]?.name || exp.realm });
                 const catalogEntry = e.typeKey ? EXPEDITION_ENEMIES[e.typeKey] : null;
                 this._updateBestiary(exp, 'regular', bKey, {
                     name: bName,
+                    nameRef: e.name ? locRef(catalogEntry, 'name') : ref('msg.exp.label.realm_creature', bName, { realm: realmRef(exp.realm) }),
+                    loreRef: locRef(catalogEntry, 'lore'),
                     sprite: e.sprite,
                     color: e.color || '#ff3333',
                     lore: catalogEntry?.lore || '',
@@ -1793,11 +1858,11 @@ export class ExplorationSystem {
             }
         }
         if (allies > 0 && rivals > 0) {
-            this._addLog(exp, game, 'Bonds and grudges alike stir in the party as battle begins.', 'combat');
+            this._addLog(exp, game, { key: 'msg.exp.synergy_mixed' }, 'combat');
         } else if (allies > 0) {
-            this._addLog(exp, game, 'Fighting alongside friends, the party takes heart!', 'success');
+            this._addLog(exp, game, { key: 'msg.exp.synergy_allies' }, 'success');
         } else if (rivals > 0) {
-            this._addLog(exp, game, 'Old rivalries flare as the party is forced to fight together.', 'combat');
+            this._addLog(exp, game, { key: 'msg.exp.synergy_rivals' }, 'combat');
         }
     }
 
@@ -1845,11 +1910,11 @@ export class ExplorationSystem {
             if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
             const rangedSfx = member.weapon.skinKey === 'projectile_bolt' ? 'bolt_fire' : 'arrow_fire';
             window.soundManager?.playExpSFX(rangedSfx);
-            const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
-            this._addLog(exp, game, `${member.name} looses an opening shot at ${targetLabel} for ${dmg} damage!`, 'combat');
+            this._addLog(exp, game, { key: 'msg.exp.opening_shot', params: { name: member.name, target: foeLabel(target), dmg } }, 'combat',
+                { fx: { kind: 'hit', byParty: true, target: null, amount: dmg } });
             if (target.hp <= 0) {
-                const slayLabel = target.isBoss ? target.name : 'a foe';
-                this._addLog(exp, game, `${member.name}'s opening shot fells ${slayLabel}!`, 'success');
+                this._addLog(exp, game, { key: 'msg.exp.opening_shot_kill', params: { name: member.name, target: foeOrBoss(target) } }, 'success',
+                    { fx: { kind: 'kill', byParty: true } });
                 window.soundManager?.playExpSFX('enemy_death');
                 if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
                 if (target.elite) { exp.eliteKills++; this._processEliteOnDeath(target, exp, game); }
@@ -1931,7 +1996,7 @@ export class ExplorationSystem {
             // member's own turn: a stunned member forfeits it, a slowed one may.
             // Weaken scales its outgoing damage.
             if (this._loseTurnToCrowdControl(member)) {
-                this._addLog(exp, game, `${member.name} ${member._lostTurnTo === 'stun' ? 'is stunned and cannot attack' : 'is slowed and loses their turn'}!`, 'danger');
+                this._addLog(exp, game, { key: member._lostTurnTo === 'stun' ? 'msg.exp.member_stunned' : 'msg.exp.member_slowed', params: { name: member.name } }, 'danger');
                 continue;
             }
             const isRanged = member.weapon && member.weapon.ranged;
@@ -1949,11 +2014,12 @@ export class ExplorationSystem {
             member._lastAttackKind = member.attackAnim
                 || (member.weapon && member.weapon.attackAnim)
                 || (member.weapon && member.weapon.ranged ? 'DrawAndShoot' : 'Swing');
-            const targetLabel = target.isBoss ? target.name : (target.elite ? `${target.eliteName} enemy` : 'an enemy');
+            const targetLabel = foeLabel(target);
 
             if (target.eliteDodge && Math.random() < target.eliteDodge) {
                 target._lastDodgeTick = game.tick;
-                this._addLog(exp, game, `${targetLabel} dodges ${member.name}'s attack!`, 'combat');
+                this._addLog(exp, game, { key: 'msg.exp.foe_dodges', params: { target: foeLabel(target, true), name: member.name } }, 'combat',
+                    { fx: { kind: 'miss', byParty: true, dodger: null } });
                 continue;
             }
 
@@ -1977,8 +2043,8 @@ export class ExplorationSystem {
 
             const memberBlindChance = this._combatStatusValue(member, 'blind', 'missChance', 0);
             if (Math.random() < baseMissChance + memberBlindChance) {
-                const msg = pickRandom(EXPLORATION_EVENTS.combatMiss).replace('{attacker}', member.name).replace('{target}', targetLabel);
-                this._addLog(exp, game, msg, 'combat');
+                const line = eventLine('combatMiss', randInt(0, EXPLORATION_EVENTS.combatMiss.length - 1), { attacker: member.name, target: targetLabel });
+                this._addLog(exp, game, line, 'combat', { fx: { kind: 'miss', byParty: true, dodger: null } });
             } else {
                 target.hp -= dmg;
                 const attackWeapon = member.weapon && !disabled.weapon ? member.weapon : null;
@@ -1993,15 +2059,16 @@ export class ExplorationSystem {
                         if (e === target || e.hp <= 0) continue;
                         e.hp -= cleaveDmg;
                         if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + cleaveDmg;
-                        if (e.hp <= 0) { this._addLog(exp, game, 'A foe falls to the sweep!', 'success'); if (e.elite) { exp.eliteKills++; this._processEliteOnDeath(e, exp, game); } this._processEnemyOnDeath(e, exp, game); }
+                        if (e.hp <= 0) { this._addLog(exp, game, { key: 'msg.exp.cleave_kill' }, 'success', { fx: { kind: 'kill', byParty: true } }); if (e.elite) { exp.eliteKills++; this._processEliteOnDeath(e, exp, game); } this._processEnemyOnDeath(e, exp, game); }
                     }
-                    if (combat.enemies.filter(e => e.hp > 0).length < combat.enemies.length) this._addLog(exp, game, `${member.name}'s sweeping strike cleaves through the pack!`, 'combat');
+                    if (combat.enemies.filter(e => e.hp > 0).length < combat.enemies.length) this._addLog(exp, game, { key: 'msg.exp.cleave', params: { name: member.name } }, 'combat');
                 }
                 if (exp.summary) exp.summary.damageDealt[member.id] = (exp.summary.damageDealt[member.id] || 0) + dmg;
                 if (critHit) member._lastCritTick = game.tick;
-                const hitMsg = critHit ? `${member.name} lands a critical strike on ${targetLabel} for ${dmg} damage!` : null;
-                const msg = hitMsg || pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', member.name).replace('{target}', targetLabel).replace('{dmg}', dmg);
-                this._addLog(exp, game, msg, 'combat');
+                const line = critHit
+                    ? { key: 'msg.exp.critical_hit', params: { name: member.name, target: targetLabel, dmg } }
+                    : eventLine('combatHit', randInt(0, EXPLORATION_EVENTS.combatHit.length - 1), { attacker: member.name, target: targetLabel, dmg });
+                this._addLog(exp, game, line, 'combat', { fx: { kind: 'hit', byParty: true, target: null, amount: dmg } });
                 const isRangedAttack = member.weapon && member.weapon.ranged;
                 const rangedSfx = (member.weapon && member.weapon.skinKey === 'projectile_bolt') ? 'bolt_fire' : 'arrow_fire';
                 window.soundManager?.playExpSFX(critHit ? 'critical_hit' : (isRangedAttack ? rangedSfx : 'colonist_damaged'));
@@ -2011,8 +2078,8 @@ export class ExplorationSystem {
                     if (healed > 0) { member.hp = Math.min(member.maxHp, member.hp + healed); if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed; }
                 }
                 if (target.hp <= 0) {
-                    const slayLabel = target.isBoss ? target.name : 'a foe';
-                    this._addLog(exp, game, `${member.name} slays ${slayLabel}!`, 'success');
+                    this._addLog(exp, game, { key: 'msg.exp.slays', params: { name: member.name, target: foeOrBoss(target) } }, 'success',
+                        { fx: { kind: 'kill', byParty: true } });
                     window.soundManager?.playExpSFX('enemy_death');
                     if (exp.summary) exp.summary.killCount[member.id] = (exp.summary.killCount[member.id] || 0) + 1;
                     const hpOnKill = memberItems.reduce((sum, it) => sum + (it.hpOnKill || 0), 0)
@@ -2042,7 +2109,7 @@ export class ExplorationSystem {
                 const summon = exp.summons[si];
                 summon.ticksRemaining -= 1;
                 if (summon.ticksRemaining <= 0 || summon.hp <= 0) {
-                    this._addLog(exp, game, `The ${summon.name} fades away.`, 'info');
+                    this._addLog(exp, game, { key: 'msg.exp.summon_fades', params: { summon: companionRef(summon) } }, 'info', { fx: { kind: 'summon_end', summon: summon.name } });
                     exp.summons.splice(si, 1);
                     continue;
                 }
@@ -2054,12 +2121,13 @@ export class ExplorationSystem {
                     summon._lastAttackKind = summon.attackAnim || (summon.ranged ? 'DrawAndShoot' : 'Swing');
                     const sDmg = summon.damage + randInt(0, 2);
                     if (Math.random() < 0.1) {
-                        this._addLog(exp, game, `The ${summon.name} misses!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.summon_misses', params: { summon: companionRef(summon) } }, 'combat', { fx: { kind: 'miss', byParty: true, dodger: null } });
                     } else {
                         summonTarget.hp -= sDmg;
-                        this._addLog(exp, game, `The ${summon.name} attacks for ${sDmg}!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.summon_attacks', params: { summon: companionRef(summon), dmg: sDmg } }, 'combat',
+                            { fx: { kind: 'hit', byParty: true, target: null, amount: sDmg } });
                         if (summonTarget.hp <= 0) {
-                            this._addLog(exp, game, `The ${summon.name} slays a foe!`, 'success');
+                            this._addLog(exp, game, { key: 'msg.exp.summon_slays', params: { summon: companionRef(summon) } }, 'success', { fx: { kind: 'kill', byParty: true } });
                             if (summonTarget.elite) { exp.eliteKills++; this._processEliteOnDeath(summonTarget, exp, game); }
                             this._processEnemyOnDeath(summonTarget, exp, game);
                         }
@@ -2083,12 +2151,13 @@ export class ExplorationSystem {
                 beast._lastAttackKind = 'Swing';
                 const bDmg = Math.max(1, beast.damage + randInt(0, 2));
                 if (Math.random() < 0.1) {
-                    this._addLog(exp, game, `The ${beast.name} snaps and misses!`, 'combat');
+                    this._addLog(exp, game, { key: 'msg.exp.beast_misses', params: { beast: companionRef(beast) } }, 'combat', { fx: { kind: 'miss', byParty: true, dodger: null } });
                 } else {
                     beastTarget.hp -= bDmg;
-                    this._addLog(exp, game, `The ${beast.name} mauls a foe for ${bDmg}!`, 'combat');
+                    this._addLog(exp, game, { key: 'msg.exp.beast_mauls', params: { beast: companionRef(beast), dmg: bDmg } }, 'combat',
+                        { fx: { kind: 'hit', byParty: true, target: null, amount: bDmg } });
                     if (beastTarget.hp <= 0) {
-                        this._addLog(exp, game, `The ${beast.name} brings down a foe!`, 'success');
+                        this._addLog(exp, game, { key: 'msg.exp.beast_kills', params: { beast: companionRef(beast) } }, 'success', { fx: { kind: 'kill', byParty: true } });
                         window.soundManager?.playExpSFX('enemy_death');
                         if (beastTarget.elite) { exp.eliteKills++; this._processEliteOnDeath(beastTarget, exp, game); }
                         this._processEnemyOnDeath(beastTarget, exp, game);
@@ -2122,7 +2191,7 @@ export class ExplorationSystem {
                 if (exp.summary) exp.summary.damageTaken[p.id] = (exp.summary.damageTaken[p.id] || 0) + actual;
                 if (p.hp <= 0) this._checkExpeditionRevive(exp, p, game);
             }
-            this._addLog(exp, game, `The realm lashes out through the enemy ranks, hitting all for ${aoeDmg}!`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.realm_lashes', params: { dmg: aoeDmg } }, 'danger');
         }
 
         // -- Enemy attack phase --
@@ -2131,12 +2200,12 @@ export class ExplorationSystem {
         const inAmbush = game.tick <= (combat.ambushEndTick || 0) && exp.partySnapshot.some(m => this.getExpeditionLevel(m.id) >= 8);
         if (inAmbush && !combat._ambushLogged) {
             combat._ambushLogged = true;
-            this._addLog(exp, game, 'The party ambushes their foes! Enemies cannot act yet.', 'success');
+            this._addLog(exp, game, { key: 'msg.exp.ambush' }, 'success');
         }
         for (const enemy of combat.enemies) {
             if (enemy.hp <= 0) continue;
             if (inAmbush) { enemy._lastAttackKind = enemy.attackAnim || 'Swing'; continue; }
-            const attackerLabel = enemy.isBoss ? enemy.name : (enemy.elite ? `${enemy.eliteName} enemy` : 'An enemy');
+            const attackerLabel = foeLabel(enemy, true);
             const enemyWeaken = this._combatStatusValue(enemy, 'weaken', 'mult', 1);
             const enemyCd = enemy.attackCooldown || COLONIST_CONFIG.baseAttackCooldown;
             // Attack-animation speed (see party snapshot): <1 fast, >1 slow. The
@@ -2151,7 +2220,7 @@ export class ExplorationSystem {
             // stunned enemy forfeits it, a slowed one has a (1 - mult) chance to.
             // Weaken (above) scales the damage of whatever attacks it does land.
             if (this._loseTurnToCrowdControl(enemy)) {
-                this._addLog(exp, game, `${attackerLabel} ${enemy._lostTurnTo === 'stun' ? 'is stunned and cannot act' : 'is slowed and loses its turn'}!`, 'combat');
+                this._addLog(exp, game, { key: enemy._lostTurnTo === 'stun' ? 'msg.exp.foe_stunned' : 'msg.exp.foe_slowed', params: { foe: attackerLabel } }, 'combat');
                 continue;
             }
             {
@@ -2159,14 +2228,16 @@ export class ExplorationSystem {
                     let castSpell = false;
                     for (const sp of enemy.spells) {
                         if (Math.random() < sp.chance) {
-                            const spName = sp.spell.replace(/_/g, ' ');
+                            const spName = ref(`msg.exp.enemy_spell.${sp.spell}`, sp.spell.replace(/_/g, ' '));
+                            const school = SPELLS[sp.spell]?.school ?? null;
                             if (sp.healPct) {
                                 const allies = combat.enemies.filter(e => e.hp > 0 && e.hp < e.maxHp);
                                 if (allies.length > 0) {
                                     const healTarget = allies[randInt(0, allies.length - 1)];
                                     const heal = Math.floor(healTarget.maxHp * sp.healPct);
                                     healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + heal);
-                                    this._addLog(exp, game, `${attackerLabel} casts ${spName}, healing for ${heal}!`, 'danger');
+                                    this._addLog(exp, game, { key: 'msg.exp.foe_cast_heal', params: { foe: attackerLabel, spell: spName, amount: heal } }, 'danger',
+                                        { fx: { kind: 'cast', caster: null, effect: 'heal', school, amount: heal, area: false } });
                                     castSpell = true; break;
                                 }
                             }
@@ -2178,14 +2249,16 @@ export class ExplorationSystem {
                                     if (exp.summary) exp.summary.damageTaken[p.id] = (exp.summary.damageTaken[p.id] || 0) + dmg;
                                     if (p.hp <= 0) this._checkExpeditionRevive(exp, p, game);
                                 }
-                                this._addLog(exp, game, `${attackerLabel} casts ${spName}, hitting all for ${dmg}!`, 'danger');
+                                this._addLog(exp, game, { key: 'msg.exp.foe_cast_aoe', params: { foe: attackerLabel, spell: spName, dmg } }, 'danger',
+                                    { fx: { kind: 'cast', caster: null, effect: 'damage', school, amount: dmg, area: true } });
                             } else if (sp.damage) {
                                 const spTarget = alive.filter(p => p.hp > 0)[randInt(0, Math.max(0, alive.filter(p => p.hp > 0).length - 1))];
                                 if (spTarget) {
                                     const dmg = randInt(sp.damage[0], sp.damage[1]);
                                     spTarget.hp -= dmg;
                                     if (exp.summary) exp.summary.damageTaken[spTarget.id] = (exp.summary.damageTaken[spTarget.id] || 0) + dmg;
-                                    this._addLog(exp, game, `${attackerLabel} casts ${spName} on ${spTarget.name} for ${dmg}!`, 'danger');
+                                    this._addLog(exp, game, { key: 'msg.exp.foe_cast_hit', params: { foe: attackerLabel, spell: spName, name: spTarget.name, dmg } }, 'danger',
+                                        { fx: { kind: 'cast', caster: null, effect: 'damage', school, amount: dmg, area: false } });
                                     if (sp.lifesteal && enemy.hp > 0) {
                                         const stolen = Math.floor(dmg * sp.lifesteal);
                                         enemy.hp = Math.min(enemy.maxHp, enemy.hp + stolen);
@@ -2202,10 +2275,10 @@ export class ExplorationSystem {
                                     const rounds = sp.dot.rounds || sp.dot.ticks || 3;
                                     const statusType = sp.dot.status || 'poison';
                                     if (statusType === 'poison' && this._memberHasPoisonImmunity(spTarget)) {
-                                        this._addLog(exp, game, `${spTarget.name} resists the poison!`, 'combat');
+                                        this._addLog(exp, game, { key: 'msg.exp.resists_poison', params: { name: spTarget.name } }, 'combat');
                                     } else {
                                         this._applyCombatStatus(spTarget, statusType, rounds, { damageRange: sp.dot.damage });
-                                        this._addLog(exp, game, `${spTarget.name} is poisoned!`, 'danger');
+                                        this._addLog(exp, game, { key: 'msg.exp.poisoned', params: { name: spTarget.name } }, 'danger');
                                     }
                                 }
                             }
@@ -2217,8 +2290,10 @@ export class ExplorationSystem {
                                     this._applyCombatStatus(t, sp.cc.type, sp.cc.rounds || 1, sp.cc.mult !== undefined ? { mult: sp.cc.mult } : {});
                                 }
                                 if (ccTargets.length > 0) {
-                                    const verb = sp.cc.type === 'stun' ? 'stuns' : sp.cc.type === 'slow' ? 'slows' : 'weakens';
-                                    this._addLog(exp, game, `${attackerLabel} casts ${spName} and ${verb} ${sp.cc.aoe ? 'the party' : ccTargets[0].name}!`, 'danger');
+                                    const verb = sp.cc.type === 'stun' ? 'stun' : sp.cc.type === 'slow' ? 'slow' : 'weaken';
+                                    const target = sp.cc.aoe ? ref('msg.exp.label.the_party_lower', 'the party') : ccTargets[0].name;
+                                    this._addLog(exp, game, { key: `msg.exp.foe_cast_cc.${verb}`, params: { foe: attackerLabel, spell: spName, target } }, 'danger',
+                                        { fx: { kind: 'cast', caster: null, effect: 'other', school, amount: null, area: !!sp.cc.aoe } });
                                 }
                             }
                             castSpell = true; break;
@@ -2241,12 +2316,15 @@ export class ExplorationSystem {
                     let dmg = enemy.damage + randInt(0, 2);
                     if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
                     if (Math.random() < baseMissChance) {
-                        this._addLog(exp, game, `${attackerLabel} misses the ${targetSummon.name}!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.foe_misses_companion', params: { foe: attackerLabel, target: companionRef(targetSummon) } }, 'combat',
+                            { fx: { kind: 'miss', byParty: false, dodger: null } });
                     } else {
                         targetSummon.hp -= dmg;
-                        this._addLog(exp, game, `${attackerLabel} strikes the ${targetSummon.name} for ${dmg}!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.foe_strikes_companion', params: { foe: attackerLabel, target: companionRef(targetSummon), dmg } }, 'combat',
+                            { fx: { kind: 'hit', byParty: false, target: null, amount: dmg } });
                         if (targetSummon.hp <= 0) {
-                            this._addLog(exp, game, `The ${targetSummon.name} is destroyed!`, 'danger');
+                            this._addLog(exp, game, { key: 'msg.exp.summon_destroyed', params: { summon: companionRef(targetSummon) } }, 'danger',
+                                { fx: { kind: 'summon_end', summon: targetSummon.name } });
                             exp.summons.splice(exp.summons.indexOf(targetSummon), 1);
                         }
                     }
@@ -2257,12 +2335,15 @@ export class ExplorationSystem {
                     let dmg = enemy.damage + randInt(0, 2);
                     if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
                     if (Math.random() < baseMissChance) {
-                        this._addLog(exp, game, `${attackerLabel} misses the ${targetSummon.name}!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.foe_misses_companion', params: { foe: attackerLabel, target: companionRef(targetSummon) } }, 'combat',
+                            { fx: { kind: 'miss', byParty: false, dodger: null } });
                     } else {
                         targetSummon.hp -= dmg;
-                        this._addLog(exp, game, `${attackerLabel} strikes the ${targetSummon.name} for ${dmg}!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.foe_strikes_companion', params: { foe: attackerLabel, target: companionRef(targetSummon), dmg } }, 'combat',
+                            { fx: { kind: 'hit', byParty: false, target: null, amount: dmg } });
                         if (targetSummon.hp <= 0) {
-                            this._addLog(exp, game, `The ${targetSummon.name} is slain!`, 'danger');
+                            this._addLog(exp, game, { key: 'msg.exp.summon_slain', params: { summon: companionRef(targetSummon) } }, 'danger',
+                                { fx: { kind: 'summon_end', summon: targetSummon.name } });
                             exp.summons.splice(exp.summons.indexOf(targetSummon), 1);
                         }
                     }
@@ -2277,16 +2358,20 @@ export class ExplorationSystem {
                     let dmg = enemy.damage + randInt(0, 2);
                     if (enemyWeaken !== 1) dmg = Math.max(1, Math.floor(dmg * enemyWeaken));
                     if (Math.random() < baseMissChance) {
-                        this._addLog(exp, game, `${attackerLabel} misses the ${targetBeast.name}!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.foe_misses_companion', params: { foe: attackerLabel, target: companionRef(targetBeast) } }, 'combat',
+                            { fx: { kind: 'miss', byParty: false, dodger: null } });
                     } else {
                         targetBeast.hp -= dmg;
-                        this._addLog(exp, game, `${attackerLabel} strikes the ${targetBeast.name} for ${dmg}!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.foe_strikes_companion', params: { foe: attackerLabel, target: companionRef(targetBeast), dmg } }, 'combat',
+                            { fx: { kind: 'hit', byParty: false, target: null, amount: dmg } });
                         if (targetBeast.hp <= 0) {
-                            this._addLog(exp, game, `The ${targetBeast.name} has fallen! It will recover back at the colony.`, 'danger');
+                            this._addLog(exp, game, { key: 'msg.exp.beast_fallen', params: { beast: companionRef(targetBeast) } }, 'danger');
                             if (exp.summary) {
                                 if (!exp.summary.beastsDefeated) exp.summary.beastsDefeated = [];
                                 if (!exp.summary.beastsDefeated.includes(targetBeast.name)) {
                                     exp.summary.beastsDefeated.push(targetBeast.name);
+                                    // Types too, so the summary can name them in the active language.
+                                    (exp.summary.beastsDefeatedTypes ||= []).push(targetBeast.type);
                                 }
                             }
                         }
@@ -2323,7 +2408,9 @@ export class ExplorationSystem {
                 if (target.dodgeCharges > 0) {
                     target.dodgeCharges--;
                     target._lastDodgeTick = game.tick;
-                    this._addLog(exp, game, `${target.name} phases through ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
+                    this._addLog(exp, game, enemy.isBoss
+                        ? { key: 'msg.exp.phases_through_boss', params: { name: target.name, boss: enemyNameRef(enemy) } }
+                        : { key: 'msg.exp.phases_through', params: { name: target.name } }, 'combat', { fx: { kind: 'miss', byParty: false, dodger: target.name } });
                     continue;
                 }
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
@@ -2332,7 +2419,9 @@ export class ExplorationSystem {
                 dodgeChance = Math.min(0.75, dodgeChance);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
                     target._lastDodgeTick = game.tick;
-                    this._addLog(exp, game, `${target.name} dodges ${enemy.isBoss ? enemy.name + '\'s' : 'an'} attack!`, 'combat');
+                    this._addLog(exp, game, enemy.isBoss
+                        ? { key: 'msg.exp.dodges_boss', params: { name: target.name, boss: enemyNameRef(enemy) } }
+                        : { key: 'msg.exp.dodges', params: { name: target.name } }, 'combat', { fx: { kind: 'miss', byParty: false, dodger: target.name } });
                     continue;
                 }
 
@@ -2351,13 +2440,13 @@ export class ExplorationSystem {
                 dmg = Math.max(1, Math.floor(dmg * formDmgTaken));
 
                 if (Math.random() < baseMissChance) {
-                    const msg = pickRandom(EXPLORATION_EVENTS.combatMiss).replace('{attacker}', attackerLabel).replace('{target}', target.name);
-                    this._addLog(exp, game, msg, 'combat');
+                    const line = eventLine('combatMiss', randInt(0, EXPLORATION_EVENTS.combatMiss.length - 1), { attacker: attackerLabel, target: target.name });
+                    this._addLog(exp, game, line, 'combat', { fx: { kind: 'miss', byParty: false, dodger: target.name } });
                 } else {
                     target.hp -= dmg;
                     if (exp.summary) exp.summary.damageTaken[target.id] = (exp.summary.damageTaken[target.id] || 0) + dmg;
-                    const msg = pickRandom(EXPLORATION_EVENTS.combatHit).replace('{attacker}', attackerLabel).replace('{target}', target.name).replace('{dmg}', dmg);
-                    this._addLog(exp, game, msg, 'combat');
+                    const line = eventLine('combatHit', randInt(0, EXPLORATION_EVENTS.combatHit.length - 1), { attacker: attackerLabel, target: target.name, dmg });
+                    this._addLog(exp, game, line, 'combat', { fx: { kind: 'hit', byParty: false, target: target.name, amount: dmg } });
                     window.soundManager?.playExpSFX('colonist_damaged');
                     // Flag a "block" for the visual layer when armor/shield absorbed a
                     // meaningful chunk (>=25%) of the blow. This drives the brace-and-spark
@@ -2368,9 +2457,9 @@ export class ExplorationSystem {
                     let thorns = targetItems.reduce((sum, it) => sum + (it.thornsDamage || 0), 0) + globalThorns;
                     if (thorns > 0 && enemy.hp > 0) {
                         enemy.hp -= thorns;
-                        this._addLog(exp, game, `Thorns deal ${thorns} damage back!`, 'combat');
+                        this._addLog(exp, game, { key: 'msg.exp.thorns', params: { dmg: thorns } }, 'combat');
                         if (enemy.hp <= 0) {
-                            this._addLog(exp, game, `${attackerLabel} is slain by thorns!`, 'success');
+                            this._addLog(exp, game, { key: 'msg.exp.thorns_kill', params: { foe: attackerLabel } }, 'success', { fx: { kind: 'kill', byParty: true } });
                             if (enemy.elite) { exp.eliteKills++; this._processEliteOnDeath(enemy, exp, game); }
                             this._processEnemyOnDeath(enemy, exp, game);
                         }
@@ -2447,11 +2536,12 @@ export class ExplorationSystem {
                         for (const t of targets) {
                             t.hp -= dmg;
                         }
-                        this._addLog(exp, game, `${member.name} casts ${spell.name}! Hits ${targets.length} foes for ${dmg} each.`, 'combat');
-                        game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                        this._addLog(exp, game, { key: 'msg.exp.cast_aoe', params: { name: member.name, spell: defRef(spell), n: targets.length, dmg } }, 'combat',
+                            { fx: { kind: 'cast', caster: member.name, effect: 'damage', school: spell.school, amount: dmg, area: false } });
+                        game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                         window.soundManager?.playExpSFX('spell_cast');
                         for (const t of targets) {
-                            if (t.hp <= 0) { this._addLog(exp, game, `An enemy is destroyed by the blast!`, 'success'); this._processEnemyOnDeath(t, exp, game); }
+                            if (t.hp <= 0) { this._addLog(exp, game, { key: 'msg.exp.blast_kill_enemy' }, 'success', { fx: { kind: 'kill', byParty: true } }); this._processEnemyOnDeath(t, exp, game); }
                         }
                     } else if (spell.effect === 'chain_damage') {
                         // Arc across up to chainTargets foes, losing chainFalloff of the
@@ -2464,25 +2554,27 @@ export class ExplorationSystem {
                             const applied = Math.max(1, Math.floor(hopDmg));
                             t.hp -= applied;
                             hitCount++;
-                            if (t.hp <= 0) { this._addLog(exp, game, `${member.name}'s ${spell.name} arcs through a foe, slaying it!`, 'success'); this._processEnemyOnDeath(t, exp, game); }
+                            if (t.hp <= 0) { this._addLog(exp, game, { key: 'msg.exp.chain_kill', params: { name: member.name, spell: defRef(spell) } }, 'success', { fx: { kind: 'kill', byParty: true } }); this._processEnemyOnDeath(t, exp, game); }
                             hopDmg *= (spell.chainFalloff || 0.6);
                         }
-                        this._addLog(exp, game, `${member.name} casts ${spell.name}, arcing through ${hitCount} ${hitCount === 1 ? 'foe' : 'foes'}!`, 'combat');
-                        game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                        this._addLog(exp, game, { key: 'msg.exp.cast_chain', params: { name: member.name, spell: defRef(spell), n: hitCount } }, 'combat',
+                            { fx: { kind: 'cast', caster: member.name, effect: 'damage', school: spell.school, amount: null, area: false } });
+                        game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                         window.soundManager?.playExpSFX('spell_cast');
                     } else {
                         const target = combat.enemies.find(e => e.hp > 0);
                         if (target) {
                             target.hp -= dmg;
-                            this._addLog(exp, game, `${member.name} casts ${spell.name} at an enemy for ${dmg} damage!`, 'combat');
-                            game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                            this._addLog(exp, game, { key: 'msg.exp.cast_bolt', params: { name: member.name, spell: defRef(spell), dmg } }, 'combat',
+                                { fx: { kind: 'cast', caster: member.name, effect: 'damage', school: spell.school, amount: dmg, area: false } });
+                            game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                             window.soundManager?.playExpSFX('spell_cast');
                             // Frost Lance et al. slow the struck foe for a couple of rounds.
                             if (spell.effect === 'ranged_damage_slow' && target.hp > 0) {
                                 this._applyCombatStatus(target, 'slow', spell.slowRounds || 2, { mult: spell.slowMult || 0.5 });
-                                this._addLog(exp, game, `The enemy is slowed by frost!`, 'combat');
+                                this._addLog(exp, game, { key: 'msg.exp.frost_slow' }, 'combat');
                             }
-                            if (target.hp <= 0) { this._addLog(exp, game, `${member.name}'s spell slays a foe!`, 'success'); this._processEnemyOnDeath(target, exp, game); }
+                            if (target.hp <= 0) { this._addLog(exp, game, { key: 'msg.exp.spell_kill', params: { name: member.name } }, 'success', { fx: { kind: 'kill', byParty: true } }); this._processEnemyOnDeath(target, exp, game); }
                         }
                     }
                     break;
@@ -2493,8 +2585,9 @@ export class ExplorationSystem {
                     member._lastCastTick = game.tick;
                     const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
                     member.dodgeCharges = (member.dodgeCharges || 0) + charges;
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, phasing through attacks!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_phase', params: { name: member.name, spell: defRef(spell) } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'phase', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_teleport');
                     break;
                 } else if (spell.effect === 'buff_defense' || spell.effect === 'absorb_shield') {
@@ -2510,8 +2603,9 @@ export class ExplorationSystem {
                         t.shieldExpiresTick = game.tick + (spell.duration || 60);
                         t.shieldReduction = reduction;
                     }
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, shielding ${this._targetsLabel(member, targets)}!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, this._buffMessage('msg.exp.cast_shield', member, spell, targets), 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'shield', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_shield');
                     break;
                 } else if (spell.effect === 'summon') {
@@ -2539,8 +2633,9 @@ export class ExplorationSystem {
                         const entityDef = ENTITIES[spell.summonType];
                         this.summonsSeen.set(spell.summonType, { name: summonDef.name, char: entityDef?.char || summonDef.char || '?', color: summonDef.color || '#9966ff', sprite: spell.summonType, lore: entityDef?.lore || '' });
                     }
-                    this._addLog(exp, game, `${member.name} summons a ${summonDef.name}!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.summons', params: { name: member.name, summon: entityRef(spell.summonType) } }, 'combat',
+                        { fx: { kind: 'summon', caster: member.name } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('summon_arrival');
                     break;
                 } else if (spell.effect === 'summon_swarm') {
@@ -2574,8 +2669,9 @@ export class ExplorationSystem {
                         const entityDef = ENTITIES[spell.summonType];
                         this.summonsSeen.set(spell.summonType, { name: summonDef.name, char: entityDef?.char || summonDef.char || '?', color: summonDef.color || '#9966ff', sprite: spell.summonType, lore: entityDef?.lore || '' });
                     }
-                    this._addLog(exp, game, `${member.name} conjures a swarm of ${count} ${summonDef.name}s!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.summon_swarm', params: { name: member.name, n: count, summon: entityRef(spell.summonType) } }, 'combat',
+                        { fx: { kind: 'summon', caster: member.name } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('summon_arrival');
                     break;
                 } else if (spell.effect === 'stun') {
@@ -2587,8 +2683,11 @@ export class ExplorationSystem {
                     if (foes.length === 0) continue;
                     this._payForSpell(member, spellKey, spell, game);
                     for (const t of foes) this._applyCombatStatus(t, 'stun', spell.stunRounds || 1);
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, stunning ${foes.length === 1 ? (foes[0].isBoss ? foes[0].name : 'a foe') : foes.length + ' foes'}!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, foes.length === 1
+                        ? { key: 'msg.exp.cast_stun_one', params: { name: member.name, spell: defRef(spell), target: foeOrBoss(foes[0]) } }
+                        : { key: 'msg.exp.cast_stun_many', params: { name: member.name, spell: defRef(spell), n: foes.length } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_cast');
                     break;
                 } else if (spell.effect === 'dot_burn') {
@@ -2598,8 +2697,9 @@ export class ExplorationSystem {
                     member.spellCooldowns[spellKey] = game.tick;
                     member._lastCastTick = game.tick;
                     this._applyCombatStatus(target, 'burn', spell.burnRounds || 3, { damage: spell.damage || 4 });
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, setting a foe ablaze!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_burn', params: { name: member.name, spell: defRef(spell) } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_cast');
                     break;
                 } else if (spell.effect === 'ranged_damage_hex') {
@@ -2613,10 +2713,11 @@ export class ExplorationSystem {
                     hexDmg = Math.floor(hexDmg * this._getMutatorEffect(exp, 'spellDamageMult'));
                     target.hp -= hexDmg;
                     this._applyCombatStatus(target, 'vulnerable', spell.hexRounds || 3, { damageMult: spell.hexDamageMult || 1.2 });
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} for ${hexDmg} damage! The foe is hexed and vulnerable.`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_hex', params: { name: member.name, spell: defRef(spell), dmg: hexDmg } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'damage', school: spell.school, amount: hexDmg, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_cast');
-                    if (target.hp <= 0) { this._addLog(exp, game, `${member.name}'s spell slays a foe!`, 'success'); this._processEnemyOnDeath(target, exp, game); }
+                    if (target.hp <= 0) { this._addLog(exp, game, { key: 'msg.exp.spell_kill', params: { name: member.name } }, 'success', { fx: { kind: 'kill', byParty: true } }); this._processEnemyOnDeath(target, exp, game); }
                     break;
                 } else if (spell.effect === 'knockback') {
                     const target = combat.enemies.find(e => e.hp > 0);
@@ -2628,10 +2729,11 @@ export class ExplorationSystem {
                     let kbDmg = Math.floor(spell.damage * expeditionSpellPower(member, spell) * (1 + schoolBonus));
                     target.hp -= kbDmg;
                     this._applyCombatStatus(target, 'stun', spell.stunRounds || 1);
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} for ${kbDmg} damage, blasting a foe back!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_knockback', params: { name: member.name, spell: defRef(spell), dmg: kbDmg } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'damage', school: spell.school, amount: kbDmg, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_cast');
-                    if (target.hp <= 0) { this._addLog(exp, game, `A foe is destroyed by the blast!`, 'success'); this._processEnemyOnDeath(target, exp, game); }
+                    if (target.hp <= 0) { this._addLog(exp, game, { key: 'msg.exp.blast_kill_foe' }, 'success', { fx: { kind: 'kill', byParty: true } }); this._processEnemyOnDeath(target, exp, game); }
                     break;
                 } else if (spell.effect === 'buff_defense_self' && !member.shieldActive) {
                     member.mana -= this._spellManaCost(member, spell);
@@ -2640,8 +2742,9 @@ export class ExplorationSystem {
                     member.shieldActive = true;
                     member.shieldExpiresTick = game.tick + (spell.duration || 60);
                     member.shieldReduction = Math.min(0.75, spell.damageReduction * expeditionSpellPower(member, spell));
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} and steels themselves!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_steel', params: { name: member.name, spell: defRef(spell) } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'shield', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_shield');
                     break;
                 } else if (spell.effect === 'debuff_accuracy') {
@@ -2652,8 +2755,9 @@ export class ExplorationSystem {
                     member.spellCooldowns[spellKey] = game.tick;
                     member._lastCastTick = game.tick;
                     this._applyCombatStatus(target, 'weaken', spell.weakenRounds || 3, { mult: spell.weakenMult || 0.7 });
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} — a dark omen hangs over a foe!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_omen', params: { name: member.name, spell: defRef(spell) } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_cast');
                     break;
                 } else if (spell.effect === 'buff_miss_chance') {
@@ -2664,8 +2768,9 @@ export class ExplorationSystem {
                     this._payForSpell(member, spellKey, spell, game);
                     const charges = Math.max(1, Math.round((spell.dodgeBonus || 0.25) * 8 * expeditionSpellPower(member, spell)));
                     for (const t of targets) t.dodgeCharges = (t.dodgeCharges || 0) + charges;
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, shrouding ${this._targetsLabel(member, targets)} in misdirection!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, this._buffMessage('msg.exp.cast_misdirection', member, spell, targets), 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_buff');
                     break;
                 } else if (spell.effect === 'convert_enemy') {
@@ -2676,8 +2781,11 @@ export class ExplorationSystem {
                     this._payForSpell(member, spellKey, spell, game);
                     const rounds = (spell.bindRounds || 2) + Math.floor(this._levelsOver(member, spell) / 3);
                     this._applyCombatStatus(target, 'stun', rounds);
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}: ${target.isBoss ? target.name + ' is' : 'a foe is'} compelled to stand down!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, target.isBoss
+                        ? { key: 'msg.exp.cast_bind_boss', params: { name: member.name, spell: defRef(spell), boss: enemyNameRef(target) } }
+                        : { key: 'msg.exp.cast_bind', params: { name: member.name, spell: defRef(spell) } }, 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_buff');
                     break;
                 } else if (spell.effect === 'summon_decoy') {
@@ -2694,8 +2802,9 @@ export class ExplorationSystem {
                         const entityDef = ENTITIES['decoy'];
                         this.summonsSeen.set('decoy', { name: summonDef.name, char: entityDef?.char || summonDef.char || '?', color: summonDef.color || '#9966ff', sprite: 'decoy', lore: entityDef?.lore || '' });
                     }
-                    this._addLog(exp, game, `${member.name} conjures a Decoy to draw enemy fire!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_decoy', params: { name: member.name } }, 'combat',
+                        { fx: { kind: 'summon', caster: member.name } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('summon_arrival');
                     break;
                 } else if (spell.effect === 'buff_speed' && spell.expeditionAttackSpeed) {
@@ -2705,8 +2814,9 @@ export class ExplorationSystem {
                     this._payForSpell(member, spellKey, spell, game);
                     const value = spell.expeditionAttackSpeed * expeditionSpellPower(member, spell);
                     for (const t of targets) this._applyCombatStatus(t, 'buff_attackSpeed', spell.expeditionRounds || 6, { value });
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}: ${this._targetsLabel(member, targets)} strike${targets.length === 1 && targets[0] !== member ? 's' : ''} with blurring speed!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, this._buffMessage('msg.exp.cast_haste', member, spell, targets), 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_buff');
                     break;
                 } else if (spell.effect === 'buff_speed') {
@@ -2718,8 +2828,9 @@ export class ExplorationSystem {
                     this._payForSpell(member, spellKey, spell, game);
                     const charges = Math.max(1, Math.round((Math.round((spell.workSpeedBonus || 0.2) * 5) + 1) * expeditionSpellPower(member, spell)));
                     for (const t of targets) t.dodgeCharges = (t.dodgeCharges || 0) + charges;
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}: ${this._targetsLabel(member, targets)} move${targets.length === 1 && targets[0] !== member ? 's' : ''} with supernatural speed!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, this._buffMessage('msg.exp.cast_quicken', member, spell, targets), 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_buff');
                     break;
                 } else if (spell.effect === 'buff_inspire') {
@@ -2731,8 +2842,9 @@ export class ExplorationSystem {
                     this._payForSpell(member, spellKey, spell, game);
                     const dmgMult = 1 + (spell.workSpeedBonus || 0.3) * expeditionSpellPower(member, spell);
                     for (const t of targets) this._applyCombatStatus(t, 'inspired', spell.inspireRounds || 3, { dmgMult });
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, filling ${this._targetsLabel(member, targets)} with fighting spirit!`, 'combat');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, this._buffMessage('msg.exp.cast_inspire', member, spell, targets), 'combat',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_buff');
                     break;
                 }
@@ -2768,9 +2880,11 @@ export class ExplorationSystem {
                     const healPower = spell.healAmount * expeditionSpellPower(member, spell) * (1 + (member.spellHealBonus || 0));
                     const healed = Math.min(Math.round(healPower), target.maxHp - target.hp);
                     target.hp += healed;
-                    const who = target === member ? '' : ` ${target.name}`;
-                    this._addLog(exp, game, `${member.name} casts ${spell.name} and heals${who || ' themselves'} for ${healed} HP.`, 'success');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, target === member
+                        ? { key: 'msg.exp.cast_heal_self', params: { name: member.name, spell: defRef(spell), amount: healed } }
+                        : { key: 'msg.exp.cast_heal', params: { name: member.name, spell: defRef(spell), target: target.name, amount: healed } }, 'success',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'heal', school: spell.school, amount: healed, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_heal');
                     break;
                 } else if (spell.effect === 'chain_heal') {
@@ -2796,8 +2910,9 @@ export class ExplorationSystem {
                         if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed;
                         power *= (spell.chainFalloff || 0.6);
                     }
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, mending ${wounded.length} ${wounded.length === 1 ? 'ally' : 'allies'} for ${total} HP total.`, 'success');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_chain_heal', params: { name: member.name, spell: defRef(spell), n: wounded.length, amount: total } }, 'success',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'heal', school: spell.school, amount: total, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_heal');
                     break;
                 } else if (spell.effect === 'heal_aura') {
@@ -2816,8 +2931,9 @@ export class ExplorationSystem {
                         total += healed;
                         if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healed;
                     }
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, restoring ${total} HP across ${wounded.length} ${wounded.length === 1 ? 'ally' : 'allies'}.`, 'success');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_heal_aura', params: { name: member.name, spell: defRef(spell), n: wounded.length, amount: total } }, 'success',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'heal', school: spell.school, amount: total, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_heal');
                     break;
                 } else if (spell.effect === 'cleanse') {
@@ -2842,8 +2958,9 @@ export class ExplorationSystem {
                     exp.activeEffects = (exp.activeEffects || []).filter(e => !(e.targetId === afflicted.p.id && e.type === 'dot'));
                     afflicted.p.statusEffects = (afflicted.p.statusEffects || []).filter(e => !harmfulStatusTypes.has(e.type));
                     afflicted.p._lastCleanseTick = game.tick;
-                    this._addLog(exp, game, `${member.name} casts ${spell.name}, cleansing ${afflicted.p.name} of afflictions!`, 'success');
-                    game.eventLog.add(game, `${member.name} casts ${spell.name} (${spell.manaCost} MP)`, 'info', null);
+                    this._addLog(exp, game, { key: 'msg.exp.cast_cleanse', params: { name: member.name, spell: defRef(spell), target: afflicted.p.name } }, 'success',
+                        { fx: { kind: 'cast', caster: member.name, effect: 'other', school: spell.school, amount: null, area: false } });
+                    game.eventLog.add(game, { key: 'msg.exp.cast_event', params: { name: member.name, spell: defRef(spell), mp: spell.manaCost } }, 'info', null);
                     window.soundManager?.playExpSFX('spell_buff');
                     break;
                 }
@@ -2874,10 +2991,13 @@ export class ExplorationSystem {
         return tank ? [tank] : [];
     }
 
-    // Log label for a buff's recipients.
-    _targetsLabel(member, targets) {
-        if (targets.length > 1) return 'the party';
-        return targets[0] === member ? 'themselves' : targets[0].name;
+    // Log line for a party buff, by who it covers: `<key>_party`, `<key>_self`
+    // (the caster) or `<key>_ally` (one other member, as `target`).
+    _buffMessage(key, member, spell, targets) {
+        const params = { name: member.name, spell: defRef(spell) };
+        if (targets.length > 1) return { key: `${key}_party`, params };
+        if (targets[0] === member) return { key: `${key}_self`, params };
+        return { key: `${key}_ally`, params: { ...params, target: targets[0].name } };
     }
 
     // Living, un-stunned foes, most dangerous first: the boss, then by damage.
@@ -2930,7 +3050,7 @@ export class ExplorationSystem {
                 member.shieldActive = false;
                 member.shieldReduction = 0;
                 member.shieldExpiresTick = null;
-                if (member.hp > 0) this._addLog(exp, game, `${member.name}'s shield fades.`, 'info');
+                if (member.hp > 0) this._addLog(exp, game, { key: 'msg.exp.shield_fades', params: { name: member.name } }, 'info');
             }
         }
     }
@@ -2970,20 +3090,19 @@ export class ExplorationSystem {
 
             if (exp.combat.isBoss && dim.boss) {
                 const boss = dim.boss;
-                this._addLog(exp, game, boss.defeatText, 'success');
+                this._addLog(exp, game, defMessage(boss, 'defeatText'), 'success');
                 if (!exp.loot._items) exp.loot._items = [];
                 for (const lootEntry of boss.guaranteedLoot) {
                     if (Math.random() < lootEntry.chance) {
                         exp.loot._items.push(lootEntry.item);
-                        const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
-                        this._addLog(exp, game, `Found ${itemName}!`, 'loot', { itemKey: lootEntry.item });
+                        this._addLog(exp, game, { key: 'msg.exp.found_item', params: { item: resourceRef(lootEntry.item) } }, 'loot', { itemKey: lootEntry.item });
                         break;
                     }
                 }
                 for (const [res, amt] of Object.entries(boss.bonusResources)) {
                     const boosted = Math.floor(amt * lootAmountMutMult * this._realmResourceMult(exp, res)) + lootBonusFlat;
                     exp.loot[res] = (exp.loot[res] || 0) + boosted;
-                    this._addLog(exp, game, `+${boosted} ${res.replace(/_/g, ' ')} from the boss!`, 'loot', { itemKey: res });
+                    this._addLog(exp, game, { key: 'msg.exp.boss_resource', params: { amount: boosted, resource: resourceRef(res) } }, 'loot', { itemKey: res });
                 }
                 this._awardExpeditionXP(exp, game, EXPEDITION_XP_CONFIG.xpPerBossKill);
                 this._awardAnimalExpeditionXP(exp, ANIMAL_XP_CONFIG.xpPerBossKill);
@@ -3005,18 +3124,17 @@ export class ExplorationSystem {
                 if (lootEntry.item) {
                     if (!exp.loot._items) exp.loot._items = [];
                     exp.loot._items.push(lootEntry.item);
-                    const itemName = ALL_ITEMS[lootEntry.item]?.name || lootEntry.item;
-                    this._addLog(exp, game, `Victory! Found ${itemName}!`, 'success');
+                    this._addLog(exp, game, { key: 'msg.exp.victory_item', params: { item: resourceRef(lootEntry.item) } }, 'success');
                 } else {
                     const resMult = this._realmResourceMult(exp, lootEntry.resource);
                     const amount = Math.floor(lootEntry.amount * lootMult * eliteLootMult * lootAmountMutMult * resMult) + lootBonusFlat;
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                    this._addLog(exp, game, `Victory! Looted ${amount} ${lootEntry.resource.replace(/_/g, ' ')}.`, 'success');
+                    this._addLog(exp, game, { key: 'msg.exp.victory_resource', params: { amount, resource: resourceRef(lootEntry.resource) } }, 'success');
                 }
                 window.soundManager?.playExpSFX('loot_drop');
             }
         } else {
-            this._addLog(exp, game, 'The party has been overwhelmed...', 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.overwhelmed' }, 'danger');
             window.soundManager?.playExpSFX('mental_break');
         }
         for (const member of exp.partySnapshot) {
@@ -3110,7 +3228,7 @@ export class ExplorationSystem {
             while (xpData.xp >= needed && xpData.level < EXPEDITION_XP_CONFIG.maxLevel) {
                 xpData.xp -= needed;
                 xpData.level++;
-                this._addLog(exp, game, `${snapshot.name} reached Adventurer level ${xpData.level}!`, 'success');
+                this._addLog(exp, game, { key: 'msg.exp.adventurer_level', params: { name: snapshot.name, level: xpData.level } }, 'success');
                 window.soundManager?.playExpSFX('magic_levelup');
                 needed = EXPEDITION_XP_CONFIG.xpToLevel + xpData.level * EXPEDITION_XP_CONFIG.xpScalePerLevel;
             }
@@ -3130,7 +3248,7 @@ export class ExplorationSystem {
             while (animal.xp >= needed && animal.level < ANIMAL_XP_CONFIG.maxLevel) {
                 animal.xp -= needed;
                 animal.level++;
-                this._addLog(exp, game, `${animal.name || animal.type} reached Animal Level ${animal.level}!`, 'success');
+                this._addLog(exp, game, { key: 'msg.exp.animal_level', params: { name: animal.name || entityRef(animal.type), level: animal.level } }, 'success');
                 window.soundManager?.playExpSFX('magic_levelup');
                 needed = ANIMAL_XP_CONFIG.xpToLevel + animal.level * ANIMAL_XP_CONFIG.xpScalePerLevel;
             }
@@ -3176,12 +3294,14 @@ export class ExplorationSystem {
                 if (multiRealm) newEntry.realms = [entry.realm];
                 if (entry.category === 'boss' && entry.bossPhases?.length) {
                     newEntry.phases = entry.bossPhases.slice(0, Math.max(1, bossDepth))
-                        .map(p => ({ name: p.name || p.displayName || '', sprite: p.sprite || null, color: p.color || null }));
+                        .map(p => ({ name: p.name || p.displayName || '', nameRef: bestiaryPhaseRef(p), sprite: p.sprite || null, color: p.color || null }));
                 }
                 this.bestiary.set(entry.key, newEntry);
             } else {
                 const existing = this.bestiary.get(entry.key);
                 existing.count++;
+                if (!existing.nameRef && entry.nameRef) existing.nameRef = entry.nameRef;
+                if (!existing.loreRef && entry.loreRef) existing.loreRef = entry.loreRef;
                 if (!existing.sprite && entry.sprite) existing.sprite = entry.sprite;
                 if (!existing.color && entry.color) existing.color = entry.color;
                 if (multiRealm) {
@@ -3190,7 +3310,7 @@ export class ExplorationSystem {
                 }
                 if (entry.category === 'boss' && entry.bossPhases?.length && bossDepth > 0) {
                     const seen = entry.bossPhases.slice(0, bossDepth)
-                        .map(p => ({ name: p.name || p.displayName || '', sprite: p.sprite || null, color: p.color || null }));
+                        .map(p => ({ name: p.name || p.displayName || '', nameRef: bestiaryPhaseRef(p), sprite: p.sprite || null, color: p.color || null }));
                     if (!existing.phases) {
                         existing.phases = seen;
                     } else {
@@ -3223,7 +3343,7 @@ export class ExplorationSystem {
         const lootPos = this._returnPos(exp, game);
         if (lootPos) {
             for (const [res, amt] of Object.entries(lootResources)) {
-                game.overlays.push({ type: 'floating_text', x: lootPos.x, y: lootPos.y, text: `+${amt}x ${ALL_ITEMS[res]?.name || res}`, color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
+                game.overlays.push({ type: 'floating_text', x: lootPos.x, y: lootPos.y, text: tr('msg.exp.loot_float', { n: amt, item: resourceRef(res) }), color: '#ffdd44', fontSize: 10, ttl: 20, maxTtl: 20 });
             }
         }
         if (game.discoveredLoot) {
@@ -3236,18 +3356,19 @@ export class ExplorationSystem {
         }
         const parts = [];
         for (const itemKey of items) {
-            parts.push(ALL_ITEMS[itemKey]?.name || itemKey);
+            parts.push(resourceRef(itemKey));
         }
         for (const [res, amt] of Object.entries(lootResources)) {
-            parts.push(`${amt}x ${ALL_ITEMS[res]?.name || res}`);
+            parts.push(ref('msg.exp.loot_amount', null, { n: amt, item: resourceRef(res) }));
         }
-        const lootSummary = parts.join(', ');
+        const loot = parts.length > 0 ? listRef(parts) : ref('msg.exp.loot_nothing', 'nothing');
+        const realm = realmRef(exp.realm, exp.realmName);
         if (!allDefeated) {
-            this._addLog(exp, game, `Returned with: ${lootSummary || 'nothing'}`, 'success');
-            game.eventLog.add(game, `Expedition returned from ${exp.realmName}: ${lootSummary || 'nothing'}`, 'event', null);
+            this._addLog(exp, game, { key: 'msg.exp.returned_with', params: { loot } }, 'success');
+            game.eventLog.add(game, { key: 'msg.exp.returned_event', params: { realm, loot } }, 'event', null);
         } else {
-            this._addLog(exp, game, `Party defeated. Salvaged: ${lootSummary || 'nothing'}`, 'danger');
-            game.eventLog.add(game, `Expedition to ${exp.realmName} failed. Salvaged: ${lootSummary || 'nothing'}`, 'warning', null);
+            this._addLog(exp, game, { key: 'msg.exp.salvaged', params: { loot } }, 'danger');
+            game.eventLog.add(game, { key: 'msg.exp.failed_event', params: { realm, loot } }, 'warning', null);
         }
 
         // Finished runs are kept (and saved) for their summaries, so bound both the
@@ -3358,13 +3479,13 @@ export class ExplorationSystem {
 
         switch (effectKey) {
             case 'surge': {
-                this._addLog(exp, game, '⚡ CHAOS: Reality surges — all damage doubled for 2 rounds!', 'combat');
+                this._addLog(exp, game, { key: 'msg.exp.chaos.surge' }, 'combat');
                 for (const c of allCombatants) this._applyCombatStatus(c, 'chaos_surge', 2, { dmgMult: 2.0 });
                 break;
             }
             case 'drain': {
                 const lossPct = Math.max(0.05, 0.20 - chaosResistance * 0.20);
-                this._addLog(exp, game, `⚡ CHAOS: Everything loses ${Math.round(lossPct * 100)}% current HP!`, 'danger');
+                this._addLog(exp, game, { key: 'msg.exp.chaos.drain', params: { pct: Math.round(lossPct * 100) } }, 'danger');
                 for (const c of allCombatants) {
                     const loss = Math.floor(c.hp * lossPct);
                     c.hp = Math.max(1, c.hp - loss);
@@ -3375,18 +3496,18 @@ export class ExplorationSystem {
                 break;
             }
             case 'frenzy': {
-                this._addLog(exp, game, '⚡ CHAOS: Frenzy seizes all combatants — everyone strikes twice this round!', 'combat');
+                this._addLog(exp, game, { key: 'msg.exp.chaos.frenzy' }, 'combat');
                 for (const c of allCombatants) this._applyCombatStatus(c, 'chaos_frenzy', 1, { extraAttack: true });
                 break;
             }
             case 'restoration': {
-                this._addLog(exp, game, '⚡ CHAOS: A surge of wild energy heals everyone — friend and foe alike!', 'success');
+                this._addLog(exp, game, { key: 'msg.exp.chaos.restoration' }, 'success');
                 for (const c of allCombatants) c.hp = Math.min(c.maxHp, c.hp + Math.floor(c.maxHp * 0.25));
                 break;
             }
             case 'blindness': {
                 const rounds = 2;
-                this._addLog(exp, game, `⚡ CHAOS: Everything goes temporarily blind — 50% chance to miss for ${rounds} rounds!`, 'combat');
+                this._addLog(exp, game, { key: 'msg.exp.chaos.blindness', params: { n: rounds } }, 'combat');
                 for (const c of allCombatants) this._applyCombatStatus(c, 'blind', rounds, { missChance: Math.max(0.1, 0.5 - chaosResistance * 0.3) });
                 break;
             }
@@ -3397,7 +3518,8 @@ export class ExplorationSystem {
                         hp: Math.floor(source.maxHp * 0.5),
                         maxHp: Math.floor(source.maxHp * 0.5),
                         damage: source.damage,
-                        name: source.name ? `Echo of ${source.name}` : 'Echo',
+                        name: source.name ? tr('msg.exp.chaos.echo_of', { name: source.name }) : tr('msg.exp.chaos.echo'),
+                        nameRef: source.name ? ref('msg.exp.chaos.echo_of', null, { name: enemyNameRef(source) }) : ref('msg.exp.chaos.echo'),
                         sprite: source.sprite,
                         color: source.color || '#cc88ff',
                         typeKey: source.typeKey,
@@ -3411,7 +3533,7 @@ export class ExplorationSystem {
                     };
                     clone._nextAttackTick = game.tick + 3;
                     if (combat) combat.enemies.push(clone);
-                    this._addLog(exp, game, `⚡ CHAOS: ${source.name || 'An enemy'} fractures — a duplicate emerges!`, 'danger');
+                    this._addLog(exp, game, { key: 'msg.exp.chaos.duplication', params: { foe: source.name ? enemyNameRef(source) : ref('msg.exp.label.an_enemy_cap', 'An enemy') } }, 'danger');
                 }
                 break;
             }
@@ -3484,11 +3606,11 @@ export class ExplorationSystem {
                         const label = s.type === 'poison' ? 'poison' : 'burning';
                         if (isParty) {
                             if (exp.summary) exp.summary.damageTaken[combatant.id] = (exp.summary.damageTaken[combatant.id] || 0) + dmg;
-                            this._addLog(exp, game, `${combatant.name} suffers ${dmg} ${label} damage!`, 'danger');
+                            this._addLog(exp, game, { key: `msg.exp.dot.${label}.member_damage`, params: { name: combatant.name, dmg } }, 'danger');
                             if (combatant.hp <= 0) this._checkExpeditionRevive(exp, combatant, game);
                         } else {
-                            this._addLog(exp, game, `An enemy takes ${dmg} ${label} damage!`, 'combat');
-                            if (combatant.hp <= 0) this._addLog(exp, game, `A foe succumbs to ${label}!`, 'success');
+                            this._addLog(exp, game, { key: `msg.exp.dot.${label}.enemy_damage`, params: { dmg } }, 'combat');
+                            if (combatant.hp <= 0) this._addLog(exp, game, { key: `msg.exp.dot.${label}.enemy_dies` }, 'success', { fx: { kind: 'kill', byParty: true } });
                         }
                     }
                 }
@@ -3515,11 +3637,17 @@ export class ExplorationSystem {
             enemy._dotEffects = enemy._dotEffects.filter(d => d.rounds > 0);
             for (const d of enemy._dotEffects) {
                 enemy.hp -= d.damage;
-                this._addLog(exp, game, `An enemy takes ${d.damage} ${d.type} damage!`, 'combat');
-                if (enemy.hp <= 0) this._addLog(exp, game, `A foe succumbs to ${d.type}!`, 'success');
+                this._addLog(exp, game, this._weaponDotMessage(d.type, 'enemy_damage', { dmg: d.damage }), 'combat');
+                if (enemy.hp <= 0) this._addLog(exp, game, this._weaponDotMessage(d.type, 'enemy_dies'), 'success', { fx: { kind: 'kill', byParty: true } });
                 d.rounds--;
             }
         }
+    }
+
+    // Log line for a weapon on-hit DoT (poison, bleed, burn) ticking on an enemy.
+    _weaponDotMessage(type, which, params) {
+        const key = `msg.exp.dot.${type}.${which}`;
+        return hasKey(key) ? { key, params } : { key: `msg.exp.dot.other.${which}`, params: { ...params, type } };
     }
 
     _updateActiveEffects(exp, game) {
@@ -3569,7 +3697,7 @@ export class ExplorationSystem {
                     m.hp = Math.min(m.maxHp, m.hp + healAmt);
                     if (m.maxMana > 0) m.mana = Math.min(m.maxMana, m.mana + Math.floor(m.maxMana * 0.01));
                 }
-                this._addLog(exp, game, `${member.name} rallies the party! (+${healAmt} HP each)`, 'success');
+                this._addLog(exp, game, { key: 'msg.exp.rally', params: { name: member.name, amount: healAmt } }, 'success');
                 if (exp.summary) exp.summary.healingDone[member.id] = (exp.summary.healingDone[member.id] || 0) + healAmt * alive.length;
                 // Distinct group beat over the whole party (F1 particles cover the
                 // per-member heals; this adds a single uplifting flourish + SFX).
@@ -3615,7 +3743,7 @@ export class ExplorationSystem {
                 m.hp -= dmg;
                 if (m.hp <= 0) this._checkExpeditionRevive(exp, m, game);
             }
-            this._addLog(exp, game, `The ${enemy.eliteName} enemy explodes! (${dmg} damage to all)`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.elite_explodes', params: { elite: eliteRef(enemy), dmg } }, 'danger');
         }
     }
 
@@ -3625,7 +3753,7 @@ export class ExplorationSystem {
             const alive = exp.partySnapshot.filter(p => p.hp > 0);
             const rounds = enemy.onDeath.rounds ?? 2;
             for (const m of alive) this._applyCombatStatus(m, 'void_drained', rounds, { maxHpMult: 0.75 });
-            this._addLog(exp, game, `${enemy.name} dies and releases void energy! The party is Void-Drained.`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.void_release', params: { foe: enemyNameRef(enemy) } }, 'danger');
         }
     }
 
@@ -3645,7 +3773,7 @@ export class ExplorationSystem {
 
         const oldPhase = phases[nextIdx - 1];
         if (oldPhase.transitionText) {
-            this._addLog(exp, game, oldPhase.transitionText, 'danger');
+            this._addLog(exp, game, oldPhase.transitionKey ? { key: oldPhase.transitionKey } : defMessage(oldPhase, 'transitionText'), 'danger');
         }
 
         bossEnemy.hp = Math.round(nextPhase.hp * this._enemyStatMults(exp).hp);
@@ -3663,11 +3791,18 @@ export class ExplorationSystem {
         // that IS the on-screen boss identity ("Crystal Colossus, Unraveled", or the
         // true name on the finale), so it follows the phase. Other bosses have no
         // displayName and keep their own name; their phase `name` is only a log label.
-        if (nextPhase.displayName) bossEnemy.name = nextPhase.displayName;
+        if (nextPhase.displayName) {
+            bossEnemy.name = nextPhase.displayName;
+            bossEnemy.nameRef = nextPhase.displayNameRef || nextPhase.displayName;
+            bossEnemy.maskKey = nextPhase.maskKey ?? null;
+        }
 
-        this._addLog(exp, game, `${bossEnemy.name} enters phase: ${nextPhase.name}!`, 'danger');
+        const phaseName = phaseNameRef(nextPhase);
+        this._addLog(exp, game, { key: 'msg.exp.boss_phase', params: { boss: enemyNameRef(bossEnemy), phase: phaseName } }, 'danger',
+            { fx: { kind: 'boss_phase', phaseName } });
         if (nextPhase.armorText && bossEnemy.damageReduction > 0) {
-            this._addLog(exp, game, nextPhase.armorText, 'info');
+            const armorOwner = nextPhase._loc ? nextPhase : { _loc: nextPhase.armorLoc, armorText: nextPhase.armorText };
+            this._addLog(exp, game, defMessage(armorOwner, 'armorText'), 'info');
         }
 
         // Chaos phase transition: apply a random chaos effect when entering new phase
@@ -3680,7 +3815,10 @@ export class ExplorationSystem {
         if (oldPhase.voidPactChoice && exp.partySnapshot.some(p => p.hp > 0)) {
             const pact = oldPhase.voidPactChoice;
             exp.pendingVoidPactChoice = {
-                text: pact.promptText,
+                // The config entry's key prefix: promptText, logAccept and logRefuse
+                // are under `<_loc>.<field>`.
+                _loc: pact._loc,
+                text: defMessage(pact, 'promptText'),
                 acceptEffect: pact.acceptEffect,
                 logAccept: pact.logAccept,
                 logRefuse: pact.logRefuse,
@@ -3712,7 +3850,7 @@ export class ExplorationSystem {
                     if (exp.summary) exp.summary.damageTaken[m.id] = (exp.summary.damageTaken[m.id] || 0) + actualDmg;
                     if (m.hp <= 0) this._checkExpeditionRevive(exp, m, game);
                 }
-                this._addLog(exp, game, ability.text || `${bossEnemy.name} unleashes a devastating attack!`, 'danger');
+                this._addLog(exp, game, ability.text ? defMessage(ability, 'text') : { key: 'msg.exp.boss_unleashes', params: { boss: enemyNameRef(bossEnemy) } }, 'danger');
             } else if (ability.type === 'summon_adds' && Math.random() < (ability.chance || 0)) {
                 const count = ability.count || 2;
                 for (let i = 0; i < count; i++) {
@@ -3722,7 +3860,7 @@ export class ExplorationSystem {
                         damage: Math.round(ability.damage * this._enemyStatMults(exp).dmg),
                     });
                 }
-                this._addLog(exp, game, ability.text || `${bossEnemy.name} summons reinforcements!`, 'danger');
+                this._addLog(exp, game, ability.text ? defMessage(ability, 'text') : { key: 'msg.exp.boss_reinforcements', params: { boss: enemyNameRef(bossEnemy) } }, 'danger');
             }
         }
     }
@@ -3753,7 +3891,11 @@ export class ExplorationSystem {
         // Pick a mask different from the current one where possible.
         const masks = this._buildAllMasks();
         if (masks.length === 0) return;
-        const candidates = masks.filter(m => m.displayName !== bossEnemy.name);
+        // By mask id, so a save reloaded in another language still excludes the
+        // current mask. Bosses saved before maskKey existed compare names.
+        const candidates = bossEnemy.maskKey !== undefined
+            ? masks.filter(m => m.maskKey !== bossEnemy.maskKey)
+            : masks.filter(m => m.displayName !== bossEnemy.name);
         const pool = candidates.length > 0 ? candidates : masks;
         const mask = pool[randInt(0, pool.length - 1)];
 
@@ -3763,10 +3905,12 @@ export class ExplorationSystem {
         bossEnemy.sprite = mask.sprite;
         bossEnemy.color = mask.color;
         bossEnemy.name = mask.displayName;
+        bossEnemy.nameRef = mask.displayNameRef;
+        bossEnemy.maskKey = mask.maskKey;
         bossEnemy.abilities = mask.abilities.map(a => ({ ...a }));
         if (pd) pd._swappedThisPhase = true;
 
-        this._addLog(exp, game, `⚡ CHAOS: The form collapses and reknits as the ${mask.label}!`, 'danger');
+        this._addLog(exp, game, { key: 'msg.exp.chaos.mask_swap', params: { boss: mask.labelRef } }, 'danger');
     }
 
     _tryUsePotions(exp, game) {
@@ -3787,7 +3931,7 @@ export class ExplorationSystem {
                     if (def.effect.buffLoot.lootMult) exp.potionLootBoosts.lootMult *= def.effect.buffLoot.lootMult;
                     if (def.effect.buffLoot.rareEncounterMult) exp.potionLootBoosts.rareEncounterMult *= def.effect.buffLoot.rareEncounterMult;
                 }
-                this._addLog(exp, game, def.logText.replace('{name}', alive[0]?.name || 'The party'), 'success');
+                this._addLog(exp, game, defMessage(def, 'logText', { name: this._actorName(alive[0]) }), 'success');
                 if (exp.summary) exp.summary.potionsUsed++;
             }
         }
@@ -3818,7 +3962,7 @@ export class ExplorationSystem {
                             }
                         }
                     }
-                    this._addLog(exp, game, def.logText.replace('{name}', slowed.name), 'success');
+                    this._addLog(exp, game, defMessage(def, 'logText', { name: slowed.name }), 'success');
                     if (exp.summary) exp.summary.potionsUsed++;
                 }
                 continue;
@@ -3890,7 +4034,7 @@ export class ExplorationSystem {
                         member._lastPotionTick = game.tick;
                         window.soundManager?.playExpSFX('spell_buff');
                     }
-                    this._addLog(exp, game, def.logText.replace('{name}', member.name), 'success');
+                    this._addLog(exp, game, defMessage(def, 'logText', { name: member.name }), 'success');
                     if (exp.summary) exp.summary.potionsUsed++;
                     break;
                 }
@@ -3944,6 +4088,10 @@ export class ExplorationSystem {
             sprite: data.sprite || null,
             color: data.color || null,
             lore: data.lore || '',
+            // Refs for the name and lore, so the bestiary can show them in the
+            // active language (name/lore are the text when discovered).
+            nameRef: data.nameRef || null,
+            loreRef: data.loreRef || null,
             eliteModifier: data.eliteModifier || null,
             eliteName: data.eliteName || null,
             bossPhases: data.bossPhases || null,
@@ -3953,6 +4101,44 @@ export class ExplorationSystem {
             exp._lastDiscoveryName = data.name || key;
             window.soundManager?.playExpSFX('spell_divination');
         }
+    }
+
+    /**
+     * Renames bestiary entries keyed by a boss's display name (`boss:<name>`, saves
+     * from before boss entries were keyed by realm) to `boss:<realmKey>`, using the
+     * realm each entry records. Duplicates are merged: counts add, the longer phase
+     * list and any missing refs, sprite, color and lore are kept. Safe to run on
+     * every load; already-migrated data is left alone.
+     * @param {Map<string, object>} bestiary The bestiary map, changed in place.
+     * @return {Map<string, object>} The same map.
+     */
+    migrateBestiaryKeys(bestiary) {
+        if (!bestiary) return bestiary;
+        for (const [key, entry] of [...bestiary]) {
+            if (!key.startsWith('boss:') || !entry || !REALMS[entry.realm]?.boss) continue;
+            const newKey = `boss:${entry.realm}`;
+            if (key === newKey) continue;
+            bestiary.delete(key);
+            entry.key = newKey;
+            const existing = bestiary.get(newKey);
+            if (!existing) {
+                bestiary.set(newKey, entry);
+                continue;
+            }
+            existing.count = (existing.count || 0) + (entry.count || 0);
+            if ((entry.phases?.length || 0) > (existing.phases?.length || 0)) existing.phases = entry.phases;
+            for (const f of ['nameRef', 'loreRef', 'sprite', 'color', 'lore']) {
+                if (!existing[f] && entry[f]) existing[f] = entry[f];
+            }
+            if (entry.eliteCounts) {
+                existing.eliteCounts ||= {};
+                for (const [mod, ec] of Object.entries(entry.eliteCounts)) {
+                    if (existing.eliteCounts[mod]) existing.eliteCounts[mod].count += ec.count || 0;
+                    else existing.eliteCounts[mod] = ec;
+                }
+            }
+        }
+        return bestiary;
     }
 
     _awardAnimalExpeditionXP(exp, amount) {
@@ -4004,9 +4190,9 @@ export class ExplorationSystem {
             if (lootItems && lootItems.length > 0) {
                 const sacrificedIdx = randInt(0, lootItems.length - 1);
                 const sacrificed = lootItems.splice(sacrificedIdx, 1)[0];
-                this._addLog(exp, game, `The offering is accepted. ${ALL_ITEMS[sacrificed]?.name || sacrificed} is consumed by the altar.`, 'event');
+                this._addLog(exp, game, { key: 'msg.exp.altar_offering', params: { item: resourceRef(sacrificed) } }, 'event');
             } else {
-                this._addLog(exp, game, 'The altar accepts nothing. Its patience is noted.', 'event');
+                this._addLog(exp, game, { key: 'msg.exp.altar_nothing' }, 'event');
             }
             // All living members receive void_blessed: +20% max HP and +1 dmg for 4 rounds.
             for (const m of alive) this._applyCombatStatus(m, 'void_blessed', 4, { maxHpMult: 1.20, dmgBonus: 1 });
@@ -4019,7 +4205,7 @@ export class ExplorationSystem {
             weakest.hp = Math.max(1, weakest.hp - effects.voidDrainedSacrifice);
             this._applyCombatStatus(weakest, 'void_drained', 99, { maxHpMult: 0.75, expiresWithExpedition: true });
             weakest._voidDrainedUntil = Infinity;
-            this._addLog(exp, game, `${weakest.name} bleeds on the altar. They feel weakened for the rest of the expedition.`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.altar_bleeds', params: { name: weakest.name } }, 'danger');
             if (weakest.hp <= 0) this._checkExpeditionRevive(exp, weakest, game);
             this._stampResolution(exp, game, false);
         }
@@ -4030,7 +4216,7 @@ export class ExplorationSystem {
                 const loss = Math.floor(m.hp * pct);
                 m.hp = Math.max(1, m.hp - loss);
             }
-            this._addLog(exp, game, `The party pays ${Math.round(pct * 100)}% of their current HP.`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.party_pays_pct', params: { pct: Math.round(pct * 100) } }, 'danger');
             this._stampResolution(exp, game, false);
         }
 
@@ -4038,20 +4224,20 @@ export class ExplorationSystem {
             const buffTarget = alive[Math.floor(Math.random() * alive.length)];
             if (buffTarget.weapon) {
                 buffTarget.weapon = { ...buffTarget.weapon, damage: (buffTarget.weapon.damage || 0) + effects.expeditionWeaponBuff };
-                this._addLog(exp, game, `${buffTarget.name}'s weapon gains +${effects.expeditionWeaponBuff} damage for this expedition.`, 'success');
+                this._addLog(exp, game, { key: 'msg.exp.weapon_buff', params: { name: buffTarget.name, amount: effects.expeditionWeaponBuff } }, 'success');
             }
         }
 
         if (effects.randomPortal) {
             const roll = Math.random();
             if (roll < 0.33) {
-                this._addLog(exp, game, 'The portal leads forward. A fortunate guess.', 'success');
+                this._addLog(exp, game, { key: 'msg.exp.portal_forward' }, 'success');
                 // No extra effect — just progress normally
             } else if (roll < 0.66) {
-                this._addLog(exp, game, 'The portal loops back to the start of this encounter. Wasted time.', 'danger');
+                this._addLog(exp, game, { key: 'msg.exp.portal_loop' }, 'danger');
                 if (exp.currentEncounter > 0) exp.currentEncounter--;
             } else {
-                this._addLog(exp, game, 'The portal opens onto a bonus cache! Enemies guard it.', 'event');
+                this._addLog(exp, game, { key: 'msg.exp.portal_cache' }, 'event');
                 if (effects.spawnCombat === undefined) {
                     const dim = REALMS[exp.realm];
                     const baseCount = randInt(dim.enemies.count[0], dim.enemies.count[1]);
@@ -4074,7 +4260,7 @@ export class ExplorationSystem {
         if (effects.healParty && alive.length > 0) {
             const heal = Math.floor(alive[0].maxHp * effects.healParty);
             for (const m of alive) m.hp = Math.min(m.maxHp, m.hp + heal);
-            this._addLog(exp, game, `Party healed for ${heal} HP each.`, 'success');
+            this._addLog(exp, game, { key: 'msg.exp.party_healed_each', params: { amount: heal } }, 'success');
             this._stampResolution(exp, game, true);
         }
         if (effects.restoreMana) {
@@ -4086,7 +4272,7 @@ export class ExplorationSystem {
             const member = alive[randInt(0, alive.length - 1)];
             const dmg = randInt(EXPLORATION_CONFIG.trapDamageRange[0], EXPLORATION_CONFIG.trapDamageRange[1]);
             member.hp -= dmg;
-            this._addLog(exp, game, `A trap springs! ${member.name} takes ${dmg} damage!`, 'danger');
+            this._addLog(exp, game, { key: 'msg.exp.trap_springs', params: { name: member.name, dmg } }, 'danger');
             if (member.hp <= 0) this._checkExpeditionRevive(exp, member, game);
             this._stampResolution(exp, game, false);
         }
@@ -4098,8 +4284,8 @@ export class ExplorationSystem {
             if (npcKeys.length > 0) {
                 const nKey = npcKeys[randInt(0, npcKeys.length - 1)];
                 const npc = NPC_ENCOUNTERS[nKey];
-                exp.pendingDecision = { type: 'npc', npcKey: nKey, text: npc.text, choices: npc.choices, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter };
-                this._addLog(exp, game, npc.text, 'info');
+                exp.pendingDecision = { type: 'npc', npcKey: nKey, text: defMessage(npc, 'text'), _loc: npc._loc, choices: npc.choices, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter };
+                this._addLog(exp, game, defMessage(npc, 'text'), 'info');
             }
         }
         if (effects.grantLoot) {
@@ -4110,11 +4296,11 @@ export class ExplorationSystem {
                 if (lootEntry.item) {
                     if (!exp.loot._items) exp.loot._items = [];
                     exp.loot._items.push(lootEntry.item);
-                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot', { itemKey: lootEntry.item });
+                    this._addLog(exp, game, { key: 'msg.exp.found_item', params: { item: resourceRef(lootEntry.item) } }, 'loot', { itemKey: lootEntry.item });
                 } else {
                     const amount = Math.floor(lootEntry.amount * mult * this._realmResourceMult(exp, lootEntry.resource));
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot', { itemKey: lootEntry.resource });
+                    this._addLog(exp, game, { key: 'msg.exp.found_resource', params: { amount, resource: resourceRef(lootEntry.resource) } }, 'loot', { itemKey: lootEntry.resource });
                 }
                 window.soundManager?.playExpSFX('loot_drop');
             }
@@ -4131,7 +4317,7 @@ export class ExplorationSystem {
                 const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * this._enemyStatMults(exp).dmg);
                 enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot' || !!eDef.ranged, projectileChar: eDef.projectileChar || null, projectileColor: eDef.projectileColor || null });
             }
-            this._addLog(exp, game, `Enemies emerge! (${count} foes)`, 'combat');
+            this._addLog(exp, game, { key: 'msg.exp.enemies_emerge', params: { n: count } }, 'combat');
             exp.combat = {
                 enemies, round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
                 ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)),
@@ -4168,13 +4354,13 @@ export class ExplorationSystem {
         const alive = exp.partySnapshot.filter(p => p.hp > 0);
 
         if (accept) {
-            this._addLog(exp, game, pact.logAccept, 'event');
+            this._addLog(exp, game, defMessage(pact, 'logAccept'), 'event');
             const fx = pact.acceptEffect;
             if (fx.partyDamage && alive.length > 0) {
                 for (const m of alive) {
                     m.hp = Math.max(1, m.hp - fx.partyDamage);
                 }
-                this._addLog(exp, game, `The party pays ${fx.partyDamage} HP as part of the agreement.`, 'danger');
+                this._addLog(exp, game, { key: 'msg.exp.pact_party_pays', params: { amount: fx.partyDamage } }, 'danger');
             }
             if (fx.nextPhaseDmgMult && exp.bossPhaseData) {
                 exp._voidPactBossDmgMult = fx.nextPhaseDmgMult;
@@ -4185,17 +4371,17 @@ export class ExplorationSystem {
                 if (fx.applyVoidDrained) {
                     this._applyCombatStatus(weakest, 'void_drained', 3, { maxHpMult: 0.75 });
                 }
-                this._addLog(exp, game, `${weakest.name} bears the greater cost.`, 'danger');
+                this._addLog(exp, game, { key: 'msg.exp.pact_weakest', params: { name: weakest.name } }, 'danger');
             }
             if (fx.bossDamage && pact.bossEnemy) {
                 pact.bossEnemy.hp = Math.max(1, pact.bossEnemy.hp - fx.bossDamage);
-                this._addLog(exp, game, `The Arbiter's HP is reduced by ${fx.bossDamage} as part of the terms.`, 'success');
+                this._addLog(exp, game, { key: 'msg.exp.pact_boss_damage', params: { amount: fx.bossDamage } }, 'success');
             }
             if (fx.bossStun && pact.bossEnemy) {
                 this._applyCombatStatus(pact.bossEnemy, 'stun', fx.bossStun);
             }
         } else {
-            this._addLog(exp, game, pact.logRefuse, 'event');
+            this._addLog(exp, game, defMessage(pact, 'logRefuse'), 'event');
         }
         this._unpauseAfterChoice(exp, game);
     }
@@ -4209,11 +4395,11 @@ export class ExplorationSystem {
                 if (lootEntry.item) {
                     if (!exp.loot._items) exp.loot._items = [];
                     exp.loot._items.push(lootEntry.item);
-                    this._addLog(exp, game, `Found ${ALL_ITEMS[lootEntry.item]?.name || lootEntry.item}!`, 'loot', { itemKey: lootEntry.item });
+                    this._addLog(exp, game, { key: 'msg.exp.found_item', params: { item: resourceRef(lootEntry.item) } }, 'loot', { itemKey: lootEntry.item });
                 } else {
                     const amount = Math.floor(lootEntry.amount * (reward.mult || 1.0));
                     exp.loot[lootEntry.resource] = (exp.loot[lootEntry.resource] || 0) + amount;
-                    this._addLog(exp, game, `Found ${amount} ${lootEntry.resource.replace(/_/g, ' ')}!`, 'loot', { itemKey: lootEntry.resource });
+                    this._addLog(exp, game, { key: 'msg.exp.found_resource', params: { amount, resource: resourceRef(lootEntry.resource) } }, 'loot', { itemKey: lootEntry.resource });
                 }
                 window.soundManager?.playExpSFX('loot_drop');
             }
@@ -4243,7 +4429,7 @@ export class ExplorationSystem {
                 const dmg = Math.round(randInt(eDef.damage[0], eDef.damage[1]) * this._enemyStatMults(exp).dmg);
                 enemies.push({ hp, maxHp: hp, damage: dmg, name: eDef.name || null, sprite: eDef.sprite || null, color: eDef.color || null, typeKey: eDef.typeKey || null, spells: eDef.spells || null, attackAnim: eDef.attackAnim || 'Swing', ranged: eDef.attackAnim === 'DrawAndShoot' || !!eDef.ranged, projectileChar: eDef.projectileChar || null, projectileColor: eDef.projectileColor || null });
             }
-            this._addLog(exp, game, `Enemies alerted! (${count} foes)`, 'combat');
+            this._addLog(exp, game, { key: 'msg.exp.enemies_alerted', params: { n: count } }, 'combat');
             exp.combat = {
                 enemies, round: 0, encounterIndex: sourceEncounterIndex ?? exp.currentEncounter, isBoss: false,
                 ambushEndTick: game.tick + Math.max(...exp.partySnapshot.map(m => m.effectiveCooldown)),
@@ -4266,11 +4452,11 @@ export class ExplorationSystem {
                 const heal = Math.floor(m.maxHp * reward.amount);
                 m.hp = Math.min(m.maxHp, m.hp + heal);
             }
-            this._addLog(exp, game, `Party healed!`, 'success');
+            this._addLog(exp, game, { key: 'msg.exp.party_healed' }, 'success');
         } else if (reward.type === 'temp_ally' && reward.ally) {
             if (!exp.summons) exp.summons = [];
             exp.summons.push({
-                type: 'npc_ally', name: reward.ally.name,
+                type: 'npc_ally', name: reward.ally.name, nameRef: defRef(reward.ally),
                 sprite: reward.ally.sprite || 'npc_ally',
                 hp: reward.ally.hp, maxHp: reward.ally.hp,
                 damage: reward.ally.damage,
@@ -4279,7 +4465,7 @@ export class ExplorationSystem {
                 ticksRemaining: (reward.ally.duration || 2) * 200,
                 maxDuration: (reward.ally.duration || 2) * 200,
             });
-            this._addLog(exp, game, `${reward.ally.name} joins the party!`, 'success');
+            this._addLog(exp, game, { key: 'msg.exp.ally_joins', params: { ally: defRef(reward.ally) } }, 'success');
         } else if (reward.type === 'reveal_encounters') {
             const count = reward.count || 1;
             for (let i = 0; i < count && exp.currentEncounter + i < (exp.nodeMap?.length || 0); i++) {
@@ -4459,12 +4645,87 @@ function getSynergyDamageMult(member, partySnapshot) {
     return Math.max(0.1, 1 + bonus - penalty);
 }
 
-function randInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+// Message for line `i` of a config list of flavor lines (realm.events.ambient,
+// EXPLORATION_EVENTS.combatHit, ...): `<owner._loc>.<field>.<i>`, or
+// `<loc>.<field>.<i>` for a list whose owner isn't stamped. Falls back to the
+// inline line with the params filled in (mod content without a locale key).
+function lineMessage(owner, field, i, params, loc) {
+    const prefix = owner?._loc || loc;
+    if (prefix && hasKey(`${prefix}.${field}.${i}`)) return { key: `${prefix}.${field}.${i}`, params };
+    return defMessage(owner, `${field}.${i}`, params);
 }
 
-function pickRandom(arr) {
-    return arr[randInt(0, arr.length - 1)];
+// A ref to a config entry's text field, or null when it has none or isn't stamped.
+function locRef(def, field) {
+    return def?._loc && def[field] ? defRef(def, field) : null;
+}
+
+// A log message ({ key, params } or text) as a param of another message.
+function messageParam(m) {
+    return m && typeof m === 'object' ? ref(m.key, null, m.params) : (m ?? '');
+}
+
+// EXPLORATION_EVENTS is a map of lists, so its entries carry no `_loc`.
+function eventLine(field, i, params) {
+    return lineMessage(EXPLORATION_EVENTS, field, i, params, 'exp_event');
+}
+
+// One param for a comma-separated list of params, nested as "{a}, {b}" refs so
+// each item is translated when shown.
+function listRef(items) {
+    if (items.length === 0) return '';
+    return items.slice(0, -1).reduceRight((rest, item) => ref('msg.exp.list_join', null, { a: item, b: rest }), items[items.length - 1]);
+}
+
+// Log params naming things. They are refs, so saved logs show the active language.
+function realmRef(key, fallback) {
+    return REALMS[key] ? defRef(REALMS[key]) : (fallback || key);
+}
+
+function enemyNameRef(enemy) {
+    if (enemy.nameRef) return enemy.nameRef;
+    const def = !enemy.isBoss && enemy.typeKey ? EXPEDITION_ENEMIES[enemy.typeKey] : null;
+    return def ? defRef(def) : (enemy.name || '');
+}
+
+function eliteRef(enemy) {
+    const mod = ELITE_MODIFIERS[enemy.elite];
+    return mod ? defRef(mod, 'prefix') : (enemy.eliteName || '');
+}
+
+// How the log names a foe: the boss by name, an elite by its modifier, others as
+// "an enemy" (`capital` for the start of a sentence).
+function foeLabel(enemy, capital = false) {
+    if (enemy.isBoss) return enemyNameRef(enemy);
+    if (enemy.elite) return ref('msg.exp.label.elite_enemy', `${enemy.eliteName} enemy`, { elite: eliteRef(enemy) });
+    return capital ? ref('msg.exp.label.an_enemy_cap', 'An enemy') : ref('msg.exp.label.an_enemy', 'an enemy');
+}
+
+// A boss phase's log label. Mask phases (the Unraveler) carry their own ref.
+function phaseNameRef(phase) {
+    if (phase.nameRef) return phase.nameRef;
+    return phase._loc ? defRef(phase) : (phase.name || '');
+}
+
+// Bestiary label of a boss phase: its name, else (mask phases) its display name.
+function bestiaryPhaseRef(phase) {
+    if (phase.name) return phaseNameRef(phase);
+    return phase.displayNameRef || phase.displayName || null;
+}
+
+// "a foe", or the boss's name.
+function foeOrBoss(enemy) {
+    return enemy.isBoss ? enemyNameRef(enemy) : ref('msg.exp.label.a_foe', 'a foe');
+}
+
+// Summons, encounter allies and war beasts.
+function companionRef(c) {
+    if (c.nameRef) return c.nameRef;
+    return ENTITIES[c.type] ? entityRef(c.type) : (c.name || '');
+}
+
+function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 // Runs `fn` and then rewinds the expedition id counter, so sandboxed what-if
@@ -4559,31 +4820,34 @@ export function estimatePartyStrength(game, colonistIds, realmKey) {
             if (existing) {
                 existing.casters.push(c.name);
             } else {
+                // Shown in the setup panel only (not saved), so plain text.
+                const fd = (key, params) => tr(`msg.forecast.effect.${key}`, params);
                 let effectDesc;
-                if (spell.effect === 'ranged_damage') effectDesc = `${spell.damage} dmg`;
-                else if (spell.effect === 'ranged_damage_aoe') effectDesc = `${spell.damage} AOE dmg`;
-                else if (spell.effect === 'melee_damage') effectDesc = `${spell.damage} melee dmg`;
-                else if (spell.effect === 'chain_damage') effectDesc = `${spell.damage} dmg, arcs to ${spell.chainTargets} foes`;
-                else if (spell.effect === 'ranged_damage_slow') effectDesc = `${spell.damage} dmg + slow`;
-                else if (spell.effect === 'heal') effectDesc = `heals ${spell.healAmount} HP`;
-                else if (spell.effect === 'chain_heal') effectDesc = `heals ${spell.healAmount} HP, chains to ${spell.chainTargets} allies`;
-                else if (spell.effect === 'cleanse') effectDesc = `cleanses debuffs`;
-                else if (spell.effect === 'buff_defense') effectDesc = `${Math.round(spell.damageReduction * 100)}% DR shield`;
-                else if (spell.effect === 'absorb_shield') effectDesc = `absorb ${spell.absorbAmount} dmg`;
-                else if (spell.effect === 'stun') effectDesc = `stuns ${spell.chainTargets > 1 ? spell.chainTargets + ' foes' : 'a foe'}`;
+                if (spell.effect === 'ranged_damage') effectDesc = fd('ranged_damage', { dmg: spell.damage });
+                else if (spell.effect === 'ranged_damage_aoe') effectDesc = fd('ranged_damage_aoe', { dmg: spell.damage });
+                else if (spell.effect === 'melee_damage') effectDesc = fd('melee_damage', { dmg: spell.damage });
+                else if (spell.effect === 'chain_damage') effectDesc = fd('chain_damage', { dmg: spell.damage, n: spell.chainTargets });
+                else if (spell.effect === 'ranged_damage_slow') effectDesc = fd('ranged_damage_slow', { dmg: spell.damage });
+                else if (spell.effect === 'heal') effectDesc = fd('heal', { hp: spell.healAmount });
+                else if (spell.effect === 'chain_heal') effectDesc = fd('chain_heal', { hp: spell.healAmount, n: spell.chainTargets });
+                else if (spell.effect === 'cleanse') effectDesc = fd('cleanse');
+                else if (spell.effect === 'buff_defense') effectDesc = fd('buff_defense', { pct: Math.round(spell.damageReduction * 100) });
+                else if (spell.effect === 'absorb_shield') effectDesc = fd('absorb_shield', { dmg: spell.absorbAmount });
+                else if (spell.effect === 'stun') effectDesc = spell.chainTargets > 1 ? fd('stun_many', { n: spell.chainTargets }) : fd('stun_one');
                 else if (spell.effect === 'teleport') {
                     const charges = spell.range >= 15 ? 3 : spell.range >= 10 ? 2 : 1;
-                    effectDesc = `dodge ${charges} attack${charges > 1 ? 's' : ''}`;
+                    effectDesc = tp('msg.forecast.effect.teleport', charges);
                 } else if (spell.effect === 'summon') {
                     const st = SUMMON_TYPES[spell.summonType];
-                    effectDesc = st ? `summons ${st.name} (${st.hp} HP, ${st.damage} dmg)` : 'summons ally';
+                    effectDesc = st ? fd('summon', { summon: entityName(spell.summonType), hp: st.hp, dmg: st.damage }) : fd('summon_ally');
                 } else if (spell.effect === 'summon_swarm') {
                     const st = SUMMON_TYPES[spell.summonType];
-                    effectDesc = st ? `summons ${spell.swarmCount}× ${st.name}` : 'summons swarm';
+                    effectDesc = st ? fd('summon_swarm', { n: spell.swarmCount, summon: entityName(spell.summonType) }) : fd('summon_swarm_generic');
                 } else effectDesc = spell.effect;
-                let triggerDesc = spell.trigger === 'inCombat' ? 'in combat'
-                    : spell.trigger === 'debuffNearby' ? 'when debuffed'
-                    : `ally HP < ${Math.round((spell.hpThreshold || 0.5) * 100)}%`;
+                // '<' is a param because the table checker reads '<' in a value as markup.
+                let triggerDesc = spell.trigger === 'inCombat' ? tr('msg.forecast.trigger.in_combat')
+                    : spell.trigger === 'debuffNearby' ? tr('msg.forecast.trigger.debuffed')
+                    : tr('msg.forecast.trigger.ally_hp_below', { lt: '<', pct: Math.round((spell.hpThreshold || 0.5) * 100) });
                 spellRoster.push({ spellKey, name: spell.name, school: spell.school, casters: [c.name], manaCost: spell.manaCost, triggerDesc, effectDesc });
             }
         }
@@ -4593,7 +4857,7 @@ export function estimatePartyStrength(game, colonistIds, realmKey) {
             name: c.name, id: c.id, dmgPerRound: memberDmg, hitsPerRound, hp: expMaxHp,
             dr: Math.round((1 - dr) * 100), maxMana: c.maxMana || 0,
             traits: combatTraits, expeditionTraits, spells: memberSpells,
-            trinketName: expTrinket?.name || null,
+            trinketName: expTrinket ? (itemName(expTrinket) || null) : null,
             expLevel, fatigued: fatigue,
         });
     }

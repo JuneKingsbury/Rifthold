@@ -1,4 +1,16 @@
 console.log('[boot] start');
+// Strings first: mods merge their own locale files into the table, and main.js
+// renders text as soon as it loads. The language is read straight from storage
+// because Game, which owns settings, doesn't exist yet.
+try {
+    let lang = 'en';
+    try { lang = JSON.parse(localStorage.getItem('colony_settings') || '{}')?.language || 'en'; } catch { /* default */ }
+    const { loadLocale } = await import('./i18n.js');
+    await loadLocale(lang);
+    console.log('[boot] locale loaded');
+} catch (err) {
+    console.error('[boot] locale error:', err);
+}
 try {
     const { runModLoader } = await import('./mod-loader.js');
     console.log('[boot] mod-loader imported');

@@ -1,5 +1,7 @@
 import { CONFIG, BUILDINGS, RECIPES, RECIPE_CATEGORIES, MAGIC_SKILLS, MAGIC_STUDY_CONFIG, RESEARCH } from '../core/config.js';
 import { findOpenRect, findNearestResource } from './tutorial-hints.js';
+import { t } from '../core/i18n.js';
+import { buildingName, resourceName, buildCategoryName, recipeCategoryName } from '../core/names.js';
 
 /**
  * Familiarity levels, chosen on the New Game screen.
@@ -12,18 +14,23 @@ export const TUTORIAL_LEVELS = ['none', 'some', 'veteran'];
 // Ticks a step can sit unfinished before the note offers extra help.
 const STUCK_TICKS = 900;
 
-// "A, B, C and D": the techs with no prerequisites, read from the tree so the
-// research step never names techs that don't exist.
+// "A, B, C and D".
+function andList(items) {
+    if (items.length < 2) return items[0] || '';
+    return t('tutorial.and_list', { list: items.slice(0, -1).join(t('msg.main.list_separator')), last: items[items.length - 1] });
+}
+
+// The techs with no prerequisites, read from the tree so the research step never
+// names techs that don't exist.
 function starterTechList() {
-    const names = Object.values(RESEARCH).filter(t => !t.requires || t.requires.length === 0).map(t => t.name);
-    return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : (names[0] || '');
+    return andList(Object.values(RESEARCH).filter(tech => !tech.requires || tech.requires.length === 0).map(tech => tech.name));
 }
 const STARTER_TECHS = starterTechList();
 const WEAPONS_RECIPE_CLUB = RECIPES.craft_wooden_club ? 'craft_wooden_club' : null;
 
 // Shown when a research step has sat for a while. Research is slow by nature, so
 // point at the two levers that actually speed it up.
-const RESEARCH_STUCK_HELP = 'Research takes a while. To speed it up, build a second Research Desk, or open Priority [P] and set one colonist\'s Research to 1. You can also skip this step.';
+const RESEARCH_STUCK_HELP = t('tutorial.research.stuck_help');
 
 // One-time popups raised by game state rather than step order. `when(game)` is
 // checked on every tutorial update; the tip shows once, while nothing else is pending.
@@ -35,7 +42,7 @@ const TUTORIAL_TIPS = [
             const w = game.weather;
             return w.year === 1 && w.season === 'autumn' && CONFIG.TICKS_PER_SEASON - w.seasonTick <= 2 * CONFIG.TICKS_PER_DAY;
         },
-        text: 'Winter is two days away. Crops stop growing in winter, so stock up now: plant extra fields while you still can, build Food Chests (Furniture tab) to slow spoilage, set an auto-cook target in Craft\'s Food & Potions tab, and put a campfire where colonists spend their time so they don\'t freeze outside.',
+        text: t('tutorial.tip.first_winter'),
     },
 ];
 
@@ -68,16 +75,16 @@ function buildPointer(type, mapSize, mapLabel) {
     return (game) => {
         const input = game.input;
         const def = BUILDINGS[type];
-        if (input.mode !== 'build') return modeBtn('build', 'Open Build');
+        if (input.mode !== 'build') return modeBtn('build', t('tutorial.pointer.open_build'));
         if (input.buildCategory !== def.category) {
-            return { selector: `#build-panel .build-tab[data-build-cat="${def.category}"]`, label: `Open the ${def.category} tab` };
+            return { selector: `#build-panel .build-tab[data-build-cat="${def.category}"]`, label: t('tutorial.pointer.open_tab', { tab: buildCategoryName(def.category) }) };
         }
         if (input.buildType !== type) {
-            return { selector: `#build-panel .build-card[data-build-opt="${type}"]`, label: `Pick ${def.name || type.replace(/_/g, ' ')}` };
+            return { selector: `#build-panel .build-card[data-build-opt="${type}"]`, label: t('tutorial.pointer.pick', { name: buildingName(type) }) };
         }
         if (!mapSize) return null;
         const rect = game.tutorial.getMapHint(game, `build:${type}`, () => findOpenRect(game, mapSize[0], mapSize[1]));
-        return rect ? { map: rect, label: mapLabel || 'Click here to place it' } : null;
+        return rect ? { map: rect, label: mapLabel || t('tutorial.pointer.place_here') } : null;
     };
 }
 
@@ -91,9 +98,9 @@ function craftPointer(getRecipeKey, fallbackTab, label) {
         const ui = game.ui;
         const recipeKey = getRecipeKey ? getRecipeKey() : null;
         const tab = (recipeKey && RECIPES[recipeKey]?.category) || fallbackTab;
-        if (!ui.craftPanelVisible) return modeBtn('craft', 'Open Craft');
+        if (!ui.craftPanelVisible) return modeBtn('craft', t('tutorial.pointer.open_craft'));
         if ((ui._craftTab || RECIPE_CATEGORIES[0]) !== tab) {
-            return { selector: `#craft-panel .craft-tab[data-craft-tab="${tab}"]`, label: `Open the ${tab} tab` };
+            return { selector: `#craft-panel .craft-tab[data-craft-tab="${tab}"]`, label: t('tutorial.pointer.open_tab', { tab: recipeCategoryName(tab) }) };
         }
         const selector = recipeKey
             ? `#craft-panel [data-craft-recipe="${recipeKey}"]`
@@ -102,20 +109,20 @@ function craftPointer(getRecipeKey, fallbackTab, label) {
     };
 }
 
-/** Click a colonist -> click the named equipment slot in their info panel. */
+/** Click a colonist -> click the named equipment slot in their info panel. `slotLabel` is the whole arrow label. */
 function equipPointer(slot, slotLabel) {
-    const pickColonist = { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: 'Click a colonist' };
     return (game) => {
+        const pickColonist = { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: t('tutorial.pointer.click_colonist') };
         if (!game.selectedColonist) return pickColonist;
         // If the info panel is showing something else, the slot is not in the DOM: point at the colonist list.
-        return { selector: `[data-tut-slot="${slot}"]`, label: `Click the ${slotLabel} slot`, fallback: pickColonist };
+        return { selector: `[data-tut-slot="${slot}"]`, label: slotLabel, fallback: pickColonist };
     };
 }
 
 /** After a craft order is queued there is nothing left to do in the menu: point at its close button. */
 function closeCraftPointer(game) {
     if (!game.ui.craftPanelVisible) return null;
-    return { selector: '#craft-panel .panel-close[data-panel-close="craft"]', label: 'Close the menu' };
+    return { selector: '#craft-panel .panel-close[data-panel-close="craft"]', label: t('tutorial.pointer.close_menu') };
 }
 
 // Same rule the game uses for its "missing attunement" alerts: a living, non-golem colonist
@@ -129,9 +136,9 @@ const needsAttunement = (c) => c.hp > 0 && !c.golem
  */
 function attunePointer(game) {
     const ui = game.ui;
-    if (!ui.priorityPanelVisible) return modeBtn('priority', 'Open Priority');
+    if (!ui.priorityPanelVisible) return modeBtn('priority', t('tutorial.pointer.open_priority'));
     if (ui._prioTab !== 'attune') {
-        return { selector: '#priority-panel [data-prio-tab="attune"]', label: 'Open the Attunement tab' };
+        return { selector: '#priority-panel [data-prio-tab="attune"]', label: t('tutorial.pointer.open_attunement_tab') };
     }
     const colonist = game.colonists.find(needsAttunement);
     if (!colonist) return null;
@@ -142,7 +149,7 @@ function attunePointer(game) {
     const school = [...schools.slice(start), ...schools.slice(0, start)].find(k => !attuned.includes(k));
     return {
         selector: `#priority-panel td[data-colonist-id="${colonist.id}"][data-attune="${school}"]`,
-        label: 'Click a school to attune',
+        label: t('tutorial.pointer.click_school'),
     };
 }
 
@@ -154,48 +161,48 @@ const needsWeapon = (c) => !c.weapon;
 function equipEveryonePointer(game) {
     const target = aliveColonists(game).find(needsWeapon);
     if (!target) return null;
-    const row = { selector: `#colonist-hud .hud-colonist[data-colonist-id="${target.id}"]`, label: `Click ${target.name}` };
+    const row = { selector: `#colonist-hud .hud-colonist[data-colonist-id="${target.id}"]`, label: t('tutorial.pointer.click_name', { name: target.name }) };
     const sel = game.selectedColonist;
     if (!sel || sel.id !== target.id) return row;
-    return { selector: '[data-tut-slot="weapon"]', label: 'Click the Weapon slot', fallback: row };
+    return { selector: '[data-tut-slot="weapon"]', label: t('tutorial.pointer.click_weapon_slot'), fallback: row };
 }
 
 // Raid pop-up -> select a colonist -> "Draft All" in their Actions list.
 function draftPointer(game) {
     if (game.events?.pendingEvent?.type === 'raid') {
-        return { selector: '#event-panel button[onclick="window.game.resolveEvent(0)"]', label: 'Go to the raiders' };
+        return { selector: '#event-panel button[onclick="window.game.resolveEvent(0)"]', label: t('tutorial.pointer.go_to_raiders') };
     }
-    const row = { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: 'Click a colonist' };
+    const row = { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: t('tutorial.pointer.click_colonist') };
     if (!game.selectedColonist) return row;
-    return { selector: '.info-actions button[onclick="window.game.draftAll()"]', label: 'Draft everyone', fallback: row };
+    return { selector: '.info-actions button[onclick="window.game.draftAll()"]', label: t('tutorial.pointer.draft_everyone'), fallback: row };
 }
 
 function undraftPointer(game) {
-    const row = { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: 'Click a colonist' };
+    const row = { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: t('tutorial.pointer.click_colonist') };
     if (!game.selectedColonist) return row;
-    return { selector: '.info-actions button[onclick="window.game.undraftAll()"]', label: 'Undraft everyone', fallback: row };
+    return { selector: '.info-actions button[onclick="window.game.undraftAll()"]', label: t('tutorial.pointer.undraft_everyone'), fallback: row };
 }
 
 /** Priority button -> Work Priorities tab -> a farming cell. Any change completes the step. */
 function workPriorityPointer(game) {
     const ui = game.ui;
-    if (!ui.priorityPanelVisible) return modeBtn('priority', 'Open Priority');
+    if (!ui.priorityPanelVisible) return modeBtn('priority', t('tutorial.pointer.open_priority'));
     if ((ui._prioTab || 'work') !== 'work') {
-        return { selector: '#priority-panel [data-prio-tab="work"]', label: 'Open Work Priorities' };
+        return { selector: '#priority-panel [data-prio-tab="work"]', label: t('tutorial.pointer.open_work_priorities') };
     }
     const colonist = aliveColonists(game)[0];
     if (!colonist) return null;
-    return { selector: `#priority-panel td[data-colonist-id="${colonist.id}"][data-skill="farming"]`, label: 'Click to change a priority' };
+    return { selector: `#priority-panel td[data-colonist-id="${colonist.id}"][data-skill="farming"]`, label: t('tutorial.pointer.change_priority') };
 }
 
 function closePriorityPointer(game) {
     if (!game.ui.priorityPanelVisible) return null;
-    return { selector: '#priority-panel .panel-close[data-panel-close="priority"]', label: 'Close the menu' };
+    return { selector: '#priority-panel .panel-close[data-panel-close="priority"]', label: t('tutorial.pointer.close_menu') };
 }
 
 function closeResearchPointer(game) {
     if (!game.ui.researchPanelVisible) return null;
-    return { selector: '#research-panel .panel-close[data-panel-close="research"]', label: 'Close the menu' };
+    return { selector: '#research-panel .panel-close[data-panel-close="research"]', label: t('tutorial.pointer.close_menu') };
 }
 
 /** Rifts button -> Expeditions tab -> realm -> party -> Launch, then collect the rewards. */
@@ -204,35 +211,35 @@ function expeditionPointer(game) {
     const expl = game.exploration;
     const panelOpen = !!ui.arcanePanelVisible;
     if (expl.pendingSummary) {
-        if (!panelOpen) return modeBtn('arcane', 'Open Rifts');
-        return { selector: '#arcane-panel button[onclick*="dismissSummary"]', label: 'Collect your rewards' };
+        if (!panelOpen) return modeBtn('arcane', t('tutorial.pointer.open_rifts'));
+        return { selector: '#arcane-panel button[onclick*="dismissSummary"]', label: t('tutorial.pointer.collect_rewards') };
     }
     if (expl.expeditions.length > 0) {
         // Running: nothing to click unless the party needs a decision. The expedition stalls until it
         // is answered, so lead the player to the first available choice. We do not pick for them.
         const waiting = expl.expeditions.some(e => !e.autoMode && (e.pendingDecision || e.pendingVoidPactChoice));
         if (!waiting) return null;
-        if (!panelOpen) return modeBtn('arcane', 'Your party needs a decision');
+        if (!panelOpen) return modeBtn('arcane', t('tutorial.pointer.party_needs_decision'));
         return {
             selector: '#arcane-panel button:not([disabled])[onclick*="resolveExpedition"], #arcane-panel button[onclick*="resolveVoidPactChoice"]',
-            label: 'Make a choice',
+            label: t('tutorial.pointer.make_choice'),
         };
     }
-    if (!panelOpen) return modeBtn('arcane', 'Open Rifts');
+    if (!panelOpen) return modeBtn('arcane', t('tutorial.pointer.open_rifts'));
     if ((ui._arcaneTab || 'expeditions') !== 'expeditions') {
-        return { selector: '#arcane-panel [data-arcane-tab="expeditions"]', label: 'Open the Expeditions tab' };
+        return { selector: '#arcane-panel [data-arcane-tab="expeditions"]', label: t('tutorial.pointer.open_expeditions_tab') };
     }
     if (!ui._arcaneExpSetup) {
-        return { selector: '#arcane-panel button[onclick*="showExpeditionSetupInPanel("]', label: 'Pick a destination' };
+        return { selector: '#arcane-panel button[onclick*="showExpeditionSetupInPanel("]', label: t('tutorial.pointer.pick_destination') };
     }
     // A lone colonist is a death sentence (the panel itself rates it "Dangerous"), so lead the player
     // through ticking every available colonist (the party holds at most 5) before launching.
     const free = document.querySelectorAll('#arcane-panel .exp-check:not(:disabled):not(:checked)');
     const picked = document.querySelectorAll('#arcane-panel .exp-check:checked').length;
     if (free.length > 0 && picked < 5) {
-        return { selector: '#arcane-panel .exp-check:not(:disabled):not(:checked)', label: 'Add everyone to the party' };
+        return { selector: '#arcane-panel .exp-check:not(:disabled):not(:checked)', label: t('tutorial.pointer.add_everyone') };
     }
-    return { selector: '#arcane-panel button[onclick*="launchExpeditionFromPanel"]', label: 'Launch' };
+    return { selector: '#arcane-panel button[onclick*="launchExpeditionFromPanel"]', label: t('tutorial.pointer.launch') };
 }
 
 function selectFirstColonist(game) {
@@ -285,15 +292,15 @@ const TUTORIAL_STEPS = [
     manualStep({
         id: 'welcome',
         levels: ['none'],
-        title: 'Welcome to Rifthold',
-        description: 'You lead a small group of colonists. They handle the work on their own. You decide what gets farmed, gathered and built, and they get to it. Nothing happens instantly, so give them a little time.',
+        title: t('tutorial.welcome.title'),
+        description: t('tutorial.welcome.description'),
     }),
     {
         id: 'pan_camera',
         levels: ['none'],
-        title: 'Look Around',
-        description: 'Move the camera with [WASD], the arrow keys, or by dragging with the middle mouse button. The mouse wheel zooms in and out. Touch screens can swipe to move the camera and pinch to zoom.',
-        descriptionTouch: 'Drag the map with one finger to look around, and pinch to zoom in and out. While you are building or farming, one finger draws on the map, so use two fingers to move it.',
+        title: t('tutorial.pan_camera.title'),
+        description: t('tutorial.pan_camera.description'),
+        descriptionTouch: t('tutorial.pan_camera.description_touch'),
         highlight: null,
         isComplete(game) { return !!game.tutorial.flags.cameraMoved; },
         goTo() {},
@@ -302,60 +309,60 @@ const TUTORIAL_STEPS = [
     {
         id: 'start_time',
         levels: ['none'],
-        title: 'Start the Clock',
-        description: 'The game starts paused so you can get your bearings. Press [Space] or click the 1x button to resume the game. You can pause again whenever you need a moment. Remember that orders can be given while the game is paused.',
+        title: t('tutorial.start_time.title'),
+        description: t('tutorial.start_time.description'),
         highlight: null,
         isComplete(game) { return !game.paused; },
         goTo(game) { if (game.paused) game.togglePause(); },
-        pointer() { return { selector: '#btn-speed-1', label: 'Resume the game' }; },
+        pointer() { return { selector: '#btn-speed-1', label: t('tutorial.pointer.resume_game') }; },
     },
     {
         id: 'select_colonist',
         levels: ['none'],
-        title: 'Meet a Colonist',
-        description: 'Click a colonist, either in the list at the bottom or on the map. Their needs, mood, and gear show up in the info panel.',
+        title: t('tutorial.select_colonist.title'),
+        description: t('tutorial.select_colonist.description'),
         highlight: null,
         isComplete(game) { return !!game.selectedColonist; },
         goTo: selectFirstColonist,
-        pointer() { return { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: 'Click a colonist' }; },
+        pointer() { return { selector: '#colonist-hud .hud-colonist[data-colonist-id]', label: t('tutorial.pointer.click_colonist') }; },
     },
     {
         id: 'farm',
         levels: ['none', 'some'],
-        title: 'Plant a Farm',
-        description: "Your starting food won't last long. Press [F] or click Farm in the mode bar, then drag on grass to plant wheat or berries. Colonists handle planting and harvesting automatically.",
-        descriptionNone: 'Colonists get hungry, and hungry colonists don\'t last long, so food comes first. Press [F] or click Farm in the mode bar, then drag across open grass to mark a field. Colonists plant and harvest crops on their own.',
+        title: t('tutorial.farm.title'),
+        description: t('tutorial.farm.description'),
+        descriptionNone: t('tutorial.farm.description_none'),
         highlight: 'zone',
         isComplete(game) { return game.mapIndex.zones.size > 0; },
         goTo(game) { game.input.setMode('zone'); },
         pointer(game) {
-            if (game.input.mode !== 'zone') return modeBtn('zone', 'Open Farm');
+            if (game.input.mode !== 'zone') return modeBtn('zone', t('tutorial.pointer.open_farm'));
             const rect = game.tutorial.getMapHint(game, 'farm', () => findOpenRect(game, 4, 3));
-            return rect ? { map: rect, label: 'Drag across this grass' } : null;
+            return rect ? { map: rect, label: t('tutorial.pointer.drag_grass') } : null;
         },
     },
     {
         id: 'gather',
         levels: ['none', 'some'],
-        title: 'Gather Resources',
-        description: 'Designate trees or rocks for your colonists to harvest. Press [G] or click Gather in the mode bar, then drag over trees or rocks.',
-        descriptionNone: 'Everything you build needs materials. Press [G] or click Gather in the mode bar, then drag over trees for wood or rocks for stone. Colonists will walk over and harvest them.',
+        title: t('tutorial.gather.title'),
+        description: t('tutorial.gather.description'),
+        descriptionNone: t('tutorial.gather.description_none'),
         highlight: 'gather',
         isComplete(game) { return !!game.tutorial.flags.gathered; },
         goTo(game) { game.input.setMode('designate'); },
         acted(game) { return queuedGather(game); },
         pointer(game) {
-            if (game.input.mode !== 'designate') return modeBtn('gather', 'Open Gather');
+            if (game.input.mode !== 'designate') return modeBtn('gather', t('tutorial.pointer.open_gather'));
             const rect = game.tutorial.getMapHint(game, 'gather', () => findNearestResource(game, ['tree']));
-            return rect ? { map: rect, label: 'Drag over these trees' } : null;
+            return rect ? { map: rect, label: t('tutorial.pointer.drag_trees') } : null;
         },
     },
     {
         id: 'workbench',
         levels: ['none', 'some'],
-        title: 'Build a Workbench',
-        description: 'A Workbench lets you craft planks, tools, and weapons. Press [B] or click Build in the mode bar, select "Production", and place a Workbench.',
-        descriptionNone: 'A Workbench is where colonists craft planks, tools and weapons. Press [B] or click Build in the mode bar, open the Production tab, pick Workbench, and click an empty spot. If you\'re short on materials, gather some first.',
+        title: t('tutorial.workbench.title'),
+        description: t('tutorial.workbench.description'),
+        descriptionNone: t('tutorial.workbench.description_none'),
         highlight: 'build',
         cost: BUILDINGS.workbench.cost,
         isComplete(game) { return buildCount(game, 'workbench') > 0; },
@@ -366,21 +373,21 @@ const TUTORIAL_STEPS = [
     {
         id: 'craft_planks',
         levels: ['none', 'some'],
-        title: 'Craft Planks',
-        description: 'Press [C] or click Craft in the mode bar, then queue a "Planks" order. Colonists will turn 2 wood into 3 planks at the workbench.',
-        descriptionNone: 'Planks are a refined material that many buildings need. Press [C] or click Craft in the mode bar, and queue a "Planks" order. A colonist will carry wood to the workbench and make them.',
+        title: t('tutorial.craft_planks.title'),
+        description: t('tutorial.craft_planks.description'),
+        descriptionNone: t('tutorial.craft_planks.description_none'),
         highlight: 'craft',
         isComplete(game) { return !!game.tutorial.flags.craftedPlanks; },
         goTo(game) { game.ui.toggleCraftPanel(); },
         acted(game) { return queuedCraft(game, recipeFor('planks')); },
         actedPointer: closeCraftPointer,
-        pointer: craftPointer(() => recipeFor('planks'), 'Materials', 'Queue Planks'),
+        pointer: craftPointer(() => recipeFor('planks'), 'Materials', t('tutorial.pointer.queue_planks')),
     },
     {
         id: 'cooking_pot',
         levels: ['none', 'some'],
-        title: 'Build a Cooking Pot',
-        description: 'You started with some wheat and your farm will add more, so it\'s time to turn it into cooked meals. A Cooking Pot lets colonists cook food that fills them up for longer and makes them happier. Order one to be built from the Build menu\'s Production tab.',
+        title: t('tutorial.cooking_pot.title'),
+        description: t('tutorial.cooking_pot.description'),
         highlight: 'build',
         cost: BUILDINGS.cooking_pot.cost,
         isComplete(game) { return buildCount(game, 'cooking_pot') > 0; },
@@ -391,20 +398,20 @@ const TUTORIAL_STEPS = [
     {
         id: 'cook',
         levels: ['none', 'some'],
-        title: 'Cook a Meal',
-        description: 'Press [C] or click Craft in the mode bar, then queue "Cook Meal". Meals restore more hunger and give a mood bonus. Tip: set an auto-cook target at the bottom of Craft\'s Food & Potions tab so colonists cook more meals on their own when stocks run low.',
+        title: t('tutorial.cook.title'),
+        description: t('tutorial.cook.description'),
         highlight: 'craft',
         isComplete(game) { return !!game.tutorial.flags.cookedMeal; },
         goTo(game) { game.ui.toggleCraftPanel(); },
         acted(game) { return queuedCraft(game, 'cook_meal'); },
         actedPointer: closeCraftPointer,
-        pointer: craftPointer(() => 'cook_meal', 'Food & Potions', 'Queue Cook Meal'),
+        pointer: craftPointer(() => 'cook_meal', 'Food & Potions', t('tutorial.pointer.queue_cook_meal')),
     },
     {
         id: 'research_desk',
         levels: ['none', 'some'],
-        title: 'Build a Research Desk',
-        description: 'A Research Desk generates research points to unlock new technologies. Order one to be built from the Build menu\'s Production tab.',
+        title: t('tutorial.research_desk.title'),
+        description: t('tutorial.research_desk.description'),
         highlight: 'build',
         cost: BUILDINGS.research_desk.cost,
         isComplete(game) { return buildCount(game, 'research_desk') > 0; },
@@ -415,10 +422,10 @@ const TUTORIAL_STEPS = [
     {//TODO: Continue reading over and fixing text for tutorial. Everything above this line feels pretty good -June 10/25/2026
         id: 'research',
         levels: ['none', 'some'],
-        title: 'Start Researching',
+        title: t('tutorial.research.title'),
         stuckHelp: RESEARCH_STUCK_HELP,
-        description: `Open Research [R] and pick a technology to study. ${STARTER_TECHS} have no prerequisites, so pick whichever sounds useful!`,
-        descriptionNone: `Research unlocks new buildings, recipes and abilities. Open Research [R] and press Select on a technology. ${STARTER_TECHS} have no prerequisites, so pick whichever sounds useful. Colonists earn the points at the Research Desk.`,
+        description: t('tutorial.research.description', { techs: STARTER_TECHS }),
+        descriptionNone: t('tutorial.research.description_none', { techs: STARTER_TECHS }),
         highlight: 'research',
         // Wait for the panel to close so the next step's arrows don't land on top of it.
         isComplete(game) { return startedResearch(game) && !game.ui?.researchPanelVisible; },
@@ -426,16 +433,17 @@ const TUTORIAL_STEPS = [
         acted: startedResearch,
         actedPointer: closeResearchPointer,
         pointer(game) {
-            if (!game.ui.researchPanelVisible) return modeBtn('research', 'Open Research');
-            return { selector: '#research-panel .research-node-btn', text: 'Select', label: 'Select a technology' };
+            if (!game.ui.researchPanelVisible) return modeBtn('research', t('tutorial.pointer.open_research'));
+            // `text` matches the button's label, so it must be the same string the research panel shows.
+            return { selector: '#research-panel .research-node-btn', text: t('ui.research.select'), label: t('tutorial.pointer.select_technology') };
         },
     },
     {
         id: 'work_priorities',
         levels: ['none', 'some'],
-        title: 'Set Work Priorities',
-        description: 'Every colonist starts with a specialty, shown by the 1s in the grid. Open Priority [P] and click any cell to change how much a colonist cares about that job. 1 is the highest priority, 5 is the lowest, and a dash turns the job off.',
-        descriptionNone: 'Colonists pick their own jobs, and the Priority panel [P] decides what they reach for first. Every colonist starts with a specialty, shown by the 1s in the grid. Click any cell to change it. 1 is the highest priority, 5 is the lowest, and a dash turns the job off for that colonist. If a job isn\'t getting done, raise its priority.',
+        title: t('tutorial.work_priorities.title'),
+        description: t('tutorial.work_priorities.description'),
+        descriptionNone: t('tutorial.work_priorities.description_none'),
         highlight: 'priority',
         // Colonists do not start at the default priority, so compare against what they had when the step began.
         onEnter(game) {
@@ -457,22 +465,22 @@ const TUTORIAL_STEPS = [
     manualStep({
         id: 'threats',
         levels: ['none'],
-        title: 'Prepare for Trouble',
-        description: 'Raiders and wild creatures will come for the colony eventually. Blight can spread through your crops. The game pauses on its own when a raid starts, and you can change that in Settings. Colonists fight with whatever they have equipped, so next you\'ll arm everyone. A few scouts will test your defenses once you\'re ready.',
+        title: t('tutorial.threats.title'),
+        description: t('tutorial.threats.description'),
     }),
     {
         id: 'weapon',
         levels: ['none', 'some'],
-        title: 'Craft Weapons for Everyone',
+        title: t('tutorial.weapon.title'),
         // Stone can be a long walk away, and the spear is the only weapon named above.
         helpText(game) {
             const club = WEAPONS_RECIPE_CLUB && RECIPES[WEAPONS_RECIPE_CLUB];
             if (!club || (game.resources.stockpile.stone || 0) >= 2) return null;
-            const cost = Object.entries(club.input).map(([k, v]) => `${v} ${k}`).join(' and ');
-            return `Short on stone? A Wooden Club needs only ${cost}.`;
+            const cost = andList(Object.entries(club.input).map(([k, v]) => t('msg.main.resource_amount', { n: v, resource: resourceName(k) })));
+            return t('tutorial.weapon.help_club', { cost });
         },
-        description: 'Open Craft [C], find the Weapons section, and craft a weapon for each colonist. The x5 button queues several at once. A Stone Spear only costs 2 stone and 1 wood.',
-        descriptionNone: 'Your colonists will need to defend themselves from raiders, and unarmed colonists fight with their fists. Open Craft [C], find the Weapons section, and craft a weapon for each colonist. The x5 button queues several at once, and a Stone Spear only costs 2 stone and 1 wood.',
+        description: t('tutorial.weapon.description'),
+        descriptionNone: t('tutorial.weapon.description_none'),
         highlight: 'craft',
         isComplete(game) {
             const armed = aliveColonists(game).filter(c => c.weapon).length;
@@ -484,14 +492,14 @@ const TUTORIAL_STEPS = [
             return armed + game.resources.weapons.length + queuedCraftCount(game, 'Weapons') >= aliveColonists(game).length;
         },
         actedPointer: closeCraftPointer,
-        pointer: craftPointer(null, 'Weapons', 'Craft a weapon'),
+        pointer: craftPointer(null, 'Weapons', t('tutorial.pointer.craft_weapon')),
     },
     {
         id: 'equip',
         levels: ['none', 'some'],
-        title: 'Equip Everyone',
-        description: 'Click a colonist to select them, then click an empty weapon slot in their info panel to equip one of your crafted weapons. Do this for each colonist. Equipped tools also boost work speed.',
-        descriptionNone: 'Crafted weapons wait in storage until a colonist equips one. Click a colonist to select them, then click their empty weapon slot in the info panel and choose a weapon. Do this for each colonist.',
+        title: t('tutorial.equip.title'),
+        description: t('tutorial.equip.description'),
+        descriptionNone: t('tutorial.equip.description_none'),
         highlight: null,
         isComplete(game) { return aliveColonists(game).every(c => c.weapon); },
         goTo(game) {
@@ -508,8 +516,8 @@ const TUTORIAL_STEPS = [
     {
         id: 'draft',
         levels: ['none', 'some'],
-        title: 'Raiders Attack!',
-        description: 'Scouts are approaching the colony. Select a colonist and press Draft All, or press [Q] to draft just the selected colonist. Drafted colonists hold their position and fight anything in range.',
+        title: t('tutorial.draft.title'),
+        description: t('tutorial.draft.description'),
         highlight: null,
         applies() { return !CONFIG.PEACEFUL_MODE; },
         onEnter(game) {
@@ -528,21 +536,21 @@ const TUTORIAL_STEPS = [
     {
         id: 'fight',
         levels: ['none', 'some'],
-        title: 'Defend the Colony',
-        description: 'Press [Space] or click the 1x button to unpause and let your drafted colonists deal with them. You can right-click the map to move drafted colonists somewhere better.',
+        title: t('tutorial.fight.title'),
+        description: t('tutorial.fight.description'),
         highlight: null,
         applies() { return !CONFIG.PEACEFUL_MODE; },
         isComplete(game) { return !game.combat.raidActive; },
         goTo(game) { if (game.paused) game.togglePause(); },
         pointer(game) {
-            return game.paused ? { selector: '#btn-speed-1', label: 'Unpause' } : null;
+            return game.paused ? { selector: '#btn-speed-1', label: t('tutorial.pointer.unpause') } : null;
         },
     },
     {
         id: 'undraft',
         levels: ['none', 'some'],
-        title: 'Stand Down',
-        description: 'Drafted colonists stand at the ready and won\'t do any work. Select a colonist and press Undraft All so everyone goes back to their jobs.',
+        title: t('tutorial.undraft.title'),
+        description: t('tutorial.undraft.description'),
         highlight: null,
         applies() { return !CONFIG.PEACEFUL_MODE; },
         isComplete(game) { return !aliveColonists(game).some(c => c.drafted); },
@@ -552,31 +560,31 @@ const TUTORIAL_STEPS = [
     {
         id: 'tome',
         levels: ['none', 'some'],
-        title: 'Craft a Tome',
-        description: 'Open Craft [C], find the Tomes section, and craft any spell tome. Your colonists can learn a wide variety of spells that can help grow your colony.',
+        title: t('tutorial.tome.title'),
+        description: t('tutorial.tome.description'),
         highlight: 'craft',
         isComplete(game) { return game.resources.tomes.length > 0; },
         goTo(game) { game.ui.toggleCraftPanel(); },
         acted(game) { return queuedCraftIn(game, 'Tomes'); },
         actedPointer: closeCraftPointer,
-        pointer: craftPointer(null, 'Tomes', 'Craft any tome'),
+        pointer: craftPointer(null, 'Tomes', t('tutorial.pointer.craft_tome')),
     },
     {
         id: 'equip_tome',
         levels: ['none', 'some'],
-        title: 'Equip a Tome',
-        description: 'Click a colonist to select them, then click an empty tome slot in their info panel to equip your crafted tome. The colonist will automatically study the tome as part of their regular research tasks.',
+        title: t('tutorial.equip_tome.title'),
+        description: t('tutorial.equip_tome.description'),
         highlight: null,
         isComplete(game) { return game.colonists.some(c => c.equippedTome); },
         goTo: selectFirstColonist,
-        pointer: equipPointer('tome', 'Tome'),
+        pointer: equipPointer('tome', t('tutorial.pointer.click_tome_slot')),
     },
     {
         id: 'attunement',
         levels: ['none', 'some'],
-        title: 'Set Magic Attunements',
-        description: 'Spells only autocast from the one school a colonist is attuned to. Open Priority [P], switch to the Attunement tab, and click a school in each colonist\'s row. Give colonists different schools so your colony can cast a wider range of spells: a healer, a battle mage, a summoner. A ★ marks the attuned school, and you can switch it for free at any time.',
-        descriptionNone: 'A colonist can learn spells from tomes, but a spell only casts on its own if its school is one they\'re attuned to. This applies at home and on expeditions. Each colonist attunes to one school at a time. Open Priority [P], switch to the Attunement tab, and click a school in each colonist\'s row to attune them. A ★ marks the attuned school. Give colonists different schools so that between them your colony can cast a wider range of spells, and pick ones that match the tomes you plan to use. You can switch it for free at any time.',
+        title: t('tutorial.attunement.title'),
+        description: t('tutorial.attunement.description'),
+        descriptionNone: t('tutorial.attunement.description_none'),
         highlight: 'priority',
         isComplete(game) { return attunedEveryone(game) && !game.ui?.priorityPanelVisible; },
         goTo(game) {
@@ -594,31 +602,31 @@ const TUTORIAL_STEPS = [
     {
         id: 'bedroom',
         levels: ['some'],
-        title: 'Build a Bedroom',
-        description: 'Build an enclosed room (walls on all sides + a door) with a Bed inside. Valid bedrooms give colonists an ongoing mood bonus when they sleep. The same system can be used to make specialty buildings for each of your different workstations.',
+        title: t('tutorial.bedroom.title'),
+        description: t('tutorial.bedroom.description'),
         highlight: 'build',
         isComplete(game) { return Object.keys(game.roomQualities).length > 0; },
         goTo(game) { openBuild(game, 'wood_wall'); },
         acted(game) { return wallPieces(game) >= 8; },
-        pointer: buildPointer('wood_wall', [5, 5], 'Outline a room here'),
+        pointer: buildPointer('wood_wall', [5, 5], t('tutorial.pointer.outline_room')),
     },
     // The same goal broken into stages for first-time players.
     {
         id: 'bedroom_walls',
         levels: ['none'],
-        title: 'Build Bedroom Walls',
-        description: 'Colonists sleep better in a proper room. Build wooden walls around a small area and leave one gap for a door. Click and drag to place a line of walls. The yellow box shows a suggested spot.',
+        title: t('tutorial.bedroom_walls.title'),
+        description: t('tutorial.bedroom_walls.description'),
         highlight: 'build',
         isComplete(game) { return buildCount(game, 'wood_wall') >= 8; },
         goTo(game) { openBuild(game, 'wood_wall'); },
         acted(game) { return wallPieces(game) >= 8; },
-        pointer: buildPointer('wood_wall', [5, 5], 'Outline a room here'),
+        pointer: buildPointer('wood_wall', [5, 5], t('tutorial.pointer.outline_room')),
     },
     {
         id: 'bedroom_door',
         levels: ['none'],
-        title: 'Add a Door',
-        description: 'A room needs a door so colonists can walk in. Pick Door from the Walls & Floors tab and place it in the gap in your wall.',
+        title: t('tutorial.bedroom_door.title'),
+        description: t('tutorial.bedroom_door.description'),
         highlight: 'build',
         cost: BUILDINGS.door.cost,
         isComplete(game) { return buildCount(game, 'door') > 0; },
@@ -629,8 +637,8 @@ const TUTORIAL_STEPS = [
     {
         id: 'bedroom_bed',
         levels: ['none'],
-        title: 'Place a Bed',
-        description: 'Last, put a Bed inside the room. You\'ll find it on the Furniture tab. Once the room is fully enclosed with a door and a bed, it counts as a bedroom, and colonists who sleep there get a mood bonus.',
+        title: t('tutorial.bedroom_bed.title'),
+        description: t('tutorial.bedroom_bed.description'),
         highlight: 'build',
         cost: BUILDINGS.bed.cost,
         isComplete(game) { return Object.keys(game.roomQualities).length > 0; },
@@ -641,8 +649,8 @@ const TUTORIAL_STEPS = [
     {
         id: 'gathering_circle',
         levels: ['none', 'some'],
-        title: 'Build a Gathering Circle',
-        description: 'Expedition parties gather at a Gathering Circle, then teleport into an expedition together, and come back to it when they return. Order one from the Build menu\'s Arcane tab. Every expedition needs one, scouting included.',
+        title: t('tutorial.gathering_circle.title'),
+        description: t('tutorial.gathering_circle.description'),
         highlight: 'build',
         cost: BUILDINGS.gathering_circle.cost,
         isComplete(game) { return buildCount(game, 'gathering_circle') > 0; },
@@ -653,8 +661,8 @@ const TUTORIAL_STEPS = [
     {
         id: 'expedition',
         levels: ['none', 'some'],
-        title: 'Complete Your First Expedition',
-        description: 'Open Rifts [V], pick The Wild Frontiers, and add all of your armed colonists to the party before you launch. The panel rates a lone colonist as Dangerous. The party fights on its own and stops now and then for you to make a choice. Keep the difficulty low for your first run. If the whole party falls, you can send everyone out again. Coming home safely from a new realm is a colony milestone and raises your colony population cap, like surviving Void Nexus waves and conquering realm chains. The Glossary (Settings, View Glossary, under Colonists & Needs) has the full list of milestones that raise the cap.',
+        title: t('tutorial.expedition.title'),
+        description: t('tutorial.expedition.description'),
         highlight: 'arcane',
         isComplete(game) { return (game.stats?.expeditionsCompleted || 0) >= 1; },
         goTo(game) { game.ui.toggleArcanePanel?.(); },
@@ -663,15 +671,15 @@ const TUTORIAL_STEPS = [
     manualStep({
         id: 'colony_growth',
         levels: ['none', 'some'],
-        title: 'Growing the Colony',
-        description: 'Your colony has room for 3 colonists. The cap rises as you reach milestones: surviving Void Nexus waves, venturing into new realms and conquering realm chains. The Rifts panel shows the next one. The Glossary (Settings, View Glossary, under Colonists & Needs) has the full list of milestones that raise the cap. With room to spare, wanderers who come by can join you.',
+        title: t('tutorial.colony_growth.title'),
+        description: t('tutorial.colony_growth.description'),
     }),
     manualStep({
         id: 'finish',
         levels: ['none'],
-        title: "You're On Your Own",
-        description: 'Your colony is up and running. Keep an eye on food, mood and defenses, and stock up before the seasons change. Story [J] tracks your goals. Beyond the Wild Frontiers, other realms open through ancient crypts: find one on the map, break in (right-click a wall in Build mode), and attune the rift anchor inside. Rifts [V] lists what you can reach.',
-        pointer: () => modeBtn('story', 'Story goals'),
+        title: t('tutorial.finish.title'),
+        description: t('tutorial.finish.description'),
+        pointer: () => modeBtn('story', t('tutorial.pointer.story_goals')),
     }),
 ];
 
@@ -679,32 +687,32 @@ const TUTORIAL_STEPS = [
 const VETERAN_GOALS = [
     {
         id: 'v_weapon',
-        title: 'Arm a colonist',
+        title: t('tutorial.v_weapon.title'),
         isComplete(game) { return game.colonists.some(c => c.weapon && c.weapon.key !== 'fists'); },
     },
     {
         id: 'v_research',
-        title: 'Start a research project',
+        title: t('tutorial.v_research.title'),
         isComplete(game) { return game.research.activeResearch !== null || game.research.completed.size > 0; },
     },
     {
         id: 'v_tome',
-        title: 'Equip a spell tome',
+        title: t('tutorial.v_tome.title'),
         isComplete(game) { return game.colonists.some(c => c.equippedTome); },
     },
     {
         id: 'v_bedroom',
-        title: 'Build a valid bedroom',
+        title: t('tutorial.v_bedroom.title'),
         isComplete(game) { return Object.keys(game.roomQualities).length > 0; },
     },
     {
         id: 'v_gathering_circle',
-        title: 'Build a Gathering Circle (Arcane tab)',
+        title: t('tutorial.v_gathering_circle.title'),
         isComplete(game) { return buildCount(game, 'gathering_circle') > 0; },
     },
     {
         id: 'v_expedition',
-        title: 'Send out an expedition (Rifts [V])',
+        title: t('tutorial.v_expedition.title'),
         isComplete(game) { return (game.exploration?.expeditions?.length || 0) > 0; },
     },
 ];
@@ -788,7 +796,7 @@ export class TutorialSystem {
         const finish = (step) => {
             this.completed.add(step.id);
             advanced = true;
-            game.notifications?.push({ text: `Tutorial: ${step.title} ✓`, tick: game.tick, type: 'success' });
+            game.notifications?.push({ text: t('tutorial.step_done', { title: step.title }), tick: game.tick, type: 'success' });
         };
 
         if (this.isChecklist) {
@@ -839,7 +847,7 @@ export class TutorialSystem {
         for (const tip of TUTORIAL_TIPS) {
             if (this.flags[`tip_${tip.id}`] || !tip.when(game)) continue;
             this.flags[`tip_${tip.id}`] = true;
-            game.events.pendingEvent = { type: 'tip', text: tip.text, choices: ['Got it'] };
+            game.events.pendingEvent = { type: 'tip', text: tip.text, choices: [t('tutorial.got_it')] };
             if (game.settings.autoPauseEvent && !game.paused) {
                 game.togglePause();
                 game._eventPaused = true;
@@ -929,11 +937,11 @@ export class TutorialSystem {
         const hint = typeof task.helpText === 'function' ? task.helpText(game) : null;
         if (hint) return hint;
         if (task.cost && game.resources?.has && !game.resources.has(task.cost)) {
-            const need = Object.entries(task.cost).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`).join(', ');
-            return `You don't have enough materials yet. This needs ${need}.`;
+            const need = Object.entries(task.cost).map(([k, v]) => t('msg.main.resource_amount', { n: v, resource: resourceName(k) })).join(t('msg.main.list_separator'));
+            return t('tutorial.not_enough_materials', { need });
         }
         if (this._stepStartTick !== null && game.tick - this._stepStartTick > STUCK_TICKS) {
-            return task.stuckHelp || 'This can take a while, since colonists need time to do the work. If nothing is happening, check Priority [P] to make sure the right jobs are turned on. You can also skip this step.';
+            return task.stuckHelp || t('tutorial.stuck_help');
         }
         return null;
     }

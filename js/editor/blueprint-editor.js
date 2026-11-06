@@ -7,7 +7,7 @@ const STRUCTURE_EFFECT_KEYS = [
 ];
 import { EditorRenderer } from './editor-renderer.js';
 import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
-import { toJsLiteral } from './config-source.js';
+import { toJsLiteral, localeBlock } from './config-source.js';
 
 const GRID_WIDTH = 100;
 const GRID_HEIGHT = 100;
@@ -755,7 +755,9 @@ class BlueprintEditor {
 
         // All strings go through toJsLiteral so quotes and newlines in names or
         // descriptions can't produce invalid JS.
-        const def = { name };
+        // Name and description go to locale/en.json (listed after the entry).
+        const strings = { [`complex_structure.${id}.name`]: name, [`complex_structure.${id}.description`]: this.structureDescription || '' };
+        const def = {};
         if (this.structureResearch) def.research = this.structureResearch;
         def.coreBuild = coreBuild;
         if (coreCell.floorKey) {
@@ -763,7 +765,6 @@ class BlueprintEditor {
         }
         def.layout = layout;
         def.effect = effect;
-        def.description = this.structureDescription || '';
 
         const lines = Object.entries(def).map(([k, v]) => {
             const value = k === 'layout'
@@ -772,7 +773,7 @@ class BlueprintEditor {
             return `    ${k}: ${value},${k === 'effect' ? effectComment : ''}`;
         });
         output += '// === Add to COMPLEX_STRUCTURES in config.js ===\n';
-        output += `${this._jsKey(id)}: {\n${lines.join('\n')}\n},\n`;
+        output += `${this._jsKey(id)}: {\n${lines.join('\n')}\n},\n${localeBlock(strings)}`;
 
         return output;
     }
@@ -909,8 +910,9 @@ class BlueprintEditor {
         if (def.breakable) out.breakable = true;
         if (def.lightRadius) out.lightRadius = def.lightRadius;
         if (def.research) out.research = def.research;
-        out.description = def.description || '';
-        return `${this._jsKey(def.key)}: ${toJsLiteral(out, { inline: true })},`;
+        // Name and description go to locale/en.json (listed after the entry).
+        const strings = { [`building.${def.key}.name`]: def.name || def.key, [`building.${def.key}.description`]: def.description || '' };
+        return `${this._jsKey(def.key)}: ${toJsLiteral(out, { inline: true })},${localeBlock(strings)}`;
     }
 
     _showExportModal(text) {

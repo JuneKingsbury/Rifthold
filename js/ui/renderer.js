@@ -6,6 +6,7 @@ import { CrtRenderer } from './crt-renderer.js';
 import { SkinManager } from './skin-manager.js';
 import { getEntityRenderPos, isEntityMoving } from '../systems/movement-lerp.js';
 import { getEntityTransform, getTreeSway, getGrassSway, getCropSway, getWaterWave, windStrengthFor, setSwayWind } from './entity-animation.js';
+import { t as tr } from '../core/i18n.js';
 
 // The four cardinal neighbors checked per tile when dithering terrain edges.
 // Hoisted to module scope so it isn't reallocated per tile, per frame.
@@ -1295,7 +1296,7 @@ export class Renderer {
                     const showEq = game.settings.showEquipmentOverlays;
                     const isSleeping = c.state === 'sleeping';
                     const sleepingInBed = isSleeping && c.assignedBed && c.x === c.assignedBed.x && c.y === c.assignedBed.y;
-                    const isFreezing = !c.golem && c.thoughts && c.thoughts.some(t => t.text === 'Freezing outside');
+                    const isFreezing = !c.golem && c.thoughts && c.thoughts.some(t => t.id === 'freezing');
                     const entData = { char: c.golem ? 'G' : '@', color, type: c.golem ? 'golem' : 'colonist', colonistId: c.id, entityId: c.id, race: c.race, bodyVariant: c.bodyVariant, hairVariant: c.hairVariant, shirtVariant: c.shirtVariant, nameColor: c.nameColor, drafted, golemType: c.golemType, sleeping: isSleeping, sleepingInBed, freezing: isFreezing, _dmgFlashUntil: c._dmgFlashUntil, _atkShakeUntil: c._atkShakeUntil, _sim: c, armorKey: showEq && !(c.hiddenEquipmentSlots||{}).armor ? (c.armor?.key || null) : null, helmetKey: showEq && !(c.hiddenEquipmentSlots||{}).helmet ? (c.helmet?.key || null) : null, clothesKey: showEq && !(c.hiddenEquipmentSlots||{}).clothes ? (((!c.armor || (c.hiddenEquipmentSlots||{}).armor) && c.clothes) ? c.clothes.key : null) : null, weaponKey: showEq && !(c.hiddenEquipmentSlots||{}).weapon ? (c.weapon?.key || null) : null, toolKey: showEq && !(c.hiddenEquipmentSlots||{}).tool ? (c.tool?.key || null) : null };
                     if (isEntityMoving(c)) {
                         movingEntities.push({ entity: c, ...entData });
@@ -2880,7 +2881,7 @@ export class Renderer {
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#ff3333';
         ctx.textAlign = 'left';
-        ctx.fillText(`${fps} FPS`, 4, 4);
+        ctx.fillText(tr('ui.render.fps', { fps }), 4, 4);
         ctx.restore();
     }
 

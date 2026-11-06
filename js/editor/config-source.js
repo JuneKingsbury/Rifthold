@@ -1,5 +1,7 @@
 // Shared helpers for editors that export full config files.
 //
+import { TEXT_FIELDS, TEXT_ARRAY_FIELDS } from '../core/i18n.js';
+
 // Exports are produced by splicing edited entries into the real config source
 // text, so comments, non-exported helpers, derived exports and every entry the
 // editor does not touch survive byte-for-byte. Edited entries are written with
@@ -23,6 +25,61 @@ export async function fetchConfigSource(file) {
     const res = await fetch(new URL(`../core/config/${file}`, import.meta.url));
     if (!res.ok) throw new Error(`Could not read ${file} (HTTP ${res.status})`);
     return res.text();
+}
+
+// --- Localized text ---
+// Config entries keep only mechanics; their text lives in locale/en.json under
+// `<category>.<id>.<field>` and is filled in when config loads (stampLoc in
+// js/core/i18n.js). Editors work on the filled-in objects, so on export the text
+// is split back out: splitText() returns the entry without its text fields and
+// adds the text to `strings`, using the same key rules as stampLoc.
+
+/**
+ * Copy of `value` without text fields, for writing to a config file. The text
+ * is added to `strings` (key -> text) under `loc`, e.g. 'realm.crystal_mines'.
+ */
+export function splitText(value, loc, strings) {
+    const fields = new Set(TEXT_FIELDS);
+    const lists = new Set(TEXT_ARRAY_FIELDS);
+    const isPlain = (v) => v && typeof v === 'object' && !Array.isArray(v) && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null);
+    const walk = (v, path) => {
+        if (Array.isArray(v)) {
+            return v.map((el, i) => (isPlain(el) ? walk(el, `${path}.${typeof el.key === 'string' || typeof el.key === 'number' ? el.key : i}`) : el));
+        }
+        if (!isPlain(v)) return v;
+        const out = {};
+        for (const [k, x] of Object.entries(v)) {
+            if (k === '_loc') continue;
+            if (typeof x === 'string' && fields.has(k)) { strings[`${path}.${k}`] = x; continue; }
+            if (Array.isArray(x) && (fields.has(k) || lists.has(k)) && x.length && x.every(e => typeof e === 'string')) {
+                x.forEach((line, i) => { strings[`${path}.${k}.${i}`] = line; });
+                out[k] = x.length;   // stampLoc expands the count back into the lines
+                continue;
+            }
+            out[k] = walk(x, `${path}.${k}`);
+        }
+        return out;
+    };
+    return walk(value, loc);
+}
+
+/**
+ * locale/en.json with `strings` merged in (they replace existing text), sorted,
+ * as file text. Download it alongside the exported config file.
+ */
+export async function buildLocaleFile(strings) {
+    const res = await fetch(new URL('../../locale/en.json', import.meta.url));
+    if (!res.ok) throw new Error(`Could not read locale/en.json (HTTP ${res.status})`);
+    const en = { ...(await res.json()), ...strings };
+    return JSON.stringify(Object.fromEntries(Object.keys(en).sort().map(k => [k, en[k]])), null, 2) + '\n';
+}
+
+/** Saves text as a download named `name`. */
+export function downloadText(name, text, type = 'text/plain') {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
 }
 
 const IDENT_RE = /^[A-Za-z_$][\w$]*$/;
@@ -71,7 +128,7 @@ export function toJsLiteral(value, { indent = '', inline = false } = {}) {
     }
     const parts = isArr
         ? value.map(v => [null, v])
-        : Object.entries(value).filter(([, v]) => v !== undefined);
+        : Object.entries(value).filter(([k, v]) => v !== undefined && k !== '_loc');
     if (parts.length === 0) return isArr ? '[]' : '{}';
 
     const fmt = (k, s) => (k === null ? s : `${formatKey(k)}: ${s}`);
@@ -201,7 +258,16 @@ function formatEntry(key, value, indent, multiline) {
 // Rewrite one export object in `src`. `changed` and `added` map key -> value,
 // `removed` is a set of keys, `renamed` maps oldKey -> { key, value } and keeps
 // the entry where it was. New entries go at the end of the object.
-export function spliceExportObject(src, name, { changed = new Map(), removed = new Set(), added = new Map(), renamed = new Map(), multiline = false } = {}) {
+//
+// With `loc` (the stampLoc category, e.g. 'realm') and a `strings` object, the
+// text of written entries goes to `strings` instead of the config source.
+export function spliceExportObject(src, name, { changed = new Map(), removed = new Set(), added = new Map(), renamed = new Map(), multiline = false, loc = null, strings = null } = {}) {
+    if (loc && strings) {
+        const split = (k, v) => splitText(v, `${loc}.${k}`, strings);
+        changed = new Map([...changed].map(([k, v]) => [k, split(k, v)]));
+        added = new Map([...added].map(([k, v]) => [k, split(k, v)]));
+        renamed = new Map([...renamed].map(([k, r]) => [k, { key: r.key, value: split(r.key, r.value) }]));
+    }
     const { close, entries, closeOwnLine, closeLineStart, baseIndent } = findExportObject(src, name);
     const edits = [];
     const kept = entries.filter(e => !removed.has(e.key));
@@ -234,4 +300,14 @@ export function spliceExportObject(src, name, { changed = new Map(), removed = n
     let out = src;
     for (const [s, e, text] of edits) out = out.slice(0, s) + text + out.slice(e);
     return out;
+}
+
+/**
+ * A comment block listing `strings` as locale/en.json lines, appended to code
+ * snippets the editors produce for pasting (the text isn't part of the code).
+ */
+export function localeBlock(strings) {
+    const keys = Object.keys(strings || {});
+    if (!keys.length) return '';
+    return `\n// === Add to locale/en.json ===\n${keys.map(k => `// ${JSON.stringify(k)}: ${JSON.stringify(strings[k])},`).join('\n')}\n`;
 }

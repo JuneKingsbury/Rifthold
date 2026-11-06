@@ -1,414 +1,447 @@
 import { MAGIC_SKILLS } from '../core/config.js';
+import { t } from '../core/i18n.js';
+import { escapeAttr, escapeHtml } from './ui-utils.js';
 
 export const GLOSSARY = [
     {
-        title: 'Colonists & Needs',
+        id: 'colonists_needs',
         subsections: [
             {
-                subtitle: 'Races',
+                id: 'races',
                 entries: [
-                    ['Races Overview', 'Five playable races, each with a unique racial trait that provides passive bonuses. Colonists of all races work together and can fill any role.'],
-                    ['Human', 'Versatile generalists who learn all skills, both mundane and magical, faster than other races.'],
-                    ['Nymph', 'Magically attuned beings who gain magic skill experience much faster than other races, but are physically frail and work more slowly.'],
-                    ['Ferin', 'Nature-bonded beings with a bonus to farming speed and exceptional skill with animals. They tend to get restless when stuck indoors for too long.'],
-                    ['Kobalos', 'Pack-minded workers who move faster and grow tougher when surrounded by allies, but they become rattled when alone. Additionally, they suffer no mood penalty from eating raw food.'],
-                    ['Bufos', 'Cold-blooded creatures who work faster during the day and slower at night. They also tend to tire more slowly than other races.'],
+                    'races_overview',
+                    'human',
+                    'nymph',
+                    'ferin',
+                    'kobalos',
+                    'bufos',
                 ]
             },
             {
-                subtitle: 'Needs & Mood',
+                id: 'needs_mood',
                 entries: [
-                    ['Hunger', 'Decays over time. Colonists interrupt work to eat when critically hungry. Cooked food fully restores hunger whereas raw food only partially restores it.'],
-                    ['Rest', 'Decays over time. Colonists seek sleep when exhausted. Sleeping in an assigned bed gives a mood bonus while sleeping on the ground does not.'],
-                    ['Mood', 'A colonist\'s mood is their base value modified by active thoughts. Mood level directly determines work speed and willingness to work.'],
-                    ['Mood Levels', 'Four tiers from best to worst: Inspired (fastest work), Content (normal speed), Stressed (slow), and Breaking (refuses all work). Keep colonists above the stress threshold for productive labor.'],
-                    ['Thoughts', 'Temporary mood modifiers gained from events, meal quality, weather, social interactions, achievements, and room quality. Each thought fades after a duration.'],
-                    ['Mental Breaks', 'When mood drops critically low, colonists enter a breaking state. While in this state the colonist will wander aimlessly and refuse tasks until their mood recovers.'],
-                    ['Critical Alerts', 'Automatic warnings appear when colonists are near starvation, approaching a mental break, or freezing in cold weather.'],
+                    'hunger',
+                    'rest',
+                    'mood',
+                    'mood_levels',
+                    'thoughts',
+                    'mental_breaks',
+                    'critical_alerts',
                 ]
             },
             {
-                subtitle: 'Traits',
+                id: 'traits',
                 entries: [
-                    ['Traits Overview', 'Permanent modifiers assigned when a colonist is created. Each colonist gets one to three traits. Some trait pairs are mutually exclusive.'],
-                    ['Work Traits', 'Hard Worker, Lazy, Night Owl, Early Bird, Creative, Scholar, Workaholic, Insomniac. These affect work speed, skill growth rate, or time-of-day performance.'],
-                    ['Survival Traits', 'Iron Stomach, Gluttonous, Tough, Brave, Quick, Sturdy, Light Sleeper, Deep Sleeper, Steadfast, Volatile. These modify hunger/rest decay, damage resistance, movement speed, or mental resilience.'],
-                    ['Combat Traits', 'Duelist (dodge chance), Deadeye (critical hit chance), Berserker (stronger at low health), Coward (flees early), Pacifist (refuses combat). These traits directly affect performance in battle.'],
-                    ['Social Traits', 'Socialite, Loner, Optimist, Pessimist, Charismatic, Abrasive, Loyal. These affect mood from social interactions, thought intensity, and how quickly relationships form or sour.'],
-                    ['Food Traits', 'Gourmand (strong reaction to meal quality), Foraging Gut (no penalty from raw food), Chef (better cooking output), Comfort Eater (eating restores extra mood). These affect how colonists interact with food and hunger.'],
-                    ['Animal Traits', 'Beast Whisperer (better taming and animal handling), Menagerist (cheered by nearby tamed animals), Skittish (worse at taming). These affect interactions with wildlife and tamed creatures.'],
-                    ['Magic Traits', 'Attuned (bonus mana regen and max mana), Spellsword (bonus spell damage), Magically Inept (much slower magic XP but slightly faster mundane XP). These affect a colonist\'s relationship with spellcasting.'],
-                    ['Expedition Traits', 'Trailblazer, Treasure Hunter, Trapsmith, Inspiring, Void-Touched, Night Owl, Green Thumb (certain traits can also have realm-specific bonuses on expeditions). These traits give bonuses during expeditions such as reduced duration, better loot, or party-wide buffs.'],
-                    ['Trade Traits', 'Silver Tongue (better trade prices), Merchant\'s Eye (Trade Rift rewards arrive at higher quality), Scavenger (chance to find bonus materials while gathering).'],
-                    ['Rare Traits', 'Lucky (better crafting quality on all items), Prodigy (gains all XP faster), Magically Gifted (starts with experience in a random magic school and its starter spell). These are uncommon to very rare and have powerful effects.'],
+                    'traits_overview',
+                    'work_traits',
+                    'survival_traits',
+                    'combat_traits',
+                    'social_traits',
+                    'food_traits',
+                    'animal_traits',
+                    'magic_traits',
+                    'expedition_traits',
+                    'trade_traits',
+                    'rare_traits',
                 ]
             },
             {
-                subtitle: 'Skills & Health',
+                id: 'skills_health',
                 entries: [
-                    ['Skills', 'Six work skills (Building, Farming, Crafting, Cooking, Animals, Research) plus six magic schools. Higher skill levels mean faster task completion and better outcomes.'],
-                    ['Skill Leveling', 'Skills improve through use, with completing related tasks granting experience. Each level requires progressively more experience than the last.'],
-                    ['Health', 'Colonists have hit points that regenerate slowly when idle and faster when sleeping. If a colonist dies, surviving colonists suffer severe mood penalties based on their relationship.'],
-                    ['Equipment Slots', 'Each colonist has Weapon, Armor, Helmet, Clothes, Boots, Tool, and Trinket slots. Use Auto-equip to quickly assign the best available gear, or manually equip from the inventory.'],
-                    ['Active Effects', 'Temporary buffs from potions and spells appear in the colonist info panel with remaining duration. Effects include speed boosts, damage shields, and healing. Buffed colonists pulse on the map.'],
+                    'skills',
+                    'skill_leveling',
+                    'health',
+                    'equipment_slots',
+                    'active_effects',
                 ]
             },
             {
-                subtitle: 'Colony Population',
+                id: 'colony_population',
                 entries: [
-                    ['Colony Cap', 'You start with room for 3 colonists. Each colony milestone you reach raises the cap: +1 on small worlds, +1.5 on medium and +2 on large, for a maximum of 12, 16 and 21. Milestones are a mix of surviving Void Nexus waves and conquering realm chain expeditions, so reaching the maximum takes progress in both.'],
-                    ['Colony Milestones', 'The milestones are: (1) Survive wave 1, (2) Complete any Tier 1 realm expedition, (3) Survive wave 3, (4) Complete any Tier 2 realm expedition, (5) Defeat a full realm chain boss, (6) Survive wave 6, (7) Conquer two full realm chains, (8) Survive wave 9, (9) Conquer three full realm chains. The Rifts panel hints at the next one in this order, but you are free to complete them in any order.'],
+                    'colony_cap',
+                    'colony_milestones',
                 ]
             },
         ]
     },
     {
-        title: 'Relationships & Social',
+        id: 'relationships_social',
         subsections: [
             {
-                subtitle: 'Social System',
+                id: 'social_system',
                 entries: [
-                    ['Socializing', 'Colonists near each other periodically interact. Each interaction shifts their opinion of each other, determining their shared relationship tier.'],
-                    ['Opinion', 'A hidden score between any two colonists ranging from very negative to very positive. This score shifts from social interactions and slowly decays toward neutral over time.'],
-                    ['Relationship Tiers', 'Progresses from Stranger through Acquaintance, Friend, and Close Friend, up to Lovers. Can also go negative to Rival and Adversary. Higher tiers provide stronger mood effects.'],
-                    ['Interactions', 'Random social events occur when colonists work or idle nearby: pleasant chats, shared meals, disagreements, and arguments. The more time colonists spend with each other, the more they will learn to enjoy the company.'],
-                    ['Thoughts & Mood', 'Making friends, falling in love, or losing loved ones to death all cause powerful mood effects. Relationship-based thoughts are among the strongest in the game.'],
-                    ['Trait Influence', 'Socialite colonists interact more often and gain mood from company. Loners prefer solitude and get stressed when crowded. Optimists amplify positive social thoughts. Pessimists amplify negative ones.'],
+                    'socializing',
+                    'opinion',
+                    'relationship_tiers',
+                    'interactions',
+                    'thoughts_mood',
+                    'trait_influence',
                 ]
             },
         ]
     },
     {
-        title: 'Work & Tasks',
+        id: 'work_tasks',
         subsections: [
             {
-                subtitle: 'Task System',
+                id: 'task_system',
                 entries: [
-                    ['How Tasks Work', 'When you designate work (building, gathering, farming, etc.), tasks enter a queue. Colonists pick tasks based on their priority settings for the relevant skill.'],
-                    ['Priorities', 'Set each skill from 1 (highest priority) to 5 (lowest), or disable it entirely. Colonists always attempt the lowest-numbered available task they have skill for, nearest first. To jump one order ahead of the rest (say, a crypt wall far from home), right-click it in Normal mode with nobody drafted to mark it Do First.'],
-                    ['Work Speed', 'How fast a colonist completes tasks is determined by their skill level, mood, traits, equipped tool, active spell or trinket effects, and workshop quality. All bonuses multiply together.'],
-                    ['Tool Bonuses', 'Equipping the right tool type (Pickaxe, Axe, Sickle, Hammer, Mattock) speeds up matching tasks. Higher-tier tools provide bigger bonuses. Mattocks cover multiple tasks but are weaker than specialists. The Tool slot also accepts off-hand combat items like shields and quivers, as well as utility items like lanterns and war drums.'],
-                    ['Mood & Work Speed', 'Inspired colonists work noticeably faster. Stressed colonists work significantly slower. Breaking colonists stop working entirely until their mood recovers.'],
-                    ['Idle Behavior', 'Colonists with no tasks may wander, stargaze, skip stones, or socialize. If a Town Hall exists, idle colonists will gather there for mood-boosting relaxation activities.'],
+                    'how_tasks_work',
+                    'priorities',
+                    'work_speed',
+                    'tool_bonuses',
+                    'mood_work_speed',
+                    'idle_behavior',
                 ]
             },
             {
-                subtitle: 'Room & Workshop Quality',
+                id: 'room_workshop_quality',
                 entries: [
-                    ['Bedrooms', 'Enclosed bedrooms (walls + door + floor + bed) have a quality score based on furnishings and decorations inside. Better bedrooms give a bigger mood bonus when colonists sleep there. Ideal size is 6–12 tiles per bed. Requires 1 Seating, 1 Table / Desk, and 1 Storage to rise above Comfortable.'],
-                    ['Workshops', 'Crafting stations in furnished rooms gain speed and quality bonuses. Nearby tool racks, chairs, tables, and material shelves all improve workshop effectiveness. Ideal size is 8–15 tiles per station. Requires 1 Tools, 1 Storage, and 1 Seating to rise above Professional.'],
-                    ['Town Hall', 'Place a Town Hall Banner in a furnished room to designate it as a gathering space. Idle colonists spend time here to socialize and get mood boosts. Better decorations improve the effect. Ideal size is 13–30 tiles. Requires 4 Seating, 1 Table / Desk, and 1 Centerpiece to become Majestic.'],
-                    ['Furniture Types', 'Each furnishing counts as a type: Seating (chair, stool, bench, armchair), Table / Desk (table, nightstand, desk), Storage (shelf, bookcase, wardrobe, material shelf, crate), Tools (tool rack, weapon rack, grindstone), or Centerpiece (podium, statue, war table). A piece only meets a requirement in rooms it improves. Misc pieces (potted plant, personal chest, painting, tapestry) add decoration but never meet a requirement. Click a room to see what it still needs.'],
+                    'bedrooms',
+                    'workshops',
+                    'town_hall',
+                    'furniture_types',
                 ]
             },
         ]
     },
     {
-        title: 'Building & Resources',
+        id: 'building_resources',
         subsections: [
             {
-                subtitle: 'Construction',
+                id: 'construction',
                 entries: [
-                    ['Placing Buildings', 'Press B to enter Build mode, select a building, and place it on valid terrain. Colonists with building priority will construct it using resources from the stockpile.'],
-                    ['Resource Costs', 'Each building requires specific resources. Costs are shown in the build menu before placement and are taken from the stockpile automatically when queued.'],
-                    ['Structure HP', 'Walls, doors, and fences have health points. Enemies with no clear path to their target must break through these buildings by attacking them. Damaged structures automatically queue repair tasks when threats are gone.'],
-                    ['Rooms', 'Place floors inside walled areas to create rooms. A room needs walls on all sides, at least one door, and floor tiles inside. Rooms provide quality-based bonuses to sleeping, crafting, or socializing based on the room\'s furnishings.'],
-                    ['Deconstruction', 'While in Build mode you can right-click in the game world to deconstruct buildings and recover a portion of their materials. You can also press X from Build mode to turn toggle Destruction mode. This is useful for reorganizing your colony layout as you expand. Colonists with Building skill handle destruction tasks. Right-clicking a chest inside an ancient crypt marks it for looting instead.'],
-                    ['Research-Gated Buildings', 'Many advanced buildings require specific research to unlock. Hover over locked buildings in the build menu to see their prerequisites, or browse the research tree to plan ahead.'],
+                    'placing_buildings',
+                    'resource_costs',
+                    'structure_hp',
+                    'rooms',
+                    'deconstruction',
+                    'research_gated_buildings',
                 ]
             },
             {
-                subtitle: 'Resources',
+                id: 'resources',
                 entries: [
-                    ['Global Stockpile', 'All resources are colony-wide and instantly accessible. There is no hauling, colonists use materials directly from the shared stockpile when working.'],
-                    ['Gathering Resources', 'Press G to designate trees for chopping (yields wood) and rock deposits for mining (yields stone, iron ore, or runite). Colonists with Building skill handle gathering tasks.'],
-                    ['Processed Materials', 'Raw materials can be refined into advanced forms: wood into planks, stone into bricks, hides into leather, iron ore into iron. These are often needed for mid-to-late-game recipes, so be sure to keep a stockpile of each refined material.'],
-                    ['Food & Decay', 'Food spoils over time. Decay is faster in summer and slower in winter. Build Food Chests and Ice Boxes to reduce spoilage rates and keep your food supply stable.'],
+                    'global_stockpile',
+                    'gathering_resources',
+                    'processed_materials',
+                    'food_decay',
                 ]
             },
         ]
     },
     {
-        title: 'Crafting & Production',
+        id: 'crafting_production',
         subsections: [
             {
-                subtitle: 'Crafting System',
+                id: 'crafting_system',
                 entries: [
-                    ['Crafting Stations', 'Different items require different stations: A Workbench for basic goods, an Anvil for metalwork, a Cooking Pot for cooking, an Alchemy Table for potions, an Enchanting Table for enchantments and runic gear, a Loom for clothing, and a Scriptorium for crafting spell tomes. Build the right station, then queue recipes. Building multiple of the same workstation will allow more colonists to take on crafting tasks at the unoccupied stations.'],
-                    ['How Crafting Works', 'Open the Craft panel (C) and queue recipes. Colonists with Crafting or Cooking skill will work queued recipes at the appropriate station. Mana-powered stations (Enchanting Tables) work faster than their unpowered counterparts (Workbenches).'],
-                    ['Quality Tiers', 'Crafted equipment rolls a quality level from Crude to Superior. Higher Crafting skill gives that colonist better odds of higher quality crafts. Quality multiplies the item\'s effectiveness signifigantly, with high-quality equipment from lower tiers outpacing low-quality equipment from higher tiers.'],
-                    ['Enchantment Effects', 'Similar to equipment Quality, you can choose to enchant any non-trinket equipment from the inventory for a small cost. This will queue an enchantment task that is prioritized as a crafting task but distinctly uses the Enchantment skill level from the working colonist. These enchantments vary widely, applying some new effect to the equipment with a power level based on the enchantment\'s tier (I, II, III, or IV). The higher the Enchantment skill, the better odds of higher enchantment tiers. Enchanted equipment can also be queued for enchantment multiple times, replacing the previous effect with a newly rolled one, allowing you to re-enchant your best equipment until you find an effect that you\'re satisfied with.'],
-                    ['Auto-Craft & Auto-Cook', 'Set stock targets on recipes to automatically queue them when supplies run low. Toggle repeat mode to keep a recipe permanently queued. Great for maintaining food and potion supplies as well as keeping materials stocked.'],
-                    ['Salvage', 'Recycle unwanted equipment from the inventory to recover a portion of its crafting materials. Useful for clearing out low-quality gear after upgrades.'],
+                    'crafting_stations',
+                    'how_crafting_works',
+                    'quality_tiers',
+                    'enchantment_effects',
+                    'auto_craft_auto_cook',
+                    'salvage',
                 ]
             },
             {
-                subtitle: 'Cooking & Potions',
+                id: 'cooking_potions',
                 entries: [
-                    ['Cooking', 'Convert raw crops and meat into cooked meals at the Cooking Pot. Cooked food fully restores hunger and provides a mood bonus. Eating raw food gives a mood penalty instead.'],
-                    ['Food Sources', 'Crops from farming, meat from hunting animals, and products from tamed creatures (eggs, milk) all serve as cooking ingredients.'],
-                    ['Potions', 'Brewed at the Alchemy Table after researching Alchemy. Potions provide temporary buffs like healing, speed, mana restoration, or damage resistance. They are auto-consumed when trigger conditions are met.'],
+                    'cooking',
+                    'food_sources',
+                    'potions',
                 ]
             },
             {
-                subtitle: 'Trading',
+                id: 'trading',
                 entries: [
-                    ['Trade Caravans', 'Merchants arrive as random events. Open the barter panel to exchange resources and items. You sell at a discount and buy at a markup compared to base values.'],
-                    ['Exclusive Items', 'Some powerful items cannot be crafted and are only available from traders or as expedition loot. Watch for rare offerings when caravans arrive.'],
-                    ['Trade Research', 'Research Trade Routes to improve your buy and sell rates colony-wide, making trading significantly more efficient.'],
-                    ['Trade Rift', 'An advanced building unlocked with Trade Rifts research. It presents periodic supply contracts: fulfill the requested goods within the season (or year, for larger contracts) to earn high-quality equipment, spell tomes, or rare artifacts. Seasonal contracts refresh each season while yearly contracts refresh once per year and carry bigger rewards. The quality floor on received gear is higher than what you tend to see when crafting, making the Trade Rift one of the best sources of top-tier equipment.'],
-                    ['Merchant Types', 'Different merchants carry different goods. Arms Dealers sell weapons and armor. Tome Peddlers sell spell tomes. Wandering Alchemists sell potions and rare ingredients. Clothiers sell clothing and boots. Expedition Outfitters carry expedition supplies and pack-animal gear. Rare Goods Brokers stock late-game trinkets and exotic materials. Watch for rare offerings when caravans arrive.'],
+                    'trade_caravans',
+                    'exclusive_items',
+                    'trade_research',
+                    'trade_rift',
+                    'merchant_types',
                 ]
             },
         ]
     },
     {
-        title: 'Research & Magic',
+        id: 'research_magic',
         subsections: [
             {
-                subtitle: 'Research',
+                id: 'research',
                 entries: [
-                    ['How Research Works', 'Select a topic from the research tree, then colonists study at Research Desks to progress it. Only one active project at a time. Additional desks contribute with diminishing returns.'],
-                    ['Research Gates', 'Advanced technologies may require more than just a prerequisite tech. Some need specific buildings on the map, population milestones, or a minimum number of completed techs in their tab.'],
-                    ['Research Tabs', 'The tree is organized into multiple tabs covering different progression paths: foundations, nature, arcane power, crafting, advanced magic, and void/exploration. Cross-tab prerequisites exist between them.'],
-                    ['What Research Unlocks', 'New buildings, recipes, crops, spells, and capabilities. Browse the tree early to plan your progression path. Some powerful buildings and mechanics are locked behind multi-step research chains.'],
+                    'how_research_works',
+                    'research_gates',
+                    'research_tabs',
+                    'what_research_unlocks',
                 ]
             },
             {
-                subtitle: 'Magic System',
+                id: 'magic_system',
                 entries: [
-                    ['Learning Spells', 'Colonists learn spells by studying Spell Tomes at a Research Desk, prioritized by the Research skill. Each tome teaches one spell. Progress persists per-colonist, and completing a tome permanently grants that spell, destroying the tome in the process. Colonists will slowly study their tome while contributing to research topic progress. Colonists will study their tome at a faster pace if there\'s no research topic to contribute to.'],
-                    ['Colonist Mana', 'Each colonist has a personal mana pool that grows as they level magic skills. Spells consume mana and go on cooldown. Mana regenerates passively over time or can be restored instantly via potions.'],
-                    ['Auto-Cast', 'Colonists auto-cast known spells when appropriate conditions are met (healing when allies are hurt, buffing speed when working). Each colonist attunes to one magic school at a time and auto-casts spells from that school only. Switching is free. Disable specific spells to conserve mana for higher-priority casts.'],
-                    ['Magic Schools', 'Six schools of magic, each with a distinct role: Evocation (damage), Enchantment (buffs and crowd control), Abjuration (healing and shields), Conjuration (summons and teleportation), Transmutation (crop growth and terrain manipulation), Divination (influencing fate and events).'],
-                    ['Evocation', MAGIC_SKILLS.evocation.summary],
-                    ['Enchantment', MAGIC_SKILLS.enchantment.summary],
-                    ['Abjuration', MAGIC_SKILLS.abjuration.summary],
-                    ['Conjuration', MAGIC_SKILLS.conjuration.summary],
-                    ['Transmutation', MAGIC_SKILLS.transmutation.summary],
-                    ['Divination', `${MAGIC_SKILLS.divination.summary} Colonists with Divination skill also generate Omens: prophecies visible in the Arcane panel (V) that give advance warning of incoming raids, weather shifts, and events. Higher Divination skill reveals finer timing and unlocks more omen categories, including hints about what lurks in expedition realms.`],
+                    'learning_spells',
+                    'colonist_mana',
+                    'auto_cast',
+                    'magic_schools',
+                    { id: 'evocation', school: 'evocation' },
+                    { id: 'enchantment', school: 'enchantment' },
+                    { id: 'abjuration', school: 'abjuration' },
+                    { id: 'conjuration', school: 'conjuration' },
+                    { id: 'transmutation', school: 'transmutation' },
+                    { id: 'divination', school: 'divination', withText: true },
                 ]
             },
             {
-                subtitle: 'Mana Grid (Power)',
+                id: 'mana_grid_power',
                 entries: [
-                    ['Net Mana', 'Mana Crystals generate power while magical buildings and pedestals consume it. If demand exceeds generation, the grid powers buildings in priority order and the rest go dark until supply catches up. The mana display shows net mana and how many buildings are dark.'],
-                    ['Power Priority', 'Every mana consumer has a priority: High, Normal or Low. When mana runs short, High is supplied first, then Normal, then Low. Defenses and heaters default to High, lights to Low, everything else to Normal. Change a building\'s priority from its info panel (the default is marked with *). Mana Relays always draw first.'],
-                    ['Mana Crystals', 'Your primary power source. You start with a limited build cap that increases through research and rare consumables. Each crystal generates a base amount of mana for the grid.'],
-                    ['Mana Relays', 'Reduce mana consumption of nearby buildings. Place relays in clusters of powered buildings to stretch your mana budget further. The reduction does not stack from multiple relays.'],
-                    ['Planning Your Grid', 'Balance generation versus consumption as you add powered buildings.'],
+                    'net_mana',
+                    'power_priority',
+                    'mana_crystals',
+                    'mana_relays',
+                    'planning_your_grid',
                 ]
             },
             {
-                subtitle: 'Golems',
+                id: 'golems',
                 entries: [
-                    ['What Are Golems', 'Animated stone workers that never eat, sleep, or have mood. Each golem specializes in one task type and works tirelessly without any needs management.'],
-                    ['Creating Golems', 'Build a Golem Forge (requires Golem Craft research) and craft golems using stone, runite, and void essence. Multiple types available, each specializing in a different skill.'],
-                    ['Golem Limitations', 'Golems cannot learn spells, cannot grow in skill, and do not count toward your colonist cap. They are pure task specialists, reliable but inflexible.'],
+                    'what_are_golems',
+                    'creating_golems',
+                    'golem_limitations',
                 ]
             },
             {
-                subtitle: 'Complex Structures',
+                id: 'complex_structures',
                 entries: [
-                    ['Pattern Activation', 'Certain multi-tile building patterns activate powerful colony-wide bonuses when completed. Find an Arcane Core in an ancient ruin, then lay Ritual Chalk around it in the required shape. Every structure uses the same core: the chalk pattern alone determines which structure activates. Destroying or removing any part of the pattern deactivates the bonus.'],
-                    ['Arcane Core', 'The universal anchor for all complex structures. Arcane Cores cannot be built or destroyed; the only ones in the world sit at the heart of the ancient ruins scattered across each biome, each marked by its symbol inlaid in brick floor. Only a few of the symbol\'s chalk marks survive, so lay Ritual Chalk on the bare brick tiles to finish it. These ruins are never sealed, warded or guarded, so a core is always safe to reach. Complete or reshape the Ritual Chalk around a core to activate a structure. Ritual Chalk is unlocked with Ritual Magic research. Check the individual structure entries below for each pattern.'],
-                    ['Great Forge', 'All 8 adjacent tiles around the Arcane Core filled with Ritual Chalk (3x3 ring). Greatly increases crafting speed and crafting quality colony-wide. Requires Masterwork research.\n  C C C\n  C * C\n  C C C\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ['Ritual Circle', 'Ritual Chalk in a diamond pattern around the Arcane Core: cardinal distance 2 (up/down/left/right) and diagonal distance 1 (all four corners). Significantly reduces spell cooldowns colony-wide. Requires Advanced Arcana research.\n  . . C . .\n  . C . C .\n  C . * . C\n  . C . C .\n  . . C . .\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
-                    ['Anvil Shrine', 'Ritual Chalk in an anvil shape: 3 chalk above the Arcane Core, 1 chalk below. Greatly increases gathering speed for chopping and mining colony-wide. Requires Irrigation research.\n  C C C\n  . * .\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ['Star Ward', 'Ritual Chalk in a cardinal cross: one chalk tile directly above, below, left, and right at distance 2. Increases colonist outgoing damage colony-wide. Requires Fortification research.\n  . . C . .\n  . . . . .\n  C . * . C\n  . . . . .\n  . . C . .\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
-                    ['Harvest Sigil', 'Ritual Chalk in a plough shape: 3 chalk extending right from the Arcane Core, with 1 chalk branching up and 1 branching down at the far end. Greatly increases farm harvest yield colony-wide. Requires Verdant Growth research.\n  . . . C\n  * C C C\n  . . . C\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ["Watcher's Eye", 'Ritual Chalk directly above and below the Arcane Core (vertical line of 3). Increases expedition loot quantity colony-wide. Requires Planar Rifts research.\n  C\n  *\n  C\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ["Scholar's Ring", 'Ritual Chalk on the 4 cardinal adjacent tiles only (no corners). Greatly increases research point generation colony-wide. Requires Arcane Studies research.\n  . C .\n  C * C\n  . C .\n\n  * = Arcane Core    C = Ritual Chalk'],
-                    ['Grand Altar', 'Ritual Chalk in a great X: corners at diagonal distance 2 and the inner diagonals at distance 1. Unlike the other structures it has no passive bonus. Instead it lets you perform powerful on-demand rituals from the tile info panel, each for a reagent cost and a long cooldown: Rite of Mending (heal all colonists), Rite of Calm Skies (force clear weather), Rite of Warding (delay the next raid), and Rite of Abundance (surge crop growth). Requires Advanced Arcana research.\n  C . . . C\n  . C . C .\n  . . * . .\n  . C . C .\n  C . . . C\n\n  * = Arcane Core    C = Ritual Chalk    . = empty'],
+                    'pattern_activation',
+                    'arcane_core',
+                    'great_forge',
+                    'ritual_circle',
+                    'anvil_shrine',
+                    'star_ward',
+                    'harvest_sigil',
+                    'watchers_eye',
+                    'scholars_ring',
+                    'grand_altar',
                 ]
             },
         ]
     },
     {
-        title: 'Combat & Exploration',
+        id: 'combat_exploration',
         subsections: [
             {
-                subtitle: 'Combat',
+                id: 'combat',
                 entries: [
-                    ['How Combat Works', 'Melee weapons attack adjacent tiles whereas ranged weapons and spells attack from a distance (with the exception of melee spells like Smite). Colonists engage in battle with enemies that step too close, automatically attacking any threat within their weapon range.'],
-                    ['Weapon Types', 'Three categories: Melee (swords, daggers, axes, and maces, all close range with attack varying speeds), Ranged (bows and crossbows for attacking from distance), and Magic (wands and staves for boosting spell damage and attacking at range). Higher-tier weapons within each category deal more damage or have better bonuses.'],
-                    ['Armor & Defense', 'Body armor and helmets reduce incoming damage. Heavier armor provides more protection in exchange for fewer magical bonuses. The two slots stack together for combined damage reduction.'],
-                    ['Drafting', 'Press Q to draft selected colonists for manual control. Drafted colonists ignore all tasks, including eating and sleeping, and move where you right-click. Box-select multiple colonists and Draft All for group control.'],
+                    'how_combat_works',
+                    'weapon_types',
+                    'armor_defense',
+                    'drafting',
                 ]
             },
             {
-                subtitle: 'Defense',
+                id: 'defense',
                 entries: [
-                    ['Raids', 'Hostile raiders attack your colony periodically. Raid strength scales with your colony\'s wealth and how long you\'ve been playing. Disabled in Peaceful Mode.'],
-                    ['Guard Mode', 'Assign colonists to guard a position. They patrol nearby and automatically engage threats within a wider radius than normal, while still eating and sleeping when needed.'],
-                    ['Turrets & Wards', 'Arcane Sentinels and Void Turrets automatically attack enemies within range. Inferno Wards and Ember Heaters damage or deter nearby hostiles. All defensive buildings consume mana from the grid.'],
-                    ['Defensive Building', 'Use walls and doors to funnel enemies through chokepoints. Place turrets along the path they must take. Reinforce critical walls with higher-tier materials (Void Walls) for durability.'],
-                    ['Peaceful Mode', 'A game setting that disables raids and hostile wildlife. The Void Nexus wave system still functions separately for players who want optional combat challenges.'],
+                    'raids',
+                    'guard_mode',
+                    'turrets_wards',
+                    'defensive_building',
+                    'peaceful_mode',
                 ]
             },
             {
-                subtitle: 'Wave Defense',
+                id: 'wave_defense',
                 entries: [
-                    ['Void Nexus', 'Build after researching Unstable Rifts. You can start wave challenges using the Rifts menu (V). During a wave enemies spawn from portals and try to destroy the Nexus. Defend it from these attacks to earn rewards. Don\'t worry, if your Nexus is destroyed you can always build a new one to replace it.'],
-                    ['How Waves Work', 'Each successive wave sends tougher and more numerous enemies. Defeat all enemies in a wave to complete it and unlock the next. Waves are strictly player-initiated, not automatic.'],
-                    ['Void Essence', 'Dropped by wave enemies. This rare resource is essential for crafting late-game equipment and advanced defensive structures.'],
-                    ['Strategy', 'Build walls and doors to create funnels toward the Nexus. Place turrets at chokepoints. Draft your colonists or set them to Guard mode to protect the Nexus themselves. Upgrade weapons and armor between waves.'],
+                    'void_nexus',
+                    'how_waves_work',
+                    'void_essence',
+                    'strategy',
                 ]
             },
             {
-                subtitle: 'Exploration',
+                id: 'exploration',
                 entries: [
-                    ['Rift Gate', 'A legacy launch point. In worlds where every realm chain has a rift anchor (every new world) the Rift Gate can no longer be built and expeditions leave from attuned Rift Anchors instead (see Ancient Crypts). Worlds created before anchors existed keep using the gate: build it after researching Planar Rifts, click it to open the expedition panel, and send parties to other realms for loot.'],
-                    ['Expedition Parties', 'Select up to five colonists, two pack animals, and two war beasts. Choose a realm and difficulty level. Higher difficulty means tougher enemies but significantly better loot and rare item chances.'],
-                    ['Formation', 'When building an expedition party, assign colonists to the front or back row. Front-row fighters absorb more incoming attacks while back-row members benefit from cover. Placing your toughest warriors up front and your spellcasters or archers in the back is generally the most effective approach.'],
-                    ['Party Synergy', 'Colonists who share a strong relationship fight better together. Friends, close friends, and lovers in the same expedition party gain a damage bonus, while rivals and adversaries in the party can undercut each other. The relationship thoughts you invest in at home carry real weight in the field.'],
-                    ['Expedition Fatigue', 'After returning from an expedition, colonists enter a rest period before they can embark again. Longer or harder expeditions impose longer fatigue. The Trailblazer trait and certain expedition XP level bonuses reduce fatigue duration.'],
-                    ['Expedition XP', 'Colonists earn expedition experience each time they complete a run. As they level up they unlock passive bonuses: increased damage, better loot, reduced fatigue, and higher rare encounter rates. Expedition level is tracked per-colonist and persists across all realms.'],
-                    ['War Beasts', 'Tamed wolves and boars can join expeditions as war beasts, fighting alongside your party in combat encounters. Unlike pack animals, war beasts actively participate in battle and can take damage. They always return home safely even if the party is defeated.'],
-                    ['Party Presets', 'Save your favorite party configurations as named presets from the expedition panel. Presets store the colonist lineup, formation, and carried potions, letting you quickly re-field a proven team without rebuilding it each time.'],
-                    ['Auto-Expedition', 'Research the Auto-Expedition tech chain to allow saved party presets to embark automatically when all members are rested and ready. Higher tiers of the research allow more presets to run simultaneously, enabling hands-off farming of multiple realms at once.'],
-                    ['Realms', 'Multiple expedition chains, each with increasing depth. Deeper realms require completing the previous one first. Later chains require additional research to unlock. Except for the Wild Frontiers, a chain can only be launched once you have researched Planar Rifts and attuned its rift anchor in an ancient crypt.'],
-                    ['Encounters', 'During expeditions, your party faces combat encounters, traps, and discoveries. Combat resolves in real-time rounds. Even on defeat, you keep items found before the loss. Colonists defeated during an expedition will always survive their retreat, re-joining the colony at extremely low health.'],
-                    ['Pack Animals', 'Tamed okapi can join expeditions as pack animals, reducing expedition duration. Bring them for faster completion and more efficient loot runs. Pack animals do not participate in combat and always return home safely.'],
+                    'rift_gate',
+                    'expedition_parties',
+                    'formation',
+                    'party_synergy',
+                    'expedition_fatigue',
+                    'expedition_xp',
+                    'war_beasts',
+                    'party_presets',
+                    'auto_expedition',
+                    'realms',
+                    'encounters',
+                    'pack_animals',
                 ]
             },
             {
-                subtitle: 'Ancient Crypts',
+                id: 'ancient_crypts',
                 entries: [
-                    ['Ancient Crypts', 'Sealed, door-less tombs scattered across the map, some round and some square. Their interior stays dark and unexplored until a wall is broken. Seven crypts hold a rift anchor, one for each realm chain beyond the Wild Frontiers, and each sits in the biome that suits its realm. Larger maps also hold extra crypts with loot only. Crypts you have discovered show on the minimap as their realm chain icon on a coloured disc: purple while sealed, blue while warded, red once breached and green once plundered.'],
-                    ['Breaching a Crypt', 'Deconstruct any wall of a crypt\'s outer ring in Build mode (right-click, or X for Deconstruct mode). The moment the ring is open the crypt wakes: its guardians rise and its traps arm, so bring armed colonists. The sealed interior cannot be entered, built on or designated until then. Ordinary ruins and the ruins that hold Arcane Cores are never sealed or guarded.'],
-                    ['Crypt Wards', 'Some crypts are warded. Their walls are indestructible warded stone (▦) until the realm chain they are bound to has been completed by clearing its final boss realm. Verdant and Crystal crypts are always open. After that the order is Arcane (after Crystal), Shadow (after Arcane), Void Pact (after Shadow), Kingdom (after Void Pact) and Chaos (after Kingdom). Loot-only crypts follow the same rule: tier 2 after Crystal and tier 3 after Void Pact. You are notified when a ward fades, and discovering a warded crypt tells you what to clear.'],
-                    ['Crypt Guardians & Traps', 'Breaching a crypt wakes guardians themed to its realm. They chase colonists who come within range and return to their post when nothing is near. Deeper crypts have tougher guardians. Hidden spike traps lie on the floor and hurt the first colonist to step on each one. A trap, once sprung, is spent.'],
-                    ['Crypt Chests', 'In Build mode, right-click a chest to mark it for looting (the same way you deconstruct a wall) and a colonist will open it. Contents depend on the crypt\'s tier and include materials from its realm. A crypt counts as plundered once every chest is looted.'],
-                    ['Rift Anchors', 'Each anchor crypt holds a dormant rift anchor (✧). Once the crypt is open, right-click the anchor in Build mode to have a colonist attune it (✦), or right-click it with colonists drafted to send them straight there. Crypt chests work the same way. An attuned anchor is the portal for its realm chain: parties gather there, depart from it and return to it. Launching also needs Planar Rifts research, and each realm keeps its own research and prerequisite requirements. The Wild Frontiers need no anchor. Worlds created before anchors existed use the Rift Gate instead.'],
-                    ['Crypt Themes', 'Each anchor crypt is dressed for its realm. Verdant: forest, wooden walls, briar guardians. Crystal: mountains, stone walls, crystal guardians. Arcane: grassland, brick walls, rune constructs. Shadow: swamp, stone walls, shades. Void Pact: tundra, void walls, void servants. Chaos: desert, brick walls, fracture horrors. Kingdom: grassland, stone and brick, risen palace guards.'],
+                    'ancient_crypts',
+                    'breaching_a_crypt',
+                    'crypt_wards',
+                    'crypt_guardians_traps',
+                    'crypt_chests',
+                    'rift_anchors',
+                    'crypt_themes',
                 ]
             },
             {
-                subtitle: 'Trinkets',
+                id: 'trinkets',
                 entries: [
-                    ['What Are Trinkets', 'Powerful unique items with special effects. Some are equipped directly on colonists for personal bonuses while others are placed on Trinket Pedestals to project area or colony-wide effects.'],
-                    ['Trinket Pedestals', 'Build after researching Arcane Infusion. Place a trinket on a pedestal to project its effect in a radius around it. Some trinkets have global effects that benefit the entire colony. Pedestals consume mana based on the placed trinket.'],
-                    ['Pedestal Overcharge', 'Pour extra mana into a pedestal from its info panel. Empowered costs 2x mana for 1.5x effects and +2 radius. Radiant costs 3x mana for 2x effects and +4 radius. Whole-number bonuses like extra harvest yield gain +1 or +2 instead. Colony-wide trinkets can only be Empowered.'],
-                    ['Equipped Trinkets', 'When worn by a colonist, these provide passive bonuses: increased move speed, work speed, combat power, or emergency auto-revival. Some have special expedition-only effects.'],
-                    ['Durability & Repair', 'Certain powerful trinkets break after activating their effect. Broken trinkets provide no bonuses. Repair tasks take place at an Anvil using runite and are queued automatically.'],
-                    ['Finding Trinkets', 'Found as expedition loot (each realm chain has signature drops), purchased from rare trader inventories, or occasionally crafted with end-game research and materials.'],
+                    'what_are_trinkets',
+                    'trinket_pedestals',
+                    'pedestal_overcharge',
+                    'equipped_trinkets',
+                    'durability_repair',
+                    'finding_trinkets',
                 ]
             },
         ]
     },
     {
-        title: 'World & Controls',
+        id: 'world_controls',
         subsections: [
             {
-                subtitle: 'Seasons & Weather',
+                id: 'seasons_weather',
                 entries: [
-                    ['Season Cycle', 'Four seasons rotate continuously: Spring, Summer, Autumn, Winter. Each season affects temperature, crop growth rates, animal spawns, and which events can occur.'],
-                    ['Spring', 'Moderate temperatures and normal crop growth. Wild animals appear more frequently. A good season for expanding farms and taming animals.'],
-                    ['Summer', 'The hottest season with the fastest crop growth, but food also spoils faster. Risk of heat waves. Plan extra food storage.'],
-                    ['Autumn', 'Cooling temperatures with slightly slower crop growth. Animal migrations commonly pass through, providing hunting opportunities.'],
-                    ['Winter', 'Cold temperatures halt most outdoor crop growth. Snow covers the ground. Colonists need warmth from Campfires, Ember Heaters, or Inferno Wards to avoid freezing. Freezing colonists will seek out nearby heat sources on their own. Press H to toggle the warmth overlay and see each source\'s coverage.'],
-                    ['Weather Effects', 'Rain boosts crop growth. Blizzards halt all crop growth entirely. Weather varies by season.'],
-                    ['Winter Feast', 'Once each year, when winter arrives, the colony holds a feast if it has stored a comfortable surplus of food. The feast eats into that stockpile and grants every colonist a lasting mood buff, a warm beat in the coldest season. A lean winter with too little food stored simply passes without one, so keep a cushion of food heading into the cold.'],
+                    'season_cycle',
+                    'spring',
+                    'summer',
+                    'autumn',
+                    'winter',
+                    'weather_effects',
+                    'winter_feast',
                 ]
             },
             {
-                subtitle: 'Farming',
+                id: 'farming',
                 entries: [
-                    ['Farm Zones', 'Press F to enter Farm Zone mode. Select a crop type, then drag an area on grass or dirt. Colonists with Farming skill will automatically plant and harvest crops in the zone.'],
-                    ['Crop Growth', 'Growth speed is affected by the current season, weather conditions, and magic spells. By default most crops do not grow during the winter season.'],
-                    ['Available Crops', 'Crops range from basic (available immediately) to advanced (requiring research). Each has different season compatibility, growth speed, and yield. Some crops, like the magical Moonbloom, grow in all seasons.'],
-                    ['Creeping Miasma', 'A blight that infects crop tiles in spring and summer, causing growth to decay. Spreads to adjacent crops over time. Farmers can cleanse infected tiles. Blight Ward potions double cleanse speed. Pedestal artifacts like the Seedkeeper\'s Locket create immunity zones.'],
-                    ['Blight Blooms', 'Hostile fungal entities that erupt on crop tiles in summer and autumn, destroying nearby crops rapidly. Must be killed by colonists in combat. The Seedkeeper\'s Locket passively damages blooms within its aura. Ward of Calamity prevents blooms from spawning.'],
+                    'farm_zones',
+                    'crop_growth',
+                    'available_crops',
+                    'creeping_miasma',
+                    'blight_blooms',
                 ]
             },
             {
-                subtitle: 'Wildlife & Taming',
+                id: 'wildlife_taming',
                 entries: [
-                    ['Wild Animals', 'Various creatures roam the map. Passive animals (deer, rabbits, okapi) flee when approached. Hostile animals (wolves) attack colonists that get too close, especially at night and in winter.'],
-                    ['Hunting', 'Select an animal and click Hunt to queue a hunting task. Colonists with Animals skill will pursue it and attack when able. Hunting yields meat and hides for cooking and crafting.'],
-                    ['Taming', 'Build a Beast Circle (requires Beast Binding research) to tame wild animals. Taming requires food and Animals skill. Higher skill improves success chance.'],
-                    ['Dangerous Tames', 'Some animals (wolves) fight back when taming fails. The colonist takes damage and gains negative mood. Higher Animals skill reduces failure risk.'],
-                    ['Tamed Roles', 'Tamed animals serve different purposes: guard animals patrol and attack threats, pack animals speed up expeditions, production animals generate resources like eggs, and some rare animals even provide passive mood auras to nearby colonists.'],
+                    'wild_animals',
+                    'hunting',
+                    'taming',
+                    'dangerous_tames',
+                    'tamed_roles',
                 ]
             },
             {
-                subtitle: 'Events',
+                id: 'events',
                 entries: [
-                    ['Random Events', 'Various events trigger as your colony grows: new colonists arriving, trade caravans, crop blights, mineral windfalls, cold snaps, animal migrations, and inspiration.'],
-                    ['Wanderers', 'New colonists occasionally ask to join your colony. Wanderers are more likely when colony mood is high. Accept or reject based on their traits and skills. Once a wanderer joins your colony you will have no simple way to remove them from their new community.'],
-                    ['Destructive Events', 'Creeping miasma infects and decays crops in spring/summer. Blight blooms erupt on crops and destroy them in summer/autumn. Cold snaps kill all outdoor crops in winter.'],
+                    'random_events',
+                    'wanderers',
+                    'destructive_events',
                 ]
             },
             {
-                subtitle: 'Controls',
+                id: 'controls',
                 entries: [
-                    ['Camera', 'WASD or Arrow keys to pan. +/- or scroll wheel to zoom. Middle-click drag to pan. Home to center on selection.'],
-                    ['Speed & Pause', 'Space to pause/unpause. < and > to change game speed (three levels). [ and ] to cycle between colonists.'],
-                    ['Selection', 'Click to select a colonist, animal, or tile. Drag to box-select multiple. E selects all colonists. N jumps to next idle colonist.'],
-                    ['Modes', 'B for Build mode, F for Farm Zone mode, G for Gather/Designate mode. X toggles deconstruct while in Build mode.'],
-                    ['Panels', 'P (Priority), C (Craft), R (Research), I (Inventory), V (Arcane), J (Story). Esc closes any open panel.'],
-                    ['Overlays', 'H = Warmth (heat source radii). Y = Defense (turret and ward attack ranges). U = Room Quality (rooms colored by tier: blue = bare, green = mid, gold = best). K = Auras (mana relay discount zones, pedestal artifact radii, light source radii).'],
-                    ['Combat Controls', 'Q drafts/undrafts selected colonists. Right-click moves drafted colonists. Number keys 1-9 cast the selected colonist\'s controllable spells.'],
-                    ['Keybindings', 'All keys can be remapped in Settings under Controls / Keybindings.'],
+                    'camera',
+                    { id: 'pause_speed', params: { slower_key: '<', faster_key: '>' } },
+                    'selection',
+                    'modes',
+                    'panels',
+                    'overlays',
+                    'combat_controls',
+                    'keybindings',
                 ]
             },
             {
-                subtitle: 'Map Symbols (ASCII-mode)',
+                id: 'map_symbols_ascii_mode',
                 symbols: [
-                    ['.', 'Grass', '#22aa22'],
-                    [',', 'Dirt', '#88aa44'],
-                    ['#', 'Rock (slow)', '#666666'],
-                    ['▲', 'Tall Rock (impassable)', '#444444'],
-                    ['~', 'Water (slow)', '#4488cc'],
-                    ['T', 'Tree', '#228822'],
-                    ['o', 'Stone/Iron/Runite deposit', '#aaaaaa'],
-                    ['@', 'Colonist', '#00ccff'],
-                    ['R', 'Raider', '#ff6600'],
-                    ['E', 'Void Enemy', '#ff2222'],
-                    ['V', 'Void Nexus', '#9933ff'],
-                    ['▓', 'Void Wall', '#6622aa'],
-                    ['Y', 'Void Turret', '#aa33ff'],
-                    ['Ω', 'Rift Gate', '#66aaff'],
-                    ['✧', 'Dormant Rift Anchor', '#66c8ff'],
-                    ['✦', 'Attuned Rift Anchor', '#aaf0ff'],
-                    ['▣', 'Crypt Chest', '#d4a84a'],
-                    ['▢', 'Looted Chest', '#7a6a44'],
-                    ['▦', 'Warded Wall', '#9d7fe0'],
-                    ['Ğ', 'Golem Forge', '#cc8833'],
-                    ['⚒', 'Forge Core', '#ff8844'],
-                    ['◎', 'Ritual Core', '#aa44ff'],
-                    ['◌', 'Ritual Chalk', '#cc99ff'],
-                    ['◆', 'Trinket Pedestal', '#ccaa44'],
-                    ['⌂', 'Anvil', '#999999'],
-                    ['Ħ', 'Inferno Ward', '#ff4400'],
-                    ['⊛', 'Mana Relay', '#aa88ff'],
-                    ['☀', 'Beacon', '#ffffaa'],
-                    ['╬', 'Reinforced Door', '#aa8855'],
-                    ['G', 'Golem', '#888888'],
-                    ['*', 'Turret beam', '#ff4444'],
+                    ['.', 'grass', '#22aa22'],
+                    [',', 'dirt', '#88aa44'],
+                    ['#', 'rock_slow', '#666666'],
+                    ['▲', 'tall_rock_impassable', '#444444'],
+                    ['~', 'water_slow', '#4488cc'],
+                    ['T', 'tree', '#228822'],
+                    ['o', 'stone_iron_runite_deposit', '#aaaaaa'],
+                    ['@', 'colonist', '#00ccff'],
+                    ['R', 'raider', '#ff6600'],
+                    ['E', 'void_enemy', '#ff2222'],
+                    ['V', 'void_nexus', '#9933ff'],
+                    ['▓', 'void_wall', '#6622aa'],
+                    ['Y', 'void_turret', '#aa33ff'],
+                    ['Ω', 'rift_gate', '#66aaff'],
+                    ['✧', 'dormant_rift_anchor', '#66c8ff'],
+                    ['✦', 'attuned_rift_anchor', '#aaf0ff'],
+                    ['▣', 'crypt_chest', '#d4a84a'],
+                    ['▢', 'looted_chest', '#7a6a44'],
+                    ['▦', 'warded_wall', '#9d7fe0'],
+                    ['Ğ', 'golem_forge', '#cc8833'],
+                    ['⚒', 'forge_core', '#ff8844'],
+                    ['◎', 'ritual_core', '#aa44ff'],
+                    ['◌', 'ritual_chalk', '#cc99ff'],
+                    ['◆', 'trinket_pedestal', '#ccaa44'],
+                    ['⌂', 'anvil', '#999999'],
+                    ['Ħ', 'inferno_ward', '#ff4400'],
+                    ['⊛', 'mana_relay', '#aa88ff'],
+                    ['☀', 'beacon', '#ffffaa'],
+                    ['╬', 'reinforced_door', '#aa8855'],
+                    ['G', 'golem', '#888888'],
+                    ['*', 'turret_beam', '#ff4444'],
                 ]
             },
         ]
     },
 ];
 
-function renderSubsectionContent(sub) {
+// Section and subsection titles, entry terms and texts are looked up from
+// glossary.<section>.<subsection>.<entry>.term/.text. Magic school entries
+// reuse the school's config name and summary.
+function sectionTitle(section) {
+    return t(`glossary.${section.id}.title`);
+}
+
+function subsectionTitle(section, sub) {
+    return t(`glossary.${section.id}.${sub.id}.subtitle`);
+}
+
+// Returns [term, text] for an entry: an id string, { id, params } for text with
+// placeholders, or { id, school, withText } for a magic school.
+function entryText(section, sub, entry) {
+    const prefix = `glossary.${section.id}.${sub.id}`;
+    if (typeof entry === 'string') {
+        return [t(`${prefix}.${entry}.term`), t(`${prefix}.${entry}.text`)];
+    }
+    if (!entry.school) {
+        return [t(`${prefix}.${entry.id}.term`), t(`${prefix}.${entry.id}.text`, entry.params)];
+    }
+    const school = MAGIC_SKILLS[entry.school];
+    const text = entry.withText ? t(`${prefix}.${entry.id}.text`, { summary: school.summary }) : school.summary;
+    return [school.name, text];
+}
+
+function symbolLabel(section, sub, labelId) {
+    return t(`glossary.${section.id}.${sub.id}.${labelId}.label`);
+}
+
+function renderSubsectionContent(section, sub) {
     let html = '';
     if (sub.symbols) {
         html += '<div style="font-family:monospace; color:#aaa; line-height:2;">';
-        for (const [char, label, color] of sub.symbols) {
-            html += `<span class="glossary-entry"><span style="color:${color}; font-size:14px;">${char}</span> ${label} &nbsp;&nbsp;</span>`;
+        for (const [char, labelId, color] of sub.symbols) {
+            html += `<span class="glossary-entry"><span style="color:${color}; font-size:14px;">${escapeHtml(char)}</span> ${escapeHtml(symbolLabel(section, sub, labelId))} &nbsp;&nbsp;</span>`;
         }
         html += '</div>';
     } else if (sub.entries) {
-        for (const [term, desc] of sub.entries) {
+        for (const entry of sub.entries) {
+            const [term, desc] = entryText(section, sub, entry);
             if (desc.includes('\n')) {
                 const parts = desc.split('\n');
-                html += `<div class="glossary-entry" style="margin:4px 0;"><b style="color:#fff">${term}</b> - ${parts[0]}</div>`;
-                html += `<pre style="margin:2px 0 8px 12px; color:#aaa; font-size:11px; line-height:1.4;">${parts.slice(1).join('\n')}</pre>`;
+                html += `<div class="glossary-entry" style="margin:4px 0;"><b style="color:#fff">${escapeHtml(term)}</b> - ${escapeHtml(parts[0])}</div>`;
+                html += `<pre style="margin:2px 0 8px 12px; color:#aaa; font-size:11px; line-height:1.4;">${escapeHtml(parts.slice(1).join('\n'))}</pre>`;
             } else {
-                html += `<div class="glossary-entry" style="margin:4px 0;"><b style="color:#fff">${term}</b> - ${desc}</div>`;
+                html += `<div class="glossary-entry" style="margin:4px 0;"><b style="color:#fff">${escapeHtml(term)}</b> - ${escapeHtml(desc)}</div>`;
             }
         }
     }
@@ -417,11 +450,11 @@ function renderSubsectionContent(sub) {
 
 export function renderGlossaryHTML() {
     let html = '';
-    html += `<input type="text" id="glossary-search" placeholder="Search glossary..." style="width:100%; padding:6px 10px; margin-bottom:10px; background:#2a2a4a; border:1px solid #555; border-radius:4px; color:#eee; font-size:12px; font-family:inherit; outline:none;">`;
+    html += `<input type="text" id="glossary-search" placeholder="${escapeAttr(t('glossary.ui.search_placeholder'))}" style="width:100%; padding:6px 10px; margin-bottom:10px; background:#2a2a4a; border:1px solid #555; border-radius:4px; color:#eee; font-size:12px; font-family:inherit; outline:none;">`;
 
     html += `<div id="glossary-tabs" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;">`;
     for (let i = 0; i < GLOSSARY.length; i++) {
-        html += `<button class="glossary-tab-btn" data-tab="${i}" style="padding:3px 8px; background:${i === 0 ? '#446' : '#2a2a4a'}; border:1px solid #555; border-radius:3px; color:${i === 0 ? '#88ccff' : '#888'}; font-size:11px; cursor:pointer; font-family:inherit;">${GLOSSARY[i].title}</button>`;
+        html += `<button class="glossary-tab-btn" data-tab="${i}" style="padding:3px 8px; background:${i === 0 ? '#446' : '#2a2a4a'}; border:1px solid #555; border-radius:3px; color:${i === 0 ? '#88ccff' : '#888'}; font-size:11px; cursor:pointer; font-family:inherit;">${escapeHtml(sectionTitle(GLOSSARY[i]))}</button>`;
     }
     html += `</div>`;
 
@@ -429,15 +462,9 @@ export function renderGlossaryHTML() {
     for (let i = 0; i < GLOSSARY.length; i++) {
         const section = GLOSSARY[i];
         html += `<div class="glossary-section" data-section="${i}" style="display:${i === 0 ? 'block' : 'none'}">`;
-        if (section.subsections) {
-            for (const sub of section.subsections) {
-                html += `<div style="color:#88ccff; font-weight:bold; margin:12px 0 6px 0; font-size:12px; border-bottom:1px solid #333; padding-bottom:3px;">${sub.subtitle}</div>`;
-                html += renderSubsectionContent(sub);
-            }
-        } else if (section.symbols) {
-            html += renderSubsectionContent(section);
-        } else {
-            html += renderSubsectionContent(section);
+        for (const sub of section.subsections) {
+            html += `<div style="color:#88ccff; font-weight:bold; margin:12px 0 6px 0; font-size:12px; border-bottom:1px solid #333; padding-bottom:3px;">${escapeHtml(subsectionTitle(section, sub))}</div>`;
+            html += renderSubsectionContent(section, sub);
         }
         html += `</div>`;
     }
@@ -485,36 +512,37 @@ export function initGlossaryInteraction() {
 
         let html = '';
         for (const section of GLOSSARY) {
-            const sources = section.subsections || [section];
-            for (const sub of sources) {
+            for (const sub of section.subsections) {
                 const matches = [];
-                const label = sub.subtitle || section.title;
+                const label = subsectionTitle(section, sub);
                 if (sub.symbols) {
-                    for (const [char, lbl, color] of sub.symbols) {
+                    for (const [char, labelId, color] of sub.symbols) {
+                        const lbl = symbolLabel(section, sub, labelId);
                         if (`${char} ${lbl}`.toLowerCase().includes(query)) {
-                            matches.push(`<span style="color:${color}; font-size:14px;">${char}</span> ${lbl}`);
+                            matches.push(`<span style="color:${color}; font-size:14px;">${escapeHtml(char)}</span> ${escapeHtml(lbl)}`);
                         }
                     }
                 } else if (sub.entries) {
-                    for (const [term, desc] of sub.entries) {
+                    for (const entry of sub.entries) {
+                        const [term, desc] = entryText(section, sub, entry);
                         if (`${term} ${desc}`.toLowerCase().includes(query)) {
                             if (desc.includes('\n')) {
                                 const parts = desc.split('\n');
-                                matches.push(`<b style="color:#fff">${term}</b> - ${parts[0]}<pre style="margin:2px 0 4px 12px; color:#aaa; font-size:11px; line-height:1.4;">${parts.slice(1).join('\n')}</pre>`);
+                                matches.push(`<b style="color:#fff">${escapeHtml(term)}</b> - ${escapeHtml(parts[0])}<pre style="margin:2px 0 4px 12px; color:#aaa; font-size:11px; line-height:1.4;">${escapeHtml(parts.slice(1).join('\n'))}</pre>`);
                             } else {
-                                matches.push(`<b style="color:#fff">${term}</b> - ${desc}`);
+                                matches.push(`<b style="color:#fff">${escapeHtml(term)}</b> - ${escapeHtml(desc)}`);
                             }
                         }
                     }
                 }
                 if (matches.length > 0) {
-                    html += `<div style="color:#88ccff; font-weight:bold; margin-top:8px; margin-bottom:4px; font-size:11px;">${label}</div>`;
+                    html += `<div style="color:#88ccff; font-weight:bold; margin-top:8px; margin-bottom:4px; font-size:11px;">${escapeHtml(label)}</div>`;
                     for (const m of matches) {
                         html += `<div style="margin:3px 0;">${m}</div>`;
                     }
                 }
             }
         }
-        results.innerHTML = html || '<div style="color:#888; margin-top:10px;">No results found.</div>';
+        results.innerHTML = html || `<div style="color:#888; margin-top:10px;">${escapeHtml(t('glossary.ui.no_results'))}</div>`;
     });
 }

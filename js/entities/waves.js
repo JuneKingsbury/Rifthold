@@ -7,6 +7,7 @@ import { createWaveEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 import { attackStructure, getColonistTargetPriority, tickHostileStatusEffects } from './combat.js';
 import { haptic } from '../ui/ui-utils.js';
+import { t as tr, ref } from '../core/i18n.js';
 
 // Evaluates all unearned colony milestones against the current game state.
 // Each newly satisfied milestone raises the colonist cap (see getColonistCap).
@@ -38,8 +39,8 @@ export function checkColonyMilestones(game) {
             const after = game.waves?.getColonistCap(game);
             // On medium worlds the cap rises 1.5 per milestone, so some milestones only bank half a colonist.
             const text = after > before
-                ? `${ms.label}: colony cap raised to ${after}!`
-                : `${ms.label}: milestone reached, the next one raises your colony cap.`;
+                ? tr('msg.waves.milestone_cap_raised', { milestone: ms.label, cap: after })
+                : tr('msg.waves.milestone_reached_half', { milestone: ms.label });
             game.notifications?.push({ text, tick: game.tick, type: 'success' });
             reached++;
         }
@@ -147,8 +148,8 @@ export class WaveSystem {
             this.portals = [this.portals[0], this.portals[2]];
         }
 
-        game.notifications.push({ text: `Wave ${this.currentWave} begins! Defend the Void Nexus!`, tick: game.tick, type: 'danger' });
-        game.eventLog.add(game, `Wave ${this.currentWave} started. ${this.enemiesToSpawn} enemies incoming!`, 'danger', { type: 'position', ...nexus });
+        game.notifications.push({ text: tr('msg.waves.wave_begins', { wave: this.currentWave }), tick: game.tick, type: 'danger' });
+        game.eventLog.add(game, { key: 'msg.waves.wave_started_log', params: { wave: this.currentWave, n: this.enemiesToSpawn } }, 'danger', { type: 'position', ...nexus });
         game.overlays.push({ type: 'screenFlash', color: COMBAT_VISUALS.waveAlertColor, alpha: 0.2, ttl: COMBAT_VISUALS.waveAlertTtl });
         window.soundManager?.playSFX('wave_alert');
         haptic([80, 60, 80]);
@@ -371,8 +372,8 @@ export class WaveSystem {
             const bonusEssence = Math.round(this.currentWave * WAVE_CONFIG.bonusEssencePerWave * voidMult * (this.forcedWaveBonusMult || 1));
             game.resources.add({ void_essence: bonusEssence });
             checkColonyMilestones(game);
-            game.notifications.push({ text: `Wave ${this.currentWave} complete! +${bonusEssence} bonus void essence.`, tick: game.tick, type: 'success' });
-            game.eventLog.add(game, `Wave ${this.currentWave} defeated!`, 'success', null);
+            game.notifications.push({ text: tr('msg.waves.wave_complete', { wave: this.currentWave, essence: bonusEssence }), tick: game.tick, type: 'success' });
+            game.eventLog.add(game, { key: 'msg.waves.wave_defeated_log', params: { wave: this.currentWave } }, 'success', null);
             game.story.checkMilestone('first_wave_completed', game);
             if (game.stats) game.stats.wavesCompleted++;
             if (game.stats?.wavesCompleted >= 10) game.story.checkMilestone('waves_10_complete', game);
@@ -380,20 +381,20 @@ export class WaveSystem {
             if (this.tideCallerActive) {
                 if (!game.voidTideCallerBuffs) game.voidTideCallerBuffs = [];
                 const buffTypes = [
-                    { type: 'research_speed', mult: 0.05, label: '+5% research speed' },
-                    { type: 'crafting_speed', mult: 0.05, label: '+5% crafting speed' },
-                    { type: 'combat_damage', mult: 0.05, label: '+5% combat damage' },
+                    { type: 'research_speed', mult: 0.05, labelKey: 'msg.waves.tide_buff_research_speed' },
+                    { type: 'crafting_speed', mult: 0.05, labelKey: 'msg.waves.tide_buff_crafting_speed' },
+                    { type: 'combat_damage', mult: 0.05, labelKey: 'msg.waves.tide_buff_combat_damage' },
                 ];
                 const picked = buffTypes[Math.floor(Math.random() * buffTypes.length)];
                 game.voidTideCallerBuffs.push({ type: picked.type, mult: picked.mult });
                 const tideBonus = Math.round(this.currentWave * 3 * voidMult);
                 game.resources.add({ void_essence: tideBonus });
-                game.notifications.push({ text: `Tide Caller: ${picked.label} (permanent)! +${tideBonus} void essence.`, tick: game.tick, type: 'success' });
-                game.eventLog.add(game, `The Tide Caller's bargain fulfilled: ${picked.label} (permanent). +${tideBonus} void essence.`, 'success', null);
+                game.notifications.push({ text: tr('msg.waves.tide_caller_toast', { buff: tr(picked.labelKey), essence: tideBonus }), tick: game.tick, type: 'success' });
+                game.eventLog.add(game, { key: 'msg.waves.tide_caller_log', params: { buff: ref(picked.labelKey), essence: tideBonus } }, 'success', null);
             }
         } else {
-            game.notifications.push({ text: `Wave ${this.currentWave} failed! The Void Nexus was destroyed!`, tick: game.tick, type: 'danger' });
-            game.eventLog.add(game, `The Void Nexus was destroyed during wave ${this.currentWave}!`, 'danger', { type: 'position', ...this.nexusPosition });
+            game.notifications.push({ text: tr('msg.waves.wave_failed', { wave: this.currentWave }), tick: game.tick, type: 'danger' });
+            game.eventLog.add(game, { key: 'msg.waves.nexus_destroyed_log', params: { wave: this.currentWave } }, 'danger', { type: 'position', ...this.nexusPosition });
             const tile = game.map[this.nexusPosition.y][this.nexusPosition.x];
             tile.structure = null;
             tile.passable = true;
@@ -410,8 +411,8 @@ export class WaveSystem {
                     pactColonist.hp = 0;
                     pactColonist.state = 'dead';
                     releaseColonistTasks(pactColonist, game);
-                    game.notifications.push({ text: `${pactColonist.name}'s void pact is forfeit. The Nexus claims them.`, tick: game.tick, type: 'danger' });
-                    game.eventLog.add(game, `${pactColonist.name}'s void pact is forfeit. The Nexus claims them.`, 'danger', { type: 'colonist', id: pactColonist.id });
+                    game.notifications.push({ text: tr('msg.waves.void_pact_forfeit', { name: pactColonist.name }), tick: game.tick, type: 'danger' });
+                    game.eventLog.add(game, { key: 'msg.waves.void_pact_forfeit', params: { name: pactColonist.name } }, 'danger', { type: 'colonist', id: pactColonist.id });
                 }
             }
         }

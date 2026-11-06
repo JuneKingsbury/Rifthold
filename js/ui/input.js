@@ -6,6 +6,8 @@ import { isPassable, isDraftBreakableWall, isDraftInteractable } from '../world/
 import { manhattanDist } from '../world/pathfinding.js';
 import { getSpellCooldownMult } from '../systems/complexBuildings.js';
 import { haptic } from './ui-utils.js';
+import { t as tr, tp } from '../core/i18n.js';
+import { buildingName, entityName } from '../core/names.js';
 
 // Minimum cursor travel (px) in normal mode before a mouse gesture counts as a
 // box-select rather than a click. Guards clicks near a tile boundary, where
@@ -23,6 +25,11 @@ const SELECT_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 
     'home', 'end', 'pageup', 'pagedown', 'tab']);
 // Shared empty set for previews with no "unaffordable" tiles (never mutated).
 const EMPTY_SET = new Set();
+// Notification labels for the order kinds a "do first" toggle can name.
+const DESIGNATION_LABELS = {
+    build: 'ui.input.task_build', chop: 'ui.input.task_chop', mine: 'ui.input.task_mine',
+    deconstruct: 'ui.input.task_deconstruct', attune_anchor: 'ui.input.task_attune_anchor', loot_chest: 'ui.input.task_loot_chest',
+};
 const WHEEL_GESTURE_GAP_MS = 200;
 
 // Touch: how far (px) a finger may wander before a touch stops counting as a tap or
@@ -345,19 +352,19 @@ export class InputHandler {
             toggleMap: () => this.game.ui.toggleMapPanel(),
             toggleWarmthOverlay: () => {
                 this.game.settings.showWarmthOverlay = !this.game.settings.showWarmthOverlay;
-                this.game.notifications.push({ text: `Warmth overlay ${this.game.settings.showWarmthOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+                this.game.notifications.push({ text: tr(this.game.settings.showWarmthOverlay ? 'ui.input.warmth_on' : 'ui.input.warmth_off'), tick: this.game.tick, type: 'info' });
             },
             toggleDefenseOverlay: () => {
                 this.game.settings.showDefenseOverlay = !this.game.settings.showDefenseOverlay;
-                this.game.notifications.push({ text: `Defense overlay ${this.game.settings.showDefenseOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+                this.game.notifications.push({ text: tr(this.game.settings.showDefenseOverlay ? 'ui.input.defense_on' : 'ui.input.defense_off'), tick: this.game.tick, type: 'info' });
             },
             toggleRoomOverlay: () => {
                 this.game.settings.showRoomOverlay = !this.game.settings.showRoomOverlay;
-                this.game.notifications.push({ text: `Room quality overlay ${this.game.settings.showRoomOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+                this.game.notifications.push({ text: tr(this.game.settings.showRoomOverlay ? 'ui.input.room_on' : 'ui.input.room_off'), tick: this.game.tick, type: 'info' });
             },
             toggleAuraOverlay: () => {
                 this.game.settings.showAuraOverlay = !this.game.settings.showAuraOverlay;
-                this.game.notifications.push({ text: `Aura overlay ${this.game.settings.showAuraOverlay ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+                this.game.notifications.push({ text: tr(this.game.settings.showAuraOverlay ? 'ui.input.aura_on' : 'ui.input.aura_off'), tick: this.game.tick, type: 'info' });
             },
 
             pause: (e) => { e.preventDefault(); this.game.togglePause(); },
@@ -380,11 +387,11 @@ export class InputHandler {
                 if (!this._recordingMode) return;
                 if (this.game.speed >= 15) {
                     this.game.speed = 1;
-                    this.game.notifications.push({ text: 'Timelapse off (1x)', tick: this.game.tick, type: 'info' });
+                    this.game.notifications.push({ text: tr('ui.input.timelapse_off'), tick: this.game.tick, type: 'info' });
                 } else {
                     this.game.speed = 15;
                     if (this.game.paused) this.game.togglePause();
-                    this.game.notifications.push({ text: 'Timelapse on (15x)', tick: this.game.tick, type: 'info' });
+                    this.game.notifications.push({ text: tr('ui.input.timelapse_on'), tick: this.game.tick, type: 'info' });
                 }
             },
         };
@@ -571,7 +578,7 @@ export class InputHandler {
         if (this._recordingMode) {
             if (key === 'c') {
                 this._cinematicPanMode = !this._cinematicPanMode;
-                this.game.notifications.push({ text: `Cinematic pan ${this._cinematicPanMode ? 'on' : 'off'}`, tick: this.game.tick, type: 'info' });
+                this.game.notifications.push({ text: tr(this._cinematicPanMode ? 'ui.input.cinematic_on' : 'ui.input.cinematic_off'), tick: this.game.tick, type: 'info' });
                 return;
             }
             if (key === 'g') {
@@ -581,7 +588,7 @@ export class InputHandler {
             }
             if (key === 'h') {
                 this._hideGhosts = !this._hideGhosts;
-                this.game.notifications.push({ text: `Building ghosts ${this._hideGhosts ? 'hidden' : 'visible'}`, tick: this.game.tick, type: 'info' });
+                this.game.notifications.push({ text: tr(this._hideGhosts ? 'ui.input.ghosts_hidden' : 'ui.input.ghosts_visible'), tick: this.game.tick, type: 'info' });
                 return;
             }
         }
@@ -652,7 +659,7 @@ export class InputHandler {
         } else {
             this.game.ui.showColonistInfo(alive[0]);
         }
-        this.game.notifications.push({ text: `Selected ${alive.length} colonist${alive.length > 1 ? 's' : ''}`, tick: this.game.tick, type: 'success' });
+        this.game.notifications.push({ text: tp('ui.input.selected_colonists', alive.length), tick: this.game.tick, type: 'success' });
     }
 
     centerOnSelection() {
@@ -1289,7 +1296,7 @@ export class InputHandler {
             if (designation && tile.designation === designation) { cancelDesignation(this.game, x, y); undone++; }
             if (zone && tile.zone === zone) { removeFarmZone(this.game, x, y); undone++; }
         }
-        this.game.notifications.push({ text: undone ? `Undid ${undone} placement${undone === 1 ? '' : 's'}` : 'Nothing left to undo there', tick: this.game.tick, type: 'info' });
+        this.game.notifications.push({ text: undone ? tp('ui.input.undid', undone) : tr('ui.input.nothing_to_undo'), tick: this.game.tick, type: 'info' });
         this.game.ui.updateBuildPanel(this);
     }
 
@@ -1475,12 +1482,12 @@ export class InputHandler {
         if (!spell || spell.castType !== 'targeted') return;
 
         if (colonist.mana < spell.manaCost) {
-            this.game.notifications.push({ text: `${colonist.name} doesn't have enough mana for ${spell.name}`, tick: this.game.tick, type: 'danger' });
+            this.game.notifications.push({ text: tr('ui.input.no_mana_for', { name: colonist.name, spell: spell.name }), tick: this.game.tick, type: 'danger' });
             return;
         }
         if (colonist._spellCooldowns && colonist._spellCooldowns[spellKey] &&
             this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown * getSpellCooldownMult(this.game)) {
-            this.game.notifications.push({ text: `${spell.name} is on cooldown`, tick: this.game.tick, type: 'danger' });
+            this.game.notifications.push({ text: tr('ui.input.on_cooldown', { spell: spell.name }), tick: this.game.tick, type: 'danger' });
             return;
         }
         this.startSpellTargeting(colonist.id, spellKey);
@@ -1490,32 +1497,32 @@ export class InputHandler {
         const spell = SPELLS[spellKey];
         if (!spell || spell.castType !== 'targeted') return;
         this.spellTargeting = { colonistId, spellKey, spell };
-        this.game.notifications.push({ text: `Select target for ${spell.name} (Esc to cancel)`, tick: this.game.tick, type: 'event' });
+        this.game.notifications.push({ text: tr('ui.input.spell_target', { spell: spell.name }), tick: this.game.tick, type: 'event' });
         this.game.ui.updateModeDisplay(this);
     }
 
     cancelSpellTargeting() {
         this.spellTargeting = null;
-        this.game.notifications.push({ text: 'Spell targeting cancelled', tick: this.game.tick, type: 'event' });
+        this.game.notifications.push({ text: tr('ui.input.spell_cancelled'), tick: this.game.tick, type: 'event' });
         this.game.ui.updateModeDisplay(this);
     }
 
     startPenReassignTargeting(animalId) {
         this.penReassignTargeting = { animalId };
-        this.game.notifications.push({ text: 'Click a Beast Circle to reassign pen (Esc to cancel)', tick: this.game.tick, type: 'event' });
+        this.game.notifications.push({ text: tr('ui.input.pen_target', { building: buildingName('beast_circle') }), tick: this.game.tick, type: 'event' });
         this.game.ui.updateModeDisplay(this);
     }
 
     cancelPenReassignTargeting() {
         this.penReassignTargeting = null;
-        this.game.notifications.push({ text: 'Pen reassignment cancelled', tick: this.game.tick, type: 'event' });
+        this.game.notifications.push({ text: tr('ui.input.pen_cancelled'), tick: this.game.tick, type: 'event' });
         this.game.ui.updateModeDisplay(this);
     }
 
     executePenReassignTarget(pos) {
         const tile = this.game.map[pos.y]?.[pos.x];
         if (!tile || tile.structure !== 'beast_circle') {
-            this.game.notifications.push({ text: 'Click on a Beast Circle to reassign', tick: this.game.tick, type: 'warning' });
+            this.game.notifications.push({ text: tr('ui.input.pen_need_circle', { building: buildingName('beast_circle') }), tick: this.game.tick, type: 'warning' });
             return;
         }
         const { animalId } = this.penReassignTargeting;
@@ -1532,7 +1539,7 @@ export class InputHandler {
                 }
             }
             if (animal._feedTaskQueued !== undefined) animal._feedTaskQueued = false;
-            this.game.notifications.push({ text: `${animal.type} pen reassigned`, tick: this.game.tick, type: 'success' });
+            this.game.notifications.push({ text: tr('ui.input.pen_reassigned', { name: entityName(animal.type) }), tick: this.game.tick, type: 'success' });
         }
         this.penReassignTargeting = null;
         this.game.ui.updateModeDisplay(this);
@@ -1541,13 +1548,13 @@ export class InputHandler {
     startGuardPointTargeting(colonistId) {
         this.guardPointTargeting = { colonistId };
         const colonist = this.game.getColonist(colonistId);
-        this.game.notifications.push({ text: `Select guard point for ${colonist.name} (Esc to cancel)`, tick: this.game.tick, type: 'event' });
+        this.game.notifications.push({ text: tr('ui.input.guard_target', { name: colonist.name }), tick: this.game.tick, type: 'event' });
         this.game.ui.updateModeDisplay(this);
     }
 
     cancelGuardPointTargeting() {
         this.guardPointTargeting = null;
-        this.game.notifications.push({ text: 'Guard point selection cancelled', tick: this.game.tick, type: 'event' });
+        this.game.notifications.push({ text: tr('ui.input.guard_cancelled'), tick: this.game.tick, type: 'event' });
         this.game.ui.updateModeDisplay(this);
     }
 
@@ -1560,7 +1567,7 @@ export class InputHandler {
         }
 
         if (!isPassable(this.game.map, pos.x, pos.y)) {
-            this.game.notifications.push({ text: 'Cannot set guard point on impassable terrain', tick: this.game.tick, type: 'danger' });
+            this.game.notifications.push({ text: tr('ui.input.guard_impassable'), tick: this.game.tick, type: 'danger' });
             return;
         }
 
@@ -1578,21 +1585,21 @@ export class InputHandler {
         }
 
         if (colonist.mana < spell.manaCost) {
-            this.game.notifications.push({ text: `${colonist.name} doesn't have enough mana`, tick: this.game.tick, type: 'danger' });
+            this.game.notifications.push({ text: tr('ui.input.no_mana', { name: colonist.name }), tick: this.game.tick, type: 'danger' });
             this.spellTargeting = null;
             return;
         }
 
         if (!colonist._spellCooldowns) colonist._spellCooldowns = {};
         if (colonist._spellCooldowns[spellKey] && this.game.tick - colonist._spellCooldowns[spellKey] < spell.cooldown * getSpellCooldownMult(this.game)) {
-            this.game.notifications.push({ text: `${spell.name} is on cooldown`, tick: this.game.tick, type: 'danger' });
+            this.game.notifications.push({ text: tr('ui.input.on_cooldown', { spell: spell.name }), tick: this.game.tick, type: 'danger' });
             this.spellTargeting = null;
             return;
         }
 
         const dist = manhattanDist(colonist.x, colonist.y, pos.x, pos.y);
         if (spell.range && dist > spell.range) {
-            this.game.notifications.push({ text: `Target out of range (max ${spell.range})`, tick: this.game.tick, type: 'danger' });
+            this.game.notifications.push({ text: tr('ui.input.out_of_range', { range: spell.range }), tick: this.game.tick, type: 'danger' });
             return;
         }
 
@@ -1624,8 +1631,10 @@ export class InputHandler {
                     c.draftTarget = null;
                     c.path = [];
                 }
-                const who = drafted.length === 1 ? drafted[0].name : `${drafted.length} colonists`;
-                this.game.notifications.push({ text: `${who} ordered to break the wall`, tick: this.game.tick, type: 'success' });
+                const text = drafted.length === 1
+                    ? tr('ui.input.order_break_one', { name: drafted[0].name })
+                    : tp('ui.input.order_break_many', drafted.length);
+                this.game.notifications.push({ text, tick: this.game.tick, type: 'success' });
                 return;
             }
             // Right-clicking an ancient chest or dormant rift anchor orders them to loot or attune it.
@@ -1636,9 +1645,11 @@ export class InputHandler {
                     c.draftTarget = null;
                     c.path = [];
                 }
-                const who = drafted.length === 1 ? drafted[0].name : `${drafted.length} colonists`;
-                const what = this.game.map[pos.y][pos.x].structure === 'rift_anchor' ? 'attune the rift anchor' : 'loot the chest';
-                this.game.notifications.push({ text: `${who} ordered to ${what}`, tick: this.game.tick, type: 'success' });
+                const anchor = this.game.map[pos.y][pos.x].structure === 'rift_anchor';
+                const text = drafted.length === 1
+                    ? tr(anchor ? 'ui.input.order_attune_one' : 'ui.input.order_loot_one', { name: drafted[0].name })
+                    : tp(anchor ? 'ui.input.order_attune_many' : 'ui.input.order_loot_many', drafted.length);
+                this.game.notifications.push({ text, tick: this.game.tick, type: 'success' });
                 return;
             }
             for (const c of drafted) {
@@ -1666,8 +1677,8 @@ export class InputHandler {
         const task = this.game.taskQueue.getAllByPosition(pos.x, pos.y).find(t => t.type === tile.designation.type);
         if (!task) return;
         task.doFirst = !task.doFirst;
-        const label = tile.designation.type.replace(/_/g, ' ');
-        this.game.notifications.push({ text: task.doFirst ? `Marked ${label} to do first` : `${label} back to normal priority`, tick: this.game.tick, type: 'success' });
+        const label = DESIGNATION_LABELS[tile.designation.type] ? tr(DESIGNATION_LABELS[tile.designation.type]) : tile.designation.type.replace(/_/g, ' ');
+        this.game.notifications.push({ text: tr(task.doFirst ? 'ui.input.do_first_on' : 'ui.input.do_first_off', { task: label }), tick: this.game.tick, type: 'success' });
     }
 
     getSpreadPositions(cx, cy, count) {
@@ -1714,7 +1725,7 @@ export class InputHandler {
             this.game.selectedColonists = colonists;
             if (colonists.length > 1 && animals.length === 0 && tamed.length === 0 && raiders.length === 0 && waveEnemies.length === 0 && summons.length === 0) {
                 this.game.ui.showMultiColonistInfo(colonists);
-                this.game.notifications.push({ text: `Selected ${colonists.length} colonists`, tick: this.game.tick, type: 'success' });
+                this.game.notifications.push({ text: tp('ui.input.selected_colonists', colonists.length), tick: this.game.tick, type: 'success' });
                 return;
             }
         } else {

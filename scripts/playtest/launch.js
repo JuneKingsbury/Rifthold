@@ -10,7 +10,7 @@
 //
 // See README.md in this folder for details.
 
-const { app, screen } = require('electron');
+const { app, screen, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -91,6 +91,9 @@ function finish(code) {
   if (finished) return;
   finished = true;
   for (const s of Object.values(streams)) s.end();
+  // app.exit() skips the normal shutdown, so write localStorage out first; bots
+  // that change settings (scripts/i18n/pseudo-scan.js) rely on the next run seeing them.
+  try { session.defaultSession.flushStorageData(); } catch { /* best effort */ }
   setTimeout(() => app.exit(code), 500);
 }
 

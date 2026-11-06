@@ -1,6 +1,8 @@
 import { CONFIG, RENDER_CONFIG, BUILDINGS, ALL_ITEMS, ROOM_QUALITY_TIERS, TOWN_HALL_QUALITY_TIERS, WORKSHOP_QUALITY_TIERS } from '../core/config.js';
 import { getTilePedestalStats } from '../systems/artifacts.js';
 import { drawBarFill } from './bar-fx.js';
+import { t as tr } from '../core/i18n.js';
+import { resourceName } from '../core/names.js';
 
 // Pre-built O(1) tier-key → index maps so _renderRoomOverlay avoids a
 // findIndex scan (O(n) per visible tile) on every frame.
@@ -19,13 +21,16 @@ const YIELD_COLORS = {
     berries: '#d05070', corn: '#f0d040', potatoes: '#c9a06a', moonbloom: '#aaccff',
     eggs: '#f0e8d0', milk: '#f8f8f0',
 };
+// Short yield labels for the floating "+N label" text (locale keys).
 const YIELD_LABELS = {
-    wood: 'Wood', stone: 'Stone', food: 'Food', planks: 'Planks',
-    bricks: 'Bricks', iron_ore: 'Ore', runite_ore: 'R.Ore', iron: 'Iron', runite: 'Runite',
-    leather: 'Leather', hides: 'Hides', wool: 'Wool', cloth: 'Cloth',
-    void_essence: 'Void', gold: 'Gold', meat: 'Meat', wheat: 'Wheat',
-    berries: 'Berries', corn: 'Corn', potatoes: 'Potatoes', moonbloom: 'Moonbloom',
-    eggs: 'Eggs', milk: 'Milk',
+    wood: 'ui.overlay.yield_wood', stone: 'ui.overlay.yield_stone', food: 'ui.overlay.yield_food',
+    planks: 'ui.overlay.yield_planks', bricks: 'ui.overlay.yield_bricks', iron_ore: 'ui.overlay.yield_iron_ore',
+    runite_ore: 'ui.overlay.yield_runite_ore', iron: 'ui.overlay.yield_iron', runite: 'ui.overlay.yield_runite',
+    leather: 'ui.overlay.yield_leather', hides: 'ui.overlay.yield_hides', wool: 'ui.overlay.yield_wool',
+    cloth: 'ui.overlay.yield_cloth', void_essence: 'ui.overlay.yield_void_essence', gold: 'ui.overlay.yield_gold',
+    meat: 'ui.overlay.yield_meat', wheat: 'ui.overlay.yield_wheat', berries: 'ui.overlay.yield_berries',
+    corn: 'ui.overlay.yield_corn', potatoes: 'ui.overlay.yield_potatoes', moonbloom: 'ui.overlay.yield_moonbloom',
+    eggs: 'ui.overlay.yield_eggs', milk: 'ui.overlay.yield_milk',
 };
 
 // Upper bound on live world particles. Spawns past it are dropped so a long
@@ -656,8 +661,8 @@ export class OverlayRenderer {
             ctx.drawImage(sprite, startX + textW + gap, sy - iconSize / 2, iconSize, iconSize);
         } else {
             // No sprite: draw "+N label" with a color hint from the resource palette.
-            const label = YIELD_LABELS[overlay.key] || overlay.key;
-            const full = `${text} ${label}`;
+            const label = YIELD_LABELS[overlay.key] ? tr(YIELD_LABELS[overlay.key]) : resourceName(overlay.key);
+            const full = tr('ui.overlay.yield', { amount: text, label });
             ctx.textAlign = 'center';
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 3;

@@ -498,7 +498,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     // is already 0 under reduceMotion). Not played while sleeping. The "who feels
     // the cold" test differs by entity kind:
     //   Colonists (they carry `thoughts`) shiver only when actually freezing. The
-    //   sim's 'Freezing outside' thought already accounts for warm clothing
+    //   sim's 'freezing' thought already accounts for warm clothing
     //   (coldResistance), warmth sources, and being indoors, so a properly-dressed
     //   colonist does NOT shake.
     //   Everything else (wildlife) has no clothing, so it reacts to any unroofed
@@ -508,7 +508,7 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
         if (entity.thoughts) {
             cold = false;
             for (const th of entity.thoughts) {
-                if (th.text === 'Freezing outside') { cold = true; break; }
+                if (th.id === 'freezing') { cold = true; break; }
             }
         } else {
             const tile = game.map[entity.y] && game.map[entity.y][entity.x];

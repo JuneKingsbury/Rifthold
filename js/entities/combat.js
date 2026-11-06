@@ -7,6 +7,10 @@ import { moveEntity } from '../systems/movement-lerp.js';
 import { createRaidEntity } from './entity-factory.js';
 import { updateEntityRoles } from './roles.js';
 import { haptic } from '../ui/ui-utils.js';
+import { t as tr, tp, defRef } from '../core/i18n.js';
+
+// Raid arrival edges by index (getEdgePosition), as locale keys for the event text.
+const EDGE_DIRECTION_KEYS = ['msg.combat.direction_north', 'msg.combat.direction_east', 'msg.combat.direction_south', 'msg.combat.direction_west'];
 
 // Phone buzz when a raid arrives: two long pulses (ms on, off, on).
 const RAID_HAPTIC = [80, 60, 80];
@@ -81,8 +85,8 @@ export class CombatSystem {
         this.crusaderRaidArmed = true;
         this.crusaderRaidFireTick = game.tick + CONFIG.TICKS_PER_SEASON;
 
-        game.notifications.push({ text: '⚠ Crusader scouts have been spotted in the region. Prepare your defenses.', tick: game.tick, type: 'danger' });
-        game.eventLog?.add(game, 'Crusader scouts spotted! A raid force will arrive next season.', 'danger');
+        game.notifications.push({ text: tr('msg.combat.crusader_scouts_toast'), tick: game.tick, type: 'danger' });
+        game.eventLog?.add(game, { key: 'msg.combat.crusader_scouts_log' }, 'danger');
     }
 
     startScriptedRaid(game, raidTypeKey, raidLevel = 8) {
@@ -115,19 +119,19 @@ export class CombatSystem {
         const raidPos = { x: game.raiders[0]?.x || 0, y: game.raiders[0]?.y || 0 };
         _startleNearbyColonists(game, raidPos.x, raidPos.y);
         game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
-        game.notifications.push({ text: `${raidType.name}! ${spawned} ${raidType.name === 'Crusader Raid' ? 'crusaders' : 'enemies'} approaching!`, tick: game.tick, type: 'danger' });
+        game.notifications.push({ text: tp(raidTypeKey === 'crusader_raid' ? 'msg.combat.scripted_raid_crusaders_toast' : 'msg.combat.scripted_raid_enemies_toast', spawned, { raid: raidType.name }), tick: game.tick, type: 'danger' });
         haptic(RAID_HAPTIC);
-        game.eventLog.add(game, `${raidType.name}! ${spawned} enemies attacking!`, 'danger', { type: 'position', ...raidPos });
+        game.eventLog.add(game, { key: 'msg.combat.scripted_raid_log', params: { raid: defRef(raidType), n: spawned } }, 'danger', { type: 'position', ...raidPos });
 
         if (raidTypeKey === 'crusader_raid') {
-            game.notifications.push({ text: 'The Crusader army has arrived. They seek to wipe out the colony!', color: '#ff6644', duration: 400 });
-            game.eventLog.add(game, 'The Crusader army has arrived in force. Defend the colony!', 'danger', { type: 'position', ...raidPos });
+            game.notifications.push({ text: tr('msg.combat.crusader_army_toast'), color: '#ff6644', duration: 400 });
+            game.eventLog.add(game, { key: 'msg.combat.crusader_army_log' }, 'danger', { type: 'position', ...raidPos });
         }
 
         game.events.pendingEvent = {
             type: 'raid',
-            text: `${raidType.name}! ${spawned} enemies are approaching from the ${['north','east','south','west'][edge]}!`,
-            choices: ['Go To Raiders', 'Dismiss'],
+            text: tp('msg.combat.scripted_raid_event', spawned, { raid: raidType.name, direction: tr(EDGE_DIRECTION_KEYS[edge]) }),
+            choices: [tr('msg.combat.choice_go_to_raiders'), tr('msg.combat.choice_dismiss')],
             data: raidPos,
         };
 
@@ -186,16 +190,16 @@ export class CombatSystem {
         const raidPos = { x: game.raiders[0]?.x || 0, y: game.raiders[0]?.y || 0 };
         _startleNearbyColonists(game, raidPos.x, raidPos.y);
         game.alertRipple = { x: raidPos.x, y: raidPos.y, startTime: performance.now(), duration: 2000 };
-        game.notifications.push({ text: `Raid! ${spawned} raiders approaching!`, tick: game.tick, type: 'danger' });
+        game.notifications.push({ text: tp('msg.combat.raid_toast', spawned), tick: game.tick, type: 'danger' });
         haptic(RAID_HAPTIC);
-        game.eventLog.add(game, `Raid! ${spawned} raiders attacking!`, 'danger', { type: 'position', ...raidPos });
+        game.eventLog.add(game, { key: 'msg.combat.raid_log', params: { n: spawned } }, 'danger', { type: 'position', ...raidPos });
 
         // A raid of one or two is a nuisance, not an emergency: toast and log only.
         if (!small) {
             game.events.pendingEvent = {
                 type: 'raid',
-                text: `Raid! ${spawned} raiders are approaching from the ${['north','east','south','west'][edge]}!`,
-                choices: ['Go To Raiders', 'Dismiss'],
+                text: tp('msg.combat.raid_event', spawned, { direction: tr(EDGE_DIRECTION_KEYS[edge]) }),
+                choices: [tr('msg.combat.choice_go_to_raiders'), tr('msg.combat.choice_dismiss')],
                 data: raidPos,
             };
 
@@ -300,12 +304,14 @@ export class CombatSystem {
                         const def = ENTITIES[raider.type];
                         const lootEntries = raider.loot || def?.loot || [];
                         const drops = lootEntries.map(d => `${d.amount || 1} ${d.item}${d.chance && d.chance < 1 ? ` (${Math.round(d.chance * 100)}%)` : ''}`);
+                        const dropList = lootEntries.map(d => (d.chance && d.chance < 1 ? { item: d.item, amount: d.amount || 1, chance: d.chance } : { item: d.item, amount: d.amount || 1 }));
                         game.exploration.raiderKills.set(raider.type, {
                             name: def?.name || raider.type,
                             char: def?.char || 'R',
                             color: def?.color || '#ff3333',
                             sprite: raider.type,
                             drops: drops.length ? drops.join(', ') : 'Nothing',
+                            dropList,
                             count: 1
                         });
                     }
@@ -334,9 +340,9 @@ export class CombatSystem {
             const wasScripted = this.activeRaidType;
             this.raidActive = false;
             this.activeRaidType = null;
-            const text = allDead ? 'Raid defeated!' : 'Raiders fled!';
-            game.notifications.push({ text, tick: game.tick, type: 'success' });
-            game.eventLog.add(game, text, 'success', null);
+            const endKey = allDead ? 'msg.combat.raid_defeated' : 'msg.combat.raiders_fled';
+            game.notifications.push({ text: tr(endKey), tick: game.tick, type: 'success' });
+            game.eventLog.add(game, { key: endKey }, 'success', null);
             game.story.checkMilestone('first_raid_survived', game);
             if (wasScripted === 'crusader_raid' && allDead) {
                 this.crusaderRaidDefeated = true;

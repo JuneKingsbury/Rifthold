@@ -15,6 +15,26 @@
  *   - 'artifact':  a random pedestal relic (yearly-only via kindWeights).
  */
 import { ALL_ITEMS, QUALITY_TIERS, TRADE_VALUES, TRADE_RIFT_CONFIG } from '../core/config.js';
+import { t, ref } from '../core/i18n.js';
+
+/**
+ * Display text for a request's vague reward ("an unknown spell tome").
+ * Requests are saved, so new ones store `vague: { key, params }`; older saves
+ * have a finished `vagueText` string.
+ *
+ * @param {object} req A Trade Rift request.
+ * @return {string} Reward description in the active language.
+ */
+export function tradeRiftRewardText(req) {
+    if (req?.vague?.key) return t(req.vague.key, req.vague.params);
+    return req?.vagueText ?? '';
+}
+
+// The saved reward description, plus `vagueText` in the current language for
+// readers that still show it directly.
+function vagueFields(vague) {
+    return { vague, vagueText: tradeRiftRewardText({ vague }) };
+}
 
 // Weighted pick from a {value: weight} map. Keys are returned as-is (strings).
 // numeric keys (tiers) are coerced by the caller.
@@ -100,7 +120,7 @@ export class TradeRiftSystem {
             cadence,
             cost: this._rollCost(targetGold, cfg),
             reward: { kind: 'equipment', type, tier, quality, enchant },
-            vagueText: this._equipmentText(type, tier, quality, enchant),
+            ...vagueFields(this._equipmentText(type, tier, quality, enchant)),
             fulfilled: false,
         };
     }
@@ -112,7 +132,7 @@ export class TradeRiftSystem {
             cadence,
             cost: this._rollCost(targetGold, cfg),
             reward: { kind: 'tome' },
-            vagueText: 'an unknown spell tome',
+            ...vagueFields({ key: 'msg.traderift.reward_tome' }),
             fulfilled: false,
         };
     }
@@ -124,7 +144,7 @@ export class TradeRiftSystem {
             cadence,
             cost: this._rollCost(targetGold, cfg),
             reward: { kind: 'artifact' },
-            vagueText: 'an unknown relic of great power',
+            ...vagueFields({ key: 'msg.traderift.reward_artifact' }),
             fulfilled: false,
         };
     }
@@ -155,13 +175,15 @@ export class TradeRiftSystem {
         return cost;
     }
 
+    // Returns the reward description as a saved message { key, params }.
     _equipmentText(type, tier, quality, enchant) {
-        const label = TRADE_RIFT_CONFIG.typeLabels[type] || type;
-        const adj = TRADE_RIFT_CONFIG.qualityAdjective[quality];
+        const label = ref(`msg.traderift.type.${type}`, TRADE_RIFT_CONFIG.typeLabels[type] || type);
+        const adj = ref(`msg.traderift.quality.${quality}`, TRADE_RIFT_CONFIG.qualityAdjective[quality]);
         // Enchanted rewards read as "rune-touched", the flavor that signals the perk.
-        const enchantWord = enchant ? 'rune-touched ' : '';
         // 'standard' (normal) quality reads better without the trailing clause.
-        if (quality === 'normal') return `an unknown ${enchantWord}Tier ${tier} ${label}`;
-        return `an unknown ${enchantWord}Tier ${tier} ${label} of ${adj} quality`;
+        if (quality === 'normal') {
+            return { key: enchant ? 'msg.traderift.reward_equipment_enchanted' : 'msg.traderift.reward_equipment', params: { tier, type: label } };
+        }
+        return { key: enchant ? 'msg.traderift.reward_equipment_enchanted_quality' : 'msg.traderift.reward_equipment_quality', params: { tier, type: label, quality: adj } };
     }
 }

@@ -1,7 +1,7 @@
 import { RESEARCH } from '../core/config/magic.js';
 import { escapeHtml, escapeAttr } from '../ui/ui-utils.js';
 import { getLoadedManifests } from '../core/mod-registry.js';
-import { importPristineConfig, fetchConfigSource, spliceExportObject, toJsLiteral } from './config-source.js';
+import { importPristineConfig, fetchConfigSource, spliceExportObject, toJsLiteral, splitText, buildLocaleFile, downloadText } from './config-source.js';
 
 const STORAGE_KEY = 'convocation_realm_pro';
 
@@ -642,7 +642,7 @@ class RealmEditorPro {
     }
 
     _serializeRealm(key, realm) {
-        return `${key}: ${toJsLiteral(this._toDef(realm))},`;
+        return `${key}: ${toJsLiteral(splitText(this._toDef(realm), `realm.${key}`, {}))},`;
     }
 
     async _showExportModal() {
@@ -665,6 +665,7 @@ class RealmEditorPro {
                 <textarea readonly style="min-height:400px;">${escapeHtml(output)}</textarea>
                 <div class="fe-modal-actions">
                     <button id="rlm-modal-download">Download File</button>
+                    <button id="rlm-modal-locale" title="Realm text lives in locale/en.json">Download en.json</button>
                     <button id="rlm-modal-copy">Copy to Clipboard</button>
                     <button id="rlm-modal-close">Close</button>
                 </div>
@@ -682,6 +683,10 @@ class RealmEditorPro {
             const a = document.createElement('a');
             a.href = url; a.download = 'exploration.js'; a.click();
             URL.revokeObjectURL(url);
+        });
+        document.getElementById('rlm-modal-locale').addEventListener('click', async () => {
+            try { downloadText('en.json', await buildLocaleFile(this._exportStrings), 'application/json'); }
+            catch (err) { alert(`Export failed: ${err.message}`); }
         });
         document.getElementById('rlm-modal-close').addEventListener('click', () => modal.remove());
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
@@ -707,7 +712,9 @@ class RealmEditorPro {
         for (const [key, realm] of this.realms) {
             if (!Object.hasOwn(REALMS, key) && !(realm._origKey && renamed.get(realm._origKey)?.key === key)) added.set(key, this._toDef(realm));
         }
-        return spliceExportObject(src, 'REALMS', { changed, removed, added, renamed, multiline: true });
+        // Text of changed realms goes to locale/en.json, offered as a second download.
+        this._exportStrings = {};
+        return spliceExportObject(src, 'REALMS', { changed, removed, added, renamed, multiline: true, loc: 'realm', strings: this._exportStrings });
     }
 
     _pushUndoState() {
