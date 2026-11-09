@@ -419,7 +419,7 @@ const TUTORIAL_STEPS = [
         acted(game) { return queuedBuild(game, 'research_desk'); },
         pointer: buildPointer('research_desk', [2, 2]),
     },
-    {//TODO: Continue reading over and fixing text for tutorial. Everything above this line feels pretty good -June 10/25/2026
+    {
         id: 'research',
         levels: ['none', 'some'],
         title: t('tutorial.research.title'),

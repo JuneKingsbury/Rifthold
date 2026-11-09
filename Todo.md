@@ -4,7 +4,10 @@
 
 ### Story Milestones
 #### Story Text 
-Milestone story left to flesh out. These are all labeled with "TODO" in js/core/config/exploration.js.
+Milestone story left to flesh out. These are all labeled with "TODO" in `locale/en.json` (`story_milestone.*.text` keys).
+
+#### Entity Lore
+Lore entries left to write. These are labeled with "TODO." in `locale/en.json`: `entity.crystal_sentinel.lore`, `entity.crystal_warden.lore`, `entity.gloom_sentinel.lore`, `entity.shade_warden.lore`.
 
 #### Achievement Portrait Art
 Make portrait art for every story that is planned to be tied to a Steam achievement.
@@ -31,9 +34,6 @@ The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest
 |------|-------------|
 | `fire_ignite.ogg` | Fire starts (event or structure) |
 | `freezing.ogg` | Colonist freezing warning |
-
-#### Weather Music
-Music to transition to when different types of weather start (think Terraria biome music transitions. This is already programmed, just need to add the music oggs).
 
 ### Steam Integration
 The steamworks.js foundation is wired up (`steam-bridge.js`, IPC handlers, preload bridge, cloud save hooks, achievement triggers in `story.js`). The game runs normally without Steam. Remaining steps to finish:
