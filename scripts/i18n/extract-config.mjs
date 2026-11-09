@@ -22,6 +22,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import * as acorn from 'acorn';
+import { sortTable } from './key-order.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CONFIG_DIR = path.join(ROOT, 'js/core/config');
@@ -259,7 +260,7 @@ if (dryRun) {
 
 const merged = { ...en };
 for (const r of results) Object.assign(merged, r.strings);
-const sorted = Object.fromEntries(Object.keys(merged).sort().map(k => [k, merged[k]]));
+const sorted = sortTable(merged);
 const enBefore = fs.readFileSync(EN_PATH, 'utf8');
 fs.writeFileSync(EN_PATH, JSON.stringify(sorted, null, 2) + '\n');
 for (const r of results) fs.writeFileSync(r.full, r.out);

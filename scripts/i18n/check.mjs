@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { sortKeys } from './key-order.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const quiet = process.argv.includes('-q');
@@ -59,7 +60,7 @@ for (const [key, value] of Object.entries(en)) {
         err(`en.json "${key}": contains markup but the key doesn't end in _html`);
     }
 }
-const sorted = Object.keys(en).slice().sort();
+const sorted = sortKeys(Object.keys(en));
 if (Object.keys(en).some((k, i) => k !== sorted[i])) err('en.json: keys are not sorted (run with --fix-order to sort)');
 if (process.argv.includes('--fix-order')) {
     const out = {};

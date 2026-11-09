@@ -8,7 +8,7 @@ To edit text, edit `locale/en.json`. To add a language, see [Adding a language](
 
 | Piece | Where | What it does |
 |---|---|---|
-| String table | `locale/en.json` | Flat dotted keys, sorted. Plurals are `{ "one": ..., "other": ... }`. |
+| String table | `locale/en.json` | Flat dotted keys, sorted (realm keys in game order, see `scripts/i18n/key-order.mjs`). Plurals are `{ "one": ..., "other": ... }`. |
 | Language list | `locale/index.json` | `[{ code, label }]` for the language dropdown. Use each language's own name as its label. |
 | Lookups | `js/core/i18n.js` | `t`, `tp`, `tHtml`, `ref`, `defRef`, `defMessage`, `stampLoc`. No game imports, so it also runs in Node. |
 | Static markup | `js/ui/i18n-dom.js` | Translates `index.html` from `data-i18n*` attributes at startup. |

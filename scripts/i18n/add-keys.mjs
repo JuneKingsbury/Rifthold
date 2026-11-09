@@ -1,4 +1,4 @@
-// Dev-only: merges new strings into locale/en.json, keeping it sorted.
+// Dev-only: merges new strings into locale/en.json, keeping it sorted (see key-order.mjs).
 //
 //   node scripts/i18n/add-keys.mjs <strings.json>    a JSON object of key -> text
 //   node scripts/i18n/add-keys.mjs - < strings.json   same, from stdin
@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sortTable } from './key-order.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const EN = path.join(ROOT, 'locale/en.json');
@@ -53,7 +54,7 @@ try {
         console.error('nothing written');
         process.exitCode = 1;
     } else {
-        const sorted = Object.fromEntries(Object.keys(en).sort().map(k => [k, en[k]]));
+        const sorted = sortTable(en);
         const tmp = EN + '.tmp' + process.pid;
         fs.writeFileSync(tmp, JSON.stringify(sorted, null, 2) + '\n');
         fs.renameSync(tmp, EN);
