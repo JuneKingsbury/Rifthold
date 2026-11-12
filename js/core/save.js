@@ -185,64 +185,134 @@ function _gdriveCloud() {
     return window.electronAPI?.gdrive || gdriveWeb;
 }
 
+// Slots whose local and cloud copies differ and that the player has not
+// resolved yet, per provider: { steam: { slotKey: cloudMetaEntry }, gdrive: ... }.
+// Pending slots are never pushed, and the meta index pushed to that provider
+// keeps their cloud entries, so the cloud copy stays intact until the player
+// chooses.
+const _pendingCloud = { steam: {}, gdrive: {} };
+let _conflictResolver = null;
+let _syncInFlight = null;
+
+/**
+ * Registers the UI that asks the player which copy of a differing slot to keep.
+ * fn(conflicts, provider) gets [{ slotKey, local, cloud }] (meta entries) and
+ * 'steam' | 'gdrive', and resolves to { slotKey: 'local' | 'cloud' }, or null
+ * to decide later. Without a resolver, differing slots are left untouched.
+ */
+export function setCloudConflictResolver(fn) {
+    _conflictResolver = fn;
+}
+
+// Local meta index with pending slots' entries swapped for the cloud ones.
+function _cloudMetaJson(provider) {
+    const pending = _pendingCloud[provider];
+    if (!Object.keys(pending).length) return localStorage.getItem(SLOT_META_KEY);
+    return JSON.stringify({ ...getAllSlotsMeta(), ...pending });
+}
+
+async function _pushSlot(cloud, provider, slotKey) {
+    const json = localStorage.getItem(slotKey);
+    if (json && !_pendingCloud[provider][slotKey]) await cloud.cloudWrite(`${slotKey}.json`, json);
+    const metaJson = _cloudMetaJson(provider);
+    if (metaJson) await cloud.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+}
+
 export async function syncSlotToCloud(slotKey) {
     const steam = _steamCloud();
     if (steam && (await steam.available())) {
-        const json = localStorage.getItem(slotKey);
-        if (json) steam.cloudWrite(`${slotKey}.json`, json);
-        const metaJson = localStorage.getItem(SLOT_META_KEY);
-        if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+        await _pushSlot(steam, 'steam', slotKey);
     }
     const gdrive = _gdriveCloud();
     if (gdrive && (await gdrive.enabled())) {
-        const json = localStorage.getItem(slotKey);
-        if (json) await gdrive.cloudWrite(`${slotKey}.json`, json);
-        const metaJson = localStorage.getItem(SLOT_META_KEY);
-        if (metaJson) await gdrive.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
+        await _pushSlot(gdrive, 'gdrive', slotKey);
         localStorage.setItem(GDRIVE_LAST_SYNC_KEY, String(Date.now()));
     }
 }
 
-// Pull slots that are newer in the cloud. Local meta is re-read after every
-// await and each slot is merged individually, so a save made while the cloud
-// reads are in flight is never overwritten by stale cloud data or a stale
-// meta snapshot.
-async function _pullNewerSlots(cloud, cloudMetaRaw) {
+function _storeCloudSlot(slotKey, slotData, cloudEntry) {
+    try {
+        const localMeta = getAllSlotsMeta();
+        localStorage.setItem(slotKey, slotData);
+        localMeta[slotKey] = cloudEntry;
+        localStorage.setItem(SLOT_META_KEY, JSON.stringify(localMeta));
+    } catch (e) {
+        console.warn('Cloud pull skipped (storage full?):', slotKey, e);
+    }
+}
+
+/**
+ * Merges one provider's cloud slots into local storage. Cloud-only slots are
+ * pulled. Slots on both sides with different timestamps go to the conflict
+ * resolver, and the player's choice is applied. Local meta is re-read after
+ * every await, so a save made meanwhile is never overwritten.
+ * @param {{cloudRead: Function, cloudWrite: Function}} cloud provider API
+ * @param {string} cloudMetaRaw the provider's slot meta index (JSON)
+ * @param {'steam'|'gdrive'} provider
+ * @returns {Promise<boolean>} false when the cloud meta index is unreadable
+ */
+export async function reconcileCloudSlots(cloud, cloudMetaRaw, provider) {
     let cloudMeta;
     try { cloudMeta = JSON.parse(cloudMetaRaw); } catch { cloudMeta = null; }
     if (!cloudMeta || typeof cloudMeta !== 'object') return false;
+    const conflicts = [];
     for (const [slotKey, cloudEntry] of Object.entries(cloudMeta)) {
+        if (!cloudEntry || typeof cloudEntry !== 'object') continue;
         const before = getAllSlotsMeta()[slotKey];
-        if (before && before.timestamp >= cloudEntry.timestamp) continue;
+        if (before) {
+            if (before.timestamp !== cloudEntry.timestamp) conflicts.push({ slotKey, local: before, cloud: cloudEntry });
+            continue;
+        }
         const slotData = await cloud.cloudRead(`${slotKey}.json`);
         if (!slotData) continue;
-        const localMeta = getAllSlotsMeta();
-        const now = localMeta[slotKey];
-        if (now && now.timestamp >= cloudEntry.timestamp) continue;
-        try {
-            localStorage.setItem(slotKey, slotData);
-            localMeta[slotKey] = cloudEntry;
-            localStorage.setItem(SLOT_META_KEY, JSON.stringify(localMeta));
-        } catch (e) {
-            console.warn('Cloud pull skipped (storage full?):', slotKey, e);
+        if (getAllSlotsMeta()[slotKey]) continue;   // saved locally meanwhile
+        _storeCloudSlot(slotKey, slotData, cloudEntry);
+    }
+    if (!conflicts.length) return true;
+
+    const pending = _pendingCloud[provider];
+    for (const c of conflicts) pending[c.slotKey] = c.cloud;
+    const choices = _conflictResolver ? await _conflictResolver(conflicts, provider) : null;
+    if (!choices) return true;   // decide later: everything stays pending
+
+    for (const c of conflicts) {
+        const choice = choices[c.slotKey];
+        if (choice !== 'local' && choice !== 'cloud') continue;
+        delete pending[c.slotKey];
+        const now = getAllSlotsMeta()[c.slotKey];
+        // The player saved this slot while the dialog was open: that save wins.
+        if (choice === 'cloud' && now && now.timestamp === c.local.timestamp) {
+            const slotData = await cloud.cloudRead(`${c.slotKey}.json`);
+            const latest = getAllSlotsMeta()[c.slotKey];
+            if (slotData && latest && latest.timestamp === c.local.timestamp) {
+                _storeCloudSlot(c.slotKey, slotData, c.cloud);
+                continue;
+            }
         }
+        await _pushSlot(cloud, provider, c.slotKey);
     }
     return true;
 }
 
-export async function syncAllFromCloud() {
+async function _syncAllFromCloud() {
     const steam = _steamCloud();
     if (steam && (await steam.available()) && (await steam.cloudEnabled())) {
         const cloudMetaRaw = await steam.cloudRead(`${SLOT_META_KEY}.json`);
-        if (cloudMetaRaw) await _pullNewerSlots(steam, cloudMetaRaw);
+        if (cloudMetaRaw) await reconcileCloudSlots(steam, cloudMetaRaw, 'steam');
     }
     const gdrive = _gdriveCloud();
     if (gdrive && (await gdrive.enabled())) {
         const cloudMetaRaw = await gdrive.cloudRead(`${SLOT_META_KEY}.json`);
-        if (cloudMetaRaw && (await _pullNewerSlots(gdrive, cloudMetaRaw))) {
+        if (cloudMetaRaw && (await reconcileCloudSlots(gdrive, cloudMetaRaw, 'gdrive'))) {
             localStorage.setItem(GDRIVE_LAST_SYNC_KEY, String(Date.now()));
         }
     }
+}
+
+// Single flight, so startup sync and Sync Now never open two conflict dialogs.
+export function syncAllFromCloud() {
+    if (!_syncInFlight) _syncInFlight = _syncAllFromCloud().finally(() => { _syncInFlight = null; });
+    return _syncInFlight;
 }
 
 export function getLastSyncTime() {
@@ -270,14 +340,16 @@ export async function forceSyncNow() {
 async function _cloudDeleteSlot(slotKey) {
     const steam = _steamCloud();
     if (steam && (await steam.available())) {
+        delete _pendingCloud.steam[slotKey];
         steam.cloudDelete(`${slotKey}.json`);
-        const metaJson = localStorage.getItem(SLOT_META_KEY);
+        const metaJson = _cloudMetaJson('steam');
         if (metaJson) steam.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
     }
     const gdrive = _gdriveCloud();
     if (gdrive && (await gdrive.enabled())) {
+        delete _pendingCloud.gdrive[slotKey];
         gdrive.cloudDelete(`${slotKey}.json`);
-        const metaJson = localStorage.getItem(SLOT_META_KEY);
+        const metaJson = _cloudMetaJson('gdrive');
         if (metaJson) gdrive.cloudWrite(`${SLOT_META_KEY}.json`, metaJson);
     }
 }

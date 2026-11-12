@@ -39,7 +39,7 @@ import { TradeRiftSystem } from '../systems/traderift.js';
 import { rollItem, applyEnchantmentEffect, pickTomeKey, pickArtifactKey, itemName } from '../entities/item-roll.js';
 import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
-import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, getLastSyncTime, forceSyncNow, PER_SAVE_SETTING_DEFAULTS, applyPerSaveSettings, slotLabel } from './save.js';
+import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, setCloudConflictResolver, getLastSyncTime, forceSyncNow, PER_SAVE_SETTING_DEFAULTS, applyPerSaveSettings, slotLabel } from './save.js';
 import { getGdriveAPI } from './gdrive-web.js';
 import { escapeHtml, escapeAttr, jsArg, isTouchUI } from '../ui/ui-utils.js';
 import { getLanguage, getAvailableLanguages, t, tp, ref, defRef } from './i18n.js';
@@ -4724,6 +4724,7 @@ window.setGameLanguage = setStoredLanguage;
 _onDOMReady(() => {
     applyDomI18n(document);
     migrateColonySave();
+    setCloudConflictResolver(_showCloudConflictModal);
     // Cloud pull runs in the background. syncAllFromCloud re-checks local
     // timestamps before each write, so a slot saved meanwhile is never clobbered.
     // Refresh the slot list if it is open when the pull lands.
@@ -4886,23 +4887,21 @@ _onDOMReady(() => {
         return { missing, added };
     }
 
-    function renderSlotCard(slotKey, meta, isAuto) {
-        const isEmpty = !meta;
-        if (meta && !Array.isArray(meta.mods)) meta = { ...meta, mods: undefined };
-        const slotIndex = parseInt(slotKey.slice(-1));
-        const defaultLabel = isAuto ? t('ui.slots.auto', { n: slotIndex + 1 }) : t('ui.slots.slot', { n: slotIndex + 1 });
-        // Slot metadata can come from imported or cloud-synced saves, so every
-        // value is escaped and the thumbnail must be an inline image.
+    // Thumbnail and details of a non-empty slot. Slot metadata can come from
+    // imported or cloud-synced saves, so every value is escaped and the
+    // thumbnail must be an inline image.
+    function _slotSummaryHtml(meta, defaultLabel) {
+        if (!Array.isArray(meta.mods)) meta = { ...meta, mods: undefined };
         const displayName = escapeHtml(slotLabel(meta, defaultLabel));
-        const seasonRaw = String(meta?.season || '');
+        const seasonRaw = String(meta.season || '');
         const season = seasonRaw ? t(`season.${seasonRaw}.name`, null, seasonRaw.charAt(0).toUpperCase() + seasonRaw.slice(1)) : '';
-        const gameStr = meta ? escapeHtml(tp('ui.slots.game_info', meta.colonistCount, { season, year: meta.year, day: meta.dayOfSeason })) : '';
-        const dateStr = meta ? escapeHtml(new Date(meta.timestamp).toLocaleString()) : '';
-        const thumbHtml = typeof meta?.thumbnail === 'string' && meta.thumbnail.startsWith('data:image/')
+        const gameStr = escapeHtml(tp('ui.slots.game_info', meta.colonistCount, { season, year: meta.year, day: meta.dayOfSeason }));
+        const dateStr = escapeHtml(new Date(meta.timestamp).toLocaleString());
+        const thumbHtml = typeof meta.thumbnail === 'string' && meta.thumbnail.startsWith('data:image/')
             ? `<img class="slot-thumbnail" src="${escapeAttr(meta.thumbnail)}" alt="">`
             : `<div class="slot-thumbnail-placeholder"></div>`;
-        const mismatch = isEmpty ? null : _slotModMismatch(meta);
-        const modsHtml = !isEmpty && meta.mods !== undefined
+        const mismatch = _slotModMismatch(meta);
+        const modsHtml = meta.mods !== undefined
             ? (() => {
                 if (!meta.mods.length && !getLoadedManifests().length) return '';
                 if (mismatch) return `<span style="color:#ffaa33;font-size:10px;">&#9888; ${escapeHtml(t('ui.slots.mod_mismatch'))}</span>`;
@@ -4910,13 +4909,109 @@ _onDOMReady(() => {
                 return `<span style="color:#666;font-size:10px;">${escapeHtml(t('ui.slots.no_mods'))}</span>`;
             })()
             : '';
+        return { thumbHtml, detailsHtml: `<span class="slot-name">${displayName}</span><br>${gameStr}<br><span class="slot-timestamp">${dateStr}</span>${modsHtml ? '<br>' + modsHtml : ''}` };
+    }
+
+    function _slotDefaultLabel(slotKey) {
+        const slotIndex = parseInt(slotKey.slice(-1));
+        return slotKey.includes('_auto_') ? t('ui.slots.auto', { n: slotIndex + 1 }) : t('ui.slots.slot', { n: slotIndex + 1 });
+    }
+
+    function renderSlotCard(slotKey, meta, isAuto) {
+        const isEmpty = !meta;
+        const slotIndex = parseInt(slotKey.slice(-1));
+        const defaultLabel = isAuto ? t('ui.slots.auto', { n: slotIndex + 1 }) : t('ui.slots.slot', { n: slotIndex + 1 });
+        const summary = isEmpty ? null : _slotSummaryHtml(meta, defaultLabel);
         return `<div class="slot-card${isEmpty ? ' slot-empty' : ''}">
-            ${thumbHtml}
+            ${isEmpty ? '<div class="slot-thumbnail-placeholder"></div>' : summary.thumbHtml}
             <div class="slot-label">${escapeHtml(defaultLabel)}</div>
-            <div class="slot-meta">${isEmpty ? `<span style="color:#555">${escapeHtml(t('ui.slots.empty'))}</span>` : `<span class="slot-name">${displayName}</span><br>${gameStr}<br><span class="slot-timestamp">${dateStr}</span>${modsHtml ? '<br>' + modsHtml : ''}`}</div>
+            <div class="slot-meta">${isEmpty ? `<span style="color:#555">${escapeHtml(t('ui.slots.empty'))}</span>` : summary.detailsHtml}</div>
             <button class="slot-export-btn" ${isEmpty ? 'disabled' : ''} data-slot-export-key="${slotKey}">${escapeHtml(t('ui.slots.export'))}</button>
             <button class="slot-load-btn" ${isEmpty ? 'disabled' : ''} data-slot-key="${slotKey}">${escapeHtml(t('ui.slots.load'))}</button>
         </div>`;
+    }
+
+    // Asks which copy to keep for each slot whose local and cloud copies differ.
+    // Resolves to { slotKey: 'local' | 'cloud' }, or null to decide later.
+    function _showCloudConflictModal(conflicts, provider) {
+        return new Promise(resolve => {
+            const providerName = t(provider === 'steam' ? 'ui.dialog.cloud_conflict_provider_steam' : 'ui.dialog.cloud_conflict_provider_gdrive');
+            const choices = {};
+            const btnStyle = 'padding:4px 14px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:12px;';
+            const sideHtml = (c, side) => {
+                const meta = c[side];
+                const other = c[side === 'local' ? 'cloud' : 'local'];
+                const newer = (meta.timestamp || 0) > (other.timestamp || 0);
+                const summary = _slotSummaryHtml(meta, _slotDefaultLabel(c.slotKey));
+                const heading = side === 'local' ? t('ui.dialog.cloud_conflict_this_device') : providerName;
+                return `<button type="button" class="slot-card cloud-conflict-side" data-slot="${escapeAttr(c.slotKey)}" data-side="${side}" style="flex:1 1 220px;min-width:0;margin:0;cursor:pointer;text-align:left;font-family:inherit;color:inherit;">
+                    ${summary.thumbHtml}
+                    <div class="slot-meta"><span style="color:#88aaff;font-size:10px;">${escapeHtml(heading)}</span>${newer ? ` <span style="color:#66ff99;font-size:10px;">${escapeHtml(t('ui.dialog.cloud_conflict_newer'))}</span>` : ''}<br>${summary.detailsHtml}</div>
+                </button>`;
+            };
+            const rowsHtml = conflicts.map(c => {
+                choices[c.slotKey] = (c.cloud.timestamp || 0) > (c.local.timestamp || 0) ? 'cloud' : 'local';
+                return `<div style="margin-bottom:12px;">
+                    <div style="color:#ccc;font-size:12px;margin-bottom:4px;">${escapeHtml(_slotDefaultLabel(c.slotKey))}</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">${sideHtml(c, 'local')}${sideHtml(c, 'cloud')}</div>
+                </div>`;
+            }).join('');
+
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `
+                <div style="background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:20px 24px;max-width:620px;width:94%;max-height:88vh;overflow-y:auto;font-family:inherit;box-shadow:0 4px 24px #000;">
+                    <div style="color:#ffaa33;font-weight:bold;margin-bottom:10px;">&#9729; ${escapeHtml(t('ui.dialog.cloud_conflict_title'))}</div>
+                    <div style="color:#aaa;font-size:12px;margin-bottom:14px;">${escapeHtml(t('ui.dialog.cloud_conflict_body', { provider: providerName }))}</div>
+                    ${rowsHtml}
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:flex-end;">
+                        <button data-action="all-local" style="${btnStyle}background:#2a2a4e;color:#ccc;border:1px solid #446;">${escapeHtml(t('ui.dialog.cloud_conflict_keep_all_local'))}</button>
+                        <button data-action="all-cloud" style="${btnStyle}background:#2a2a4e;color:#ccc;border:1px solid #446;">${escapeHtml(t('ui.dialog.cloud_conflict_keep_all_cloud', { provider: providerName }))}</button>
+                        <button data-action="confirm" style="${btnStyle}background:#2a3a2a;color:#88cc88;border:1px solid #446644;">${escapeHtml(t('ui.dialog.cloud_conflict_confirm'))}</button>
+                        <button data-action="later" style="${btnStyle}background:#2a2a2a;color:#aaa;border:1px solid #444;">${escapeHtml(t('ui.dialog.cloud_conflict_later'))}</button>
+                    </div>
+                    <div style="color:#888;font-size:10px;margin-top:8px;text-align:right;">${escapeHtml(t('ui.dialog.cloud_conflict_overwrite_warning'))}</div>
+                </div>`;
+
+            const highlight = () => {
+                for (const el of overlay.querySelectorAll('.cloud-conflict-side')) {
+                    const picked = choices[el.dataset.slot] === el.dataset.side;
+                    el.style.borderColor = picked ? '#66ff99' : '#444';
+                    el.style.opacity = picked ? '1' : '0.55';
+                }
+            };
+            const finish = (result) => {
+                window.removeEventListener('keydown', onKey, true);
+                overlay.remove();
+                resolve(result);
+            };
+            const onKey = (e) => {
+                if (e.key !== 'Escape') return;
+                e.stopPropagation();
+                finish(null);
+            };
+            overlay.addEventListener('click', (e) => {
+                const side = e.target.closest('.cloud-conflict-side');
+                if (side) {
+                    choices[side.dataset.slot] = side.dataset.side;
+                    highlight();
+                    window.soundManager?.playSFXPitched('button_click', 0);
+                    return;
+                }
+                const action = e.target.closest('[data-action]')?.dataset.action;
+                if (action === 'all-local' || action === 'all-cloud') {
+                    const pick = action === 'all-local' ? 'local' : 'cloud';
+                    finish(Object.fromEntries(conflicts.map(c => [c.slotKey, pick])));
+                } else if (action === 'confirm') {
+                    finish({ ...choices });
+                } else if (action === 'later') {
+                    finish(null);
+                }
+            });
+            window.addEventListener('keydown', onKey, true);
+            document.body.appendChild(overlay);
+            highlight();
+        });
     }
 
     function openSaveSlotScreen({ silent = false } = {}) {
