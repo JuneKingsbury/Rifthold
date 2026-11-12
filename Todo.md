@@ -42,4 +42,4 @@ The steamworks.js foundation is wired up (`steam-bridge.js`, IPC handlers, prelo
 
 **Polish**
 - [ ] Display Steam player name somewhere in the UI (start screen or settings)
-- [ ] Add a "cloud vs local" conflict resolution prompt instead of auto-picking newest
+- [x] Add a "cloud vs local" conflict resolution prompt instead of auto-picking newest
