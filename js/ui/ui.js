@@ -1,4 +1,4 @@
-import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, SKILL_MILESTONES, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG, WAVE_TYPES, WORLD_SIZE_COLONY } from '../core/config.js';
+import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG, WAVE_TYPES, WORLD_SIZE_COLONY } from '../core/config.js';
 import { ROOM_SCORE_CAPS, ROOM_SIZE_BANDS, furnitureCountsFor } from '../world/rooms.js';
 import { FURNITURE_TYPES, POWER_PRIORITY, PEDESTAL_CHARGE, RESEARCH } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
@@ -42,20 +42,14 @@ const WEATHER_ICONS = { clear: '☀', rain: '☔', thunderstorm: '⛈', snow: '�
 
 // Skill/magic XP tooltip text, shared by the colonist tooltip refresh and the
 // colonist info panel so both show identical "XP: x/y (z%)" (or "(MAX)") text.
-function skillXpTip(def, skillKey, level, xp) {
+function skillXpTip(def, level, xp) {
     const maxXp = COLONIST_CONFIG.skillXpToLevel + level * COLONIST_CONFIG.skillXpScalePerLevel;
     const pct = Math.floor((xp / maxXp) * 100);
-    const milestones = SKILL_MILESTONES[skillKey] || {};
     const lines = [];
     if (level >= COLONIST_CONFIG.skillMaxLevel) {
         lines.push(t('ui.colonist.skill_tip_max', { desc: def.description }));
     } else {
         lines.push(t('ui.colonist.skill_tip_xp', { desc: def.description, xp, max: maxXp, pct }));
-    }
-    for (const [threshold, m] of Object.entries(milestones).sort((a, b) => Number(a[0]) - Number(b[0]))) {
-        const lvl = Number(threshold);
-        const unlocked = level >= lvl;
-        lines.push(t(unlocked ? 'ui.colonist.skill_milestone_done' : 'ui.colonist.skill_milestone', { lvl, desc: m.description }));
     }
     return lines.join('\n');
 }
@@ -1949,7 +1943,7 @@ export class UI {
         for (const tip of tips) {
             const k = tip.dataset.skill;
             if (k && SKILLS[k]) {
-                tip.dataset.tip = skillXpTip(SKILLS[k], k, colonist.skills[k] || 1, colonist.skillXp?.[k] || 0);
+                tip.dataset.tip = skillXpTip(SKILLS[k], colonist.skills[k] || 1, colonist.skillXp?.[k] || 0);
                 continue;
             }
             const m = tip.dataset.magic;
@@ -2479,7 +2473,7 @@ export class UI {
         html += `<div style="${sectionHdr}">${escapeHtml(t('ui.colonist.section_skills'))}</div>`;
         html += `<div class="info-row">${Object.entries(SKILLS).map(([k, def]) => {
             const level = colonist.skills[k] || 1;
-            const xpTip = skillXpTip(def, k, level, colonist.skillXp?.[k] || 0);
+            const xpTip = skillXpTip(def, level, colonist.skillXp?.[k] || 0);
             return `<span class="skill-tip" data-skill="${escapeAttr(k)}" data-tip="${escapeAttr(xpTip)}">${escapeHtml(t('ui.colonist.skill_level', { name: def.name, n: level }))}</span>`;
         }).join(' ')}</div>`;
         const hasMagic = colonist.magicSkills && Object.values(colonist.magicSkills).some(v => v > 0);

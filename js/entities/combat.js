@@ -43,8 +43,9 @@ export class CombatSystem {
     update(game) {
         if (CONFIG.PEACEFUL_MODE) return;
 
-        // The Crusader raid gates the Kingdom chain. It musters once the boss of the
-        // chain the Kingdom crypt's ward is bound to falls, the same moment that ward lifts.
+        // The Crusader raid musters once the boss of the chain the Kingdom crypt's
+        // ward is bound to falls, the same moment that ward lifts. It no longer gates
+        // the Kingdom chain, which opens through its anchor like every other chain.
         if (!this.crusaderRaidArmed && !this.crusaderRaidTriggered && !this.crusaderRaidDefeated &&
             game.tick % 50 === 0 && game.exploration?.completedRealms.has(crusaderTriggerRealm())) {
             this.armCrusaderRaid(game);

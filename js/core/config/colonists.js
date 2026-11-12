@@ -10,6 +10,8 @@ export const SKILLS = {
 };
 stampLoc(SKILLS, 'skill');
 
+// Planned level 5 / 10 skill perks. Nothing reads these yet, so they are not
+// shown anywhere in game (the skill tooltip used to list them).
 export const SKILL_MILESTONES = {
     building: {
         5:  { type: 'deconstructSpeed', value: 0.15 },
@@ -302,6 +304,9 @@ export const MOOD_SPEED_MULT = {
 };
 
 export const WORK_CONFIG = {
+    // Floor on a working colonist's base work speed, so stacked mood, trait and
+    // time-of-day penalties slow them down but never stop them outright.
+    minWorkSpeedMult: 0.25,
     plantWork: 5,
     harvestWork: 8,
     // One research task is a longer sitting worth researchSessionsPerTask of the old

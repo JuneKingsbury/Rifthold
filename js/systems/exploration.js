@@ -2415,6 +2415,8 @@ export class ExplorationSystem {
                 }
                 const targetItems = [target.weapon, target.armor, target.helmet, target.clothes, target.boots, target.tool, target.trinket].filter(Boolean);
                 let dodgeChance = targetItems.reduce((sum, it) => sum + (it.dodgeChance || 0), 0);
+                // Expedition-only evasion from traits (Trailblazer, Quick).
+                for (const traitKey of (target.traits || [])) dodgeChance += TRAITS[traitKey]?.expedition?.dodgeChanceMod || 0;
                 dodgeChance += this._combatStatusValue(target, 'buff_dodgeChance', 'value', 0);
                 dodgeChance = Math.min(0.75, dodgeChance);
                 if (dodgeChance > 0 && Math.random() < dodgeChance) {
@@ -3215,6 +3217,12 @@ export class ExplorationSystem {
                     const t = TRAITS[traitKey];
                     if (t?.expedition?.fatigueMult) personalFatigue = Math.floor(personalFatigue * t.expedition.fatigueMult);
                 }
+            }
+            // Expedition gear (e.g. Wanderer's Rations Pouch). The snapshot holds the
+            // Expedition set the colonist actually carried, not the Colony set just swapped back in.
+            for (const slot of ['weapon', 'armor', 'helmet', 'clothes', 'tool', 'boots', 'trinket']) {
+                const mult = snapshot[slot]?.expedition?.fatigueMult;
+                if (mult) personalFatigue = Math.floor(personalFatigue * mult);
             }
             const xpFatigueMult = this._getXpLevelBonus(snapshot.id, 'fatigueMult');
             if (xpFatigueMult !== 1) personalFatigue = Math.floor(personalFatigue * xpFatigueMult);

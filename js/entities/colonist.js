@@ -593,7 +593,8 @@ function checkCriticalAlerts(colonist, game) {
         flags.hunger = false;
     }
 
-    if (colonist.mood < 30 && colonist.mood > 20 && !flags.mood) {
+    const breakAt = breakThreshold(colonist);
+    if (colonist.mood < breakAt + 10 && colonist.mood > breakAt && !flags.mood) {
         flags.mood = true;
         pushColonistAlert(game, colonist, 'mood', 'msg.colonist.alert_near_breaking', 'warning');
         game.overlays.push({ type: 'floating_text', x: colonist.x, y: colonist.y, text: tr('msg.colonist.float_low_mood'), color: '#ff4444', fontSize: 11, ttl: 12, maxTtl: 12 });
@@ -717,12 +718,17 @@ function getMoodLevel(mood) {
     return 'breaking';
 }
 
-// Whether a colonist should enter a mental break. Steadfast lowers the effective
-// breaking threshold, so it takes a deeper mood dip to trigger a break.
-function isBreaking(colonist) {
+// Mood below which a colonist enters a mental break. Steadfast lowers it, so it
+// takes a deeper mood dip to trigger a break.
+function breakThreshold(colonist) {
     let threshold = MOOD_THRESHOLDS.stressed;
     if (colonist.traits.includes('steadfast')) threshold *= TRAITS.steadfast.breakThresholdMult;
-    return colonist.mood < threshold;
+    return threshold;
+}
+
+// Whether a colonist should enter a mental break.
+function isBreaking(colonist) {
+    return colonist.mood < breakThreshold(colonist);
 }
 
 // True if a friend, close friend, or lover is within social range. Backs the
@@ -740,7 +746,10 @@ function isNearFriend(colonist, game) {
 
 function getWorkSpeed(colonist, game) {
     let speed = 1.0;
-    const moodLevel = getMoodLevel(colonist.mood);
+    // A colonist below the stressed threshold who isn't breaking (Steadfast holds
+    // out longer) still works, at the stressed rate rather than the breaking 0.
+    let moodLevel = getMoodLevel(colonist.mood);
+    if (moodLevel === 'breaking' && !isBreaking(colonist)) moodLevel = 'stressed';
     speed *= MOOD_SPEED_MULT[moodLevel];
 
     if (colonist.traits.includes('hard_worker')) speed *= (1 + TRAITS.hard_worker.workSpeedBonus);
@@ -763,7 +772,8 @@ function getWorkSpeed(colonist, game) {
 
     if (colonist.voidBound) speed *= 0.90;
 
-    return speed;
+    // Stacked penalties never stall a working colonist entirely.
+    return Math.max(speed, WORK_CONFIG.minWorkSpeedMult);
 }
 
 export function getEquippedItems(colonist) {

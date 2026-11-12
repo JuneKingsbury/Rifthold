@@ -845,7 +845,6 @@ export const REALMS = {
         duration: [700, 1000], encounters: 9, combatEncounters: [3, 6],
 
         vis: { wall: 'kingdom_wall', floor: 'kingdom_floor' },
-        requiresEvent: 'crusader_raid_defeated',
         loot: [
             { resource: 'gold', weight: 35, amount: [5, 12] },
             { resource: 'runite', weight: 25, amount: [3, 7] },

@@ -196,7 +196,6 @@ export const COMPLEX_STRUCTURES = {
         activeLightRadius: 4,
     },
     anvil_shrine: {
-        research: 'irrigation',
         coreBuild: 'arcane_core',
         layout: [
             { dx: -1, dy: -1, req: 'ritual_chalk' }, { dx: 0, dy: -1, req: 'ritual_chalk' }, { dx: 1, dy: -1, req: 'ritual_chalk' },
