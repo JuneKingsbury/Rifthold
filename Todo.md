@@ -2,38 +2,14 @@
 
 ## Content
 
-### Story Milestones
-#### Story Text 
-Milestone story left to flesh out. These are all labeled with "TODO" in `locale/en.json` (`story_milestone.*.text` keys).
+### Verify in-game glossary is up-to-date
+Go through in-game glossary and make sure everything is up-to-date with the latest version of the game.
 
-#### Entity Lore
-Lore entries left to write. These are labeled with "TODO." in `locale/en.json`: `entity.crystal_sentinel.lore`, `entity.crystal_warden.lore`, `entity.gloom_sentinel.lore`, `entity.shade_warden.lore`.
+### Verify tutorial text
+Go through all 3 tutorial types and verify they progress as intended and their tasks are clear.
 
-#### Achievement Portrait Art
-Make portrait art for every story that is planned to be tied to a Steam achievement.
-
-### Audio Assets
-The sound system is fully wired up (`js/core/sound.js` + `js/core/sound-manifest.js`). Music tracks are all present. The tables below list only the **missing** SFX files. All paths are relative to the project root. Format: `.ogg` (Vorbis).
-
-#### Combat SFX — `audio/sfx/combat/`
-
-| File | Description |
-|------|-------------|
-| `enemy_death.ogg` | Enemy killed |
-
-#### Spell SFX — `audio/sfx/spells/`
-
-| File | Description |
-|------|-------------|
-| `magic_levelup.ogg` | Magic skill level up |
-| `mana_regen.ogg` | Mana crystal recharge |
-
-#### Environment SFX — `audio/sfx/environment/`
-
-| File | Description |
-|------|-------------|
-| `fire_ignite.ogg` | Fire starts (event or structure) |
-| `freezing.ogg` | Colonist freezing warning |
+### Achievement Portrait Art
+Make portrait art for every story that is planned to be tied to a Steam achievement (see skin editor dev tool for list).
 
 ### Steam Integration
 The steamworks.js foundation is wired up (`steam-bridge.js`, IPC handlers, preload bridge, cloud save hooks, achievement triggers in `story.js`). The game runs normally without Steam. Remaining steps to finish:
