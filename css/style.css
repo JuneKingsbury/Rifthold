@@ -1984,6 +1984,21 @@ img.pixel-art-icon {
     opacity: 0.5;
 }
 
+/* Tome recipes some colonist could study right now. */
+.craft-row.craft-tome-usable {
+    background: rgba(170, 102, 255, 0.12);
+    box-shadow: inset 3px 0 0 #aa66ff;
+    border-radius: 3px;
+}
+.craft-row.craft-tome-usable.craft-unavailable { opacity: 0.75; }
+
+.craft-tome-badge {
+    color: #777;
+    font-size: 0.82em;
+    white-space: nowrap;
+}
+.craft-tome-usable .craft-tome-badge { color: #c9a8ff; }
+
 .craft-unavailable button {
     background: #333;
     border: 1px solid #444;

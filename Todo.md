@@ -2,9 +2,6 @@
 
 ## Content
 
-### Verify in-game glossary is up-to-date
-Go through in-game glossary and make sure everything is up-to-date with the latest version of the game.
-
 ### Verify tutorial text
 Go through all 3 tutorial types and verify they progress as intended and their tasks are clear.
 

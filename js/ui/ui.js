@@ -4343,6 +4343,17 @@ export class UI {
             tan_leather: textiles, weave_cloth: textiles,
             smelt_iron: smithing, smelt_runite: smithing, repair_trinket: smithing,
         };
+        // Tomes tab: copies already made (in storage or equipped by a colonist), and the
+        // colonists who could study each tome right now (same gate as advanceTomeStudy).
+        const tomeOwned = {};
+        let tomeStudents = [];
+        if (hasTomeFilter) {
+            for (const tome of this.game.resources.tomes || []) tomeOwned[tome.key] = (tomeOwned[tome.key] || 0) + 1;
+            for (const c of this.game.colonists) {
+                if (c.equippedTome) tomeOwned[c.equippedTome] = (tomeOwned[c.equippedTome] || 0) + 1;
+            }
+            tomeStudents = this.game.colonists.filter(c => c.hp > 0 && !c.golem && c.magicSkills);
+        }
         let lastTier = null;
         let lastMaterialsGroup = null;
         let lastTomeSchool = null;
@@ -4384,7 +4395,24 @@ export class UI {
                 if (tip) return `${this._itemIcon(k)}<span class="skill-tip" data-tip="${escapeAttr(tip)}">${escapeHtml(v > 1 ? t('ui.craft.amount', { name: resourceName(k), n: v }) : resourceName(k))}</span>`;
                 return escapeHtml(t('ui.craft.amount', { name: resourceName(k), n: v }));
             }).join('+');
-            const cls = canCraft ? 'craft-available' : 'craft-unavailable';
+            let cls = canCraft ? 'craft-available' : 'craft-unavailable';
+            let tomeBadge = '';
+            if (hasTomeFilter) {
+                const tomeKey = Object.keys(recipe.output)[0];
+                const tome = SPELL_TOMES[tomeKey];
+                const spell = tome ? SPELLS[tome.spell] : null;
+                if (spell) {
+                    const learners = tomeStudents.filter(c =>
+                        !(c.knownSpells || []).includes(tome.spell) &&
+                        (c.magicSkills[spell.school] || 0) >= (tome.minSchoolLevel || 0));
+                    if (learners.length > 0) cls += ' craft-tome-usable';
+                    const tip = learners.length > 0
+                        ? t('ui.craft.tome_learners_tip', { names: learners.map(c => c.name).join(', ') })
+                        : t('ui.craft.tome_learners_none');
+                    const label = t('ui.craft.tome_badge', { n: learners.length, made: tomeOwned[tomeKey] || 0 });
+                    tomeBadge = `<span class="craft-tome-badge skill-tip" data-tip="${escapeAttr(tip)}" style="margin-left:${hasStation ? 'auto' : '8px'};">${escapeHtml(label)}</span>`;
+                }
+            }
             const ct = this.game.settings.craftTargets[key] || {};
             const repeatCls = ct.repeat ? 'craft-repeat active' : 'craft-repeat';
             html += `<div class="craft-row ${cls}">`;
@@ -4397,6 +4425,7 @@ export class UI {
                 const stationName = buildingName(recipe.station || 'workbench');
                 html += `<span style="color:#ff4444;font-size:0.85em;margin-left:auto;">${escapeHtml(t('ui.craft.needs_station', { name: stationName }))}</span>`;
             }
+            html += tomeBadge;
             html += `</div>`;
         }
         if (filtered.length === 0) {
