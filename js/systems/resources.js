@@ -5,7 +5,8 @@
  * FOOD_DECAY_CONFIG.decayInterval cadence; the rest is invoked on demand by
  * building, crafting, trading, and equipment code.
  */
-import { CONFIG, FOODSTUFFS, FOOD_DECAY_CONFIG, WORK_CONFIG, ALL_ITEMS, TRADE_VALUES, RAID_WEALTH_WEIGHTS, NEED_DECAY, COLONIST_CONFIG, TRAITS } from '../core/config.js';
+import { CONFIG, FOODSTUFFS, FOOD_DECAY_CONFIG, WORK_CONFIG, ALL_ITEMS, TRADE_VALUES, RAID_WEALTH_WEIGHTS, NEED_DECAY, COLONIST_CONFIG } from '../core/config.js';
+import { getHungerDecayMult } from '../entities/colonist.js';
 
 export { FOODSTUFFS };
 
@@ -390,10 +391,7 @@ export class ResourceManager {
         let total = 0;
         for (const colonist of game.colonists) {
             if (colonist.golem || colonist.dead) continue;
-            let hungerMult = 1;
-            if (colonist.traits.includes('iron_stomach'))  hungerMult *= TRAITS.iron_stomach.hungerDecayMult;
-            if (colonist.traits.includes('gluttonous'))    hungerMult *= TRAITS.gluttonous.hungerDecayMult;
-            if (colonist.traits.includes('comfort_eater')) hungerMult *= TRAITS.comfort_eater.hungerDecayMult;
+            const hungerMult = getHungerDecayMult(colonist);
             const ticksPerMeal = hungerPerMeal / (NEED_DECAY.hunger * hungerMult);
             total += CONFIG.TICKS_PER_DAY / ticksPerMeal;
         }

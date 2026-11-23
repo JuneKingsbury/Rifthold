@@ -501,8 +501,8 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
     //   sim's 'freezing' thought already accounts for warm clothing
     //   (coldResistance), warmth sources, and being indoors, so a properly-dressed
     //   colonist does NOT shake.
-    //   Everything else (wildlife) has no clothing, so it reacts to any unroofed
-    //   tile in cold weather.
+    //   Everything else (wildlife) has no clothing, so it shivers in winter on any
+    //   tile that is neither inside a room nor in a heat source's warm zone.
     if (flags.weatherIntensity > 0 && entity && entity.state !== 'sleeping') {
         let cold;
         if (entity.thoughts) {
@@ -510,9 +510,12 @@ export function getEntityTransform(entity, now, game, moveT, seed, flags) {
             for (const th of entity.thoughts) {
                 if (th.id === 'freezing') { cold = true; break; }
             }
+        } else if (game.weather?.season !== 'winter') {
+            cold = false;
         } else {
             const tile = game.map[entity.y] && game.map[entity.y][entity.x];
-            cold = !(tile && tile.roomId !== null && tile.roomId !== undefined);
+            const indoors = tile && tile.roomId !== null && tile.roomId !== undefined;
+            cold = !indoors && !game.power?.isTileWarmed(game, entity.x, entity.y);
         }
         if (cold) {
             const WR = RENDER_CONFIG.weatherReaction;

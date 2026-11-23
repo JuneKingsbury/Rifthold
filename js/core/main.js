@@ -16,7 +16,7 @@ import { TaskQueue } from './tasks.js';
 import { ResourceManager } from '../systems/resources.js';
 import { detectRooms, calculateRoomQualities } from '../world/rooms.js';
 import { updateFarming } from '../systems/farming.js';
-import { queueCraftingOrder, queueEnchantingOrder, updateAutoCook, updateAutoCraft } from '../systems/crafting.js';
+import { queueCraftingOrder, queueEnchantingOrder, cancelCraftingOrder, updateAutoCook, updateAutoCraft } from '../systems/crafting.js';
 import { Weather } from '../world/weather.js';
 import { updateWildlife, designateHunt } from '../entities/wildlife.js';
 import { CombatSystem } from '../entities/combat.js';
@@ -200,6 +200,7 @@ class Game {
             pauseOnLowHealth: true,
             pauseOnResearch: true,
             uiFontScale: 1,
+            uiFontAuto: true,
             autoCookTarget: 0,
             showOverlays: true,
             showNightLighting: true,
@@ -268,6 +269,12 @@ class Game {
                     if (key !== 'tutorialLevel' && key !== 'showTutorial') delete saved[key];
                 }
                 Object.assign(this.settings, saved);
+                // Auto font size came later. Players still on the old default size get it;
+                // anyone who picked their own size keeps it.
+                if (saved.uiFontAuto === undefined) {
+                    const scale = saved.uiFontScale ?? (saved.uiFontSize != null ? saved.uiFontSize / 12 : 1);
+                    this.settings.uiFontAuto = scale === 1 || scale === TOUCH_UI_FONT_SCALE;
+                }
             }
             if ((_isMobileApp || isTouchUI()) && !saved) Object.assign(this.settings, TOUCH_FIRST_RUN_SETTINGS);
         } catch (e) {}
@@ -1802,6 +1809,7 @@ class Game {
     craft(recipeKey) {
         if (queueCraftingOrder(this, recipeKey)) {
             this.notifications.push({ text: t('msg.main.craft_queued', { name: _recipeName(recipeKey) }), tick: this.tick, type: 'success' });
+            this.ui.onCraftQueued(recipeKey);
         }
     }
 
@@ -1813,6 +1821,15 @@ class Game {
         }
         if (queued > 0) {
             this.notifications.push({ text: t('msg.main.craft_queued_n', { n: queued, name: _recipeName(recipeKey) }), tick: this.tick, type: 'success' });
+            this.ui.onCraftQueued(recipeKey);
+        }
+    }
+
+    cancelCraft(recipeKey) {
+        if (cancelCraftingOrder(this, recipeKey)) {
+            this.notifications.push({ text: t('msg.main.craft_cancelled', { name: _recipeName(recipeKey) }), tick: this.tick, type: 'info' });
+            window.soundManager?.playSFXPitched('button_click', -4);
+            this.ui.updateCraftPanel();
         }
     }
 
@@ -3859,7 +3876,7 @@ class Game {
         const potionAutoUse = this.settings.potionAutoUse || {};
         Object.assign(this.settings, {
             autoPauseHostile: true, autoPauseEvent: true, autoPauseCaravan: false, pauseOnDeath: true, pauseOnLowHealth: true, pauseOnResearch: true,
-            uiFontScale: 1, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
+            uiFontScale: 1, uiFontAuto: true, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
             showWeatherParticles: true, particleDensity: 100, showColonistNames: 'selected', showMinimap: true, showFps: false,
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',
             largeClickTargets: false, pauseOnFocusLoss: true, enableScreenShake: true, colorblindMode: 'none',
@@ -3877,7 +3894,7 @@ class Game {
         this.saveSettingsToStorage();
         // Re-apply live effects that have side effects beyond the settings object.
         _setFullscreen(false);
-        window.setUIFontScale?.(this.settings.uiFontScale);
+        applyUIFontSetting(this.settings);
         if (window.soundManager) { window.soundManager.setMusicVolume(50); window.soundManager.setSFXVolume(50); }
         document.getElementById('game')?.classList.toggle('paused', this.paused && this.settings.darkenOnPause);
         document.getElementById('game-container')?.classList.toggle('large-targets', !!this.settings.largeClickTargets);
@@ -3952,8 +3969,7 @@ class Game {
             if (this.settings.layoutMode && this.settings.layoutMode !== 'auto') {
                 this.setLayoutMode(this.settings.layoutMode);
             }
-            if (this.settings.uiFontScale != null) window.setUIFontScale?.(this.settings.uiFontScale);
-            else if (this.settings.uiFontSize != null) window.setUIFontScale?.(this.settings.uiFontSize / 12);
+            applyUIFontSetting(this.settings);
             return true;
         }
         this.notifications.push({ text: t('msg.main.load_failed'), tick: this.tick, type: 'danger' });
@@ -3976,8 +3992,7 @@ class Game {
             if (this.settings.layoutMode && this.settings.layoutMode !== 'auto') {
                 this.setLayoutMode(this.settings.layoutMode);
             }
-            if (this.settings.uiFontScale != null) window.setUIFontScale?.(this.settings.uiFontScale);
-            else if (this.settings.uiFontSize != null) window.setUIFontScale?.(this.settings.uiFontSize / 12);
+            applyUIFontSetting(this.settings);
         }
     }
 
@@ -4542,6 +4557,55 @@ function resetMinimapSize() {
 
 window.resetMinimapSize = resetMinimapSize;
 
+// Interface text scale for the Auto font setting, from the window's height in CSS
+// pixels: 1 on screens up to about 1080p, growing on bigger ones to the slider's max.
+const AUTO_FONT_BASE_HEIGHT = 1000;
+const AUTO_FONT_MAX_SCALE = 1.4;
+function autoUIFontScale() {
+    const byHeight = Math.round((window.innerHeight / AUTO_FONT_BASE_HEIGHT) * 20) / 20;
+    const scale = Math.min(AUTO_FONT_MAX_SCALE, Math.max(1, byHeight));
+    return isTouchUI() ? Math.max(scale, TOUCH_UI_FONT_SCALE) : scale;
+}
+
+// Applies the font setting: the Auto scale when uiFontAuto is on, else the player's own.
+// Older settings stored uiFontSize in px instead of a scale.
+function applyUIFontSetting(settings) {
+    if (settings.uiFontAuto) return setUIFontScale(autoUIFontScale());
+    if (settings.uiFontScale != null) return setUIFontScale(settings.uiFontScale);
+    if (settings.uiFontSize != null) return setUIFontScale(settings.uiFontSize / 12);
+    setUIFontScale(1);
+}
+
+// The font setting as the start screen's controls have it, before a game exists.
+function _startFontSettings() {
+    const auto = document.getElementById('start-ui-font-auto');
+    const slider = document.getElementById('start-ui-font-size');
+    if (!auto || !slider) return null;
+    return { uiFontAuto: auto.checked, uiFontScale: parseFloat(slider.value) || 1 };
+}
+
+function _syncStartFontAuto() {
+    const settings = _startFontSettings();
+    if (!settings) return;
+    if (settings.uiFontAuto) {
+        const scale = autoUIFontScale();
+        document.getElementById('start-ui-font-size').value = scale;
+        document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(scale);
+    }
+    applyUIFontSetting(settings);
+}
+
+// Auto follows the window as it is resized or moved to another screen.
+let _autoFontFrame = 0;
+window.addEventListener('resize', () => {
+    if (_autoFontFrame) return;
+    _autoFontFrame = requestAnimationFrame(() => {
+        _autoFontFrame = 0;
+        const settings = window.game?.settings || _startFontSettings();
+        if (settings?.uiFontAuto) applyUIFontSetting(settings);
+    });
+});
+
 function setUIFontScale(scale) {
     scale = parseFloat(scale) || 1;
     document.documentElement.style.setProperty('--ui-font-scale', scale);
@@ -4558,6 +4622,8 @@ function _fontScaleLabel(scale) {
 }
 
 window.setUIFontScale = setUIFontScale;
+window.applyUIFontSetting = applyUIFontSetting;
+window.autoUIFontScale = autoUIFontScale;
 // index.html's font size slider labels itself with this.
 window._fontScaleLabel = _fontScaleLabel;
 window.setUIFontSize = scale => setUIFontScale(scale);
@@ -6248,6 +6314,7 @@ _onDOMReady(() => {
             s.sfxVolume = parseInt(document.getElementById('start-sfx-vol').value);
             s.showColonistNames = document.getElementById('start-names').value;
             s.uiFontScale = parseFloat(document.getElementById('start-ui-font-size').value) || 1;
+            s.uiFontAuto = document.getElementById('start-ui-font-auto').checked;
             localStorage.setItem('colony_settings', JSON.stringify(s));
             if (SoundManager) {
                 SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
@@ -6325,6 +6392,10 @@ _onDOMReady(() => {
             if (s.showColonistNames != null) document.getElementById('start-names').value = s.showColonistNames;
             if (s.uiFontScale != null) { document.getElementById('start-ui-font-size').value = s.uiFontScale; document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(s.uiFontScale); }
             else if (s.uiFontSize != null) { const sc = s.uiFontSize / 12; document.getElementById('start-ui-font-size').value = sc; document.getElementById('start-ui-font-val').textContent = _fontScaleLabel(sc); }
+            // Same migration as the Game constructor: the old default size becomes Auto.
+            const fontAuto = s.uiFontAuto ?? [undefined, 1, TOUCH_UI_FONT_SCALE].includes(s.uiFontScale ?? (s.uiFontSize != null ? s.uiFontSize / 12 : undefined));
+            document.getElementById('start-ui-font-auto').checked = fontAuto;
+            _syncStartFontAuto();
             if (SoundManager) {
                 SoundManager.setMusicVolume(parseInt(document.getElementById('start-music-vol').value));
                 SoundManager.setSFXVolume(parseInt(document.getElementById('start-sfx-vol').value));
@@ -6337,6 +6408,13 @@ _onDOMReady(() => {
 
     document.getElementById('start-settings-panel').addEventListener('change', saveStartSettings);
     document.getElementById('start-settings-panel').addEventListener('input', saveStartSettings);
+
+    // Font size: ticking Auto moves the slider to the auto size; moving the slider turns Auto off.
+    document.getElementById('start-ui-font-auto').addEventListener('change', _syncStartFontAuto);
+    document.getElementById('start-ui-font-size').addEventListener('input', () => {
+        document.getElementById('start-ui-font-auto').checked = false;
+        applyUIFontSetting(_startFontSettings());
+    });
 
     // Language: the table is loaded once in boot.js, so a change is stored and
     // applies on restart. Nothing is in progress on the start screen, so it
@@ -6427,6 +6505,8 @@ _onDOMReady(() => {
         document.getElementById('start-names').value = 'selected';
         document.getElementById('start-ui-font-size').value = 1;
         document.getElementById('start-ui-font-val').textContent = t('ui.start.font_medium');
+        document.getElementById('start-ui-font-auto').checked = true;
+        _syncStartFontAuto();
         document.getElementById('start-autopause-hostile').checked = true;
         document.getElementById('start-autopause-event').checked = true;
         document.getElementById('start-autopause-caravan').checked = false;
@@ -6772,6 +6852,7 @@ _onDOMReady(() => {
             ditherQuality: document.getElementById('start-dither-qual').value,
             showColonistNames: document.getElementById('start-names').value,
             uiFontScale: parseFloat(document.getElementById('start-ui-font-size').value) || 1,
+            uiFontAuto: document.getElementById('start-ui-font-auto').checked,
             activeSkin: document.getElementById('start-skin').value || '16x16_tiny_world',
             demoMode: document.getElementById('start-demo-mode').checked,
             darkenOnPause: document.getElementById('start-darken-pause').checked,
@@ -6791,9 +6872,7 @@ _onDOMReady(() => {
         } else if (tutorialLevel) {
             startSettings.showTutorial = true;
             startSettings.tutorialLevel = tutorialLevel;
-            // New players rarely find the auto-cook setting before their first hungry
-            // winter, so walkthrough games start with it on unless the player chose a target.
-            if (tutorialLevel !== 'veteran' && !startSettings.autoCookTarget) startSettings.autoCookTarget = 10;
+            // Walkthrough games start with auto-cook off: the Cook step has the player set it.
         }
         if (tutorialLevel) {
             // Remember the choice so the next New Game pre-selects it.
@@ -6804,7 +6883,7 @@ _onDOMReady(() => {
                 localStorage.setItem('colony_settings', JSON.stringify(stored));
             } catch (e) { /* settings are best-effort */ }
         }
-        setUIFontScale(startSettings.uiFontScale || 1);
+        applyUIFontSetting(startSettings);
         localStorage.setItem('convocation_skin', startSettings.activeSkin);
         RENDER_CONFIG.terrainDithering = document.getElementById('start-dither-dist').value !== 'none';
         const customDefs = readCustomColonistDefs();

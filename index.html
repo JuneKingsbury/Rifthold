@@ -160,6 +160,7 @@
                 <div class="settings-row">
                     <label for="start-ui-font-size"><span data-i18n="html.settings.ui_font_size.label">UI Font Size: </span><span id="start-ui-font-val" data-i18n="ui.start.font_medium">Medium</span></label>
                     <input type="range" id="start-ui-font-size" min="0.75" max="1.4" step="0.05" value="1" style="width:80px" oninput="document.getElementById('start-ui-font-val').textContent=window._fontScaleLabel(this.value)">
+                    <input type="checkbox" id="start-ui-font-auto" checked><label for="start-ui-font-auto" data-i18n="html.settings.ui_font_auto.label">Auto</label>
                 </div>
                 <div class="settings-row">
                     <label for="start-temp-unit" data-i18n="html.settings.temp_unit.label">Temperature unit:</label>
@@ -236,7 +237,8 @@
                 <div class="settings-row"><input type="checkbox" id="start-pause-death" checked><label for="start-pause-death" data-i18n="html.settings.pause_death.label">Auto-pause on colonist death</label></div>
                 <div class="settings-row"><input type="checkbox" id="start-pause-low-health" checked><label for="start-pause-low-health" data-i18n="html.settings.pause_low_health.label">Auto-pause on critically low colonist health</label></div>
                 <div class="settings-row"><input type="checkbox" id="start-pause-research" checked><label for="start-pause-research" data-i18n="html.settings.pause_research.label">Auto-pause on research complete</label></div>
-                <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check" data-i18n="html.settings.peaceful_check.label">Peaceful mode (no raids/hostile animals)</label></div>
+                <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check" data-i18n="html.settings.peaceful_check.label">No Raids (peaceful at home)</label></div>
+                <div class="settings-row" style="font-size:10px;color:#888;margin-top:-4px;padding-left:22px;" data-i18n="html.settings.peaceful_check.hint">No raids, hostile animals, or crypt guardians at home. Expeditions and Void Nexus waves still have combat.</div>
                 <div class="settings-row"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode" data-i18n="html.settings.demo_mode.label">Demo Mode (locks advanced research)</label></div>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">

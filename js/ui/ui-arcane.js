@@ -456,6 +456,8 @@ const arcaneMethods = {
                 }).join(', ');
                 html += `<div class="info-row" style="color:#aaddff;font-weight:bold;">${escapeHtml(t('ui.arcane.exp.realm_assembling', { realm: _expRealmName(exp) }))}</div>`;
                 html += `<div class="info-row" style="color:#888;">${_tm(t('ui.arcane.exp.party_names', { names: _m(0) }), names)}</div>`;
+                // Same canvas the run plays out on, so it's clear this is where to watch.
+                html += `<canvas class="exp-vis-canvas" width="768" height="192"></canvas>`;
             } else {
                 const elapsed = this.game.tick - exp.startTick;
                 const totalDur = Math.floor(exp.duration * 1.2);
@@ -1949,6 +1951,39 @@ const arcaneMethods = {
         }
     },
 
+    // The party is still walking to the Gathering Circle: a waiting card with a slowly
+    // turning rift and how many have arrived.
+    _renderGatheringVis(ctx, W, H, exp) {
+        const expl = this.game.exploration;
+        const party = exp.partyIds.map(id => this.game.getColonist(id)).filter(Boolean);
+        const arrived = exp.gatherPos ? party.filter(c => expl._isGathered(c, exp.gatherPos)).length : 0;
+        const time = this.game.settings.reduceMotion ? 0 : performance.now() / 1000;
+
+        ctx.fillStyle = '#0a0a1a';
+        ctx.fillRect(0, 0, W, H);
+        const cx = W / 2, cy = H / 2 - 14;
+        ctx.save();
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+            const pulse = 1 + 0.06 * Math.sin(time * 2 + i);
+            ctx.globalAlpha = 0.25 + 0.15 * i;
+            ctx.strokeStyle = i === 2 ? '#aaddff' : '#6655cc';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, (70 - i * 18) * pulse, (34 - i * 9) * pulse, time * 0.3 * (i % 2 ? -1 : 1), 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#aaddff';
+        ctx.font = "bold 20px 'Courier New', monospace";
+        ctx.fillText(t('ui.arcane.exp.waiting_gather', { n: arrived, total: party.length }), cx, H - 42);
+        ctx.fillStyle = '#888';
+        ctx.font = "14px 'Courier New', monospace";
+        ctx.fillText(t('ui.arcane.exp.waiting_gather_sub'), cx, H - 18);
+    },
+
     _renderExpeditionVis() {
         const canvas = this.elements.arcanePanel.querySelector('.exp-vis-canvas');
         if (!canvas) return;
@@ -1970,7 +2005,9 @@ const arcaneMethods = {
                 this._expVisState.finishing = true;
                 this._expVisState.finishFrame = 0;
             } else {
-                ctx.clearRect(0, 0, W, H);
+                const gathering = expl.expeditions.find(e => !e.autoMode && e.status === 'gathering');
+                if (gathering) this._renderGatheringVis(ctx, W, H, gathering);
+                else ctx.clearRect(0, 0, W, H);
                 return;
             }
         } else {

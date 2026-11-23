@@ -267,7 +267,8 @@ export class InputHandler {
                 if (x < 0 || x >= CONFIG.MAP_WIDTH || y < 0 || y >= CONFIG.MAP_HEIGHT) continue;
                 const tile = this.game.map[y][x];
                 const key = y * CONFIG.MAP_WIDTH + x;
-                if (tile.resource || UNBUILDABLE_TERRAIN.has(tile.terrain) || !tile.passable) {
+                // World-generation-only pieces can never be designated (designateBuild refuses them).
+                if (def.noBuild || tile.resource || UNBUILDABLE_TERRAIN.has(tile.terrain) || !tile.passable) {
                     blocked.add(key);
                     continue;
                 }
@@ -609,7 +610,7 @@ export class InputHandler {
         if (ui.closeMoreMenu?.()) return;
         const hadPanel = ui.priorityPanelVisible || ui.craftPanelVisible ||
             ui.researchPanelVisible || ui.inventoryVisible ||
-            ui.settingsPanelVisible ||
+            ui.settingsPanelVisible || ui.saveSlotPanelVisible ||
             ui.arcanePanelVisible || ui.storyPanelVisible || ui.mapPanelVisible;
         if (hadPanel) {
             if (ui.priorityPanelVisible) ui.togglePriorityPanel();
@@ -617,6 +618,7 @@ export class InputHandler {
             if (ui.researchPanelVisible) ui.toggleResearchPanel();
             if (ui.inventoryVisible) ui.toggleInventoryPanel();
             if (ui.settingsPanelVisible) ui.toggleSettingsPanel();
+            if (ui.saveSlotPanelVisible) ui.toggleSaveSlotPanel();
             if (ui.arcanePanelVisible) ui.toggleArcanePanel();
             if (ui.storyPanelVisible) ui.toggleStoryPanel();
             if (ui.mapPanelVisible) ui.toggleMapPanel();

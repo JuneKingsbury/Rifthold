@@ -325,13 +325,24 @@ export function updateColonist(colonist, game) {
     }
 }
 
-function updateNeeds(colonist, game) {
+// How fast this colonist gets hungry, relative to NEED_DECAY.hunger: traits, plus gear.
+// Gear multipliers (hungerDecayMult on trinkets) multiply together, so they are read per
+// item rather than through getEquipmentStat, which sums.
+export function getHungerDecayMult(colonist) {
     let hungerMult = 1;
-    if (colonist.traits.includes('iron_stomach')) hungerMult = TRAITS.iron_stomach.hungerDecayMult;
+    if (colonist.traits.includes('iron_stomach')) hungerMult *= TRAITS.iron_stomach.hungerDecayMult;
     if (colonist.traits.includes('gluttonous')) hungerMult *= TRAITS.gluttonous.hungerDecayMult;
     if (colonist.traits.includes('comfort_eater')) hungerMult *= TRAITS.comfort_eater.hungerDecayMult;
     const hungerReduction = getEquipmentStat(colonist, 'hungerReduction');
     if (hungerReduction > 0) hungerMult *= (1 - hungerReduction);
+    for (const item of getEquippedItems(colonist)) {
+        if (typeof item.hungerDecayMult === 'number') hungerMult *= item.hungerDecayMult;
+    }
+    return hungerMult;
+}
+
+function updateNeeds(colonist, game) {
+    const hungerMult = getHungerDecayMult(colonist);
     colonist.needs.hunger = Math.max(0, colonist.needs.hunger - NEED_DECAY.hunger * hungerMult);
 
     let restDecayMult = 1;
@@ -346,19 +357,22 @@ function updateNeeds(colonist, game) {
     }
     colonist.needs.rest = Math.max(0, colonist.needs.rest - NEED_DECAY.rest * restDecayMult);
 
-    if (game.weather.season === 'winter' && !isIndoors(colonist, game.map)) {
-        const warmed = game.power.isTileWarmed(game, colonist.x, colonist.y);
-        if (!warmed) {
-            let coldRes = getEquipmentStat(colonist, 'coldResistance');
-            if (colonist.activeEffects) {
-                for (const e of colonist.activeEffects) {
-                    if (e.type === 'warmth' && e.coldResistanceBonus) coldRes += e.coldResistanceBonus;
-                }
-            }
-            if (coldRes <= 0 || Math.random() >= coldRes) {
-                applyThought(colonist, 'freezing', game.tick);
+    // Warming up is immediate: once a colonist is inside or by a heat source the freezing
+    // thought (and its shiver) goes away, rather than lingering for the thought's duration.
+    const outInTheCold = game.weather.season === 'winter' && !isIndoors(colonist, game.map)
+        && !game.power.isTileWarmed(game, colonist.x, colonist.y);
+    if (outInTheCold) {
+        let coldRes = getEquipmentStat(colonist, 'coldResistance');
+        if (colonist.activeEffects) {
+            for (const e of colonist.activeEffects) {
+                if (e.type === 'warmth' && e.coldResistanceBonus) coldRes += e.coldResistanceBonus;
             }
         }
+        if (coldRes <= 0 || Math.random() >= coldRes) {
+            applyThought(colonist, 'freezing', game.tick);
+        }
+    } else {
+        removeThought(colonist, 'freezing');
     }
 
     if (game.weather.currentWeather === 'heatwave' && !isIndoors(colonist, game.map)) {
@@ -673,6 +687,12 @@ export function addThought(colonist, thought, moodEffect, duration, tick) {
 export function applyThought(colonist, thoughtKey, tick) {
     const t = THOUGHTS[thoughtKey];
     if (t) addThought(colonist, thoughtKey, t.moodEffect, t.duration, tick);
+}
+
+/** Drops the thought with this id, if the colonist has it. */
+export function removeThought(colonist, id) {
+    const i = colonist.thoughts.findIndex(t => t.id === id);
+    if (i >= 0) colonist.thoughts.splice(i, 1);
 }
 
 /** True if the colonist currently has the thought with this id. */

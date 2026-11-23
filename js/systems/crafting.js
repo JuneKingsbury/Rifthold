@@ -4,7 +4,7 @@
  * auto-craft passes. updateAutoCook and updateAutoCraft are called from
  * simulationTick every 10th tick; queueCraftingOrder is player-driven.
  */
-import { RECIPES, WORK_CONFIG, ENCHANT_COST_BY_TIER } from '../core/config.js';
+import { RECIPES, WORK_CONFIG, ENCHANT_COST_BY_TIER, FOODSTUFFS } from '../core/config.js';
 import { getEquippedItems } from '../entities/colonist.js';
 import { t } from '../core/i18n.js';
 import { resourceName } from '../core/names.js';
@@ -54,7 +54,15 @@ export function queueCraftingOrder(game, recipeKey) {
     const station = findAvailableStation(game, stationType);
     if (!station) return false;
 
+    // Record exactly what was taken, so a cancelled order can give it back. A "foodstuffs"
+    // input is paid in whichever foods are in stock.
+    const before = { ...game.resources.stockpile };
     game.resources.deduct(recipe.input);
+    const paid = {};
+    for (const [k, v] of Object.entries(before)) {
+        const spent = v - (game.resources.stockpile[k] || 0);
+        if (spent > 0) paid[k] = spent;
+    }
 
     let workAmount = recipe.ticks;
     if (stationType === 'workbench' && station.powered) {
@@ -68,8 +76,71 @@ export function queueCraftingOrder(game, recipeKey) {
         y: station.y,
         workAmount,
         recipe,
+        recipeKey,
+        paid,
     });
 
+    return true;
+}
+
+// The recipe key of a craft/cook task. Saved games store the recipe as a copy, and
+// orders from before recipeKey was recorded are matched on their output and inputs.
+function taskRecipeKey(task) {
+    if (task.recipeKey) return task.recipeKey;
+    const r = task.recipe;
+    if (!r) return null;
+    const sig = (o) => Object.keys(o || {}).sort().join(',');
+    return Object.keys(RECIPES).find(k => RECIPES[k] === r
+        || (sig(RECIPES[k].output) === sig(r.output) && sig(RECIPES[k].input) === sig(r.input))) || null;
+}
+
+const isCraftTask = (task) => (task.type === 'craft' || task.type === 'cook') && task.recipe;
+
+// Order counts per recipe key, split into waiting and being worked on, for the craft panel.
+export function countCraftingOrders(game) {
+    const counts = {};
+    for (const task of game.taskQueue.getAll()) {
+        if (!isCraftTask(task)) continue;
+        const key = taskRecipeKey(task);
+        if (!key) continue;
+        const c = counts[key] || (counts[key] = { queued: 0, active: 0 });
+        if (task.assignedTo != null) c.active++;
+        else c.queued++;
+    }
+    return counts;
+}
+
+/**
+ * Cancels one order for this recipe and refunds what it cost, which queueCraftingOrder
+ * took up front. Waiting orders go first, newest first. With none waiting, the newest one
+ * in progress is cancelled and its colonist freed.
+ */
+export function cancelCraftingOrder(game, recipeKey) {
+    const recipe = RECIPES[recipeKey];
+    if (!recipe) return false;
+    const orders = game.taskQueue.getAll().filter(t => isCraftTask(t) && taskRecipeKey(t) === recipeKey);
+    if (orders.length === 0) return false;
+    const task = orders.filter(t => t.assignedTo == null).pop() || orders.pop();
+    if (task.assignedTo != null) {
+        const worker = game.getColonist(task.assignedTo);
+        if (worker && worker.currentTaskId === task.id) {
+            worker.currentTaskId = null;
+            worker.path = [];
+            worker.state = 'idle';
+        }
+    }
+    game.taskQueue.remove(task.id);
+    // Older orders have no record of what they took: refund the recipe, with a
+    // "foodstuffs" input paid back as the first food on the list.
+    let refund = task.paid;
+    if (!refund) {
+        refund = {};
+        for (const [k, v] of Object.entries(recipe.input)) {
+            const res = k === 'foodstuffs' ? FOODSTUFFS[0] : k;
+            refund[res] = (refund[res] || 0) + v;
+        }
+    }
+    game.resources.add(refund);
     return true;
 }
 

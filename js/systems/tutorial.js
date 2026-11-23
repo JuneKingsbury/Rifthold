@@ -27,6 +27,9 @@ function starterTechList() {
 }
 const STARTER_TECHS = starterTechList();
 const WEAPONS_RECIPE_CLUB = RECIPES.craft_wooden_club ? 'craft_wooden_club' : null;
+// Auto-cook target set when the cook step is skipped.
+const DEFAULT_AUTO_COOK_TARGET = 10;
+const autoCooking = (game) => (game.settings.autoCookTarget || 0) > 0;
 
 // Shown when a research step has sat for a while. Research is slow by nature, so
 // point at the two levers that actually speed it up.
@@ -62,11 +65,12 @@ const LEGACY_STEP_IDS = [
 
 const modeBtn = (action, label) => ({ selector: `#mode-bar [data-mode-action="${action}"]`, label });
 
+// Goes through setBuildCategory so the list gets the same filtering as the Build menu.
+// Building the list by hand here once leaked world-generation-only pieces (Warded Wall,
+// Rift Anchor) into the Arcane tab.
 function openBuild(game, type) {
-    const cat = BUILDINGS[type].category;
-    game.input.buildCategory = cat;
-    game.input.buildOptions = Object.keys(BUILDINGS).filter(k => BUILDINGS[k].category === cat);
     game.input.buildType = type;
+    game.input.setBuildCategory(BUILDINGS[type].category);
     game.input.setMode('build');
 }
 
@@ -92,8 +96,11 @@ function recipeFor(outputKey) {
     return Object.keys(RECIPES).find(k => RECIPES[k].output && RECIPES[k].output[outputKey]);
 }
 
-/** Craft button -> recipe category tab -> recipe button (a specific one, or the first craftable). */
-function craftPointer(getRecipeKey, fallbackTab, label) {
+/**
+ * Craft button -> recipe category tab -> recipe button (a specific one, or the first craftable).
+ * `finalSelector` points at something else on the tab instead of a recipe button.
+ */
+function craftPointer(getRecipeKey, fallbackTab, label, finalSelector = null) {
     return (game) => {
         const ui = game.ui;
         const recipeKey = getRecipeKey ? getRecipeKey() : null;
@@ -102,9 +109,9 @@ function craftPointer(getRecipeKey, fallbackTab, label) {
         if ((ui._craftTab || RECIPE_CATEGORIES[0]) !== tab) {
             return { selector: `#craft-panel .craft-tab[data-craft-tab="${tab}"]`, label: t('tutorial.pointer.open_tab', { tab: recipeCategoryName(tab) }) };
         }
-        const selector = recipeKey
+        const selector = finalSelector || (recipeKey
             ? `#craft-panel [data-craft-recipe="${recipeKey}"]`
-            : '#craft-panel .craft-row.craft-available > button:first-child';
+            : '#craft-panel .craft-row.craft-available > button:first-child');
         return { selector, label };
     };
 }
@@ -124,6 +131,17 @@ function closeCraftPointer(game) {
     if (!game.ui.craftPanelVisible) return null;
     return { selector: '#craft-panel .panel-close[data-panel-close="craft"]', label: t('tutorial.pointer.close_menu') };
 }
+
+/** After the Build, Farm or Gather order is given, point at the menu's Close button. */
+function closeModePointer(game) {
+    if (game.input.mode === 'normal') return null;
+    return { selector: '#build-panel .build-panel-close[data-mode-action="back"]', label: t('tutorial.pointer.close_menu') };
+}
+
+// The Build, Farm and Gather menus stay open until closed, and the next step's arrows would
+// land on top of them, so steps that use one also wait for it to close.
+const menuClosed = (game) => game.input.mode === 'normal';
+const craftClosed = (game) => !game.ui?.craftPanelVisible;
 
 // Same rule the game uses for its "missing attunement" alerts: a living, non-golem colonist
 // with fewer attuned schools than there are slots.
@@ -210,25 +228,33 @@ function expeditionPointer(game) {
     const ui = game.ui;
     const expl = game.exploration;
     const panelOpen = !!ui.arcanePanelVisible;
+    const onExpTab = (ui._arcaneTab || 'expeditions') === 'expeditions';
+    const expTab = { selector: '#arcane-panel [data-arcane-tab="expeditions"]', label: t('tutorial.pointer.open_expeditions_tab') };
     if (expl.pendingSummary) {
         if (!panelOpen) return modeBtn('arcane', t('tutorial.pointer.open_rifts'));
         return { selector: '#arcane-panel button[onclick*="dismissSummary"]', label: t('tutorial.pointer.collect_rewards') };
     }
+    // The party is home: the step finishes once the player has read the report.
+    if (expl.pendingAutoSummaries?.length > 0) {
+        if (!panelOpen) return modeBtn('arcane', t('tutorial.pointer.view_report'));
+        if (!onExpTab) return expTab;
+        return { selector: '#arcane-panel button[onclick*="collectAutoExpedition"]', label: t('tutorial.pointer.view_report') };
+    }
     if (expl.expeditions.length > 0) {
-        // Running: nothing to click unless the party needs a decision. The expedition stalls until it
-        // is answered, so lead the player to the first available choice. We do not pick for them.
+        // Running: the expedition plays out in the Rifts panel, so keep the player there. Nothing
+        // to click unless the party needs a decision. The expedition stalls until it is answered,
+        // so lead the player to the first available choice. We do not pick for them.
         const waiting = expl.expeditions.some(e => !e.autoMode && (e.pendingDecision || e.pendingVoidPactChoice));
+        if (!panelOpen) return modeBtn('arcane', t(waiting ? 'tutorial.pointer.party_needs_decision' : 'tutorial.pointer.watch_expedition'));
+        if (!onExpTab) return expTab;
         if (!waiting) return null;
-        if (!panelOpen) return modeBtn('arcane', t('tutorial.pointer.party_needs_decision'));
         return {
             selector: '#arcane-panel button:not([disabled])[onclick*="resolveExpedition"], #arcane-panel button[onclick*="resolveVoidPactChoice"]',
             label: t('tutorial.pointer.make_choice'),
         };
     }
     if (!panelOpen) return modeBtn('arcane', t('tutorial.pointer.open_rifts'));
-    if ((ui._arcaneTab || 'expeditions') !== 'expeditions') {
-        return { selector: '#arcane-panel [data-arcane-tab="expeditions"]', label: t('tutorial.pointer.open_expeditions_tab') };
-    }
+    if (!onExpTab) return expTab;
     if (!ui._arcaneExpSetup) {
         return { selector: '#arcane-panel button[onclick*="showExpeditionSetupInPanel("]', label: t('tutorial.pointer.pick_destination') };
     }
@@ -265,11 +291,39 @@ const changedPriorities = (game) => {
     return base !== undefined && base !== prioSnapshot(game);
 };
 const attunedEveryone = (game) => !game.colonists.some(needsAttunement);
-const queuedCraft = (game, recipeKey) => queued(game, t => (t.type === 'craft' || t.type === 'cook') && t.recipe === RECIPES[recipeKey]);
+// Saved games hold a copy of the recipe, so match the key first.
+const queuedCraft = (game, recipeKey) => queued(game, t => (t.type === 'craft' || t.type === 'cook')
+    && (t.recipeKey ? t.recipeKey === recipeKey : t.recipe === RECIPES[recipeKey]));
 const queuedCraftCount = (game, category) => game.taskQueue.tasks.filter(t => (t.type === 'craft' || t.type === 'cook') && t.recipe?.category === category).length;
 const queuedCraftIn = (game, category) => queued(game, t => (t.type === 'craft' || t.type === 'cook') && t.recipe?.category === category);
+// Landmarks come with their own walls, doors and beds, so the room steps only count what
+// was built after the room lesson began. The first room step takes the baseline in its
+// isComplete, because update() can test a step before its onEnter runs. Saves already past
+// that step have none, and then everything counts.
+function takeRoomBaseline(game) {
+    const flags = game.tutorial.flags;
+    if (flags.roomBaseline) return;
+    flags.roomBaseline = {
+        walls: buildCount(game, 'wood_wall'),
+        doors: [...game.mapIndex.getStructurePositions('door')],
+        beds: [...game.mapIndex.getStructurePositions('bed')],
+    };
+}
+const roomBaseline = (game) => game.tutorial.flags.roomBaseline || { walls: 0, doors: [], beds: [] };
+function newPositions(game, type, before) {
+    const old = new Set(before);
+    return [...game.mapIndex.getStructurePositions(type)].filter(k => !old.has(k));
+}
+const roomIdAt = (game, k) => game.map[k >> 16]?.[k & 0xFFFF]?.roomId ?? null;
+const newWalls = (game) => buildCount(game, 'wood_wall') - roomBaseline(game).walls;
+// A door is part of the room it closes, so a new door with a room id means a finished enclosure.
+const newDoorEnclosed = (game) => newPositions(game, 'door', roomBaseline(game).doors).some(k => roomIdAt(game, k) !== null);
+const newBedroom = (game) => newPositions(game, 'bed', roomBaseline(game).beds).some(k => {
+    const id = roomIdAt(game, k);
+    return id !== null && !!game.roomQualities[id];
+});
 // Walls are placed in bulk, so only count the room as started once enough pieces are down.
-const wallPieces = (game) => buildCount(game, 'wood_wall') + game.taskQueue.tasks.filter(t => t.type === 'build' && t.buildType === 'wood_wall').length;
+const wallPieces = (game) => newWalls(game) + game.taskQueue.tasks.filter(t => t.type === 'build' && t.buildType === 'wood_wall').length;
 
 /** A step the player dismisses with a "Got it" button. */
 function manualStep(step) {
@@ -333,8 +387,10 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.farm.description'),
         descriptionNone: t('tutorial.farm.description_none'),
         highlight: 'zone',
-        isComplete(game) { return game.mapIndex.zones.size > 0; },
+        isComplete(game) { return game.mapIndex.zones.size > 0 && menuClosed(game); },
         goTo(game) { game.input.setMode('zone'); },
+        acted(game) { return game.mapIndex.zones.size > 0; },
+        actedPointer: closeModePointer,
         pointer(game) {
             if (game.input.mode !== 'zone') return modeBtn('zone', t('tutorial.pointer.open_farm'));
             const rect = game.tutorial.getMapHint(game, 'farm', () => findOpenRect(game, 4, 3));
@@ -348,9 +404,10 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.gather.description'),
         descriptionNone: t('tutorial.gather.description_none'),
         highlight: 'gather',
-        isComplete(game) { return !!game.tutorial.flags.gathered; },
+        isComplete(game) { return !!game.tutorial.flags.gathered && menuClosed(game); },
         goTo(game) { game.input.setMode('designate'); },
-        acted(game) { return queuedGather(game); },
+        acted(game) { return queuedGather(game) || !!game.tutorial.flags.gathered; },
+        actedPointer: closeModePointer,
         pointer(game) {
             if (game.input.mode !== 'designate') return modeBtn('gather', t('tutorial.pointer.open_gather'));
             const rect = game.tutorial.getMapHint(game, 'gather', () => findNearestResource(game, ['tree']));
@@ -365,9 +422,10 @@ const TUTORIAL_STEPS = [
         descriptionNone: t('tutorial.workbench.description_none'),
         highlight: 'build',
         cost: BUILDINGS.workbench.cost,
-        isComplete(game) { return buildCount(game, 'workbench') > 0; },
+        isComplete(game) { return buildCount(game, 'workbench') > 0 && menuClosed(game); },
         goTo(game) { openBuild(game, 'workbench'); },
-        acted(game) { return queuedBuild(game, 'workbench'); },
+        acted(game) { return queuedBuild(game, 'workbench') || buildCount(game, 'workbench') > 0; },
+        actedPointer: closeModePointer,
         pointer: buildPointer('workbench', [2, 2]),
     },
     {
@@ -377,9 +435,9 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.craft_planks.description'),
         descriptionNone: t('tutorial.craft_planks.description_none'),
         highlight: 'craft',
-        isComplete(game) { return !!game.tutorial.flags.craftedPlanks; },
+        isComplete(game) { return !!game.tutorial.flags.craftedPlanks && craftClosed(game); },
         goTo(game) { game.ui.toggleCraftPanel(); },
-        acted(game) { return queuedCraft(game, recipeFor('planks')); },
+        acted(game) { return queuedCraft(game, recipeFor('planks')) || !!game.tutorial.flags.craftedPlanks; },
         actedPointer: closeCraftPointer,
         pointer: craftPointer(() => recipeFor('planks'), 'Materials', t('tutorial.pointer.queue_planks')),
     },
@@ -390,22 +448,28 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.cooking_pot.description'),
         highlight: 'build',
         cost: BUILDINGS.cooking_pot.cost,
-        isComplete(game) { return buildCount(game, 'cooking_pot') > 0; },
+        isComplete(game) { return buildCount(game, 'cooking_pot') > 0 && menuClosed(game); },
         goTo(game) { openBuild(game, 'cooking_pot'); },
-        acted(game) { return queuedBuild(game, 'cooking_pot'); },
+        acted(game) { return queuedBuild(game, 'cooking_pot') || buildCount(game, 'cooking_pot') > 0; },
+        actedPointer: closeModePointer,
         pointer: buildPointer('cooking_pot', [2, 2]),
     },
     {
+        // Teaches the auto-cook target rather than a one-off order, so the colony keeps
+        // cooking on its own from here on.
         id: 'cook',
         levels: ['none', 'some'],
         title: t('tutorial.cook.title'),
         description: t('tutorial.cook.description'),
+        descriptionNone: t('tutorial.cook.description_none'),
         highlight: 'craft',
-        isComplete(game) { return !!game.tutorial.flags.cookedMeal; },
+        isComplete(game) { return autoCooking(game) && craftClosed(game); },
         goTo(game) { game.ui.toggleCraftPanel(); },
-        acted(game) { return queuedCraft(game, 'cook_meal'); },
+        acted: autoCooking,
         actedPointer: closeCraftPointer,
-        pointer: craftPointer(() => 'cook_meal', 'Food & Potions', t('tutorial.pointer.queue_cook_meal')),
+        pointer: craftPointer(() => 'cook_meal', 'Food & Potions', t('tutorial.pointer.set_autocook'), '#craft-panel #set-autocook'),
+        // Skipping must not leave a new colony with nobody cooking.
+        onSkip(game) { if (!autoCooking(game)) game.setAutoCookTarget(DEFAULT_AUTO_COOK_TARGET); },
     },
     {
         id: 'research_desk',
@@ -414,9 +478,10 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.research_desk.description'),
         highlight: 'build',
         cost: BUILDINGS.research_desk.cost,
-        isComplete(game) { return buildCount(game, 'research_desk') > 0; },
+        isComplete(game) { return buildCount(game, 'research_desk') > 0 && menuClosed(game); },
         goTo(game) { openBuild(game, 'research_desk'); },
-        acted(game) { return queuedBuild(game, 'research_desk'); },
+        acted(game) { return queuedBuild(game, 'research_desk') || buildCount(game, 'research_desk') > 0; },
+        actedPointer: closeModePointer,
         pointer: buildPointer('research_desk', [2, 2]),
     },
     {
@@ -484,7 +549,7 @@ const TUTORIAL_STEPS = [
         highlight: 'craft',
         isComplete(game) {
             const armed = aliveColonists(game).filter(c => c.weapon).length;
-            return armed + game.resources.weapons.length >= aliveColonists(game).length;
+            return armed + game.resources.weapons.length >= aliveColonists(game).length && craftClosed(game);
         },
         goTo(game) { game.ui.toggleCraftPanel(); },
         acted(game) {
@@ -563,9 +628,9 @@ const TUTORIAL_STEPS = [
         title: t('tutorial.tome.title'),
         description: t('tutorial.tome.description'),
         highlight: 'craft',
-        isComplete(game) { return game.resources.tomes.length > 0; },
+        isComplete(game) { return game.resources.tomes.length > 0 && craftClosed(game); },
         goTo(game) { game.ui.toggleCraftPanel(); },
-        acted(game) { return queuedCraftIn(game, 'Tomes'); },
+        acted(game) { return queuedCraftIn(game, 'Tomes') || game.resources.tomes.length > 0; },
         actedPointer: closeCraftPointer,
         pointer: craftPointer(null, 'Tomes', t('tutorial.pointer.craft_tome')),
     },
@@ -605,9 +670,11 @@ const TUTORIAL_STEPS = [
         title: t('tutorial.bedroom.title'),
         description: t('tutorial.bedroom.description'),
         highlight: 'build',
-        isComplete(game) { return Object.keys(game.roomQualities).length > 0; },
+        stuckHelp: t('tutorial.room_stuck_help'),
+        isComplete(game) { takeRoomBaseline(game); return newBedroom(game) && menuClosed(game); },
         goTo(game) { openBuild(game, 'wood_wall'); },
         acted(game) { return wallPieces(game) >= 8; },
+        actedPointer(game) { return newBedroom(game) ? closeModePointer(game) : null; },
         pointer: buildPointer('wood_wall', [5, 5], t('tutorial.pointer.outline_room')),
     },
     // The same goal broken into stages for first-time players.
@@ -617,9 +684,10 @@ const TUTORIAL_STEPS = [
         title: t('tutorial.bedroom_walls.title'),
         description: t('tutorial.bedroom_walls.description'),
         highlight: 'build',
-        isComplete(game) { return buildCount(game, 'wood_wall') >= 8; },
+        isComplete(game) { takeRoomBaseline(game); return newWalls(game) >= 8 && menuClosed(game); },
         goTo(game) { openBuild(game, 'wood_wall'); },
         acted(game) { return wallPieces(game) >= 8; },
+        actedPointer: closeModePointer,
         pointer: buildPointer('wood_wall', [5, 5], t('tutorial.pointer.outline_room')),
     },
     {
@@ -629,10 +697,23 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.bedroom_door.description'),
         highlight: 'build',
         cost: BUILDINGS.door.cost,
-        isComplete(game) { return buildCount(game, 'door') > 0; },
+        isComplete(game) { return newPositions(game, 'door', roomBaseline(game).doors).length > 0 && menuClosed(game); },
         goTo(game) { openBuild(game, 'door'); },
-        acted(game) { return queuedBuild(game, 'door'); },
+        acted(game) { return queuedBuild(game, 'door') || newPositions(game, 'door', roomBaseline(game).doors).length > 0; },
+        actedPointer: closeModePointer,
         pointer: buildPointer('door', null),
+    },
+    // Walls and a door only make a building once they close off the inside completely.
+    {
+        id: 'enclosed_room',
+        levels: ['none'],
+        title: t('tutorial.enclosed_room.title'),
+        description: t('tutorial.enclosed_room.description'),
+        stuckHelp: t('tutorial.room_stuck_help'),
+        highlight: null,
+        isComplete: newDoorEnclosed,
+        goTo() {},
+        pointer: null,
     },
     {
         id: 'bedroom_bed',
@@ -641,9 +722,10 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.bedroom_bed.description'),
         highlight: 'build',
         cost: BUILDINGS.bed.cost,
-        isComplete(game) { return Object.keys(game.roomQualities).length > 0; },
+        isComplete(game) { return newBedroom(game) && menuClosed(game); },
         goTo(game) { openBuild(game, 'bed'); },
-        acted(game) { return queuedBuild(game, 'bed'); },
+        acted(game) { return queuedBuild(game, 'bed') || newBedroom(game); },
+        actedPointer: closeModePointer,
         pointer: buildPointer('bed', null),
     },
     {
@@ -653,9 +735,10 @@ const TUTORIAL_STEPS = [
         description: t('tutorial.gathering_circle.description'),
         highlight: 'build',
         cost: BUILDINGS.gathering_circle.cost,
-        isComplete(game) { return buildCount(game, 'gathering_circle') > 0; },
+        isComplete(game) { return buildCount(game, 'gathering_circle') > 0 && menuClosed(game); },
         goTo(game) { openBuild(game, 'gathering_circle'); },
-        acted(game) { return queuedBuild(game, 'gathering_circle'); },
+        acted(game) { return queuedBuild(game, 'gathering_circle') || buildCount(game, 'gathering_circle') > 0; },
+        actedPointer: closeModePointer,
         pointer: buildPointer('gathering_circle', [1, 1]),
     },
     {
@@ -664,8 +747,13 @@ const TUTORIAL_STEPS = [
         title: t('tutorial.expedition.title'),
         description: t('tutorial.expedition.description'),
         highlight: 'arcane',
-        isComplete(game) { return (game.stats?.expeditionsCompleted || 0) >= 1; },
-        goTo(game) { game.ui.toggleArcanePanel?.(); },
+        // Finished once the party is home and the player has read the report (View report,
+        // then Continue), so they see what the run brought back.
+        isComplete(game) {
+            const expl = game.exploration;
+            return (game.stats?.expeditionsCompleted || 0) >= 1 && !expl.pendingSummary && !(expl.pendingAutoSummaries?.length > 0);
+        },
+        goTo(game) { if (!game.ui.arcanePanelVisible) game.ui.toggleArcanePanel?.('expeditions'); },
         pointer: expeditionPointer,
     },
     manualStep({
@@ -890,6 +978,7 @@ export class TutorialSystem {
     skip(game) {
         const task = this.getCurrentTask();
         if (!task) return;
+        if (typeof task.onSkip === 'function') task.onSkip(game);
         this.completed.add(task.id);
         this.currentStep++;
         this._skipCompleted();

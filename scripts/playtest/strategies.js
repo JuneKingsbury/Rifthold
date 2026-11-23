@@ -845,7 +845,7 @@ class Strategy {
                 break;
             }
             case 'craft_planks': this.craft('craft_planks', 1); break;
-            case 'cook': this.craft('cook_meal', 1); break;
+            case 'cook': g.setAutoCookTarget(10); break;
             case 'research': this.chooseResearch(); break;
             case 'work_priorities': g.cyclePriority(cs[0].id, 'research'); break;
             case 'weapon': {
@@ -864,6 +864,7 @@ class Strategy {
             }
             case 'equip_tome': if (g.resources.tomes.length) g.equipTome(cs[0].id, 0); break;
             case 'attunement': cs.forEach((c, i) => { for (const s of schoolsFor(i)) if (!(c.attunedSchools || []).includes(s)) g.toggleAttunement(c.id, s); }); break;
+            case 'enclosed_room': break;
             case 'bedroom_walls': case 'bedroom_door': case 'bedroom_bed': case 'bedroom':
                 if (!this._tutorialRoom) { if (this.buildBedroom()) this._tutorialRoom = true; else this.gather(['tree'], 10); }
                 break;
@@ -920,6 +921,8 @@ function closePanels(gm) {
     if (ui.priorityPanelVisible) ui.togglePriorityPanel();
     if (ui.arcanePanelVisible) ui.toggleArcanePanel();
     if (ui.craftPanelVisible) ui.toggleCraftPanel();
+    // Build, Farm and Gather are modes, not panels. The tutorial waits for them to close.
+    if (gm.input.mode !== 'normal') gm.input.setMode('normal');
 }
 
 // Small seeded PRNG so the bot's own choices are repeatable between runs.

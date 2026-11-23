@@ -188,9 +188,12 @@ function decorBenefits(bDef, roomType) {
 
 // Whether a piece of furniture counts toward a room type's requirements: it
 // must already contribute to that room's score (decor for bedrooms and town
-// halls, workshop support for workshops).
+// halls, workshop support for workshops). Seating is the exception: anything
+// you can sit on (chair, stool, bench, armchair) meets a seating need in any
+// room, even where it adds no decor score.
 export function furnitureCountsFor(bDef, roomType) {
     if (!bDef || !bDef.furnitureType || bDef.furnitureType === 'misc') return false;
+    if (bDef.furnitureType === 'seating') return true;
     if (roomType === 'workshop') return !!bDef.workshopBonus;
     return !!bDef.roomQuality && decorBenefits(bDef, roomType);
 }

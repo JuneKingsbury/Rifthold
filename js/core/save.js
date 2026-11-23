@@ -1441,6 +1441,8 @@ function restoreLayout(layout) {
     if (layout.footerHeight) footer.style.height = layout.footerHeight;
     if (layout.colonistHudFlex) colonistHud.style.flex = layout.colonistHudFlex;
     if (layout.eventLogFlex) eventLog.style.flex = layout.eventLogFlex;
+    // With Auto font size on, the text follows the screen, not the size the save was made at.
+    if (window.game?.settings?.uiFontAuto) return;
     if (layout.uiFontScale) window.setUIFontScale?.(layout.uiFontScale);
     else if (layout.uiFontSize) window.setUIFontScale?.(layout.uiFontSize / 12);
 }

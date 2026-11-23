@@ -276,9 +276,11 @@ export const COLONIST_APPEARANCE = {
     shirtCount: 1,
 };
 
+// Per-tick drain. A full stomach lasts about 670 ticks (1.4 days) and full rest about
+// 1670 ticks (3.5 days), so one long job (a research session) can't starve a colonist.
 export const NEED_DECAY = {
-    hunger: 0.25,
-    rest: 0.1,
+    hunger: 0.15,
+    rest: 0.06,
 };
 
 export const PRIORITY_PROFILES = {

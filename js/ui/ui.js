@@ -6,7 +6,7 @@ import { getTradeRates, computeTradeValues } from '../systems/events.js';
 import { getItemTradeValue, itemName, itemDescription } from '../entities/item-roll.js';
 import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../systems/complexBuildings.js';
 import { getTameChance } from '../entities/taming.js';
-import { getAvailableRecipes } from '../systems/crafting.js';
+import { getAvailableRecipes, countCraftingOrders } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
 import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml, isTouchUI, isCompactLayout, keyHint, haptic } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
@@ -928,6 +928,7 @@ export class UI {
                 case 'arcane': this.toggleArcanePanel(); break;
                 case 'story': this.toggleStoryPanel(); break;
                 case 'map': this.toggleMapPanel(); break;
+                case 'saveslot': this.toggleSaveSlotPanel(); break;
             }
         });
 
@@ -2101,8 +2102,9 @@ export class UI {
         return LOG_STYLES[type] || LOG_STYLES.info;
     }
 
-    _spellTooltip(spell) {
-        const parts = [MAGIC_SKILLS[spell.school]?.name || spell.school.charAt(0).toUpperCase() + spell.school.slice(1)];
+    // `withSchool: false` leaves the school name off, for places that already show it.
+    _spellTooltip(spell, { withSchool = true } = {}) {
+        const parts = withSchool ? [MAGIC_SKILLS[spell.school]?.name || spell.school.charAt(0).toUpperCase() + spell.school.slice(1)] : [];
         const pct = (v) => Math.round(v * 100);
         switch (spell.effect) {
             case 'ranged_damage': parts.push(t('ui.colonist.spell_ranged_damage', { dmg: spell.damage, range: spell.range })); break;
@@ -2110,7 +2112,8 @@ export class UI {
             case 'heal': parts.push(t('ui.colonist.spell_heal', { hp: spell.healAmount, pct: pct(spell.hpThreshold || 0.5) })); break;
             case 'buff_defense': parts.push(t('ui.colonist.spell_buff_defense', { pct: pct(spell.damageReduction), t: spell.duration })); break;
             case 'buff_speed': {
-                const work = spell.workSpeedBonus > 1 ? t('ui.colonist.spell_buff_speed_work', { pct: pct(spell.workSpeedBonus - 1) }) : '';
+                // Spell speed buffs add to 1 (0.2 is +20%, see the 'speed' effect in colonist.js).
+                const work = spell.workSpeedBonus > 0 ? t('ui.colonist.spell_buff_speed_work', { pct: pct(spell.workSpeedBonus) }) : '';
                 const move = spell.moveSpeedBonus ? t('ui.colonist.spell_buff_speed_move', { n: spell.moveSpeedBonus }) : '';
                 parts.push(t('ui.colonist.spell_buff_speed', { work, move, t: spell.duration }));
                 break;
@@ -3333,6 +3336,7 @@ export class UI {
             if (spell.damage) tip += t('ui.craft.tome_damage', { n: spell.damage });
             if (spell.healAmount) tip += t('ui.craft.tome_heals', { n: spell.healAmount });
             if (spell.range) tip += t('ui.craft.tip_range', { n: spell.range });
+            tip += `\n${this._spellTooltip(spell, { withSchool: false })}`;
             return tip;
         }
         return null;
@@ -4095,7 +4099,7 @@ export class UI {
     _workPriorityGridHtml() {
         const skills = Object.keys(SKILLS);
         let html = `<table class="prio-grid"><tr><th>${escapeHtml(t('ui.panel.prio_col_colonist'))}</th>`;
-        skills.forEach(s => { html += `<th>${escapeHtml((SKILLS[s].name || s).substring(0, 8))}</th>`; });
+        skills.forEach(s => { html += `<th>${escapeHtml(SKILLS[s].name || s)}</th>`; });
         html += '<th></th></tr>';
 
         for (const c of this.game.colonists) {
@@ -4125,7 +4129,7 @@ export class UI {
     _attunementGridHtml() {
         const schools = Object.keys(MAGIC_SKILLS);
         let html = `<table class="prio-grid"><tr><th>${escapeHtml(t('ui.panel.prio_col_colonist'))}</th>`;
-        schools.forEach(s => { html += `<th><span class="skill-tip" data-tip="${escapeAttr(MAGIC_SKILLS[s].summary || MAGIC_SKILLS[s].description)}" style="color:${MAGIC_SKILLS[s].color}">${escapeHtml(MAGIC_SKILLS[s].name.substring(0, 8))}</span></th>`; });
+        schools.forEach(s => { html += `<th><span class="skill-tip" data-tip="${escapeAttr(MAGIC_SKILLS[s].summary || MAGIC_SKILLS[s].description)}" style="color:${MAGIC_SKILLS[s].color}">${escapeHtml(MAGIC_SKILLS[s].name)}</span></th>`; });
         html += '</tr>';
 
         for (const c of this.game.colonists) {
@@ -4357,6 +4361,7 @@ export class UI {
         let lastTier = null;
         let lastMaterialsGroup = null;
         let lastTomeSchool = null;
+        const orderCounts = countCraftingOrders(this.game);
         for (const { key, recipe, canCraft, hasStation } of filtered) {
             if (hasEquipTiers) {
                 const outputKey = Object.keys(recipe.output)[0];
@@ -4397,6 +4402,7 @@ export class UI {
             }).join('+');
             let cls = canCraft ? 'craft-available' : 'craft-unavailable';
             let tomeBadge = '';
+            let spellDesc = '';
             if (hasTomeFilter) {
                 const tomeKey = Object.keys(recipe.output)[0];
                 const tome = SPELL_TOMES[tomeKey];
@@ -4411,6 +4417,9 @@ export class UI {
                         : t('ui.craft.tome_learners_none');
                     const label = t('ui.craft.tome_badge', { n: learners.length, made: tomeOwned[tomeKey] || 0 });
                     tomeBadge = `<span class="craft-tome-badge skill-tip" data-tip="${escapeAttr(tip)}" style="margin-left:${hasStation ? 'auto' : '8px'};">${escapeHtml(label)}</span>`;
+                    // What the spell does, without having to hover the tome.
+                    spellDesc = `<div class="craft-spell-desc">${escapeHtml(this._spellTooltip(spell, { withSchool: false }))}</div>`;
+                    cls += ' craft-row-wrap';
                 }
             }
             const ct = this.game.settings.craftTargets[key] || {};
@@ -4420,12 +4429,20 @@ export class UI {
             html += `<button ${canCraft ? '' : 'disabled'} onclick="window.game.craftMultiple(${jsArg(key)},5)" class="craft-multi">x5</button>`;
             html += `<button onclick="window.game.toggleCraftRepeat(${jsArg(key)})" class="craft-multi ${repeatCls}" title="${escapeAttr(t('ui.craft.auto_repeat'))}">&#x27F3;</button>`;
             html += `<input type="number" min="0" max="999" value="${parseInt(ct.target) || 0}" onchange="window.game.setCraftTarget(${jsArg(key)},this.value)" title="${escapeAttr(t('ui.craft.stock_target_tip'))}" style="width:35px;background:#1a1a2e;color:#ccc;border:1px solid #444;border-radius:3px;padding:1px 2px;text-align:center;font-size:0.85em;">`;
+            // Orders for this recipe that are waiting or being made, so a click visibly did something.
+            const orders = orderCounts[key];
+            if (orders) {
+                const n = orders.queued + orders.active;
+                html += `<span class="craft-queued skill-tip" data-tip="${escapeAttr(t('ui.craft.orders_tip', { queued: orders.queued, active: orders.active }))}">${escapeHtml(t('ui.craft.orders_count', { n }))}`
+                    + `<button class="craft-cancel-one" onclick="window.game.cancelCraft(${jsArg(key)})" title="${escapeAttr(t('ui.craft.cancel_one_tip'))}">&times;</button></span>`;
+            }
             html += `<span>${inputStr} → ${outputStr}</span>`;
             if (!hasStation) {
                 const stationName = buildingName(recipe.station || 'workbench');
                 html += `<span style="color:#ff4444;font-size:0.85em;margin-left:auto;">${escapeHtml(t('ui.craft.needs_station', { name: stationName }))}</span>`;
             }
             html += tomeBadge;
+            html += spellDesc;
             html += `</div>`;
         }
         if (filtered.length === 0) {
@@ -4456,7 +4473,22 @@ export class UI {
             if (newTabsContainer) {
                 newTabsContainer.scrollLeft = craftTabsScroll;
             }
+            // The rebuild made a fresh button, so adding the class plays the pop once.
+            if (this._craftPulseKey && !this.game.settings.reduceMotion) {
+                const btn = this.elements.craftPanel.querySelector(`[data-craft-recipe="${CSS.escape(this._craftPulseKey)}"]`);
+                btn?.closest('.craft-row')?.classList.add('craft-pulse');
+            }
         }
+        this._craftPulseKey = null;
+    }
+
+    /** Feedback for a queued craft order: a click, and the recipe's row pops as its order count goes up. */
+    onCraftQueued(recipeKey) {
+        window.soundManager?.playSFXPitched('button_click', 4);
+        if (!this.craftPanelVisible) return;
+        this._craftPulseKey = recipeKey;
+        this._lastCraftHtml = '';
+        this.updateCraftPanel();
     }
 
     _moodSparklineSvg(colonist) {
@@ -5200,7 +5232,8 @@ export class UI {
     updateSaveSlotPanel() {
         const meta = getAllSlotsMeta();
         const primary = this.game.settings.primarySaveSlot;
-        let html = `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.slots_title'))}</div>`;
+        let html = `<div class="panel-close" data-panel-close="saveslot">&times;</div>`;
+        html += `<div class="settings-section"><div class="settings-section-title">${escapeHtml(t('ui.settings.slots_title'))}</div>`;
         html += `<div style="color:#aaa;font-size:11px;margin-bottom:8px;">${tHtml('ui.settings.slots_note_html')}</div>`;
         for (let i = 0; i < 10; i++) {
             const key = `colony_slot_manual_${i}`;
@@ -5341,9 +5374,15 @@ export class UI {
         const uiScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-font-scale')) || 1;
         const [scaleSmall, scaleMedium, scaleLarge] = [t('ui.settings.font_small'), t('ui.settings.font_medium'), t('ui.settings.font_large')];
         const uiScaleLabel = uiScale <= 0.8 ? scaleSmall : uiScale >= 1.2 ? scaleLarge : scaleMedium;
+        // Moving the slider picks a size by hand, which turns Auto off. Ticking Auto
+        // goes back to sizing the text from the screen.
+        const sliderScript = `const lbl=this.value<=0.8?${JSON.stringify(scaleSmall)}:this.value>=1.2?${JSON.stringify(scaleLarge)}:${JSON.stringify(scaleMedium)};document.getElementById('ui-font-size-val').textContent=lbl;`
+            + `const s=window.game.settings;s.uiFontAuto=false;document.getElementById('set-ui-font-auto').checked=false;s.uiFontScale=parseFloat(this.value);window.setUIFontScale(this.value);window.game.saveSettingsToStorage()`;
+        const autoScript = `const s=window.game.settings;s.uiFontAuto=this.checked;window.applyUIFontSetting(s);window.game.saveSettingsToStorage();window.game.ui.updateSettingsPanel()`;
         graphics += `<div class="settings-row">`;
         graphics += `<label for="set-ui-font-size">${escapeHtml(t('ui.settings.ui_font_size'))} <span id="ui-font-size-val">${escapeHtml(uiScaleLabel)}</span></label>`;
-        graphics += `<input type="range" id="set-ui-font-size" min="0.75" max="1.4" step="0.05" value="${uiScale}" style="width:80px" oninput="const lbl=this.value<=0.8?${jsArg(scaleSmall)}:this.value>=1.2?${jsArg(scaleLarge)}:${jsArg(scaleMedium)};document.getElementById('ui-font-size-val').textContent=lbl;window.setUIFontScale(this.value);window.game.settings.uiFontScale=parseFloat(this.value);window.game.saveSettingsToStorage()">`;
+        graphics += `<input type="range" id="set-ui-font-size" min="0.75" max="1.4" step="0.05" value="${uiScale}" style="width:80px" oninput="${escapeAttr(sliderScript)}">`;
+        graphics += `<input type="checkbox" id="set-ui-font-auto" ${s.uiFontAuto ? 'checked' : ''} onchange="${escapeAttr(autoScript)}"><label for="set-ui-font-auto">${escapeHtml(t('ui.settings.font_auto'))}</label>`;
         graphics += `</div>`;
         graphics += `<div class="settings-row"><label for="set-temp-unit">${escapeHtml(t('ui.settings.temp_unit'))}</label><select id="set-temp-unit" onchange="window.game.settings.temperatureUnit=this.value" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`;
         for (const [val, label] of [['F', t('ui.settings.temp_f')], ['C', t('ui.settings.temp_c')]]) {
@@ -5383,6 +5422,7 @@ export class UI {
         general += this._settingsCheck('set-pause-low-health', s.pauseOnLowHealth, 'window.game.settings.pauseOnLowHealth=this.checked', t('ui.settings.opt_pause_low_health'));
         general += this._settingsCheck('set-pause-research', s.pauseOnResearch, 'window.game.settings.pauseOnResearch=this.checked', t('ui.settings.opt_pause_research'));
         general += this._settingsCheck('set-peaceful', CONFIG.PEACEFUL_MODE, 'window.game.togglePeaceful()', t('ui.settings.opt_peaceful'));
+        general += `<div class="settings-row" style="font-size:0.85em;color:#888;margin-top:-4px;padding-left:22px;">${escapeHtml(t('ui.settings.opt_peaceful_hint'))}</div>`;
         general += this._settingsCheck('set-tutorial', s.showTutorial, 'window.game.settings.showTutorial=this.checked;window.game.saveSettingsToStorage();window.game.ui.updateTutorialNote(window.game)', t('ui.settings.opt_tutorial'));
         const tutLevel = this.game.tutorial.level;
         general += `<div class="settings-row"><label for="set-tutorial-level">${escapeHtml(t('ui.settings.tutorial_style'))}</label><select id="set-tutorial-level" onchange="window.game.tutorial.changeLevel(window.game,this.value)" style="background:#1a1a2e;color:#ccc;border:1px solid #444;padding:2px 4px;font-family:inherit;font-size:11px;border-radius:3px;">`

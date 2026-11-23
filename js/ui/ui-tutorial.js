@@ -12,11 +12,23 @@ function withKeycaps(text) {
     return text.replace(/\[([A-Za-z0-9,./<>+-]{1,8})\]/g, '<kbd>$1</kbd>');
 }
 
+// Steps are long, so the words that matter are marked **like this** in the locale text.
+function withBold(text) {
+    return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+const formatStepText = (text) => withBold(withKeycaps(text));
+
+// The width the player dragged the note to, in px, kept across sessions.
+const NOTE_WIDTH_KEY = 'tutorialNoteWidth';
+const NOTE_MIN_WIDTH = 200;
+
 const tutorialMethods = {
     initTutorialNote() {
         this._tutorialExpanded = true;
         this._tutorialEl = document.getElementById('tutorial-note');
         if (!this._tutorialEl) return;
+        this._initTutorialResize();
         this._listen(this._tutorialEl, 'click', (e) => {
             const cls = e.target.classList;
             if (cls.contains('tutorial-collapse')) {
@@ -34,6 +46,37 @@ const tutorialMethods = {
             }
         });
         this.initTutorialPointer();
+    },
+
+    // Dragging the left edge widens the note. The handle is part of the note's HTML,
+    // which is rebuilt often, so the listener sits on the note itself.
+    _initTutorialResize() {
+        const el = this._tutorialEl;
+        const saved = parseInt(localStorage.getItem(NOTE_WIDTH_KEY), 10);
+        if (saved > 0) el.style.setProperty('--tutorial-note-width', `${saved}px`);
+        let startX = 0, startWidth = 0;
+        const onMove = (e) => {
+            const width = Math.round(Math.max(NOTE_MIN_WIDTH, Math.min(window.innerWidth * 0.5, startWidth + startX - e.clientX)));
+            el.style.setProperty('--tutorial-note-width', `${width}px`);
+        };
+        const onUp = () => {
+            el.classList.remove('resizing');
+            document.body.style.cursor = '';
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            try { localStorage.setItem(NOTE_WIDTH_KEY, String(el.offsetWidth)); } catch (err) { /* best-effort */ }
+        };
+        this._listen(el, 'pointerdown', (e) => {
+            if (!e.target.classList.contains('tutorial-resize')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            startX = e.clientX;
+            startWidth = el.offsetWidth;
+            el.classList.add('resizing');
+            document.body.style.cursor = 'ew-resize';
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
+        });
     },
 
     // Narrow screens: the card covers much of the map, so touching the map tucks it down
@@ -67,7 +110,7 @@ const tutorialMethods = {
                 html += '<ul class="tutorial-goals">';
                 for (const goal of tutorial.steps) {
                     const isDone = tutorial.completed.has(goal.id);
-                    html += `<li class="${isDone ? 'done' : ''}">${isDone ? '&#10003;' : '&#9744;'} ${withKeycaps(touchText(goal.title))}</li>`;
+                    html += `<li class="${isDone ? 'done' : ''}">${isDone ? '&#10003;' : '&#9744;'} ${formatStepText(touchText(goal.title))}</li>`;
                 }
                 html += '</ul>';
             }
@@ -85,15 +128,17 @@ const tutorialMethods = {
                 + `<div class="tutorial-progress"><div class="tutorial-progress-fill" style="width:${pct}%"></div></div>`
                 + `<div class="tutorial-title">${escapeHtml(touchText(task.title))}</div>`;
             if (this._tutorialExpanded) {
-                html += `<div class="tutorial-desc">${withKeycaps(touchText(tutorial.getDescription(task, isTouchUI())))}</div>`;
+                html += `<div class="tutorial-desc">${formatStepText(touchText(tutorial.getDescription(task, isTouchUI())))}</div>`;
                 const help = touchText(tutorial.getHelpText(game));
-                if (help) html += `<div class="tutorial-help">${help}</div>`;
+                if (help) html += `<div class="tutorial-help">${formatStepText(help)}</div>`;
                 html += task.manual
                     ? `<button class="tutorial-ack">${escapeHtml(t('ui.tutorial_ui.got_it'))}</button>`
                     : `<button class="tutorial-goto">${escapeHtml(t('ui.tutorial_ui.go_to'))}</button>`;
                 if (!task.manual) html += `<div class="tutorial-skip">${escapeHtml(t('ui.tutorial_ui.skip'))}</div>`;
             }
         }
+
+        if (this._tutorialExpanded) html += '<div class="tutorial-resize"></div>';
 
         el.style.display = 'block';
         el.classList.toggle('expanded', this._tutorialExpanded);

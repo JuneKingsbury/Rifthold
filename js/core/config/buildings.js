@@ -26,7 +26,7 @@ export const BUILDINGS = {
     rug:               { char: '~', color: '#cc6644', bg: '#4a2211', cost: { leather: 2 }, work: 10, structureType: 'furniture', category: 'Furniture', roomQuality: 5, noShadow: true },
     // Lighting & warmth
     candle:            { char: 'i', color: '#ffcc00', cost: { wood: 1 }, work: 4, structureType: 'furniture', category: 'Furniture', dragPlace: true, lightRadius: 5, candleEmitter: true, noShadow: true },
-    campfire:          { char: '≈', color: '#ff8833', cost: { wood: 3 }, work: 10, structureType: 'furniture', category: 'Furniture', lightRadius: 3, warmRadius: 3, smokeEmitter: true, noShadow: true },
+    campfire:          { char: '≈', color: '#ff8833', cost: { wood: 3 }, work: 10, structureType: 'furniture', category: 'Furniture', lightRadius: 3, warmRadius: 4, smokeEmitter: true, noShadow: true },
     glowstone:         { char: 'L', color: '#ffff88', cost: { planks: 2, stone: 1 }, work: 14, structureType: 'furniture', category: 'Furniture', lightRadius: 14, research: 'luminance', power: { consumes: 0.5 } },
     // Food preservation
     food_chest:        { char: 'S', color: '#997744', cost: { planks: 4, stone: 2 }, work: 25, structureType: 'furniture', category: 'Furniture', maxCount: 4 },
