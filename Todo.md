@@ -8,11 +8,6 @@ Go through all 3 tutorial types and verify they progress as intended and their t
 ### Achievement Portrait Art
 Make portrait art for every story that is planned to be tied to a Steam achievement (see skin editor dev tool for list).
 
-### In-game art complete
-- [ ] All items have a unique inventory sprite
-- [x] All wearable items have a unique equipped sprite
-- [ ] All buildings/furniture have a unique sprite
-
 ### Music tracks
 All realms have a specified music track to play (I believe Wild Frontier might not have one yet?)
 
