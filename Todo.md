@@ -10,7 +10,7 @@ Make portrait art for every story that is planned to be tied to a Steam achievem
 
 ### In-game art complete
 - [ ] All items have a unique inventory sprite
-- [ ] All wearable items have a unique equipped sprite
+- [x] All wearable items have a unique equipped sprite
 - [ ] All buildings/furniture have a unique sprite
 
 ### Music tracks

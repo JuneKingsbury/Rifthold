@@ -275,6 +275,11 @@ class SkinEditor {
         this.showGrid = true;
         this.hoveredPixel = null;
         this.savedSprites = {};
+        // Duplicate detection compares decoded pixels, since imported PNGs with
+        // identical art can still differ byte-for-byte.
+        this._spriteHashes = new Map(); // sprite data URL -> pixel hash
+        this._dupCounts = {}; // spriteKey -> sprites sharing its pixels (only when > 1)
+        this._dupToken = 0;
         this.categoryFilter = 'Buildings';
         this.bodyVariants = 3;
         this.humanBodyVariants = 3;
@@ -815,10 +820,83 @@ class SkinEditor {
                 ? `<img src="${escapeAttr(saved.data)}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;">`
                 : `<span style="color:${escapeAttr(item.color)}">${escapeHtml(item.char)}</span>`;
             html += `<div class="bp-palette-item${active}" data-key="${escapeAttr(item.key)}" data-category="${escapeAttr(item.category)}" title="${escapeAttr(item.desc)}">
-                ${icon} ${escapeHtml(item.key.replace(/_/g, ' '))}${removeBtn}
+                ${icon} ${escapeHtml(item.key.replace(/_/g, ' '))}<span class="se-dup-badge"></span>${removeBtn}
             </div>`;
         }
         palette.innerHTML = html;
+        this._applyDuplicateBadges();
+        this._refreshDuplicates();
+    }
+
+    // --- Duplicate detection ---
+    _hashPixels(pixels, size) {
+        let h1 = 0xdeadbeef ^ size, h2 = 0x41c6ce57 ^ size;
+        for (let i = 0; i < pixels.length; i += 4) {
+            // Fully transparent pixels compare equal regardless of their RGB.
+            const a = pixels[i + 3];
+            const v = a === 0 ? 0 : ((pixels[i] << 24) | (pixels[i + 1] << 16) | (pixels[i + 2] << 8) | a);
+            h1 = Math.imul(h1 ^ v, 2654435761);
+            h2 = Math.imul(h2 ^ v, 1597334677);
+        }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return `${size}:${(h2 >>> 0).toString(36)}:${(h1 >>> 0).toString(36)}`;
+    }
+
+    _hashDataURL(dataURL) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                const c = this._hashCanvas || (this._hashCanvas = document.createElement('canvas'));
+                c.width = img.width;
+                c.height = img.height;
+                const ctx = c.getContext('2d', { willReadFrequently: true });
+                ctx.clearRect(0, 0, c.width, c.height);
+                ctx.drawImage(img, 0, 0);
+                resolve(this._hashPixels(ctx.getImageData(0, 0, c.width, c.height).data, img.width));
+            };
+            // Undecodable sprites get a unique hash so they never count as duplicates.
+            img.onerror = () => resolve(`err:${dataURL}`);
+            img.src = dataURL;
+        });
+    }
+
+    async _refreshDuplicates() {
+        const token = ++this._dupToken;
+        const hashes = new Map();
+        await Promise.all(Object.values(this.savedSprites).map(async ({ data }) => {
+            if (hashes.has(data)) return;
+            hashes.set(data, this._spriteHashes.get(data) ?? null);
+            if (hashes.get(data) === null) hashes.set(data, await this._hashDataURL(data));
+        }));
+        // A newer refresh started while this one was decoding; let it win.
+        if (token !== this._dupToken) return;
+        this._spriteHashes = hashes; // also drops hashes of sprites that no longer exist
+
+        const groups = new Map();
+        for (const [spriteKey, { data }] of Object.entries(this.savedSprites)) {
+            const hash = hashes.get(data);
+            if (!groups.has(hash)) groups.set(hash, []);
+            groups.get(hash).push(spriteKey);
+        }
+        this._dupCounts = {};
+        for (const keys of groups.values()) {
+            if (keys.length < 2) continue;
+            for (const k of keys) this._dupCounts[k] = keys.length;
+        }
+        this._applyDuplicateBadges();
+    }
+
+    _applyDuplicateBadges() {
+        const palette = document.getElementById('se-palette');
+        if (!palette) return;
+        palette.querySelectorAll('.bp-palette-item[data-key]').forEach(el => {
+            const badge = el.querySelector('.se-dup-badge');
+            if (!badge) return;
+            const count = this._dupCounts[`${el.dataset.category}:${el.dataset.key}`];
+            badge.textContent = count ? `x${count}` : '';
+            badge.title = count ? `This sprite is identical to ${count - 1} other sprite(s) in this skin` : '';
+        });
     }
 
     _bindEvents() {
@@ -3197,6 +3275,7 @@ class SkinEditor {
             this.savedSprites[spriteKey] = { size, data: tempCanvas.toDataURL('image/png') };
         }
         this._schedulePersist();
+        this._refreshDuplicates();
     }
 
     _variantCounts() {
