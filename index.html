@@ -139,7 +139,7 @@
                 <button data-start-tab-btn="general" class="settings-tab-btn active" style="flex:1; padding:5px 8px; background:#2a2a4e; color:#ffcc00; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.general">General</button>
                 <button data-start-tab-btn="graphics" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.graphics">Graphics</button>
                 <button data-start-tab-btn="controls" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.controls">Controls</button>
-                <button data-start-tab-btn="devtools" class="settings-tab-btn" style="flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.devtools">Dev Tools</button>
+                <button data-start-tab-btn="devtools" class="settings-tab-btn" style="display:none; flex:1; padding:5px 8px; background:#16162a; color:#999; border:1px solid #444; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-family:inherit; font-size:inherit;" data-i18n="html.settings.tab.devtools">Dev Tools</button>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">
                 <div class="settings-section-title" data-i18n="html.settings.section.visual">Visual</div>
@@ -239,7 +239,7 @@
                 <div class="settings-row"><input type="checkbox" id="start-pause-research" checked><label for="start-pause-research" data-i18n="html.settings.pause_research.label">Auto-pause on research complete</label></div>
                 <div class="settings-row"><input type="checkbox" id="start-peaceful-check"><label for="start-peaceful-check" data-i18n="html.settings.peaceful_check.label">No Raids (peaceful at home)</label></div>
                 <div class="settings-row" style="font-size:10px;color:#888;margin-top:-4px;padding-left:22px;" data-i18n="html.settings.peaceful_check.hint">No raids, hostile animals, or crypt guardians at home. Expeditions and Void Nexus waves still have combat.</div>
-                <div class="settings-row"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode" data-i18n="html.settings.demo_mode.label">Demo Mode (locks advanced research)</label></div>
+                <div class="settings-row" id="start-demo-mode-row" style="display:none;"><input type="checkbox" id="start-demo-mode"><label for="start-demo-mode" data-i18n="html.settings.demo_mode.label">Demo Mode (locks advanced research)</label></div>
             </div>
             <div class="settings-section" data-start-tab="graphics" style="display:none;">
                 <div class="settings-section-title" data-i18n="html.settings.section.effects_performance">Effects & Performance</div>

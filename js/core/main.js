@@ -41,7 +41,7 @@ import { WaveSystem } from '../entities/waves.js';
 import { EventLog } from '../ui/eventlog.js';
 import { saveGame, loadGame, hasSave, exportSave, importSave, saveToSlot, loadFromSlot, saveAutoSlot, getAllSlotsMeta, migrateColonySave, exportSlot, syncAllFromCloud, setCloudConflictResolver, getLastSyncTime, forceSyncNow, PER_SAVE_SETTING_DEFAULTS, applyPerSaveSettings, slotLabel } from './save.js';
 import { getGdriveAPI } from './gdrive-web.js';
-import { escapeHtml, escapeAttr, jsArg, isTouchUI } from '../ui/ui-utils.js';
+import { escapeHtml, escapeAttr, jsArg, isTouchUI, isDevMode } from '../ui/ui-utils.js';
 import { getLanguage, getAvailableLanguages, t, tp, ref, defRef } from './i18n.js';
 import { resourceName, entityName, raceName, idLabel } from './names.js';
 import { applyDomI18n } from '../ui/i18n-dom.js';
@@ -6328,9 +6328,11 @@ _onDOMReady(() => {
         const demo = document.getElementById('start-demo-mode').checked;
         document.getElementById('demo-banner-start').style.display = demo ? '' : 'none';
         const devTab = document.querySelector('[data-start-tab-btn="devtools"]');
-        if (devTab) devTab.style.display = demo ? 'none' : '';
+        if (devTab) devTab.style.display = (demo || !isDevMode()) ? 'none' : '';
     }
     document.getElementById('start-demo-mode').addEventListener('change', syncDemoBanner);
+    // The Demo Mode toggle is a dev-only control, shown only with ?dev in the URL.
+    if (isDevMode()) document.getElementById('start-demo-mode-row').style.display = '';
 
     function loadStartSettings() {
         _loadingSettings = true;

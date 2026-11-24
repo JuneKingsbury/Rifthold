@@ -160,6 +160,16 @@ export function sanitizeHtml(html) {
     return out;
 }
 
+// True when the page was opened with ?dev in the URL. Gates the start-screen
+// Dev Tools tab and the in-game Debug / Testing settings section.
+export function isDevMode() {
+    try {
+        return new URLSearchParams(globalThis.location?.search || '').has('dev');
+    } catch {
+        return false;
+    }
+}
+
 // True when the primary pointer is a finger (phones, tablets). Touch-only UI
 // (long-press tips, no keyboard hints, bigger tap targets) keys off this, so a
 // laptop with a touchscreen but a mouse or trackpad keeps the desktop UI.

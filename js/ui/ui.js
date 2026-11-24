@@ -8,7 +8,7 @@ import { getComplexStructureAt, getSpellCooldownMult, hasRitualAltar } from '../
 import { getTameChance } from '../entities/taming.js';
 import { getAvailableRecipes, countCraftingOrders } from '../systems/crafting.js';
 import { getMaxCountBonus } from '../systems/building.js';
-import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml, isTouchUI, isCompactLayout, keyHint, haptic } from './ui-utils.js';
+import { getTargetPriority, getThreatDisplayHtml, countByKey, adventurerLevelTooltip, animalLevelTooltip, escapeHtml, escapeAttr, jsArg, escapeHtmlKeepEntities, sanitizeHtml, isTouchUI, isCompactLayout, keyHint, haptic, isDevMode } from './ui-utils.js';
 import { CROP_RESEARCH_REQS } from '../systems/farming.js';
 import { t, tp, tHtml, defName, getLanguage, getAvailableLanguages } from '../core/i18n.js';
 import { resourceName, buildingName, entityName, terrainName, buildCategoryName, recipeCategoryName, realmGroupName, priorityProfileName, stationGroupName } from '../core/names.js';
@@ -5502,7 +5502,7 @@ export class UI {
         // ===== CONTROLS TAB =====
         let controls = this._keybindingsSectionHtml();
 
-        if (!this.game.settings.demoMode) {
+        if (!this.game.settings.demoMode && isDevMode()) {
         general += `<details class="settings-section settings-debug"><summary class="settings-section-title" style="color:#ff6666;cursor:pointer;list-style:revert;">${escapeHtml(t('ui.settings.debug_title'))}</summary>`;
         general += `<button onclick="if(confirm(${jsArg(t('ui.settings.debug_confirm_1'))}))window.game.cheatResources()" class="settings-btn settings-btn-danger" style="margin-top:8px;">${escapeHtml(t('ui.settings.debug_grant_999_resources'))}</button>`;
         general += `<button onclick="if(confirm(${jsArg(t('ui.settings.debug_confirm_2'))}))window.game.cheatGrantResearch()" class="settings-btn settings-btn-danger">${escapeHtml(t('ui.settings.debug_grant_all_research'))}</button>`;
