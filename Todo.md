@@ -8,6 +8,9 @@ Go through all 3 tutorial types and verify they progress as intended and their t
 ### Achievement Portrait Art
 Make portrait art for every story that is planned to be tied to a Steam achievement (see skin editor dev tool for list).
 
+### Entity Art
+Make sure all entity art is made and no placeholder assets remain. Also replace any duplicate entity sprites.
+
 ### Music tracks
 All realms have a specified music track to play (I believe Wild Frontier might not have one yet?)
 
