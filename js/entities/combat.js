@@ -24,6 +24,29 @@ function crusaderTriggerRealm() {
     return _crusaderTriggerRealm;
 }
 
+// The raid pop-up and auto-pause, which every raid gets unless the player has
+// turned raid warnings off, or turned off warnings for raids smaller than the
+// colony and this is one. Such a smaller raid's pop-up offers that second switch
+// as a button. The tutorial's training raid always pops up (its pointer targets
+// the pop-up) and never offers the button.
+function announceRaid(game, text, raidPos, raiderCount, isTraining) {
+    const s = game.settings;
+    const weaker = raiderCount < game.colonists.filter(c => c.hp > 0).length;
+    if (!isTraining) {
+        if (!s.autoPauseHostile) return;
+        if (weaker && s.warnWeakRaids === false) return;
+    }
+
+    const choices = [tr('msg.combat.choice_go_to_raiders'), tr('msg.combat.choice_dismiss')];
+    if (weaker && !isTraining) choices.push(tr('msg.combat.choice_ignore_weaker'));
+    game.events.pendingEvent = { type: 'raid', text, choices, data: raidPos };
+
+    if (s.autoPauseHostile && !game.paused) {
+        game.togglePause();
+        game._eventPaused = true;
+    }
+}
+
 export class CombatSystem {
     constructor() {
         this.nextRaidTick = RAID_CONFIG.firstRaidTick;
@@ -129,17 +152,8 @@ export class CombatSystem {
             game.eventLog.add(game, { key: 'msg.combat.crusader_army_log' }, 'danger', { type: 'position', ...raidPos });
         }
 
-        game.events.pendingEvent = {
-            type: 'raid',
-            text: tp('msg.combat.scripted_raid_event', spawned, { raid: raidType.name, direction: tr(EDGE_DIRECTION_KEYS[edge]) }),
-            choices: [tr('msg.combat.choice_go_to_raiders'), tr('msg.combat.choice_dismiss')],
-            data: raidPos,
-        };
-
-        if (game.settings.autoPauseHostile && !game.paused) {
-            game.togglePause();
-            game._eventPaused = true;
-        }
+        announceRaid(game, tp('msg.combat.scripted_raid_event', spawned, { raid: raidType.name, direction: tr(EDGE_DIRECTION_KEYS[edge]) }),
+            raidPos, spawned, raidTypeKey === 'training_raid');
 
         this.nextRaidTick = game.tick + RAID_CONFIG.minInterval +
             Math.floor(Math.random() * (RAID_CONFIG.maxInterval - RAID_CONFIG.minInterval));
@@ -195,20 +209,7 @@ export class CombatSystem {
         haptic(RAID_HAPTIC);
         game.eventLog.add(game, { key: 'msg.combat.raid_log', params: { n: spawned } }, 'danger', { type: 'position', ...raidPos });
 
-        // A raid of one or two is a nuisance, not an emergency: toast and log only.
-        if (!small) {
-            game.events.pendingEvent = {
-                type: 'raid',
-                text: tp('msg.combat.raid_event', spawned, { direction: tr(EDGE_DIRECTION_KEYS[edge]) }),
-                choices: [tr('msg.combat.choice_go_to_raiders'), tr('msg.combat.choice_dismiss')],
-                data: raidPos,
-            };
-
-            if (game.settings.autoPauseHostile && !game.paused) {
-                game.togglePause();
-                game._eventPaused = true;
-            }
-        }
+        announceRaid(game, tp('msg.combat.raid_event', spawned, { direction: tr(EDGE_DIRECTION_KEYS[edge]) }), raidPos, spawned, false);
 
         this.nextRaidTick = game.tick + RAID_CONFIG.minInterval +
             Math.floor(Math.random() * (RAID_CONFIG.maxInterval - RAID_CONFIG.minInterval));

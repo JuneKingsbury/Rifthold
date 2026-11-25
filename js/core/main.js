@@ -192,6 +192,8 @@ class Game {
         this.timeOfDay = 75;
         this.settings = {
             autoPauseHostile: true,
+            // Off hides the pop-up and pause for raids with fewer raiders than living colonists.
+            warnWeakRaids: true,
             autoPauseEvent: true,
             // Caravans only toast by default: they arrived about every 5 days in
             // playtests and are rarely urgent. Their popup still waits for the player.
@@ -1865,6 +1867,10 @@ class Game {
         } else if (evt.type === 'raid') {
             if (choice === 0) {
                 this.camera.centerOn(evt.data.x, evt.data.y);
+            } else if (choice === 2) {
+                this.settings.warnWeakRaids = false;
+                this.saveSettingsToStorage();
+                this.notifications.push({ text: t('msg.combat.ignore_weaker_toast'), tick: this.tick, type: 'info' });
             }
             this.events.pendingEvent = null;
         } else if (evt.type === 'research_complete') {
@@ -3875,7 +3881,7 @@ class Game {
         const craftTargets = this.settings.craftTargets || {};
         const potionAutoUse = this.settings.potionAutoUse || {};
         Object.assign(this.settings, {
-            autoPauseHostile: true, autoPauseEvent: true, autoPauseCaravan: false, pauseOnDeath: true, pauseOnLowHealth: true, pauseOnResearch: true,
+            autoPauseHostile: true, warnWeakRaids: true, autoPauseEvent: true, autoPauseCaravan: false, pauseOnDeath: true, pauseOnLowHealth: true, pauseOnResearch: true,
             uiFontScale: 1, uiFontAuto: true, autoCookTarget: 0, showOverlays: true, showNightLighting: true,
             showWeatherParticles: true, particleDensity: 100, showColonistNames: 'selected', showMinimap: true, showFps: false,
             autoSaveInterval: 24, demoMode: false, darkenOnPause: true, toolbarMode: 'auto',

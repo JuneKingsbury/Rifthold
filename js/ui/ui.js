@@ -1,5 +1,5 @@
 import { CONFIG, CRYPT_CONFIG, COLONIST_CONFIG, MAGIC_STUDY_CONFIG, TRAITS, BUILDINGS, BUILD_CATEGORIES, TILE_CHARS, TILE_COLORS, ANIMALS, TAMED_ANIMALS, WAVE_CONFIG, RECIPE_CATEGORIES, WEAPONS, ARMORS, HELMETS, CLOTHES, BOOTS, TOOLS, TRINKETS, POTIONS, SKILLS, MAGIC_SKILLS, SPELL_TOMES, SPELLS, FOODSTUFFS, WORK_CONFIG, GOLEM_TYPES, TRADE_VALUES, TIER_BUY_MARKUP, ALL_ITEMS, COMPLEX_STRUCTURES, EVENTS, STORY_MILESTONES, RENDER_CONFIG, LOG_COLORS, LOG_STYLES, CROPS, ENTITIES, EXPEDITION_ENEMIES, NPC_ENCOUNTERS, STAT_META, formatStatValue, getItemStatLines, getNestedEffectLines, getOnHitLines, RELATIONSHIP_TIERS, RAID_TYPES, REALMS, ENCHANT_COST_BY_TIER, RITUALS, RECIPES, SALVAGE_RATE, PRIORITY_PROFILES, EXPLORATION_CONFIG, WAVE_TYPES, WORLD_SIZE_COLONY } from '../core/config.js';
-import { ROOM_SCORE_CAPS, ROOM_SIZE_BANDS, furnitureCountsFor } from '../world/rooms.js';
+import { ROOM_SCORE_CAPS, ROOM_SIZE_BANDS, furnitureTypesOf } from '../world/rooms.js';
 import { FURNITURE_TYPES, POWER_PRIORITY, PEDESTAL_CHARGE, RESEARCH } from '../core/config.js';
 import { getRelationshipTier } from '../systems/social-utils.js';
 import { getTradeRates, computeTradeValues } from '../systems/events.js';
@@ -3069,7 +3069,7 @@ export class UI {
                 html += `<div class="info-row" style="color:#88ff88;font-size:0.85em;">    ✓ ${label} ${r.have}/${r.need}</div>`;
             } else {
                 const options = Object.entries(BUILDINGS)
-                    .filter(([, b]) => b.furnitureType === r.type && !b.noBuild && furnitureCountsFor(b, roomType))
+                    .filter(([, b]) => !b.noBuild && furnitureTypesOf(b).includes(r.type))
                     .map(([k]) => buildingName(k));
                 html += `<div class="info-row" style="color:#ff7766;font-size:0.85em;">    ✗ ${label} ${r.have}/${r.need}${options.length ? ` (${escapeHtml(options.join(', '))})` : ''}</div>`;
             }
@@ -5416,6 +5416,7 @@ export class UI {
         }
         general += `</select></div>`;
         general += this._settingsCheck('set-pause-hostile', s.autoPauseHostile, 'window.game.settings.autoPauseHostile=this.checked', t('ui.settings.opt_pause_hostile'));
+        general += this._settingsCheck('set-warn-weak-raids', s.warnWeakRaids !== false, 'window.game.settings.warnWeakRaids=this.checked', t('ui.settings.opt_warn_weak_raids'));
         general += this._settingsCheck('set-pause-event', s.autoPauseEvent, 'window.game.settings.autoPauseEvent=this.checked', t('ui.settings.opt_pause_event'));
         general += this._settingsCheck('set-pause-caravan', s.autoPauseCaravan, 'window.game.settings.autoPauseCaravan=this.checked', t('ui.settings.opt_pause_caravan'));
         general += this._settingsCheck('set-pause-death', s.pauseOnDeath, 'window.game.settings.pauseOnDeath=this.checked', t('ui.settings.opt_pause_death'));

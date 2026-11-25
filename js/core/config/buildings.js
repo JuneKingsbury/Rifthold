@@ -53,7 +53,7 @@ export const BUILDINGS = {
     // Centerpiece
     podium:            { char: 'Π', color: '#c9a24a', cost: { planks: 4, wood: 2 }, work: 18, structureType: 'furniture', category: 'Furniture', roomQuality: 8, decorRooms: ['townhall'], furnitureType: 'centerpiece' },
     statue:            { char: '♜', color: '#c8c8c0', cost: { stone: 8 }, work: 35, structureType: 'furniture', category: 'Furniture', roomQuality: 10, decorRooms: ['townhall'], furnitureType: 'centerpiece' },
-    war_table:         { char: '╧', color: '#b89a5a', cost: { planks: 4, leather: 1 }, work: 22, structureType: 'furniture', category: 'Furniture', roomQuality: 8, decorRooms: ['townhall'], furnitureType: 'centerpiece' },
+    war_table:         { char: '╧', color: '#b89a5a', cost: { planks: 4, leather: 1 }, work: 22, structureType: 'furniture', category: 'Furniture', roomQuality: 8, decorRooms: ['townhall'], furnitureType: 'centerpiece', extraFurnitureTypes: ['surface'] },
     // Misc decor
     potted_plant:      { char: '¶', color: '#5fae4a', cost: { stone: 1, wood: 1 }, work: 6, structureType: 'furniture', category: 'Furniture', roomQuality: 3, workshopBonus: 2, furnitureType: 'misc' },
     personal_chest:    { char: '▤', color: '#a87a44', cost: { planks: 3 }, work: 14, structureType: 'furniture', category: 'Furniture', roomQuality: 4, decorRooms: ['bedroom'], furnitureType: 'misc' },

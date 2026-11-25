@@ -186,25 +186,38 @@ function decorBenefits(bDef, roomType) {
     return bDef.decorRooms.includes(roomType);
 }
 
-// Whether a piece of furniture counts toward a room type's requirements: it
-// must already contribute to that room's score (decor for bedrooms and town
-// halls, workshop support for workshops). Seating is the exception: anything
-// you can sit on (chair, stool, bench, armchair) meets a seating need in any
-// room, even where it adds no decor score.
-export function furnitureCountsFor(bDef, roomType) {
-    if (!bDef || !bDef.furnitureType || bDef.furnitureType === 'misc') return false;
-    if (bDef.furnitureType === 'seating') return true;
-    if (roomType === 'workshop') return !!bDef.workshopBonus;
-    return !!bDef.roomQuality && decorBenefits(bDef, roomType);
+// Every requirement type a piece of furniture can meet. Most pieces have one
+// (`furnitureType`); a piece may list more in `extraFurnitureTypes` (the war
+// table is a centerpiece that also serves as a table). Misc pieces meet none.
+// Any variant meets its need in every room type (a nightstand is a table in a
+// town hall, a wardrobe is storage in a workshop), even where it adds no decor
+// or workshop score.
+export function furnitureTypesOf(bDef) {
+    if (!bDef || !bDef.furnitureType || bDef.furnitureType === 'misc') return [];
+    return bDef.extraFurnitureTypes ? [bDef.furnitureType, ...bDef.extraFurnitureTypes] : [bDef.furnitureType];
 }
 
 function evaluateRequirements(a, roomType) {
     const { needs, ceiling } = ROOM_REQUIREMENTS[roomType];
     const have = {};
+    const flexible = [];
     for (const [type, count] of Object.entries(a.furniture)) {
-        const bDef = BUILDINGS[type];
-        if (!furnitureCountsFor(bDef, roomType)) continue;
-        have[bDef.furnitureType] = (have[bDef.furnitureType] || 0) + count;
+        const types = furnitureTypesOf(BUILDINGS[type]);
+        if (types.length === 0) continue;
+        if (types.length === 1) have[types[0]] = (have[types[0]] || 0) + count;
+        else flexible.push({ types, count });
+    }
+    // A piece with several types fills one need, not all of them: each goes to
+    // whichever of its types is furthest short, after single-type pieces count.
+    for (const { types, count } of flexible) {
+        for (let i = 0; i < count; i++) {
+            let best = types[0], bestShort = 0;
+            for (const t of types) {
+                const short = (needs[t] || 0) - (have[t] || 0);
+                if (short > bestShort) { best = t; bestShort = short; }
+            }
+            have[best] = (have[best] || 0) + 1;
+        }
     }
     const list = Object.entries(needs).map(([type, need]) => ({
         type, need, have: have[type] || 0, met: (have[type] || 0) >= need,
